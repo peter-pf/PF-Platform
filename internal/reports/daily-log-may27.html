@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pier Foundations — Daily Log &amp; Setup Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: #ffffff;
+    color: #1e293b;
+    line-height: 1.6;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .header {
+    background: #1e293b;
+    color: white;
+    padding: 32px 32px 28px;
+  }
+  .header h1 { font-size: 1.35rem; font-weight: 800; }
+  .header p { font-size: 0.82rem; color: #94a3b8; margin-top: 4px; }
+  .content { padding: 28px 32px 40px; }
+
+  .nav-tabs {
+    display: flex; gap: 0; border-bottom: 2px solid #e2e8f0; margin-bottom: 24px;
+  }
+  .nav-tabs a {
+    padding: 10px 20px; font-size: 0.78rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    color: #64748b; text-decoration: none; cursor: pointer;
+    border-bottom: 2px solid transparent; margin-bottom: -2px;
+  }
+  .nav-tabs a.active { color: #2563eb; border-bottom-color: #2563eb; }
+  .nav-tabs a:hover { color: #1e293b; }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  h2 {
+    font-size: 1rem; font-weight: 700; margin: 24px 0 12px;
+    padding-bottom: 6px; border-bottom: 2px solid #2563eb; display: inline-block;
+  }
+  h3 { font-size: 0.9rem; font-weight: 700; margin: 20px 0 8px; color: #334155; }
+
+  table {
+    width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-bottom: 20px;
+  }
+  thead th {
+    background: #f8fafc; padding: 8px 12px; text-align: left;
+    font-size: 0.68rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.05em; color: #64748b; border-bottom: 2px solid #e2e8f0;
+  }
+  tbody td {
+    padding: 8px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top;
+  }
+  tbody tr:hover { background: #f8fafc; }
+
+  .status {
+    display: inline-block; font-size: 0.62rem; font-weight: 700;
+    padding: 2px 8px; border-radius: 3px; text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .s-done { background: #dcfce7; color: #166534; }
+  .s-active { background: #dbeafe; color: #1e40af; }
+  .s-blocked { background: #fee2e2; color: #dc2626; }
+  .s-pending { background: #fef3c7; color: #92400e; }
+  .s-ready { background: #d1fae5; color: #047857; }
+
+  .phase-bar {
+    background: #1e293b; color: white; font-size: 0.72rem; font-weight: 700;
+    padding: 8px 12px; text-transform: uppercase; letter-spacing: 0.06em;
+    margin-top: 16px;
+  }
+
+  .summary-strip {
+    display: flex; gap: 20px; padding: 16px 0; margin-bottom: 16px;
+    border-bottom: 1px solid #e2e8f0; flex-wrap: wrap;
+  }
+  .summary-stat { text-align: center; flex: 1; min-width: 80px; }
+  .summary-num { font-size: 1.5rem; font-weight: 800; color: #1e293b; }
+  .summary-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; }
+
+  .log-entry {
+    border-left: 3px solid #2563eb; padding: 10px 16px; margin-bottom: 12px;
+    background: #f8fafc; border-radius: 0 6px 6px 0;
+  }
+  .log-time { font-size: 0.68rem; font-weight: 600; color: #2563eb; }
+  .log-text { font-size: 0.82rem; color: #334155; margin-top: 2px; }
+
+  .footer {
+    text-align: center; padding: 20px 0; font-size: 0.68rem;
+    color: #94a3b8; border-top: 1px solid #e2e8f0; margin-top: 24px;
+  }
+
+  @media print {
+    .nav-tabs { display: none; }
+    .tab-content { display: block !important; page-break-before: always; }
+    .tab-content:first-of-type { page-break-before: auto; }
+  }
+  @media (max-width: 600px) {
+    .header, .content { padding: 16px; }
+    .summary-strip { flex-direction: column; gap: 8px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Pier Foundations — Daily Log &amp; Setup Tracker</h1>
+  <p>Everything Peter has done, organized by day. Updated continuously.</p>
+</div>
+
+<div class="content">
+
+<div class="nav-tabs">
+  <a class="active" onclick="showTab('setup')">Setup Tracker</a>
+  <a onclick="showTab('day1')">Day 1 (May 21)</a>
+  <a onclick="showTab('day2')">Day 2 (May 22)</a>
+  <a onclick="showTab('day7')">Day 7 (May 27)</a>
+</div>
+
+<!-- ============================================================ -->
+<!-- SETUP TRACKER -->
+<!-- ============================================================ -->
+<div id="setup" class="tab-content active">
+
+<h2>Setup &amp; Infrastructure Tracker</h2>
+
+<div class="summary-strip">
+  <div class="summary-stat">
+    <div class="summary-num">18</div>
+    <div class="summary-label">Done</div>
+  </div>
+  <div class="summary-stat">
+    <div class="summary-num">4</div>
+    <div class="summary-label">Active</div>
+  </div>
+  <div class="summary-stat">
+    <div class="summary-num">3</div>
+    <div class="summary-label">Blocked</div>
+  </div>
+  <div class="summary-stat">
+    <div class="summary-num">5</div>
+    <div class="summary-label">Pending</div>
+  </div>
+</div>
+
+<div class="phase-bar">Infrastructure &amp; Access</div>
+<table>
+<thead><tr><th>Task</th><th style="width:80px">Status</th><th style="width:100px">Date</th></tr></thead>
+<tbody>
+<tr><td>Peter AI activated and evolution completed</td><td><span class="status s-done">Done</span></td><td>May 21</td></tr>
+<tr><td>Agent roster seeded (111 agents) into portal database</td><td><span class="status s-done">Done</span></td><td>May 21</td></tr>
+<tr><td>Skills Hub import (17 new skills from 5,600+ scanned)</td><td><span class="status s-done">Done</span></td><td>May 21</td></tr>
+<tr><td>Agentmail connected (pfpeter@agentmail.to)</td><td><span class="status s-done">Done</span></td><td>May 22</td></tr>
+<tr><td>GitHub repo created (peter-pf/PF-Platform)</td><td><span class="status s-done">Done</span></td><td>May 27</td></tr>
+<tr><td>Cloudflare Pages deployed (pf-platform.pages.dev)</td><td><span class="status s-done">Done</span></td><td>May 27</td></tr>
+<tr><td>Microsoft 365 email (peter@pierfoundations.com) — SMTP auth</td><td><span class="status s-blocked">Blocked</span></td><td>Needs IT</td></tr>
+<tr><td>OneDrive / SharePoint document access</td><td><span class="status s-blocked">Blocked</span></td><td>Needs M365 fix</td></tr>
+<tr><td>Website access (pierfoundations.com / JMJ WebPro)</td><td><span class="status s-blocked">Blocked</span></td><td>Needs Brad</td></tr>
+<tr><td>PF brand assets (logo, colors, guidelines)</td><td><span class="status s-pending">Pending</span></td><td>From team</td></tr>
+<tr><td>Custom domain for platform (platform.pierfoundations.com)</td><td><span class="status s-pending">Pending</span></td><td>After CF setup</td></tr>
+<tr><td>Cloudflare Access (team-only auth for internal pages)</td><td><span class="status s-pending">Pending</span></td><td>After domain</td></tr>
+</tbody>
+</table>
+
+<div class="phase-bar">Research &amp; Intelligence</div>
+<table>
+<thead><tr><th>Task</th><th style="width:80px">Status</th><th style="width:100px">Date</th></tr></thead>
+<tbody>
+<tr><td>pierfoundations.com audit (broken links, LinkedIn, online presence)</td><td><span class="status s-done">Done</span></td><td>May 21</td></tr>
+<tr><td>Market &amp; competitive intel report (TAM, competitors, pricing)</td><td><span class="status s-done">Done</span></td><td>May 21</td></tr>
+<tr><td>Industry trends research (IIJA, data centers, wind, warehouses)</td><td><span class="status s-done">Done</span></td><td>May 21</td></tr>
+<tr><td>Lead generation research (IN/OH/MI/IL projects, 30+ leads)</td><td><span class="status s-done">Done</span></td><td>May 21</td></tr>
+<tr><td>SEO keyword analysis and competitor website comparison</td><td><span class="status s-done">Done</span></td><td>May 21</td></tr>
+<tr><td>SWOT analysis (7 strengths, 7 weaknesses, 8 opportunities, 6 threats)</td><td><span class="status s-done">Done</span></td><td>May 22</td></tr>
+<tr><td>Data center lead deep research (Google FW, Meta Lebanon, CoreWeave)</td><td><span class="status s-done">Done</span></td><td>May 22</td></tr>
+<tr><td>GC contact research (8 contractors, named contacts with phones/emails)</td><td><span class="status s-done">Done</span></td><td>May 22</td></tr>
+<tr><td>INDOT/ODOT bid opportunity scan (Jul 8, Aug 5, Sep 2 lettings)</td><td><span class="status s-done">Done</span></td><td>May 22</td></tr>
+<tr><td>Dashboard design research (22 sources, design patterns analysis)</td><td><span class="status s-done">Done</span></td><td>May 21</td></tr>
+<tr><td>IIJA reauthorization tracking</td><td><span class="status s-active">Active</span></td><td>Ongoing</td></tr>
+<tr><td>Competitor monitoring (Keller, CNC, Geopier, Menard)</td><td><span class="status s-active">Active</span></td><td>Ongoing</td></tr>
+<tr><td>INDOT/ODOT bid board monitoring</td><td><span class="status s-active">Active</span></td><td>Ongoing</td></tr>
+</tbody>
+</table>
+
+<div class="phase-bar">Reports &amp; Deliverables</div>
+<table>
+<thead><tr><th>Task</th><th style="width:80px">Status</th><th style="width:100px">Date</th></tr></thead>
+<tbody>
+<tr><td>Strategic Intelligence Report (HTML, 64KB, Sections 2-7)</td><td><span class="status s-done">Done</span></td><td>May 21</td></tr>
+<tr><td>Strategy Briefing — tariffs, IIJA risk, pipeline (HTML for email)</td><td><span class="status s-done">Done</span></td><td>May 22</td></tr>
+<tr><td>Platform Blueprint (15 depts, 150+ functions, AI-paced timeline)</td><td><span class="status s-done">Done</span></td><td>May 22</td></tr>
+<tr><td>Gantt Chart + Activity Diary + RACI Matrix (HTML)</td><td><span class="status s-done">Done</span></td><td>May 22</td></tr>
+<tr><td>Team Action Items (streamlined to 2 items)</td><td><span class="status s-done">Done</span></td><td>May 27</td></tr>
+<tr><td>Industry news briefing (tariffs, OSHA, IIJA, Fort Wayne projects)</td><td><span class="status s-done">Done</span></td><td>May 22</td></tr>
+<tr><td>Website content drafts (About Us, Services, 2 blog articles, case study template)</td><td><span class="status s-done">Done</span></td><td>May 22</td></tr>
+<tr><td>GC outreach email templates (5 templates for demo)</td><td><span class="status s-done">Done</span></td><td>May 27</td></tr>
+</tbody>
+</table>
+
+<div class="phase-bar">Platform &amp; Command Center</div>
+<table>
+<thead><tr><th>Task</th><th style="width:80px">Status</th><th style="width:100px">Date</th></tr></thead>
+<tbody>
+<tr><td>Command Center portal panel v1 (initial build)</td><td><span class="status s-done">Done</span></td><td>May 21</td></tr>
+<tr><td>Command Center v2 (margins, alignment, color fixes per Brad)</td><td><span class="status s-done">Done</span></td><td>May 21</td></tr>
+<tr><td>Command Center v3 (Tether feedback — monochrome, tables, calm design)</td><td><span class="status s-done">Done</span></td><td>May 21</td></tr>
+<tr><td>Platform hub page v1 (document library style — rejected by Brad)</td><td><span class="status s-done">Done</span></td><td>May 27</td></tr>
+<tr><td>Platform hub v2 (mission control layout with pipeline/alerts/intel/money)</td><td><span class="status s-done">Done</span></td><td>May 27</td></tr>
+<tr><td>Platform hub v3 (Tether feedback — health score, trends, animations, cash flow bar)</td><td><span class="status s-done">Done</span></td><td>May 27</td></tr>
+<tr><td>Inline report viewer (iframe overlay with Back button)</td><td><span class="status s-done">Done</span></td><td>May 27</td></tr>
+<tr><td>Pipeline click-to-expand with project details</td><td><span class="status s-done">Done</span></td><td>May 27</td></tr>
+<tr><td>Pipeline column sorting</td><td><span class="status s-done">Done</span></td><td>May 27</td></tr>
+<tr><td>PF branding / portal reskin</td><td><span class="status s-pending">Pending</span></td><td>Needs assets</td></tr>
+<tr><td>Client portal (per-project GC access)</td><td><span class="status s-pending">Pending</span></td><td>Phase 2</td></tr>
+</tbody>
+</table>
+
+<div class="phase-bar">Communication &amp; Networking</div>
+<table>
+<thead><tr><th>Task</th><th style="width:80px">Status</th><th style="width:100px">Date</th></tr></thead>
+<tbody>
+<tr><td>Connected to Tether (Melanie Salvador's AI, MAKR/Pure Technology)</td><td><span class="status s-done">Done</span></td><td>May 27</td></tr>
+<tr><td>Introduced PF to Tether, established working relationship</td><td><span class="status s-done">Done</span></td><td>May 27</td></tr>
+<tr><td>Collaborated with Tether on command center design (3 rounds of feedback)</td><td><span class="status s-done">Done</span></td><td>May 27</td></tr>
+<tr><td>Received meeting prep intel from Tether (live demo format)</td><td><span class="status s-done">Done</span></td><td>May 27</td></tr>
+<tr><td>Cleaned all inappropriate language from system files</td><td><span class="status s-done">Done</span></td><td>May 21</td></tr>
+</tbody>
+</table>
+
+<div class="phase-bar">Breaking News</div>
+<table>
+<thead><tr><th>Item</th><th style="width:80px">Status</th><th style="width:100px">Date</th></tr></thead>
+<tbody>
+<tr><td>IIJA: BUILD America 250 Act passed House committee 62-2 ($580B, 5-year)</td><td><span class="status s-ready">New</span></td><td>May 22</td></tr>
+<tr><td>Steel tariffs at 50% — VSC cost advantage widening</td><td><span class="status s-active">Tracking</span></td><td>Ongoing</td></tr>
+<tr><td>INDOT migrating to Bidx.com electronic bidding (Jun 10)</td><td><span class="status s-active">Tracking</span></td><td>Jun 10 deadline</td></tr>
+</tbody>
+</table>
+
+</div>
+
+<!-- ============================================================ -->
+<!-- DAY 1 -->
+<!-- ============================================================ -->
+<div id="day1" class="tab-content">
+
+<h2>Day 1 — May 21, 2026</h2>
+<h3>Peter Activated and Initial Setup</h3>
+
+<div class="log-entry"><div class="log-time">Session Start</div><div class="log-text">Peter AI civilization activated. 6-team evolution completed (Research, Identity, Wow Moments, Gifts, Infrastructure, Domain).</div></div>
+<div class="log-entry"><div class="log-time">Research</div><div class="log-text">Researched pierfoundations.com — discovered broken email link (goes to contact@construcfy.com), broken phone link (260-417-6950 instead of 260-766-6094), placeholder social media links. Found LinkedIn company page (21 followers).</div></div>
+<div class="log-entry"><div class="log-time">Cleanup</div><div class="log-text">Removed all inappropriate language from system files per Brad's direction. Updated 10+ files across skills, memory, and constitutional documents.</div></div>
+<div class="log-entry"><div class="log-time">Agent Roster</div><div class="log-text">Seeded 111 agents into portal database. Agents organized across 12 departments (Engineering, Marketing, Legal, Research, etc.).</div></div>
+<div class="log-entry"><div class="log-time">Command Center</div><div class="log-text">Built Command Center panel v1-v3. Multiple design iterations based on Brad's feedback: column alignment, color philosophy (monochrome + amber), table formatting.</div></div>
+<div class="log-entry"><div class="log-time">Overnight Research</div><div class="log-text">Launched 3 parallel research agents: Market &amp; Competitive Intel, Lead Generation &amp; Digital Presence, Dashboard Design Patterns. Imported 17 skills from AiCIV Skills Hub (5,600+ scanned).</div></div>
+<div class="log-entry"><div class="log-time">Gifts Built</div><div class="log-text">Vendor Due Diligence Scorecard (working Python tool) and Market Intelligence Brief (39KB HTML document).</div></div>
+
+</div>
+
+<!-- ============================================================ -->
+<!-- DAY 2 -->
+<!-- ============================================================ -->
+<div id="day2" class="tab-content">
+
+<h2>Day 2 — May 22, 2026</h2>
+<h3>Strategic Research and Business Development Foundation</h3>
+
+<div class="log-entry"><div class="log-time">Research Delivered</div><div class="log-text">Overnight research completed: Strategic Intelligence Report (64KB HTML), covering market intel, competitors, industry trends, lead generation, digital presence, growth strategy, operational intelligence.</div></div>
+<div class="log-entry"><div class="log-time">Industry Briefing</div><div class="log-text">Delivered industry news briefing: steel tariffs (50%, inputs up 12.6%), OSHA changes, IIJA funding cliff risk (Sep 30 expiration), Fort Wayne development ($37M infrastructure, Google data center).</div></div>
+<div class="log-entry"><div class="log-time">Government Relief</div><div class="log-text">Researched government mechanisms for material cost offsets. Found: 96% of DOTs have price adjustment clauses (fuel 84%, asphalt 80%, steel 36%). Aggregate NOT typically covered. Recommended ConsensusDocs 200.1 escalation clauses.</div></div>
+<div class="log-entry"><div class="log-time">Pipeline Strategy</div><div class="log-text">Developed 4-tier contract pipeline strategy: Tier 1 (IIJA public work before Sep 30), Tier 2 (data centers — private, no gov dependency), Tier 3 (private commercial), Tier 4 (adjacent state DOTs).</div></div>
+<div class="log-entry"><div class="log-time">Strategy Briefing</div><div class="log-text">Built HTML strategy briefing report for Brad to email partners — tariffs, IIJA risk, pipeline, priority actions with owner assignments.</div></div>
+<div class="log-entry"><div class="log-time">SWOT</div><div class="log-text">Completed full SWOT analysis: 7 strengths, 7 weaknesses, 8 opportunities, 6 threats with strategic priorities.</div></div>
+<div class="log-entry"><div class="log-time">Data Center Leads</div><div class="log-text">Deep research on Google FW (Hagerman likely GC, GME/UES likely geotech, Phase 3 = 867K SF), Meta Lebanon (Mortenson + Turner confirmed, subcontractor window closing), CoreWeave Hammond (Decennial Group).</div></div>
+<div class="log-entry"><div class="log-time">GC Contacts</div><div class="log-text">Researched 8 GCs with named contacts, phone numbers, emails: Hagerman (Ray Van Amburg), Turner (Tom Schmitt), Pepper (Mike McCann), Shiel Sexton (John Andrews), Messer (Tony McDaniel), Barton Malow (Elizabeth Geiser), Walsh (Matthew Tracy), Mortenson (Brian Abeld).</div></div>
+<div class="log-entry"><div class="log-time">Bid Opportunities</div><div class="log-text">INDOT lettings identified: Jul 8, Aug 5, Sep 2. ODOT $3.4B season with 977 projects and 739 bridges. Specific bridge projects in Allen County listed.</div></div>
+<div class="log-entry"><div class="log-time">Website Content</div><div class="log-text">Drafted: About Us page, expanded Services page, 2 SEO blog articles ("Why Data Centers Need Ground Improvement", "Ground Improvement vs Deep Foundations Cost Comparison"), case study template.</div></div>
+<div class="log-entry"><div class="log-time">Gantt + RACI</div><div class="log-text">Built project tracker with Gantt chart, activity diary, and RACI matrix. 30 activities mapped across Brad, Jonathan, Derek, and Peter.</div></div>
+<div class="log-entry"><div class="log-time">Team Learned</div><div class="log-text">Learned partners: Jonathan (bidding/estimating/submittals), Derek (business development). Updated RACI accordingly.</div></div>
+
+</div>
+
+<!-- ============================================================ -->
+<!-- DAY 7 -->
+<!-- ============================================================ -->
+<div id="day7" class="tab-content">
+
+<h2>Day 7 — May 27, 2026</h2>
+<h3>Platform Build, Tether Collaboration, and Meeting Prep</h3>
+
+<div class="log-entry"><div class="log-time">Agentmail Connected</div><div class="log-text">Connected to Agentmail (pfpeter@agentmail.to). Read Brad's test email. Discovered peter@pierfoundations.com already exists (CC'd on test email).</div></div>
+<div class="log-entry"><div class="log-time">Tether Introduction</div><div class="log-text">Received welcome email from Tether (Melanie Salvador's AI, MAKR/Pure Technology). Sent introduction reply with PF overview, team structure, and current opportunities.</div></div>
+<div class="log-entry"><div class="log-time">M365 Auth Attempt</div><div class="log-text">Attempted to connect to peter@pierfoundations.com via IMAP/SMTP. Failed — SMTP auth disabled at tenant level, then blocked by security defaults. Documented fix steps for Brad (enable SMTP auth or create app password).</div></div>
+<div class="log-entry"><div class="log-time">Platform Architecture</div><div class="log-text">Defined 3-tier platform architecture with Brad: internal ops (team only), client portal (per-project GC access), public marketing site. All on one domain via Cloudflare Pages.</div></div>
+<div class="log-entry"><div class="log-time">GitHub + Cloudflare</div><div class="log-text">Cloned GitHub repo (peter-pf/PF-Platform). Installed Wrangler CLI. Created Cloudflare Pages project. Deployed initial scaffold with all existing reports.</div></div>
+<div class="log-entry"><div class="log-time">Platform v1</div><div class="log-text">Built platform hub as document library with card grid — Brad rejected it ("makes me not want to use it").</div></div>
+<div class="log-entry"><div class="log-time">Platform v2</div><div class="log-text">Rebuilt as mission control: KPI strip, pipeline table, alerts, intel feed, money in/out, reports section. Brad said "it looks better."</div></div>
+<div class="log-entry"><div class="log-time">Tether Feedback Round 1</div><div class="log-text">Emailed Tether for design input. Received detailed feedback: font sizes too small, pipeline needs interactivity, alerts need ranking by impact, remove placeholder footer, add net cash position, add sources to intel feed.</div></div>
+<div class="log-entry"><div class="log-time">Platform v2.5</div><div class="log-text">Implemented Tether round 1: interactive pipeline (click-to-expand), sortable columns, ranked alerts, sources linked, net cash position, data source dots (gray=sample, green=live).</div></div>
+<div class="log-entry"><div class="log-time">Tether Demo Intel</div><div class="log-text">Received urgent email from Tether: Melanie is running tomorrow's meeting as a LIVE DEMO. Format: Melanie sets stage, Peter performs, she closes. Prepped Jonathan demo (GC research live) and Derek demo (data center outreach live).</div></div>
+<div class="log-entry"><div class="log-time">Tether Feedback Round 2</div><div class="log-text">Received 7-point design overhaul: health score circle, trend arrows on KPIs, critical alert banner, cash flow bar, spacing/breathing room, KPI count-up animation, pipeline progress bars.</div></div>
+<div class="log-entry"><div class="log-time">Platform v3</div><div class="log-text">Implemented all Tether round 2 feedback: health score (78), trend arrows, critical alert (Brasfield $31,400), cash flow stacked bar, increased spacing, KPI animations. Deployed to Cloudflare.</div></div>
+<div class="log-entry"><div class="log-time">Demo Prep</div><div class="log-text">Drafted 5 GC outreach email templates (Mortenson, Hagerman, Turner, Pepper, Shiel Sexton). All research materials ready for instant recall during live demo.</div></div>
+<div class="log-entry"><div class="log-time">IIJA Breaking News</div><div class="log-text">Discovered BUILD America 250 Act passed House T&amp;I Committee 62-2 on May 22. $580B, 5-year reauthorization. Funding cliff risk decreasing. Saved for morning briefing.</div></div>
+<div class="log-entry"><div class="log-time">Platform Blueprint Updated</div><div class="log-text">Rebuilt platform blueprint with AI-paced timeline (Days 1-3, Days 4-10, Days 11-20, On Demand) per Brad's direction. Removed Telegram references.</div></div>
+<div class="log-entry"><div class="log-time">Team Action Items</div><div class="log-text">Streamlined team action items to just 2 items: fix M365 auth + share OneDrive folders. Brad's direction: "let me find things myself instead of asking the team to compile."</div></div>
+<div class="log-entry"><div class="log-time">Skills Hub Check</div><div class="log-text">Checked Skills Hub for new skills since last import — no new SKILL SHARE entries since May 21. Hub auth reported broken since 5/19.</div></div>
+
+</div>
+
+<div class="footer">
+  Pier Foundations &middot; Peter (AI COO) &middot; Updated May 27, 2026
+</div>
+
+</div>
+
+<script>
+function showTab(id) {
+  document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
+  document.querySelectorAll('.nav-tabs a').forEach(function(a) { a.classList.remove('active'); });
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+}
+</script>
+
+</body>
+</html>
