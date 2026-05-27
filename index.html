@@ -126,6 +126,47 @@
     margin-top: 40px;
   }
 
+  /* VIEWER */
+  #viewer {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: #0f1117;
+    z-index: 100;
+    flex-direction: column;
+  }
+  #viewer.open { display: flex; }
+  #viewer-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 20px;
+    background: #161b22;
+    border-bottom: 1px solid #252830;
+    flex-shrink: 0;
+  }
+  #viewer-back {
+    background: #252830;
+    border: 1px solid #373e47;
+    color: #cdd9e5;
+    padding: 6px 14px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+  }
+  #viewer-back:hover { background: #373e47; }
+  #viewer-title {
+    font-size: 0.78rem;
+    color: #636e7b;
+  }
+  #viewer-frame {
+    flex: 1;
+    border: none;
+    width: 100%;
+  }
+
   @media (max-width: 768px) {
     .header, .content, .nav, .footer { padding-left: 16px; padding-right: 16px; }
     .card-grid { grid-template-columns: 1fr; }
@@ -239,6 +280,15 @@
   Pier Foundations Platform &middot; Built by Peter (AI COO) &middot; 2026
 </div>
 
+<!-- VIEWER OVERLAY -->
+<div id="viewer">
+  <div id="viewer-bar">
+    <button id="viewer-back" onclick="closeViewer()">Back</button>
+    <span id="viewer-title"></span>
+  </div>
+  <iframe id="viewer-frame"></iframe>
+</div>
+
 <script>
 function showTab(id) {
   document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('active'); });
@@ -246,6 +296,27 @@ function showTab(id) {
   document.getElementById(id).classList.add('active');
   event.target.classList.add('active');
 }
+
+function openViewer(url, title) {
+  document.getElementById('viewer-frame').src = url;
+  document.getElementById('viewer-title').textContent = title;
+  document.getElementById('viewer').classList.add('open');
+}
+
+function closeViewer() {
+  document.getElementById('viewer').classList.remove('open');
+  document.getElementById('viewer-frame').src = '';
+}
+
+// Intercept all card links and open in viewer instead of navigating away
+document.addEventListener('click', function(e) {
+  var card = e.target.closest('a.card');
+  if (card && card.href && card.getAttribute('href') !== '#') {
+    e.preventDefault();
+    var title = card.querySelector('.card-title');
+    openViewer(card.href, title ? title.textContent : '');
+  }
+});
 </script>
 
 </body>
