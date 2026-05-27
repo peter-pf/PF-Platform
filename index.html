@@ -3,281 +3,659 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pier Foundations — Platform</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<title>Pier Foundations -- Command Center</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300..800;1,14..32,300..800&display=swap" rel="stylesheet">
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'Inter', -apple-system, sans-serif;
-    background: #0f1117;
-    color: #cdd9e5;
-    min-height: 100vh;
-  }
-  .header {
-    padding: 40px 40px 32px;
-    border-bottom: 1px solid #252830;
-  }
-  .header h1 {
-    font-size: 1.4rem;
-    font-weight: 800;
-    color: #e6edf3;
-    letter-spacing: -0.02em;
-  }
-  .header p {
-    font-size: 0.82rem;
-    color: #636e7b;
-    margin-top: 6px;
-  }
-  .nav {
-    display: flex;
-    gap: 0;
-    padding: 0 40px;
-    background: #161b22;
-    border-bottom: 1px solid #252830;
-  }
-  .nav a {
-    padding: 12px 20px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: #636e7b;
-    text-decoration: none;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
-    transition: color 0.15s;
-  }
-  .nav a:hover { color: #cdd9e5; }
-  .nav a.active { color: #539bf5; border-bottom-color: #539bf5; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  .content { padding: 32px 40px; max-width: 1000px; }
+:root {
+  --bg-0: #0d1117;
+  --bg-1: #151b23;
+  --bg-2: #1c2128;
+  --bg-3: #252b35;
+  --border: #2a3140;
+  --text-0: #e6edf3;
+  --text-1: #cdd9e5;
+  --text-2: #8b949e;
+  --text-3: #636e7b;
+  --blue: #539bf5;
+  --amber: #D4952A;
+  --green: #3fb950;
+  --red: #f47067;
+  --dim: #3d444d;
+}
 
-  .section { display: none; }
-  .section.active { display: block; }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-0);
+  color: var(--text-1);
+  min-height: 100vh;
+  font-feature-settings: 'tnum' 1;
+  -webkit-font-smoothing: antialiased;
+}
 
-  h2 {
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: #cdd9e5;
-    margin-bottom: 16px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid #252830;
-  }
+/* ---- TOP BAR ---- */
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 28px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-1);
+}
+.topbar-left {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-0);
+}
+.topbar-right {
+  font-size: 0.66rem;
+  font-weight: 500;
+  color: var(--text-3);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
 
-  .card-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 14px;
-    margin-bottom: 28px;
-  }
-  .card {
-    background: #161b22;
-    border: 1px solid #252830;
-    border-radius: 8px;
-    padding: 20px;
-    transition: border-color 0.15s, background 0.15s;
-    text-decoration: none;
-    color: inherit;
-    display: block;
-  }
-  .card:hover {
-    border-color: #539bf5;
-    background: #1a1f2b;
-  }
-  .card-title {
-    font-size: 0.88rem;
-    font-weight: 700;
-    color: #e6edf3;
-    margin-bottom: 6px;
-  }
-  .card-desc {
-    font-size: 0.75rem;
-    color: #636e7b;
-    line-height: 1.5;
-  }
-  .card-tag {
-    display: inline-block;
-    font-size: 0.58rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    padding: 2px 8px;
-    border-radius: 3px;
-    margin-top: 10px;
-  }
-  .tag-live { background: rgba(63, 185, 80, 0.15); color: #3fb950; }
-  .tag-building { background: rgba(83, 155, 245, 0.12); color: #539bf5; }
-  .tag-planned { background: rgba(99, 110, 123, 0.15); color: #768390; }
+/* ---- KPI STRIP ---- */
+.kpi-strip {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-1);
+}
+.kpi {
+  flex: 1;
+  padding: 14px 24px;
+  text-align: center;
+  border-right: 1px solid var(--border);
+}
+.kpi:last-child { border-right: none; }
+.kpi-label {
+  font-size: 0.58rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+  margin-bottom: 4px;
+}
+.kpi-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-0);
+  font-variant-numeric: tabular-nums;
+}
+.kpi-value.amber { color: var(--amber); }
 
-  .empty-state {
-    text-align: center;
-    padding: 60px 20px;
-    color: #636e7b;
-    font-size: 0.85rem;
-  }
-  .empty-state .big { font-size: 2rem; margin-bottom: 12px; color: #252830; }
+/* ---- SECTIONS ---- */
+.main-content {
+  padding: 20px 24px;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+.row {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.row-3 { grid-template-columns: 2fr 1.5fr 1.5fr; }
+.row-2 { grid-template-columns: 1fr 1fr; }
 
-  .footer {
-    text-align: center;
-    padding: 24px 40px;
-    font-size: 0.62rem;
-    color: #3d444d;
-    border-top: 1px solid #252830;
-    margin-top: 40px;
-  }
+.panel {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.panel-header {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.panel-title {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-2);
+}
+.panel-count {
+  font-size: 0.58rem;
+  font-weight: 600;
+  color: var(--text-3);
+}
 
-  /* VIEWER */
-  #viewer {
-    display: none;
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: #0f1117;
-    z-index: 100;
-    flex-direction: column;
-  }
-  #viewer.open { display: flex; }
-  #viewer-bar {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 20px;
-    background: #161b22;
-    border-bottom: 1px solid #252830;
-    flex-shrink: 0;
-  }
-  #viewer-back {
-    background: #252830;
-    border: 1px solid #373e47;
-    color: #cdd9e5;
-    padding: 6px 14px;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: 'Inter', sans-serif;
-  }
-  #viewer-back:hover { background: #373e47; }
-  #viewer-title {
-    font-size: 0.78rem;
-    color: #636e7b;
-  }
-  #viewer-frame {
-    flex: 1;
-    border: none;
-    width: 100%;
-  }
+/* ---- PIPELINE TABLE ---- */
+.pipeline-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.pipeline-table th {
+  font-size: 0.56rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+  text-align: left;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-2);
+}
+.pipeline-table th:nth-child(3),
+.pipeline-table td:nth-child(3) { text-align: right; }
+.pipeline-table td {
+  font-size: 0.72rem;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(42,49,64,0.5);
+  color: var(--text-1);
+  white-space: nowrap;
+}
+.pipeline-table tr:last-child td { border-bottom: none; }
+.pipeline-table tr:hover { background: var(--bg-2); }
 
-  @media (max-width: 768px) {
-    .header, .content, .nav, .footer { padding-left: 16px; padding-right: 16px; }
-    .card-grid { grid-template-columns: 1fr; }
-  }
+.pill {
+  display: inline-block;
+  font-size: 0.52rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 3px;
+}
+.pill-pursuing { background: rgba(83,155,245,0.15); color: var(--blue); }
+.pill-bid { background: rgba(212,149,42,0.18); color: var(--amber); }
+.pill-won { background: rgba(63,185,80,0.15); color: var(--green); }
+.pill-complete { background: rgba(61,68,77,0.3); color: var(--dim); }
+
+.row-dim td { color: var(--dim) !important; }
+.row-dim .pill { opacity: 0.6; }
+
+/* ---- ALERTS ---- */
+.alert-list { padding: 4px 0; }
+.alert-item {
+  display: flex;
+  gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid rgba(42,49,64,0.4);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  align-items: flex-start;
+}
+.alert-item:last-child { border-bottom: none; }
+.alert-item:hover { background: var(--bg-2); }
+.alert-tag {
+  flex-shrink: 0;
+  font-size: 0.5rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-top: 1px;
+}
+.tag-urgent { background: rgba(212,149,42,0.2); color: var(--amber); }
+.tag-watch { background: rgba(83,155,245,0.12); color: var(--blue); }
+.tag-info { background: rgba(61,68,77,0.3); color: var(--text-3); }
+.alert-text { color: var(--text-1); }
+.alert-text .val { color: var(--amber); font-weight: 600; }
+
+/* ---- INTEL FEED ---- */
+.intel-list { padding: 4px 0; }
+.intel-item {
+  display: flex;
+  gap: 10px;
+  padding: 7px 14px;
+  border-bottom: 1px solid rgba(42,49,64,0.4);
+  font-size: 0.7rem;
+  line-height: 1.45;
+  align-items: flex-start;
+}
+.intel-item:last-child { border-bottom: none; }
+.intel-item:hover { background: var(--bg-2); }
+.intel-date {
+  flex-shrink: 0;
+  font-size: 0.58rem;
+  font-weight: 600;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  min-width: 42px;
+}
+.intel-text { color: var(--text-2); }
+.intel-text strong { color: var(--text-1); font-weight: 600; }
+
+/* ---- MONEY ---- */
+.money-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 0;
+}
+.money-col {
+  border-right: 1px solid var(--border);
+}
+.money-col:last-child { border-right: none; }
+.money-col-header {
+  font-size: 0.56rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-2);
+}
+.money-col-header.income { color: var(--green); }
+.money-col-header.expense { color: var(--amber); }
+.money-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 14px;
+  border-bottom: 1px solid rgba(42,49,64,0.4);
+  font-size: 0.7rem;
+}
+.money-row:last-child { border-bottom: none; }
+.money-row:hover { background: var(--bg-2); }
+.money-name { color: var(--text-1); flex: 1; }
+.money-amt {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  min-width: 70px;
+  margin: 0 12px;
+  color: var(--text-0);
+}
+.money-due {
+  font-size: 0.6rem;
+  color: var(--text-3);
+  min-width: 60px;
+  text-align: right;
+}
+.money-row.late .money-due { color: var(--amber); font-weight: 600; }
+.money-row.done { text-decoration: line-through; }
+.money-row.done .money-name,
+.money-row.done .money-amt,
+.money-row.done .money-due { color: var(--dim); }
+
+/* ---- REPORTS ---- */
+.report-list { padding: 4px 0; }
+.report-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 14px;
+  border-bottom: 1px solid rgba(42,49,64,0.4);
+  font-size: 0.72rem;
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--text-1);
+  transition: background 0.1s;
+}
+.report-item:last-child { border-bottom: none; }
+.report-item:hover { background: var(--bg-2); }
+.report-item.disabled {
+  color: var(--dim);
+  cursor: default;
+}
+.report-item.disabled:hover { background: transparent; }
+.report-name { flex: 1; }
+.report-item:not(.disabled) .report-name { color: var(--blue); }
+.report-status {
+  font-size: 0.52rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 3px;
+}
+.status-live { background: rgba(63,185,80,0.12); color: var(--green); }
+.status-building { background: rgba(83,155,245,0.1); color: var(--blue); }
+.status-planned { background: rgba(61,68,77,0.25); color: var(--dim); }
+
+/* ---- FOOTER ---- */
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 28px;
+  border-top: 1px solid var(--border);
+  font-size: 0.58rem;
+  color: var(--dim);
+  margin-top: 8px;
+}
+
+/* ---- VIEWER OVERLAY ---- */
+#viewer {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--bg-0);
+  z-index: 200;
+  flex-direction: column;
+}
+#viewer.open { display: flex; }
+#viewer-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 20px;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+#viewer-back {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: var(--text-1);
+  padding: 5px 14px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  transition: background 0.1s;
+}
+#viewer-back:hover { background: #333b48; }
+#viewer-title {
+  font-size: 0.72rem;
+  color: var(--text-3);
+  font-weight: 500;
+}
+#viewer-frame {
+  flex: 1;
+  border: none;
+  width: 100%;
+  background: var(--bg-0);
+}
+
+/* ---- RESPONSIVE ---- */
+@media (max-width: 1100px) {
+  .row-3 { grid-template-columns: 1fr; }
+  .row-2 { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .kpi-strip { flex-wrap: wrap; }
+  .kpi { flex: 0 0 50%; border-bottom: 1px solid var(--border); }
+  .kpi:last-child { flex: 0 0 100%; }
+  .money-grid { grid-template-columns: 1fr; }
+  .money-col { border-right: none; border-bottom: 1px solid var(--border); }
+  .main-content { padding: 12px; }
+}
 </style>
 </head>
 <body>
 
-<div class="header">
-  <h1>Pier Foundations</h1>
-  <p>Company Platform</p>
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-left">Pier Foundations</div>
+  <div class="topbar-right"><span id="topbar-date"></span> &mdash; Command Center</div>
 </div>
 
-<div class="nav">
-  <a class="active" onclick="showTab('internal')">Internal</a>
-  <a onclick="showTab('external')">Client Portal</a>
-  <a onclick="showTab('public')">Marketing</a>
+<!-- KPI STRIP -->
+<div class="kpi-strip">
+  <div class="kpi">
+    <div class="kpi-label">Active Bids</div>
+    <div class="kpi-value">3</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Pipeline Value</div>
+    <div class="kpi-value">$2.4M</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Outstanding AR</div>
+    <div class="kpi-value">$170,900</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Overdue</div>
+    <div class="kpi-value amber">$31,400</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Win Rate</div>
+    <div class="kpi-value">67%</div>
+  </div>
 </div>
 
-<div class="content">
+<div class="main-content">
 
-<!-- INTERNAL -->
-<div id="internal" class="section active">
+<!-- ROW 1: PIPELINE / ALERTS / INTEL -->
+<div class="row row-3">
 
-  <h2>Reports &amp; Intelligence</h2>
-  <div class="card-grid">
-    <a class="card" href="internal/reports/strategic-intelligence-report.html">
-      <div class="card-title">Strategic Intelligence Report</div>
-      <div class="card-desc">Market intel, competitive analysis, industry trends, lead generation, digital presence, growth strategy, and operational intelligence.</div>
-      <span class="card-tag tag-live">Live</span>
-    </a>
-    <a class="card" href="internal/reports/strategy-briefing-may22.html">
-      <div class="card-title">Strategy Briefing — May 22</div>
-      <div class="card-desc">Tariff impact, IIJA funding cliff risk, contract pipeline strategy, and priority action items for the team.</div>
-      <span class="card-tag tag-live">Live</span>
-    </a>
-    <a class="card" href="internal/reports/platform-blueprint.html">
-      <div class="card-title">Platform Blueprint</div>
-      <div class="card-desc">15 departments, 150+ functions. The full enterprise operating system with build timeline and owner assignments.</div>
-      <span class="card-tag tag-live">Live</span>
-    </a>
-    <a class="card" href="internal/reports/team-action-items.html">
-      <div class="card-title">Team Action Items</div>
-      <div class="card-desc">What we need from the team to get Peter fully operational. Currently: 2 items.</div>
-      <span class="card-tag tag-live">Live</span>
-    </a>
+  <!-- PIPELINE -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Pipeline</span>
+      <span class="panel-count">5 projects</span>
+    </div>
+    <table class="pipeline-table">
+      <thead>
+        <tr>
+          <th>Status</th>
+          <th>Project</th>
+          <th>Value</th>
+          <th>GC</th>
+          <th>Due</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="pill pill-pursuing">Pursuing</span></td>
+          <td>Google FW Phase 3</td>
+          <td>$800K</td>
+          <td>Hagerman</td>
+          <td>TBD</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-pursuing">Pursuing</span></td>
+          <td>Meta Lebanon</td>
+          <td>$1.2M</td>
+          <td>Mortenson / Turner</td>
+          <td>Active</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-bid">Bid Out</span></td>
+          <td>INDOT SR-930 Bridge</td>
+          <td>$145K</td>
+          <td>Direct</td>
+          <td>Jul 8</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-won">Won</span></td>
+          <td>Walsh Warehouse FW</td>
+          <td>$89K</td>
+          <td>Walsh Group</td>
+          <td>Jun 15</td>
+        </tr>
+        <tr class="row-dim">
+          <td><span class="pill pill-complete">Complete</span></td>
+          <td>Hensel Phelps Indy</td>
+          <td>$47K</td>
+          <td>Hensel Phelps</td>
+          <td>Done</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 
-  <h2>Operations</h2>
-  <div class="card-grid">
-    <a class="card" href="internal/raci/project-tracker.html">
-      <div class="card-title">Project Tracker</div>
-      <div class="card-desc">Gantt chart, activity diary, and RACI matrix. Every task since Day 1 with owner assignments.</div>
-      <span class="card-tag tag-live">Live</span>
-    </a>
-    <a class="card" href="#">
-      <div class="card-title">Project Pipeline</div>
-      <div class="card-desc">Active bids, pending projects, won contracts. Track every opportunity from lead to close.</div>
-      <span class="card-tag tag-building">Building</span>
-    </a>
-    <a class="card" href="#">
-      <div class="card-title">Bid Calendar</div>
-      <div class="card-desc">INDOT/ODOT letting dates, private bid deadlines, submission tracking.</div>
-      <span class="card-tag tag-building">Building</span>
-    </a>
-    <a class="card" href="#">
-      <div class="card-title">GC Relationship Tracker</div>
-      <div class="card-desc">General contractor contacts, last touch date, open opportunities, relationship status.</div>
-      <span class="card-tag tag-building">Building</span>
-    </a>
+  <!-- ALERTS & ACTION -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Alerts & Action</span>
+      <span class="panel-count">6 items</span>
+    </div>
+    <div class="alert-list">
+      <div class="alert-item">
+        <span class="alert-tag tag-urgent">Urgent</span>
+        <span class="alert-text">AR -- Brasfield & Gorrie <span class="val">$31,400</span> (45d overdue)</span>
+      </div>
+      <div class="alert-item">
+        <span class="alert-tag tag-urgent">Urgent</span>
+        <span class="alert-text">Register Mortenson TradeTapp -- bid window closing</span>
+      </div>
+      <div class="alert-item">
+        <span class="alert-tag tag-watch">Watch</span>
+        <span class="alert-text">OSHA 30 -- J. Martinez expires 12d</span>
+      </div>
+      <div class="alert-item">
+        <span class="alert-tag tag-watch">Watch</span>
+        <span class="alert-text">Vibroflot #3 maintenance -- 200h over schedule</span>
+      </div>
+      <div class="alert-item">
+        <span class="alert-tag tag-info">Info</span>
+        <span class="alert-text">INDOT switching to Bidx.com Jun 10</span>
+      </div>
+      <div class="alert-item">
+        <span class="alert-tag tag-info">Info</span>
+        <span class="alert-text">IIJA expires Sep 30 -- 4 months remaining</span>
+      </div>
+    </div>
   </div>
 
-  <h2>Command Center</h2>
-  <div class="card-grid">
-    <a class="card" href="#">
-      <div class="card-title">Operations Dashboard</div>
-      <div class="card-desc">Alerts, money in, money out, industry intel — all at a glance. Available in the portal sidebar.</div>
-      <span class="card-tag tag-live">In Portal</span>
-    </a>
+  <!-- INTEL FEED -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Intel Feed</span>
+      <span class="panel-count">Industry</span>
+    </div>
+    <div class="intel-list">
+      <div class="intel-item">
+        <span class="intel-date">May 22</span>
+        <span class="intel-text"><strong>Steel tariffs 50%</strong> -- VSC cost advantage widening</span>
+      </div>
+      <div class="intel-item">
+        <span class="intel-date">May 22</span>
+        <span class="intel-text"><strong>Ohio DOT $3.4B</strong> season -- 977 projects, 739 bridges</span>
+      </div>
+      <div class="intel-item">
+        <span class="intel-date">May 18</span>
+        <span class="intel-text"><strong>OSHA silica limits</strong> update -- effective Jul 1</span>
+      </div>
+      <div class="intel-item">
+        <span class="intel-date">May 15</span>
+        <span class="intel-text"><strong>Indiana DOT $340M</strong> highway expansion announced</span>
+      </div>
+      <div class="intel-item">
+        <span class="intel-date">May 12</span>
+        <span class="intel-text"><strong>Keller Q1:</strong> 12% growth in N. America</span>
+      </div>
+      <div class="intel-item">
+        <span class="intel-date">May 8</span>
+        <span class="intel-text"><strong>Steel prices</strong> drop 8% MoM -- material cost pressure easing</span>
+      </div>
+    </div>
   </div>
 
 </div>
 
-<!-- EXTERNAL -->
-<div id="external" class="section">
+<!-- ROW 2: MONEY / REPORTS -->
+<div class="row row-2">
 
-  <h2>Client Portal</h2>
-  <div class="empty-state">
-    <div class="big">Coming Soon</div>
-    <p>Client-facing portal for GCs and prospects. Per-project access with proposals, status updates, and documentation.</p>
-    <p style="margin-top:8px;color:#3d444d;">Pending: PF branding assets and Cloudflare Access setup.</p>
+  <!-- MONEY -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Money</span>
+      <span class="panel-count">In / Out</span>
+    </div>
+    <div class="money-grid">
+      <div class="money-col">
+        <div class="money-col-header income">Money In</div>
+        <div class="money-row">
+          <span class="money-name">Turner Construction</span>
+          <span class="money-amt">$68,200</span>
+          <span class="money-due">Jun 1</span>
+        </div>
+        <div class="money-row">
+          <span class="money-name">Walsh Construction</span>
+          <span class="money-amt">$47,500</span>
+          <span class="money-due">Jun 15</span>
+        </div>
+        <div class="money-row late">
+          <span class="money-name">Brasfield & Gorrie</span>
+          <span class="money-amt">$31,400</span>
+          <span class="money-due">45d LATE</span>
+        </div>
+        <div class="money-row done">
+          <span class="money-name">Hensel Phelps</span>
+          <span class="money-amt">$23,800</span>
+          <span class="money-due">Received</span>
+        </div>
+      </div>
+      <div class="money-col">
+        <div class="money-col-header expense">Money Out</div>
+        <div class="money-row">
+          <span class="money-name">Martin Marietta</span>
+          <span class="money-amt">$8,200</span>
+          <span class="money-due">May 28</span>
+        </div>
+        <div class="money-row">
+          <span class="money-name">Cat Financial</span>
+          <span class="money-amt">$4,500</span>
+          <span class="money-due">Jun 1</span>
+        </div>
+        <div class="money-row">
+          <span class="money-name">Insurance Q3</span>
+          <span class="money-amt">$12,800</span>
+          <span class="money-due">Jun 15</span>
+        </div>
+        <div class="money-row done">
+          <span class="money-name">Speedway Fleet</span>
+          <span class="money-amt">$2,100</span>
+          <span class="money-due">Paid</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REPORTS & TOOLS -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Reports & Tools</span>
+      <span class="panel-count">8 items</span>
+    </div>
+    <div class="report-list">
+      <a class="report-item report-link" href="internal/reports/strategic-intelligence-report.html" data-title="Strategic Intelligence Report">
+        <span class="report-name">Strategic Intelligence Report</span>
+        <span class="report-status status-live">Live</span>
+      </a>
+      <a class="report-item report-link" href="internal/reports/strategy-briefing-may22.html" data-title="Strategy Briefing -- May 22">
+        <span class="report-name">Strategy Briefing -- May 22</span>
+        <span class="report-status status-live">Live</span>
+      </a>
+      <a class="report-item report-link" href="internal/reports/platform-blueprint.html" data-title="Platform Blueprint">
+        <span class="report-name">Platform Blueprint</span>
+        <span class="report-status status-live">Live</span>
+      </a>
+      <a class="report-item report-link" href="internal/raci/project-tracker.html" data-title="Project Tracker & RACI">
+        <span class="report-name">Project Tracker & RACI</span>
+        <span class="report-status status-live">Live</span>
+      </a>
+      <a class="report-item report-link" href="internal/reports/team-action-items.html" data-title="Team Action Items">
+        <span class="report-name">Team Action Items</span>
+        <span class="report-status status-live">Live</span>
+      </a>
+      <div class="report-item disabled">
+        <span class="report-name">SWOT Analysis</span>
+        <span class="report-status status-building">Building</span>
+      </div>
+      <div class="report-item disabled">
+        <span class="report-name">Bid Calendar</span>
+        <span class="report-status status-planned">Planned</span>
+      </div>
+      <div class="report-item disabled">
+        <span class="report-name">GC Tracker</span>
+        <span class="report-status status-planned">Planned</span>
+      </div>
+    </div>
   </div>
 
 </div>
 
-<!-- PUBLIC -->
-<div id="public" class="section">
-
-  <h2>Marketing Site</h2>
-  <div class="empty-state">
-    <div class="big">Coming Soon</div>
-    <p>Public marketing site — capabilities, case studies, thought leadership, and lead capture.</p>
-    <p style="margin-top:8px;color:#3d444d;">Content drafted. Pending: PF branding, domain configuration, and website access.</p>
-  </div>
-
 </div>
 
-</div>
-
+<!-- FOOTER -->
 <div class="footer">
-  Pier Foundations Platform &middot; Built by Peter (AI COO) &middot; 2026
+  <span>Updated: <span id="footer-time"></span></span>
+  <span>Placeholder data -- connect systems for live numbers</span>
+  <span>Built by Peter (AI COO)</span>
 </div>
 
 <!-- VIEWER OVERLAY -->
@@ -290,33 +668,51 @@
 </div>
 
 <script>
-function showTab(id) {
-  document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('active'); });
-  document.querySelectorAll('.nav a').forEach(function(a) { a.classList.remove('active'); });
-  document.getElementById(id).classList.add('active');
-  event.target.classList.add('active');
-}
+(function() {
+  // Date formatting
+  var now = new Date();
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var dateStr = days[now.getDay()] + ' ' + months[now.getMonth()] + ' ' + now.getDate() + ', ' + now.getFullYear();
+  document.getElementById('topbar-date').textContent = dateStr;
 
-function openViewer(url, title) {
-  document.getElementById('viewer-frame').src = url;
-  document.getElementById('viewer-title').textContent = title;
-  document.getElementById('viewer').classList.add('open');
-}
+  var h = now.getHours();
+  var m = now.getMinutes();
+  var ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  var timeStr = dateStr + ' ' + h + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
+  document.getElementById('footer-time').textContent = timeStr;
 
-function closeViewer() {
-  document.getElementById('viewer').classList.remove('open');
-  document.getElementById('viewer-frame').src = '';
-}
+  // Viewer
+  window.openViewer = function(url, title) {
+    document.getElementById('viewer-frame').src = url;
+    document.getElementById('viewer-title').textContent = title || '';
+    document.getElementById('viewer').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  };
 
-// Intercept all card links and open in viewer instead of navigating away
-document.addEventListener('click', function(e) {
-  var card = e.target.closest('a.card');
-  if (card && card.href && card.getAttribute('href') !== '#') {
-    e.preventDefault();
-    var title = card.querySelector('.card-title');
-    openViewer(card.href, title ? title.textContent : '');
-  }
-});
+  window.closeViewer = function() {
+    document.getElementById('viewer').classList.remove('open');
+    document.getElementById('viewer-frame').src = '';
+    document.body.style.overflow = '';
+  };
+
+  // Intercept report links
+  document.addEventListener('click', function(e) {
+    var link = e.target.closest('.report-link');
+    if (link) {
+      e.preventDefault();
+      var url = link.getAttribute('href');
+      var title = link.getAttribute('data-title') || '';
+      openViewer(url, title);
+    }
+  });
+
+  // Escape key closes viewer
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeViewer();
+  });
+})();
 </script>
 
 </body>
