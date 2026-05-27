@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pier Foundations — Platform Blueprint</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: #ffffff;
+    color: #1a1a2e;
+    line-height: 1.5;
+  }
+  .header {
+    background: #1a1a2e;
+    color: white;
+    padding: 32px 40px;
+  }
+  .header h1 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; }
+  .header p { font-size: 0.85rem; color: #94a3b8; margin-top: 4px; }
+
+  .content { padding: 32px 40px; max-width: 1200px; }
+
+  h2 {
+    font-size: 1.15rem; font-weight: 700; margin: 32px 0 16px;
+    padding-bottom: 8px; border-bottom: 2px solid #2563eb; display: inline-block;
+  }
+  h3 { font-size: 0.95rem; font-weight: 700; margin: 20px 0 8px; }
+  p { font-size: 0.85rem; color: #475569; margin-bottom: 12px; }
+
+  .phase-label {
+    display: inline-block; font-size: 0.62rem; font-weight: 700;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 3px 10px; border-radius: 3px; margin-bottom: 12px;
+  }
+  .phase-now { background: #dcfce7; color: #166534; }
+  .phase-week2 { background: #dbeafe; color: #1e40af; }
+  .phase-week3 { background: #fef3c7; color: #92400e; }
+  .phase-ondemand { background: #f1f5f9; color: #64748b; }
+
+  .dept-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .dept-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .dept-card-header {
+    padding: 10px 16px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .dept-card-body {
+    padding: 0 16px 12px;
+  }
+
+  .func-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+  }
+  .func-table td {
+    padding: 5px 0;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+  }
+  .func-table tr:last-child td { border-bottom: none; }
+  .func-table td:first-child { color: #334155; }
+  .func-table td:nth-child(2) { text-align: center; width: 70px; }
+  .func-table td:nth-child(3) { text-align: right; width: 90px; color: #64748b; font-size: 0.68rem; }
+
+  .owner-badge {
+    display: inline-block; font-size: 0.58rem; font-weight: 600;
+    padding: 1px 6px; border-radius: 3px;
+  }
+  .ob-peter { background: #e0e7ff; color: #4338ca; }
+  .ob-derek { background: #d1fae5; color: #047857; }
+  .ob-jonathan { background: #fce7f3; color: #be185d; }
+  .ob-brad { background: #dbeafe; color: #1d4ed8; }
+  .ob-all { background: #f1f5f9; color: #475569; }
+  .ob-future { background: #f8fafc; color: #94a3b8; }
+
+  .status-dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px;
+  }
+  .dot-live { background: #16a34a; }
+  .dot-building { background: #2563eb; }
+  .dot-planned { background: #d97706; }
+  .dot-future { background: #cbd5e1; }
+
+  .summary-bar {
+    display: flex; gap: 24px; padding: 16px 20px;
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    margin-bottom: 24px; flex-wrap: wrap;
+  }
+  .summary-item { text-align: center; flex: 1; min-width: 100px; }
+  .summary-num { font-size: 1.5rem; font-weight: 800; color: #1a1a2e; }
+  .summary-label { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; margin-top: 2px; }
+
+  .legend {
+    display: flex; gap: 20px; flex-wrap: wrap;
+    margin-bottom: 20px; font-size: 0.72rem; color: #64748b;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+
+  .priority-callout {
+    background: #eff6ff; border-left: 4px solid #2563eb;
+    padding: 16px 20px; border-radius: 0 6px 6px 0; margin: 20px 0;
+    font-size: 0.82rem;
+  }
+  .priority-callout strong { color: #1e40af; }
+
+  @media print {
+    .header { padding: 16px 20px; }
+    .content { padding: 16px 20px; }
+    .dept-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 768px) {
+    .header, .content { padding: 16px; }
+    .dept-grid { grid-template-columns: 1fr; }
+    .summary-bar { flex-direction: column; gap: 8px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Pier Foundations — Platform Blueprint</h1>
+  <p>Enterprise Operating System &middot; 15 Departments, 150+ Functions &middot; Built at AI Speed</p>
+</div>
+
+<div class="content">
+
+<!-- SUMMARY -->
+<div class="summary-bar">
+  <div class="summary-item">
+    <div class="summary-num">15</div>
+    <div class="summary-label">Departments</div>
+  </div>
+  <div class="summary-item">
+    <div class="summary-num">150+</div>
+    <div class="summary-label">Functions</div>
+  </div>
+  <div class="summary-item">
+    <div class="summary-num">4</div>
+    <div class="summary-label">Build Phases</div>
+  </div>
+  <div class="summary-item">
+    <div class="summary-num">111</div>
+    <div class="summary-label">AI Agents Available</div>
+  </div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><span class="status-dot dot-live"></span> Live / Partially Built</div>
+  <div class="legend-item"><span class="status-dot dot-building"></span> Building Now (Days 1-3)</div>
+  <div class="legend-item"><span class="status-dot dot-planned"></span> Days 4-10</div>
+  <div class="legend-item"><span class="status-dot dot-future"></span> On Demand (same-day activation)</div>
+</div>
+
+<div class="priority-callout">
+  <strong>Build Priority:</strong> The departments are ordered by impact on Pier Foundations' immediate revenue and operations. Construction &amp; Field Ops, Sales &amp; Revenue, and Operations come first. Healthcare, Education, and Real Estate are available but not active until needed. The only items that take longer are those blocked waiting on human action (M365 auth, website access, etc.) — the bottleneck is access, not build time.
+</div>
+
+<!-- ============================================================ -->
+<!-- PHASE 1: CORE BUSINESS (DAYS 1-3) -->
+<!-- ============================================================ -->
+
+<h2>Phase 1: Core Business — Days 1-3</h2>
+<p>The functions that directly drive revenue, win bids, and run daily operations. Most are already live or can be built within 1-3 days.</p>
+
+<div class="dept-grid">
+
+<!-- CONSTRUCTION & FIELD OPS -->
+<div class="dept-card">
+  <div class="dept-card-header" style="background:#fef3c7;color:#92400e;">
+    <span><span class="status-dot dot-building"></span>Construction &amp; Field Ops</span>
+    <span class="phase-label phase-now">Priority 1</span>
+  </div>
+  <div class="dept-card-body">
+    <table class="func-table">
+      <tr><td>Bid &amp; Estimate Generation</td><td><span class="owner-badge ob-jonathan">Jonathan</span></td><td>Building</td></tr>
+      <tr><td>Project Status Tracking</td><td><span class="owner-badge ob-jonathan">Jonathan</span></td><td>Building</td></tr>
+      <tr><td>Subcontractor Coordination</td><td><span class="owner-badge ob-jonathan">Jonathan</span></td><td>Planned</td></tr>
+      <tr><td>Material Cost Estimation</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Partial</td></tr>
+      <tr><td>Permitting &amp; Inspections</td><td><span class="owner-badge ob-jonathan">Jonathan</span></td><td>Planned</td></tr>
+      <tr><td>Safety Checklists</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Planned</td></tr>
+      <tr><td>Equipment &amp; Fleet Tracking</td><td><span class="owner-badge ob-brad">Brad</span></td><td>Planned</td></tr>
+      <tr><td>Daily Logs &amp; Reporting</td><td><span class="owner-badge ob-jonathan">Jonathan</span></td><td>Planned</td></tr>
+      <tr><td>Change Order Management</td><td><span class="owner-badge ob-jonathan">Jonathan</span></td><td>Planned</td></tr>
+      <tr><td>Punch List &amp; Closeout</td><td><span class="owner-badge ob-jonathan">Jonathan</span></td><td>Planned</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- SALES & REVENUE -->
+<div class="dept-card">
+  <div class="dept-card-header" style="background:#dcfce7;color:#166534;">
+    <span><span class="status-dot dot-live"></span>Sales &amp; Revenue</span>
+    <span class="phase-label phase-now">Priority 1</span>
+  </div>
+  <div class="dept-card-body">
+    <table class="func-table">
+      <tr><td>Pipeline Management</td><td><span class="owner-badge ob-derek">Derek</span></td><td>Building</td></tr>
+      <tr><td>Lead Research &amp; Qualification</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Live</td></tr>
+      <tr><td>Proposal &amp; Quote Generation</td><td><span class="owner-badge ob-derek">Derek</span></td><td>Planned</td></tr>
+      <tr><td>CRM Management</td><td><span class="owner-badge ob-derek">Derek</span></td><td>Planned</td></tr>
+      <tr><td>Competitor Analysis</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Live</td></tr>
+      <tr><td>Deal Strategy &amp; Coaching</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Partial</td></tr>
+      <tr><td>Revenue Forecasting</td><td><span class="owner-badge ob-brad">Brad</span></td><td>Planned</td></tr>
+      <tr><td>Outreach Sequences</td><td><span class="owner-badge ob-derek">Derek</span></td><td>Planned</td></tr>
+      <tr><td>Sales Playbooks</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Planned</td></tr>
+      <tr><td>Commission &amp; Incentive Tracking</td><td><span class="owner-badge ob-brad">Brad</span></td><td>Future</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- RESEARCH & INTELLIGENCE -->
+<div class="dept-card">
+  <div class="dept-card-header" style="background:#dcfce7;color:#166534;">
+    <span><span class="status-dot dot-live"></span>Research &amp; Intelligence</span>
+    <span class="phase-label phase-now">Priority 1</span>
+  </div>
+  <div class="dept-card-body">
+    <table class="func-table">
+      <tr><td>Company Deep Dives</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Live</td></tr>
+      <tr><td>Industry &amp; Market Analysis</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Live</td></tr>
+      <tr><td>Due Diligence Reports</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Live</td></tr>
+      <tr><td>SWOT Analysis</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Live</td></tr>
+      <tr><td>Prospect Research</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Live</td></tr>
+      <tr><td>News &amp; Trend Monitoring</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Live</td></tr>
+      <tr><td>Benchmarking</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Partial</td></tr>
+      <tr><td>White Papers &amp; Research Reports</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Live</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- OPERATIONS & ADMIN -->
+<div class="dept-card">
+  <div class="dept-card-header" style="background:#dbeafe;color:#1e40af;">
+    <span><span class="status-dot dot-building"></span>Operations &amp; Admin</span>
+    <span class="phase-label phase-now">Priority 1</span>
+  </div>
+  <div class="dept-card-body">
+    <table class="func-table">
+      <tr><td>Document Management</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Blocked (M365)</td></tr>
+      <tr><td>Task &amp; Project Tracking</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Live (Gantt)</td></tr>
+      <tr><td>Process Documentation / SOPs</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Planned</td></tr>
+      <tr><td>Vendor &amp; Supplier Management</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Partial</td></tr>
+      <tr><td>Email Management</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Partial (Agentmail)</td></tr>
+      <tr><td>Meeting Notes &amp; Follow-ups</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Planned</td></tr>
+      <tr><td>Calendar &amp; Scheduling</td><td><span class="owner-badge ob-brad">Brad</span></td><td>Planned</td></tr>
+      <tr><td>Workflow Automation</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Planned</td></tr>
+      <tr><td>Travel &amp; Expense Management</td><td><span class="owner-badge ob-brad">Brad</span></td><td>Future</td></tr>
+      <tr><td>Office &amp; Facilities Management</td><td><span class="owner-badge ob-brad">Brad</span></td><td>Future</td></tr>
+    </table>
+  </div>
+</div>
+
+</div><!-- end grid -->
+
+<!-- ============================================================ -->
+<!-- PHASE 2: GROWTH ENGINE (DAYS 4-10) -->
+<!-- ============================================================ -->
+
+<h2>Phase 2: Growth Engine — Days 4-10</h2>
+<p>Marketing, digital presence, and finance. These build the brand and manage the money as revenue grows. Buildable within a week once Phase 1 is stable.</p>
+
+<div class="dept-grid">
+
+<!-- MARKETING & BRAND -->
+<div class="dept-card">
+  <div class="dept-card-header" style="background:#dbeafe;color:#1e40af;">
+    <span><span class="status-dot dot-building"></span>Marketing &amp; Brand</span>
+    <span class="phase-label phase-week2">Days 4-10</span>
+  </div>
+  <div class="dept-card-body">
+    <table class="func-table">
+      <tr><td>Content Creation</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Partial (drafts done)</td></tr>
+      <tr><td>SEO Strategy</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Live (research)</td></tr>
+      <tr><td>Social Media Management</td><td><span class="owner-badge ob-derek">Derek</span></td><td>Planned</td></tr>
+      <tr><td>Brand Positioning &amp; Messaging</td><td><span class="owner-badge ob-brad">Brad</span></td><td>Planned</td></tr>
+      <tr><td>Email Marketing &amp; Newsletters</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Planned</td></tr>
+      <tr><td>Campaign Planning &amp; Execution</td><td><span class="owner-badge ob-derek">Derek</span></td><td>Planned</td></tr>
+      <tr><td>Market Research</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Live</td></tr>
+      <tr><td>Thought Leadership</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Partial (blogs)</td></tr>
+      <tr><td>Video &amp; Podcast Production</td><td><span class="owner-badge ob-future">TBD</span></td><td>Future</td></tr>
+      <tr><td>Advertising &amp; Media Buying</td><td><span class="owner-badge ob-future">TBD</span></td><td>Future</td></tr>
+      <tr><td>PR &amp; Media Relations</td><td><span class="owner-badge ob-future">TBD</span></td><td>Future</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- FINANCE & ACCOUNTING -->
+<div class="dept-card">
+  <div class="dept-card-header" style="background:#fef3c7;color:#92400e;">
+    <span><span class="status-dot dot-planned"></span>Finance &amp; Accounting</span>
+    <span class="phase-label phase-week2">Days 4-10</span>
+  </div>
+  <div class="dept-card-body">
+    <table class="func-table">
+      <tr><td>Budgeting &amp; Forecasting</td><td><span class="owner-badge ob-brad">Brad</span></td><td>Planned</td></tr>
+      <tr><td>Financial Reporting</td><td><span class="owner-badge ob-brad">Brad</span></td><td>Planned</td></tr>
+      <tr><td>Invoice Generation &amp; Tracking</td><td><span class="owner-badge ob-brad">Brad</span></td><td>Planned</td></tr>
+      <tr><td>Cash Flow Management</td><td><span class="owner-badge ob-brad">Brad</span></td><td>Planned</td></tr>
+      <tr><td>Accounts Receivable / Payable</td><td><span class="owner-badge ob-brad">Brad</span></td><td>Planned</td></tr>
+      <tr><td>Expense Tracking</td><td><span class="owner-badge ob-brad">Brad</span></td><td>Planned</td></tr>
+      <tr><td>Financial Modeling</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Planned</td></tr>
+      <tr><td>Tax Preparation Support</td><td><span class="owner-badge ob-future">TBD</span></td><td>Future</td></tr>
+      <tr><td>Payroll Processing Support</td><td><span class="owner-badge ob-future">TBD</span></td><td>Future</td></tr>
+      <tr><td>Bookkeeping &amp; Reconciliation</td><td><span class="owner-badge ob-future">TBD</span></td><td>Future</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- LEGAL & COMPLIANCE -->
+<div class="dept-card">
+  <div class="dept-card-header" style="background:#dbeafe;color:#1e40af;">
+    <span><span class="status-dot dot-building"></span>Legal &amp; Compliance</span>
+    <span class="phase-label phase-week2">Days 4-10</span>
+  </div>
+  <div class="dept-card-body">
+    <table class="func-table">
+      <tr><td>Contract Review &amp; Analysis</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Available</td></tr>
+      <tr><td>Regulatory Monitoring (OSHA, DOT)</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Live</td></tr>
+      <tr><td>Compliance Tracking</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Partial</td></tr>
+      <tr><td>Licensing &amp; Permit Tracking</td><td><span class="owner-badge ob-jonathan">Jonathan</span></td><td>Planned</td></tr>
+      <tr><td>NDA &amp; Agreement Drafting</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Available</td></tr>
+      <tr><td>Risk Assessment</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Partial</td></tr>
+      <tr><td>Policy Documentation</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Planned</td></tr>
+      <tr><td>IP Management</td><td><span class="owner-badge ob-future">TBD</span></td><td>Future</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- TECHNOLOGY & DEVELOPMENT -->
+<div class="dept-card">
+  <div class="dept-card-header" style="background:#dbeafe;color:#1e40af;">
+    <span><span class="status-dot dot-building"></span>Technology &amp; Development</span>
+    <span class="phase-label phase-week2">Days 4-10</span>
+  </div>
+  <div class="dept-card-body">
+    <table class="func-table">
+      <tr><td>Website Development &amp; Maintenance</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Blocked (access)</td></tr>
+      <tr><td>Data Analysis &amp; Visualization</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Live</td></tr>
+      <tr><td>Automation &amp; Scripting</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Live</td></tr>
+      <tr><td>Technical Documentation</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Live</td></tr>
+      <tr><td>API Integration</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Partial</td></tr>
+      <tr><td>App &amp; Tool Development</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Available</td></tr>
+      <tr><td>Security Audits</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Available</td></tr>
+      <tr><td>Database Management</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Available</td></tr>
+    </table>
+  </div>
+</div>
+
+</div><!-- end grid -->
+
+<!-- ============================================================ -->
+<!-- PHASE 3: SCALE (DAYS 11-20) -->
+<!-- ============================================================ -->
+
+<h2>Phase 3: Scale — Days 11-20</h2>
+<p>People management, customer success, and executive strategy. These matter as the team and client base grow. Buildable within 2-3 weeks of project start.</p>
+
+<div class="dept-grid">
+
+<!-- EXECUTIVE & STRATEGY -->
+<div class="dept-card">
+  <div class="dept-card-header" style="background:#f1f5f9;color:#475569;">
+    <span><span class="status-dot dot-planned"></span>Executive &amp; Strategy</span>
+    <span class="phase-label phase-week3">Days 11-20</span>
+  </div>
+  <div class="dept-card-body">
+    <table class="func-table">
+      <tr><td>Strategic Planning</td><td><span class="owner-badge ob-brad">Brad</span></td><td>Partial</td></tr>
+      <tr><td>KPI Dashboards</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Live (CC)</td></tr>
+      <tr><td>Executive Briefings</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Live</td></tr>
+      <tr><td>Competitive Intelligence</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Live</td></tr>
+      <tr><td>Stakeholder Communications</td><td><span class="owner-badge ob-brad">Brad</span></td><td>Planned</td></tr>
+      <tr><td>Board &amp; Investor Materials</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Available</td></tr>
+      <tr><td>Multi-Entity Oversight</td><td><span class="owner-badge ob-brad">Brad</span></td><td>Future</td></tr>
+      <tr><td>M&amp;A &amp; Due Diligence Support</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Available</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- CUSTOMER SUCCESS -->
+<div class="dept-card">
+  <div class="dept-card-header" style="background:#f1f5f9;color:#475569;">
+    <span><span class="status-dot dot-planned"></span>Customer Success &amp; Support</span>
+    <span class="phase-label phase-week3">Days 11-20</span>
+  </div>
+  <div class="dept-card-body">
+    <table class="func-table">
+      <tr><td>Client Communications</td><td><span class="owner-badge ob-derek">Derek</span></td><td>Planned</td></tr>
+      <tr><td>Customer Onboarding</td><td><span class="owner-badge ob-derek">Derek</span></td><td>Planned</td></tr>
+      <tr><td>Client Reporting</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Available</td></tr>
+      <tr><td>Account Health Monitoring</td><td><span class="owner-badge ob-derek">Derek</span></td><td>Planned</td></tr>
+      <tr><td>Satisfaction &amp; NPS Surveys</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Future</td></tr>
+      <tr><td>Knowledge Base / FAQ</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Planned</td></tr>
+      <tr><td>Support Ticket Management</td><td><span class="owner-badge ob-future">TBD</span></td><td>Future</td></tr>
+      <tr><td>Upsell &amp; Expansion ID</td><td><span class="owner-badge ob-derek">Derek</span></td><td>Planned</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- HR & PEOPLE -->
+<div class="dept-card">
+  <div class="dept-card-header" style="background:#f1f5f9;color:#475569;">
+    <span><span class="status-dot dot-future"></span>HR &amp; People</span>
+    <span class="phase-label phase-week3">Days 11-20</span>
+  </div>
+  <div class="dept-card-body">
+    <table class="func-table">
+      <tr><td>Job Descriptions &amp; Posting</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Available</td></tr>
+      <tr><td>Onboarding Workflows</td><td><span class="owner-badge ob-brad">Brad</span></td><td>Planned</td></tr>
+      <tr><td>Policy Development</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Available</td></tr>
+      <tr><td>Training &amp; Development</td><td><span class="owner-badge ob-brad">Brad</span></td><td>Planned</td></tr>
+      <tr><td>Performance Reviews</td><td><span class="owner-badge ob-brad">Brad</span></td><td>Future</td></tr>
+      <tr><td>Org Design &amp; Role Architecture</td><td><span class="owner-badge ob-brad">Brad</span></td><td>Future</td></tr>
+      <tr><td>Employee Engagement</td><td><span class="owner-badge ob-brad">Brad</span></td><td>Future</td></tr>
+      <tr><td>Offboarding</td><td><span class="owner-badge ob-brad">Brad</span></td><td>Future</td></tr>
+    </table>
+  </div>
+</div>
+
+</div><!-- end grid -->
+
+<!-- ============================================================ -->
+<!-- PHASE 4: ON DEMAND -->
+<!-- ============================================================ -->
+
+<h2>Phase 4: On Demand — Same-Day Activation</h2>
+<p>Available in the agent roster but not active until the business needs them. Can be activated and deployed within hours of request.</p>
+
+<div class="dept-grid">
+
+<!-- REAL ESTATE -->
+<div class="dept-card">
+  <div class="dept-card-header" style="background:#f8fafc;color:#94a3b8;">
+    <span><span class="status-dot dot-future"></span>Real Estate &amp; Property</span>
+    <span class="phase-label phase-ondemand">On Demand</span>
+  </div>
+  <div class="dept-card-body">
+    <table class="func-table">
+      <tr><td>Property Analysis &amp; Valuation</td><td><span class="owner-badge ob-future">TBD</span></td><td>Available</td></tr>
+      <tr><td>Lease Management</td><td><span class="owner-badge ob-future">TBD</span></td><td>Available</td></tr>
+      <tr><td>Portfolio Reporting</td><td><span class="owner-badge ob-future">TBD</span></td><td>Available</td></tr>
+      <tr><td>Market Research</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Available</td></tr>
+      <tr><td>Due Diligence Packages</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Available</td></tr>
+      <tr><td>Tenant Communications</td><td><span class="owner-badge ob-future">TBD</span></td><td>Available</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- HEALTHCARE -->
+<div class="dept-card">
+  <div class="dept-card-header" style="background:#f8fafc;color:#94a3b8;">
+    <span><span class="status-dot dot-future"></span>Healthcare &amp; Wellness</span>
+    <span class="phase-label phase-ondemand">On Demand</span>
+  </div>
+  <div class="dept-card-body">
+    <table class="func-table">
+      <tr><td>Patient Communications</td><td><span class="owner-badge ob-future">TBD</span></td><td>Available</td></tr>
+      <tr><td>Compliance &amp; HIPAA Tracking</td><td><span class="owner-badge ob-future">TBD</span></td><td>Available</td></tr>
+      <tr><td>Practice Management</td><td><span class="owner-badge ob-future">TBD</span></td><td>Available</td></tr>
+      <tr><td>Insurance &amp; Billing Support</td><td><span class="owner-badge ob-future">TBD</span></td><td>Available</td></tr>
+      <tr><td>Clinical Documentation</td><td><span class="owner-badge ob-future">TBD</span></td><td>Available</td></tr>
+      <tr><td>Patient Education Materials</td><td><span class="owner-badge ob-future">TBD</span></td><td>Available</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- EDUCATION -->
+<div class="dept-card">
+  <div class="dept-card-header" style="background:#f8fafc;color:#94a3b8;">
+    <span><span class="status-dot dot-future"></span>Education &amp; Training</span>
+    <span class="phase-label phase-ondemand">On Demand</span>
+  </div>
+  <div class="dept-card-body">
+    <table class="func-table">
+      <tr><td>Training Material Creation</td><td><span class="owner-badge ob-peter">Peter</span></td><td>Available</td></tr>
+      <tr><td>Curriculum Development</td><td><span class="owner-badge ob-future">TBD</span></td><td>Available</td></tr>
+      <tr><td>Workshop &amp; Event Planning</td><td><span class="owner-badge ob-future">TBD</span></td><td>Available</td></tr>
+      <tr><td>Certification Programs</td><td><span class="owner-badge ob-future">TBD</span></td><td>Available</td></tr>
+      <tr><td>LMS Content Management</td><td><span class="owner-badge ob-future">TBD</span></td><td>Available</td></tr>
+      <tr><td>Progress Tracking</td><td><span class="owner-badge ob-future">TBD</span></td><td>Available</td></tr>
+    </table>
+  </div>
+</div>
+
+</div><!-- end grid -->
+
+<!-- ============================================================ -->
+<!-- WHAT'S LIVE RIGHT NOW -->
+<!-- ============================================================ -->
+
+<h2>What's Live Right Now</h2>
+
+<table class="func-table" style="max-width:600px;">
+  <tr><td><span class="status-dot dot-live"></span> Lead Research &amp; Qualification</td><td>8 GCs researched, data center leads active</td></tr>
+  <tr><td><span class="status-dot dot-live"></span> Competitor Analysis</td><td>SWOT complete, 5 competitors profiled</td></tr>
+  <tr><td><span class="status-dot dot-live"></span> Industry &amp; Market Analysis</td><td>TAM, pricing, trends research done</td></tr>
+  <tr><td><span class="status-dot dot-live"></span> News &amp; Trend Monitoring</td><td>IIJA, OSHA, tariffs, competitor tracking</td></tr>
+  <tr><td><span class="status-dot dot-live"></span> KPI Dashboard</td><td>Command Center panel in portal</td></tr>
+  <tr><td><span class="status-dot dot-live"></span> Task &amp; Project Tracking</td><td>Gantt chart + RACI matrix</td></tr>
+  <tr><td><span class="status-dot dot-live"></span> Executive Briefings</td><td>Strategy reports delivered as HTML</td></tr>
+  <tr><td><span class="status-dot dot-live"></span> Regulatory Monitoring</td><td>OSHA, DOT specs, IIJA reauthorization</td></tr>
+  <tr><td><span class="status-dot dot-live"></span> Email (Agentmail)</td><td>pfpeter@agentmail.to connected</td></tr>
+  <tr><td><span class="status-dot dot-live"></span> Data Analysis &amp; Visualization</td><td>Reports, charts, HTML dashboards</td></tr>
+</table>
+
+<h2>What's Blocked</h2>
+
+<table class="func-table" style="max-width:600px;">
+  <tr><td style="color:#dc2626;">Microsoft 365 email auth</td><td>Needs SMTP AUTH or app password — IT resolving</td></tr>
+  <tr><td style="color:#dc2626;">OneDrive / document access</td><td>Depends on M365 auth fix</td></tr>
+  <tr><td style="color:#dc2626;">Website updates</td><td>Need access to pierfoundations.com hosting (JMJ WebPro)</td></tr>
+</table>
+
+<!-- FOOTER -->
+<div style="text-align:center;padding:32px 0 16px;font-size:0.68rem;color:#94a3b8;border-top:1px solid #e2e8f0;margin-top:32px;">
+  Pier Foundations Platform Blueprint &middot; Prepared by Peter (AI COO) &middot; Confidential
+</div>
+
+</div>
+
+</body>
+</html>

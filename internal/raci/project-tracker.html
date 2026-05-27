@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pier Foundations — Project Tracker &amp; RACI</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #ffffff;
+    --text: #1a1a2e;
+    --text-dim: #64748b;
+    --border: #e2e8f0;
+    --blue: #2563eb;
+    --blue-light: #eff6ff;
+    --green: #16a34a;
+    --green-light: #f0fdf4;
+    --amber: #d97706;
+    --amber-light: #fffbeb;
+    --red: #dc2626;
+    --red-light: #fef2f2;
+    --gray: #94a3b8;
+    --gray-light: #f8fafc;
+    --purple: #7c3aed;
+    --purple-light: #f5f3ff;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    padding: 0;
+  }
+
+  /* HEADER */
+  .header {
+    background: var(--text);
+    color: white;
+    padding: 32px 40px;
+  }
+  .header h1 {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  .header p {
+    font-size: 0.85rem;
+    color: #94a3b8;
+    margin-top: 4px;
+  }
+
+  /* NAV */
+  .nav {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid var(--border);
+    padding: 0 40px;
+    background: var(--gray-light);
+  }
+  .nav a {
+    padding: 12px 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-dim);
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    cursor: pointer;
+  }
+  .nav a.active {
+    color: var(--blue);
+    border-bottom-color: var(--blue);
+  }
+  .nav a:hover {
+    color: var(--text);
+  }
+
+  /* CONTENT */
+  .content {
+    padding: 32px 40px;
+    max-width: 1400px;
+  }
+  .section { display: none; }
+  .section.active { display: block; }
+
+  h2 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--blue);
+    display: inline-block;
+  }
+  h3 {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin: 24px 0 12px;
+    color: var(--text);
+  }
+
+  /* GANTT */
+  .gantt-container {
+    overflow-x: auto;
+    margin-bottom: 32px;
+  }
+  .gantt-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+    min-width: 1000px;
+  }
+  .gantt-table th {
+    background: var(--text);
+    color: white;
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .gantt-table th.date-col {
+    text-align: center;
+    min-width: 36px;
+    padding: 8px 4px;
+  }
+  .gantt-table td {
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .gantt-table td.date-cell {
+    padding: 6px 2px;
+    text-align: center;
+  }
+  .gantt-table tbody tr:hover {
+    background: var(--blue-light);
+  }
+
+  /* Gantt bars */
+  .bar {
+    height: 14px;
+    border-radius: 3px;
+    min-width: 14px;
+  }
+  .bar-done { background: var(--green); }
+  .bar-active { background: var(--blue); }
+  .bar-planned { background: var(--border); border: 1px dashed var(--gray); }
+  .bar-urgent { background: var(--amber); }
+
+  /* Status pills */
+  .pill {
+    display: inline-block;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 3px;
+  }
+  .pill-done { background: var(--green-light); color: var(--green); }
+  .pill-active { background: var(--blue-light); color: var(--blue); }
+  .pill-planned { background: var(--gray-light); color: var(--gray); border: 1px solid var(--border); }
+  .pill-urgent { background: var(--amber-light); color: var(--amber); }
+  .pill-blocked { background: var(--red-light); color: var(--red); }
+
+  /* Owner badges */
+  .owner {
+    display: inline-block;
+    font-size: 0.62rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 3px;
+    letter-spacing: 0.03em;
+  }
+  .owner-brad { background: #dbeafe; color: #1d4ed8; }
+  .owner-jonathan { background: #fce7f3; color: #be185d; }
+  .owner-derek { background: #d1fae5; color: #047857; }
+  .owner-peter { background: #e0e7ff; color: #4338ca; }
+  .owner-all { background: #f1f5f9; color: #475569; }
+
+  /* RACI TABLE */
+  .raci-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+  }
+  .raci-table th {
+    background: var(--text);
+    color: white;
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+  }
+  .raci-table th.raci-person {
+    text-align: center;
+    min-width: 80px;
+  }
+  .raci-table td {
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .raci-table td.raci-cell {
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.82rem;
+  }
+  .raci-table tbody tr:hover {
+    background: var(--blue-light);
+  }
+  .raci-R { color: var(--red); }
+  .raci-A { color: var(--blue); }
+  .raci-C { color: var(--amber); }
+  .raci-I { color: var(--gray); }
+
+  .raci-category {
+    background: var(--gray-light);
+    font-weight: 700;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+  }
+
+  /* DIARY */
+  .diary-entry {
+    border-left: 3px solid var(--blue);
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    background: var(--gray-light);
+    border-radius: 0 6px 6px 0;
+  }
+  .diary-date {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--blue);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+  }
+  .diary-title {
+    font-size: 0.88rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .diary-items {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    list-style: none;
+    padding: 0;
+  }
+  .diary-items li {
+    padding: 2px 0;
+    padding-left: 12px;
+    position: relative;
+  }
+  .diary-items li::before {
+    content: '-';
+    position: absolute;
+    left: 0;
+  }
+
+  /* LEGEND */
+  .legend {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .legend-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+  }
+
+  /* RACI LEGEND */
+  .raci-legend {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 20px;
+    font-size: 0.75rem;
+  }
+  .raci-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .raci-legend-letter {
+    font-weight: 800;
+    font-size: 0.85rem;
+    width: 22px;
+    text-align: center;
+  }
+
+  /* PRINT */
+  @media print {
+    .nav { display: none; }
+    .section { display: block !important; page-break-before: always; }
+    .section:first-child { page-break-before: auto; }
+    .header { padding: 20px; }
+    .content { padding: 20px; }
+  }
+
+  @media (max-width: 768px) {
+    .header, .content, .nav { padding-left: 16px; padding-right: 16px; }
+    .gantt-table { font-size: 0.7rem; }
+    .raci-table { font-size: 0.7rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Pier Foundations — Project Tracker</h1>
+  <p>Gantt Chart, Activity Diary, and RACI Matrix &middot; Updated May 22, 2026</p>
+</div>
+
+<div class="nav">
+  <a class="active" onclick="showTab('gantt')">Gantt Chart</a>
+  <a onclick="showTab('diary')">Activity Diary</a>
+  <a onclick="showTab('raci')">RACI Matrix</a>
+</div>
+
+<div class="content">
+
+<!-- ============================================================ -->
+<!-- GANTT CHART -->
+<!-- ============================================================ -->
+<div id="gantt" class="section active">
+
+<h2>Project Gantt Chart</h2>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-swatch" style="background:var(--green)"></div> Complete</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:var(--blue)"></div> In Progress</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:var(--amber)"></div> Urgent</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:var(--border);border:1px dashed var(--gray)"></div> Planned</div>
+  <div class="legend-item"><span class="owner owner-brad">Brad</span></div>
+  <div class="legend-item"><span class="owner owner-jonathan">Jonathan</span></div>
+  <div class="legend-item"><span class="owner owner-derek">Derek</span></div>
+  <div class="legend-item"><span class="owner owner-peter">Peter</span></div>
+</div>
+
+<div class="gantt-container">
+<table class="gantt-table">
+<thead>
+<tr>
+  <th style="min-width:200px">Task</th>
+  <th style="min-width:70px">Owner</th>
+  <th style="min-width:60px">Status</th>
+  <th class="date-col">May 21</th>
+  <th class="date-col">May 22</th>
+  <th class="date-col">May 23</th>
+  <th class="date-col">Wk 4</th>
+  <th class="date-col">Wk 5</th>
+  <th class="date-col">Jun</th>
+  <th class="date-col">Jul</th>
+  <th class="date-col">Aug</th>
+  <th class="date-col">Sep</th>
+  <th class="date-col">Q4</th>
+</tr>
+</thead>
+<tbody>
+
+<!-- PHASE 1: SETUP -->
+<tr><td colspan="13" style="background:var(--text);color:white;font-weight:700;font-size:0.72rem;letter-spacing:0.06em;text-transform:uppercase;padding:6px 12px;">Phase 1: Setup &amp; Infrastructure</td></tr>
+
+<tr>
+  <td>Peter AI activation &amp; evolution</td>
+  <td><span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-done">Done</span></td>
+  <td class="date-cell"><div class="bar bar-done"></div></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>Agent roster seeded (111 agents)</td>
+  <td><span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-done">Done</span></td>
+  <td class="date-cell"><div class="bar bar-done"></div></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>Skills hub import (17 new skills)</td>
+  <td><span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-done">Done</span></td>
+  <td class="date-cell"><div class="bar bar-done"></div></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>Command Center panel (v1-v4)</td>
+  <td><span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-active">Active</span></td>
+  <td class="date-cell"><div class="bar bar-done"></div></td>
+  <td class="date-cell"><div class="bar bar-blue"></div></td>
+  <td class="date-cell"></td><td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>Agentmail setup</td>
+  <td><span class="owner owner-brad">Brad</span></td>
+  <td><span class="pill pill-active">Active</span></td>
+  <td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-active"></div></td>
+  <td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>Microsoft 365 / email for Peter</td>
+  <td><span class="owner owner-brad">Brad</span></td>
+  <td><span class="pill pill-planned">Planned</span></td>
+  <td class="date-cell"></td><td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>Telegram bot setup</td>
+  <td><span class="owner owner-brad">Brad</span></td>
+  <td><span class="pill pill-planned">Planned</span></td>
+  <td class="date-cell"></td><td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>Cloudflare Pages for external proposals</td>
+  <td><span class="owner owner-brad">Brad</span> <span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-planned">Planned</span></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+
+<!-- PHASE 2: RESEARCH & INTEL -->
+<tr><td colspan="13" style="background:var(--text);color:white;font-weight:700;font-size:0.72rem;letter-spacing:0.06em;text-transform:uppercase;padding:6px 12px;">Phase 2: Research &amp; Intelligence</td></tr>
+
+<tr>
+  <td>pierfoundations.com research &amp; audit</td>
+  <td><span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-done">Done</span></td>
+  <td class="date-cell"><div class="bar bar-done"></div></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>Market &amp; competitive intel report</td>
+  <td><span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-done">Done</span></td>
+  <td class="date-cell"><div class="bar bar-done"></div></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>Industry trends research (IIJA, data centers)</td>
+  <td><span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-done">Done</span></td>
+  <td class="date-cell"><div class="bar bar-done"></div></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>Lead generation research (IN/OH/MI/IL projects)</td>
+  <td><span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-done">Done</span></td>
+  <td class="date-cell"><div class="bar bar-done"></div></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>SEO &amp; digital presence analysis</td>
+  <td><span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-done">Done</span></td>
+  <td class="date-cell"><div class="bar bar-done"></div></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>Strategic intelligence report (HTML)</td>
+  <td><span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-done">Done</span></td>
+  <td class="date-cell"><div class="bar bar-done"></div></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>SWOT analysis</td>
+  <td><span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-done">Done</span></td>
+  <td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-done"></div></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>Data center lead research (Google FW, Meta, CoreWeave)</td>
+  <td><span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-done">Done</span></td>
+  <td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-done"></div></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>GC contact research (8 contractors)</td>
+  <td><span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-done">Done</span></td>
+  <td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-done"></div></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>INDOT/ODOT bid opportunity scan</td>
+  <td><span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-done">Done</span></td>
+  <td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-done"></div></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>Industry news briefing (tariffs, OSHA, competitors)</td>
+  <td><span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-done">Done</span></td>
+  <td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-done"></div></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>Strategy briefing report (IIJA risk, pipeline)</td>
+  <td><span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-done">Done</span></td>
+  <td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-done"></div></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+
+<!-- PHASE 3: BUSINESS DEVELOPMENT -->
+<tr><td colspan="13" style="background:var(--text);color:white;font-weight:700;font-size:0.72rem;letter-spacing:0.06em;text-transform:uppercase;padding:6px 12px;">Phase 3: Business Development</td></tr>
+
+<tr>
+  <td>Register Mortenson TradeTapp prequalification</td>
+  <td><span class="owner owner-brad">Brad</span> <span class="owner owner-derek">Derek</span></td>
+  <td><span class="pill pill-urgent">Urgent</span></td>
+  <td class="date-cell"></td><td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-urgent"></div></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>Register Turner subcontractor prequalification</td>
+  <td><span class="owner owner-brad">Brad</span> <span class="owner owner-derek">Derek</span></td>
+  <td><span class="pill pill-urgent">Urgent</span></td>
+  <td class="date-cell"></td><td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-urgent"></div></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>Contact Hagerman Group (Ray Van Amburg)</td>
+  <td><span class="owner owner-derek">Derek</span></td>
+  <td><span class="pill pill-urgent">Urgent</span></td>
+  <td class="date-cell"></td><td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-urgent"></div></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>Google FW — identify GC &amp; geotech engineer</td>
+  <td><span class="owner owner-derek">Derek</span> <span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-active">Active</span></td>
+  <td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-active"></div></td>
+  <td class="date-cell"><div class="bar bar-active"></div></td><td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>Outreach: Pepper, Shiel Sexton, Messer, Barton Malow</td>
+  <td><span class="owner owner-derek">Derek</span></td>
+  <td><span class="pill pill-planned">Planned</span></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>Geotech firm relationship building (GME/UES, GEOTILL, CTL)</td>
+  <td><span class="owner owner-derek">Derek</span> <span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-planned">Planned</span></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>Capability statement / one-pager</td>
+  <td><span class="owner owner-peter">Peter</span> <span class="owner owner-derek">Derek</span></td>
+  <td><span class="pill pill-planned">Planned</span></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+
+<!-- PHASE 4: BIDDING -->
+<tr><td colspan="13" style="background:var(--text);color:white;font-weight:700;font-size:0.72rem;letter-spacing:0.06em;text-transform:uppercase;padding:6px 12px;">Phase 4: Bidding &amp; Contracts</td></tr>
+
+<tr>
+  <td>Register INDOT Bidx.com (electronic bidding)</td>
+  <td><span class="owner owner-jonathan">Jonathan</span></td>
+  <td><span class="pill pill-urgent">Urgent</span></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-urgent"></div></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>Verify INDOT prequalification status</td>
+  <td><span class="owner owner-jonathan">Jonathan</span></td>
+  <td><span class="pill pill-planned">Planned</span></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>Add price escalation clauses to contracts</td>
+  <td><span class="owner owner-jonathan">Jonathan</span> <span class="owner owner-brad">Brad</span></td>
+  <td><span class="pill pill-planned">Planned</span></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>INDOT July 8 letting — bid prep</td>
+  <td><span class="owner owner-jonathan">Jonathan</span> <span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-planned">Planned</span></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>INDOT Aug 5 letting — bid prep</td>
+  <td><span class="owner owner-jonathan">Jonathan</span> <span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-planned">Planned</span></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>INDOT Sep 2 letting — bid prep (last pre-IIJA)</td>
+  <td><span class="owner owner-jonathan">Jonathan</span> <span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-planned">Planned</span></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>Lock aggregate pricing (Midwest Quarry, 6-12 mo)</td>
+  <td><span class="owner owner-brad">Brad</span></td>
+  <td><span class="pill pill-planned">Planned</span></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+
+<!-- PHASE 5: MARKETING -->
+<tr><td colspan="13" style="background:var(--text);color:white;font-weight:700;font-size:0.72rem;letter-spacing:0.06em;text-transform:uppercase;padding:6px 12px;">Phase 5: Marketing &amp; Digital Presence</td></tr>
+
+<tr>
+  <td>Website content drafts (About, Services, Blog x2)</td>
+  <td><span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-done">Done</span></td>
+  <td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-done"></div></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>Fix pierfoundations.com broken links</td>
+  <td><span class="owner owner-brad">Brad</span></td>
+  <td><span class="pill pill-blocked">Blocked</span></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>Add new pages to pierfoundations.com</td>
+  <td><span class="owner owner-brad">Brad</span> <span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-blocked">Blocked</span></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>Google Business Profile setup/optimization</td>
+  <td><span class="owner owner-brad">Brad</span> <span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-planned">Planned</span></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>LinkedIn Company Page — create and start posting</td>
+  <td><span class="owner owner-derek">Derek</span> <span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-planned">Planned</span></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"><div class="bar bar-planned"></div></td>
+</tr>
+<tr>
+  <td>Case study development (3-5 projects)</td>
+  <td><span class="owner owner-peter">Peter</span> <span class="owner owner-brad">Brad</span></td>
+  <td><span class="pill pill-planned">Planned</span></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+<tr>
+  <td>Google reviews campaign (target 10+)</td>
+  <td><span class="owner owner-derek">Derek</span></td>
+  <td><span class="pill pill-planned">Planned</span></td>
+  <td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td><td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"><div class="bar bar-planned"></div></td><td class="date-cell"></td><td class="date-cell"></td>
+</tr>
+
+<!-- PHASE 6: ONGOING -->
+<tr><td colspan="13" style="background:var(--text);color:white;font-weight:700;font-size:0.72rem;letter-spacing:0.06em;text-transform:uppercase;padding:6px 12px;">Ongoing Monitoring</td></tr>
+
+<tr>
+  <td>IIJA reauthorization tracking</td>
+  <td><span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-active">Active</span></td>
+  <td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-active"></div></td>
+  <td class="date-cell"><div class="bar bar-active"></div></td>
+  <td class="date-cell"><div class="bar bar-active"></div></td><td class="date-cell"><div class="bar bar-active"></div></td><td class="date-cell"><div class="bar bar-active"></div></td><td class="date-cell"><div class="bar bar-active"></div></td><td class="date-cell"><div class="bar bar-active"></div></td><td class="date-cell"><div class="bar bar-active"></div></td><td class="date-cell"><div class="bar bar-planned"></div></td>
+</tr>
+<tr>
+  <td>INDOT/ODOT bid board monitoring (weekly)</td>
+  <td><span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-active">Active</span></td>
+  <td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-active"></div></td>
+  <td class="date-cell"><div class="bar bar-active"></div></td>
+  <td class="date-cell"><div class="bar bar-active"></div></td><td class="date-cell"><div class="bar bar-active"></div></td><td class="date-cell"><div class="bar bar-active"></div></td><td class="date-cell"><div class="bar bar-active"></div></td><td class="date-cell"><div class="bar bar-active"></div></td><td class="date-cell"><div class="bar bar-active"></div></td><td class="date-cell"><div class="bar bar-planned"></div></td>
+</tr>
+<tr>
+  <td>Competitor monitoring (Keller, CNC, Geopier, Menard)</td>
+  <td><span class="owner owner-peter">Peter</span></td>
+  <td><span class="pill pill-active">Active</span></td>
+  <td class="date-cell"></td>
+  <td class="date-cell"><div class="bar bar-active"></div></td>
+  <td class="date-cell"><div class="bar bar-active"></div></td>
+  <td class="date-cell"><div class="bar bar-active"></div></td><td class="date-cell"><div class="bar bar-active"></div></td><td class="date-cell"><div class="bar bar-active"></div></td><td class="date-cell"><div class="bar bar-active"></div></td><td class="date-cell"><div class="bar bar-active"></div></td><td class="date-cell"><div class="bar bar-active"></div></td><td class="date-cell"><div class="bar bar-planned"></div></td>
+</tr>
+
+</tbody>
+</table>
+</div>
+
+</div>
+
+<!-- ============================================================ -->
+<!-- ACTIVITY DIARY -->
+<!-- ============================================================ -->
+<div id="diary" class="section">
+
+<h2>Activity Diary</h2>
+
+<div class="diary-entry">
+  <div class="diary-date">May 21, 2026 — Day 1</div>
+  <div class="diary-title">Peter Activated &amp; Initial Setup</div>
+  <ul class="diary-items">
+    <li>Peter AI civilization born and evolution completed (6 teams: Research, Identity, Wow Moments, Gifts, Infrastructure, Domain)</li>
+    <li>Researched pierfoundations.com — found broken email link (goes to contact@construcfy.com), broken phone link (260-417-6950 instead of 260-766-6094), placeholder social media links</li>
+    <li>Found LinkedIn company page (21 followers, 2-10 employees, Partnership type)</li>
+    <li>Cleaned all inappropriate language from system files per Brad's direction</li>
+    <li>Seeded 111 agents into portal Agent Roster database</li>
+    <li>Built Command Center panel v1-v3 (multiple design iterations per Brad's feedback)</li>
+    <li>Launched overnight research: market intel, leads/digital, dashboard design patterns</li>
+    <li>Imported 17 new skills from AiCIV Skills Hub (5,600+ scanned)</li>
+    <li>Built Vendor Scorecard tool and Market Intelligence Brief (evolution gifts)</li>
+    <li>Created custom team leads: ops-lead, bd-lead, intel-lead</li>
+  </ul>
+</div>
+
+<div class="diary-entry">
+  <div class="diary-date">May 22, 2026 — Day 2</div>
+  <div class="diary-title">Strategic Research &amp; Business Development Foundation</div>
+  <ul class="diary-items">
+    <li>Delivered overnight research results: Market &amp; Competitive Intel (Sections 2,3,5,6), Lead Generation &amp; Digital Presence (Sections 4,7)</li>
+    <li>Built Strategic Intelligence Report (HTML, 64KB, 1,995 lines) — accessible at portal /static/</li>
+    <li>Redesigned Command Center v4 — monochrome + amber accent, proper table alignment</li>
+    <li>Industry news briefing: tariffs (steel 50%, inputs up 12.6%), OSHA changes, IIJA cliff risk, Fort Wayne development</li>
+    <li>Researched government relief mechanisms for material cost increases — found DOT price adjustment clauses (96% of DOTs), no direct federal subsidies</li>
+    <li>Developed contract pipeline strategy: 4 tiers (Public IIJA, Data Centers, Private Commercial, Adjacent DOTs)</li>
+    <li>Built Strategy Briefing Report (HTML) for Brad to email partners — covers tariffs, IIJA risk, pipeline, action items</li>
+    <li>Completed SWOT analysis — 7 strengths, 7 weaknesses, 8 opportunities, 6 threats</li>
+    <li>Data center lead deep research: Google Fort Wayne (Hagerman likely GC, GME/UES likely geotech), Meta Lebanon (Mortenson + Turner confirmed, subcontractor window closing), CoreWeave Hammond (Decennial Group)</li>
+    <li>GC contact research: 8 contractors with named contacts, phone numbers, emails, procurement methods</li>
+    <li>INDOT/ODOT bid opportunity scan — upcoming lettings July 8, Aug 5, Sep 2</li>
+    <li>Website content drafts: About Us, expanded Services, 2 SEO blog articles, case study template</li>
+    <li>Learned partners: Jonathan (bidding/estimating/submittals), Derek (business development)</li>
+    <li>Created Gantt chart and RACI matrix for project tracking</li>
+  </ul>
+</div>
+
+</div>
+
+<!-- ============================================================ -->
+<!-- RACI MATRIX -->
+<!-- ============================================================ -->
+<div id="raci" class="section">
+
+<h2>RACI Matrix</h2>
+
+<div class="raci-legend">
+  <div class="raci-legend-item"><span class="raci-legend-letter raci-R">R</span> Responsible (does the work)</div>
+  <div class="raci-legend-item"><span class="raci-legend-letter raci-A">A</span> Accountable (owns the outcome)</div>
+  <div class="raci-legend-item"><span class="raci-legend-letter raci-C">C</span> Consulted (provides input)</div>
+  <div class="raci-legend-item"><span class="raci-legend-letter raci-I">I</span> Informed (kept in the loop)</div>
+</div>
+
+<table class="raci-table">
+<thead>
+<tr>
+  <th style="min-width:280px">Activity</th>
+  <th class="raci-person">Brad<br><span style="font-weight:400;font-size:0.58rem;text-transform:none;">CEO</span></th>
+  <th class="raci-person">Jonathan<br><span style="font-weight:400;font-size:0.58rem;text-transform:none;">Estimating</span></th>
+  <th class="raci-person">Derek<br><span style="font-weight:400;font-size:0.58rem;text-transform:none;">Bus. Dev.</span></th>
+  <th class="raci-person">Peter<br><span style="font-weight:400;font-size:0.58rem;text-transform:none;">AI COO</span></th>
+</tr>
+</thead>
+<tbody>
+
+<tr class="raci-category"><td colspan="5">Strategy &amp; Decision Making</td></tr>
+<tr>
+  <td>Overall business strategy</td>
+  <td class="raci-cell raci-A">A</td>
+  <td class="raci-cell raci-C">C</td>
+  <td class="raci-cell raci-C">C</td>
+  <td class="raci-cell raci-C">C</td>
+</tr>
+<tr>
+  <td>Go/no-go on bids</td>
+  <td class="raci-cell raci-A">A</td>
+  <td class="raci-cell raci-R">R</td>
+  <td class="raci-cell raci-C">C</td>
+  <td class="raci-cell raci-C">C</td>
+</tr>
+<tr>
+  <td>Pricing decisions</td>
+  <td class="raci-cell raci-A">A</td>
+  <td class="raci-cell raci-R">R</td>
+  <td class="raci-cell raci-C">C</td>
+  <td class="raci-cell raci-I">I</td>
+</tr>
+<tr>
+  <td>Contract terms / escalation clauses</td>
+  <td class="raci-cell raci-A">A</td>
+  <td class="raci-cell raci-R">R</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-C">C</td>
+</tr>
+<tr>
+  <td>Geographic expansion decisions</td>
+  <td class="raci-cell raci-A">A</td>
+  <td class="raci-cell raci-C">C</td>
+  <td class="raci-cell raci-C">C</td>
+  <td class="raci-cell raci-C">C</td>
+</tr>
+<tr>
+  <td>New service line decisions (rigid inclusions, etc.)</td>
+  <td class="raci-cell raci-A">A</td>
+  <td class="raci-cell raci-C">C</td>
+  <td class="raci-cell raci-C">C</td>
+  <td class="raci-cell raci-C">C</td>
+</tr>
+
+<tr class="raci-category"><td colspan="5">Business Development</td></tr>
+<tr>
+  <td>GC relationship building</td>
+  <td class="raci-cell raci-C">C</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-R">R</td>
+  <td class="raci-cell raci-C">C</td>
+</tr>
+<tr>
+  <td>GC prequalification registration</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-C">C</td>
+  <td class="raci-cell raci-R">R</td>
+  <td class="raci-cell raci-C">C</td>
+</tr>
+<tr>
+  <td>Geotech firm referral relationships</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-R">R</td>
+  <td class="raci-cell raci-C">C</td>
+</tr>
+<tr>
+  <td>Data center project pursuit</td>
+  <td class="raci-cell raci-A">A</td>
+  <td class="raci-cell raci-C">C</td>
+  <td class="raci-cell raci-R">R</td>
+  <td class="raci-cell raci-R">R</td>
+</tr>
+<tr>
+  <td>Lead identification and research</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-C">C</td>
+  <td class="raci-cell raci-R">R</td>
+</tr>
+<tr>
+  <td>Capability statements / proposals</td>
+  <td class="raci-cell raci-A">A</td>
+  <td class="raci-cell raci-C">C</td>
+  <td class="raci-cell raci-R">R</td>
+  <td class="raci-cell raci-R">R</td>
+</tr>
+
+<tr class="raci-category"><td colspan="5">Bidding &amp; Estimating</td></tr>
+<tr>
+  <td>INDOT/ODOT bid preparation</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-R">R</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-C">C</td>
+</tr>
+<tr>
+  <td>Cost estimation</td>
+  <td class="raci-cell raci-A">A</td>
+  <td class="raci-cell raci-R">R</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-I">I</td>
+</tr>
+<tr>
+  <td>Submittal documentation</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-R">R</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-I">I</td>
+</tr>
+<tr>
+  <td>Bid board monitoring (INDOT, ODOT, MDOT, IDOT)</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-C">C</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-R">R</td>
+</tr>
+<tr>
+  <td>Private project bid response</td>
+  <td class="raci-cell raci-A">A</td>
+  <td class="raci-cell raci-R">R</td>
+  <td class="raci-cell raci-C">C</td>
+  <td class="raci-cell raci-C">C</td>
+</tr>
+
+<tr class="raci-category"><td colspan="5">Marketing &amp; Digital Presence</td></tr>
+<tr>
+  <td>Website updates (pierfoundations.com)</td>
+  <td class="raci-cell raci-A">A</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-C">C</td>
+  <td class="raci-cell raci-R">R</td>
+</tr>
+<tr>
+  <td>Blog / content creation</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-C">C</td>
+  <td class="raci-cell raci-R">R</td>
+</tr>
+<tr>
+  <td>LinkedIn content &amp; engagement</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-A">A</td>
+  <td class="raci-cell raci-R">R</td>
+</tr>
+<tr>
+  <td>Google Business Profile management</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-A">A</td>
+  <td class="raci-cell raci-R">R</td>
+</tr>
+<tr>
+  <td>Case study development</td>
+  <td class="raci-cell raci-C">C</td>
+  <td class="raci-cell raci-C">C</td>
+  <td class="raci-cell raci-A">A</td>
+  <td class="raci-cell raci-R">R</td>
+</tr>
+<tr>
+  <td>SEO strategy &amp; keyword targeting</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-C">C</td>
+  <td class="raci-cell raci-R">R</td>
+</tr>
+
+<tr class="raci-category"><td colspan="5">Research &amp; Intelligence</td></tr>
+<tr>
+  <td>Market &amp; competitive intelligence</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-C">C</td>
+  <td class="raci-cell raci-R">R</td>
+</tr>
+<tr>
+  <td>Industry news monitoring</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-R">R</td>
+</tr>
+<tr>
+  <td>IIJA / regulatory tracking</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-C">C</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-R">R</td>
+</tr>
+<tr>
+  <td>Pricing / material cost monitoring</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-A">A</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-R">R</td>
+</tr>
+<tr>
+  <td>Competitor activity monitoring</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-C">C</td>
+  <td class="raci-cell raci-R">R</td>
+</tr>
+
+<tr class="raci-category"><td colspan="5">Operations &amp; Infrastructure</td></tr>
+<tr>
+  <td>AI portal / tools management</td>
+  <td class="raci-cell raci-A">A</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-R">R</td>
+</tr>
+<tr>
+  <td>Report generation</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-R">R</td>
+</tr>
+<tr>
+  <td>Vendor / supplier research</td>
+  <td class="raci-cell raci-A">A</td>
+  <td class="raci-cell raci-C">C</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-R">R</td>
+</tr>
+<tr>
+  <td>OSHA / safety compliance monitoring</td>
+  <td class="raci-cell raci-A">A</td>
+  <td class="raci-cell raci-C">C</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-R">R</td>
+</tr>
+<tr>
+  <td>Insurance / bonding management</td>
+  <td class="raci-cell raci-A">A</td>
+  <td class="raci-cell raci-C">C</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-I">I</td>
+</tr>
+<tr>
+  <td>DFI / ADSC membership</td>
+  <td class="raci-cell raci-A">A</td>
+  <td class="raci-cell raci-I">I</td>
+  <td class="raci-cell raci-C">C</td>
+  <td class="raci-cell raci-R">R</td>
+</tr>
+
+</tbody>
+</table>
+
+</div>
+
+</div>
+
+<script>
+function showTab(id) {
+  document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('active'); });
+  document.querySelectorAll('.nav a').forEach(function(a) { a.classList.remove('active'); });
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+}
+</script>
+
+</body>
+</html>

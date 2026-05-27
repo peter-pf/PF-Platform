@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pier Foundations — Strategy Briefing | May 22, 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-alt: #f8fafc;
+    --text: #1e293b;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
+    --accent: #2563eb;
+    --accent-light: #dbeafe;
+    --accent-dark: #1e40af;
+    --border: #e2e8f0;
+    --border-dark: #cbd5e1;
+    --green: #059669;
+    --green-bg: #ecfdf5;
+    --red: #dc2626;
+    --red-bg: #fef2f2;
+    --yellow: #d97706;
+    --yellow-bg: #fffbeb;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .container {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 40px 32px;
+  }
+
+  /* Header */
+  .report-header {
+    border-bottom: 3px solid var(--accent);
+    padding-bottom: 24px;
+    margin-bottom: 32px;
+  }
+
+  .report-header .company-name {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+
+  .report-header h1 {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--text);
+    line-height: 1.2;
+    margin-bottom: 4px;
+  }
+
+  .report-header .subtitle {
+    font-size: 16px;
+    font-weight: 400;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+  }
+
+  .report-header .meta {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .report-header .meta span {
+    margin-right: 16px;
+  }
+
+  /* Sections */
+  .section {
+    margin-bottom: 36px;
+    page-break-inside: avoid;
+  }
+
+  .section-number {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+
+  .section h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section h3 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    margin-top: 20px;
+    margin-bottom: 10px;
+  }
+
+  .section p {
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    font-size: 13.5px;
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 16px 0;
+    font-size: 13px;
+  }
+
+  thead th {
+    background: var(--accent);
+    color: #ffffff;
+    font-weight: 600;
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  thead th:first-child {
+    border-radius: 4px 0 0 0;
+  }
+
+  thead th:last-child {
+    border-radius: 0 4px 0 0;
+  }
+
+  tbody td {
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-secondary);
+  }
+
+  tbody tr:nth-child(even) {
+    background: var(--bg-alt);
+  }
+
+  tbody tr:hover {
+    background: var(--accent-light);
+  }
+
+  /* Bullet lists */
+  ul, ol {
+    margin: 8px 0 14px 0;
+    padding-left: 20px;
+  }
+
+  li {
+    color: var(--text-secondary);
+    margin-bottom: 5px;
+    font-size: 13.5px;
+  }
+
+  li strong {
+    color: var(--text);
+  }
+
+  /* Callout boxes */
+  .callout {
+    border-left: 4px solid var(--accent);
+    background: var(--bg-alt);
+    padding: 12px 16px;
+    margin: 12px 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 13px;
+  }
+
+  .callout.green {
+    border-left-color: var(--green);
+    background: var(--green-bg);
+  }
+
+  .callout.red {
+    border-left-color: var(--red);
+    background: var(--red-bg);
+  }
+
+  .callout.yellow {
+    border-left-color: var(--yellow);
+    background: var(--yellow-bg);
+  }
+
+  .callout p {
+    margin: 0;
+    color: var(--text);
+  }
+
+  /* Action items */
+  .action-list {
+    counter-reset: action;
+    list-style: none;
+    padding-left: 0;
+  }
+
+  .action-list li {
+    counter-increment: action;
+    display: flex;
+    align-items: flex-start;
+    padding: 10px 14px;
+    margin-bottom: 2px;
+    border-radius: 4px;
+    font-size: 13.5px;
+  }
+
+  .action-list li:nth-child(odd) {
+    background: var(--bg-alt);
+  }
+
+  .action-list li::before {
+    content: counter(action);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 50%;
+    margin-right: 12px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .action-owner {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    margin-left: 6px;
+    white-space: nowrap;
+  }
+
+  .owner-brad {
+    background: var(--accent-light);
+    color: var(--accent-dark);
+  }
+
+  .owner-peter {
+    background: #e0e7ff;
+    color: #3730a3;
+  }
+
+  .owner-both {
+    background: #fae8ff;
+    color: #7e22ce;
+  }
+
+  /* Bottom line box */
+  .bottom-line {
+    background: var(--bg-alt);
+    border: 2px solid var(--accent);
+    border-radius: 6px;
+    padding: 20px 24px;
+    margin-top: 8px;
+  }
+
+  .bottom-line p {
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.7;
+    margin: 0;
+  }
+
+  /* Footer */
+  .report-footer {
+    margin-top: 40px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .report-footer .confidential {
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 4px;
+    color: var(--text-muted);
+  }
+
+  /* Note styling */
+  .note {
+    font-size: 12.5px;
+    color: var(--text-muted);
+    font-style: italic;
+    margin: 6px 0 12px 0;
+  }
+
+  /* Tier labels */
+  .tier-label {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 3px 10px;
+    border-radius: 3px;
+    margin-bottom: 8px;
+  }
+
+  .tier-1 { background: var(--accent-light); color: var(--accent-dark); }
+  .tier-2 { background: #dcfce7; color: #166534; }
+  .tier-3 { background: #fef3c7; color: #92400e; }
+  .tier-4 { background: #e0e7ff; color: #3730a3; }
+
+  /* Print styles */
+  @media print {
+    body {
+      font-size: 12px;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .container {
+      max-width: 100%;
+      padding: 20px;
+    }
+
+    .report-header {
+      padding-bottom: 16px;
+      margin-bottom: 20px;
+    }
+
+    .report-header h1 {
+      font-size: 24px;
+    }
+
+    .section {
+      margin-bottom: 24px;
+      page-break-inside: avoid;
+    }
+
+    .section h2 {
+      font-size: 17px;
+    }
+
+    table {
+      font-size: 11px;
+    }
+
+    thead th {
+      padding: 7px 10px;
+      font-size: 10px;
+    }
+
+    tbody td {
+      padding: 6px 10px;
+    }
+
+    .action-list li {
+      padding: 7px 10px;
+      font-size: 12px;
+    }
+
+    .bottom-line {
+      padding: 14px 18px;
+    }
+
+    .bottom-line p {
+      font-size: 12px;
+    }
+
+    .report-footer {
+      margin-top: 24px;
+    }
+
+    a { color: var(--text); text-decoration: none; }
+  }
+
+  /* Responsive */
+  @media (max-width: 640px) {
+    .container { padding: 20px 16px; }
+    .report-header h1 { font-size: 22px; }
+    table { font-size: 12px; }
+    thead th, tbody td { padding: 7px 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <header class="report-header">
+    <div class="company-name">Pier Foundations</div>
+    <h1>Strategy Briefing</h1>
+    <div class="subtitle">Market Conditions, Risk Mitigation, and Contract Pipeline</div>
+    <div class="meta">
+      <span>May 22, 2026</span>
+      <span>Prepared by Peter (AI COO)</span>
+    </div>
+  </header>
+
+  <!-- Section 1: Market Conditions -->
+  <div class="section">
+    <div class="section-number">Section 1</div>
+    <h2>Current Market Conditions Affecting Pier Foundations</h2>
+
+    <h3>Tariff Impact on Construction Materials</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Material</th>
+          <th>Tariff / Increase</th>
+          <th>Impact</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Steel</strong></td>
+          <td>50% tariff</td>
+          <td>Up 20.7% year-over-year</td>
+        </tr>
+        <tr>
+          <td><strong>Aggregate / Concrete</strong></td>
+          <td>No direct tariff</td>
+          <td>4-6% increase expected through 2026</td>
+        </tr>
+        <tr>
+          <td><strong>Overall Construction Inputs</strong></td>
+          <td>Multiple tariff categories</td>
+          <td>Surged 12.6% annualized (fastest since 2022)</td>
+        </tr>
+        <tr>
+          <td><strong>Total Project Costs</strong></td>
+          <td>--</td>
+          <td>Up approximately 3-6%</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout green">
+      <p><strong>Key Insight:</strong> Steel-heavy deep foundations get MORE expensive under tariffs, making Pier Foundations' VSC solution MORE competitive. Our existing 30-50% cost advantage over traditional deep foundations <strong>widens</strong> as steel prices rise.</p>
+    </div>
+
+    <h3>IIJA Funding Cliff Risk</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>IIJA Authorization Expiration</strong></td>
+          <td>September 30, 2026</td>
+        </tr>
+        <tr>
+          <td><strong>Allocated So Far</strong></td>
+          <td>$568B of $1.2T total (47%)</td>
+        </tr>
+        <tr>
+          <td><strong>Already Rescinded</strong></td>
+          <td>$2.3B</td>
+        </tr>
+        <tr>
+          <td><strong>Remaining to Allocate</strong></td>
+          <td>$492B</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout yellow">
+      <p><strong>If Congress does not reauthorize:</strong> Unobligated funds for discretionary programs expire and new lettings pause. However, projects already under contract continue getting paid.</p>
+    </div>
+
+    <p>The next highway bill is expected to be "significantly higher" than IIJA (per Granite Construction CEO), but timing remains uncertain.</p>
+  </div>
+
+  <!-- Section 2: Government Relief -->
+  <div class="section">
+    <div class="section-number">Section 2</div>
+    <h2>Government Relief Mechanisms</h2>
+
+    <h3>Federal Level</h3>
+    <ul>
+      <li>No direct subsidies for tariff-driven cost increases</li>
+      <li>Tax incentives (179D, 45L, Clean Energy ITC) benefit building owners, not directly subcontractors</li>
+      <li>Surface transportation reauthorization pending -- if passed on time, should stabilize supply</li>
+    </ul>
+
+    <h3>State DOT Price Adjustment Clauses</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Material</th>
+          <th>% of State DOTs with Adjustment Clause</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Fuel</td>
+          <td>84%</td>
+        </tr>
+        <tr>
+          <td>Asphalt</td>
+          <td>80%</td>
+        </tr>
+        <tr>
+          <td>Steel</td>
+          <td>36%</td>
+        </tr>
+        <tr>
+          <td>Cement</td>
+          <td>6%</td>
+        </tr>
+        <tr>
+          <td>Aggregate</td>
+          <td>Not typically covered</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout red">
+      <p><strong>Note:</strong> Most clauses require a 5% price swing to trigger. Aggregate -- Pier Foundations' primary material -- is NOT typically covered by price adjustment clauses.</p>
+    </div>
+
+    <h3>Indiana State Incentives</h3>
+    <ul>
+      <li><strong>Industrial Development Grant Fund (IDGF)</strong> -- cash grants for infrastructure tied to business expansions</li>
+      <li><strong>Redevelopment Tax Credit</strong> -- up to 30% of qualified investment</li>
+      <li><strong>Enterprise Zone benefits</strong> -- investment deductions in designated areas</li>
+      <li><strong>2026 priority shift:</strong> Indiana prioritizing companies paying 125%+ of county average wage</li>
+    </ul>
+
+    <h3>Recommended Actions</h3>
+    <ol>
+      <li>Add ConsensusDocs 200.1 price escalation clauses to every private contract</li>
+      <li>Verify INDOT's specific price adjustment clause provisions before bidding DOT work</li>
+      <li>Lock in aggregate pricing with suppliers (Midwest Quarry in Woodburn, 15 miles from Fort Wayne)</li>
+      <li>Monitor IIJA reauthorization closely</li>
+    </ol>
+  </div>
+
+  <!-- Section 3: Contract Pipeline -->
+  <div class="section">
+    <div class="section-number">Section 3</div>
+    <h2>Lock In Revenue Before September 30</h2>
+
+    <p>With 4 months until IIJA expires, the strategy is simple: bid aggressively on public work now (these contracts get paid even if funding lapses), while simultaneously building private-sector relationships that don't depend on government funding at all.</p>
+
+    <!-- Tier 1 -->
+    <span class="tier-label tier-1">Tier 1 -- Public Infrastructure (IIJA-Funded)</span>
+    <h3>INDOT Remaining Lettings Before Deadline</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Letting Date</th>
+          <th>Status</th>
+          <th>Action Required</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>July 8, 2026</strong></td>
+          <td>Coming -- new electronic bidding starts</td>
+          <td>Register on Bidx.com NOW</td>
+        </tr>
+        <tr>
+          <td><strong>August 5, 2026</strong></td>
+          <td>Coming</td>
+          <td>Monitor for bridge/foundation work</td>
+        </tr>
+        <tr>
+          <td><strong>September 2, 2026</strong></td>
+          <td>Last before IIJA expires</td>
+          <td>Bid aggressively</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout">
+      <p><strong>INDOT Electronic Bidding Migration:</strong> INDOT is migrating to Bidx.com starting June 10. Registration required. Contact: John Wooden at INDOT (317-233-5743 / jwooden@indot.in.gov)</p>
+    </div>
+
+    <p class="note">Ohio DOT: Record $3.4B construction season, 977 new projects, 739 bridges.</p>
+
+    <!-- Tier 2 -->
+    <span class="tier-label tier-2">Tier 2 -- Data Centers (Private, No Government Dependency)</span>
+    <table>
+      <thead>
+        <tr>
+          <th>Project</th>
+          <th>Value</th>
+          <th>Timeline</th>
+          <th>General Contractor</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Google Fort Wayne</strong> (Project Zodiac)</td>
+          <td>$2B+</td>
+          <td>Active development</td>
+          <td>TBD -- identify GC and geotech engineer</td>
+        </tr>
+        <tr>
+          <td><strong>Meta Lebanon</strong> (Project Domino)</td>
+          <td>$10B</td>
+          <td>Broke ground Feb 2026</td>
+          <td>Mortenson + Turner</td>
+        </tr>
+        <tr>
+          <td><strong>Cologix Ohio</strong></td>
+          <td>$7B total campus</td>
+          <td>Phase 1 underway</td>
+          <td>TBD</td>
+        </tr>
+        <tr>
+          <td><strong>CoreWeave Hammond</strong></td>
+          <td>180 MW</td>
+          <td>Pre-construction</td>
+          <td>TBD</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout green">
+      <p><strong>Opportunity:</strong> A single data center building = $200K-$1M+ in ground improvement work. These projects run 2-5 years. Completely independent of IIJA funding.</p>
+    </div>
+
+    <!-- Tier 3 -->
+    <span class="tier-label tier-3">Tier 3 -- Private Commercial</span>
+    <table>
+      <thead>
+        <tr>
+          <th>Project</th>
+          <th>Location</th>
+          <th>Value / Size</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Neighborhood Infrastructure</strong></td>
+          <td>Fort Wayne</td>
+          <td>$37M ($28.4M roads/bridges)</td>
+        </tr>
+        <tr>
+          <td><strong>Electric Works Phase II</strong></td>
+          <td>Fort Wayne</td>
+          <td>296 units + commercial</td>
+        </tr>
+        <tr>
+          <td><strong>The Landing Exchange</strong></td>
+          <td>Fort Wayne</td>
+          <td>40 units + 5,000 SF commercial</td>
+        </tr>
+        <tr>
+          <td><strong>Amazon Fulfillment Center</strong></td>
+          <td>Greenfield, IN</td>
+          <td>1M SF</td>
+        </tr>
+        <tr>
+          <td><strong>IU Health Academic Center</strong></td>
+          <td>Indianapolis</td>
+          <td>Multi-phase through 2027</td>
+        </tr>
+        <tr>
+          <td><strong>Stellantis Engine Plant</strong></td>
+          <td>Kokomo, IN</td>
+          <td>$100M+</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Tier 4 -->
+    <span class="tier-label tier-4">Tier 4 -- Adjacent State DOTs</span>
+    <table>
+      <thead>
+        <tr>
+          <th>State</th>
+          <th>Opportunity</th>
+          <th>Monitoring Link</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Ohio</strong></td>
+          <td>$3.4B season, 977 projects, 739 bridges</td>
+          <td>ODOT Contracts &amp; Proposals</td>
+        </tr>
+        <tr>
+          <td><strong>Michigan</strong></td>
+          <td>2026-2030 Five-Year Program</td>
+          <td>MDOT Projects &amp; Studies</td>
+        </tr>
+        <tr>
+          <td><strong>Illinois</strong></td>
+          <td>Monthly lettings, $10.3B data center spending</td>
+          <td>IDOT Letting and Bidding</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Section 4: Action Items -->
+  <div class="section">
+    <div class="section-number">Section 4</div>
+    <h2>Priority Actions -- Next 30 Days</h2>
+
+    <ol class="action-list">
+      <li>
+        <div>Register for INDOT electronic bidding on Bidx.com <span class="action-owner owner-brad">Brad -- before June 10</span></div>
+      </li>
+      <li>
+        <div>Verify INDOT prequalification status is current <span class="action-owner owner-brad">Brad</span></div>
+      </li>
+      <li>
+        <div>Add price escalation clauses to all new contracts (use ConsensusDocs 200.1) <span class="action-owner owner-brad">Brad</span></div>
+      </li>
+      <li>
+        <div>Lock aggregate pricing with Midwest Quarry for 6-12 months <span class="action-owner owner-brad">Brad</span></div>
+      </li>
+      <li>
+        <div>Identify GC and geotech engineer for Google Fort Wayne data center <span class="action-owner owner-peter">Peter</span></div>
+      </li>
+      <li>
+        <div>Contact Mortenson/Turner re: Meta Lebanon subcontractor opportunities <span class="action-owner owner-both">Brad + Peter</span></div>
+      </li>
+      <li>
+        <div>Pull INDOT 18-month letting list for July-September opportunities <span class="action-owner owner-peter">Peter</span></div>
+      </li>
+      <li>
+        <div>Monitor ODOT and MDOT bid boards weekly <span class="action-owner owner-peter">Peter</span></div>
+      </li>
+      <li>
+        <div>Begin outreach to target GCs: Pepper Construction, Hagerman Group, Shiel Sexton, Barton Malow <span class="action-owner owner-brad">Brad</span></div>
+      </li>
+      <li>
+        <div>Track IIJA reauthorization progress -- flag any developments <span class="action-owner owner-peter">Peter</span></div>
+      </li>
+    </ol>
+  </div>
+
+  <!-- Section 5: Bottom Line -->
+  <div class="section">
+    <div class="section-number">Section 5</div>
+    <h2>The Bottom Line</h2>
+
+    <div class="bottom-line">
+      <p>The market is moving in Pier Foundations' favor: tariffs on steel make our VSC solution more cost-competitive, and the Midwest is experiencing unprecedented construction demand from data centers, infrastructure, and industrial development. The risk is a potential public funding gap if IIJA reauthorization stalls. The mitigation is straightforward: lock in public contracts before September 30, build private-sector data center relationships that don't depend on government funding, and protect margins with price escalation clauses and locked-in material pricing. The worst position is an empty pipeline in Q1 2027.</p>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="report-footer">
+    <div>Prepared by Peter (AI COO) | Pier Foundations</div>
+    <div class="confidential">Confidential</div>
+  </footer>
+
+</div>
+</body>
+</html>
