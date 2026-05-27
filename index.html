@@ -39,19 +39,19 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 28px;
+  padding: 12px 28px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-1);
 }
 .topbar-left {
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-0);
 }
 .topbar-right {
-  font-size: 0.66rem;
+  font-size: 0.72rem;
   font-weight: 500;
   color: var(--text-3);
   letter-spacing: 0.04em;
@@ -66,13 +66,13 @@ body {
 }
 .kpi {
   flex: 1;
-  padding: 14px 24px;
+  padding: 16px 24px;
   text-align: center;
   border-right: 1px solid var(--border);
 }
 .kpi:last-child { border-right: none; }
 .kpi-label {
-  font-size: 0.58rem;
+  font-size: 0.65rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -80,12 +80,19 @@ body {
   margin-bottom: 4px;
 }
 .kpi-value {
-  font-size: 1.5rem;
+  font-size: 1.6rem;
   font-weight: 700;
   color: var(--text-0);
   font-variant-numeric: tabular-nums;
 }
 .kpi-value.amber { color: var(--amber); }
+/* Net cash KPI */
+.kpi-value.positive { color: var(--green); }
+.kpi-sub {
+  font-size: 0.62rem;
+  color: var(--text-3);
+  margin-top: 2px;
+}
 
 /* ---- SECTIONS ---- */
 .main-content {
@@ -115,17 +122,29 @@ body {
   align-items: center;
 }
 .panel-title {
-  font-size: 0.62rem;
+  font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--text-2);
 }
 .panel-count {
-  font-size: 0.58rem;
+  font-size: 0.62rem;
   font-weight: 600;
   color: var(--text-3);
 }
+
+/* Data source indicator */
+.data-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.dot-sample { background: var(--dim); }
+.dot-live { background: var(--green); }
 
 /* ---- PIPELINE TABLE ---- */
 .pipeline-table {
@@ -133,35 +152,74 @@ body {
   border-collapse: collapse;
 }
 .pipeline-table th {
-  font-size: 0.56rem;
+  font-size: 0.62rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-3);
   text-align: left;
-  padding: 6px 12px;
+  padding: 7px 14px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-2);
+  cursor: pointer;
+  user-select: none;
+}
+.pipeline-table th:hover { color: var(--text-1); }
+.pipeline-table th.sorted::after {
+  content: ' ^';
+  font-size: 0.5rem;
+}
+.pipeline-table th.sorted.desc::after {
+  content: ' v';
 }
 .pipeline-table th:nth-child(3),
 .pipeline-table td:nth-child(3) { text-align: right; }
 .pipeline-table td {
-  font-size: 0.72rem;
-  padding: 8px 12px;
+  font-size: 0.82rem;
+  padding: 10px 14px;
   border-bottom: 1px solid rgba(42,49,64,0.5);
   color: var(--text-1);
   white-space: nowrap;
 }
 .pipeline-table tr:last-child td { border-bottom: none; }
-.pipeline-table tr:hover { background: var(--bg-2); }
+.pipeline-table tbody tr { cursor: pointer; transition: background 0.1s; }
+.pipeline-table tbody tr:hover { background: var(--bg-2); }
+
+/* Pipeline row expand */
+.pipeline-detail {
+  display: none;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+}
+.pipeline-detail.open { display: table-row; }
+.pipeline-detail td {
+  padding: 12px 14px 14px;
+  font-size: 0.78rem;
+  color: var(--text-2);
+  line-height: 1.6;
+  white-space: normal;
+}
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 24px;
+}
+.detail-label {
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+}
+.detail-val { color: var(--text-1); font-size: 0.82rem; }
 
 .pill {
   display: inline-block;
-  font-size: 0.52rem;
+  font-size: 0.58rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  padding: 2px 7px;
+  padding: 3px 8px;
   border-radius: 3px;
 }
 .pill-pursuing { background: rgba(83,155,245,0.15); color: var(--blue); }
@@ -177,55 +235,95 @@ body {
 .alert-item {
   display: flex;
   gap: 10px;
-  padding: 8px 14px;
+  padding: 9px 14px;
   border-bottom: 1px solid rgba(42,49,64,0.4);
-  font-size: 0.72rem;
-  line-height: 1.45;
+  font-size: 0.82rem;
+  line-height: 1.5;
   align-items: flex-start;
 }
 .alert-item:last-child { border-bottom: none; }
 .alert-item:hover { background: var(--bg-2); }
 .alert-tag {
   flex-shrink: 0;
-  font-size: 0.5rem;
+  font-size: 0.56rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  padding: 2px 6px;
+  padding: 3px 7px;
   border-radius: 3px;
-  margin-top: 1px;
+  margin-top: 2px;
 }
 .tag-urgent { background: rgba(212,149,42,0.2); color: var(--amber); }
 .tag-watch { background: rgba(83,155,245,0.12); color: var(--blue); }
 .tag-info { background: rgba(61,68,77,0.3); color: var(--text-3); }
 .alert-text { color: var(--text-1); }
 .alert-text .val { color: var(--amber); font-weight: 600; }
+.alert-impact {
+  font-size: 0.62rem;
+  color: var(--text-3);
+  margin-left: auto;
+  flex-shrink: 0;
+  text-align: right;
+  min-width: 60px;
+}
 
 /* ---- INTEL FEED ---- */
 .intel-list { padding: 4px 0; }
 .intel-item {
   display: flex;
   gap: 10px;
-  padding: 7px 14px;
+  padding: 9px 14px;
   border-bottom: 1px solid rgba(42,49,64,0.4);
-  font-size: 0.7rem;
-  line-height: 1.45;
+  font-size: 0.82rem;
+  line-height: 1.5;
   align-items: flex-start;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.1s;
 }
 .intel-item:last-child { border-bottom: none; }
 .intel-item:hover { background: var(--bg-2); }
 .intel-date {
   flex-shrink: 0;
-  font-size: 0.58rem;
+  font-size: 0.65rem;
   font-weight: 600;
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
-  min-width: 42px;
+  min-width: 44px;
+  margin-top: 2px;
 }
 .intel-text { color: var(--text-2); }
 .intel-text strong { color: var(--text-1); font-weight: 600; }
+.intel-source {
+  font-size: 0.58rem;
+  color: var(--dim);
+  margin-top: 2px;
+}
 
 /* ---- MONEY ---- */
+.money-net {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+}
+.money-net-label {
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+}
+.money-net-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--green);
+}
+
 .money-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -236,23 +334,31 @@ body {
 }
 .money-col:last-child { border-right: none; }
 .money-col-header {
-  font-size: 0.56rem;
+  font-size: 0.62rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   padding: 8px 14px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 .money-col-header.income { color: var(--green); }
 .money-col-header.expense { color: var(--amber); }
+.money-col-total {
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
 .money-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 7px 14px;
+  padding: 9px 14px;
   border-bottom: 1px solid rgba(42,49,64,0.4);
-  font-size: 0.7rem;
+  font-size: 0.82rem;
 }
 .money-row:last-child { border-bottom: none; }
 .money-row:hover { background: var(--bg-2); }
@@ -266,16 +372,15 @@ body {
   color: var(--text-0);
 }
 .money-due {
-  font-size: 0.6rem;
+  font-size: 0.68rem;
   color: var(--text-3);
-  min-width: 60px;
+  min-width: 64px;
   text-align: right;
 }
 .money-row.late .money-due { color: var(--amber); font-weight: 600; }
-.money-row.done { text-decoration: line-through; }
-.money-row.done .money-name,
-.money-row.done .money-amt,
-.money-row.done .money-due { color: var(--dim); }
+.money-row.late .money-amt { color: var(--amber); }
+.money-row.done { opacity: 0.4; }
+.money-row.done .money-name { text-decoration: line-through; }
 
 /* ---- REPORTS ---- */
 .report-list { padding: 4px 0; }
@@ -283,9 +388,9 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 7px 14px;
+  padding: 9px 14px;
   border-bottom: 1px solid rgba(42,49,64,0.4);
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   cursor: pointer;
   text-decoration: none;
   color: var(--text-1);
@@ -301,16 +406,19 @@ body {
 .report-name { flex: 1; }
 .report-item:not(.disabled) .report-name { color: var(--blue); }
 .report-status {
-  font-size: 0.52rem;
+  font-size: 0.58rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  padding: 2px 7px;
+  padding: 3px 8px;
   border-radius: 3px;
 }
 .status-live { background: rgba(63,185,80,0.12); color: var(--green); }
-.status-building { background: rgba(83,155,245,0.1); color: var(--blue); }
-.status-planned { background: rgba(61,68,77,0.25); color: var(--dim); }
+.report-needs {
+  font-size: 0.62rem;
+  color: var(--text-3);
+  font-style: italic;
+}
 
 /* ---- FOOTER ---- */
 .footer {
@@ -319,7 +427,7 @@ body {
   align-items: center;
   padding: 10px 28px;
   border-top: 1px solid var(--border);
-  font-size: 0.58rem;
+  font-size: 0.62rem;
   color: var(--dim);
   margin-top: 8px;
 }
@@ -338,7 +446,7 @@ body {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 8px 20px;
+  padding: 10px 20px;
   background: var(--bg-1);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
@@ -347,9 +455,9 @@ body {
   background: var(--bg-3);
   border: 1px solid var(--border);
   color: var(--text-1);
-  padding: 5px 14px;
+  padding: 6px 16px;
   border-radius: 4px;
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
   font-family: 'Inter', sans-serif;
@@ -357,7 +465,7 @@ body {
 }
 #viewer-back:hover { background: #333b48; }
 #viewer-title {
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   color: var(--text-3);
   font-weight: 500;
 }
@@ -380,6 +488,7 @@ body {
   .money-grid { grid-template-columns: 1fr; }
   .money-col { border-right: none; border-bottom: 1px solid var(--border); }
   .main-content { padding: 12px; }
+  .detail-grid { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -410,8 +519,9 @@ body {
     <div class="kpi-value amber">$31,400</div>
   </div>
   <div class="kpi">
-    <div class="kpi-label">Win Rate</div>
-    <div class="kpi-value">67%</div>
+    <div class="kpi-label">Net Cash Position</div>
+    <div class="kpi-value positive">+$143,400</div>
+    <div class="kpi-sub">AR $170,900 - AP $27,500</div>
   </div>
 </div>
 
@@ -423,54 +533,107 @@ body {
   <!-- PIPELINE -->
   <div class="panel">
     <div class="panel-header">
-      <span class="panel-title">Pipeline</span>
+      <span class="panel-title">Pipeline<span class="data-dot dot-sample" title="Sample data"></span></span>
       <span class="panel-count">5 projects</span>
     </div>
-    <table class="pipeline-table">
+    <table class="pipeline-table" id="pipelineTable">
       <thead>
         <tr>
-          <th>Status</th>
-          <th>Project</th>
-          <th>Value</th>
-          <th>GC</th>
-          <th>Due</th>
+          <th data-sort="status">Status</th>
+          <th data-sort="project">Project</th>
+          <th data-sort="value">Value</th>
+          <th data-sort="gc">GC</th>
+          <th data-sort="due">Due</th>
         </tr>
       </thead>
       <tbody>
-        <tr>
+        <tr class="pipeline-row" data-idx="0">
           <td><span class="pill pill-pursuing">Pursuing</span></td>
           <td>Google FW Phase 3</td>
           <td>$800K</td>
           <td>Hagerman</td>
           <td>TBD</td>
         </tr>
-        <tr>
+        <tr class="pipeline-detail" data-idx="0">
+          <td colspan="5">
+            <div class="detail-grid">
+              <div><div class="detail-label">Location</div><div class="detail-val">Fort Wayne, IN (Adams Center Rd)</div></div>
+              <div><div class="detail-label">Contact</div><div class="detail-val">Ray Van Amburg, VP of BD</div></div>
+              <div><div class="detail-label">Scope</div><div class="detail-val">VSC for 3 buildings, 867,000 SF total (Phase 3)</div></div>
+              <div><div class="detail-label">Next Step</div><div class="detail-val">Confirm Hagerman as GC via GME/UES geotech contact</div></div>
+              <div><div class="detail-label">Soil Conditions</div><div class="detail-val">Glacial till, lake clay, high water table -- ideal for VSC</div></div>
+              <div><div class="detail-label">Competition</div><div class="detail-val">CNC Foundations (Indianapolis office), Subsurface Constructors</div></div>
+            </div>
+          </td>
+        </tr>
+        <tr class="pipeline-row" data-idx="1">
           <td><span class="pill pill-pursuing">Pursuing</span></td>
           <td>Meta Lebanon</td>
           <td>$1.2M</td>
           <td>Mortenson / Turner</td>
           <td>Active</td>
         </tr>
-        <tr>
+        <tr class="pipeline-detail" data-idx="1">
+          <td colspan="5">
+            <div class="detail-grid">
+              <div><div class="detail-label">Location</div><div class="detail-val">LEAP District, Lebanon, Boone County, IN</div></div>
+              <div><div class="detail-label">Contact</div><div class="detail-val">Tom Schmitt (Turner) -- tschmitt@tcco.com</div></div>
+              <div><div class="detail-label">Scope</div><div class="detail-val">$10B campus, 1,500 acres, 13 buildings, 4M SF, 1 GW</div></div>
+              <div><div class="detail-label">Next Step</div><div class="detail-val">Register on Mortenson TradeTapp + Turner prequalification</div></div>
+              <div><div class="detail-label">Soil Conditions</div><div class="detail-val">Glacial till, agricultural clay, 1,500 acres greenfield</div></div>
+              <div><div class="detail-label">Status</div><div class="detail-val">GCs actively packaging subcontractor scopes NOW</div></div>
+            </div>
+          </td>
+        </tr>
+        <tr class="pipeline-row" data-idx="2">
           <td><span class="pill pill-bid">Bid Out</span></td>
           <td>INDOT SR-930 Bridge</td>
           <td>$145K</td>
           <td>Direct</td>
           <td>Jul 8</td>
         </tr>
-        <tr>
+        <tr class="pipeline-detail" data-idx="2">
+          <td colspan="5">
+            <div class="detail-grid">
+              <div><div class="detail-label">Location</div><div class="detail-val">Allen County, Fort Wayne -- Bridge over Maumee River</div></div>
+              <div><div class="detail-label">Letting</div><div class="detail-val">INDOT July 8 letting (first electronic bidding on Bidx.com)</div></div>
+              <div><div class="detail-label">Scope</div><div class="detail-val">Bridge deck overlay, potential foundation improvement</div></div>
+              <div><div class="detail-label">Next Step</div><div class="detail-val">Register on Bidx.com before Jun 10</div></div>
+            </div>
+          </td>
+        </tr>
+        <tr class="pipeline-row" data-idx="3">
           <td><span class="pill pill-won">Won</span></td>
           <td>Walsh Warehouse FW</td>
           <td>$89K</td>
           <td>Walsh Group</td>
           <td>Jun 15</td>
         </tr>
-        <tr class="row-dim">
+        <tr class="pipeline-detail" data-idx="3">
+          <td colspan="5">
+            <div class="detail-grid">
+              <div><div class="detail-label">Location</div><div class="detail-val">Fort Wayne, IN</div></div>
+              <div><div class="detail-label">Scope</div><div class="detail-val">VSC installation for warehouse foundation</div></div>
+              <div><div class="detail-label">Mobilization</div><div class="detail-val">Jun 15, 2026</div></div>
+              <div><div class="detail-label">Status</div><div class="detail-val">Contract signed, awaiting mobilization</div></div>
+            </div>
+          </td>
+        </tr>
+        <tr class="pipeline-row row-dim" data-idx="4">
           <td><span class="pill pill-complete">Complete</span></td>
           <td>Hensel Phelps Indy</td>
           <td>$47K</td>
           <td>Hensel Phelps</td>
           <td>Done</td>
+        </tr>
+        <tr class="pipeline-detail" data-idx="4">
+          <td colspan="5">
+            <div class="detail-grid">
+              <div><div class="detail-label">Location</div><div class="detail-val">Indianapolis, IN</div></div>
+              <div><div class="detail-label">Result</div><div class="detail-val">Completed on schedule. Payment received May 19.</div></div>
+              <div><div class="detail-label">Case Study</div><div class="detail-val">Pending -- need soil data and photos for write-up</div></div>
+            </div>
+          </td>
         </tr>
       </tbody>
     </table>
@@ -479,33 +642,39 @@ body {
   <!-- ALERTS & ACTION -->
   <div class="panel">
     <div class="panel-header">
-      <span class="panel-title">Alerts & Action</span>
+      <span class="panel-title">Alerts &amp; Action<span class="data-dot dot-sample" title="Sample data"></span></span>
       <span class="panel-count">6 items</span>
     </div>
     <div class="alert-list">
       <div class="alert-item">
         <span class="alert-tag tag-urgent">Urgent</span>
-        <span class="alert-text">AR -- Brasfield & Gorrie <span class="val">$31,400</span> (45d overdue)</span>
+        <span class="alert-text">AR -- Brasfield &amp; Gorrie <span class="val">$31,400</span> (45d overdue)</span>
+        <span class="alert-impact">-$31.4K</span>
       </div>
       <div class="alert-item">
         <span class="alert-tag tag-urgent">Urgent</span>
         <span class="alert-text">Register Mortenson TradeTapp -- bid window closing</span>
+        <span class="alert-impact">$1.2M at risk</span>
       </div>
       <div class="alert-item">
         <span class="alert-tag tag-watch">Watch</span>
-        <span class="alert-text">OSHA 30 -- J. Martinez expires 12d</span>
+        <span class="alert-text">OSHA 30 -- J. Martinez expires in 12 days</span>
+        <span class="alert-impact">Jun 2</span>
       </div>
       <div class="alert-item">
         <span class="alert-tag tag-watch">Watch</span>
         <span class="alert-text">Vibroflot #3 maintenance -- 200h over schedule</span>
+        <span class="alert-impact">Downtime risk</span>
       </div>
       <div class="alert-item">
         <span class="alert-tag tag-info">Info</span>
-        <span class="alert-text">INDOT switching to Bidx.com Jun 10</span>
+        <span class="alert-text">INDOT switching to Bidx.com electronic bidding</span>
+        <span class="alert-impact">Jun 10</span>
       </div>
       <div class="alert-item">
         <span class="alert-tag tag-info">Info</span>
-        <span class="alert-text">IIJA expires Sep 30 -- 4 months remaining</span>
+        <span class="alert-text">IIJA authorization expires -- 4 months remaining</span>
+        <span class="alert-impact">Sep 30</span>
       </div>
     </div>
   </div>
@@ -513,34 +682,30 @@ body {
   <!-- INTEL FEED -->
   <div class="panel">
     <div class="panel-header">
-      <span class="panel-title">Intel Feed</span>
+      <span class="panel-title">Intel Feed<span class="data-dot dot-live" title="Live data"></span></span>
       <span class="panel-count">Industry</span>
     </div>
     <div class="intel-list">
-      <div class="intel-item">
+      <a class="intel-item" href="https://www.constructiondive.com/news/tariffs-construction-input-prices-january-2026/813419/" target="_blank" rel="noopener">
         <span class="intel-date">May 22</span>
-        <span class="intel-text"><strong>Steel tariffs 50%</strong> -- VSC cost advantage widening</span>
-      </div>
-      <div class="intel-item">
+        <span class="intel-text"><strong>Steel tariffs 50%</strong> -- VSC cost advantage widening<div class="intel-source">Source: Construction Dive</div></span>
+      </a>
+      <a class="intel-item" href="https://www.wkyc.com/article/traffic/construction/ohio-construction-2026-cleveland-akron-odot-northeast-projects-department-of-transportaiotn/95-6bcfe546-f230-439d-b820-fd9159904e85" target="_blank" rel="noopener">
         <span class="intel-date">May 22</span>
-        <span class="intel-text"><strong>Ohio DOT $3.4B</strong> season -- 977 projects, 739 bridges</span>
-      </div>
-      <div class="intel-item">
+        <span class="intel-text"><strong>Ohio DOT $3.4B</strong> season -- 977 projects, 739 bridges<div class="intel-source">Source: WKYC / ODOT</div></span>
+      </a>
+      <a class="intel-item" href="https://www.oshaoutreachcourses.com/blog/osha-changes-and-preparation/" target="_blank" rel="noopener">
         <span class="intel-date">May 18</span>
-        <span class="intel-text"><strong>OSHA silica limits</strong> update -- effective Jul 1</span>
-      </div>
-      <div class="intel-item">
+        <span class="intel-text"><strong>OSHA silica limits</strong> update -- effective Jul 1<div class="intel-source">Source: OSHA Outreach</div></span>
+      </a>
+      <a class="intel-item" href="https://www.in.gov/indot/projects/" target="_blank" rel="noopener">
         <span class="intel-date">May 15</span>
-        <span class="intel-text"><strong>Indiana DOT $340M</strong> highway expansion announced</span>
-      </div>
-      <div class="intel-item">
+        <span class="intel-text"><strong>Indiana DOT $340M</strong> highway expansion announced<div class="intel-source">Source: INDOT</div></span>
+      </a>
+      <a class="intel-item" href="https://www.keller.com/" target="_blank" rel="noopener">
         <span class="intel-date">May 12</span>
-        <span class="intel-text"><strong>Keller Q1:</strong> 12% growth in N. America</span>
-      </div>
-      <div class="intel-item">
-        <span class="intel-date">May 8</span>
-        <span class="intel-text"><strong>Steel prices</strong> drop 8% MoM -- material cost pressure easing</span>
-      </div>
+        <span class="intel-text"><strong>Keller Q1:</strong> 12% growth in N. America<div class="intel-source">Source: Keller Group</div></span>
+      </a>
     </div>
   </div>
 
@@ -552,12 +717,19 @@ body {
   <!-- MONEY -->
   <div class="panel">
     <div class="panel-header">
-      <span class="panel-title">Money</span>
+      <span class="panel-title">Money<span class="data-dot dot-sample" title="Sample data"></span></span>
       <span class="panel-count">In / Out</span>
+    </div>
+    <div class="money-net">
+      <span class="money-net-label">Net Cash Position</span>
+      <span class="money-net-value">+$143,400</span>
     </div>
     <div class="money-grid">
       <div class="money-col">
-        <div class="money-col-header income">Money In</div>
+        <div class="money-col-header income">
+          <span>Money In</span>
+          <span class="money-col-total">$170,900</span>
+        </div>
         <div class="money-row">
           <span class="money-name">Turner Construction</span>
           <span class="money-amt">$68,200</span>
@@ -569,7 +741,7 @@ body {
           <span class="money-due">Jun 15</span>
         </div>
         <div class="money-row late">
-          <span class="money-name">Brasfield & Gorrie</span>
+          <span class="money-name">Brasfield &amp; Gorrie</span>
           <span class="money-amt">$31,400</span>
           <span class="money-due">45d LATE</span>
         </div>
@@ -580,7 +752,10 @@ body {
         </div>
       </div>
       <div class="money-col">
-        <div class="money-col-header expense">Money Out</div>
+        <div class="money-col-header expense">
+          <span>Money Out</span>
+          <span class="money-col-total">$27,500</span>
+        </div>
         <div class="money-row">
           <span class="money-name">Martin Marietta</span>
           <span class="money-amt">$8,200</span>
@@ -608,7 +783,7 @@ body {
   <!-- REPORTS & TOOLS -->
   <div class="panel">
     <div class="panel-header">
-      <span class="panel-title">Reports & Tools</span>
+      <span class="panel-title">Reports &amp; Tools<span class="data-dot dot-live" title="Live"></span></span>
       <span class="panel-count">8 items</span>
     </div>
     <div class="report-list">
@@ -624,8 +799,8 @@ body {
         <span class="report-name">Platform Blueprint</span>
         <span class="report-status status-live">Live</span>
       </a>
-      <a class="report-item report-link" href="internal/raci/project-tracker.html" data-title="Project Tracker & RACI">
-        <span class="report-name">Project Tracker & RACI</span>
+      <a class="report-item report-link" href="internal/raci/project-tracker.html" data-title="Project Tracker &amp; RACI">
+        <span class="report-name">Project Tracker &amp; RACI</span>
         <span class="report-status status-live">Live</span>
       </a>
       <a class="report-item report-link" href="internal/reports/team-action-items.html" data-title="Team Action Items">
@@ -634,15 +809,15 @@ body {
       </a>
       <div class="report-item disabled">
         <span class="report-name">SWOT Analysis</span>
-        <span class="report-status status-building">Building</span>
+        <span class="report-needs">Needs: PF branding to finalize</span>
       </div>
       <div class="report-item disabled">
         <span class="report-name">Bid Calendar</span>
-        <span class="report-status status-planned">Planned</span>
+        <span class="report-needs">Needs: INDOT Bidx.com registration</span>
       </div>
       <div class="report-item disabled">
         <span class="report-name">GC Tracker</span>
-        <span class="report-status status-planned">Planned</span>
+        <span class="report-needs">Needs: Derek's relationship data</span>
       </div>
     </div>
   </div>
@@ -654,7 +829,7 @@ body {
 <!-- FOOTER -->
 <div class="footer">
   <span>Updated: <span id="footer-time"></span></span>
-  <span>Placeholder data -- connect systems for live numbers</span>
+  <span><span class="data-dot dot-sample"></span> Sample data &nbsp; <span class="data-dot dot-live"></span> Live data</span>
   <span>Built by Peter (AI COO)</span>
 </div>
 
@@ -682,6 +857,67 @@ body {
   h = h % 12 || 12;
   var timeStr = dateStr + ' ' + h + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
   document.getElementById('footer-time').textContent = timeStr;
+
+  // Pipeline row expand/collapse
+  document.querySelectorAll('.pipeline-row').forEach(function(row) {
+    row.addEventListener('click', function() {
+      var idx = this.getAttribute('data-idx');
+      var detail = document.querySelector('.pipeline-detail[data-idx="' + idx + '"]');
+      if (detail) {
+        detail.classList.toggle('open');
+      }
+    });
+  });
+
+  // Column sorting
+  var sortState = {};
+  document.querySelectorAll('.pipeline-table th[data-sort]').forEach(function(th) {
+    th.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var col = this.getAttribute('data-sort');
+      var table = document.getElementById('pipelineTable');
+      var tbody = table.querySelector('tbody');
+      var rows = [];
+      var pipelineRows = tbody.querySelectorAll('.pipeline-row');
+
+      pipelineRows.forEach(function(row) {
+        var detail = tbody.querySelector('.pipeline-detail[data-idx="' + row.getAttribute('data-idx') + '"]');
+        rows.push({ row: row, detail: detail });
+      });
+
+      var colIdx = Array.from(th.parentNode.children).indexOf(th);
+      var asc = sortState[col] !== 'asc';
+      sortState[col] = asc ? 'asc' : 'desc';
+
+      // Clear sorted classes
+      document.querySelectorAll('.pipeline-table th').forEach(function(t) {
+        t.classList.remove('sorted', 'desc');
+      });
+      th.classList.add('sorted');
+      if (!asc) th.classList.add('desc');
+
+      rows.sort(function(a, b) {
+        var aVal = a.row.children[colIdx].textContent.replace(/[$,KM]/g, '');
+        var bVal = b.row.children[colIdx].textContent.replace(/[$,KM]/g, '');
+        var aNum = parseFloat(aVal);
+        var bNum = parseFloat(bVal);
+        if (!isNaN(aNum) && !isNaN(bNum)) {
+          // Handle K and M suffixes
+          if (a.row.children[colIdx].textContent.includes('K')) aNum *= 1000;
+          if (a.row.children[colIdx].textContent.includes('M')) aNum *= 1000000;
+          if (b.row.children[colIdx].textContent.includes('K')) bNum *= 1000;
+          if (b.row.children[colIdx].textContent.includes('M')) bNum *= 1000000;
+          return asc ? aNum - bNum : bNum - aNum;
+        }
+        return asc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      });
+
+      rows.forEach(function(item) {
+        tbody.appendChild(item.row);
+        if (item.detail) tbody.appendChild(item.detail);
+      });
+    });
+  });
 
   // Viewer
   window.openViewer = function(url, title) {
