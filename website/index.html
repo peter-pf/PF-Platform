@@ -12,19 +12,23 @@
     <meta property="og:url" content="https://pierfoundations.com">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
         :root {
-            --white: #ffffff;
-            --off-white: #f8f9fa;
-            --navy: #0C1B2A;
+            --bg: #0a0e17;
+            --surface: #111827;
+            --glass: rgba(255, 255, 255, 0.06);
+            --glass-border: rgba(255, 255, 255, 0.10);
+            --glass-hover: rgba(255, 255, 255, 0.10);
             --accent: #D4703C;
-            --accent-hover: #c0612f;
-            --text-dark: #1a1a2e;
-            --text-muted: #64748b;
-            --border: #e5e7eb;
+            --accent-hover: #e07d47;
+            --accent-glow: rgba(212, 112, 60, 0.4);
+            --accent-glow-subtle: rgba(212, 112, 60, 0.15);
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --text-dim: #475569;
             --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         }
 
@@ -32,13 +36,14 @@
 
         body {
             font-family: var(--font);
-            color: var(--text-dark);
-            background: var(--white);
+            color: var(--text);
+            background: var(--bg);
             overflow-x: hidden;
             line-height: 1.8;
             font-size: 1rem;
             font-weight: 400;
             -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
         .container {
@@ -53,12 +58,46 @@
         /* ========== SCROLL REVEAL ========== */
         .reveal {
             opacity: 0;
-            transform: translateY(30px);
-            transition: opacity 0.7s ease, transform 0.7s ease;
+            transform: translateY(40px) scale(0.98);
+            transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+                        transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
         }
         .reveal.visible {
             opacity: 1;
-            transform: translateY(0);
+            transform: translateY(0) scale(1);
+        }
+        .reveal-d1 { transition-delay: 0.1s; }
+        .reveal-d2 { transition-delay: 0.2s; }
+        .reveal-d3 { transition-delay: 0.3s; }
+        .reveal-d4 { transition-delay: 0.4s; }
+        .reveal-d5 { transition-delay: 0.5s; }
+
+        /* ========== PHOTO REVEAL ========== */
+        .photo-reveal {
+            overflow: hidden;
+            border-radius: 16px;
+        }
+        .photo-reveal img {
+            transition: transform 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+            transform: scale(1.1);
+        }
+        .photo-reveal.visible img {
+            transform: scale(1);
+        }
+
+        /* ========== SECTION BACKGROUND TEXT ========== */
+        .section-bg-text {
+            position: absolute;
+            font-size: clamp(6rem, 15vw, 12rem);
+            font-weight: 900;
+            color: rgba(255, 255, 255, 0.02);
+            text-transform: uppercase;
+            pointer-events: none;
+            white-space: nowrap;
+            top: -20px;
+            left: -20px;
+            z-index: 0;
+            user-select: none;
         }
 
         /* ========== SECTION LABEL ========== */
@@ -72,9 +111,9 @@
         }
 
         .section-title {
-            font-size: clamp(2rem, 4vw, 3.5rem);
+            font-size: clamp(2rem, 4vw, 3rem);
             font-weight: 700;
-            color: var(--text-dark);
+            color: var(--text);
             line-height: 1.15;
             margin-bottom: 24px;
         }
@@ -94,12 +133,15 @@
             left: 0;
             right: 0;
             z-index: 1000;
-            background: var(--white);
-            border-bottom: 1px solid var(--border);
-            transition: box-shadow 0.3s ease;
+            background: transparent;
+            transition: background 0.4s ease, backdrop-filter 0.4s ease, border-color 0.4s ease;
+            border-bottom: 1px solid transparent;
         }
         .nav.scrolled {
-            box-shadow: 0 1px 8px rgba(0,0,0,0.06);
+            background: rgba(10, 14, 23, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
         }
         .nav-inner {
             display: flex;
@@ -120,7 +162,7 @@
         .nav-links a {
             font-size: 0.9rem;
             font-weight: 500;
-            color: var(--text-dark);
+            color: rgba(255, 255, 255, 0.8);
             transition: color 0.2s;
         }
         .nav-links a:hover {
@@ -129,19 +171,21 @@
         .nav-phone {
             font-size: 0.9rem;
             font-weight: 600;
-            color: var(--text-dark);
+            color: rgba(255, 255, 255, 0.9);
         }
         .nav-cta {
             background: var(--accent);
-            color: var(--white);
+            color: #ffffff;
             padding: 10px 24px;
-            border-radius: 4px;
+            border-radius: 8px;
             font-size: 0.85rem;
             font-weight: 600;
-            transition: background 0.2s;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 20px rgba(212, 112, 60, 0.2);
         }
         .nav-cta:hover {
-            background: var(--accent-hover);
+            box-shadow: 0 0 30px rgba(212, 112, 60, 0.4);
+            transform: translateY(-1px);
         }
         .nav-hamburger {
             display: none;
@@ -154,7 +198,7 @@
             display: block;
             width: 24px;
             height: 2px;
-            background: var(--text-dark);
+            background: var(--text);
             margin: 6px 0;
             transition: all 0.3s;
         }
@@ -162,117 +206,173 @@
         /* ========== HERO ========== */
         .hero {
             position: relative;
-            min-height: 85vh;
+            min-height: 100vh;
             display: flex;
-            align-items: center;
-            margin-top: 72px;
+            flex-direction: column;
+            justify-content: center;
             overflow: hidden;
         }
         .hero-bg {
             position: absolute;
-            inset: 0;
+            inset: -10%;
             background-image: url('https://cdn.prod.website-files.com/6657f77de37d943d68146136/66b1acf48c9b0dd8c4f7c92a_cropped1.png');
             background-size: cover;
             background-position: center;
+            will-change: transform;
         }
         .hero-overlay {
             position: absolute;
             inset: 0;
-            background: linear-gradient(to right, rgba(12,27,42,0.82) 0%, rgba(12,27,42,0.55) 60%, rgba(12,27,42,0.3) 100%);
+            background: linear-gradient(
+                135deg,
+                rgba(10, 14, 23, 0.92) 0%,
+                rgba(10, 14, 23, 0.75) 40%,
+                rgba(10, 14, 23, 0.5) 70%,
+                rgba(10, 14, 23, 0.4) 100%
+            );
         }
         .hero-content {
             position: relative;
             z-index: 2;
-            max-width: 680px;
-            padding: 80px 0;
+            max-width: 720px;
+            padding: 160px 0 180px;
         }
         .hero-label {
             font-size: 0.8rem;
             font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 3px;
+            letter-spacing: 4px;
             color: var(--accent);
-            margin-bottom: 20px;
+            margin-bottom: 24px;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: heroFadeIn 0.8s 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
         .hero-title {
-            font-size: clamp(2.5rem, 5.5vw, 4.5rem);
+            font-size: clamp(3rem, 7vw, 5.5rem);
             font-weight: 700;
             color: #ffffff;
-            line-height: 1.08;
-            margin-bottom: 20px;
+            line-height: 1.05;
+            margin-bottom: 24px;
+            text-shadow: 0 0 80px rgba(212, 112, 60, 0.15);
+            opacity: 0;
+            transform: translateY(30px);
+            animation: heroFadeIn 0.8s 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
         .hero-subtitle {
-            font-size: 1.15rem;
+            font-size: 1.2rem;
             font-weight: 400;
-            color: rgba(255,255,255,0.8);
+            color: rgba(255, 255, 255, 0.7);
             line-height: 1.7;
-            margin-bottom: 40px;
+            margin-bottom: 48px;
             max-width: 520px;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: heroFadeIn 0.8s 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
         .hero-buttons {
             display: flex;
             gap: 16px;
             flex-wrap: wrap;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: heroFadeIn 0.8s 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
+
+        @keyframes heroFadeIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         .btn-primary {
             background: var(--accent);
             color: #ffffff;
-            padding: 14px 32px;
-            border-radius: 4px;
+            padding: 16px 36px;
+            border-radius: 10px;
             font-size: 0.95rem;
             font-weight: 600;
             border: none;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: all 0.3s ease;
             display: inline-flex;
             align-items: center;
             gap: 8px;
+            box-shadow: 0 0 20px rgba(212, 112, 60, 0.3);
         }
-        .btn-primary:hover { background: var(--accent-hover); }
+        .btn-primary:hover {
+            box-shadow: 0 0 40px rgba(212, 112, 60, 0.5);
+            transform: translateY(-2px);
+        }
         .btn-outline {
-            background: transparent;
+            background: rgba(255, 255, 255, 0.06);
             color: #ffffff;
-            padding: 14px 32px;
-            border-radius: 4px;
+            padding: 16px 36px;
+            border-radius: 10px;
             font-size: 0.95rem;
             font-weight: 600;
-            border: 1px solid rgba(255,255,255,0.4);
+            border: 1px solid rgba(255, 255, 255, 0.15);
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.3s ease;
             display: inline-flex;
             align-items: center;
             gap: 8px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
         }
         .btn-outline:hover {
-            border-color: #ffffff;
-            background: rgba(255,255,255,0.08);
+            border-color: rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
         }
 
-        /* ========== STATS BAR ========== */
-        .stats {
-            padding: 64px 0;
-            background: var(--white);
-            border-bottom: 1px solid var(--border);
+        /* ========== HERO STATS ========== */
+        .hero-stats {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 3;
+            padding: 0 24px 48px;
         }
-        .stats-grid {
+        .hero-stats-inner {
+            max-width: 1200px;
+            margin: 0 auto;
             display: grid;
             grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+        .stat-card {
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 24px;
             text-align: center;
+            transition: all 0.4s ease;
+            opacity: 0;
+            transform: translateY(30px);
+            animation: heroFadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
-        .stat-item {
-            padding: 16px 24px;
-            border-right: 1px solid var(--border);
+        .stat-card:nth-child(1) { animation-delay: 1.1s; }
+        .stat-card:nth-child(2) { animation-delay: 1.2s; }
+        .stat-card:nth-child(3) { animation-delay: 1.3s; }
+        .stat-card:nth-child(4) { animation-delay: 1.4s; }
+        .stat-card:hover {
+            border-color: rgba(212, 112, 60, 0.3);
+            box-shadow: 0 0 30px rgba(212, 112, 60, 0.1);
         }
-        .stat-item:last-child { border-right: none; }
         .stat-number {
-            font-size: 2.5rem;
+            font-size: 2rem;
             font-weight: 700;
-            color: var(--text-dark);
+            color: #ffffff;
             line-height: 1.1;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
         .stat-label {
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             font-weight: 500;
             color: var(--text-muted);
             text-transform: uppercase;
@@ -282,7 +382,9 @@
         /* ========== SERVICES ========== */
         .services {
             padding: 140px 0;
-            background: var(--white);
+            background: var(--bg);
+            position: relative;
+            overflow: hidden;
         }
         .services-top {
             display: grid;
@@ -292,64 +394,104 @@
             margin-bottom: 80px;
         }
         .services-photo {
-            border-radius: 4px;
+            border-radius: 16px;
             overflow: hidden;
         }
         .services-photo img {
             width: 100%;
             height: 100%;
             object-fit: cover;
+            transition: transform 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+            transform: scale(1.05);
+        }
+        .services-photo.visible img {
+            transform: scale(1);
         }
         .advantages-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 32px;
+            gap: 20px;
         }
         .advantage-card {
-            padding: 36px 32px;
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            transition: box-shadow 0.2s;
+            padding: 36px 28px;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            transition: all 0.4s ease;
+            position: relative;
+            overflow: hidden;
         }
+        .advantage-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 50% 0%, rgba(212, 112, 60, 0.06) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+        .advantage-card:hover::before { opacity: 1; }
         .advantage-card:hover {
-            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            border-color: rgba(212, 112, 60, 0.3);
+            box-shadow: 0 0 30px rgba(212, 112, 60, 0.1), 0 25px 50px rgba(0, 0, 0, 0.3);
+            transform: translateY(-4px);
         }
         .advantage-icon {
-            font-size: 1.5rem;
-            margin-bottom: 16px;
-            display: block;
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: rgba(212, 112, 60, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
             color: var(--accent);
-            line-height: 1;
+        }
+        .advantage-icon svg {
+            width: 24px;
+            height: 24px;
+            stroke: var(--accent);
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
         }
         .advantage-title {
             font-size: 1.1rem;
             font-weight: 600;
-            color: var(--text-dark);
-            margin-bottom: 8px;
+            color: var(--text);
+            margin-bottom: 10px;
         }
         .advantage-text {
             font-size: 0.9rem;
             font-weight: 400;
             color: var(--text-muted);
-            line-height: 1.6;
+            line-height: 1.7;
         }
 
         /* ========== VIDEO ========== */
         .video-section {
             padding: 140px 0;
-            background: var(--off-white);
+            background: var(--surface);
+            position: relative;
+            overflow: hidden;
         }
         .video-header {
             text-align: center;
             margin-bottom: 56px;
         }
+        .video-header .section-text {
+            margin: 0 auto;
+        }
+        .video-frame {
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.4), 0 0 1px rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
         .video-wrap {
             position: relative;
             width: 100%;
             padding-bottom: 56.25%;
-            border-radius: 4px;
-            overflow: hidden;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
         }
         .video-wrap iframe {
             position: absolute;
@@ -363,18 +505,16 @@
             text-align: center;
             margin-top: 24px;
             font-size: 0.9rem;
-            color: var(--text-muted);
+            color: var(--text-dim);
         }
 
         /* ========== ABOUT ========== */
         .about {
             padding: 140px 0;
-            background: var(--navy);
-            color: #ffffff;
+            background: var(--bg);
+            position: relative;
+            overflow: hidden;
         }
-        .about .section-label { color: var(--accent); }
-        .about .section-title { color: #ffffff; }
-        .about .section-text { color: rgba(255,255,255,0.7); max-width: 100%; }
         .about-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -383,14 +523,19 @@
             margin-bottom: 80px;
         }
         .dr-card {
-            background: #ffffff;
-            color: var(--text-dark);
-            border-radius: 4px;
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-left: 3px solid var(--accent);
+            border-radius: 20px;
             padding: 40px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
         }
         .dr-card-name {
             font-size: 1.3rem;
             font-weight: 700;
+            color: var(--text);
             margin-bottom: 4px;
         }
         .dr-card-title {
@@ -399,7 +544,7 @@
             color: var(--accent);
             text-transform: uppercase;
             letter-spacing: 1px;
-            margin-bottom: 20px;
+            margin-bottom: 24px;
         }
         .dr-card-list {
             list-style: none;
@@ -408,11 +553,25 @@
         .dr-card-list li {
             font-size: 0.9rem;
             color: var(--text-muted);
-            padding: 8px 0;
-            border-bottom: 1px solid var(--border);
+            padding: 10px 0;
+            padding-left: 20px;
+            position: relative;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
             line-height: 1.5;
         }
+        .dr-card-list li::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #22c55e;
+        }
         .dr-card-list li:last-child { border-bottom: none; }
+
         .team-row {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -420,22 +579,32 @@
         }
         .team-member {
             text-align: center;
+            padding: 32px 24px;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            transition: all 0.3s ease;
+        }
+        .team-member:hover {
+            border-color: rgba(212, 112, 60, 0.2);
         }
         .team-member-name {
             font-size: 1.1rem;
             font-weight: 600;
-            color: #ffffff;
+            color: var(--text);
             margin-bottom: 4px;
         }
         .team-member-role {
             font-size: 0.85rem;
-            color: rgba(255,255,255,0.6);
+            color: var(--text-muted);
         }
 
         /* ========== PROCESS ========== */
         .process {
             padding: 140px 0;
-            background: var(--white);
+            background: var(--surface);
+            position: relative;
+            overflow: hidden;
         }
         .process-header {
             text-align: center;
@@ -447,28 +616,29 @@
         .process-timeline {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 0;
+            gap: 20px;
             position: relative;
         }
-        .process-timeline::before {
-            content: '';
-            position: absolute;
-            top: 28px;
-            left: 16.66%;
-            right: 16.66%;
-            height: 1px;
-            background: var(--border);
-        }
         .process-step {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 36px 28px;
             text-align: center;
-            padding: 0 24px;
+            transition: all 0.4s ease;
+            position: relative;
+        }
+        .process-step:hover {
+            border-color: rgba(212, 112, 60, 0.3);
+            box-shadow: 0 0 30px rgba(212, 112, 60, 0.08);
+            transform: translateY(-4px);
         }
         .step-number {
             width: 56px;
             height: 56px;
-            border-radius: 50%;
-            background: var(--white);
-            border: 2px solid var(--border);
+            border-radius: 14px;
+            background: rgba(212, 112, 60, 0.1);
+            border: 1px solid rgba(212, 112, 60, 0.2);
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -476,28 +646,28 @@
             font-weight: 700;
             color: var(--accent);
             margin-bottom: 20px;
-            position: relative;
-            z-index: 2;
         }
         .step-title {
             font-size: 1.1rem;
             font-weight: 600;
-            color: var(--text-dark);
-            margin-bottom: 8px;
+            color: var(--text);
+            margin-bottom: 10px;
         }
         .step-text {
             font-size: 0.9rem;
             color: var(--text-muted);
-            line-height: 1.6;
+            line-height: 1.7;
         }
         .process-row-2 {
-            margin-top: 64px;
+            margin-top: 20px;
         }
 
         /* ========== PROJECTS ========== */
         .projects {
             padding: 140px 0;
-            background: var(--off-white);
+            background: var(--bg);
+            position: relative;
+            overflow: hidden;
         }
         .projects-header {
             margin-bottom: 56px;
@@ -505,11 +675,11 @@
         .projects-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 32px;
+            gap: 24px;
         }
         .project-card {
             position: relative;
-            border-radius: 4px;
+            border-radius: 16px;
             overflow: hidden;
             aspect-ratio: 4/5;
             cursor: default;
@@ -518,43 +688,57 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transition: transform 0.4s ease;
+            transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
         }
         .project-card:hover img {
-            transform: scale(1.03);
+            transform: scale(1.05);
         }
         .project-card-overlay {
             position: absolute;
             inset: 0;
-            background: linear-gradient(to top, rgba(12,27,42,0.85) 0%, rgba(12,27,42,0.1) 60%);
+            background: linear-gradient(to top, rgba(10, 14, 23, 0.9) 0%, rgba(10, 14, 23, 0.1) 60%);
             display: flex;
             flex-direction: column;
             justify-content: flex-end;
             padding: 32px;
+            transition: background 0.4s ease;
+        }
+        .project-card:hover .project-card-overlay {
+            background: linear-gradient(to top, rgba(10, 14, 23, 0.85) 0%, rgba(10, 14, 23, 0.05) 60%);
+        }
+        .project-card-info {
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 20px;
         }
         .project-type {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 2px;
             color: var(--accent);
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
         .project-name {
-            font-size: 1.25rem;
+            font-size: 1.15rem;
             font-weight: 700;
             color: #ffffff;
-            margin-bottom: 8px;
+            margin-bottom: 4px;
         }
         .project-detail {
-            font-size: 0.85rem;
-            color: rgba(255,255,255,0.7);
+            font-size: 0.8rem;
+            color: var(--text-muted);
         }
 
         /* ========== SERVICE AREA ========== */
         .service-area {
             padding: 140px 0;
-            background: var(--white);
+            background: var(--surface);
+            position: relative;
+            overflow: hidden;
         }
         .area-header {
             text-align: center;
@@ -563,19 +747,29 @@
         .area-header .section-text {
             margin: 0 auto;
         }
-        .area-map {
+        .area-map-wrap {
             max-width: 800px;
             margin: 0 auto 48px;
-            border-radius: 4px;
+            border-radius: 20px;
             overflow: hidden;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+            position: relative;
         }
-        .area-map img {
+        .area-map-wrap img {
             width: 100%;
+            display: block;
+        }
+        .area-map-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to bottom, rgba(10, 14, 23, 0.1) 0%, rgba(10, 14, 23, 0.4) 100%);
+            pointer-events: none;
         }
         .area-states {
             text-align: center;
-            font-size: 0.9rem;
-            color: var(--text-muted);
+            font-size: 0.85rem;
+            color: var(--text-dim);
             line-height: 2;
             max-width: 800px;
             margin: 0 auto;
@@ -584,8 +778,9 @@
         /* ========== CONTACT ========== */
         .contact {
             padding: 140px 0;
-            background: var(--white);
-            border-top: 1px solid var(--border);
+            background: var(--bg);
+            position: relative;
+            overflow: hidden;
         }
         .contact-grid {
             display: grid;
@@ -593,35 +788,49 @@
             gap: 80px;
             align-items: start;
         }
-        .contact-form { display: flex; flex-direction: column; gap: 20px; }
+        .contact-form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
         .form-group { display: flex; flex-direction: column; }
         .form-group label {
             font-size: 0.8rem;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 1px;
-            color: var(--text-dark);
+            color: var(--text-muted);
             margin-bottom: 8px;
         }
         .form-group input,
         .form-group textarea,
         .form-group select {
             padding: 14px 16px;
-            border: 1px solid var(--border);
-            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
             font-family: var(--font);
             font-size: 0.95rem;
-            color: var(--text-dark);
-            background: var(--white);
-            transition: border-color 0.2s;
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.04);
+            transition: all 0.3s ease;
             outline: none;
         }
         .form-group input:focus,
         .form-group textarea:focus,
         .form-group select:focus {
             border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(212, 112, 60, 0.15);
+            background: rgba(255, 255, 255, 0.06);
+        }
+        .form-group input::placeholder,
+        .form-group textarea::placeholder {
+            color: var(--text-dim);
         }
         .form-group textarea { resize: vertical; min-height: 120px; }
+        .form-group select option {
+            background: var(--surface);
+            color: var(--text);
+        }
         .form-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -632,35 +841,44 @@
             color: #ffffff;
             padding: 16px 40px;
             border: none;
-            border-radius: 4px;
+            border-radius: 10px;
             font-family: var(--font);
             font-size: 0.95rem;
             font-weight: 600;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: all 0.3s ease;
             align-self: flex-start;
+            box-shadow: 0 0 20px rgba(212, 112, 60, 0.3);
         }
-        .btn-submit:hover { background: var(--accent-hover); }
-        .contact-info { padding-top: 8px; }
+        .btn-submit:hover {
+            box-shadow: 0 0 40px rgba(212, 112, 60, 0.5);
+            transform: translateY(-2px);
+        }
+        .contact-info {
+            padding-top: 8px;
+        }
+        .contact-info-block {
+            margin-bottom: 32px;
+        }
         .contact-info-label {
             font-size: 0.8rem;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 1px;
-            color: var(--text-muted);
+            color: var(--text-dim);
             margin-bottom: 8px;
         }
         .contact-info-value {
             font-size: 1rem;
-            color: var(--text-dark);
-            margin-bottom: 32px;
+            color: var(--text-muted);
             line-height: 1.7;
         }
         .contact-phone-cta {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--text-dark);
-            margin-top: 24px;
+            margin-top: 40px;
+            padding: 32px;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
         }
         .contact-phone-cta span {
             display: block;
@@ -669,12 +887,21 @@
             color: var(--text-muted);
             margin-bottom: 8px;
         }
+        .contact-phone-cta a {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text);
+            transition: color 0.2s;
+        }
+        .contact-phone-cta a:hover {
+            color: var(--accent);
+        }
 
         /* ========== FOOTER ========== */
         .footer {
-            padding: 64px 0;
-            background: var(--navy);
-            color: rgba(255,255,255,0.6);
+            padding: 48px 0;
+            background: var(--surface);
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
         }
         .footer-inner {
             display: flex;
@@ -682,10 +909,12 @@
             justify-content: space-between;
         }
         .footer-logo img {
-            height: 32px;
+            height: 28px;
             width: auto;
-            opacity: 0.8;
+            opacity: 0.6;
+            transition: opacity 0.2s;
         }
+        .footer-logo:hover img { opacity: 0.9; }
         .footer-links {
             display: flex;
             gap: 32px;
@@ -693,12 +922,13 @@
         }
         .footer-links a {
             font-size: 0.85rem;
-            color: rgba(255,255,255,0.6);
+            color: var(--text-dim);
             transition: color 0.2s;
         }
-        .footer-links a:hover { color: #ffffff; }
+        .footer-links a:hover { color: var(--text); }
         .footer-copy {
             font-size: 0.8rem;
+            color: var(--text-dim);
         }
 
         /* ========== VIDEO MODAL ========== */
@@ -706,11 +936,13 @@
             display: none;
             position: fixed;
             inset: 0;
-            background: rgba(0,0,0,0.85);
+            background: rgba(0, 0, 0, 0.9);
             z-index: 9999;
             align-items: center;
             justify-content: center;
             padding: 40px;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
         }
         .modal-overlay.active { display: flex; }
         .modal-content {
@@ -720,21 +952,29 @@
         }
         .modal-close {
             position: absolute;
-            top: -40px;
+            top: -48px;
             right: 0;
-            background: none;
-            border: none;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
             color: #ffffff;
-            font-size: 1.5rem;
+            font-size: 0.9rem;
             cursor: pointer;
-            padding: 8px;
+            padding: 8px 20px;
             font-family: var(--font);
-            font-weight: 300;
+            font-weight: 500;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+        .modal-close:hover {
+            background: rgba(255, 255, 255, 0.15);
         }
         .modal-video {
             position: relative;
             width: 100%;
             padding-bottom: 56.25%;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
         }
         .modal-video iframe {
             position: absolute;
@@ -743,11 +983,45 @@
             border: 0;
         }
 
+        /* ========== SECTION DIVIDERS ========== */
+        .section-divider {
+            height: 1px;
+            background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.06), transparent);
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        /* ========== REDUCED MOTION ========== */
+        @media (prefers-reduced-motion: reduce) {
+            .reveal {
+                opacity: 1;
+                transform: none;
+                transition: none;
+            }
+            .hero-label, .hero-title, .hero-subtitle, .hero-buttons, .stat-card {
+                opacity: 1;
+                transform: none;
+                animation: none;
+            }
+            .hero-bg {
+                will-change: auto;
+            }
+            .photo-reveal img {
+                transform: none;
+                transition: none;
+            }
+            .services-photo img {
+                transform: none;
+                transition: none;
+            }
+        }
+
         /* ========== RESPONSIVE ========== */
         @media (max-width: 1024px) {
             .services-top { grid-template-columns: 1fr; gap: 48px; }
             .about-grid { grid-template-columns: 1fr; gap: 48px; }
             .advantages-grid { grid-template-columns: repeat(2, 1fr); }
+            .hero-stats-inner { grid-template-columns: repeat(2, 1fr); }
         }
 
         @media (max-width: 768px) {
@@ -760,32 +1034,31 @@
                 top: 72px;
                 left: 0;
                 right: 0;
-                background: var(--white);
+                background: rgba(10, 14, 23, 0.95);
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
                 padding: 24px;
-                border-bottom: 1px solid var(--border);
+                border-bottom: 1px solid rgba(255, 255, 255, 0.06);
                 gap: 20px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.06);
             }
 
-            .hero { min-height: 70vh; }
-            .hero-title { font-size: clamp(2rem, 7vw, 3rem); }
+            .hero { min-height: 100vh; }
+            .hero-content { padding: 140px 0 200px; }
+            .hero-title { font-size: clamp(2.2rem, 8vw, 3.5rem); }
 
-            .stats-grid {
+            .hero-stats-inner {
                 grid-template-columns: repeat(2, 1fr);
-                gap: 0;
+                gap: 12px;
             }
-            .stat-item { padding: 24px 16px; }
-            .stat-item:nth-child(2) { border-right: none; }
-            .stat-item:nth-child(1),
-            .stat-item:nth-child(2) { border-bottom: 1px solid var(--border); }
+            .stat-card { padding: 18px 16px; }
+            .stat-number { font-size: 1.5rem; }
 
             .advantages-grid { grid-template-columns: 1fr; }
-            .process-timeline { grid-template-columns: 1fr; gap: 40px; }
-            .process-timeline::before { display: none; }
-            .process-row-2 { margin-top: 0; }
+            .process-timeline { grid-template-columns: 1fr; gap: 16px; }
+            .process-row-2 { margin-top: 0; gap: 16px; }
             .projects-grid { grid-template-columns: 1fr; }
             .contact-grid { grid-template-columns: 1fr; gap: 56px; }
-            .team-row { grid-template-columns: 1fr; gap: 24px; }
+            .team-row { grid-template-columns: 1fr; gap: 16px; }
             .footer-inner {
                 flex-direction: column;
                 gap: 24px;
@@ -822,36 +1095,37 @@
 
     <!-- HERO -->
     <section class="hero">
-        <div class="hero-bg"></div>
+        <div class="hero-bg" id="heroBg"></div>
         <div class="hero-overlay"></div>
         <div class="container hero-content">
             <div class="hero-label">Vibratory Stone Column Specialists</div>
-            <h1 class="hero-title">Built on Solid Ground</h1>
+            <h1 class="hero-title">Built on<br>Solid Ground</h1>
             <p class="hero-subtitle">Strengthening soil beneath the Midwest's most critical projects.</p>
             <div class="hero-buttons">
                 <a href="#contact" class="btn-primary">Request a Feasibility Analysis</a>
-                <button class="btn-outline" id="watchVideo">Watch Our Story</button>
+                <button class="btn-outline" id="watchVideo">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    Watch Our Story
+                </button>
             </div>
         </div>
-    </section>
 
-    <!-- STATS BAR -->
-    <section class="stats reveal">
-        <div class="container">
-            <div class="stats-grid">
-                <div class="stat-item">
+        <!-- STATS IN HERO -->
+        <div class="hero-stats">
+            <div class="hero-stats-inner">
+                <div class="stat-card">
                     <div class="stat-number"><span class="counter" data-target="50" data-prefix="30-" data-suffix="%">0</span></div>
                     <div class="stat-label">Cost Savings</div>
                 </div>
-                <div class="stat-item">
+                <div class="stat-card">
                     <div class="stat-number"><span class="counter" data-target="60" data-prefix="40-">0</span> /Day</div>
                     <div class="stat-label">Piers Installed</div>
                 </div>
-                <div class="stat-item">
+                <div class="stat-card">
                     <div class="stat-number"><span class="counter" data-target="39">0</span> States</div>
                     <div class="stat-label">Licensed</div>
                 </div>
-                <div class="stat-item">
+                <div class="stat-card">
                     <div class="stat-number"><span class="counter" data-target="4000" data-suffix="+" data-step="100">0</span> PSF</div>
                     <div class="stat-label">Bearing Capacity</div>
                 </div>
@@ -861,47 +1135,60 @@
 
     <!-- SERVICES -->
     <section class="services" id="services">
+        <div class="section-bg-text">Services</div>
         <div class="container">
-            <div class="services-top reveal">
-                <div>
+            <div class="services-top">
+                <div class="reveal">
                     <div class="section-label">What We Do</div>
                     <h2 class="section-title">Ground Improvement<br>That Performs</h2>
                     <p class="section-text">Vibratory Stone Columns strengthen weak soils by displacing and compacting surrounding ground with crushed stone. The result is a reinforced foundation system that delivers the performance of deep foundations at a fraction of the cost and schedule.</p>
                     <p class="section-text" style="margin-top: 16px;">Our approach eliminates the need for costly over-excavation, soil export, and structural fill import -- saving projects 30-50% compared to traditional deep foundation methods.</p>
                 </div>
-                <div class="services-photo">
+                <div class="services-photo photo-reveal reveal reveal-d2">
                     <img src="https://cdn.prod.website-files.com/6657f77de37d943d68146136/669220c18ba59eb9fad100fe_ourservimg1.jpg" alt="Pier Foundations jobsite - vibratory stone column installation" loading="lazy">
                 </div>
             </div>
 
-            <div class="advantages-grid reveal">
-                <div class="advantage-card">
-                    <span class="advantage-icon">&#9660;</span>
+            <div class="advantages-grid">
+                <div class="advantage-card reveal">
+                    <div class="advantage-icon">
+                        <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                    </div>
                     <h3 class="advantage-title">Cost Reduction</h3>
                     <p class="advantage-text">30-50% savings versus traditional deep foundation systems through elimination of over-excavation and structural fill.</p>
                 </div>
-                <div class="advantage-card">
-                    <span class="advantage-icon">&#9201;</span>
+                <div class="advantage-card reveal reveal-d1">
+                    <div class="advantage-icon">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </div>
                     <h3 class="advantage-title">Faster Schedules</h3>
                     <p class="advantage-text">40-60 piers installed per day means shorter construction timelines and earlier building occupancy.</p>
                 </div>
-                <div class="advantage-card">
-                    <span class="advantage-icon">&#9878;</span>
+                <div class="advantage-card reveal reveal-d2">
+                    <div class="advantage-icon">
+                        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    </div>
                     <h3 class="advantage-title">Engineered Solutions</h3>
                     <p class="advantage-text">Licensed Professional Engineer on staff ensuring design integrity from feasibility through final verification.</p>
                 </div>
-                <div class="advantage-card">
-                    <span class="advantage-icon">&#9881;</span>
+                <div class="advantage-card reveal reveal-d3">
+                    <div class="advantage-icon">
+                        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    </div>
                     <h3 class="advantage-title">Proven Technology</h3>
                     <p class="advantage-text">Vibratory stone columns have a 60+ year track record across commercial, industrial, and infrastructure projects worldwide.</p>
                 </div>
-                <div class="advantage-card">
-                    <span class="advantage-icon">&#9733;</span>
+                <div class="advantage-card reveal reveal-d4">
+                    <div class="advantage-icon">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                    </div>
                     <h3 class="advantage-title">National Reach</h3>
                     <p class="advantage-text">Licensed in 39 states with the mobilization capability to serve projects across the country from our Fort Wayne base.</p>
                 </div>
-                <div class="advantage-card">
-                    <span class="advantage-icon">&#9635;</span>
+                <div class="advantage-card reveal reveal-d5">
+                    <div class="advantage-icon">
+                        <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    </div>
                     <h3 class="advantage-title">Quality Assurance</h3>
                     <p class="advantage-text">Every pier is load-tested and verified. Detailed documentation package provided for every project.</p>
                 </div>
@@ -911,38 +1198,44 @@
 
     <!-- VIDEO SECTION -->
     <section class="video-section" id="video">
+        <div class="section-bg-text">Process</div>
         <div class="container">
             <div class="video-header reveal">
                 <div class="section-label">See Our Work</div>
                 <h2 class="section-title">The Process in Action</h2>
             </div>
-            <div class="video-wrap reveal">
-                <iframe src="https://www.youtube.com/embed/M2cyUtMcRgY" title="Pier Foundations - Vibratory Stone Columns" allowfullscreen loading="lazy"></iframe>
+            <div class="video-frame reveal reveal-d1">
+                <div class="video-wrap">
+                    <iframe src="https://www.youtube.com/embed/M2cyUtMcRgY" title="Pier Foundations - Vibratory Stone Columns" allowfullscreen loading="lazy"></iframe>
+                </div>
             </div>
-            <p class="video-caption reveal">Watch how vibratory stone columns are installed to strengthen soil for commercial construction.</p>
+            <p class="video-caption reveal reveal-d2">Watch how vibratory stone columns are installed to strengthen soil for commercial construction.</p>
         </div>
     </section>
 
     <!-- ABOUT -->
     <section class="about" id="about">
+        <div class="section-bg-text">About</div>
         <div class="container">
-            <div class="about-grid reveal">
-                <div>
+            <div class="about-grid">
+                <div class="reveal">
                     <div class="section-label">Who We Are</div>
-                    <h2 class="section-title" style="color:#fff">Owner-Operated.<br>Engineering-Driven.</h2>
+                    <h2 class="section-title">Owner-Operated.<br>Engineering-Driven.</h2>
                     <p class="section-text">Pier Foundations is a Fort Wayne, Indiana-based ground improvement firm specializing exclusively in vibratory stone columns. We are owner-operated, meaning the people who own this company are the same people on your jobsite.</p>
                     <p class="section-text" style="margin-top: 16px;">Our team combines hands-on field experience with licensed engineering expertise to deliver reliable, cost-effective foundation solutions for commercial and industrial construction across the Midwest and beyond.</p>
                 </div>
-                <div class="dr-card">
-                    <div class="dr-card-name">Dr. David Garbin, PE, PhD</div>
-                    <div class="dr-card-title">Chief Engineer</div>
-                    <ul class="dr-card-list">
-                        <li>PhD in Geotechnical Engineering</li>
-                        <li>Licensed Professional Engineer</li>
-                        <li>30+ years of ground improvement experience</li>
-                        <li>Licensed in 39 states</li>
-                        <li>Designs and verifies every Pier Foundations project</li>
-                    </ul>
+                <div class="reveal reveal-d2">
+                    <div class="dr-card">
+                        <div class="dr-card-name">Dr. David Garbin, PE, PhD</div>
+                        <div class="dr-card-title">Chief Engineer</div>
+                        <ul class="dr-card-list">
+                            <li>PhD in Geotechnical Engineering</li>
+                            <li>Licensed Professional Engineer</li>
+                            <li>30+ years of ground improvement experience</li>
+                            <li>Licensed in 39 states</li>
+                            <li>Designs and verifies every Pier Foundations project</li>
+                        </ul>
+                    </div>
                 </div>
             </div>
 
@@ -951,11 +1244,11 @@
                     <div class="team-member-name">Bradley Reinking</div>
                     <div class="team-member-role">Managing Partner</div>
                 </div>
-                <div class="team-member">
+                <div class="team-member reveal-d1">
                     <div class="team-member-name">Jonathan Klonowski</div>
                     <div class="team-member-role">Partner</div>
                 </div>
-                <div class="team-member">
+                <div class="team-member reveal-d2">
                     <div class="team-member-name">Derek Sanchez</div>
                     <div class="team-member-role">Partner</div>
                 </div>
@@ -965,6 +1258,7 @@
 
     <!-- PROCESS -->
     <section class="process" id="process">
+        <div class="section-bg-text">Method</div>
         <div class="container">
             <div class="process-header reveal">
                 <div class="section-label">How We Work</div>
@@ -972,36 +1266,36 @@
                 <p class="section-text">A straightforward process built on engineering rigor and clear communication.</p>
             </div>
 
-            <div class="process-timeline reveal">
-                <div class="process-step">
+            <div class="process-timeline">
+                <div class="process-step reveal">
                     <div class="step-number">1</div>
                     <h3 class="step-title">Feasibility Review</h3>
                     <p class="step-text">We evaluate your geotechnical data and project requirements to determine if VSC is the right solution.</p>
                 </div>
-                <div class="process-step">
+                <div class="process-step reveal reveal-d1">
                     <div class="step-number">2</div>
                     <h3 class="step-title">Engineering Design</h3>
                     <p class="step-text">Dr. Garbin designs the stone column layout, spacing, and depth based on your loading and soil conditions.</p>
                 </div>
-                <div class="process-step">
+                <div class="process-step reveal reveal-d2">
                     <div class="step-number">3</div>
                     <h3 class="step-title">Proposal & Bid</h3>
                     <p class="step-text">You receive a clear, fixed-price proposal with timeline, scope, and expected performance criteria.</p>
                 </div>
             </div>
 
-            <div class="process-timeline process-row-2 reveal">
-                <div class="process-step">
+            <div class="process-timeline process-row-2">
+                <div class="process-step reveal">
                     <div class="step-number">4</div>
                     <h3 class="step-title">Mobilization</h3>
                     <p class="step-text">Our crew and specialized equipment arrive on schedule, ready to begin installation.</p>
                 </div>
-                <div class="process-step">
+                <div class="process-step reveal reveal-d1">
                     <div class="step-number">5</div>
                     <h3 class="step-title">Installation</h3>
                     <p class="step-text">Stone columns are installed at 40-60 piers per day with real-time quality monitoring on every pier.</p>
                 </div>
-                <div class="process-step">
+                <div class="process-step reveal reveal-d2">
                     <div class="step-number">6</div>
                     <h3 class="step-title">Verification</h3>
                     <p class="step-text">Load testing and documentation confirm performance. You receive a complete project deliverable package.</p>
@@ -1012,34 +1306,41 @@
 
     <!-- PROJECTS -->
     <section class="projects" id="projects">
+        <div class="section-bg-text">Work</div>
         <div class="container">
             <div class="projects-header reveal">
                 <div class="section-label">Our Work</div>
                 <h2 class="section-title">Recent Projects</h2>
             </div>
-            <div class="projects-grid reveal">
-                <div class="project-card">
+            <div class="projects-grid">
+                <div class="project-card reveal">
                     <img src="https://cdn.prod.website-files.com/6657f77de37d943d68146136/66922a7249c5117f9dac2b79_ourservimg2.jpg" alt="Commercial construction ground improvement project" loading="lazy">
                     <div class="project-card-overlay">
-                        <div class="project-type">Commercial</div>
-                        <div class="project-name">Distribution Warehouse</div>
-                        <div class="project-detail">Midwest | Ground improvement for 200,000+ SF facility</div>
+                        <div class="project-card-info">
+                            <div class="project-type">Commercial</div>
+                            <div class="project-name">Distribution Warehouse</div>
+                            <div class="project-detail">Midwest | Ground improvement for 200,000+ SF facility</div>
+                        </div>
                     </div>
                 </div>
-                <div class="project-card">
+                <div class="project-card reveal reveal-d1">
                     <img src="https://cdn.prod.website-files.com/6657f77de37d943d68146136/66922a973938d1b973f4fe8e_ourservimg3.jpg" alt="Industrial ground improvement project" loading="lazy">
                     <div class="project-card-overlay">
-                        <div class="project-type">Industrial</div>
-                        <div class="project-name">Manufacturing Facility</div>
-                        <div class="project-detail">Indiana | High-load bearing capacity requirement</div>
+                        <div class="project-card-info">
+                            <div class="project-type">Industrial</div>
+                            <div class="project-name">Manufacturing Facility</div>
+                            <div class="project-detail">Indiana | High-load bearing capacity requirement</div>
+                        </div>
                     </div>
                 </div>
-                <div class="project-card">
+                <div class="project-card reveal reveal-d2">
                     <img src="https://cdn.prod.website-files.com/6657f77de37d943d68146136/66b1b02a2fab0321eff8735a_Job-site_downsized.jpg" alt="Pier Foundations jobsite with equipment" loading="lazy">
                     <div class="project-card-overlay">
-                        <div class="project-type">Infrastructure</div>
-                        <div class="project-name">Site Preparation</div>
-                        <div class="project-detail">Regional | Soil stabilization for heavy construction</div>
+                        <div class="project-card-info">
+                            <div class="project-type">Infrastructure</div>
+                            <div class="project-name">Site Preparation</div>
+                            <div class="project-detail">Regional | Soil stabilization for heavy construction</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1048,28 +1349,31 @@
 
     <!-- SERVICE AREA -->
     <section class="service-area" id="coverage">
+        <div class="section-bg-text">Coverage</div>
         <div class="container">
             <div class="area-header reveal">
                 <div class="section-label">Where We Work</div>
                 <h2 class="section-title">Nationwide Coverage</h2>
                 <p class="section-text">Licensed in 39 states with the ability to mobilize equipment and crews to projects across the country.</p>
             </div>
-            <div class="area-map reveal">
+            <div class="area-map-wrap reveal reveal-d1">
                 <img src="https://cdn.prod.website-files.com/6657f77de37d943d68146136/6694f21a430a1585cff52c22_mapimg.jpg" alt="Pier Foundations service area map - 39 states" loading="lazy">
+                <div class="area-map-overlay"></div>
             </div>
-            <p class="area-states reveal">Indiana, Ohio, Michigan, Illinois, Wisconsin, Minnesota, Iowa, Missouri, Kentucky, Tennessee, West Virginia, Virginia, Pennsylvania, New York, New Jersey, Connecticut, Massachusetts, Maryland, Delaware, North Carolina, South Carolina, Georgia, Florida, Alabama, Mississippi, Louisiana, Texas, Arkansas, Oklahoma, Kansas, Nebraska, South Dakota, North Dakota, Montana, Wyoming, Colorado, New Mexico, Arizona, Nevada</p>
+            <p class="area-states reveal reveal-d2">Indiana, Ohio, Michigan, Illinois, Wisconsin, Minnesota, Iowa, Missouri, Kentucky, Tennessee, West Virginia, Virginia, Pennsylvania, New York, New Jersey, Connecticut, Massachusetts, Maryland, Delaware, North Carolina, South Carolina, Georgia, Florida, Alabama, Mississippi, Louisiana, Texas, Arkansas, Oklahoma, Kansas, Nebraska, South Dakota, North Dakota, Montana, Wyoming, Colorado, New Mexico, Arizona, Nevada</p>
         </div>
     </section>
 
     <!-- CONTACT -->
     <section class="contact" id="contact">
+        <div class="section-bg-text">Contact</div>
         <div class="container">
             <div class="reveal">
                 <div class="section-label">Get Started</div>
                 <h2 class="section-title">Start a Conversation</h2>
             </div>
-            <div class="contact-grid reveal">
-                <form class="contact-form" id="contactForm" onsubmit="handleSubmit(event)">
+            <div class="contact-grid">
+                <form class="contact-form reveal reveal-d1" id="contactForm" onsubmit="handleSubmit(event)">
                     <div class="form-row">
                         <div class="form-group">
                             <label for="firstName">First Name</label>
@@ -1112,16 +1416,19 @@
                     </div>
                     <button type="submit" class="btn-submit">Request Feasibility Analysis</button>
                 </form>
-                <div class="contact-info">
-                    <div class="contact-info-label">Email</div>
-                    <div class="contact-info-value">info@pierfoundations.com</div>
-
-                    <div class="contact-info-label">Headquarters</div>
-                    <div class="contact-info-value">Fort Wayne, Indiana</div>
-
-                    <div class="contact-info-label">Service Area</div>
-                    <div class="contact-info-value">Licensed in 39 states<br>Nationwide mobilization</div>
-
+                <div class="contact-info reveal reveal-d2">
+                    <div class="contact-info-block">
+                        <div class="contact-info-label">Email</div>
+                        <div class="contact-info-value">info@pierfoundations.com</div>
+                    </div>
+                    <div class="contact-info-block">
+                        <div class="contact-info-label">Headquarters</div>
+                        <div class="contact-info-value">Fort Wayne, Indiana</div>
+                    </div>
+                    <div class="contact-info-block">
+                        <div class="contact-info-label">Service Area</div>
+                        <div class="contact-info-value">Licensed in 39 states<br>Nationwide mobilization</div>
+                    </div>
                     <div class="contact-phone-cta">
                         <span>Or call us directly</span>
                         <a href="tel:2607666094">260-766-6094</a>
@@ -1158,10 +1465,30 @@
     </div>
 
     <script>
+        // Parallax hero background
+        const heroBg = document.getElementById('heroBg');
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        if (!prefersReducedMotion) {
+            let ticking = false;
+            window.addEventListener('scroll', () => {
+                if (!ticking) {
+                    requestAnimationFrame(() => {
+                        const scrollY = window.pageYOffset;
+                        if (scrollY < window.innerHeight * 1.2) {
+                            heroBg.style.transform = 'translateY(' + (scrollY * 0.3) + 'px)';
+                        }
+                        ticking = false;
+                    });
+                    ticking = true;
+                }
+            });
+        }
+
         // Navigation scroll effect
         const nav = document.getElementById('nav');
         window.addEventListener('scroll', () => {
-            nav.classList.toggle('scrolled', window.scrollY > 10);
+            nav.classList.toggle('scrolled', window.scrollY > 50);
         });
 
         // Mobile menu toggle
@@ -1178,17 +1505,29 @@
             });
         });
 
-        // Scroll reveal (IntersectionObserver)
-        const observer = new IntersectionObserver((entries) => {
+        // Scroll reveal with staggered cascade (IntersectionObserver)
+        const revealObserver = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
                     entry.target.classList.add('visible');
-                    observer.unobserve(entry.target);
+                    revealObserver.unobserve(entry.target);
                 }
             });
-        }, { threshold: 0.12 });
+        }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
 
-        document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+        document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+        // Photo reveal observer
+        const photoObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    photoObserver.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.15 });
+
+        document.querySelectorAll('.photo-reveal').forEach(el => photoObserver.observe(el));
 
         // Counter animation
         function animateCounters() {
@@ -1213,6 +1552,7 @@
             });
         }
 
+        // Trigger counters when hero stats are visible
         const statsObserver = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
@@ -1222,8 +1562,8 @@
             });
         }, { threshold: 0.3 });
 
-        const statsSection = document.querySelector('.stats');
-        if (statsSection) statsObserver.observe(statsSection);
+        const heroStats = document.querySelector('.hero-stats');
+        if (heroStats) statsObserver.observe(heroStats);
 
         // Video modal
         const watchBtn = document.getElementById('watchVideo');
@@ -1258,10 +1598,12 @@
             const btn = e.target.querySelector('.btn-submit');
             const originalText = btn.textContent;
             btn.textContent = 'Sent -- We\'ll be in touch.';
-            btn.style.background = '#2E8B57';
+            btn.style.background = '#22c55e';
+            btn.style.boxShadow = '0 0 30px rgba(34, 197, 94, 0.3)';
             setTimeout(() => {
                 btn.textContent = originalText;
                 btn.style.background = '';
+                btn.style.boxShadow = '';
                 e.target.reset();
             }, 3000);
         }
