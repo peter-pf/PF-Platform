@@ -3,1459 +3,1061 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pier Foundations — Operations Playbook</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<title>Pier Foundations -- SOP Review & Recommendations</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  :root {
-    --blue: #2563eb;
-    --blue-light: #dbeafe;
-    --blue-bg: #eff6ff;
-    --green: #16a34a;
-    --green-light: #dcfce7;
-    --green-bg: #f0fdf4;
-    --amber: #d97706;
-    --amber-light: #fef3c7;
-    --amber-bg: #fffbeb;
-    --purple: #7c3aed;
-    --purple-light: #ede9fe;
-    --purple-bg: #f5f3ff;
-    --gray-50: #f9fafb;
-    --gray-100: #f3f4f6;
-    --gray-200: #e5e7eb;
-    --gray-300: #d1d5db;
-    --gray-400: #9ca3af;
-    --gray-500: #6b7280;
-    --gray-600: #4b5563;
-    --gray-700: #374151;
-    --gray-800: #1f2937;
-    --gray-900: #111827;
-    --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
-    --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
-    --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.06);
-    --shadow-lg: 0 10px 15px rgba(0,0,0,0.1), 0 4px 6px rgba(0,0,0,0.05);
-    --radius: 8px;
-    --radius-lg: 12px;
-  }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #f5f6f8;
+  color: #1a1a2e;
+  line-height: 1.6;
+  font-size: 15px;
+}
 
-  body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    background: #ffffff;
-    color: var(--gray-800);
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
-  }
+.page-header {
+  background: #fff;
+  border-bottom: 3px solid #1a3a5c;
+  padding: 32px 40px 24px;
+}
 
-  /* HEADER */
-  .header {
-    background: linear-gradient(135deg, var(--gray-900) 0%, #1e3a5f 100%);
-    color: #fff;
-    padding: 48px 40px 40px;
-    text-align: center;
-  }
-  .header h1 {
-    font-size: 32px;
-    font-weight: 800;
-    letter-spacing: -0.5px;
-    margin-bottom: 8px;
-  }
-  .header p {
-    font-size: 16px;
-    font-weight: 400;
-    color: #94a3b8;
-    letter-spacing: 0.5px;
-  }
+.page-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a3a5c;
+  margin-bottom: 4px;
+}
 
-  /* TAB NAV */
-  .tab-nav {
-    display: flex;
-    justify-content: center;
-    gap: 4px;
-    background: var(--gray-100);
-    padding: 6px;
-    border-bottom: 1px solid var(--gray-200);
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-  .tab-btn {
-    padding: 10px 24px;
-    border: none;
-    background: transparent;
-    font-family: 'Inter', sans-serif;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--gray-600);
-    cursor: pointer;
-    border-radius: 6px;
-    transition: all 0.2s;
-  }
-  .tab-btn:hover { background: #fff; color: var(--gray-800); }
-  .tab-btn.active {
-    background: #fff;
-    color: var(--blue);
-    font-weight: 600;
-    box-shadow: var(--shadow-sm);
-  }
+.page-header .subtitle {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 400;
+}
 
-  /* CONTENT */
-  .tab-content { display: none; padding: 40px; max-width: 1100px; margin: 0 auto; }
-  .tab-content.active { display: block; }
+.summary-box {
+  background: #eef2f7;
+  border-left: 4px solid #1a3a5c;
+  padding: 16px 24px;
+  margin: 24px 40px 0;
+  border-radius: 0 6px 6px 0;
+  font-size: 14px;
+  color: #374151;
+}
 
-  .section-title {
-    font-size: 24px;
-    font-weight: 700;
-    color: var(--gray-900);
-    margin-bottom: 8px;
-  }
-  .section-subtitle {
-    font-size: 14px;
-    color: var(--gray-500);
-    margin-bottom: 32px;
-  }
+.summary-box strong { color: #1a3a5c; }
 
-  /* FLOWCHART */
-  .flowchart {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0;
-    padding: 24px 0;
-  }
-  .flow-box {
-    width: 260px;
-    padding: 14px 16px;
-    border-radius: var(--radius);
-    text-align: center;
-    font-size: 12px;
-    font-weight: 600;
-    line-height: 1.4;
-    box-shadow: var(--shadow);
-    position: relative;
-    border: 2px solid transparent;
-  }
-  .flow-box.blue { background: var(--blue-light); color: var(--blue); border-color: var(--blue); }
-  .flow-box.green { background: var(--green-light); color: #15803d; border-color: var(--green); }
-  .flow-box.amber { background: var(--amber-light); color: #92400e; border-color: var(--amber); }
-  .flow-box.purple { background: var(--purple-light); color: var(--purple); border-color: var(--purple); }
+.tab-nav {
+  display: flex;
+  gap: 0;
+  background: #fff;
+  padding: 0 40px;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  overflow-x: auto;
+}
 
-  .flow-connector {
-    width: 2px;
-    height: 24px;
-    background: var(--gray-300);
-    position: relative;
-  }
-  .flow-connector::after {
-    content: '';
-    position: absolute;
-    bottom: -4px;
-    left: -4px;
-    width: 0; height: 0;
-    border-left: 5px solid transparent;
-    border-right: 5px solid transparent;
-    border-top: 6px solid var(--gray-300);
-  }
+.tab-btn {
+  padding: 14px 22px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
 
-  /* DECISION BOX */
-  .flow-decision-row {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-  .flow-decision {
-    width: 220px;
-    padding: 12px 14px;
-    border-radius: var(--radius);
-    text-align: center;
-    font-size: 12px;
-    font-weight: 600;
-    transform: rotate(0deg);
-    border: 2px dashed;
-    background: #fff;
-  }
-  .flow-decision.blue { border-color: var(--blue); color: var(--blue); }
-  .flow-decision.green { border-color: var(--green); color: #15803d; }
-  .flow-decision.purple { border-color: var(--purple); color: var(--purple); }
+.tab-btn:hover { color: #1a3a5c; background: #f9fafb; }
 
-  .flow-exit {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--gray-400);
-    padding: 6px 14px;
-    border: 1px solid var(--gray-300);
-    border-radius: 20px;
-    background: var(--gray-50);
-  }
-  .flow-exit-label {
-    font-size: 10px;
-    color: var(--gray-400);
-    font-weight: 500;
-    margin-bottom: 2px;
-  }
-  .flow-exit-group { text-align: center; }
+.tab-btn.active {
+  color: #1a3a5c;
+  border-bottom-color: #1a3a5c;
+  font-weight: 600;
+}
 
-  /* PARALLEL CONNECTOR */
-  .flow-parallel {
-    display: flex;
-    align-items: flex-start;
-    gap: 40px;
-    position: relative;
-  }
-  .flow-parallel::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 60%;
-    height: 2px;
-    background: var(--gray-300);
-  }
-  .flow-parallel-branch {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0;
-  }
-  .flow-parallel-merge {
-    width: 60%;
-    height: 2px;
-    background: var(--gray-300);
-    margin: 0 auto;
-    position: relative;
-  }
+.tab-content { display: none; padding: 32px 40px 60px; max-width: 960px; }
+.tab-content.active { display: block; }
 
-  /* PHASE LABELS */
-  .phase-label {
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    padding: 4px 14px;
-    border-radius: 20px;
-    margin: 16px 0 8px;
-  }
-  .phase-label.blue { background: var(--blue); color: #fff; }
-  .phase-label.green { background: var(--green); color: #fff; }
-  .phase-label.amber { background: var(--amber); color: #fff; }
-  .phase-label.purple { background: var(--purple); color: #fff; }
+.section-header {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a3a5c;
+  margin: 36px 0 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #e5e7eb;
+}
 
-  /* CONTACTS TABLE */
-  .contacts-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 40px;
-    font-size: 13px;
-  }
-  .contacts-table th {
-    text-align: left;
-    padding: 10px 14px;
-    background: var(--gray-100);
-    font-weight: 600;
-    color: var(--gray-700);
-    border-bottom: 2px solid var(--gray-200);
-  }
-  .contacts-table td {
-    padding: 10px 14px;
-    border-bottom: 1px solid var(--gray-100);
-    color: var(--gray-600);
-  }
-  .contacts-table tr:hover td { background: var(--gray-50); }
+.section-header:first-child { margin-top: 0; }
 
-  /* STEP CARDS */
-  .step-card {
-    background: #fff;
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-lg);
-    padding: 24px;
-    margin-bottom: 16px;
-    box-shadow: var(--shadow-sm);
-    display: flex;
-    gap: 20px;
-    transition: box-shadow 0.2s;
-  }
-  .step-card:hover { box-shadow: var(--shadow-md); }
+/* Current SOP summary */
+.sop-summary { margin-bottom: 32px; }
 
-  .step-number {
-    width: 44px;
-    height: 44px;
-    min-width: 44px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-    font-weight: 700;
-    color: #fff;
-    flex-shrink: 0;
-  }
-  .step-number.blue { background: var(--blue); }
-  .step-number.green { background: var(--green); }
-  .step-number.amber { background: var(--amber); }
-  .step-number.purple { background: var(--purple); }
+.sop-phase {
+  margin-bottom: 16px;
+}
 
-  .step-body { flex: 1; }
-  .step-title {
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--gray-900);
-    margin-bottom: 6px;
-  }
-  .step-desc {
-    font-size: 13px;
-    color: var(--gray-600);
-    margin-bottom: 10px;
-  }
-  .step-details {
-    list-style: none;
-    padding: 0;
-  }
-  .step-details li {
-    font-size: 12px;
-    color: var(--gray-500);
-    padding: 3px 0 3px 16px;
-    position: relative;
-  }
-  .step-details li::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 10px;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--gray-300);
-  }
+.sop-phase-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4b5563;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
 
-  .badge {
-    display: inline-block;
-    font-size: 11px;
-    font-weight: 600;
-    padding: 3px 10px;
-    border-radius: 20px;
-    margin-top: 8px;
-  }
-  .badge.blue { background: var(--blue-light); color: var(--blue); }
-  .badge.green { background: var(--green-light); color: var(--green); }
-  .badge.amber { background: var(--amber-light); color: var(--amber); }
-  .badge.purple { background: var(--purple-light); color: var(--purple); }
+.sop-summary ul {
+  list-style: none;
+  padding: 0;
+}
 
-  /* REFERENCE CARDS */
-  .ref-card {
-    background: var(--gray-50);
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-lg);
-    padding: 20px 24px;
-    margin: 24px 0;
-  }
-  .ref-card h4 {
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--gray-800);
-    margin-bottom: 12px;
-  }
-  .ref-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-  }
-  .ref-table th {
-    text-align: left;
-    padding: 6px 12px;
-    font-weight: 600;
-    color: var(--gray-600);
-    border-bottom: 1px solid var(--gray-200);
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-  .ref-table td {
-    padding: 6px 12px;
-    color: var(--gray-600);
-    border-bottom: 1px solid var(--gray-100);
-  }
+.sop-summary li {
+  padding: 5px 0 5px 20px;
+  position: relative;
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.5;
+}
 
-  .supplier-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 8px;
-  }
-  .supplier-tag {
-    font-size: 12px;
-    padding: 4px 12px;
-    background: #fff;
-    border: 1px solid var(--gray-200);
-    border-radius: 20px;
-    color: var(--gray-600);
-  }
+.sop-summary li::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 12px;
+  width: 6px;
+  height: 6px;
+  background: #9ca3af;
+  border-radius: 50%;
+}
 
-  /* TIMELINE */
-  .timeline-bar {
-    display: flex;
-    align-items: center;
-    gap: 0;
-    margin: 32px 0;
-    overflow-x: auto;
-  }
-  .timeline-step {
-    padding: 10px 16px;
-    font-size: 11px;
-    font-weight: 600;
-    text-align: center;
-    white-space: nowrap;
-    border: 2px solid;
-    position: relative;
-    min-width: 120px;
-  }
-  .timeline-step:first-child { border-radius: 8px 0 0 8px; }
-  .timeline-step:last-child { border-radius: 0 8px 8px 0; }
-  .timeline-step.green { background: var(--green-light); border-color: var(--green); color: #15803d; }
-  .timeline-step.amber { background: var(--amber-light); border-color: var(--amber); color: #92400e; }
-  .timeline-arrow {
-    width: 0; height: 0;
-    border-top: 12px solid transparent;
-    border-bottom: 12px solid transparent;
-    border-left: 10px solid var(--gray-300);
-    flex-shrink: 0;
-  }
-  .timeline-duration {
-    font-size: 10px;
-    font-weight: 400;
-    display: block;
-    margin-top: 2px;
-    opacity: 0.8;
-  }
+/* Recommendation cards */
+.rec-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+  transition: box-shadow 0.2s;
+}
 
-  /* QA/QC SECTIONS */
-  .qaqc-section {
-    margin-bottom: 40px;
-  }
-  .qaqc-section-title {
-    font-size: 18px;
-    font-weight: 700;
-    padding: 12px 20px;
-    border-radius: var(--radius);
-    margin-bottom: 20px;
-    display: inline-block;
-  }
-  .qaqc-section-title.purple { background: var(--purple-light); color: var(--purple); }
-  .qaqc-section-title.amber { background: var(--amber-light); color: #92400e; }
+.rec-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
 
-  /* DECISION TREE (QA/QC) */
-  .decision-tree {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0;
-    padding: 24px 0;
-    margin: 20px 0;
-  }
-  .dt-box {
-    width: 280px;
-    padding: 12px 16px;
-    border-radius: var(--radius);
-    text-align: center;
-    font-size: 12px;
-    font-weight: 600;
-    border: 2px solid;
-  }
-  .dt-box.question { background: var(--purple-light); border-color: var(--purple); color: var(--purple); }
-  .dt-box.pass { background: var(--green-light); border-color: var(--green); color: #15803d; }
-  .dt-box.fail { background: #fef2f2; border-color: #ef4444; color: #dc2626; }
+.rec-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
 
-  .dt-connector {
-    width: 2px;
-    height: 20px;
-    background: var(--gray-300);
-    position: relative;
-  }
-  .dt-connector::after {
-    content: '';
-    position: absolute;
-    bottom: -4px;
-    left: -4px;
-    width: 0; height: 0;
-    border-left: 5px solid transparent;
-    border-right: 5px solid transparent;
-    border-top: 6px solid var(--gray-300);
-  }
+.rec-card-num {
+  font-size: 12px;
+  font-weight: 700;
+  color: #9ca3af;
+  min-width: 24px;
+}
 
-  .dt-row {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-  .dt-label {
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-  }
-  .dt-label.yes { color: var(--green); }
-  .dt-label.no { color: #dc2626; }
+.rec-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a2e;
+  flex: 1;
+}
 
-  /* TWO COLUMN LAYOUT */
-  .two-col {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-    margin: 20px 0;
-  }
-  @media (max-width: 768px) {
-    .two-col { grid-template-columns: 1fr; }
-    .flow-parallel { flex-direction: column; align-items: center; gap: 0; }
-    .flow-parallel::before { display: none; }
-    .timeline-bar { flex-direction: column; }
-    .timeline-step { border-radius: 8px !important; min-width: auto; width: 100%; }
-    .timeline-arrow { transform: rotate(90deg); }
-    .tab-nav { flex-wrap: wrap; }
-    .tab-btn { font-size: 12px; padding: 8px 14px; }
-  }
+.rec-why {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 10px;
+  line-height: 1.55;
+}
 
-  /* LEGEND */
-  .legend {
-    display: flex;
-    gap: 20px;
-    flex-wrap: wrap;
-    margin-bottom: 24px;
-  }
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    color: var(--gray-600);
-  }
-  .legend-dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 3px;
-    border: 2px solid;
-  }
-  .legend-dot.blue { background: var(--blue-light); border-color: var(--blue); }
-  .legend-dot.green { background: var(--green-light); border-color: var(--green); }
-  .legend-dot.amber { background: var(--amber-light); border-color: var(--amber); }
-  .legend-dot.purple { background: var(--purple-light); border-color: var(--purple); }
+.rec-what {
+  font-size: 14px;
+  color: #374151;
+  background: #f9fafb;
+  border-left: 3px solid #d1d5db;
+  padding: 10px 14px;
+  border-radius: 0 4px 4px 0;
+  line-height: 1.55;
+}
 
-  /* FOOTER */
-  .footer {
-    text-align: center;
-    padding: 24px 40px;
-    border-top: 1px solid var(--gray-200);
-    font-size: 12px;
-    color: var(--gray-400);
-  }
+.rec-what strong { color: #1a3a5c; }
 
-  /* PRINT */
-  @media print {
-    .tab-nav { display: none; }
-    .tab-content { display: block !important; page-break-before: always; }
-    .tab-content:first-of-type { page-break-before: auto; }
-    .header { padding: 24px; }
-    body { font-size: 11px; }
-  }
+/* Priority badges */
+.badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.badge-high { background: #fee2e2; color: #991b1b; }
+.badge-medium { background: #fef3c7; color: #92400e; }
+.badge-low { background: #f3f4f6; color: #4b5563; }
+
+/* Checklist */
+.checklist-counter {
+  background: #eef2f7;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.checklist-counter span { font-weight: 700; color: #1a3a5c; }
+
+.checklist-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.checklist-table th {
+  text-align: left;
+  padding: 10px 12px;
+  background: #f9fafb;
+  border-bottom: 2px solid #e5e7eb;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.checklist-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: middle;
+}
+
+.checklist-table tr:hover { background: #f9fafb; }
+
+.checklist-table input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #1a3a5c;
+}
+
+.checklist-table .rec-name { font-weight: 500; color: #1a1a2e; }
+
+.notes-placeholder {
+  font-size: 12px;
+  color: #d1d5db;
+  font-style: italic;
+}
+
+/* Missing SOPs tab */
+.missing-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-left: 4px solid #dc2626;
+  border-radius: 0 8px 8px 0;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+
+.missing-card.medium-priority { border-left-color: #d97706; }
+
+.missing-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.missing-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.missing-card p {
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.55;
+}
+
+.missing-card label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4b5563;
+  cursor: pointer;
+}
+
+.missing-card label input {
+  width: 16px;
+  height: 16px;
+  accent-color: #1a3a5c;
+}
+
+/* Save note */
+.save-note {
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 6px;
+  padding: 14px 18px;
+  margin-top: 32px;
+  font-size: 13px;
+  color: #92400e;
+  line-height: 1.5;
+}
+
+.save-note strong { color: #78350f; }
+
+/* Footer */
+.page-footer {
+  text-align: center;
+  padding: 24px 40px;
+  font-size: 12px;
+  color: #9ca3af;
+  border-top: 1px solid #e5e7eb;
+  background: #fff;
+}
+
+/* Print styles */
+@media print {
+  .tab-nav { display: none; }
+  .tab-content { display: block !important; page-break-before: always; }
+  .tab-content:first-of-type { page-break-before: avoid; }
+  .page-header { border-bottom-width: 1px; }
+  body { background: #fff; font-size: 12px; }
+  .rec-card, .missing-card { break-inside: avoid; }
+  .checklist-table { font-size: 12px; }
+}
+
+@media (max-width: 768px) {
+  .page-header, .tab-content { padding-left: 20px; padding-right: 20px; }
+  .tab-nav { padding: 0 12px; }
+  .tab-btn { padding: 12px 14px; font-size: 12px; }
+  .summary-box { margin-left: 20px; margin-right: 20px; }
+}
 </style>
 </head>
 <body>
 
-<!-- HEADER -->
-<div class="header">
-  <h1>Pier Foundations &mdash; Operations Playbook</h1>
-  <p>From Bid Invitation to Project Closeout</p>
+<div class="page-header">
+  <h1>Pier Foundations -- SOP Review & Recommendations</h1>
+  <div class="subtitle">Review by Peter (AI COO) | May 28, 2026</div>
 </div>
 
-<!-- TAB NAVIGATION -->
-<div class="tab-nav">
-  <button class="tab-btn active" onclick="showTab('overview')">Overview</button>
-  <button class="tab-btn" onclick="showTab('estimating')">Estimating SOP</button>
-  <button class="tab-btn" onclick="showTab('award')">Project Award SOP</button>
-  <button class="tab-btn" onclick="showTab('qaqc')">QA/QC</button>
+<div class="summary-box">
+  <strong>What this document is:</strong> Peter reviewed the 4 existing SOPs written by Jonathan and prepared specific recommendations for additions and improvements. Each recommendation includes a checkbox so Brad and Jonathan can approve items for inclusion. A fifth tab identifies SOPs that should exist but do not yet.
 </div>
 
-<!-- ======================= TAB 1: OVERVIEW ======================= -->
-<div id="tab-overview" class="tab-content active">
-  <h2 class="section-title">Master Process Flowchart</h2>
-  <p class="section-subtitle">Complete lifecycle from bid invitation through project closeout</p>
+<nav class="tab-nav">
+  <button class="tab-btn active" onclick="switchTab('estimating')">Estimating SOP</button>
+  <button class="tab-btn" onclick="switchTab('award')">Project Award SOP</button>
+  <button class="tab-btn" onclick="switchTab('guhma')">GUHMA Column Checking SOP</button>
+  <button class="tab-btn" onclick="switchTab('modulus')">Modulus Testing SOP</button>
+  <button class="tab-btn" onclick="switchTab('missing')">Missing SOPs</button>
+</nav>
 
-  <div class="legend">
-    <div class="legend-item"><div class="legend-dot blue"></div> Estimating / Bid</div>
-    <div class="legend-item"><div class="legend-dot green"></div> Award / Preconstruction</div>
-    <div class="legend-item"><div class="legend-dot amber"></div> Field / Installation</div>
-    <div class="legend-item"><div class="legend-dot purple"></div> QA/QC</div>
+<!-- ============================================================ -->
+<!-- TAB 1: ESTIMATING SOP -->
+<!-- ============================================================ -->
+<div id="tab-estimating" class="tab-content active">
+
+  <h2 class="section-header">What's Currently in the SOP</h2>
+  <div class="sop-summary">
+    <div class="sop-phase">
+      <div class="sop-phase-title">Bid Intake & Initial Review</div>
+      <ul>
+        <li>Receiving and processing bid invitations from GCs</li>
+        <li>Downloading and reviewing geotech reports to confirm AP requirement</li>
+        <li>Downloading civil, structural, and architectural drawings</li>
+        <li>Adding projects to the Bid Log on SharePoint</li>
+      </ul>
+    </div>
+    <div class="sop-phase">
+      <div class="sop-phase-title">Project Setup & Engineering</div>
+      <ul>
+        <li>Creating standardized project folder structure (Drawings, Specs, Geotech, Addenda, Other, Vendor Quotes)</li>
+        <li>Packaging bid documents in Bluebeam for Dr. Ed Garbin</li>
+        <li>Sending geotech report and bid docs to Dr. Ed for preliminary design (5 days min, 2+ weeks preferred)</li>
+        <li>Handling addenda and forwarding to Dr. Ed</li>
+      </ul>
+    </div>
+    <div class="sop-phase">
+      <div class="sop-phase-title">Takeoff & Estimating</div>
+      <ul>
+        <li>Performing takeoffs using Kreo (column footings EA, wall footings LF, slab SF)</li>
+        <li>Cross-checking takeoffs against Dr. Ed's preliminary design</li>
+        <li>Linking prelim design data into the Excel estimate template</li>
+        <li>Getting stone quotes (3 minimum, #57 stone, state-specific naming)</li>
+        <li>Getting transport quotes (Paddacks and Stephan Trucking)</li>
+        <li>Getting layout/staking quotes (Miller Land Surveying)</li>
+      </ul>
+    </div>
+    <div class="sop-phase">
+      <div class="sop-phase-title">Estimate Build & Submission</div>
+      <ul>
+        <li>Building the detailed estimate in Excel with highlighted cells for project-specific inputs</li>
+        <li>Calculating spoils (1.5x LF for 24", 2x LF for 30")</li>
+        <li>Building the Word proposal with project-specific details</li>
+        <li>Reviewing estimate with head of estimating</li>
+        <li>Final approval and submission to GC</li>
+      </ul>
+    </div>
   </div>
 
-  <!-- FLOWCHART -->
-  <div class="flowchart">
+  <h2 class="section-header">Recommended Additions</h2>
 
-    <div class="phase-label blue">Estimating Phase</div>
-
-    <div class="flow-box blue">BID INVITATION RECEIVED</div>
-    <div class="flow-connector"></div>
-
-    <div class="flow-box blue">DOWNLOAD &amp; REVIEW GEOTECH REPORT</div>
-    <div class="flow-connector"></div>
-
-    <div class="flow-decision-row">
-      <div class="flow-decision blue">AP REQUIRED?</div>
-      <div class="flow-exit-group">
-        <div class="flow-exit-label">NO</div>
-        <div class="flow-exit">PASS</div>
-      </div>
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">01</span>
+      <span class="rec-card-title">Bid/No-Bid Decision Criteria</span>
+      <span class="badge badge-high">High</span>
     </div>
-    <div class="flow-connector"></div>
-
-    <div class="flow-box blue">DOWNLOAD DRAWINGS<br><span style="font-weight:400;font-size:11px">Civil, Structural, Architectural</span></div>
-    <div class="flow-connector"></div>
-
-    <div class="flow-box blue">ADD TO BID LOG</div>
-    <div class="flow-connector"></div>
-
-    <div class="flow-box blue">CREATE PROJECT FOLDER<br><span style="font-weight:400;font-size:11px">SharePoint structure</span></div>
-    <div class="flow-connector"></div>
-
-    <div class="flow-box blue">PACKAGE BID DOCS FOR DR. ED<br><span style="font-weight:400;font-size:11px">Bluebeam extraction</span></div>
-    <div class="flow-connector"></div>
-
-    <div class="flow-box blue">SEND TO DR. ED GARBIN<br><span style="font-weight:400;font-size:11px">5 days min / 2+ weeks preferred</span></div>
-    <div class="flow-connector"></div>
-
-    <!-- PARALLEL -->
-    <div class="flow-parallel">
-      <div class="flow-parallel-branch">
-        <div class="flow-connector"></div>
-        <div class="flow-box blue" style="width:200px;">DO TAKEOFFS<br><span style="font-weight:400;font-size:11px">Kreo.com</span></div>
-      </div>
-      <div class="flow-parallel-branch">
-        <div class="flow-connector"></div>
-        <div class="flow-box blue" style="width:200px;">DR. ED PRELIM DESIGN<br><span style="font-weight:400;font-size:11px">Returned</span></div>
-      </div>
-    </div>
-
-    <div class="flow-connector"></div>
-
-    <div class="flow-box blue">GET VENDOR QUOTES<br><span style="font-weight:400;font-size:11px">Stone, Transport, Layout</span></div>
-    <div class="flow-connector"></div>
-
-    <div class="flow-box blue">BUILD ESTIMATE<br><span style="font-weight:400;font-size:11px">Excel Template</span></div>
-    <div class="flow-connector"></div>
-
-    <div class="flow-box blue">BID REVIEW WITH HEAD OF ESTIMATING</div>
-    <div class="flow-connector"></div>
-
-    <div class="flow-box blue">BUILD PROPOSAL<br><span style="font-weight:400;font-size:11px">Word Template</span></div>
-    <div class="flow-connector"></div>
-
-    <div class="flow-box blue">SUBMIT BID TO GC</div>
-    <div class="flow-connector"></div>
-
-    <div class="flow-decision-row">
-      <div class="flow-decision blue">AWARDED?</div>
-      <div class="flow-exit-group">
-        <div class="flow-exit-label">NO</div>
-        <div class="flow-exit">ARCHIVE</div>
-      </div>
-    </div>
-    <div class="flow-connector"></div>
-
-    <div class="phase-label green">Award / Preconstruction</div>
-
-    <div class="flow-box green">PROJECT AWARD PROCESS<br><span style="font-weight:400;font-size:11px">Request submittals from GC</span></div>
-    <div class="flow-connector"></div>
-
-    <div class="flow-box green">DR. ED ENGINEERED SHOP DRAWINGS<br><span style="font-weight:400;font-size:11px">3-4 weeks</span></div>
-    <div class="flow-connector"></div>
-
-    <div class="flow-box green">SUBMIT TO GC FOR REVIEW<br><span style="font-weight:400;font-size:11px">1-2 weeks</span></div>
-    <div class="flow-connector"></div>
-
-    <div class="flow-box green">SUBMITTALS APPROVED</div>
-    <div class="flow-connector"></div>
-
-    <div class="flow-box green">CREATE TURNOVER BUDGET</div>
-    <div class="flow-connector"></div>
-
-    <div class="phase-label amber">Field / Installation</div>
-
-    <div class="flow-box amber">MOBILIZE CREW &amp; EQUIPMENT<br><span style="font-weight:400;font-size:11px">From 14308 Figel Rd, Monroeville</span></div>
-    <div class="flow-connector"></div>
-
-    <div class="flow-box amber">INSTALL AGGREGATE PIERS<br><span style="font-weight:400;font-size:11px">Production: LF / 1000 = working days</span></div>
-    <div class="flow-connector"></div>
-
-    <div class="phase-label purple">QA/QC</div>
-
-    <div class="flow-box purple">QA/QC<br><span style="font-weight:400;font-size:11px">GUHMA column checking + Modulus tests</span></div>
-    <div class="flow-connector"></div>
-
-    <div class="flow-box purple">CLOSEOUT &amp; DEMOBILIZE</div>
-
+    <div class="rec-why">Currently there is no formal process for deciding whether to invest time in a bid. Estimating effort takes 20+ hours per bid. Without clear go/no-go criteria, PF could waste resources on bids they should not be chasing.</div>
+    <div class="rec-what"><strong>What to add:</strong> A checklist before committing to bid -- evaluate project distance from yard, GC relationship history, project size relative to PF capacity, schedule conflicts with active jobs, bonding capacity, competition level.</div>
   </div>
 
-  <!-- KEY CONTACTS -->
-  <h3 style="font-size:18px;font-weight:700;margin-top:48px;margin-bottom:16px;color:var(--gray-900);">Key Contacts</h3>
-  <table class="contacts-table">
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">02</span>
+      <span class="rec-card-title">Geotech Report Disqualification Criteria</span>
+      <span class="badge badge-high">High</span>
+    </div>
+    <div class="rec-why">The SOP says "confirm the project requires AP" but does not define what makes a project NOT suitable. A new estimator would not know when to pass.</div>
+    <div class="rec-what"><strong>What to add:</strong> Specific soil conditions that disqualify AP (peat deposits, very soft clay cu &lt; 15 kPa, treatment depths &gt; 30 ft, clean dense sands that do not need improvement). Include SPT N-value and cu ranges that indicate AP is viable.</div>
+  </div>
+
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">03</span>
+      <span class="rec-card-title">RFI Process During Bidding</span>
+      <span class="badge badge-medium">Medium</span>
+    </div>
+    <div class="rec-why">Geotech reports are often incomplete, drawings have conflicts, or specs are ambiguous. No step exists for asking questions during the bid period.</div>
+    <div class="rec-what"><strong>What to add:</strong> Step for identifying questions during geotech/drawing review, submitting RFIs to GC before bid date, documenting responses, and adjusting estimate accordingly.</div>
+  </div>
+
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">04</span>
+      <span class="rec-card-title">Competitive Pricing Sanity Check</span>
+      <span class="badge badge-medium">Medium</span>
+    </div>
+    <div class="rec-why">No step for verifying the estimate is in a competitive range. PF could be significantly over or under market without knowing.</div>
+    <div class="rec-what"><strong>What to add:</strong> Quick check against industry benchmarks ($15-20/LF for stone columns, $1,200-$3,000 per pier). Compare $/LF and $/column to recent PF bids on similar projects. Flag estimates that are more than 15% above or below typical range for review.</div>
+  </div>
+
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">05</span>
+      <span class="rec-card-title">Margin and Markup Guidance</span>
+      <span class="badge badge-high">High</span>
+    </div>
+    <div class="rec-why">The SOP covers cost building but never mentions target margins, how to adjust for risk, or pricing strategy.</div>
+    <div class="rec-what"><strong>What to add:</strong> Target margin range for standard projects. Adjustments for risk factors: new GC (+X%), difficult site access (+X%), tight schedule (+X%), prevailing wage projects (+X%), high-profile projects (strategic pricing guidance).</div>
+  </div>
+
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">06</span>
+      <span class="rec-card-title">Insurance and Bonding Verification</span>
+      <span class="badge badge-medium">Medium</span>
+    </div>
+    <div class="rec-why">GCs often require specific insurance limits and bonding. If PF does not have adequate coverage for a project, they cannot bid or win.</div>
+    <div class="rec-what"><strong>What to add:</strong> Step to check GC's insurance requirements (per spec/bid docs) against PF's current coverage. Verify bonding capacity for the bid amount. Contact bonding company if project exceeds current capacity.</div>
+  </div>
+
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">07</span>
+      <span class="rec-card-title">Prevailing Wage / Certified Payroll Check</span>
+      <span class="badge badge-high">High</span>
+    </div>
+    <div class="rec-why">Public projects (DOT, municipal, federally funded) require prevailing wages which significantly increase labor costs. Missing this wrecks the estimate.</div>
+    <div class="rec-what"><strong>What to add:</strong> Step to check if the project is publicly funded (DOT, municipality, IIJA-funded). If yes, look up prevailing wage rates for the project county and adjust labor costs in the estimate.</div>
+  </div>
+
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">08</span>
+      <span class="rec-card-title">Addenda Tracking Log</span>
+      <span class="badge badge-low">Low</span>
+    </div>
+    <div class="rec-why">Multiple addenda can come in during the bid period. Without a formal tracking system, changes get missed and the estimate is wrong.</div>
+    <div class="rec-what"><strong>What to add:</strong> Simple addenda log -- addenda number, date received, what changed, was Dr. Ed notified (Y/N), was estimate updated (Y/N).</div>
+  </div>
+
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">09</span>
+      <span class="rec-card-title">Bid Day Submission Checklist</span>
+      <span class="badge badge-medium">Medium</span>
+    </div>
+    <div class="rec-why">No step covers the actual submission process -- who gives final approval, when to submit, how to submit, confirmation of receipt.</div>
+    <div class="rec-what"><strong>What to add:</strong> Bid day checklist -- final number review (who signs off), submission method (email, portal, BuildingConnected), deadline with timezone, confirmation of receipt from GC, follow-up call within 24 hours.</div>
+  </div>
+
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">10</span>
+      <span class="rec-card-title">Price Escalation Language in Proposal</span>
+      <span class="badge badge-high">High</span>
+    </div>
+    <div class="rec-why">With 50% steel tariffs and 4-6% aggregate cost increases in 2026, material costs can change between bid and mobilization. Without escalation protection, PF absorbs the increase.</div>
+    <div class="rec-what"><strong>What to add:</strong> Standard price escalation clause in the proposal template. Recommend ConsensusDocs 200.1 language. Include expiration date on pricing (30-60 days typical).</div>
+  </div>
+
+  <h2 class="section-header">Decision Checklist</h2>
+  <div class="checklist-counter" id="counter-estimating"><span>0</span> of <span>10</span> selected</div>
+  <table class="checklist-table">
     <thead>
-      <tr><th>Role</th><th>Name</th><th>Contact</th></tr>
+      <tr>
+        <th style="width:40px"></th>
+        <th>Recommendation</th>
+        <th style="width:90px">Priority</th>
+        <th style="width:200px">Notes</th>
+      </tr>
     </thead>
     <tbody>
-      <tr><td>Engineer of Record</td><td>Dr. Edward J. Garbin, Jr., Ph.D., P.E., D.GE</td><td>Ed@GarbinGeo.com / (844) 4-GEODOC</td></tr>
-      <tr><td>Estimating</td><td>Jonathan Reinking</td><td>jreinking@pierfoundations.com / 260.458.4300</td></tr>
-      <tr><td>Business Development</td><td>Derek Franke</td><td>dfranke@pierfoundations.com</td></tr>
-      <tr><td>CEO</td><td>Brad Reinking</td><td>breinking@pierfoundations.com / 260.413.8442</td></tr>
-      <tr><td>AI COO</td><td>Peter</td><td>peter@pierfoundations.com / pfpeter@agentmail.to</td></tr>
-      <tr><td>Stone Layout</td><td>Brett Miller (MLS)</td><td>brett@mlswebsite.us</td></tr>
-      <tr><td>Transport - Paddacks</td><td>Miah</td><td>miah@paddacks.com</td></tr>
-      <tr><td>Transport - Stephan</td><td>Mark Maller</td><td>mark@stephantrucking.com</td></tr>
+      <tr><td><input type="checkbox" data-group="estimating" onchange="updateCounter('estimating')"></td><td class="rec-name">Bid/No-Bid Decision Criteria</td><td><span class="badge badge-high">High</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+      <tr><td><input type="checkbox" data-group="estimating" onchange="updateCounter('estimating')"></td><td class="rec-name">Geotech Report Disqualification Criteria</td><td><span class="badge badge-high">High</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+      <tr><td><input type="checkbox" data-group="estimating" onchange="updateCounter('estimating')"></td><td class="rec-name">RFI Process During Bidding</td><td><span class="badge badge-medium">Medium</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+      <tr><td><input type="checkbox" data-group="estimating" onchange="updateCounter('estimating')"></td><td class="rec-name">Competitive Pricing Sanity Check</td><td><span class="badge badge-medium">Medium</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+      <tr><td><input type="checkbox" data-group="estimating" onchange="updateCounter('estimating')"></td><td class="rec-name">Margin and Markup Guidance</td><td><span class="badge badge-high">High</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+      <tr><td><input type="checkbox" data-group="estimating" onchange="updateCounter('estimating')"></td><td class="rec-name">Insurance and Bonding Verification</td><td><span class="badge badge-medium">Medium</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+      <tr><td><input type="checkbox" data-group="estimating" onchange="updateCounter('estimating')"></td><td class="rec-name">Prevailing Wage / Certified Payroll Check</td><td><span class="badge badge-high">High</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+      <tr><td><input type="checkbox" data-group="estimating" onchange="updateCounter('estimating')"></td><td class="rec-name">Addenda Tracking Log</td><td><span class="badge badge-low">Low</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+      <tr><td><input type="checkbox" data-group="estimating" onchange="updateCounter('estimating')"></td><td class="rec-name">Bid Day Submission Checklist</td><td><span class="badge badge-medium">Medium</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+      <tr><td><input type="checkbox" data-group="estimating" onchange="updateCounter('estimating')"></td><td class="rec-name">Price Escalation Language in Proposal</td><td><span class="badge badge-high">High</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
     </tbody>
   </table>
 </div>
 
-<!-- ======================= TAB 2: ESTIMATING SOP ======================= -->
-<div id="tab-estimating" class="tab-content">
-  <h2 class="section-title">Estimating SOP</h2>
-  <p class="section-subtitle">Aggregate Pier estimating process from bid invitation through submission</p>
-
-  <!-- STEP 1 -->
-  <div class="step-card">
-    <div class="step-number blue">1</div>
-    <div class="step-body">
-      <div class="step-title">Receive Bid Invitation</div>
-      <div class="step-desc">Open GC link, download geotech report, and confirm project requires aggregate piers.</div>
-      <ul class="step-details">
-        <li>Read geotech report to confirm AP is required</li>
-        <li>Run geotech through AI if time allows for secondary confirmation</li>
-        <li>If no AP needed, pass on the project</li>
-      </ul>
-      <span class="badge blue">Estimating</span>
-    </div>
-  </div>
-
-  <!-- STEP 2 -->
-  <div class="step-card">
-    <div class="step-number blue">2</div>
-    <div class="step-body">
-      <div class="step-title">Download Drawings</div>
-      <div class="step-desc">Collect all relevant project documents from the GC's bid invitation.</div>
-      <ul class="step-details">
-        <li>Civil Drawings</li>
-        <li>Structural Drawings</li>
-        <li>Architectural Drawings</li>
-        <li>Schedules, specifications, bid forms, scopes of work</li>
-      </ul>
-      <span class="badge blue">Estimating</span>
-    </div>
-  </div>
-
-  <!-- STEP 3 -->
-  <div class="step-card">
-    <div class="step-number blue">3</div>
-    <div class="step-body">
-      <div class="step-title">Create Project in Bid Log</div>
-      <div class="step-desc">Add project to the SharePoint Bid Log with all pertinent information for tracking.</div>
-      <ul class="step-details">
-        <li>Due date, contact info, project details</li>
-        <li>Location: SharePoint > 03 - Estimating > Bid Log</li>
-        <li>Ensure all PF team members can track quickly</li>
-      </ul>
-      <span class="badge blue">Estimating</span>
-    </div>
-  </div>
-
-  <!-- STEP 4 -->
-  <div class="step-card">
-    <div class="step-number blue">4</div>
-    <div class="step-body">
-      <div class="step-title">Set Up Project Folder</div>
-      <div class="step-desc">Create structured project folder in SharePoint under Actively Bidding.</div>
-      <ul class="step-details">
-        <li>Create folder: SharePoint > 03 - Estimating > 01 - Aggregate Piers > 20XX Project Bids > 01 - Actively Bidding</li>
-        <li>Subfolder structure: Drawings / Specs / Geotech / Addenda / Other Bid Docs / Vendor Quotes</li>
-        <li>Copy Word Template Proposal and Excel Template Estimate into root of project folder</li>
-        <li>Rename: "YY-MMDD Project Name - PF Bid" and "YY-MMDD Project Name Estimate"</li>
-      </ul>
-      <span class="badge blue">Estimating</span>
-    </div>
-  </div>
-
-  <!-- STEP 5 -->
-  <div class="step-card">
-    <div class="step-number blue">5</div>
-    <div class="step-body">
-      <div class="step-title">Package Bid Docs</div>
-      <div class="step-desc">Extract relevant drawing pages in Bluebeam to create a focused bid document for Dr. Ed.</div>
-      <ul class="step-details">
-        <li>Architectural: Title page, lowest/first floor plans, site plan</li>
-        <li>Civil: Alta survey, demo plan, site plan, grading plans</li>
-        <li>Structural: Note pages (S001-S005), foundation plans (S100), concrete details + schedules (S300-S500)</li>
-        <li>Save as "Project Name - PF Bid Docs"</li>
-        <li>Reduce file size in Bluebeam if over 25MB</li>
-      </ul>
-      <span class="badge blue">Estimating</span>
-    </div>
-  </div>
-
-  <!-- STEP 6 -->
-  <div class="step-card">
-    <div class="step-number blue">6</div>
-    <div class="step-body">
-      <div class="step-title">Send to Dr. Ed</div>
-      <div class="step-desc">Email Dr. Ed Garbin with the geotech report, bid docs, and specs requesting preliminary design.</div>
-      <ul class="step-details">
-        <li>Send: Geotech report + "Project Name - PF Bid Docs" + specs (if applicable)</li>
-        <li>Minimum 5 working days turnaround; 2+ weeks preferred</li>
-        <li>If addenda received, send relevant updates to Dr. Ed ASAP</li>
-        <li>Pair down addenda to AP-relevant content only</li>
-      </ul>
-      <span class="badge blue">Dr. Ed Garbin / Estimating</span>
-    </div>
-  </div>
-
-  <!-- STEP 7 -->
-  <div class="step-card">
-    <div class="step-number blue">7</div>
-    <div class="step-body">
-      <div class="step-title">Do Takeoffs</div>
-      <div class="step-desc">Perform quantity takeoffs in Kreo.com while Dr. Ed works on the preliminary design.</div>
-      <ul class="step-details">
-        <li>Platform: Kreo.com (takeoff.kreo.net/2d/projects)</li>
-        <li>Upload "Project Name - PF Bid Docs" to Kreo</li>
-        <li>Foundation Plan: Count column footings by type (EA), wall footings by type (LF), slab area by type (SF)</li>
-        <li>Civil Plan: Get SF of slabs to cross-check; get SF of site perimeter, convert to acres (SF / 43,560)</li>
-        <li>Plug Building Footprint (SF) into H17 and Site Size (Acres) into H18</li>
-      </ul>
-      <span class="badge blue">Estimating</span>
-    </div>
-  </div>
-
-  <!-- STEP 8 -->
-  <div class="step-card">
-    <div class="step-number blue">8</div>
-    <div class="step-body">
-      <div class="step-title">Receive Prelim Design</div>
-      <div class="step-desc">Download Dr. Ed's preliminary design and cross-check takeoffs.</div>
-      <ul class="step-details">
-        <li>Save prelim design in main project folder (not a subfolder)</li>
-        <li>Compare Dr. Ed's LF and column counts against your takeoffs</li>
-        <li>Only flag major discrepancies</li>
-        <li>Copy prelim sheets into Excel estimate as third tab (replacing stock tab)</li>
-        <li>Also copy "Design Notes" tab as the last tab in the estimate</li>
-      </ul>
-      <span class="badge blue">Estimating</span>
-    </div>
-  </div>
-
-  <!-- STEP 9 -->
-  <div class="step-card">
-    <div class="step-number blue">9</div>
-    <div class="step-body">
-      <div class="step-title">Get Vendor Quotes</div>
-      <div class="step-desc">Obtain quotes for stone material, transportation, and column layout.</div>
-      <ul class="step-details">
-        <li>Stone: Get 3 quotes for #57 stone (washed, no fines, 3/8"-1" chips). Start 1 week before bid due date.</li>
-        <li>Transport: Get quotes from both Paddacks (Miah) and Stephan (Mark Maller)</li>
-        <li>Transport from: 14308 Figel Rd, Monroeville, IN 46773 to project site</li>
-        <li>Loads: Cat 336 excavator/vibro (98k lb), 80k excavator, F450/F550 + trailer, fall-off testing materials</li>
-        <li>Layout: Email Brett Miller at MLS with column count for $/column quote ($8-14/column typical)</li>
-      </ul>
-      <span class="badge blue">Estimating</span>
-    </div>
-  </div>
-
-  <!-- STEP 10 -->
-  <div class="step-card">
-    <div class="step-number blue">10</div>
-    <div class="step-body">
-      <div class="step-title">Build Estimate</div>
-      <div class="step-desc">Plug all values into the Excel template estimate. Key cells auto-populate from prelim design.</div>
-      <ul class="step-details">
-        <li>H9: LF of piers (link to Prelim Design Summary, typically T20)</li>
-        <li>H15: Stone tons (link to Prelim Design Summary, typically T21)</li>
-        <li>H16: Column count (link to Prelim Design Summary, typically T19)</li>
-        <li>H17: Building SF / H18: Site acres</li>
-        <li>Engineering cost: From Dr. Ed prelim (typically cell W54)</li>
-        <li>Stone + delivery: Use cheapest quote, note supplier in cell notes</li>
-        <li>Travel days: Minimum 2, add 1 per 6 working days</li>
-        <li>Mileage: Farm to site x2 (round trip), multiply for longer projects</li>
-        <li>Mobilization: Use cheaper of Paddacks or Stephan, note in cell</li>
-        <li>Equipment rental: Minimum 1 week, add 1 week per 5 working days</li>
-      </ul>
-      <span class="badge blue">Estimating</span>
-    </div>
-  </div>
-
-  <!-- STEP 11 -->
-  <div class="step-card">
-    <div class="step-number blue">11</div>
-    <div class="step-body">
-      <div class="step-title">Review with Head of Estimating</div>
-      <div class="step-desc">Meeting to review the complete estimate and project details before proposal.</div>
-      <ul class="step-details">
-        <li>Review project total price at bottom of estimate</li>
-        <li>Discuss alternates (slab support, helical piles for additions)</li>
-        <li>Confirm spoils amount, layout alternate pricing, timeline</li>
-      </ul>
-      <span class="badge blue">Head of Estimating</span>
-    </div>
-  </div>
-
-  <!-- STEP 12 -->
-  <div class="step-card">
-    <div class="step-number blue">12</div>
-    <div class="step-body">
-      <div class="step-title">Build Proposal</div>
-      <div class="step-desc">Update the Word template proposal with project-specific information and pricing.</div>
-      <ul class="step-details">
-        <li>Update date, project name, project address</li>
-        <li>Update contract documents date (from bid set drawings)</li>
-        <li>Update architect of record and date</li>
-        <li>Update geotechnical engineer and report date</li>
-        <li>Plug in pricing as directed in bid review meeting</li>
-        <li>Spoils: 1.5x Total LF for 24" columns, 2x Total LF for 30" columns</li>
-        <li>Layout alternate: Quote from MLS x 25-50%</li>
-        <li>Duration: Estimated working days + 3-5 days, present as range</li>
-        <li>Update bearing pressure PSF from GGG prelim</li>
-        <li>Update tax inclusion/exclusion per project</li>
-      </ul>
-      <span class="badge blue">Estimating</span>
-    </div>
-  </div>
-
-  <!-- STEP 13 -->
-  <div class="step-card">
-    <div class="step-number blue">13</div>
-    <div class="step-body">
-      <div class="step-title">Submit Bid</div>
-      <div class="step-desc">PDF the proposal and send with the reviewed estimate for final approval, then to the GC.</div>
-      <ul class="step-details">
-        <li>PDF the Word document proposal</li>
-        <li>Send reviewed Excel estimate + PDF proposal to Head of Estimating for final sign-off</li>
-        <li>Upon approval, submit to GC</li>
-      </ul>
-      <span class="badge blue">Head of Estimating / Estimating</span>
-    </div>
-  </div>
-
-  <!-- REFERENCE CARDS -->
-  <div class="two-col">
-    <div class="ref-card">
-      <h4>Stone Names by State</h4>
-      <table class="ref-table">
-        <thead><tr><th>State</th><th>Local Name</th></tr></thead>
-        <tbody>
-          <tr><td>Indiana</td><td>IN #8s</td></tr>
-          <tr><td>Illinois</td><td>CA-7</td></tr>
-          <tr><td>Michigan</td><td>6-AA</td></tr>
-          <tr><td>Wisconsin</td><td>1" Clear</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="ref-card">
-      <h4>Common Stone Suppliers</h4>
-      <div class="supplier-list">
-        <span class="supplier-tag">Heidelberg</span>
-        <span class="supplier-tag">IMI</span>
-        <span class="supplier-tag">Martin Marietta</span>
-        <span class="supplier-tag">StoneCo / Shelly</span>
-        <span class="supplier-tag">Vulcan</span>
-        <span class="supplier-tag">Jergensen (Melvin Stone)</span>
-        <span class="supplier-tag">Amirize</span>
-        <span class="supplier-tag">Rogers</span>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ======================= TAB 3: PROJECT AWARD SOP ======================= -->
+<!-- ============================================================ -->
+<!-- TAB 2: PROJECT AWARD SOP -->
+<!-- ============================================================ -->
 <div id="tab-award" class="tab-content">
-  <h2 class="section-title">Project Award SOP</h2>
-  <p class="section-subtitle">From Letter of Intent through crew mobilization</p>
 
-  <!-- TIMELINE -->
-  <div style="margin-bottom:32px;">
-    <h4 style="font-size:14px;font-weight:600;color:var(--gray-700);margin-bottom:12px;">Award-to-Mobilization Timeline</h4>
-    <div class="timeline-bar">
-      <div class="timeline-step green">Award / LOI</div>
-      <div class="timeline-arrow"></div>
-      <div class="timeline-step green">Submittals to GGG<span class="timeline-duration">3-4 weeks</span></div>
-      <div class="timeline-arrow"></div>
-      <div class="timeline-step green">GC Review<span class="timeline-duration">1-2 weeks</span></div>
-      <div class="timeline-arrow"></div>
-      <div class="timeline-step green">Approval</div>
-      <div class="timeline-arrow"></div>
-      <div class="timeline-step green">Prep &amp; Turnover<span class="timeline-duration">1 week</span></div>
-      <div class="timeline-arrow"></div>
-      <div class="timeline-step amber">Mobilize</div>
+  <h2 class="section-header">What's Currently in the SOP</h2>
+  <div class="sop-summary">
+    <div class="sop-phase">
+      <div class="sop-phase-title">Award Processing & Documentation</div>
+      <ul>
+        <li>Requesting submittal documents from GC (structural CAD, civil CAD, full structural PDF, civil PDF, design loads, additional geotech, site grade elevation)</li>
+        <li>Notifying Dr. Ed Garbin of award and providing project number</li>
+        <li>Updating the Bid Log (move to Awarded, assign job number, update status and value)</li>
+      </ul>
+    </div>
+    <div class="sop-phase">
+      <div class="sop-phase-title">Project Setup</div>
+      <ul>
+        <li>Moving project folders from Estimating to Project Management</li>
+        <li>Setting up template folder structure (preconstruction, PM, engineering, GC drawings, field)</li>
+        <li>Updating the Project Schedule tab (color coding, LF, column count, start date)</li>
+        <li>Updating the Project Dashboard (copy template, fill yellow highlighted items)</li>
+      </ul>
+    </div>
+    <div class="sop-phase">
+      <div class="sop-phase-title">Engineering & Turnover</div>
+      <ul>
+        <li>Managing the submittal process between GC and GGG</li>
+        <li>Creating turnover budget based on approved submittal values</li>
+        <li>Creating project contact info turnover sheet</li>
+        <li>Sending turnover documents to PM 1 week before start</li>
+        <li>Holding turnover meeting for high-risk items</li>
+      </ul>
     </div>
   </div>
 
-  <!-- STEP 1 -->
-  <div class="step-card">
-    <div class="step-number green">1</div>
-    <div class="step-body">
-      <div class="step-title">Request Submittals from GC</div>
-      <div class="step-desc">Request all necessary shop drawing information from the awarding GC within 1 week of NTP/LOI.</div>
-      <ul class="step-details">
-        <li>Structural Foundation Plan - Current Set (CAD)</li>
-        <li>Civil Grading Plan - Current Set (CAD)</li>
-        <li>Full Structural - Current Set (PDF)</li>
-        <li>Full Civil - Current Set (PDF)</li>
-        <li>Design Service Loads (DL + LL)</li>
-        <li>Any additional geotechnical reports (post-bid date)</li>
-        <li>Site grade elevation during PF installation (within 3" +/-)</li>
-        <li>Check GC schedule for PF installation timing</li>
+  <h2 class="section-header">Recommended Additions</h2>
+
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">01</span>
+      <span class="rec-card-title">Subcontract Review Process</span>
+      <span class="badge badge-high">High</span>
+    </div>
+    <div class="rec-why">The SOP mentions "subcontract is fully executed" but does not cover reviewing the GC's subcontract terms. Unfavorable clauses around retainage, pay-when-paid, indemnification, or warranty can cost PF significantly.</div>
+    <div class="rec-what"><strong>What to add:</strong> Step to review subcontract before signing -- check payment terms, retainage percentage, insurance requirements, indemnification clauses, warranty period, liquidated damages, dispute resolution. Flag unfavorable terms for Brad's review. Consider having Dr. Ed or counsel review contracts over a certain dollar threshold.</div>
+  </div>
+
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">02</span>
+      <span class="rec-card-title">Pre-Mobilization Site Visit</span>
+      <span class="badge badge-high">High</span>
+    </div>
+    <div class="rec-why">Showing up to a site blind creates problems -- access too tight for equipment, overhead power lines, soft ground that will not support the excavator, no staging area for stone delivery.</div>
+    <div class="rec-what"><strong>What to add:</strong> Required site visit before mobilization for projects over a certain threshold (or all projects). Checklist: equipment access path and clearances, staging area for stone storage, overhead obstructions, underground utilities (call 811), water source (if wet method), nearest stone supplier delivery route.</div>
+  </div>
+
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">03</span>
+      <span class="rec-card-title">Mobilization Equipment and Material Checklist</span>
+      <span class="badge badge-medium">Medium</span>
+    </div>
+    <div class="rec-why">Forgetting a piece of equipment or tooling means a crew sitting idle on site while someone drives back to the yard.</div>
+    <div class="rec-what"><strong>What to add:</strong> Standard mobilization checklist -- vibroflot and attachments, excavator, loader/skid steer, F450/F550 with trailer, job trailer, testing jack and gauges, dial indicators, reference beam, safety equipment, hand tools, daily log sheets, modulus test sheets, survey/layout stakes, water pump (if needed).</div>
+  </div>
+
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">04</span>
+      <span class="rec-card-title">Crew Assignment and Certification Verification</span>
+      <span class="badge badge-medium">Medium</span>
+    </div>
+    <div class="rec-why">No process for confirming crew members are assigned and their certifications are current before sending them to a job site.</div>
+    <div class="rec-what"><strong>What to add:</strong> Step to assign crew (operator, laborer, spotter), verify OSHA 10/30 certifications are current, confirm equipment operator certifications, ensure any site-specific training (MSHA, confined space, etc.) is completed.</div>
+  </div>
+
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">05</span>
+      <span class="rec-card-title">Pre-Construction Meeting with GC</span>
+      <span class="badge badge-medium">Medium</span>
+    </div>
+    <div class="rec-why">Alignment with the GC before mobilization prevents misunderstandings about schedule, access, coordination with other trades, and site rules.</div>
+    <div class="rec-what"><strong>What to add:</strong> Schedule pre-con meeting with GC PM to cover: schedule and sequencing, site access and staging, daily coordination protocol, safety plan review, weather day procedures, quality requirements, inspection/testing schedule, payment application process.</div>
+  </div>
+
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">06</span>
+      <span class="rec-card-title">Insurance Certificate Delivery</span>
+      <span class="badge badge-high">High</span>
+    </div>
+    <div class="rec-why">GCs require a Certificate of Insurance (COI) naming them as additional insured before allowing work to begin. If PF forgets this step, mobilization gets delayed.</div>
+    <div class="rec-what"><strong>What to add:</strong> Step to request COI from insurance agent with GC named as additional insured. Send to GC at least 1 week before mobilization. Verify limits match subcontract requirements.</div>
+  </div>
+
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">07</span>
+      <span class="rec-card-title">Stone Delivery Coordination</span>
+      <span class="badge badge-high">High</span>
+    </div>
+    <div class="rec-why">Stone needs to be on site when the crew arrives and needs continuous delivery during installation. No step covers this coordination.</div>
+    <div class="rec-what"><strong>What to add:</strong> Step to contact stone supplier 2 weeks before mobilization -- confirm pricing, schedule delivery start date, agree on daily delivery quantity (tons/day based on production rate), confirm delivery access and staging area, establish backup supplier contact.</div>
+  </div>
+
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">08</span>
+      <span class="rec-card-title">Change Order Process</span>
+      <span class="badge badge-high">High</span>
+    </div>
+    <div class="rec-why">Field changes happen on every project -- additional columns, depth changes, scope additions by GC. Without a formal CO process, PF does extra work without getting paid.</div>
+    <div class="rec-what"><strong>What to add:</strong> Step-by-step change order process -- field team identifies change, notifies PM immediately, PM documents the change with photos/logs, PM prices the change using estimate rates, PM submits CO to GC in writing within 48 hours, work does not proceed on changed scope until CO is approved (except emergency).</div>
+  </div>
+
+  <h2 class="section-header">Decision Checklist</h2>
+  <div class="checklist-counter" id="counter-award"><span>0</span> of <span>8</span> selected</div>
+  <table class="checklist-table">
+    <thead>
+      <tr>
+        <th style="width:40px"></th>
+        <th>Recommendation</th>
+        <th style="width:90px">Priority</th>
+        <th style="width:200px">Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><input type="checkbox" data-group="award" onchange="updateCounter('award')"></td><td class="rec-name">Subcontract Review Process</td><td><span class="badge badge-high">High</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+      <tr><td><input type="checkbox" data-group="award" onchange="updateCounter('award')"></td><td class="rec-name">Pre-Mobilization Site Visit</td><td><span class="badge badge-high">High</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+      <tr><td><input type="checkbox" data-group="award" onchange="updateCounter('award')"></td><td class="rec-name">Mobilization Equipment and Material Checklist</td><td><span class="badge badge-medium">Medium</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+      <tr><td><input type="checkbox" data-group="award" onchange="updateCounter('award')"></td><td class="rec-name">Crew Assignment and Certification Verification</td><td><span class="badge badge-medium">Medium</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+      <tr><td><input type="checkbox" data-group="award" onchange="updateCounter('award')"></td><td class="rec-name">Pre-Construction Meeting with GC</td><td><span class="badge badge-medium">Medium</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+      <tr><td><input type="checkbox" data-group="award" onchange="updateCounter('award')"></td><td class="rec-name">Insurance Certificate Delivery</td><td><span class="badge badge-high">High</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+      <tr><td><input type="checkbox" data-group="award" onchange="updateCounter('award')"></td><td class="rec-name">Stone Delivery Coordination</td><td><span class="badge badge-high">High</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+      <tr><td><input type="checkbox" data-group="award" onchange="updateCounter('award')"></td><td class="rec-name">Change Order Process</td><td><span class="badge badge-high">High</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ============================================================ -->
+<!-- TAB 3: GUHMA COLUMN CHECKING SOP -->
+<!-- ============================================================ -->
+<div id="tab-guhma" class="tab-content">
+
+  <h2 class="section-header">What's Currently in the SOP</h2>
+  <div class="sop-summary">
+    <div class="sop-phase">
+      <div class="sop-phase-title">Data Retrieval & Setup</div>
+      <ul>
+        <li>Downloading column log zip files from Operations Manager</li>
+        <li>Saving to project folder (Engineering & Design/QAQC/Guhma Data)</li>
+        <li>Opening GUHMA desktop app in Extended Mode</li>
+        <li>Loading data files and configuring Report Settings</li>
       </ul>
-      <span class="badge green">Estimating / PM</span>
+    </div>
+    <div class="sop-phase">
+      <div class="sop-phase-title">Diagram & Parameter Configuration</div>
+      <ul>
+        <li>Setting up Time Diagram parameters (depth, buckets)</li>
+        <li>Setting up Depth/Time Diagram parameters (depth, flot pressure, winch down, winch up, buckets)</li>
+        <li>Configuring Table, Printout, and Profile settings</li>
+        <li>Updating Job Site Data (project name, number, contractor, client, equipment ID)</li>
+      </ul>
+    </div>
+    <div class="sop-phase">
+      <div class="sop-phase-title">Verification & Reporting</div>
+      <ul>
+        <li>Verifying all columns are accounted for vs. submittal (GI-300)</li>
+        <li>Checking each column hit design depth (blue = meets, red = short)</li>
+        <li>Comparing bucket counts between hand logs and GUHMA software</li>
+        <li>Editing raw data files to correct bucket discrepancies</li>
+        <li>Generating combined PDF report for all columns</li>
+        <li>Sending report to GC and engineer as closeout documentation</li>
+      </ul>
     </div>
   </div>
 
-  <!-- STEP 2 -->
-  <div class="step-card">
-    <div class="step-number green">2</div>
-    <div class="step-body">
-      <div class="step-title">Notify Dr. Ed (GGG)</div>
-      <div class="step-desc">Email Garbin Geostructural Group that the project was awarded. Provide PF project number.</div>
-      <ul class="step-details">
-        <li>Ask what additional information is needed beyond standard submittal items</li>
-        <li>Allow 3-4 weeks for engineered shop drawing preparation once all docs received</li>
+  <h2 class="section-header">Recommended Additions</h2>
+
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">01</span>
+      <span class="rec-card-title">Acceptance Criteria for Short Columns</span>
+      <span class="badge badge-high">High</span>
+    </div>
+    <div class="rec-why">The SOP flags short columns in red but does not define how short is acceptable. Is 3 inches short OK? 1 foot? Without clear thresholds, every short column becomes an escalation.</div>
+    <div class="rec-what"><strong>What to add:</strong> Define depth tolerance (e.g., columns within 6 inches of design depth are acceptable without review; columns more than 6 inches short require Dr. Ed's engineering review; columns more than 2 feet short require potential reinstallation). Get Dr. Ed to define these thresholds.</div>
+  </div>
+
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">02</span>
+      <span class="rec-card-title">Pressure Data Interpretation Guide</span>
+      <span class="badge badge-medium">Medium</span>
+    </div>
+    <div class="rec-why">The GUHMA records flot pressure, winch down pressure, and winch up pressure continuously, but the SOP does not explain what these readings mean or what anomalies to look for.</div>
+    <div class="rec-what"><strong>What to add:</strong> Reference guide -- what does normal pressure look like during a good installation? What does a pressure spike indicate (hitting a hard layer, obstruction)? What does a pressure drop indicate (void, very soft zone)? What patterns suggest inadequate compaction? This turns the GUHMA from a recording tool into a diagnostic tool.</div>
+  </div>
+
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">03</span>
+      <span class="rec-card-title">Stone Consumption Rate Verification</span>
+      <span class="badge badge-medium">Medium</span>
+    </div>
+    <div class="rec-why">Total bucket count only tells part of the story. Stone consumption per linear foot is a better indicator of column quality. Abnormally high consumption could indicate a void; low consumption could indicate inadequate compaction.</div>
+    <div class="rec-what"><strong>What to add:</strong> Calculate stone consumption rate (buckets per LF or tons per LF) for each column. Compare to expected rate from Dr. Ed's design. Flag columns with consumption more than 20% above or below expected.</div>
+  </div>
+
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">04</span>
+      <span class="rec-card-title">QC Completion Timing Requirement</span>
+      <span class="badge badge-high">High</span>
+    </div>
+    <div class="rec-why">If GUHMA review happens after the crew has demobilized, short columns cannot be fixed without remobilizing -- which is expensive.</div>
+    <div class="rec-what"><strong>What to add:</strong> Requirement that GUHMA column checking must be completed within 24 hours of final column installation, BEFORE the crew demobilizes. Short columns identified during review must be reinstalled before crew leaves site.</div>
+  </div>
+
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">05</span>
+      <span class="rec-card-title">Failed Column Response Procedure</span>
+      <span class="badge badge-high">High</span>
+    </div>
+    <div class="rec-why">When a column fails QC (short depth, missing buckets, anomalous data), there is no documented procedure for resolution.</div>
+    <div class="rec-what"><strong>What to add:</strong> Step-by-step: notify Jonathan immediately, send column data to Dr. Ed with specific question (accept as-built or reinstall?), document Dr. Ed's response, if reinstall needed -- coordinate with site crew before demobilization. If crew already left, document cost of remobilization.</div>
+  </div>
+
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">06</span>
+      <span class="rec-card-title">Complete Closeout Document Package</span>
+      <span class="badge badge-medium">Medium</span>
+    </div>
+    <div class="rec-why">The SOP mentions sending the GUHMA PDF to GC and engineer, but does not list the full closeout package.</div>
+    <div class="rec-what"><strong>What to add:</strong> Closeout package checklist -- GUHMA column installation report (PDF), modulus test results, as-built column layout drawing (with actual depths noted), stone delivery tickets, daily installation logs, any change order documentation, warranty letter (if applicable).</div>
+  </div>
+
+  <h2 class="section-header">Decision Checklist</h2>
+  <div class="checklist-counter" id="counter-guhma"><span>0</span> of <span>6</span> selected</div>
+  <table class="checklist-table">
+    <thead>
+      <tr>
+        <th style="width:40px"></th>
+        <th>Recommendation</th>
+        <th style="width:90px">Priority</th>
+        <th style="width:200px">Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><input type="checkbox" data-group="guhma" onchange="updateCounter('guhma')"></td><td class="rec-name">Acceptance Criteria for Short Columns</td><td><span class="badge badge-high">High</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+      <tr><td><input type="checkbox" data-group="guhma" onchange="updateCounter('guhma')"></td><td class="rec-name">Pressure Data Interpretation Guide</td><td><span class="badge badge-medium">Medium</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+      <tr><td><input type="checkbox" data-group="guhma" onchange="updateCounter('guhma')"></td><td class="rec-name">Stone Consumption Rate Verification</td><td><span class="badge badge-medium">Medium</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+      <tr><td><input type="checkbox" data-group="guhma" onchange="updateCounter('guhma')"></td><td class="rec-name">QC Completion Timing Requirement</td><td><span class="badge badge-high">High</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+      <tr><td><input type="checkbox" data-group="guhma" onchange="updateCounter('guhma')"></td><td class="rec-name">Failed Column Response Procedure</td><td><span class="badge badge-high">High</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+      <tr><td><input type="checkbox" data-group="guhma" onchange="updateCounter('guhma')"></td><td class="rec-name">Complete Closeout Document Package</td><td><span class="badge badge-medium">Medium</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ============================================================ -->
+<!-- TAB 4: MODULUS TESTING SOP -->
+<!-- ============================================================ -->
+<div id="tab-modulus" class="tab-content">
+
+  <h2 class="section-header">What's Currently in the SOP</h2>
+  <div class="sop-summary">
+    <div class="sop-phase">
+      <div class="sop-phase-title">Template Setup</div>
+      <ul>
+        <li>Copying modulus test template from SharePoint</li>
+        <li>Saving to project folder (Engineering & Design/Modulus Test)</li>
+        <li>Renaming file with date and project name</li>
+        <li>Filling in job name, location, number, and tested by</li>
       </ul>
-      <span class="badge green">Estimating</span>
+    </div>
+    <div class="sop-phase">
+      <div class="sop-phase-title">Design Parameters</div>
+      <ul>
+        <li>Setting AP Design Diameter (2.00' for 24" or 2.50' for 30") from GI-200</li>
+        <li>Setting Diameter of Plate to match pier diameter</li>
+        <li>Setting AP Reaction Modulus from GI-100 submittal</li>
+        <li>Setting AP Design Load from GI-200 Modulus Test Schedule</li>
+      </ul>
+    </div>
+    <div class="sop-phase">
+      <div class="sop-phase-title">Calibration & Verification</div>
+      <ul>
+        <li>Setting Jack Calibration Factor (small jack = 49.84, large jack = 32.88)</li>
+        <li>Annual recalibration through Chicago Jack and Dr. Ed</li>
+        <li>Confirming % design load, load increment, and kips match submittal</li>
+      </ul>
     </div>
   </div>
 
-  <!-- STEP 3 -->
-  <div class="step-card">
-    <div class="step-number green">3</div>
-    <div class="step-body">
-      <div class="step-title">Update Bid Log</div>
-      <div class="step-desc">Move the project in the bid log from Submitted to Awarded section.</div>
-      <ul class="step-details">
-        <li>Assign next sequential job number in Column B</li>
-        <li>Flip bid status in Column U to "Awarded"</li>
-        <li>Update bid total value in Column V to expected contract value</li>
-      </ul>
-      <span class="badge green">Estimating</span>
+  <h2 class="section-header">Recommended Additions</h2>
+
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">01</span>
+      <span class="rec-card-title">Actual Test Procedure</span>
+      <span class="badge badge-high">High</span>
     </div>
+    <div class="rec-why">The current SOP covers setting up the test SHEET but not how to actually perform the physical test. An operator needs to know the loading sequence, hold times, and reading procedures.</div>
+    <div class="rec-what"><strong>What to add:</strong> Step-by-step test execution -- set up reaction frame and loading jack, install settlement measuring devices (dial gauges on independent reference beam), load in increments (25%, 50%, 75%, 100%, 150%, 200% of design load), hold each increment for specified time (typically 5 minutes or until settlement stabilizes), record settlement readings, unload in decrements, record rebound. Reference ASTM D1143 Loading Procedure B.</div>
   </div>
 
-  <!-- STEP 4 -->
-  <div class="step-card">
-    <div class="step-number green">4</div>
-    <div class="step-body">
-      <div class="step-title">Move Project Folders</div>
-      <div class="step-desc">Relocate project files from 03-Estimating to 04-Project Management.</div>
-      <ul class="step-details">
-        <li>Move folder to: 04 - Project Management > 02 - Projects</li>
-        <li>Rename folder: XX-XXX - Project Name - General Contractor</li>
-      </ul>
-      <span class="badge green">Estimating / PM</span>
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">02</span>
+      <span class="rec-card-title">Pass/Fail Acceptance Criteria</span>
+      <span class="badge badge-high">High</span>
     </div>
+    <div class="rec-why">The SOP does not define what constitutes a passing or failing test. The operator and PM need to know immediately if a test passes.</div>
+    <div class="rec-what"><strong>What to add:</strong> Define acceptance criteria -- maximum settlement at design load (100%), maximum settlement at 200% design load, minimum stiffness modulus required (from Dr. Ed's design). Example: if settlement at design load exceeds X inches, the test fails. Get Dr. Ed to define project-specific thresholds based on his GI-100 design criteria.</div>
   </div>
 
-  <!-- STEP 5 -->
-  <div class="step-card">
-    <div class="step-number green">5</div>
-    <div class="step-body">
-      <div class="step-title">Set Up Template Folders</div>
-      <div class="step-desc">Copy template folder structure into the newly moved project folder.</div>
-      <ul class="step-details">
-        <li>Preconstruction</li>
-        <li>Project Management</li>
-        <li>Engineering &amp; Design</li>
-        <li>GC Drawings &amp; Specs</li>
-        <li>Field</li>
-        <li>Organize all existing documents into the correct subfolders</li>
-      </ul>
-      <span class="badge green">Estimating / PM</span>
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">03</span>
+      <span class="rec-card-title">Test Column Selection Criteria</span>
+      <span class="badge badge-medium">Medium</span>
     </div>
+    <div class="rec-why">No guidance on which columns to test or how many.</div>
+    <div class="rec-what"><strong>What to add:</strong> Selection criteria -- test frequency (1 per 500 piers minimum, or as specified in the contract/submittal), select test columns in the weakest soil zone identified in the geotech report, avoid columns at the edge of the treatment area, select columns representative of different pier lengths if the design has varying depths. Coordinate test column selection with Dr. Ed.</div>
   </div>
 
-  <!-- STEP 6 -->
-  <div class="step-card">
-    <div class="step-number green">6</div>
-    <div class="step-body">
-      <div class="step-title">Update Project Schedule</div>
-      <div class="step-desc">Update the PF Project Master Sheet with schedule details.</div>
-      <ul class="step-details">
-        <li>Color code project by status (LOI, contract, etc.)</li>
-        <li>Plug in total LF and column count</li>
-        <li>Calculate working days: LF / 1000, mark out that many days</li>
-        <li>Plug in start date based on GC response</li>
-      </ul>
-      <span class="badge green">PM</span>
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">04</span>
+      <span class="rec-card-title">Equipment Setup Procedure</span>
+      <span class="badge badge-medium">Medium</span>
     </div>
+    <div class="rec-why">Accurate test results depend on proper setup. No guidance on reaction frame, jack positioning, or gauge placement.</div>
+    <div class="rec-what"><strong>What to add:</strong> Setup checklist -- clear the column head and level with grout/sand cap, center the loading plate on the column, set up the reaction system (weighted platform, anchor piles, or dead weight), install reference beam supported independently from the test column (minimum 8 feet from test column), mount dial gauges on the reference beam, verify jack is centered and plumb, take initial readings before applying any load.</div>
   </div>
 
-  <!-- STEP 7 -->
-  <div class="step-card">
-    <div class="step-number green">7</div>
-    <div class="step-body">
-      <div class="step-title">Update Project Dashboard</div>
-      <div class="step-desc">Add the project to the PF Project Dashboard Tab in the Master Sheet.</div>
-      <ul class="step-details">
-        <li>Copy "TEMPLATE NEW JOB" columns and insert between most recent project and template</li>
-        <li>Fill out known project information immediately</li>
-        <li>Yellow highlighted items are project-specific and need updating</li>
-        <li>Check back daily for outstanding items; push for info by GC/GGG deadlines</li>
-      </ul>
-      <span class="badge green">PM</span>
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">05</span>
+      <span class="rec-card-title">Results Review and Reporting</span>
+      <span class="badge badge-medium">Medium</span>
     </div>
+    <div class="rec-why">No step for who reviews test results or how they are documented beyond the test sheet.</div>
+    <div class="rec-what"><strong>What to add:</strong> After test completion -- calculate stiffness modulus from load-settlement data, compare to design modulus requirement, send results to Dr. Ed for review and approval, include approved results in the closeout document package, report results to GC within 48 hours of test.</div>
   </div>
 
-  <!-- STEP 8 -->
-  <div class="step-card">
-    <div class="step-number green">8</div>
-    <div class="step-body">
-      <div class="step-title">Manage Submittal Process</div>
-      <div class="step-desc">Coordinate document flow between GC and Garbin Geostructural Group (GGG).</div>
-      <ul class="step-details">
-        <li>Track all documents sent and received between GC and GGG</li>
-        <li>Coordinate between Estimating and PM on who tracks each item</li>
-        <li>Once GGG completes submittals, send to GC for Owner/Design/GC review</li>
-        <li>GC review typically 1-2 weeks</li>
-      </ul>
-      <span class="badge green">Estimating / PM</span>
+  <div class="rec-card">
+    <div class="rec-card-header">
+      <span class="rec-card-num">06</span>
+      <span class="rec-card-title">Failed Test Response Procedure</span>
+      <span class="badge badge-high">High</span>
     </div>
+    <div class="rec-why">What happens if a column fails the modulus test is not documented.</div>
+    <div class="rec-what"><strong>What to add:</strong> If test fails -- immediately notify Jonathan and Dr. Ed, do NOT proceed with additional testing until failure is discussed, evaluate cause (installation issue, soil conditions, equipment malfunction), options include: retest on a different column, reinstall the failed column and retest, modify the design (additional columns, closer spacing), Dr. Ed makes the engineering call.</div>
   </div>
 
-  <!-- STEP 9 -->
-  <div class="step-card">
-    <div class="step-number green">9</div>
-    <div class="step-body">
-      <div class="step-title">Create Turnover Budget</div>
-      <div class="step-desc">Convert the bid estimate into the project turnover budget using actual submittal values.</div>
-      <ul class="step-details">
-        <li>Open project estimate from Preconstruction folder</li>
-        <li>"Save As" YY-MMDD Project Name - Turnover Budget</li>
-        <li>Adjust to actual LF, columns, and stone tonnage from approved submittals</li>
-        <li>Spot check all line items with revised values</li>
-        <li>Adjust contingency so contract value matches turnover budget exactly</li>
-        <li>Confirm selected alternates match contract (pier layout, helical piles, etc.)</li>
-      </ul>
-      <span class="badge green">Estimating / PM</span>
+  <h2 class="section-header">Decision Checklist</h2>
+  <div class="checklist-counter" id="counter-modulus"><span>0</span> of <span>6</span> selected</div>
+  <table class="checklist-table">
+    <thead>
+      <tr>
+        <th style="width:40px"></th>
+        <th>Recommendation</th>
+        <th style="width:90px">Priority</th>
+        <th style="width:200px">Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><input type="checkbox" data-group="modulus" onchange="updateCounter('modulus')"></td><td class="rec-name">Actual Test Procedure</td><td><span class="badge badge-high">High</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+      <tr><td><input type="checkbox" data-group="modulus" onchange="updateCounter('modulus')"></td><td class="rec-name">Pass/Fail Acceptance Criteria</td><td><span class="badge badge-high">High</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+      <tr><td><input type="checkbox" data-group="modulus" onchange="updateCounter('modulus')"></td><td class="rec-name">Test Column Selection Criteria</td><td><span class="badge badge-medium">Medium</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+      <tr><td><input type="checkbox" data-group="modulus" onchange="updateCounter('modulus')"></td><td class="rec-name">Equipment Setup Procedure</td><td><span class="badge badge-medium">Medium</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+      <tr><td><input type="checkbox" data-group="modulus" onchange="updateCounter('modulus')"></td><td class="rec-name">Results Review and Reporting</td><td><span class="badge badge-medium">Medium</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+      <tr><td><input type="checkbox" data-group="modulus" onchange="updateCounter('modulus')"></td><td class="rec-name">Failed Test Response Procedure</td><td><span class="badge badge-high">High</span></td><td><span class="notes-placeholder">Add notes here</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ============================================================ -->
+<!-- TAB 5: MISSING SOPs -->
+<!-- ============================================================ -->
+<div id="tab-missing" class="tab-content">
+
+  <h2 class="section-header">SOPs That Should Exist</h2>
+  <p style="font-size:14px; color:#6b7280; margin-bottom:24px;">These are standard operating procedures that Pier Foundations does not currently have documented. Each one covers a critical area of the business. Check the box to approve creation.</p>
+
+  <div class="checklist-counter" id="counter-missing"><span>0</span> of <span>6</span> approved for creation</div>
+
+  <div class="missing-card">
+    <div class="missing-card-header">
+      <span class="missing-card-title">Business Development SOP</span>
+      <span class="badge badge-high">High</span>
     </div>
+    <p>Referenced in Estimating SOP but does not exist. Should cover: lead sources, GC outreach process, bid invitation tracking, prequalification submissions, relationship management, win/loss analysis.</p>
+    <label><input type="checkbox" data-group="missing" onchange="updateCounter('missing')"> Approve creation of this SOP</label>
   </div>
 
-  <!-- STEP 10 -->
-  <div class="step-card">
-    <div class="step-number green">10</div>
-    <div class="step-body">
-      <div class="step-title">Project Turnover</div>
-      <div class="step-desc">Send finalized budget and project info to the project manager at least 1 week before start.</div>
-      <ul class="step-details">
-        <li>Create Project Contact Info Turnover Sheet from template (02-Project Management folder)</li>
-        <li>Name: YY-MMDD - Project # - Project Name - Project Info</li>
-        <li>Fill all yellow highlighted cells in contact sheet</li>
-        <li>Email turnover budget + project info sheets to PM</li>
-        <li>Note any special items for site team (stone credit apps, etc.)</li>
-        <li>Hold turnover meeting if high-risk or unusual items exist</li>
-      </ul>
-      <span class="badge green">Estimating / PM</span>
+  <div class="missing-card">
+    <div class="missing-card-header">
+      <span class="missing-card-title">Field Installation SOP</span>
+      <span class="badge badge-high">High</span>
     </div>
+    <p>The core work PF does is not documented. Should cover: daily setup procedure, vibroflot penetration process, stone placement and compaction (lift sequence), production logging, hand log completion, daily reports, equipment daily inspections.</p>
+    <label><input type="checkbox" data-group="missing" onchange="updateCounter('missing')"> Approve creation of this SOP</label>
+  </div>
+
+  <div class="missing-card">
+    <div class="missing-card-header">
+      <span class="missing-card-title">Safety SOP</span>
+      <span class="badge badge-high">High</span>
+    </div>
+    <p>Should cover: OSHA requirements, daily safety briefings (toolbox talks), PPE requirements specific to VSC work, vibration exposure monitoring, silica dust management, heat illness prevention, emergency procedures, incident reporting, near-miss reporting.</p>
+    <label><input type="checkbox" data-group="missing" onchange="updateCounter('missing')"> Approve creation of this SOP</label>
+  </div>
+
+  <div class="missing-card medium-priority">
+    <div class="missing-card-header">
+      <span class="missing-card-title">Project Closeout SOP</span>
+      <span class="badge badge-medium">Medium</span>
+    </div>
+    <p>Should cover: final inspections, closeout document package assembly (GUHMA, modulus tests, as-builts, delivery tickets, daily logs), warranty documentation, final payment application, lien waiver process, demobilization checklist, lessons learned debrief.</p>
+    <label><input type="checkbox" data-group="missing" onchange="updateCounter('missing')"> Approve creation of this SOP</label>
+  </div>
+
+  <div class="missing-card medium-priority">
+    <div class="missing-card-header">
+      <span class="missing-card-title">Equipment Maintenance SOP</span>
+      <span class="badge badge-medium">Medium</span>
+    </div>
+    <p>Should cover: vibroflot maintenance schedule (hours-based), excavator service intervals, daily pre-shift equipment inspection checklist, breakdown response procedure, parts inventory and reorder process, annual certification/calibration schedule (including Chicago Jack testing).</p>
+    <label><input type="checkbox" data-group="missing" onchange="updateCounter('missing')"> Approve creation of this SOP</label>
+  </div>
+
+  <div class="missing-card medium-priority">
+    <div class="missing-card-header">
+      <span class="missing-card-title">Change Order SOP</span>
+      <span class="badge badge-medium">Medium</span>
+    </div>
+    <p>Should cover: identifying changes in the field, documenting with photos and measurements, pricing using estimate rates, written submission to GC within 48 hours, tracking pending COs, following up on approvals.</p>
+    <label><input type="checkbox" data-group="missing" onchange="updateCounter('missing')"> Approve creation of this SOP</label>
+  </div>
+
+</div>
+
+<!-- ============================================================ -->
+<!-- SAVE NOTE & FOOTER -->
+<!-- ============================================================ -->
+<div style="max-width:960px; padding: 0 40px 32px;">
+  <div class="save-note">
+    <strong>Note on saving selections:</strong> Checkboxes are session-only and will reset if the page is refreshed. To preserve your selections, take a screenshot or print this page (Ctrl+P / Cmd+P) after completing your review. The page is print-optimized and will include all tabs when printed.
   </div>
 </div>
 
-<!-- ======================= TAB 4: QA/QC ======================= -->
-<div id="tab-qaqc" class="tab-content">
-  <h2 class="section-title">QA/QC</h2>
-  <p class="section-subtitle">GUHMA column checking and modulus testing procedures</p>
-
-  <!-- SECTION A: GUHMA -->
-  <div class="qaqc-section">
-    <div class="qaqc-section-title purple">Section A: GUHMA Column Checking</div>
-
-    <!-- DECISION TREE -->
-    <div style="margin-bottom:24px;">
-      <h4 style="font-size:14px;font-weight:600;color:var(--gray-700);margin-bottom:12px;">Column Check Decision Tree</h4>
-      <div class="decision-tree">
-
-        <div class="dt-box question">Column installed?</div>
-        <div class="dt-row">
-          <div>
-            <div class="dt-connector"></div>
-            <div class="dt-label yes" style="text-align:center;">YES</div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <div class="dt-label no">NO</div>
-            <div style="width:40px;height:2px;background:#ef4444;"></div>
-            <div class="dt-box fail" style="width:240px;">NOTIFY PF OWNER IMMEDIATELY</div>
-          </div>
-        </div>
-        <div class="dt-connector"></div>
-
-        <div class="dt-box question">Depth meets design?</div>
-        <div class="dt-row">
-          <div>
-            <div class="dt-connector"></div>
-            <div class="dt-label yes" style="text-align:center;">YES (mark blue)</div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <div class="dt-label no">NO</div>
-            <div style="width:40px;height:2px;background:#ef4444;"></div>
-            <div class="dt-box fail" style="width:240px;">FLAG RED - Send to Dr. Ed for review</div>
-          </div>
-        </div>
-        <div class="dt-connector"></div>
-
-        <div class="dt-box question">Buckets match hand logs?</div>
-        <div class="dt-row">
-          <div>
-            <div class="dt-connector"></div>
-            <div class="dt-label yes" style="text-align:center;">YES</div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <div class="dt-label no">NO</div>
-            <div style="width:40px;height:2px;background:#ef4444;"></div>
-            <div class="dt-box fail" style="width:240px;">Edit raw data file, update GUHMA</div>
-          </div>
-        </div>
-        <div class="dt-connector"></div>
-
-        <div class="dt-box pass">COLUMN PASSES QC</div>
-
-      </div>
-    </div>
-
-    <!-- GUHMA STEPS -->
-    <div class="step-card">
-      <div class="step-number purple">1</div>
-      <div class="step-body">
-        <div class="step-title">Download Column Log Data</div>
-        <div class="step-desc">Download zip file with column logs from Operations Manager.</div>
-        <ul class="step-details">
-          <li>Save to: Project Folder > Engineering &amp; Design > QAQC > Guhma Data</li>
-        </ul>
-        <span class="badge purple">QA/QC</span>
-      </div>
-    </div>
-
-    <div class="step-card">
-      <div class="step-number purple">2</div>
-      <div class="step-body">
-        <div class="step-title">Open GUHMA in Extended Mode</div>
-        <div class="step-desc">Launch the GUHMA desktop application and load all data files.</div>
-        <ul class="step-details">
-          <li>Click Extended Mode</li>
-          <li>Click Open Files, navigate to saved data folder</li>
-          <li>Select all data files and click Open</li>
-        </ul>
-        <span class="badge purple">QA/QC</span>
-      </div>
-    </div>
-
-    <div class="step-card">
-      <div class="step-number purple">3</div>
-      <div class="step-body">
-        <div class="step-title">Configure Report Settings</div>
-        <div class="step-desc">Set up document title, project info, and PF branding.</div>
-        <ul class="step-details">
-          <li>Click Report Settings (bottom left of window)</li>
-          <li>Fill in Project # and Project Title</li>
-          <li>Add PF Logo if not already selected</li>
-        </ul>
-        <span class="badge purple">QA/QC</span>
-      </div>
-    </div>
-
-    <div class="step-card">
-      <div class="step-number purple">4</div>
-      <div class="step-body">
-        <div class="step-title">Set Up Time Diagram</div>
-        <div class="step-desc">Configure the Time Diagram graph parameters for the report.</div>
-        <ul class="step-details">
-          <li>Row 1: Select "2 depth" - min = next interval of 5 above deepest column, max = 0</li>
-          <li>Interval: 1 for under 20', 2 for over 20'</li>
-          <li>Row 2: Always None</li>
-          <li>Row 3: Select "7 Buckets" - min=0, max=5, interval=1</li>
-          <li>Rows 4, 5: Always None</li>
-        </ul>
-        <span class="badge purple">QA/QC</span>
-      </div>
-    </div>
-
-    <div class="step-card">
-      <div class="step-number purple">5</div>
-      <div class="step-body">
-        <div class="step-title">Set Up Depth/Time Diagram</div>
-        <div class="step-desc">Configure the vertical Depth/Time Diagram with 5 data channels.</div>
-        <ul class="step-details">
-          <li>Diagram 1: "2 depth" - match Time Diagram settings, smoothing=0</li>
-          <li>Diagram 2: "14 Flot" - min=0, max=5000, interval=1000, smoothing=1</li>
-          <li>Diagram 3: "9 Winch A (Down)" - min=0, max=5000, interval=1000, smoothing=1</li>
-          <li>Diagram 4: "10 PSI B (Winch Up)" - min=0, max=5000, interval=1000, smoothing=1</li>
-          <li>Diagram 5: "7 Buckets" - match Time Diagram settings, smoothing=0</li>
-        </ul>
-        <span class="badge purple">QA/QC</span>
-      </div>
-    </div>
-
-    <div class="step-card">
-      <div class="step-number purple">6</div>
-      <div class="step-body">
-        <div class="step-title">Configure Table, Printout, and Profile</div>
-        <div class="step-desc">Finalize output settings for the report.</div>
-        <ul class="step-details">
-          <li>Table tab: Uncheck "Show Table"</li>
-          <li>Printout tab: Match standard PF selections</li>
-          <li>Profil/Others tab: Check "Show profile"</li>
-          <li>Update Job Site Data via info button: Project name, area (project #), contractor (PF), client (GC), Equipment ID (VSC Rig)</li>
-        </ul>
-        <span class="badge purple">QA/QC</span>
-      </div>
-    </div>
-
-    <div class="step-card">
-      <div class="step-number purple">7</div>
-      <div class="step-body">
-        <div class="step-title">Review Each Column Against Submittal</div>
-        <div class="step-desc">The core QC check: verify all columns are installed correctly per the approved design.</div>
-        <ul class="step-details">
-          <li>Print GI-300 column layout page to PDF, save in QAQC folder</li>
-          <li>Check 1: All columns accounted for? Compare GUHMA pile list to GI-300 submittal</li>
-          <li>Check 2: All columns hit design depth? Type depths on submittal page (blue = meets/exceeds, red = short)</li>
-          <li>Check 3: Buckets match hand logs? Cross-reference GUHMA data with field hand logs</li>
-          <li>Missing columns: Notify PF owner (Jonathan Reinking) immediately</li>
-          <li>Short columns: Flag red, send to Dr. Ed for engineering review</li>
-        </ul>
-        <span class="badge purple">QA/QC</span>
-      </div>
-    </div>
-
-    <div class="step-card">
-      <div class="step-number purple">8</div>
-      <div class="step-body">
-        <div class="step-title">Fix Data Discrepancies</div>
-        <div class="step-desc">Edit raw data files in SharePoint to correct bucket counts that don't match hand logs.</div>
-        <ul class="step-details">
-          <li>Navigate to raw data file for the column in SharePoint</li>
-          <li>Open in Notepad, scroll to bottom of file</li>
-          <li>Bucket column is one column left of the ";0;" column</li>
-          <li>Update last 3-5 numbers to correct bucket count</li>
-          <li>Save file - GUHMA will reflect the update</li>
-        </ul>
-        <span class="badge purple">QA/QC</span>
-      </div>
-    </div>
-
-    <div class="step-card">
-      <div class="step-number purple">9</div>
-      <div class="step-body">
-        <div class="step-title">Generate Combined PDF Report</div>
-        <div class="step-desc">Create the final GUHMA report for project closeout.</div>
-        <ul class="step-details">
-          <li>Select all piles: Click top column, hold Shift, click bottom column</li>
-          <li>Click "Create combined PDF with selected files"</li>
-          <li>Save to a new "GUHMA" folder, then copy to project QAQC folder</li>
-          <li>Report includes one page per column with all diagrams</li>
-          <li>This PDF is a closeout deliverable sent to GC and Dr. Ed</li>
-        </ul>
-        <span class="badge purple">QA/QC</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- SECTION B: MODULUS TESTING -->
-  <div class="qaqc-section">
-    <div class="qaqc-section-title amber">Section B: Modulus Testing</div>
-
-    <div class="step-card">
-      <div class="step-number amber">1</div>
-      <div class="step-body">
-        <div class="step-title">Copy Modulus Test Template</div>
-        <div class="step-desc">Get the template from SharePoint and prepare it for the specific project.</div>
-        <ul class="step-details">
-          <li>Source: SharePoint > 04 - Project Management > 03 - AP Modulus Test</li>
-          <li>Copy "AP Modulus Testing Report_PF"</li>
-          <li>Paste to: Project Folder > 03 - Engineering &amp; Design > Modulus Test</li>
-          <li>Rename: YY-MMDD Project Name Modulus Test</li>
-        </ul>
-        <span class="badge amber">QA/QC</span>
-      </div>
-    </div>
-
-    <div class="step-card">
-      <div class="step-number amber">2</div>
-      <div class="step-body">
-        <div class="step-title">Fill In Project Info</div>
-        <div class="step-desc">Enter basic project information in the grey fillable fields.</div>
-        <ul class="step-details">
-          <li>Job Name, Location, Number, Tested By</li>
-          <li>AP Number and Test Date: filled out during actual field test</li>
-        </ul>
-        <span class="badge amber">QA/QC</span>
-      </div>
-    </div>
-
-    <div class="step-card">
-      <div class="step-number amber">3</div>
-      <div class="step-body">
-        <div class="step-title">Set Design Parameters from Submittal</div>
-        <div class="step-desc">Pull design values from Dr. Ed's approved submittal and enter into the test sheet.</div>
-        <ul class="step-details">
-          <li>AP Design Diameter: 2.00' (24") or 2.50' (30") - check GI-200 page</li>
-          <li>Diameter of Plate: Same as AP Design Diameter</li>
-          <li>AP Reaction Modulus: From GI-100, AP Design and Installation Criteria section</li>
-          <li>AP Design Load: From GI-200 Modulus Test Schedule, applied load column (kips)</li>
-          <li>Jack Calibration: Small jack (under 175 kips) = 49.84 / Large jack (over 175 kips) = 32.88</li>
-          <li>Jacks recalibrated annually by Chicago Jack, new factors from Dr. Ed/GGG</li>
-        </ul>
-        <span class="badge amber">QA/QC</span>
-      </div>
-    </div>
-
-    <div class="step-card">
-      <div class="step-number amber">4</div>
-      <div class="step-body">
-        <div class="step-title">Verify and Hand Off</div>
-        <div class="step-desc">Confirm all calculated values match the submittal, then the sheet is ready for field use.</div>
-        <ul class="step-details">
-          <li>Confirm % design load, load increment, and kips from submittal match the Excel sheet</li>
-          <li>Rest of sheet auto-populates and is ready for field operator during test</li>
-        </ul>
-        <span class="badge amber">Field Operator</span>
-      </div>
-    </div>
-
-    <!-- MODULUS REFERENCE CARD -->
-    <div class="ref-card">
-      <h4>Modulus Test Parameter Reference</h4>
-      <table class="ref-table">
-        <thead>
-          <tr><th>Parameter</th><th>Source</th><th>Location in Submittal</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>Column Diameter</td><td>GI-200</td><td>Top left + typical AP detail</td></tr>
-          <tr><td>Design Reaction Modulus</td><td>GI-100</td><td>AP Design &amp; Installation Criteria</td></tr>
-          <tr><td>Design Load (kips)</td><td>GI-200</td><td>Modulus Test Schedule</td></tr>
-          <tr><td>Jack Cal Factor (small, under 175 kips)</td><td>Lab cert</td><td>Currently 49.84</td></tr>
-          <tr><td>Jack Cal Factor (large, over 175 kips)</td><td>Lab cert</td><td>Currently 32.88</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<!-- FOOTER -->
-<div class="footer">
-  Pier Foundations Operations Playbook &nbsp;|&nbsp; Prepared by Peter (AI COO) &nbsp;|&nbsp; Confidential
-</div>
+<footer class="page-footer">
+  Pier Foundations SOP Review | Peter (AI COO) | Confidential | May 28, 2026
+</footer>
 
 <script>
-function showTab(tabId) {
-  // Hide all tabs
-  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-
-  // Show selected tab
+// Tab switching
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-content').forEach(function(el) {
+    el.classList.remove('active');
+  });
+  document.querySelectorAll('.tab-btn').forEach(function(el) {
+    el.classList.remove('active');
+  });
   document.getElementById('tab-' + tabId).classList.add('active');
 
-  // Activate the correct button
-  const btns = document.querySelectorAll('.tab-btn');
-  const tabMap = ['overview', 'estimating', 'award', 'qaqc'];
-  const idx = tabMap.indexOf(tabId);
-  if (idx >= 0) btns[idx].classList.add('active');
+  var tabs = ['estimating', 'award', 'guhma', 'modulus', 'missing'];
+  var idx = tabs.indexOf(tabId);
+  if (idx >= 0) {
+    document.querySelectorAll('.tab-btn')[idx].classList.add('active');
+  }
 }
+
+// Counter updates
+function updateCounter(group) {
+  var checkboxes = document.querySelectorAll('input[data-group="' + group + '"]');
+  var checked = 0;
+  for (var i = 0; i < checkboxes.length; i++) {
+    if (checkboxes[i].checked) checked++;
+  }
+  var counter = document.getElementById('counter-' + group);
+  if (counter) {
+    var spans = counter.querySelectorAll('span');
+    spans[0].textContent = checked;
+  }
+}
+
+// Make notes placeholder editable on click
+document.addEventListener('click', function(e) {
+  if (e.target.classList.contains('notes-placeholder')) {
+    var td = e.target.parentElement;
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = 'Type notes...';
+    input.style.cssText = 'width:100%;padding:4px 6px;font-size:13px;font-family:Inter,sans-serif;border:1px solid #d1d5db;border-radius:4px;outline:none;';
+    input.addEventListener('focus', function() {
+      this.style.borderColor = '#1a3a5c';
+    });
+    input.addEventListener('blur', function() {
+      this.style.borderColor = '#d1d5db';
+    });
+    td.innerHTML = '';
+    td.appendChild(input);
+    input.focus();
+  }
+});
 </script>
 
 </body>
