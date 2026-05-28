@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vanta.js Lab — Testing Effects</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #000; color: #fff; }
+
+    .effect-section {
+        position: relative;
+        width: 100%;
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .effect-bg {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+    }
+    .effect-label {
+        position: relative;
+        z-index: 1;
+        text-align: center;
+        pointer-events: none;
+    }
+    .effect-label h2 {
+        font-size: 3rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        margin-bottom: 8px;
+        text-shadow: 0 2px 20px rgba(0,0,0,0.5);
+    }
+    .effect-label p {
+        font-size: 1rem;
+        color: rgba(255,255,255,0.6);
+        text-shadow: 0 1px 10px rgba(0,0,0,0.5);
+    }
+
+    .nav-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 100;
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        padding: 16px;
+        background: rgba(0,0,0,0.7);
+        backdrop-filter: blur(12px);
+    }
+    .nav-bar a {
+        color: rgba(255,255,255,0.6);
+        text-decoration: none;
+        font-size: 0.8rem;
+        font-weight: 600;
+        padding: 8px 16px;
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 6px;
+        transition: all 0.2s;
+    }
+    .nav-bar a:hover {
+        color: #fff;
+        border-color: #D4703C;
+        background: rgba(212,112,60,0.15);
+    }
+</style>
+</head>
+<body>
+
+<nav class="nav-bar">
+    <a href="#topology">Topology</a>
+    <a href="#waves">Waves</a>
+    <a href="#fog">Fog</a>
+    <a href="#net">Net</a>
+    <a href="#cells">Cells</a>
+    <a href="#dots">Dots</a>
+</nav>
+
+<!-- TOPOLOGY -->
+<section class="effect-section" id="topology">
+    <div class="effect-bg" id="vanta-topology"></div>
+    <div class="effect-label">
+        <h2>TOPOLOGY</h2>
+        <p>Geometric network — engineering feel</p>
+    </div>
+</section>
+
+<!-- WAVES -->
+<section class="effect-section" id="waves">
+    <div class="effect-bg" id="vanta-waves"></div>
+    <div class="effect-label">
+        <h2>WAVES</h2>
+        <p>Dynamic water — movement and flow</p>
+    </div>
+</section>
+
+<!-- FOG -->
+<section class="effect-section" id="fog">
+    <div class="effect-bg" id="vanta-fog"></div>
+    <div class="effect-label">
+        <h2>FOG</h2>
+        <p>Volumetric atmosphere — cinematic depth</p>
+    </div>
+</section>
+
+<!-- NET -->
+<section class="effect-section" id="net">
+    <div class="effect-bg" id="vanta-net"></div>
+    <div class="effect-label">
+        <h2>NET</h2>
+        <p>Connected points — data visualization</p>
+    </div>
+</section>
+
+<!-- CELLS -->
+<section class="effect-section" id="cells">
+    <div class="effect-bg" id="vanta-cells"></div>
+    <div class="effect-label">
+        <h2>CELLS</h2>
+        <p>Organic cell patterns — soil texture</p>
+    </div>
+</section>
+
+<!-- DOTS -->
+<section class="effect-section" id="dots">
+    <div class="effect-bg" id="vanta-dots"></div>
+    <div class="effect-label">
+        <h2>DOTS</h2>
+        <p>Minimal particle grid — clean and technical</p>
+    </div>
+</section>
+
+<!-- Three.js + Vanta effects -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.topology.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.waves.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.fog.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.net.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.cells.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.dots.min.js"></script>
+
+<script>
+    // PF brand colors
+    var navy = 0x0a0e17;
+    var accent = 0xD4703C;
+    var accentDark = 0xB55A2A;
+    var steel = 0x1E3A5F;
+
+    // TOPOLOGY — geometric network
+    VANTA.TOPOLOGY({
+        el: '#vanta-topology',
+        THREE: THREE,
+        mouseControls: true,
+        touchControls: false,
+        gyroControls: false,
+        color: accent,
+        backgroundColor: navy,
+        scale: 1.0,
+        scaleMobile: 0.5
+    });
+
+    // WAVES — dynamic water
+    VANTA.WAVES({
+        el: '#vanta-waves',
+        THREE: THREE,
+        mouseControls: true,
+        touchControls: false,
+        gyroControls: false,
+        color: steel,
+        shininess: 35,
+        waveHeight: 15,
+        waveSpeed: 0.8,
+        zoom: 0.75,
+        scaleMobile: 0.5
+    });
+
+    // FOG — volumetric atmosphere
+    VANTA.FOG({
+        el: '#vanta-fog',
+        THREE: THREE,
+        mouseControls: true,
+        touchControls: false,
+        gyroControls: false,
+        highlightColor: accent,
+        midtoneColor: steel,
+        lowlightColor: navy,
+        baseColor: navy,
+        blurFactor: 0.6,
+        speed: 1.5,
+        zoom: 1.2,
+        scaleMobile: 0.5
+    });
+
+    // NET — connected points
+    VANTA.NET({
+        el: '#vanta-net',
+        THREE: THREE,
+        mouseControls: true,
+        touchControls: false,
+        gyroControls: false,
+        color: accent,
+        backgroundColor: navy,
+        points: 10,
+        maxDistance: 22,
+        spacing: 16,
+        showDots: true,
+        scaleMobile: 0.5
+    });
+
+    // CELLS — organic pattern
+    VANTA.CELLS({
+        el: '#vanta-cells',
+        THREE: THREE,
+        mouseControls: true,
+        touchControls: false,
+        gyroControls: false,
+        color1: accent,
+        color2: steel,
+        size: 1.5,
+        speed: 1.0,
+        scale: 1.0,
+        scaleMobile: 0.5
+    });
+
+    // DOTS — minimal grid
+    VANTA.DOTS({
+        el: '#vanta-dots',
+        THREE: THREE,
+        mouseControls: true,
+        touchControls: false,
+        gyroControls: false,
+        color: accent,
+        color2: steel,
+        backgroundColor: navy,
+        size: 3,
+        spacing: 35,
+        showLines: false,
+        scaleMobile: 0.5
+    });
+</script>
+
+</body>
+</html>
