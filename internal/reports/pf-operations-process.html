@@ -1,0 +1,1462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pier Foundations — Operations Playbook</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --blue: #2563eb;
+    --blue-light: #dbeafe;
+    --blue-bg: #eff6ff;
+    --green: #16a34a;
+    --green-light: #dcfce7;
+    --green-bg: #f0fdf4;
+    --amber: #d97706;
+    --amber-light: #fef3c7;
+    --amber-bg: #fffbeb;
+    --purple: #7c3aed;
+    --purple-light: #ede9fe;
+    --purple-bg: #f5f3ff;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+    --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.06);
+    --shadow-lg: 0 10px 15px rgba(0,0,0,0.1), 0 4px 6px rgba(0,0,0,0.05);
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #ffffff;
+    color: var(--gray-800);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* HEADER */
+  .header {
+    background: linear-gradient(135deg, var(--gray-900) 0%, #1e3a5f 100%);
+    color: #fff;
+    padding: 48px 40px 40px;
+    text-align: center;
+  }
+  .header h1 {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    margin-bottom: 8px;
+  }
+  .header p {
+    font-size: 16px;
+    font-weight: 400;
+    color: #94a3b8;
+    letter-spacing: 0.5px;
+  }
+
+  /* TAB NAV */
+  .tab-nav {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    background: var(--gray-100);
+    padding: 6px;
+    border-bottom: 1px solid var(--gray-200);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .tab-btn {
+    padding: 10px 24px;
+    border: none;
+    background: transparent;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--gray-600);
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s;
+  }
+  .tab-btn:hover { background: #fff; color: var(--gray-800); }
+  .tab-btn.active {
+    background: #fff;
+    color: var(--blue);
+    font-weight: 600;
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* CONTENT */
+  .tab-content { display: none; padding: 40px; max-width: 1100px; margin: 0 auto; }
+  .tab-content.active { display: block; }
+
+  .section-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-bottom: 8px;
+  }
+  .section-subtitle {
+    font-size: 14px;
+    color: var(--gray-500);
+    margin-bottom: 32px;
+  }
+
+  /* FLOWCHART */
+  .flowchart {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    padding: 24px 0;
+  }
+  .flow-box {
+    width: 260px;
+    padding: 14px 16px;
+    border-radius: var(--radius);
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.4;
+    box-shadow: var(--shadow);
+    position: relative;
+    border: 2px solid transparent;
+  }
+  .flow-box.blue { background: var(--blue-light); color: var(--blue); border-color: var(--blue); }
+  .flow-box.green { background: var(--green-light); color: #15803d; border-color: var(--green); }
+  .flow-box.amber { background: var(--amber-light); color: #92400e; border-color: var(--amber); }
+  .flow-box.purple { background: var(--purple-light); color: var(--purple); border-color: var(--purple); }
+
+  .flow-connector {
+    width: 2px;
+    height: 24px;
+    background: var(--gray-300);
+    position: relative;
+  }
+  .flow-connector::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: -4px;
+    width: 0; height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid var(--gray-300);
+  }
+
+  /* DECISION BOX */
+  .flow-decision-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .flow-decision {
+    width: 220px;
+    padding: 12px 14px;
+    border-radius: var(--radius);
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    transform: rotate(0deg);
+    border: 2px dashed;
+    background: #fff;
+  }
+  .flow-decision.blue { border-color: var(--blue); color: var(--blue); }
+  .flow-decision.green { border-color: var(--green); color: #15803d; }
+  .flow-decision.purple { border-color: var(--purple); color: var(--purple); }
+
+  .flow-exit {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--gray-400);
+    padding: 6px 14px;
+    border: 1px solid var(--gray-300);
+    border-radius: 20px;
+    background: var(--gray-50);
+  }
+  .flow-exit-label {
+    font-size: 10px;
+    color: var(--gray-400);
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+  .flow-exit-group { text-align: center; }
+
+  /* PARALLEL CONNECTOR */
+  .flow-parallel {
+    display: flex;
+    align-items: flex-start;
+    gap: 40px;
+    position: relative;
+  }
+  .flow-parallel::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    height: 2px;
+    background: var(--gray-300);
+  }
+  .flow-parallel-branch {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+  .flow-parallel-merge {
+    width: 60%;
+    height: 2px;
+    background: var(--gray-300);
+    margin: 0 auto;
+    position: relative;
+  }
+
+  /* PHASE LABELS */
+  .phase-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 4px 14px;
+    border-radius: 20px;
+    margin: 16px 0 8px;
+  }
+  .phase-label.blue { background: var(--blue); color: #fff; }
+  .phase-label.green { background: var(--green); color: #fff; }
+  .phase-label.amber { background: var(--amber); color: #fff; }
+  .phase-label.purple { background: var(--purple); color: #fff; }
+
+  /* CONTACTS TABLE */
+  .contacts-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 40px;
+    font-size: 13px;
+  }
+  .contacts-table th {
+    text-align: left;
+    padding: 10px 14px;
+    background: var(--gray-100);
+    font-weight: 600;
+    color: var(--gray-700);
+    border-bottom: 2px solid var(--gray-200);
+  }
+  .contacts-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--gray-100);
+    color: var(--gray-600);
+  }
+  .contacts-table tr:hover td { background: var(--gray-50); }
+
+  /* STEP CARDS */
+  .step-card {
+    background: #fff;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    gap: 20px;
+    transition: box-shadow 0.2s;
+  }
+  .step-card:hover { box-shadow: var(--shadow-md); }
+
+  .step-number {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+  }
+  .step-number.blue { background: var(--blue); }
+  .step-number.green { background: var(--green); }
+  .step-number.amber { background: var(--amber); }
+  .step-number.purple { background: var(--purple); }
+
+  .step-body { flex: 1; }
+  .step-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-bottom: 6px;
+  }
+  .step-desc {
+    font-size: 13px;
+    color: var(--gray-600);
+    margin-bottom: 10px;
+  }
+  .step-details {
+    list-style: none;
+    padding: 0;
+  }
+  .step-details li {
+    font-size: 12px;
+    color: var(--gray-500);
+    padding: 3px 0 3px 16px;
+    position: relative;
+  }
+  .step-details li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 10px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--gray-300);
+  }
+
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-top: 8px;
+  }
+  .badge.blue { background: var(--blue-light); color: var(--blue); }
+  .badge.green { background: var(--green-light); color: var(--green); }
+  .badge.amber { background: var(--amber-light); color: var(--amber); }
+  .badge.purple { background: var(--purple-light); color: var(--purple); }
+
+  /* REFERENCE CARDS */
+  .ref-card {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 20px 24px;
+    margin: 24px 0;
+  }
+  .ref-card h4 {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--gray-800);
+    margin-bottom: 12px;
+  }
+  .ref-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .ref-table th {
+    text-align: left;
+    padding: 6px 12px;
+    font-weight: 600;
+    color: var(--gray-600);
+    border-bottom: 1px solid var(--gray-200);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .ref-table td {
+    padding: 6px 12px;
+    color: var(--gray-600);
+    border-bottom: 1px solid var(--gray-100);
+  }
+
+  .supplier-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .supplier-tag {
+    font-size: 12px;
+    padding: 4px 12px;
+    background: #fff;
+    border: 1px solid var(--gray-200);
+    border-radius: 20px;
+    color: var(--gray-600);
+  }
+
+  /* TIMELINE */
+  .timeline-bar {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin: 32px 0;
+    overflow-x: auto;
+  }
+  .timeline-step {
+    padding: 10px 16px;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+    white-space: nowrap;
+    border: 2px solid;
+    position: relative;
+    min-width: 120px;
+  }
+  .timeline-step:first-child { border-radius: 8px 0 0 8px; }
+  .timeline-step:last-child { border-radius: 0 8px 8px 0; }
+  .timeline-step.green { background: var(--green-light); border-color: var(--green); color: #15803d; }
+  .timeline-step.amber { background: var(--amber-light); border-color: var(--amber); color: #92400e; }
+  .timeline-arrow {
+    width: 0; height: 0;
+    border-top: 12px solid transparent;
+    border-bottom: 12px solid transparent;
+    border-left: 10px solid var(--gray-300);
+    flex-shrink: 0;
+  }
+  .timeline-duration {
+    font-size: 10px;
+    font-weight: 400;
+    display: block;
+    margin-top: 2px;
+    opacity: 0.8;
+  }
+
+  /* QA/QC SECTIONS */
+  .qaqc-section {
+    margin-bottom: 40px;
+  }
+  .qaqc-section-title {
+    font-size: 18px;
+    font-weight: 700;
+    padding: 12px 20px;
+    border-radius: var(--radius);
+    margin-bottom: 20px;
+    display: inline-block;
+  }
+  .qaqc-section-title.purple { background: var(--purple-light); color: var(--purple); }
+  .qaqc-section-title.amber { background: var(--amber-light); color: #92400e; }
+
+  /* DECISION TREE (QA/QC) */
+  .decision-tree {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    padding: 24px 0;
+    margin: 20px 0;
+  }
+  .dt-box {
+    width: 280px;
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    border: 2px solid;
+  }
+  .dt-box.question { background: var(--purple-light); border-color: var(--purple); color: var(--purple); }
+  .dt-box.pass { background: var(--green-light); border-color: var(--green); color: #15803d; }
+  .dt-box.fail { background: #fef2f2; border-color: #ef4444; color: #dc2626; }
+
+  .dt-connector {
+    width: 2px;
+    height: 20px;
+    background: var(--gray-300);
+    position: relative;
+  }
+  .dt-connector::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: -4px;
+    width: 0; height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid var(--gray-300);
+  }
+
+  .dt-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .dt-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .dt-label.yes { color: var(--green); }
+  .dt-label.no { color: #dc2626; }
+
+  /* TWO COLUMN LAYOUT */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin: 20px 0;
+  }
+  @media (max-width: 768px) {
+    .two-col { grid-template-columns: 1fr; }
+    .flow-parallel { flex-direction: column; align-items: center; gap: 0; }
+    .flow-parallel::before { display: none; }
+    .timeline-bar { flex-direction: column; }
+    .timeline-step { border-radius: 8px !important; min-width: auto; width: 100%; }
+    .timeline-arrow { transform: rotate(90deg); }
+    .tab-nav { flex-wrap: wrap; }
+    .tab-btn { font-size: 12px; padding: 8px 14px; }
+  }
+
+  /* LEGEND */
+  .legend {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--gray-600);
+  }
+  .legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    border: 2px solid;
+  }
+  .legend-dot.blue { background: var(--blue-light); border-color: var(--blue); }
+  .legend-dot.green { background: var(--green-light); border-color: var(--green); }
+  .legend-dot.amber { background: var(--amber-light); border-color: var(--amber); }
+  .legend-dot.purple { background: var(--purple-light); border-color: var(--purple); }
+
+  /* FOOTER */
+  .footer {
+    text-align: center;
+    padding: 24px 40px;
+    border-top: 1px solid var(--gray-200);
+    font-size: 12px;
+    color: var(--gray-400);
+  }
+
+  /* PRINT */
+  @media print {
+    .tab-nav { display: none; }
+    .tab-content { display: block !important; page-break-before: always; }
+    .tab-content:first-of-type { page-break-before: auto; }
+    .header { padding: 24px; }
+    body { font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <h1>Pier Foundations &mdash; Operations Playbook</h1>
+  <p>From Bid Invitation to Project Closeout</p>
+</div>
+
+<!-- TAB NAVIGATION -->
+<div class="tab-nav">
+  <button class="tab-btn active" onclick="showTab('overview')">Overview</button>
+  <button class="tab-btn" onclick="showTab('estimating')">Estimating SOP</button>
+  <button class="tab-btn" onclick="showTab('award')">Project Award SOP</button>
+  <button class="tab-btn" onclick="showTab('qaqc')">QA/QC</button>
+</div>
+
+<!-- ======================= TAB 1: OVERVIEW ======================= -->
+<div id="tab-overview" class="tab-content active">
+  <h2 class="section-title">Master Process Flowchart</h2>
+  <p class="section-subtitle">Complete lifecycle from bid invitation through project closeout</p>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot blue"></div> Estimating / Bid</div>
+    <div class="legend-item"><div class="legend-dot green"></div> Award / Preconstruction</div>
+    <div class="legend-item"><div class="legend-dot amber"></div> Field / Installation</div>
+    <div class="legend-item"><div class="legend-dot purple"></div> QA/QC</div>
+  </div>
+
+  <!-- FLOWCHART -->
+  <div class="flowchart">
+
+    <div class="phase-label blue">Estimating Phase</div>
+
+    <div class="flow-box blue">BID INVITATION RECEIVED</div>
+    <div class="flow-connector"></div>
+
+    <div class="flow-box blue">DOWNLOAD &amp; REVIEW GEOTECH REPORT</div>
+    <div class="flow-connector"></div>
+
+    <div class="flow-decision-row">
+      <div class="flow-decision blue">AP REQUIRED?</div>
+      <div class="flow-exit-group">
+        <div class="flow-exit-label">NO</div>
+        <div class="flow-exit">PASS</div>
+      </div>
+    </div>
+    <div class="flow-connector"></div>
+
+    <div class="flow-box blue">DOWNLOAD DRAWINGS<br><span style="font-weight:400;font-size:11px">Civil, Structural, Architectural</span></div>
+    <div class="flow-connector"></div>
+
+    <div class="flow-box blue">ADD TO BID LOG</div>
+    <div class="flow-connector"></div>
+
+    <div class="flow-box blue">CREATE PROJECT FOLDER<br><span style="font-weight:400;font-size:11px">SharePoint structure</span></div>
+    <div class="flow-connector"></div>
+
+    <div class="flow-box blue">PACKAGE BID DOCS FOR DR. ED<br><span style="font-weight:400;font-size:11px">Bluebeam extraction</span></div>
+    <div class="flow-connector"></div>
+
+    <div class="flow-box blue">SEND TO DR. ED GARBIN<br><span style="font-weight:400;font-size:11px">5 days min / 2+ weeks preferred</span></div>
+    <div class="flow-connector"></div>
+
+    <!-- PARALLEL -->
+    <div class="flow-parallel">
+      <div class="flow-parallel-branch">
+        <div class="flow-connector"></div>
+        <div class="flow-box blue" style="width:200px;">DO TAKEOFFS<br><span style="font-weight:400;font-size:11px">Kreo.com</span></div>
+      </div>
+      <div class="flow-parallel-branch">
+        <div class="flow-connector"></div>
+        <div class="flow-box blue" style="width:200px;">DR. ED PRELIM DESIGN<br><span style="font-weight:400;font-size:11px">Returned</span></div>
+      </div>
+    </div>
+
+    <div class="flow-connector"></div>
+
+    <div class="flow-box blue">GET VENDOR QUOTES<br><span style="font-weight:400;font-size:11px">Stone, Transport, Layout</span></div>
+    <div class="flow-connector"></div>
+
+    <div class="flow-box blue">BUILD ESTIMATE<br><span style="font-weight:400;font-size:11px">Excel Template</span></div>
+    <div class="flow-connector"></div>
+
+    <div class="flow-box blue">BID REVIEW WITH HEAD OF ESTIMATING</div>
+    <div class="flow-connector"></div>
+
+    <div class="flow-box blue">BUILD PROPOSAL<br><span style="font-weight:400;font-size:11px">Word Template</span></div>
+    <div class="flow-connector"></div>
+
+    <div class="flow-box blue">SUBMIT BID TO GC</div>
+    <div class="flow-connector"></div>
+
+    <div class="flow-decision-row">
+      <div class="flow-decision blue">AWARDED?</div>
+      <div class="flow-exit-group">
+        <div class="flow-exit-label">NO</div>
+        <div class="flow-exit">ARCHIVE</div>
+      </div>
+    </div>
+    <div class="flow-connector"></div>
+
+    <div class="phase-label green">Award / Preconstruction</div>
+
+    <div class="flow-box green">PROJECT AWARD PROCESS<br><span style="font-weight:400;font-size:11px">Request submittals from GC</span></div>
+    <div class="flow-connector"></div>
+
+    <div class="flow-box green">DR. ED ENGINEERED SHOP DRAWINGS<br><span style="font-weight:400;font-size:11px">3-4 weeks</span></div>
+    <div class="flow-connector"></div>
+
+    <div class="flow-box green">SUBMIT TO GC FOR REVIEW<br><span style="font-weight:400;font-size:11px">1-2 weeks</span></div>
+    <div class="flow-connector"></div>
+
+    <div class="flow-box green">SUBMITTALS APPROVED</div>
+    <div class="flow-connector"></div>
+
+    <div class="flow-box green">CREATE TURNOVER BUDGET</div>
+    <div class="flow-connector"></div>
+
+    <div class="phase-label amber">Field / Installation</div>
+
+    <div class="flow-box amber">MOBILIZE CREW &amp; EQUIPMENT<br><span style="font-weight:400;font-size:11px">From 14308 Figel Rd, Monroeville</span></div>
+    <div class="flow-connector"></div>
+
+    <div class="flow-box amber">INSTALL AGGREGATE PIERS<br><span style="font-weight:400;font-size:11px">Production: LF / 1000 = working days</span></div>
+    <div class="flow-connector"></div>
+
+    <div class="phase-label purple">QA/QC</div>
+
+    <div class="flow-box purple">QA/QC<br><span style="font-weight:400;font-size:11px">GUHMA column checking + Modulus tests</span></div>
+    <div class="flow-connector"></div>
+
+    <div class="flow-box purple">CLOSEOUT &amp; DEMOBILIZE</div>
+
+  </div>
+
+  <!-- KEY CONTACTS -->
+  <h3 style="font-size:18px;font-weight:700;margin-top:48px;margin-bottom:16px;color:var(--gray-900);">Key Contacts</h3>
+  <table class="contacts-table">
+    <thead>
+      <tr><th>Role</th><th>Name</th><th>Contact</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Engineer of Record</td><td>Dr. Edward J. Garbin, Jr., Ph.D., P.E., D.GE</td><td>Ed@GarbinGeo.com / (844) 4-GEODOC</td></tr>
+      <tr><td>Estimating</td><td>Jonathan Reinking</td><td>jreinking@pierfoundations.com / 260.458.4300</td></tr>
+      <tr><td>Business Development</td><td>Derek Franke</td><td>dfranke@pierfoundations.com</td></tr>
+      <tr><td>CEO</td><td>Brad Reinking</td><td>breinking@pierfoundations.com / 260.413.8442</td></tr>
+      <tr><td>AI COO</td><td>Peter</td><td>peter@pierfoundations.com / pfpeter@agentmail.to</td></tr>
+      <tr><td>Stone Layout</td><td>Brett Miller (MLS)</td><td>brett@mlswebsite.us</td></tr>
+      <tr><td>Transport - Paddacks</td><td>Miah</td><td>miah@paddacks.com</td></tr>
+      <tr><td>Transport - Stephan</td><td>Mark Maller</td><td>mark@stephantrucking.com</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ======================= TAB 2: ESTIMATING SOP ======================= -->
+<div id="tab-estimating" class="tab-content">
+  <h2 class="section-title">Estimating SOP</h2>
+  <p class="section-subtitle">Aggregate Pier estimating process from bid invitation through submission</p>
+
+  <!-- STEP 1 -->
+  <div class="step-card">
+    <div class="step-number blue">1</div>
+    <div class="step-body">
+      <div class="step-title">Receive Bid Invitation</div>
+      <div class="step-desc">Open GC link, download geotech report, and confirm project requires aggregate piers.</div>
+      <ul class="step-details">
+        <li>Read geotech report to confirm AP is required</li>
+        <li>Run geotech through AI if time allows for secondary confirmation</li>
+        <li>If no AP needed, pass on the project</li>
+      </ul>
+      <span class="badge blue">Estimating</span>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step-card">
+    <div class="step-number blue">2</div>
+    <div class="step-body">
+      <div class="step-title">Download Drawings</div>
+      <div class="step-desc">Collect all relevant project documents from the GC's bid invitation.</div>
+      <ul class="step-details">
+        <li>Civil Drawings</li>
+        <li>Structural Drawings</li>
+        <li>Architectural Drawings</li>
+        <li>Schedules, specifications, bid forms, scopes of work</li>
+      </ul>
+      <span class="badge blue">Estimating</span>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="step-card">
+    <div class="step-number blue">3</div>
+    <div class="step-body">
+      <div class="step-title">Create Project in Bid Log</div>
+      <div class="step-desc">Add project to the SharePoint Bid Log with all pertinent information for tracking.</div>
+      <ul class="step-details">
+        <li>Due date, contact info, project details</li>
+        <li>Location: SharePoint > 03 - Estimating > Bid Log</li>
+        <li>Ensure all PF team members can track quickly</li>
+      </ul>
+      <span class="badge blue">Estimating</span>
+    </div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="step-card">
+    <div class="step-number blue">4</div>
+    <div class="step-body">
+      <div class="step-title">Set Up Project Folder</div>
+      <div class="step-desc">Create structured project folder in SharePoint under Actively Bidding.</div>
+      <ul class="step-details">
+        <li>Create folder: SharePoint > 03 - Estimating > 01 - Aggregate Piers > 20XX Project Bids > 01 - Actively Bidding</li>
+        <li>Subfolder structure: Drawings / Specs / Geotech / Addenda / Other Bid Docs / Vendor Quotes</li>
+        <li>Copy Word Template Proposal and Excel Template Estimate into root of project folder</li>
+        <li>Rename: "YY-MMDD Project Name - PF Bid" and "YY-MMDD Project Name Estimate"</li>
+      </ul>
+      <span class="badge blue">Estimating</span>
+    </div>
+  </div>
+
+  <!-- STEP 5 -->
+  <div class="step-card">
+    <div class="step-number blue">5</div>
+    <div class="step-body">
+      <div class="step-title">Package Bid Docs</div>
+      <div class="step-desc">Extract relevant drawing pages in Bluebeam to create a focused bid document for Dr. Ed.</div>
+      <ul class="step-details">
+        <li>Architectural: Title page, lowest/first floor plans, site plan</li>
+        <li>Civil: Alta survey, demo plan, site plan, grading plans</li>
+        <li>Structural: Note pages (S001-S005), foundation plans (S100), concrete details + schedules (S300-S500)</li>
+        <li>Save as "Project Name - PF Bid Docs"</li>
+        <li>Reduce file size in Bluebeam if over 25MB</li>
+      </ul>
+      <span class="badge blue">Estimating</span>
+    </div>
+  </div>
+
+  <!-- STEP 6 -->
+  <div class="step-card">
+    <div class="step-number blue">6</div>
+    <div class="step-body">
+      <div class="step-title">Send to Dr. Ed</div>
+      <div class="step-desc">Email Dr. Ed Garbin with the geotech report, bid docs, and specs requesting preliminary design.</div>
+      <ul class="step-details">
+        <li>Send: Geotech report + "Project Name - PF Bid Docs" + specs (if applicable)</li>
+        <li>Minimum 5 working days turnaround; 2+ weeks preferred</li>
+        <li>If addenda received, send relevant updates to Dr. Ed ASAP</li>
+        <li>Pair down addenda to AP-relevant content only</li>
+      </ul>
+      <span class="badge blue">Dr. Ed Garbin / Estimating</span>
+    </div>
+  </div>
+
+  <!-- STEP 7 -->
+  <div class="step-card">
+    <div class="step-number blue">7</div>
+    <div class="step-body">
+      <div class="step-title">Do Takeoffs</div>
+      <div class="step-desc">Perform quantity takeoffs in Kreo.com while Dr. Ed works on the preliminary design.</div>
+      <ul class="step-details">
+        <li>Platform: Kreo.com (takeoff.kreo.net/2d/projects)</li>
+        <li>Upload "Project Name - PF Bid Docs" to Kreo</li>
+        <li>Foundation Plan: Count column footings by type (EA), wall footings by type (LF), slab area by type (SF)</li>
+        <li>Civil Plan: Get SF of slabs to cross-check; get SF of site perimeter, convert to acres (SF / 43,560)</li>
+        <li>Plug Building Footprint (SF) into H17 and Site Size (Acres) into H18</li>
+      </ul>
+      <span class="badge blue">Estimating</span>
+    </div>
+  </div>
+
+  <!-- STEP 8 -->
+  <div class="step-card">
+    <div class="step-number blue">8</div>
+    <div class="step-body">
+      <div class="step-title">Receive Prelim Design</div>
+      <div class="step-desc">Download Dr. Ed's preliminary design and cross-check takeoffs.</div>
+      <ul class="step-details">
+        <li>Save prelim design in main project folder (not a subfolder)</li>
+        <li>Compare Dr. Ed's LF and column counts against your takeoffs</li>
+        <li>Only flag major discrepancies</li>
+        <li>Copy prelim sheets into Excel estimate as third tab (replacing stock tab)</li>
+        <li>Also copy "Design Notes" tab as the last tab in the estimate</li>
+      </ul>
+      <span class="badge blue">Estimating</span>
+    </div>
+  </div>
+
+  <!-- STEP 9 -->
+  <div class="step-card">
+    <div class="step-number blue">9</div>
+    <div class="step-body">
+      <div class="step-title">Get Vendor Quotes</div>
+      <div class="step-desc">Obtain quotes for stone material, transportation, and column layout.</div>
+      <ul class="step-details">
+        <li>Stone: Get 3 quotes for #57 stone (washed, no fines, 3/8"-1" chips). Start 1 week before bid due date.</li>
+        <li>Transport: Get quotes from both Paddacks (Miah) and Stephan (Mark Maller)</li>
+        <li>Transport from: 14308 Figel Rd, Monroeville, IN 46773 to project site</li>
+        <li>Loads: Cat 336 excavator/vibro (98k lb), 80k excavator, F450/F550 + trailer, fall-off testing materials</li>
+        <li>Layout: Email Brett Miller at MLS with column count for $/column quote ($8-14/column typical)</li>
+      </ul>
+      <span class="badge blue">Estimating</span>
+    </div>
+  </div>
+
+  <!-- STEP 10 -->
+  <div class="step-card">
+    <div class="step-number blue">10</div>
+    <div class="step-body">
+      <div class="step-title">Build Estimate</div>
+      <div class="step-desc">Plug all values into the Excel template estimate. Key cells auto-populate from prelim design.</div>
+      <ul class="step-details">
+        <li>H9: LF of piers (link to Prelim Design Summary, typically T20)</li>
+        <li>H15: Stone tons (link to Prelim Design Summary, typically T21)</li>
+        <li>H16: Column count (link to Prelim Design Summary, typically T19)</li>
+        <li>H17: Building SF / H18: Site acres</li>
+        <li>Engineering cost: From Dr. Ed prelim (typically cell W54)</li>
+        <li>Stone + delivery: Use cheapest quote, note supplier in cell notes</li>
+        <li>Travel days: Minimum 2, add 1 per 6 working days</li>
+        <li>Mileage: Farm to site x2 (round trip), multiply for longer projects</li>
+        <li>Mobilization: Use cheaper of Paddacks or Stephan, note in cell</li>
+        <li>Equipment rental: Minimum 1 week, add 1 week per 5 working days</li>
+      </ul>
+      <span class="badge blue">Estimating</span>
+    </div>
+  </div>
+
+  <!-- STEP 11 -->
+  <div class="step-card">
+    <div class="step-number blue">11</div>
+    <div class="step-body">
+      <div class="step-title">Review with Head of Estimating</div>
+      <div class="step-desc">Meeting to review the complete estimate and project details before proposal.</div>
+      <ul class="step-details">
+        <li>Review project total price at bottom of estimate</li>
+        <li>Discuss alternates (slab support, helical piles for additions)</li>
+        <li>Confirm spoils amount, layout alternate pricing, timeline</li>
+      </ul>
+      <span class="badge blue">Head of Estimating</span>
+    </div>
+  </div>
+
+  <!-- STEP 12 -->
+  <div class="step-card">
+    <div class="step-number blue">12</div>
+    <div class="step-body">
+      <div class="step-title">Build Proposal</div>
+      <div class="step-desc">Update the Word template proposal with project-specific information and pricing.</div>
+      <ul class="step-details">
+        <li>Update date, project name, project address</li>
+        <li>Update contract documents date (from bid set drawings)</li>
+        <li>Update architect of record and date</li>
+        <li>Update geotechnical engineer and report date</li>
+        <li>Plug in pricing as directed in bid review meeting</li>
+        <li>Spoils: 1.5x Total LF for 24" columns, 2x Total LF for 30" columns</li>
+        <li>Layout alternate: Quote from MLS x 25-50%</li>
+        <li>Duration: Estimated working days + 3-5 days, present as range</li>
+        <li>Update bearing pressure PSF from GGG prelim</li>
+        <li>Update tax inclusion/exclusion per project</li>
+      </ul>
+      <span class="badge blue">Estimating</span>
+    </div>
+  </div>
+
+  <!-- STEP 13 -->
+  <div class="step-card">
+    <div class="step-number blue">13</div>
+    <div class="step-body">
+      <div class="step-title">Submit Bid</div>
+      <div class="step-desc">PDF the proposal and send with the reviewed estimate for final approval, then to the GC.</div>
+      <ul class="step-details">
+        <li>PDF the Word document proposal</li>
+        <li>Send reviewed Excel estimate + PDF proposal to Head of Estimating for final sign-off</li>
+        <li>Upon approval, submit to GC</li>
+      </ul>
+      <span class="badge blue">Head of Estimating / Estimating</span>
+    </div>
+  </div>
+
+  <!-- REFERENCE CARDS -->
+  <div class="two-col">
+    <div class="ref-card">
+      <h4>Stone Names by State</h4>
+      <table class="ref-table">
+        <thead><tr><th>State</th><th>Local Name</th></tr></thead>
+        <tbody>
+          <tr><td>Indiana</td><td>IN #8s</td></tr>
+          <tr><td>Illinois</td><td>CA-7</td></tr>
+          <tr><td>Michigan</td><td>6-AA</td></tr>
+          <tr><td>Wisconsin</td><td>1" Clear</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="ref-card">
+      <h4>Common Stone Suppliers</h4>
+      <div class="supplier-list">
+        <span class="supplier-tag">Heidelberg</span>
+        <span class="supplier-tag">IMI</span>
+        <span class="supplier-tag">Martin Marietta</span>
+        <span class="supplier-tag">StoneCo / Shelly</span>
+        <span class="supplier-tag">Vulcan</span>
+        <span class="supplier-tag">Jergensen (Melvin Stone)</span>
+        <span class="supplier-tag">Amirize</span>
+        <span class="supplier-tag">Rogers</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= TAB 3: PROJECT AWARD SOP ======================= -->
+<div id="tab-award" class="tab-content">
+  <h2 class="section-title">Project Award SOP</h2>
+  <p class="section-subtitle">From Letter of Intent through crew mobilization</p>
+
+  <!-- TIMELINE -->
+  <div style="margin-bottom:32px;">
+    <h4 style="font-size:14px;font-weight:600;color:var(--gray-700);margin-bottom:12px;">Award-to-Mobilization Timeline</h4>
+    <div class="timeline-bar">
+      <div class="timeline-step green">Award / LOI</div>
+      <div class="timeline-arrow"></div>
+      <div class="timeline-step green">Submittals to GGG<span class="timeline-duration">3-4 weeks</span></div>
+      <div class="timeline-arrow"></div>
+      <div class="timeline-step green">GC Review<span class="timeline-duration">1-2 weeks</span></div>
+      <div class="timeline-arrow"></div>
+      <div class="timeline-step green">Approval</div>
+      <div class="timeline-arrow"></div>
+      <div class="timeline-step green">Prep &amp; Turnover<span class="timeline-duration">1 week</span></div>
+      <div class="timeline-arrow"></div>
+      <div class="timeline-step amber">Mobilize</div>
+    </div>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="step-card">
+    <div class="step-number green">1</div>
+    <div class="step-body">
+      <div class="step-title">Request Submittals from GC</div>
+      <div class="step-desc">Request all necessary shop drawing information from the awarding GC within 1 week of NTP/LOI.</div>
+      <ul class="step-details">
+        <li>Structural Foundation Plan - Current Set (CAD)</li>
+        <li>Civil Grading Plan - Current Set (CAD)</li>
+        <li>Full Structural - Current Set (PDF)</li>
+        <li>Full Civil - Current Set (PDF)</li>
+        <li>Design Service Loads (DL + LL)</li>
+        <li>Any additional geotechnical reports (post-bid date)</li>
+        <li>Site grade elevation during PF installation (within 3" +/-)</li>
+        <li>Check GC schedule for PF installation timing</li>
+      </ul>
+      <span class="badge green">Estimating / PM</span>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step-card">
+    <div class="step-number green">2</div>
+    <div class="step-body">
+      <div class="step-title">Notify Dr. Ed (GGG)</div>
+      <div class="step-desc">Email Garbin Geostructural Group that the project was awarded. Provide PF project number.</div>
+      <ul class="step-details">
+        <li>Ask what additional information is needed beyond standard submittal items</li>
+        <li>Allow 3-4 weeks for engineered shop drawing preparation once all docs received</li>
+      </ul>
+      <span class="badge green">Estimating</span>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="step-card">
+    <div class="step-number green">3</div>
+    <div class="step-body">
+      <div class="step-title">Update Bid Log</div>
+      <div class="step-desc">Move the project in the bid log from Submitted to Awarded section.</div>
+      <ul class="step-details">
+        <li>Assign next sequential job number in Column B</li>
+        <li>Flip bid status in Column U to "Awarded"</li>
+        <li>Update bid total value in Column V to expected contract value</li>
+      </ul>
+      <span class="badge green">Estimating</span>
+    </div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="step-card">
+    <div class="step-number green">4</div>
+    <div class="step-body">
+      <div class="step-title">Move Project Folders</div>
+      <div class="step-desc">Relocate project files from 03-Estimating to 04-Project Management.</div>
+      <ul class="step-details">
+        <li>Move folder to: 04 - Project Management > 02 - Projects</li>
+        <li>Rename folder: XX-XXX - Project Name - General Contractor</li>
+      </ul>
+      <span class="badge green">Estimating / PM</span>
+    </div>
+  </div>
+
+  <!-- STEP 5 -->
+  <div class="step-card">
+    <div class="step-number green">5</div>
+    <div class="step-body">
+      <div class="step-title">Set Up Template Folders</div>
+      <div class="step-desc">Copy template folder structure into the newly moved project folder.</div>
+      <ul class="step-details">
+        <li>Preconstruction</li>
+        <li>Project Management</li>
+        <li>Engineering &amp; Design</li>
+        <li>GC Drawings &amp; Specs</li>
+        <li>Field</li>
+        <li>Organize all existing documents into the correct subfolders</li>
+      </ul>
+      <span class="badge green">Estimating / PM</span>
+    </div>
+  </div>
+
+  <!-- STEP 6 -->
+  <div class="step-card">
+    <div class="step-number green">6</div>
+    <div class="step-body">
+      <div class="step-title">Update Project Schedule</div>
+      <div class="step-desc">Update the PF Project Master Sheet with schedule details.</div>
+      <ul class="step-details">
+        <li>Color code project by status (LOI, contract, etc.)</li>
+        <li>Plug in total LF and column count</li>
+        <li>Calculate working days: LF / 1000, mark out that many days</li>
+        <li>Plug in start date based on GC response</li>
+      </ul>
+      <span class="badge green">PM</span>
+    </div>
+  </div>
+
+  <!-- STEP 7 -->
+  <div class="step-card">
+    <div class="step-number green">7</div>
+    <div class="step-body">
+      <div class="step-title">Update Project Dashboard</div>
+      <div class="step-desc">Add the project to the PF Project Dashboard Tab in the Master Sheet.</div>
+      <ul class="step-details">
+        <li>Copy "TEMPLATE NEW JOB" columns and insert between most recent project and template</li>
+        <li>Fill out known project information immediately</li>
+        <li>Yellow highlighted items are project-specific and need updating</li>
+        <li>Check back daily for outstanding items; push for info by GC/GGG deadlines</li>
+      </ul>
+      <span class="badge green">PM</span>
+    </div>
+  </div>
+
+  <!-- STEP 8 -->
+  <div class="step-card">
+    <div class="step-number green">8</div>
+    <div class="step-body">
+      <div class="step-title">Manage Submittal Process</div>
+      <div class="step-desc">Coordinate document flow between GC and Garbin Geostructural Group (GGG).</div>
+      <ul class="step-details">
+        <li>Track all documents sent and received between GC and GGG</li>
+        <li>Coordinate between Estimating and PM on who tracks each item</li>
+        <li>Once GGG completes submittals, send to GC for Owner/Design/GC review</li>
+        <li>GC review typically 1-2 weeks</li>
+      </ul>
+      <span class="badge green">Estimating / PM</span>
+    </div>
+  </div>
+
+  <!-- STEP 9 -->
+  <div class="step-card">
+    <div class="step-number green">9</div>
+    <div class="step-body">
+      <div class="step-title">Create Turnover Budget</div>
+      <div class="step-desc">Convert the bid estimate into the project turnover budget using actual submittal values.</div>
+      <ul class="step-details">
+        <li>Open project estimate from Preconstruction folder</li>
+        <li>"Save As" YY-MMDD Project Name - Turnover Budget</li>
+        <li>Adjust to actual LF, columns, and stone tonnage from approved submittals</li>
+        <li>Spot check all line items with revised values</li>
+        <li>Adjust contingency so contract value matches turnover budget exactly</li>
+        <li>Confirm selected alternates match contract (pier layout, helical piles, etc.)</li>
+      </ul>
+      <span class="badge green">Estimating / PM</span>
+    </div>
+  </div>
+
+  <!-- STEP 10 -->
+  <div class="step-card">
+    <div class="step-number green">10</div>
+    <div class="step-body">
+      <div class="step-title">Project Turnover</div>
+      <div class="step-desc">Send finalized budget and project info to the project manager at least 1 week before start.</div>
+      <ul class="step-details">
+        <li>Create Project Contact Info Turnover Sheet from template (02-Project Management folder)</li>
+        <li>Name: YY-MMDD - Project # - Project Name - Project Info</li>
+        <li>Fill all yellow highlighted cells in contact sheet</li>
+        <li>Email turnover budget + project info sheets to PM</li>
+        <li>Note any special items for site team (stone credit apps, etc.)</li>
+        <li>Hold turnover meeting if high-risk or unusual items exist</li>
+      </ul>
+      <span class="badge green">Estimating / PM</span>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= TAB 4: QA/QC ======================= -->
+<div id="tab-qaqc" class="tab-content">
+  <h2 class="section-title">QA/QC</h2>
+  <p class="section-subtitle">GUHMA column checking and modulus testing procedures</p>
+
+  <!-- SECTION A: GUHMA -->
+  <div class="qaqc-section">
+    <div class="qaqc-section-title purple">Section A: GUHMA Column Checking</div>
+
+    <!-- DECISION TREE -->
+    <div style="margin-bottom:24px;">
+      <h4 style="font-size:14px;font-weight:600;color:var(--gray-700);margin-bottom:12px;">Column Check Decision Tree</h4>
+      <div class="decision-tree">
+
+        <div class="dt-box question">Column installed?</div>
+        <div class="dt-row">
+          <div>
+            <div class="dt-connector"></div>
+            <div class="dt-label yes" style="text-align:center;">YES</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div class="dt-label no">NO</div>
+            <div style="width:40px;height:2px;background:#ef4444;"></div>
+            <div class="dt-box fail" style="width:240px;">NOTIFY PF OWNER IMMEDIATELY</div>
+          </div>
+        </div>
+        <div class="dt-connector"></div>
+
+        <div class="dt-box question">Depth meets design?</div>
+        <div class="dt-row">
+          <div>
+            <div class="dt-connector"></div>
+            <div class="dt-label yes" style="text-align:center;">YES (mark blue)</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div class="dt-label no">NO</div>
+            <div style="width:40px;height:2px;background:#ef4444;"></div>
+            <div class="dt-box fail" style="width:240px;">FLAG RED - Send to Dr. Ed for review</div>
+          </div>
+        </div>
+        <div class="dt-connector"></div>
+
+        <div class="dt-box question">Buckets match hand logs?</div>
+        <div class="dt-row">
+          <div>
+            <div class="dt-connector"></div>
+            <div class="dt-label yes" style="text-align:center;">YES</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div class="dt-label no">NO</div>
+            <div style="width:40px;height:2px;background:#ef4444;"></div>
+            <div class="dt-box fail" style="width:240px;">Edit raw data file, update GUHMA</div>
+          </div>
+        </div>
+        <div class="dt-connector"></div>
+
+        <div class="dt-box pass">COLUMN PASSES QC</div>
+
+      </div>
+    </div>
+
+    <!-- GUHMA STEPS -->
+    <div class="step-card">
+      <div class="step-number purple">1</div>
+      <div class="step-body">
+        <div class="step-title">Download Column Log Data</div>
+        <div class="step-desc">Download zip file with column logs from Operations Manager.</div>
+        <ul class="step-details">
+          <li>Save to: Project Folder > Engineering &amp; Design > QAQC > Guhma Data</li>
+        </ul>
+        <span class="badge purple">QA/QC</span>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-number purple">2</div>
+      <div class="step-body">
+        <div class="step-title">Open GUHMA in Extended Mode</div>
+        <div class="step-desc">Launch the GUHMA desktop application and load all data files.</div>
+        <ul class="step-details">
+          <li>Click Extended Mode</li>
+          <li>Click Open Files, navigate to saved data folder</li>
+          <li>Select all data files and click Open</li>
+        </ul>
+        <span class="badge purple">QA/QC</span>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-number purple">3</div>
+      <div class="step-body">
+        <div class="step-title">Configure Report Settings</div>
+        <div class="step-desc">Set up document title, project info, and PF branding.</div>
+        <ul class="step-details">
+          <li>Click Report Settings (bottom left of window)</li>
+          <li>Fill in Project # and Project Title</li>
+          <li>Add PF Logo if not already selected</li>
+        </ul>
+        <span class="badge purple">QA/QC</span>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-number purple">4</div>
+      <div class="step-body">
+        <div class="step-title">Set Up Time Diagram</div>
+        <div class="step-desc">Configure the Time Diagram graph parameters for the report.</div>
+        <ul class="step-details">
+          <li>Row 1: Select "2 depth" - min = next interval of 5 above deepest column, max = 0</li>
+          <li>Interval: 1 for under 20', 2 for over 20'</li>
+          <li>Row 2: Always None</li>
+          <li>Row 3: Select "7 Buckets" - min=0, max=5, interval=1</li>
+          <li>Rows 4, 5: Always None</li>
+        </ul>
+        <span class="badge purple">QA/QC</span>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-number purple">5</div>
+      <div class="step-body">
+        <div class="step-title">Set Up Depth/Time Diagram</div>
+        <div class="step-desc">Configure the vertical Depth/Time Diagram with 5 data channels.</div>
+        <ul class="step-details">
+          <li>Diagram 1: "2 depth" - match Time Diagram settings, smoothing=0</li>
+          <li>Diagram 2: "14 Flot" - min=0, max=5000, interval=1000, smoothing=1</li>
+          <li>Diagram 3: "9 Winch A (Down)" - min=0, max=5000, interval=1000, smoothing=1</li>
+          <li>Diagram 4: "10 PSI B (Winch Up)" - min=0, max=5000, interval=1000, smoothing=1</li>
+          <li>Diagram 5: "7 Buckets" - match Time Diagram settings, smoothing=0</li>
+        </ul>
+        <span class="badge purple">QA/QC</span>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-number purple">6</div>
+      <div class="step-body">
+        <div class="step-title">Configure Table, Printout, and Profile</div>
+        <div class="step-desc">Finalize output settings for the report.</div>
+        <ul class="step-details">
+          <li>Table tab: Uncheck "Show Table"</li>
+          <li>Printout tab: Match standard PF selections</li>
+          <li>Profil/Others tab: Check "Show profile"</li>
+          <li>Update Job Site Data via info button: Project name, area (project #), contractor (PF), client (GC), Equipment ID (VSC Rig)</li>
+        </ul>
+        <span class="badge purple">QA/QC</span>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-number purple">7</div>
+      <div class="step-body">
+        <div class="step-title">Review Each Column Against Submittal</div>
+        <div class="step-desc">The core QC check: verify all columns are installed correctly per the approved design.</div>
+        <ul class="step-details">
+          <li>Print GI-300 column layout page to PDF, save in QAQC folder</li>
+          <li>Check 1: All columns accounted for? Compare GUHMA pile list to GI-300 submittal</li>
+          <li>Check 2: All columns hit design depth? Type depths on submittal page (blue = meets/exceeds, red = short)</li>
+          <li>Check 3: Buckets match hand logs? Cross-reference GUHMA data with field hand logs</li>
+          <li>Missing columns: Notify PF owner (Jonathan Reinking) immediately</li>
+          <li>Short columns: Flag red, send to Dr. Ed for engineering review</li>
+        </ul>
+        <span class="badge purple">QA/QC</span>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-number purple">8</div>
+      <div class="step-body">
+        <div class="step-title">Fix Data Discrepancies</div>
+        <div class="step-desc">Edit raw data files in SharePoint to correct bucket counts that don't match hand logs.</div>
+        <ul class="step-details">
+          <li>Navigate to raw data file for the column in SharePoint</li>
+          <li>Open in Notepad, scroll to bottom of file</li>
+          <li>Bucket column is one column left of the ";0;" column</li>
+          <li>Update last 3-5 numbers to correct bucket count</li>
+          <li>Save file - GUHMA will reflect the update</li>
+        </ul>
+        <span class="badge purple">QA/QC</span>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-number purple">9</div>
+      <div class="step-body">
+        <div class="step-title">Generate Combined PDF Report</div>
+        <div class="step-desc">Create the final GUHMA report for project closeout.</div>
+        <ul class="step-details">
+          <li>Select all piles: Click top column, hold Shift, click bottom column</li>
+          <li>Click "Create combined PDF with selected files"</li>
+          <li>Save to a new "GUHMA" folder, then copy to project QAQC folder</li>
+          <li>Report includes one page per column with all diagrams</li>
+          <li>This PDF is a closeout deliverable sent to GC and Dr. Ed</li>
+        </ul>
+        <span class="badge purple">QA/QC</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION B: MODULUS TESTING -->
+  <div class="qaqc-section">
+    <div class="qaqc-section-title amber">Section B: Modulus Testing</div>
+
+    <div class="step-card">
+      <div class="step-number amber">1</div>
+      <div class="step-body">
+        <div class="step-title">Copy Modulus Test Template</div>
+        <div class="step-desc">Get the template from SharePoint and prepare it for the specific project.</div>
+        <ul class="step-details">
+          <li>Source: SharePoint > 04 - Project Management > 03 - AP Modulus Test</li>
+          <li>Copy "AP Modulus Testing Report_PF"</li>
+          <li>Paste to: Project Folder > 03 - Engineering &amp; Design > Modulus Test</li>
+          <li>Rename: YY-MMDD Project Name Modulus Test</li>
+        </ul>
+        <span class="badge amber">QA/QC</span>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-number amber">2</div>
+      <div class="step-body">
+        <div class="step-title">Fill In Project Info</div>
+        <div class="step-desc">Enter basic project information in the grey fillable fields.</div>
+        <ul class="step-details">
+          <li>Job Name, Location, Number, Tested By</li>
+          <li>AP Number and Test Date: filled out during actual field test</li>
+        </ul>
+        <span class="badge amber">QA/QC</span>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-number amber">3</div>
+      <div class="step-body">
+        <div class="step-title">Set Design Parameters from Submittal</div>
+        <div class="step-desc">Pull design values from Dr. Ed's approved submittal and enter into the test sheet.</div>
+        <ul class="step-details">
+          <li>AP Design Diameter: 2.00' (24") or 2.50' (30") - check GI-200 page</li>
+          <li>Diameter of Plate: Same as AP Design Diameter</li>
+          <li>AP Reaction Modulus: From GI-100, AP Design and Installation Criteria section</li>
+          <li>AP Design Load: From GI-200 Modulus Test Schedule, applied load column (kips)</li>
+          <li>Jack Calibration: Small jack (under 175 kips) = 49.84 / Large jack (over 175 kips) = 32.88</li>
+          <li>Jacks recalibrated annually by Chicago Jack, new factors from Dr. Ed/GGG</li>
+        </ul>
+        <span class="badge amber">QA/QC</span>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-number amber">4</div>
+      <div class="step-body">
+        <div class="step-title">Verify and Hand Off</div>
+        <div class="step-desc">Confirm all calculated values match the submittal, then the sheet is ready for field use.</div>
+        <ul class="step-details">
+          <li>Confirm % design load, load increment, and kips from submittal match the Excel sheet</li>
+          <li>Rest of sheet auto-populates and is ready for field operator during test</li>
+        </ul>
+        <span class="badge amber">Field Operator</span>
+      </div>
+    </div>
+
+    <!-- MODULUS REFERENCE CARD -->
+    <div class="ref-card">
+      <h4>Modulus Test Parameter Reference</h4>
+      <table class="ref-table">
+        <thead>
+          <tr><th>Parameter</th><th>Source</th><th>Location in Submittal</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Column Diameter</td><td>GI-200</td><td>Top left + typical AP detail</td></tr>
+          <tr><td>Design Reaction Modulus</td><td>GI-100</td><td>AP Design &amp; Installation Criteria</td></tr>
+          <tr><td>Design Load (kips)</td><td>GI-200</td><td>Modulus Test Schedule</td></tr>
+          <tr><td>Jack Cal Factor (small, under 175 kips)</td><td>Lab cert</td><td>Currently 49.84</td></tr>
+          <tr><td>Jack Cal Factor (large, over 175 kips)</td><td>Lab cert</td><td>Currently 32.88</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  Pier Foundations Operations Playbook &nbsp;|&nbsp; Prepared by Peter (AI COO) &nbsp;|&nbsp; Confidential
+</div>
+
+<script>
+function showTab(tabId) {
+  // Hide all tabs
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+
+  // Show selected tab
+  document.getElementById('tab-' + tabId).classList.add('active');
+
+  // Activate the correct button
+  const btns = document.querySelectorAll('.tab-btn');
+  const tabMap = ['overview', 'estimating', 'award', 'qaqc'];
+  const idx = tabMap.indexOf(tabId);
+  if (idx >= 0) btns[idx].classList.add('active');
+}
+</script>
+
+</body>
+</html>
