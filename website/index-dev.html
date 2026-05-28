@@ -17,8 +17,9 @@
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
         :root {
-            --bg: #0a0e17;
-            --surface: #111827;
+            --bg: rgba(10, 14, 23, 0.85);
+            --bg-solid: #0a0e17;
+            --surface: rgba(17, 24, 39, 0.80);
             --glass: rgba(255, 255, 255, 0.06);
             --glass-border: rgba(255, 255, 255, 0.10);
             --glass-hover: rgba(255, 255, 255, 0.10);
@@ -44,6 +45,23 @@
             font-weight: 400;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* Vanta Dots — fixed full-page background */
+        #vantaDots {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* All sections float above the dots */
+        .nav, .hero, section, footer, .modal-overlay {
+            position: relative;
+            z-index: 1;
         }
 
         .container {
@@ -381,7 +399,7 @@
 
         /* ========== SERVICES ========== */
         .services {
-            padding: 140px 0;
+            padding: 200px 0;
             background: var(--bg);
             position: relative;
             overflow: hidden;
@@ -472,7 +490,7 @@
 
         /* ========== VIDEO ========== */
         .video-section {
-            padding: 140px 0;
+            padding: 200px 0;
             background: var(--surface);
             position: relative;
             overflow: hidden;
@@ -516,7 +534,7 @@
 
         /* ========== ABOUT ========== */
         .about {
-            padding: 140px 0;
+            padding: 200px 0;
             background: var(--bg);
             position: relative;
             overflow: hidden;
@@ -607,7 +625,7 @@
 
         /* ========== PROCESS ========== */
         .process {
-            padding: 140px 0;
+            padding: 200px 0;
             background: var(--surface);
             position: relative;
             overflow: hidden;
@@ -672,7 +690,7 @@
 
         /* ========== PROJECTS ========== */
         .projects {
-            padding: 140px 0;
+            padding: 200px 0;
             background: var(--bg);
             position: relative;
             overflow: hidden;
@@ -743,7 +761,7 @@
 
         /* ========== SERVICE AREA ========== */
         .service-area {
-            padding: 140px 0;
+            padding: 200px 0;
             background: var(--surface);
             position: relative;
             overflow: hidden;
@@ -789,7 +807,7 @@
 
         /* ========== CONTACT ========== */
         .contact {
-            padding: 140px 0;
+            padding: 200px 0;
             background: var(--bg);
             position: relative;
             overflow: hidden;
@@ -1088,6 +1106,9 @@
     </style>
 </head>
 <body>
+
+    <!-- VANTA DOTS — persistent background -->
+    <div id="vantaDots"></div>
 
     <!-- NAVIGATION -->
     <nav class="nav" id="nav">
@@ -1637,6 +1658,31 @@
                     window.scrollTo({ top, behavior: 'smooth' });
                 }
             });
+        });
+    </script>
+
+    <!-- Vanta.js Dots Background -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.dots.min.js"></script>
+    <script>
+        window.addEventListener('load', function() {
+            var prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            if (!prefersReduced && window.VANTA && window.VANTA.DOTS) {
+                VANTA.DOTS({
+                    el: '#vantaDots',
+                    THREE: THREE,
+                    mouseControls: true,
+                    touchControls: false,
+                    gyroControls: false,
+                    color: 0xD4703C,
+                    color2: 0x1E3A5F,
+                    backgroundColor: 0x0a0e17,
+                    size: 2.5,
+                    spacing: 40,
+                    showLines: false,
+                    scaleMobile: 0.4
+                });
+            }
         });
     </script>
 
