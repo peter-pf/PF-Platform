@@ -1,10 +1,11 @@
 # Statement of Work: Material Cost Estimation Tool
 
 **Project:** Pier Foundations -- Aggregate Material Cost Estimator
-**Version:** 1.0
-**Date:** May 29, 2026
+**Version:** 1.1
+**Date:** May 30, 2026
 **Prepared by:** Peter (AI COO)
 **Approved by:** _Pending Brad/Jonathan review_
+**Implementation Status:** v1.0 BUILT -- deployed to pf-platform.pages.dev/platform/
 
 ---
 
