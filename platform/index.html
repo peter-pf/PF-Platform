@@ -6,6 +6,86 @@
 <title>Pier Foundations — Operations Platform</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
+/* ---- LOGIN SCREEN ---- */
+.login-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #f8f9fb;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.login-overlay.hidden { display: none; }
+.login-box {
+  background: #fff;
+  border: 1px solid #dde1e6;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+  padding: 40px;
+  width: 360px;
+  text-align: center;
+}
+.login-box .login-logo {
+  width: 48px; height: 48px;
+  background: #D4703C;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: white;
+  font-size: 1.1rem;
+  margin-bottom: 16px;
+}
+.login-box h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1a1d21;
+  margin-bottom: 4px;
+}
+.login-box p {
+  font-size: 0.82rem;
+  color: #9ca3af;
+  margin-bottom: 24px;
+}
+.login-box input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #dde1e6;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-family: 'Inter', sans-serif;
+  margin-bottom: 12px;
+  text-align: center;
+}
+.login-box input:focus {
+  outline: none;
+  border-color: #D4703C;
+  box-shadow: 0 0 0 3px rgba(212,112,60,0.1);
+}
+.login-box button {
+  width: 100%;
+  padding: 10px;
+  background: #D4703C;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.login-box button:hover { background: #B85C2F; }
+.login-error {
+  color: #dc2626;
+  font-size: 0.78rem;
+  margin-top: 8px;
+  display: none;
+}
+</style>
+<style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
@@ -512,6 +592,44 @@ table tbody tr:hover {
 </style>
 </head>
 <body>
+
+<!-- LOGIN SCREEN -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-box">
+    <div class="login-logo">PF</div>
+    <h2>Pier Foundations</h2>
+    <p>Operations Platform</p>
+    <input type="password" id="loginPassword" placeholder="Enter password" onkeydown="if(event.key==='Enter')checkLogin()">
+    <button onclick="checkLogin()">Sign In</button>
+    <div class="login-error" id="loginError">Incorrect password. Try again.</div>
+  </div>
+</div>
+<script>
+function checkLogin() {
+  var pw = document.getElementById('loginPassword').value;
+  // Hash compare — not storing plaintext in source
+  if (hashCode(pw) === 837443002) {
+    document.getElementById('loginOverlay').classList.add('hidden');
+    sessionStorage.setItem('pf_auth', '1');
+  } else {
+    document.getElementById('loginError').style.display = 'block';
+    document.getElementById('loginPassword').value = '';
+    document.getElementById('loginPassword').focus();
+  }
+}
+function hashCode(s) {
+  var h = 0;
+  for (var i = 0; i < s.length; i++) {
+    h = ((h << 5) - h) + s.charCodeAt(i);
+    h |= 0;
+  }
+  return h;
+}
+// Auto-login if already authenticated this session
+if (sessionStorage.getItem('pf_auth') === '1') {
+  document.getElementById('loginOverlay').classList.add('hidden');
+}
+</script>
 
 <!-- SIDEBAR -->
 <aside class="sidebar" id="sidebar">
