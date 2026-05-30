@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pier Foundations — Alpha Review</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ---- RESET & BASE ---- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #F9FAFD;
+  color: #2B2F36;
+  line-height: 1.6;
+  font-size: 0.92rem;
+}
+
+/* ---- HEADER ---- */
+.header {
+  background: linear-gradient(135deg, #1E2A38 0%, #2B3E50 50%, #1E2A38 100%);
+  color: #fff;
+  padding: 36px 40px 28px;
+}
+.header h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+}
+.header .subtitle {
+  font-size: 0.88rem;
+  color: #8A9AAB;
+  font-weight: 400;
+  margin-bottom: 10px;
+}
+.header .creds {
+  font-size: 0.78rem;
+  color: #5A6370;
+  font-family: 'Inter', monospace;
+}
+.header .creds code {
+  background: rgba(255,255,255,0.08);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  color: #8A9AAB;
+}
+
+/* ---- CONTAINER ---- */
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 60px;
+}
+
+/* ---- SECTION HEADINGS ---- */
+.section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #000000;
+  margin: 36px 0 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #006DB0;
+}
+
+/* ---- RELEASE STAGES BAR ---- */
+.stages-bar {
+  display: flex;
+  gap: 0;
+  margin: 24px 0 32px;
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #C8D5DC;
+  overflow: hidden;
+}
+.stage {
+  flex: 1;
+  padding: 16px 12px;
+  text-align: center;
+  position: relative;
+  border-right: 1px solid #C8D5DC;
+}
+.stage:last-child { border-right: none; }
+.stage .stage-num {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+.stage .stage-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #000;
+  margin-bottom: 4px;
+}
+.stage .stage-desc {
+  font-size: 0.72rem;
+  color: #5A6370;
+  line-height: 1.4;
+}
+.stage .stage-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-bottom: 6px;
+}
+
+/* Stage states */
+.stage.done { background: #f0fdf4; }
+.stage.done .stage-dot { background: #22c55e; }
+.stage.done .stage-num { color: #16a34a; }
+
+.stage.current { background: #E0F0FF; }
+.stage.current .stage-dot {
+  background: #006DB0;
+  box-shadow: 0 0 0 4px rgba(0,109,176,0.2);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+.stage.current .stage-num { color: #006DB0; }
+
+.stage.upcoming { background: #F3F5F8; }
+.stage.upcoming .stage-dot { background: #C8D5DC; }
+.stage.upcoming .stage-num { color: #8A9AAB; }
+.stage.upcoming .stage-label { color: #5A6370; }
+
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(0,109,176,0.2); }
+  50% { box-shadow: 0 0 0 8px rgba(0,109,176,0.08); }
+}
+
+/* ---- MODULE STATUS TABLE ---- */
+.status-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #C8D5DC;
+  margin-bottom: 32px;
+}
+.status-table thead th {
+  background: #2B3E50;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 10px 14px;
+  text-align: left;
+}
+.status-table tbody td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #F3F5F8;
+  font-size: 0.84rem;
+}
+.status-table tbody tr:last-child td { border-bottom: none; }
+.status-table tbody tr:hover { background: #F9FAFD; }
+.status-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: #E0F0FF;
+  color: #006DB0;
+}
+
+/* ---- MODULE CARDS (expandable) ---- */
+.module-card {
+  background: #fff;
+  border: 1px solid #C8D5DC;
+  border-radius: 10px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  transition: box-shadow 0.2s ease;
+}
+.module-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+.module-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  cursor: pointer;
+  user-select: none;
+}
+.module-card-header:hover { background: #F9FAFD; }
+.module-card-header .mod-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px; height: 28px;
+  background: #E0F0FF;
+  color: #006DB0;
+  font-weight: 700;
+  font-size: 0.78rem;
+  border-radius: 8px;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+.module-card-header .mod-title {
+  font-weight: 600;
+  color: #000;
+  font-size: 0.92rem;
+  flex: 1;
+}
+.module-card-header .mod-brief {
+  font-weight: 400;
+  color: #5A6370;
+  font-size: 0.82rem;
+  margin-left: 6px;
+}
+.module-card-header .chevron {
+  color: #8A9AAB;
+  font-size: 0.9rem;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+.module-card.open .chevron { transform: rotate(180deg); }
+
+.module-card-body {
+  display: none;
+  padding: 0 18px 18px;
+  border-top: 1px solid #F3F5F8;
+}
+.module-card.open .module-card-body { display: block; }
+
+.module-card-body .meta-row {
+  display: flex;
+  gap: 24px;
+  margin: 12px 0 16px;
+  font-size: 0.82rem;
+}
+.module-card-body .meta-label {
+  font-weight: 600;
+  color: #5A6370;
+  margin-right: 4px;
+}
+.module-card-body .meta-val {
+  color: #2B2F36;
+}
+
+.module-card-body h4 {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #006DB0;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.module-card-body ol {
+  padding-left: 18px;
+}
+.module-card-body ol li {
+  margin-bottom: 8px;
+  font-size: 0.86rem;
+  color: #2B2F36;
+  line-height: 1.5;
+}
+.module-card-body ol li strong {
+  color: #000;
+}
+
+/* ---- CHECKLISTS ---- */
+.checklist-section {
+  background: #fff;
+  border: 1px solid #C8D5DC;
+  border-radius: 10px;
+  padding: 20px 22px;
+  margin-bottom: 16px;
+}
+.checklist-section h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #000;
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #F3F5F8;
+}
+.checklist-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 0.86rem;
+}
+.checklist-item input[type="checkbox"] {
+  margin-top: 3px;
+  accent-color: #006DB0;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.checklist-item label {
+  cursor: pointer;
+  color: #2B2F36;
+}
+
+/* ---- NEXT STEPS ---- */
+.next-steps {
+  background: #fff;
+  border: 1px solid #C8D5DC;
+  border-radius: 10px;
+  padding: 20px 22px;
+  margin-bottom: 32px;
+}
+.next-steps ol {
+  padding-left: 18px;
+}
+.next-steps ol li {
+  margin-bottom: 8px;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+.next-steps ol li strong {
+  color: #000;
+}
+
+/* ---- FOOTER ---- */
+.footer {
+  text-align: center;
+  padding: 24px;
+  color: #8A9AAB;
+  font-size: 0.78rem;
+  border-top: 1px solid #C8D5DC;
+}
+
+/* ---- STAT CARDS (for summary) ---- */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin: 16px 0 24px;
+}
+.stat-card {
+  background: linear-gradient(135deg, #ffffff 0%, #F3F8FF 100%);
+  border: 1px solid #C8D5DC;
+  border-top: 3px solid #006DB0;
+  border-radius: 10px;
+  padding: 16px;
+  text-align: center;
+}
+.stat-card .stat-val {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #006DB0;
+}
+.stat-card .stat-label {
+  font-size: 0.76rem;
+  color: #5A6370;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+/* ---- PRINT STYLES ---- */
+@media print {
+  body { background: #fff; font-size: 10pt; }
+  .header { padding: 20px; background: #1E2A38 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .container { max-width: 100%; padding: 16px; }
+  .module-card-body { display: block !important; }
+  .module-card { break-inside: avoid; page-break-inside: avoid; margin-bottom: 8px; }
+  .module-card-header .chevron { display: none; }
+  .stages-bar { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .stage { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .stage-dot { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .status-table thead th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .status-badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .stat-card { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .checklist-section { break-inside: avoid; page-break-inside: avoid; }
+  .section-title { break-after: avoid; }
+}
+
+/* ---- RESPONSIVE ---- */
+@media (max-width: 768px) {
+  .header { padding: 24px 16px 20px; }
+  .header h1 { font-size: 1.3rem; }
+  .container { padding: 16px 12px 40px; }
+  .stages-bar { flex-direction: column; }
+  .stage { border-right: none; border-bottom: 1px solid #C8D5DC; }
+  .stage:last-child { border-bottom: none; }
+  .stat-row { grid-template-columns: 1fr 1fr; }
+  .module-card-header .mod-brief { display: none; }
+  .module-card-body .meta-row { flex-direction: column; gap: 4px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<div class="header">
+  <h1>Pier Foundations — Alpha Review</h1>
+  <div class="subtitle">Platform Walkthrough for Brad &amp; Jonathan | May 30, 2026</div>
+  <div class="creds">Password: <code>PierFoundations2024</code> &nbsp;|&nbsp; URL: <code>pf-platform.pages.dev/platform/</code></div>
+</div>
+
+<!-- ===== MAIN CONTENT ===== -->
+<div class="container">
+
+  <!-- ===== SUMMARY STATS ===== -->
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="stat-val">16</div>
+      <div class="stat-label">Modules Built</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val">Alpha</div>
+      <div class="stat-label">Current Stage</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val">130+</div>
+      <div class="stat-label">Review Questions</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val">3</div>
+      <div class="stat-label">Checklists</div>
+    </div>
+  </div>
+
+  <!-- ===== RELEASE STAGES ===== -->
+  <h2 class="section-title">Release Stages</h2>
+  <div class="stages-bar">
+    <div class="stage done">
+      <div class="stage-dot"></div>
+      <div class="stage-num">Stage 1</div>
+      <div class="stage-label">Pre-Alpha</div>
+      <div class="stage-desc">Core build, data integration</div>
+    </div>
+    <div class="stage current">
+      <div class="stage-dot"></div>
+      <div class="stage-num">Stage 2</div>
+      <div class="stage-label">Alpha</div>
+      <div class="stage-desc">Internal review — does it work?</div>
+    </div>
+    <div class="stage upcoming">
+      <div class="stage-dot"></div>
+      <div class="stage-num">Stage 3</div>
+      <div class="stage-label">UAT</div>
+      <div class="stage-desc">End user testing on real bids</div>
+    </div>
+    <div class="stage upcoming">
+      <div class="stage-dot"></div>
+      <div class="stage-num">Stage 4</div>
+      <div class="stage-label">Beta</div>
+      <div class="stage-desc">2 weeks daily use</div>
+    </div>
+    <div class="stage upcoming">
+      <div class="stage-dot"></div>
+      <div class="stage-num">Stage 5</div>
+      <div class="stage-label">Production v1.0</div>
+      <div class="stage-desc">Official release + manual</div>
+    </div>
+  </div>
+
+  <!-- ===== MODULE STATUS GRID ===== -->
+  <h2 class="section-title">Module Status Grid</h2>
+  <table class="status-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Module</th>
+        <th>Status</th>
+        <th>Data Source</th>
+        <th>Reviewer</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>1</td><td>Dashboard</td><td><span class="status-badge">Alpha - In Review</span></td><td>Bid Log + WIP</td><td>Brad</td></tr>
+      <tr><td>2</td><td>Feasibility Tool</td><td><span class="status-badge">Alpha - In Review</span></td><td>Scoring Engine</td><td>Brad</td></tr>
+      <tr><td>3</td><td>Bid Pipeline</td><td><span class="status-badge">Alpha - In Review</span></td><td>Bid Log</td><td>Jonathan</td></tr>
+      <tr><td>4</td><td>Material Costs</td><td><span class="status-badge">Alpha - In Review</span></td><td>Supplier Quotes</td><td>Jonathan</td></tr>
+      <tr><td>5</td><td>Estimating</td><td><span class="status-badge">Alpha - In Review</span></td><td>POET Template</td><td>Jonathan</td></tr>
+      <tr><td>6</td><td>Active Projects</td><td><span class="status-badge">Alpha - In Review</span></td><td>Project Master</td><td>Both</td></tr>
+      <tr><td>7</td><td>QA/QC GUHMA</td><td><span class="status-badge">Alpha - In Review</span></td><td>GUHMA Logs</td><td>Jonathan</td></tr>
+      <tr><td>8</td><td>Modulus Testing</td><td><span class="status-badge">Alpha - In Review</span></td><td>Field Tests</td><td>Jonathan</td></tr>
+      <tr><td>9</td><td>Proposals</td><td><span class="status-badge">Alpha - In Review</span></td><td>Proposal History</td><td>Jonathan</td></tr>
+      <tr><td>10</td><td>Change Orders</td><td><span class="status-badge">Alpha - In Review</span></td><td>CO Log</td><td>Jonathan</td></tr>
+      <tr><td>11</td><td>Equipment</td><td><span class="status-badge">Alpha - In Review</span></td><td>Fleet Roster</td><td>Both</td></tr>
+      <tr><td>12</td><td>Safety</td><td><span class="status-badge">Alpha - In Review</span></td><td>Safety SOPs</td><td>Jonathan</td></tr>
+      <tr><td>13</td><td>Daily Logs</td><td><span class="status-badge">Alpha - In Review</span></td><td>Field Reports</td><td>Jonathan</td></tr>
+      <tr><td>14</td><td>Subcontractors</td><td><span class="status-badge">Alpha - In Review</span></td><td>Vendor Roster</td><td>Brad</td></tr>
+      <tr><td>15</td><td>Permits</td><td><span class="status-badge">Alpha - In Review</span></td><td>Permit Tracker</td><td>Jonathan</td></tr>
+      <tr><td>16</td><td>Closeout</td><td><span class="status-badge">Alpha - In Review</span></td><td>GGG Workflow</td><td>Jonathan</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ===== MODULE-BY-MODULE WALKTHROUGH ===== -->
+  <h2 class="section-title">Module-by-Module Walkthrough</h2>
+  <p style="color:#5A6370; font-size:0.84rem; margin-bottom:16px;">Click any module to expand its review questions. These are specific things we need your input on.</p>
+
+  <!-- Module 1: Dashboard -->
+  <div class="module-card" id="mod-1">
+    <div class="module-card-header" onclick="toggleCard('mod-1')">
+      <span class="mod-num">1</span>
+      <span class="mod-title">Dashboard</span>
+      <span class="mod-brief">— Summary KPIs, recent bids, active projects</span>
+      <span class="chevron">&#9662;</span>
+    </div>
+    <div class="module-card-body">
+      <div class="meta-row">
+        <div><span class="meta-label">Data Source:</span> <span class="meta-val">Bid Log + WIP</span></div>
+        <div><span class="meta-label">Reviewer:</span> <span class="meta-val">Brad</span></div>
+      </div>
+      <h4>Review Questions</h4>
+      <ol>
+        <li>Are these the right metrics for daily decision-making?</li>
+        <li>Should we add <strong>FY26 revenue progress ($6M target)</strong>?</li>
+        <li>What numbers are you currently tracking that aren't shown?</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- Module 2: Feasibility Tool -->
+  <div class="module-card" id="mod-2">
+    <div class="module-card-header" onclick="toggleCard('mod-2')">
+      <span class="mod-num">2</span>
+      <span class="mod-title">Feasibility Tool</span>
+      <span class="mod-brief">— Bid/no-bid scoring (0-100)</span>
+      <span class="chevron">&#9662;</span>
+    </div>
+    <div class="module-card-body">
+      <div class="meta-row">
+        <div><span class="meta-label">Data Source:</span> <span class="meta-val">Scoring Engine</span></div>
+        <div><span class="meta-label">Reviewer:</span> <span class="meta-val">Brad</span></div>
+      </div>
+      <h4>Review Questions</h4>
+      <ol>
+        <li><strong>Brad:</strong> Minimum project value worth pursuing? ($25K? $50K? $75K?)</li>
+        <li><strong>Brad:</strong> Maximum distance from yard? (300 mi? 500 mi? No limit?)</li>
+        <li>Do the scoring weights feel right? <strong>(Technical 55%, Commercial 25%, Operational 15%, Risk 5%)</strong></li>
+        <li>Are there GCs you'd always/never bid for regardless of score?</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- Module 3: Bid Pipeline -->
+  <div class="module-card" id="mod-3">
+    <div class="module-card-header" onclick="toggleCard('mod-3')">
+      <span class="mod-num">3</span>
+      <span class="mod-title">Bid Pipeline</span>
+      <span class="mod-brief">— All bids from bid log, filterable, FY26 tracking</span>
+      <span class="chevron">&#9662;</span>
+    </div>
+    <div class="module-card-body">
+      <div class="meta-row">
+        <div><span class="meta-label">Data Source:</span> <span class="meta-val">Bid Log</span></div>
+        <div><span class="meta-label">Reviewer:</span> <span class="meta-val">Jonathan</span></div>
+      </div>
+      <h4>Review Questions</h4>
+      <ol>
+        <li><strong>Jonathan:</strong> Do project names, GCs, and values look right?</li>
+        <li>Are the status categories correct? (Submitted, Awarded, Lost, Pending, etc.)</li>
+        <li>Is the win rate correct? <strong>(24.4% submitted, 32.4% with Garbin prelim)</strong></li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- Module 4: Material Costs -->
+  <div class="module-card" id="mod-4">
+    <div class="module-card-header" onclick="toggleCard('mod-4')">
+      <span class="mod-num">4</span>
+      <span class="mod-title">Material Costs</span>
+      <span class="mod-brief">— 17 supplier prices + cost calculator</span>
+      <span class="chevron">&#9662;</span>
+    </div>
+    <div class="module-card-body">
+      <div class="meta-row">
+        <div><span class="meta-label">Data Source:</span> <span class="meta-val">Supplier Quotes</span></div>
+        <div><span class="meta-label">Reviewer:</span> <span class="meta-val">Jonathan</span></div>
+      </div>
+      <h4>Review Questions</h4>
+      <ol>
+        <li><strong>Jonathan:</strong> Are all 17 supplier prices current?</li>
+        <li>Any suppliers missing from the roster?</li>
+        <li>Is <strong>0.209 tons/LF</strong> correct for 30" columns?</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- Module 5: Estimating -->
+  <div class="module-card" id="mod-5">
+    <div class="module-card-header" onclick="toggleCard('mod-5')">
+      <span class="mod-num">5</span>
+      <span class="mod-title">Estimating</span>
+      <span class="mod-brief">— POET template, auto-calc, budget vs actual</span>
+      <span class="chevron">&#9662;</span>
+    </div>
+    <div class="module-card-body">
+      <div class="meta-row">
+        <div><span class="meta-label">Data Source:</span> <span class="meta-val">POET Template</span></div>
+        <div><span class="meta-label">Reviewer:</span> <span class="meta-val">Jonathan</span></div>
+      </div>
+      <h4>Review Questions</h4>
+      <ol>
+        <li><strong>Jonathan:</strong> Daily rates accurate? (Op #1 <strong>$1,000</strong>, Op #2/#3 <strong>$650</strong>, hotel <strong>$165/night</strong>, meals <strong>$50/day</strong>)</li>
+        <li>Equipment rates right? (VSC Rig <strong>$500/day</strong>, CAT 308 <strong>$250/day</strong>)</li>
+        <li>Markup structure correct? (<strong>OH 5.42%, Commissions 2.65%, Contingency 2.01%, Profit 4.0%</strong>)</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- Module 6: Active Projects -->
+  <div class="module-card" id="mod-6">
+    <div class="module-card-header" onclick="toggleCard('mod-6')">
+      <span class="mod-num">6</span>
+      <span class="mod-title">Active Projects</span>
+      <span class="mod-brief">— WIP dashboard, 130-field checklist</span>
+      <span class="chevron">&#9662;</span>
+    </div>
+    <div class="module-card-body">
+      <div class="meta-row">
+        <div><span class="meta-label">Data Source:</span> <span class="meta-val">Project Master</span></div>
+        <div><span class="meta-label">Reviewer:</span> <span class="meta-val">Both</span></div>
+      </div>
+      <h4>Review Questions</h4>
+      <ol>
+        <li><strong>Jonathan:</strong> Are the 5 WIP projects correct? Any missing?</li>
+        <li>Completion percentages current?</li>
+        <li>Does the 130-field checklist match what you actually track?</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- Module 7: QA/QC GUHMA -->
+  <div class="module-card" id="mod-7">
+    <div class="module-card-header" onclick="toggleCard('mod-7')">
+      <span class="mod-num">7</span>
+      <span class="mod-title">QA/QC GUHMA</span>
+      <span class="mod-brief">— Pier installation logs, QA thresholds</span>
+      <span class="chevron">&#9662;</span>
+    </div>
+    <div class="module-card-body">
+      <div class="meta-row">
+        <div><span class="meta-label">Data Source:</span> <span class="meta-val">GUHMA Logs</span></div>
+        <div><span class="meta-label">Reviewer:</span> <span class="meta-val">Jonathan</span></div>
+      </div>
+      <h4>Review Questions</h4>
+      <ol>
+        <li><strong>Jonathan:</strong> Minimum depth threshold right? (<strong>10ft target, flag below 9ft</strong>)</li>
+        <li>Minimum install time threshold right? (<strong>Flag below 30 seconds</strong>)</li>
+        <li>Other QA checks to automate?</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- Module 8: Modulus Testing -->
+  <div class="module-card" id="mod-8">
+    <div class="module-card-header" onclick="toggleCard('mod-8')">
+      <span class="mod-num">8</span>
+      <span class="mod-title">Modulus Testing</span>
+      <span class="mod-brief">— Load-deflection charts, pass/fail, test entry</span>
+      <span class="chevron">&#9662;</span>
+    </div>
+    <div class="module-card-body">
+      <div class="meta-row">
+        <div><span class="meta-label">Data Source:</span> <span class="meta-val">Field Tests</span></div>
+        <div><span class="meta-label">Reviewer:</span> <span class="meta-val">Jonathan</span></div>
+      </div>
+      <h4>Review Questions</h4>
+      <ol>
+        <li><strong>Jonathan:</strong> Test procedure accurate?</li>
+        <li>Jack calibration factors current? (Small: <strong>49.84</strong>, Large: <strong>32.88</strong>)</li>
+        <li>Pass/fail formula correct? (<strong>Kp measured >= Kp design</strong>)</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- Module 9: Proposals -->
+  <div class="module-card" id="mod-9">
+    <div class="module-card-header" onclick="toggleCard('mod-9')">
+      <span class="mod-num">9</span>
+      <span class="mod-title">Proposals</span>
+      <span class="mod-brief">— History + 12-section template</span>
+      <span class="chevron">&#9662;</span>
+    </div>
+    <div class="module-card-body">
+      <div class="meta-row">
+        <div><span class="meta-label">Data Source:</span> <span class="meta-val">Proposal History</span></div>
+        <div><span class="meta-label">Reviewer:</span> <span class="meta-val">Jonathan</span></div>
+      </div>
+      <h4>Review Questions</h4>
+      <ol>
+        <li><strong>Jonathan:</strong> Are the 12 sections the right ones for your proposals?</li>
+        <li>Should we include standard exclusions language?</li>
+        <li>Any sections missing that GCs expect to see?</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- Module 10: Change Orders -->
+  <div class="module-card" id="mod-10">
+    <div class="module-card-header" onclick="toggleCard('mod-10')">
+      <span class="mod-num">10</span>
+      <span class="mod-title">Change Orders</span>
+      <span class="mod-brief">— CO tracker with SOP workflow</span>
+      <span class="chevron">&#9662;</span>
+    </div>
+    <div class="module-card-body">
+      <div class="meta-row">
+        <div><span class="meta-label">Data Source:</span> <span class="meta-val">CO Log</span></div>
+        <div><span class="meta-label">Reviewer:</span> <span class="meta-val">Jonathan</span></div>
+      </div>
+      <h4>Review Questions</h4>
+      <ol>
+        <li><strong>Jonathan:</strong> Does the CO workflow match field practice?</li>
+        <li>What info per CO isn't shown that you need?</li>
+        <li>Do CO approval thresholds need to be defined? (e.g., Jonathan approves under $X, Brad above)</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- Module 11: Equipment -->
+  <div class="module-card" id="mod-11">
+    <div class="module-card-header" onclick="toggleCard('mod-11')">
+      <span class="mod-num">11</span>
+      <span class="mod-title">Equipment</span>
+      <span class="mod-brief">— Roster, daily rates, maintenance, transport contacts</span>
+      <span class="chevron">&#9662;</span>
+    </div>
+    <div class="module-card-body">
+      <div class="meta-row">
+        <div><span class="meta-label">Data Source:</span> <span class="meta-val">Fleet Roster</span></div>
+        <div><span class="meta-label">Reviewer:</span> <span class="meta-val">Both</span></div>
+      </div>
+      <h4>Review Questions</h4>
+      <ol>
+        <li><strong>Brad/Jonathan:</strong> Equipment list complete?</li>
+        <li>Daily rates current?</li>
+        <li>Transport contacts current? (<strong>Paddacks/Miah, Stephan/Mark Maller</strong>)</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- Module 12: Safety -->
+  <div class="module-card" id="mod-12">
+    <div class="module-card-header" onclick="toggleCard('mod-12')">
+      <span class="mod-num">12</span>
+      <span class="mod-title">Safety</span>
+      <span class="mod-brief">— Pre-shift checklist, hazards, toolbox talks, JSA</span>
+      <span class="chevron">&#9662;</span>
+    </div>
+    <div class="module-card-body">
+      <div class="meta-row">
+        <div><span class="meta-label">Data Source:</span> <span class="meta-val">Safety SOPs</span></div>
+        <div><span class="meta-label">Reviewer:</span> <span class="meta-val">Jonathan</span></div>
+      </div>
+      <h4>Review Questions</h4>
+      <ol>
+        <li><strong>Jonathan:</strong> Pre-shift checklist cover everything your crew checks?</li>
+        <li>PPE requirements complete for VSC operations?</li>
+        <li>Are the 10 VSC hazards the right ones? Any missing?</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- Module 13: Daily Logs -->
+  <div class="module-card" id="mod-13">
+    <div class="module-card-header" onclick="toggleCard('mod-13')">
+      <span class="mod-num">13</span>
+      <span class="mod-title">Daily Logs</span>
+      <span class="mod-brief">— Field reporting with production tracking</span>
+      <span class="chevron">&#9662;</span>
+    </div>
+    <div class="module-card-body">
+      <div class="meta-row">
+        <div><span class="meta-label">Data Source:</span> <span class="meta-val">Field Reports</span></div>
+        <div><span class="meta-label">Reviewer:</span> <span class="meta-val">Jonathan</span></div>
+      </div>
+      <h4>Review Questions</h4>
+      <ol>
+        <li><strong>Jonathan:</strong> Does the form capture everything field team needs daily?</li>
+        <li>Fields missing that GCs ask for in their daily reports?</li>
+        <li>Should photos be required or optional per log?</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- Module 14: Subcontractors -->
+  <div class="module-card" id="mod-14">
+    <div class="module-card-header" onclick="toggleCard('mod-14')">
+      <span class="mod-num">14</span>
+      <span class="mod-title">Subcontractors</span>
+      <span class="mod-brief">— Vendor roster with contacts</span>
+      <span class="chevron">&#9662;</span>
+    </div>
+    <div class="module-card-body">
+      <div class="meta-row">
+        <div><span class="meta-label">Data Source:</span> <span class="meta-val">Vendor Roster</span></div>
+        <div><span class="meta-label">Reviewer:</span> <span class="meta-val">Brad</span></div>
+      </div>
+      <h4>Review Questions</h4>
+      <ol>
+        <li><strong>Brad:</strong> All vendors listed? Any missing?</li>
+        <li>Contact details current?</li>
+        <li>Should we add vendor rating/notes fields?</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- Module 15: Permits -->
+  <div class="module-card" id="mod-15">
+    <div class="module-card-header" onclick="toggleCard('mod-15')">
+      <span class="mod-num">15</span>
+      <span class="mod-title">Permits</span>
+      <span class="mod-brief">— Permit tracker with expiration alerts</span>
+      <span class="chevron">&#9662;</span>
+    </div>
+    <div class="module-card-body">
+      <div class="meta-row">
+        <div><span class="meta-label">Data Source:</span> <span class="meta-val">Permit Tracker</span></div>
+        <div><span class="meta-label">Reviewer:</span> <span class="meta-val">Jonathan</span></div>
+      </div>
+      <h4>Review Questions</h4>
+      <ol>
+        <li><strong>Jonathan:</strong> What permits does PF typically need per project?</li>
+        <li>Who handles applications — PF or GC?</li>
+        <li>Any recurring permits/licenses PF needs to renew?</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- Module 16: Closeout -->
+  <div class="module-card" id="mod-16">
+    <div class="module-card-header" onclick="toggleCard('mod-16')">
+      <span class="mod-num">16</span>
+      <span class="mod-title">Closeout</span>
+      <span class="mod-brief">— GGG workflow, retainage tracking</span>
+      <span class="chevron">&#9662;</span>
+    </div>
+    <div class="module-card-body">
+      <div class="meta-row">
+        <div><span class="meta-label">Data Source:</span> <span class="meta-val">GGG Workflow</span></div>
+        <div><span class="meta-label">Reviewer:</span> <span class="meta-val">Jonathan</span></div>
+      </div>
+      <h4>Review Questions</h4>
+      <ol>
+        <li><strong>Jonathan:</strong> Does the closeout workflow match your SOP?</li>
+        <li>10-business-day GGG expectation realistic?</li>
+        <li>Retainage tracking — what info do you need to follow up?</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- ===== ALPHA REVIEW CHECKLISTS ===== -->
+  <h2 class="section-title">Alpha Review Checklists</h2>
+
+  <!-- Brad's Checklist -->
+  <div class="checklist-section">
+    <h3>Brad's Checklist</h3>
+    <div class="checklist-item"><input type="checkbox" id="b1"><label for="b1">Login and password work</label></div>
+    <div class="checklist-item"><input type="checkbox" id="b2"><label for="b2">Look and feel matches PF brand</label></div>
+    <div class="checklist-item"><input type="checkbox" id="b3"><label for="b3">Navigation intuitive — find any module in 2 clicks</label></div>
+    <div class="checklist-item"><input type="checkbox" id="b4"><label for="b4">Dashboard shows right KPIs</label></div>
+    <div class="checklist-item"><input type="checkbox" id="b5"><label for="b5">Feasibility scoring thresholds confirmed</label></div>
+    <div class="checklist-item"><input type="checkbox" id="b6"><label for="b6">Estimating markup structure accurate</label></div>
+    <div class="checklist-item"><input type="checkbox" id="b7"><label for="b7">Supplier list current and complete</label></div>
+    <div class="checklist-item"><input type="checkbox" id="b8"><label for="b8">Equipment roster accurate</label></div>
+    <div class="checklist-item"><input type="checkbox" id="b9"><label for="b9">Vendor contacts correct</label></div>
+    <div class="checklist-item"><input type="checkbox" id="b10"><label for="b10">No sensitive data exposed</label></div>
+  </div>
+
+  <!-- Jonathan's Checklist -->
+  <div class="checklist-section">
+    <h3>Jonathan's Checklist</h3>
+    <div class="checklist-item"><input type="checkbox" id="j1"><label for="j1">Pipeline data matches bid log</label></div>
+    <div class="checklist-item"><input type="checkbox" id="j2"><label for="j2">Stone prices match current quotes</label></div>
+    <div class="checklist-item"><input type="checkbox" id="j3"><label for="j3">Estimating rates accurate</label></div>
+    <div class="checklist-item"><input type="checkbox" id="j4"><label for="j4">WIP data matches Project Master</label></div>
+    <div class="checklist-item"><input type="checkbox" id="j5"><label for="j5">GUHMA thresholds correct</label></div>
+    <div class="checklist-item"><input type="checkbox" id="j6"><label for="j6">Modulus test procedure correct</label></div>
+    <div class="checklist-item"><input type="checkbox" id="j7"><label for="j7">Daily log format captures everything needed</label></div>
+    <div class="checklist-item"><input type="checkbox" id="j8"><label for="j8">Safety checklist complete</label></div>
+    <div class="checklist-item"><input type="checkbox" id="j9"><label for="j9">Closeout workflow matches GGG process</label></div>
+    <div class="checklist-item"><input type="checkbox" id="j10"><label for="j10">Proposal template sections correct</label></div>
+  </div>
+
+  <!-- Joint Review -->
+  <div class="checklist-section">
+    <h3>Joint Review</h3>
+    <div class="checklist-item"><input type="checkbox" id="jt1"><label for="jt1">Walk through a real bid end-to-end (bid &rarr; feasibility &rarr; estimate &rarr; proposal)</label></div>
+    <div class="checklist-item"><input type="checkbox" id="jt2"><label for="jt2">Walk through a real project (award &rarr; mobilize &rarr; install &rarr; closeout)</label></div>
+    <div class="checklist-item"><input type="checkbox" id="jt3"><label for="jt3">Identify missing fields or steps</label></div>
+    <div class="checklist-item"><input type="checkbox" id="jt4"><label for="jt4">Agree on must-fix vs nice-to-have changes</label></div>
+  </div>
+
+  <!-- ===== NEXT STEPS ===== -->
+  <h2 class="section-title">Next Steps</h2>
+  <div class="next-steps">
+    <ol>
+      <li><strong>Send notes to Peter</strong> — what's right, wrong, missing in each module</li>
+      <li><strong>Peter makes must-fix changes</strong> — priority fixes first, nice-to-haves after</li>
+      <li><strong>Move to UAT</strong> — Jonathan tests on the next real bid, end-to-end</li>
+      <li><strong>Beta</strong> — 2 weeks of daily use by both Brad and Jonathan</li>
+      <li><strong>Production v1.0</strong> — official release with platform manual</li>
+    </ol>
+  </div>
+
+</div>
+
+<!-- ===== FOOTER ===== -->
+<div class="footer">
+  Pier Foundations | Alpha Review | Peter (AI COO) | May 30, 2026
+</div>
+
+<!-- ===== JAVASCRIPT ===== -->
+<script>
+function toggleCard(id) {
+  var card = document.getElementById(id);
+  if (card) card.classList.toggle('open');
+}
+
+// Expand/collapse all
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'e' && e.altKey) {
+    var cards = document.querySelectorAll('.module-card');
+    var allOpen = Array.from(cards).every(function(c) { return c.classList.contains('open'); });
+    cards.forEach(function(c) {
+      if (allOpen) c.classList.remove('open');
+      else c.classList.add('open');
+    });
+  }
+});
+</script>
+
+</body>
+</html>
