@@ -38,6 +38,8 @@ DRIVE_ID = os.environ.get("SP_DRIVE_ID", "")
 FILES = {
     "bid_log": "016ISVH6Y7M7KQIB5C5FDLNKI5H3IZFXRK",
     "project_master": "016ISVH64J5UAFQWEW6NC3FJBZVMTVLLX6",
+    "estimate_template": "016ISVH63NJBJ4O6UAUBGJ66O246RALYBJ",
+    "bd_master": "016ISVH67CTBZWYBZMDREITDFK2XCIWMKM",
     "production_calcs": "016ISVH6Y5EAOIMTDZL5D2IGNUKRZ7LFAC",
     "project_readiness": "016ISVH6Z7SPMXRXECJZALGGG5UEGBVKJU",
 }
@@ -226,6 +228,110 @@ def extract_project_master(filepath):
     }
 
 
+def extract_estimate_template(filepath):
+    """Extract estimate template structure and default rates to JSON."""
+    import openpyxl
+    wb = openpyxl.load_workbook(filepath, data_only=True)
+
+    rates = {}
+    line_items = []
+
+    # Handle trailing spaces in sheet names
+    budget_sheet = next((s for s in wb.sheetnames if s.strip() == "Detailed Budget"), None)
+    if budget_sheet:
+        ws = wb[budget_sheet]
+        for row in range(1, ws.max_row + 1):
+            code = ws.cell(row=row, column=1).value
+            desc = ws.cell(row=row, column=7).value or ws.cell(row=row, column=3).value
+            qty = ws.cell(row=row, column=10).value
+            unit = ws.cell(row=row, column=11).value
+            unit_cost = ws.cell(row=row, column=12).value
+            amount = ws.cell(row=row, column=16).value
+            if code and desc:
+                item = {
+                    "code": code,
+                    "description": str(desc).strip(),
+                    "quantity": qty,
+                    "unit": unit,
+                    "unit_cost": round(unit_cost, 2) if isinstance(unit_cost, float) else unit_cost,
+                    "amount": round(amount, 2) if isinstance(amount, float) else amount,
+                }
+                line_items.append(item)
+
+    # Extract OH calcs if present
+    oh_items = []
+    if "OH Calcs" in wb.sheetnames:
+        ws2 = wb["OH Calcs"]
+        for row in range(1, ws2.max_row + 1):
+            code = ws2.cell(row=row, column=1).value
+            desc = ws2.cell(row=row, column=2).value
+            qty = ws2.cell(row=row, column=3).value
+            unit = ws2.cell(row=row, column=4).value
+            cost = ws2.cell(row=row, column=5).value
+            pct = ws2.cell(row=row, column=6).value
+            total = ws2.cell(row=row, column=7).value
+            if desc and str(desc).strip():
+                oh_items.append({
+                    "code": code,
+                    "description": str(desc).strip(),
+                    "quantity": qty,
+                    "unit": unit,
+                    "cost_per_unit": cost,
+                    "pct_dedicated": pct,
+                    "total": total,
+                })
+
+    return {
+        "line_items": line_items,
+        "oh_items": oh_items,
+        "sheet_names": wb.sheetnames,
+        "sync_time": datetime.utcnow().isoformat() + "Z",
+        "source": "SharePoint/03 - Estimating/01 - Aggregate Piers/26-0422 Master Budget Estimate Template PF.xlsm",
+    }
+
+
+def extract_bd_master(filepath):
+    """Extract BD master data to JSON."""
+    import openpyxl
+    wb = openpyxl.load_workbook(filepath, data_only=True)
+
+    contacts = []
+    gc_relationships = []
+
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+        # Read header row to understand columns
+        headers = []
+        for col in range(1, ws.max_column + 1):
+            val = ws.cell(row=1, column=col).value
+            if val:
+                headers.append({"col": col, "name": str(val).strip()})
+
+        if not headers:
+            continue
+
+        # Read data rows
+        for row in range(2, min(ws.max_row + 1, 500)):
+            row_data = {}
+            has_data = False
+            for h in headers:
+                val = ws.cell(row=row, column=h["col"]).value
+                if val is not None:
+                    has_data = True
+                row_data[h["name"]] = val
+            if has_data and any(v for v in row_data.values() if v):
+                row_data["_sheet"] = sheet_name
+                contacts.append(row_data)
+
+    return {
+        "contacts": contacts,
+        "sheet_names": wb.sheetnames,
+        "total_records": len(contacts),
+        "sync_time": datetime.utcnow().isoformat() + "Z",
+        "source": "SharePoint/01 - Admin/13 - Master Spreadsheets/PF BD Master.xlsm",
+    }
+
+
 def main():
     print(f"PF SharePoint Sync — {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC")
     print("=" * 50)
@@ -235,12 +341,14 @@ def main():
     token = get_token()
     print("  Token acquired")
 
-    # Download files
+    # Download all 4 master files
     print("\nDownloading from SharePoint...")
     bid_log_path = download_file(token, FILES["bid_log"], "Project_Bid_Log.xlsx")
     project_master_path = download_file(token, FILES["project_master"], "PF_Project_Master.xlsx")
+    estimate_path = download_file(token, FILES["estimate_template"], "Master_Budget_Estimate_Template.xlsm")
+    bd_path = download_file(token, FILES["bd_master"], "PF_BD_Master.xlsm")
 
-    # Extract data
+    # Extract data from all 4
     print("\nExtracting bid log data...")
     bid_data = extract_bid_log(bid_log_path)
     print(f"  {len(bid_data['bids'])} bids, {len(bid_data['stone_costs'])} stone suppliers")
@@ -248,6 +356,14 @@ def main():
     print("Extracting project master data...")
     project_data = extract_project_master(project_master_path)
     print(f"  {len(project_data['projects'])} projects, {len(project_data['cost_codes'])} cost codes")
+
+    print("Extracting estimate template...")
+    estimate_data = extract_estimate_template(estimate_path)
+    print(f"  {len(estimate_data['line_items'])} line items, {len(estimate_data['oh_items'])} OH items")
+
+    print("Extracting BD master...")
+    bd_data = extract_bd_master(bd_path)
+    print(f"  {bd_data['total_records']} BD records across {len(bd_data['sheet_names'])} sheets")
 
     # Write JSON output
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -260,6 +376,14 @@ def main():
         json.dump(project_data, f, indent=2, default=str)
     print(f"  Wrote: data/project-master.json")
 
+    with open(os.path.join(OUTPUT_DIR, "estimate-template.json"), "w") as f:
+        json.dump(estimate_data, f, indent=2, default=str)
+    print(f"  Wrote: data/estimate-template.json")
+
+    with open(os.path.join(OUTPUT_DIR, "bd-master.json"), "w") as f:
+        json.dump(bd_data, f, indent=2, default=str)
+    print(f"  Wrote: data/bd-master.json")
+
     # Write sync metadata
     meta = {
         "last_sync": datetime.utcnow().isoformat() + "Z",
@@ -267,6 +391,8 @@ def main():
         "bid_count": len(bid_data["bids"]),
         "project_count": len(project_data["projects"]),
         "stone_supplier_count": len(bid_data["stone_costs"]),
+        "estimate_line_items": len(estimate_data["line_items"]),
+        "bd_records": bd_data["total_records"],
     }
     with open(os.path.join(OUTPUT_DIR, "sync-meta.json"), "w") as f:
         json.dump(meta, f, indent=2)
