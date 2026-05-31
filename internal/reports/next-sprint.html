@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pier Foundations — Days 4-6 Sprint Plan</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', sans-serif; background: #F9FAFD; color: #2B2F36; line-height: 1.6; max-width: 1000px; margin: 0 auto; }
+  .header { background: #1E2A38; color: #fff; padding: 32px; }
+  .header h1 { font-size: 1.35rem; font-weight: 800; }
+  .header p { font-size: 0.82rem; color: #8A9AAB; margin-top: 4px; }
+
+  .content { padding: 28px 32px 40px; }
+
+  .status-banner { background: #EBF5FF; border: 1px solid #D0E4F5; border-left: 4px solid #006DB0; padding: 14px 18px; border-radius: 0 6px 6px 0; margin-bottom: 24px; font-size: 0.85rem; color: #005A91; }
+
+  .summary-strip { display: flex; gap: 16px; margin-bottom: 28px; padding: 16px 0; border-bottom: 1px solid #C8D5DC; flex-wrap: wrap; }
+  .summary-stat { text-align: center; flex: 1; min-width: 80px; background: linear-gradient(135deg, #EBF5FF, #F5FAFF); border: 1px solid #D0E4F5; border-top: 3px solid #006DB0; border-radius: 8px; padding: 12px 8px; }
+  .summary-num { font-size: 1.8rem; font-weight: 800; color: #000; }
+  .summary-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.06em; color: #005A91; }
+
+  .section-title { font-size: 1rem; font-weight: 700; margin: 28px 0 12px; padding-bottom: 6px; display: inline-block; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin: 12px 0 24px; }
+  thead th { background: #2B3E50; color: #fff; padding: 8px 12px; text-align: left; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+  thead th:first-child { border-radius: 6px 0 0 0; }
+  thead th:last-child { border-radius: 0 6px 0 0; }
+  tbody td { padding: 10px 12px; border-bottom: 1px solid #E2EAF0; vertical-align: top; }
+  tbody tr:hover { background: #F3F5F8; }
+
+  .tag { display: inline-block; font-size: 0.62rem; font-weight: 700; padding: 2px 8px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .tag-done { background: #dcfce7; color: #16a34a; }
+  .tag-blocked { background: #fee2e2; color: #dc2626; }
+  .tag-pending { background: #fef3c7; color: #d97706; }
+  .tag-new { background: #E0F0FF; color: #006DB0; }
+
+  .totals-bar { display: flex; gap: 0; margin: 24px 0; border-radius: 8px; overflow: hidden; height: 32px; }
+  .totals-seg { display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; color: #fff; }
+  .seg-done { background: #16a34a; }
+  .seg-sprint { background: #006DB0; }
+  .seg-brad { background: #d97706; }
+
+  .day-section { background: #fff; border: 1px solid #C8D5DC; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+  .day-section h3 { font-size: 0.9rem; font-weight: 700; margin-bottom: 4px; }
+  .day-section .day-theme { font-size: 0.78rem; color: #5A6370; margin-bottom: 12px; font-style: italic; }
+
+  .brad-section { background: #fff; border: 1px solid #C8D5DC; border-left: 3px solid #d97706; border-radius: 8px; padding: 20px; margin-top: 24px; }
+  .brad-section h3 { font-size: 0.9rem; font-weight: 700; color: #d97706; margin-bottom: 8px; }
+
+  .outcome-section { background: #EBF5FF; border: 1px solid #D0E4F5; border-radius: 8px; padding: 20px; margin-top: 24px; }
+  .outcome-section h3 { font-size: 0.9rem; font-weight: 700; color: #006DB0; margin-bottom: 8px; }
+  .outcome-section ul { list-style: none; padding: 0; }
+  .outcome-section li { padding: 6px 0; font-size: 0.82rem; color: #2B2F36; padding-left: 16px; position: relative; }
+  .outcome-section li::before { content: ''; position: absolute; left: 0; top: 12px; width: 6px; height: 6px; background: #006DB0; border-radius: 50%; }
+
+  .progress-ascii { background: #F3F5F8; border: 1px solid #C8D5DC; border-radius: 8px; padding: 16px 20px; margin-top: 16px; font-family: 'Inter', monospace; font-size: 0.78rem; line-height: 2; }
+  .progress-ascii .label { display: inline-block; width: 160px; color: #5A6370; }
+  .progress-ascii .bar { color: #16a34a; font-weight: 700; }
+  .progress-ascii .bar-pending { color: #006DB0; font-weight: 700; }
+  .progress-ascii .bar-empty { color: #C8D5DC; }
+  .progress-ascii .pct { color: #2B2F36; font-weight: 600; }
+
+  .footer { text-align: center; padding: 20px 0; font-size: 0.68rem; color: #8A9AAB; border-top: 1px solid #C8D5DC; margin-top: 24px; }
+
+  @media print {
+    body { max-width: 100%; }
+    .header { background: #1E2A38 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    thead th { background: #2B3E50 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .totals-seg { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .tag { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .summary-stat { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .day-section, .brad-section, .outcome-section { break-inside: avoid; }
+  }
+
+  @media (max-width: 600px) { .header, .content { padding: 16px; } .summary-strip { flex-direction: column; gap: 8px; } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Days 4-6 Sprint Plan — Finishing the Checklist</h1>
+  <p>Prepared May 31, 2026 | Peter (AI COO) | Context: 3-day sprint completed in 1 day</p>
+</div>
+
+<div class="content">
+
+<div class="status-banner">
+  <strong>Context:</strong> Days 1-3 sprint delivered 22/22 tasks + 8 bonus items in a single day. Alpha review sent. SharePoint connected. This plan tackles the remaining 9 checklist items to reach 91% completion.
+</div>
+
+<!-- ============================================================ -->
+<!-- SUMMARY STRIP -->
+<!-- ============================================================ -->
+<div class="summary-strip">
+  <div class="summary-stat"><div class="summary-num">24</div><div class="summary-label">Already Done</div></div>
+  <div class="summary-stat"><div class="summary-num">9</div><div class="summary-label">Remaining</div></div>
+  <div class="summary-stat"><div class="summary-num">91%</div><div class="summary-label">After Sprint</div></div>
+  <div class="summary-stat"><div class="summary-num">18</div><div class="summary-label">Tasks Planned</div></div>
+</div>
+
+<!-- ============================================================ -->
+<!-- PROGRESS BAR -->
+<!-- ============================================================ -->
+<p style="font-size:0.85rem;color:#5A6370;margin-bottom:8px;">Checklist progress (33 items total):</p>
+<div class="totals-bar">
+  <div class="totals-seg seg-done" style="width:73%">Done (24)</div>
+  <div class="totals-seg seg-sprint" style="width:18%">Days 4-6 (6)</div>
+  <div class="totals-seg seg-brad" style="width:9%">Needs Brad (3)</div>
+</div>
+
+<div class="progress-ascii">
+  <div><span class="label">After Days 1-3:</span> <span class="bar">||||||||||||||||||||||||</span><span class="bar-empty">|||||||||</span> <span class="pct">24/33 (73%)</span></div>
+  <div><span class="label">After Days 4-6:</span> <span class="bar">||||||||||||||||||||||||</span><span class="bar-pending">||||||</span><span class="bar-empty">|||</span> <span class="pct">30/33 (91%)</span></div>
+  <div><span class="label">After Brad inputs:</span> <span class="bar">|||||||||||||||||||||||||||||||||</span> <span class="pct">33/33 (100%)</span></div>
+</div>
+
+<!-- ============================================================ -->
+<!-- MASTER CHECKLIST -->
+<!-- ============================================================ -->
+<h2 class="section-title" style="color:#006DB0; border-bottom: 2px solid #006DB0;">Master Checklist — Tether's 33 Items</h2>
+
+<table>
+<thead><tr><th>#</th><th>Item</th><th style="width:100px">Status</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Project Status Tracking</td><td><span class="tag tag-done">DONE</span></td><td>18 live projects from SharePoint</td></tr>
+<tr><td>2</td><td>Bid & Estimate Generation</td><td><span class="tag tag-done">DONE</span></td><td>POET template, auto-calc</td></tr>
+<tr><td>3</td><td>Subcontractor Coordination</td><td><span class="tag tag-done">DONE</span></td><td>12 vendors, contacts, rates</td></tr>
+<tr><td>4</td><td>Permitting & Inspections</td><td><span class="tag tag-done">DONE</span></td><td>Permit tracker, expiration alerts</td></tr>
+<tr><td>5</td><td>Safety Checklists</td><td><span class="tag tag-done">DONE</span></td><td>Pre-shift, JSA, incident form</td></tr>
+<tr><td>6</td><td>Material Cost Estimation</td><td><span class="tag tag-done">DONE</span></td><td>11 suppliers, calculator</td></tr>
+<tr><td>7</td><td>Punch List & Closeout</td><td><span class="tag tag-done">DONE</span></td><td>GGG workflow, retainage</td></tr>
+<tr><td>8</td><td>Equipment & Fleet Tracking</td><td><span class="tag tag-done">DONE</span></td><td>15 items, daily rates</td></tr>
+<tr><td>9</td><td>Daily Logs & Reporting</td><td><span class="tag tag-done">DONE</span></td><td>Production tracking, 5 samples</td></tr>
+<tr><td>10</td><td>Change Order Management</td><td><span class="tag tag-done">DONE</span></td><td>CO tracker, SOP workflow</td></tr>
+<tr><td>11</td><td>Feasibility / No-Go Tool</td><td><span class="tag tag-done">DONE</span></td><td>Weighted scoring, disqualifiers</td></tr>
+<tr><td>12</td><td>Pipeline Management</td><td><span class="tag tag-done">DONE</span></td><td>155 live bids from SharePoint</td></tr>
+<tr><td>13</td><td>Proposal & Quote Generation</td><td><span class="tag tag-done">DONE</span></td><td>12-section template</td></tr>
+<tr><td>14</td><td>Competitor Analysis</td><td><span class="tag tag-done">DONE</span></td><td>Keller, CNC, Geopier, Menard</td></tr>
+<tr><td>15</td><td>Process Documentation / SOPs</td><td><span class="tag tag-done">DONE</span></td><td>11 SOPs + 38 additions</td></tr>
+<tr><td>16</td><td>Workflow Automation</td><td><span class="tag tag-done">DONE</span></td><td>SharePoint sync live (4 files)</td></tr>
+<tr><td>17</td><td>SharePoint/OneDrive Connection</td><td><span class="tag tag-done">DONE</span></td><td>Graph API, all 6 folders</td></tr>
+<tr><td>18</td><td>Geotechnical Engineering Education</td><td><span class="tag tag-done">DONE</span></td><td>Berkeley + Purdue (A- exam)</td></tr>
+<tr><td>19</td><td>Company Process Training</td><td><span class="tag tag-done">DONE</span></td><td>SOPs reviewed, additions approved</td></tr>
+<tr><td>20</td><td>Website Development</td><td><span class="tag tag-done">DONE</span></td><td>v4.1 built, Dots version</td></tr>
+<tr><td>21</td><td>Engineer Resume/Bio</td><td><span class="tag tag-done">DONE</span></td><td>Dr. Garbin full CV/bio</td></tr>
+<tr><td>22</td><td>Additional Workflow Docs</td><td><span class="tag tag-done">DONE</span></td><td>34 SOW/SRS documents, all v1.2</td></tr>
+<tr><td>23</td><td>Project Management Dashboard</td><td><span class="tag tag-done">DONE</span></td><td>Unified platform, 15 modules</td></tr>
+<tr><td>24</td><td>GUHMA Integration</td><td><span class="tag tag-done">DONE</span></td><td>186 pier logs, QA module</td></tr>
+<tr style="background: #FFFBF0;"><td>25</td><td>ConstructConnect / RFP Scanning</td><td><span class="tag tag-blocked">BLOCKED</span></td><td>Needs CC subscription ($3-10K/yr)</td></tr>
+<tr style="background: #FFFBF0;"><td>26</td><td>QuickBooks API Integration</td><td><span class="tag tag-blocked">BLOCKED</span></td><td>Needs QB version + credentials</td></tr>
+<tr style="background: #FFFBF0;"><td>27</td><td>Budgeting & Forecasting</td><td><span class="tag tag-new">DAY 4</span></td><td>Framework buildable now, QB later</td></tr>
+<tr style="background: #FFFBF0;"><td>28</td><td>Invoice Generation & Tracking</td><td><span class="tag tag-new">DAY 4</span></td><td>Template buildable now, QB later</td></tr>
+<tr style="background: #FFFBF0;"><td>29</td><td>CEO Dashboard Integration</td><td><span class="tag tag-new">DAY 4</span></td><td>MBA framework, 12 KPIs</td></tr>
+<tr style="background: #FFFBF0;"><td>30</td><td>Training Rollout (Jonathan/Derek)</td><td><span class="tag tag-new">DAY 6</span></td><td>Materials buildable, timing TBD</td></tr>
+<tr style="background: #FFFBF0;"><td>31</td><td>Alpha Review Changes</td><td><span class="tag tag-pending">WAITING</span></td><td>Awaiting Brad/Jonathan feedback</td></tr>
+<tr style="background: #FFFBF0;"><td>32</td><td>Live Data in All Modules</td><td><span class="tag tag-new">DAY 4</span></td><td>Wire remaining modules to SP</td></tr>
+<tr style="background: #FFFBF0;"><td>33</td><td>Platform Manual</td><td><span class="tag tag-new">DAY 5</span></td><td>Module-by-module user guide</td></tr>
+</tbody>
+</table>
+
+<!-- ============================================================ -->
+<!-- DAY 4 -->
+<!-- ============================================================ -->
+<div class="day-section" style="border-top: 3px solid #006DB0;">
+  <h3 style="color: #006DB0;">Day 4 — Data Integration + Financial Framework</h3>
+  <div class="day-theme">Make every module show real data, build financial tools</div>
+  <table>
+  <thead><tr><th>#</th><th>Task</th><th style="width:60px">Owner</th><th style="width:50px">Time</th><th>Deliverable</th></tr></thead>
+  <tbody>
+  <tr>
+    <td>1</td>
+    <td><strong>Wire live SP data into ALL modules</strong></td>
+    <td>Peter</td>
+    <td>30 min</td>
+    <td>Pipeline, projects, materials, estimating all show live data</td>
+  </tr>
+  <tr>
+    <td>2</td>
+    <td><strong>Build CEO Dashboard module</strong></td>
+    <td>Peter</td>
+    <td>30 min</td>
+    <td>Brad's daily view: 12 KPIs (6 ops + 6 finance) from MBA framework</td>
+  </tr>
+  <tr>
+    <td>3</td>
+    <td><strong>Build Budgeting & Forecasting module (framework)</strong></td>
+    <td>Peter</td>
+    <td>20 min</td>
+    <td>Break-even analysis, capacity model, cash flow forecast template</td>
+  </tr>
+  <tr>
+    <td>4</td>
+    <td><strong>Build Invoice Tracking module (template)</strong></td>
+    <td>Peter</td>
+    <td>15 min</td>
+    <td>G702/G703 tracker, retainage, AR aging</td>
+  </tr>
+  <tr>
+    <td>5</td>
+    <td><strong>Ingest remaining SP files</strong></td>
+    <td>Agents</td>
+    <td>BG</td>
+    <td>Deep knowledge from all 11 SOPs, safety manual, templates</td>
+  </tr>
+  <tr>
+    <td>6</td>
+    <td><strong>INDOT/ODOT bid board scan</strong></td>
+    <td>Agents</td>
+    <td>BG</td>
+    <td>Bridge/foundation/ground improvement opportunities</td>
+  </tr>
+  </tbody>
+  </table>
+</div>
+
+<!-- ============================================================ -->
+<!-- DAY 5 -->
+<!-- ============================================================ -->
+<div class="day-section" style="border-top: 3px solid #006DB0;">
+  <h3 style="color: #006DB0;">Day 5 — Polish + Integrations + Manual</h3>
+  <div class="day-theme">Tighten everything up, start the manual</div>
+  <table>
+  <thead><tr><th>#</th><th>Task</th><th style="width:60px">Owner</th><th style="width:50px">Time</th><th>Deliverable</th></tr></thead>
+  <tbody>
+  <tr>
+    <td>7</td>
+    <td><strong>Implement remaining Tether feedback (items 4 & 8)</strong></td>
+    <td>Peter</td>
+    <td>15 min</td>
+    <td>Feasibility as prominent CTA, real-data-first UAT approach</td>
+  </tr>
+  <tr>
+    <td>8</td>
+    <td><strong>Alpha review changes (from Brad/Jonathan)</strong></td>
+    <td>Peter</td>
+    <td>30-60m</td>
+    <td>All must-fix items resolved</td>
+  </tr>
+  <tr>
+    <td>9</td>
+    <td><strong>ConstructConnect alternatives research</strong></td>
+    <td>Agents</td>
+    <td>BG</td>
+    <td>Free/low-cost bid scanning (BidClerk, iSqFt, state DOT boards)</td>
+  </tr>
+  <tr>
+    <td>10</td>
+    <td><strong>Draft Platform Manual v1</strong></td>
+    <td>Peter</td>
+    <td>30 min</td>
+    <td>Module-by-module user guide for Jonathan/Derek</td>
+  </tr>
+  <tr>
+    <td>11</td>
+    <td><strong>Update 3-day sprint report with final status</strong></td>
+    <td>Peter</td>
+    <td>10 min</td>
+    <td>Complete scorecard for Tether's checklist</td>
+  </tr>
+  <tr>
+    <td>12</td>
+    <td><strong>Competitor monitoring refresh</strong></td>
+    <td>Agents</td>
+    <td>BG</td>
+    <td>Keller, CNC, Geopier, Menard latest activity</td>
+  </tr>
+  </tbody>
+  </table>
+</div>
+
+<!-- ============================================================ -->
+<!-- DAY 6 -->
+<!-- ============================================================ -->
+<div class="day-section" style="border-top: 3px solid #006DB0;">
+  <h3 style="color: #006DB0;">Day 6 — QuickBooks Prep + Training + Cleanup</h3>
+  <div class="day-theme">Prep for QB integration, training materials, tie loose ends</div>
+  <table>
+  <thead><tr><th>#</th><th>Task</th><th style="width:60px">Owner</th><th style="width:50px">Time</th><th>Deliverable</th></tr></thead>
+  <tbody>
+  <tr>
+    <td>13</td>
+    <td><strong>QuickBooks integration prep</strong></td>
+    <td>Peter</td>
+    <td>20 min</td>
+    <td>Chart of accounts, job costing setup guide, ready-to-implement config</td>
+  </tr>
+  <tr>
+    <td>14</td>
+    <td><strong>Training materials for Jonathan</strong></td>
+    <td>Peter</td>
+    <td>20 min</td>
+    <td>Quick-start guide for daily platform use</td>
+  </tr>
+  <tr>
+    <td>15</td>
+    <td><strong>Training materials for Derek</strong></td>
+    <td>Peter</td>
+    <td>15 min</td>
+    <td>BD/pipeline module walkthrough</td>
+  </tr>
+  <tr>
+    <td>16</td>
+    <td><strong>IIJA reauthorization check</strong></td>
+    <td>Agents</td>
+    <td>BG</td>
+    <td>BUILD America 250 status update</td>
+  </tr>
+  <tr>
+    <td>17</td>
+    <td><strong>Data center lead research refresh</strong></td>
+    <td>Agents</td>
+    <td>BG</td>
+    <td>Google Zodiac, Meta Lebanon updates</td>
+  </tr>
+  <tr>
+    <td>18</td>
+    <td><strong>Final documentation push to Git</strong></td>
+    <td>Peter</td>
+    <td>10 min</td>
+    <td>All docs v1.3, everything committed</td>
+  </tr>
+  </tbody>
+  </table>
+</div>
+
+<!-- ============================================================ -->
+<!-- WHAT STILL NEEDS BRAD -->
+<!-- ============================================================ -->
+<div class="brad-section">
+  <h3>What Still Needs Brad's Input</h3>
+  <table>
+  <thead><tr><th>Item</th><th>What Peter Needs</th><th>Impact</th></tr></thead>
+  <tbody>
+  <tr>
+    <td><strong>QuickBooks access</strong></td>
+    <td>Version (Online/Desktop), login credentials</td>
+    <td>Unlocks financial integration (3 checklist items)</td>
+  </tr>
+  <tr>
+    <td><strong>ConstructConnect decision</strong></td>
+    <td>Subscribe ($3-10K/yr) or use free alternatives?</td>
+    <td>Unlocks automated bid scanning</td>
+  </tr>
+  <tr>
+    <td><strong>Alpha review feedback</strong></td>
+    <td>Answers from walkthrough form</td>
+    <td>Unlocks UAT stage</td>
+  </tr>
+  <tr>
+    <td><strong>CEO Dashboard priorities</strong></td>
+    <td>What does Brad want to see first thing every morning?</td>
+    <td>Drives dashboard design</td>
+  </tr>
+  <tr>
+    <td><strong>Feasibility thresholds</strong></td>
+    <td>Min project value, max distance, always/never GCs</td>
+    <td>Calibrates scoring engine</td>
+  </tr>
+  <tr>
+    <td><strong>Tax strategy status</strong></td>
+    <td>Which of the 7 recommendations are already in place?</td>
+    <td>Prioritizes tax actions</td>
+  </tr>
+  </tbody>
+  </table>
+</div>
+
+<!-- ============================================================ -->
+<!-- AFTER DAY 6 -->
+<!-- ============================================================ -->
+<div class="outcome-section">
+  <h3>After Day 6 — Expected Outcome</h3>
+  <ul>
+    <li><strong>30 of 33</strong> Tether checklist items complete (<strong>91%</strong>)</li>
+    <li>Every module wired to live SharePoint data</li>
+    <li>CEO Dashboard with 12 KPIs ready for Brad's morning review</li>
+    <li>Financial framework (budgeting, invoicing) ready for QuickBooks plug-in</li>
+    <li>Platform Manual v1 for Jonathan and Derek onboarding</li>
+    <li>Training materials tailored to each partner's daily workflow</li>
+  </ul>
+  <p style="font-size: 0.82rem; color: #5A6370; margin-top: 12px; padding-top: 12px; border-top: 1px solid #D0E4F5;">
+    <strong>Final 3 items</strong> depend on external factors:
+    <strong>QuickBooks Integration</strong> (needs credentials),
+    <strong>ConstructConnect Live Scanning</strong> (needs subscription decision),
+    <strong>Training Rollout</strong> (needs Brad's timing for Jonathan/Derek sessions).
+  </p>
+</div>
+
+<div class="footer">
+  Pier Foundations | Days 4-6 Sprint Plan | Peter (AI COO) | May 31, 2026
+</div>
+
+</div>
+</body>
+</html>
