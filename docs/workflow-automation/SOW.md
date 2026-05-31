@@ -1,10 +1,11 @@
 # Statement of Work: Workflow Automation (System Integration Document)
 
 **Project:** Pier Foundations -- Workflow Automation & Tool Integration
-**Version:** 1.0
-**Date:** May 29, 2026
+**Version:** 1.2
+**Date:** May 31, 2026
 **Prepared by:** Peter (AI COO)
 **Approved by:** _Pending Brad/Jonathan review_
+**Implementation Status:** v1.0 BUILT -- deployed to pf-platform.pages.dev/platform/
 
 ---
 
@@ -183,3 +184,10 @@ Project archived with full documentation
 3. Should automated transitions be reversible (can a stage be moved backward)?
 4. What notifications should accompany automated transitions (email, dashboard, both)?
 5. Are there seasonal workflow variations (winter slowdowns, etc.)?
+
+## 10. Implementation Notes
+
+- **Platform:** pf-platform.pages.dev/platform/
+- **Data Source:** SharePoint live sync (4 master files)
+- **SharePoint Sync:** Live -- 4 master files synced
+- **Stage:** Alpha -- awaiting Brad/Jonathan review

@@ -1,8 +1,8 @@
 # Statement of Work: Feasibility / No-Go Tool
 
 **Project:** Pier Foundations — Feasibility & Bid/No-Bid Decision Tool
-**Version:** 1.1
-**Date:** May 30, 2026
+**Version:** 1.2
+**Date:** May 31, 2026
 **Prepared by:** Peter (AI COO)
 **Approved by:** _Pending Brad/Jonathan review_
 **Implementation Status:** v1.0 BUILT -- deployed to pf-platform.pages.dev/platform/
@@ -93,3 +93,9 @@ This tool provides a rapid, standardized project feasibility assessment that out
 | Tool is too rigid (passes on good opportunities) | Include "Needs Review" middle category, not just binary |
 | Team doesn't use it | Make it faster than the current mental checklist — under 5 min |
 | Scoring weights are wrong | Make weights configurable, adjust based on win/loss data over time |
+
+## 10. Implementation Notes
+
+- **Platform:** pf-platform.pages.dev/platform/
+- **Data Source:** SharePoint live sync (4 master files)
+- **Stage:** Alpha -- awaiting Brad/Jonathan review

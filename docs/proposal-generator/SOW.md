@@ -1,10 +1,11 @@
 # Statement of Work: Proposal & Quote Generation Tool
 
 **Project:** Pier Foundations -- Proposal & Quote Generator
-**Version:** 1.0
-**Date:** May 29, 2026
+**Version:** 1.2
+**Date:** May 31, 2026
 **Prepared by:** Peter (AI COO)
 **Approved by:** _Pending Brad/Jonathan review_
+**Implementation Status:** v1.0 BUILT -- deployed to pf-platform.pages.dev/platform/
 
 ---
 
@@ -97,3 +98,9 @@ This tool auto-generates PF's standard proposal document from a completed and ap
 4. Should helical pile alternates be calculated or always manually determined?
 5. How is the tax inclusion/exclusion decision made (state? project type? GC preference?)?
 6. Is the proposal ever customized beyond what the template provides (custom cover letters, etc.)?
+
+## 10. Implementation Notes
+
+- **Platform:** pf-platform.pages.dev/platform/
+- **Data Source:** SharePoint live sync (4 master files)
+- **Stage:** Alpha -- awaiting Brad/Jonathan review

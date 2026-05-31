@@ -1,8 +1,8 @@
 # Statement of Work: Bid & Estimate Generation Tool
 
 **Project:** Pier Foundations -- Bid & Estimate Generation Workflow
-**Version:** 1.1
-**Date:** May 30, 2026
+**Version:** 1.2
+**Date:** May 31, 2026
 **Prepared by:** Peter (AI COO)
 **Approved by:** _Pending Brad/Jonathan review_
 **Implementation Status:** v1.0 BUILT -- deployed to pf-platform.pages.dev/platform/
@@ -109,3 +109,9 @@ This tool digitizes and partially automates the Estimating SOP, providing a guid
 4. Are there project types that use a different estimate template or workflow?
 5. How is the "project days" calculation adjusted for weather or site constraints?
 6. What is the review meeting format -- in-person, Teams, or async review of the estimate file?
+
+## 10. Implementation Notes
+
+- **Platform:** pf-platform.pages.dev/platform/
+- **Data Source:** SharePoint live sync (4 master files)
+- **Stage:** Alpha -- awaiting Brad/Jonathan review

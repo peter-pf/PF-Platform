@@ -1,10 +1,11 @@
 # Statement of Work: Lead Generation & RFP/Bid Scanning Tool
 
 **Project:** Pier Foundations -- ConstructConnect Scanner & Bid Opportunity Alerts
-**Version:** 1.0
-**Date:** May 29, 2026
+**Version:** 1.2
+**Date:** May 31, 2026
 **Prepared by:** Peter (AI COO)
 **Approved by:** _Pending Brad/Jonathan review_
+**Implementation Status:** PENDING -- requires ConstructConnect subscription
 
 ---
 
@@ -100,3 +101,9 @@ This tool automates the scanning of ConstructConnect, INDOT, ODOT, MDOT, IDOT, a
 4. Should the tool also flag projects where ground improvement is NOT specified but soil conditions suggest it could be value-engineered?
 5. What is the minimum project size worth flagging?
 6. Are there specific GCs whose projects should always be flagged regardless of other criteria?
+
+## 10. Implementation Notes
+
+- **Platform:** pf-platform.pages.dev/platform/
+- **Data Source:** SharePoint live sync (4 master files)
+- **Stage:** Alpha -- awaiting Brad/Jonathan review

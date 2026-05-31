@@ -1,10 +1,11 @@
 # Statement of Work: Permitting & Inspections Tool
 
 **Project:** Pier Foundations -- Permitting & Inspection Tracking
-**Version:** 1.0
-**Date:** May 29, 2026
+**Version:** 1.2
+**Date:** May 31, 2026
 **Prepared by:** Peter (AI COO)
 **Approved by:** _Pending Brad/Jonathan review_
+**Implementation Status:** v1.0 BUILT -- deployed to pf-platform.pages.dev/platform/
 
 ---
 
@@ -92,3 +93,9 @@ This tool tracks permits by project, manages deadline alerts, schedules inspecti
 4. How long are 811 locates valid in Indiana? Other states?
 5. Are there any environmental permits required for VSC work (stormwater, erosion, etc.)?
 6. Does PF maintain any licenses or registrations that need renewal tracking?
+
+## 10. Implementation Notes
+
+- **Platform:** pf-platform.pages.dev/platform/
+- **Data Source:** SharePoint live sync (4 master files)
+- **Stage:** Alpha -- awaiting Brad/Jonathan review

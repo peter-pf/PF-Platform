@@ -1,10 +1,11 @@
 # Statement of Work: QuickBooks API Integration (Research & Specification)
 
 **Project:** Pier Foundations -- QuickBooks Financial Integration
-**Version:** 1.0
-**Date:** May 29, 2026
+**Version:** 1.2
+**Date:** May 31, 2026
 **Prepared by:** Peter (AI COO)
 **Approved by:** _Pending Brad/Jonathan review_
+**Implementation Status:** PENDING -- requires QuickBooks version confirmation + API credentials
 
 ---
 
@@ -113,3 +114,9 @@ This is a RESEARCH AND SPECIFICATION document. Before building any integration, 
 7. Who currently generates invoices to GCs -- Brad, Jonathan, or an accountant?
 8. Does PF have a bookkeeper or accountant who manages QuickBooks?
 9. What financial reports does Brad currently pull from QuickBooks regularly?
+
+## 10. Implementation Notes
+
+- **Platform:** pf-platform.pages.dev/platform/
+- **Data Source:** SharePoint live sync (4 master files)
+- **Stage:** Alpha -- awaiting Brad/Jonathan review

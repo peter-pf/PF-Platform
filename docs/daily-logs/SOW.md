@@ -1,10 +1,11 @@
 # Statement of Work: Daily Logs & Reporting Tool
 
 **Project:** Pier Foundations -- Daily Field Logs & Production Reporting
-**Version:** 1.0
-**Date:** May 29, 2026
+**Version:** 1.2
+**Date:** May 31, 2026
 **Prepared by:** Peter (AI COO)
 **Approved by:** _Pending Brad/Jonathan review_
+**Implementation Status:** v1.0 BUILT -- deployed to pf-platform.pages.dev/platform/
 
 ---
 
@@ -97,3 +98,9 @@ This tool provides a standardized daily field report with production data (colum
 4. What weather conditions cause a work stoppage (rain threshold, wind speed, temperature)?
 5. Who currently reviews daily production -- Jonathan, Brad, or both?
 6. Should daily logs include a section for material deliveries received on site?
+
+## 10. Implementation Notes
+
+- **Platform:** pf-platform.pages.dev/platform/
+- **Data Source:** SharePoint live sync (4 master files)
+- **Stage:** Alpha -- awaiting Brad/Jonathan review

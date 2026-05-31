@@ -1,10 +1,11 @@
 # Statement of Work: Change Order Management Tool
 
 **Project:** Pier Foundations -- Change Order Management
-**Version:** 1.0
-**Date:** May 29, 2026
+**Version:** 1.2
+**Date:** May 31, 2026
 **Prepared by:** Peter (AI COO)
 **Approved by:** _Pending Brad/Jonathan review_
+**Implementation Status:** v1.0 BUILT -- deployed to pf-platform.pages.dev/platform/
 
 ---
 
@@ -94,3 +95,9 @@ This tool provides a structured change order workflow from identification throug
 4. What contractual notification window does PF typically have for COs (48 hours? 7 days?)?
 5. What markup does PF apply to CO work (same as original bid, or different)?
 6. How often do COs get approved vs. disputed by GCs?
+
+## 10. Implementation Notes
+
+- **Platform:** pf-platform.pages.dev/platform/
+- **Data Source:** SharePoint live sync (4 master files)
+- **Stage:** Alpha -- awaiting Brad/Jonathan review

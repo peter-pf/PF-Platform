@@ -1,8 +1,8 @@
 # Statement of Work: Pipeline Management Tool
 
 **Project:** Pier Foundations -- Pipeline Management & Opportunity Tracking
-**Version:** 1.1
-**Date:** May 30, 2026
+**Version:** 1.2
+**Date:** May 31, 2026
 **Prepared by:** Peter (AI COO)
 **Approved by:** _Pending Brad/Jonathan review_
 **Implementation Status:** v1.0 BUILT -- deployed to pf-platform.pages.dev/platform/
@@ -98,3 +98,9 @@ This tool provides a unified pipeline from lead through completion, replacing ma
 3. What loss reasons should be tracked? (Price, schedule, scope, GC chose competitor, project canceled, etc.)
 4. How far back should historical bid data be imported for baseline metrics?
 5. Should Derek and Jonathan have different dashboard views tailored to their pipeline stages?
+
+## 10. Implementation Notes
+
+- **Platform:** pf-platform.pages.dev/platform/
+- **Data Source:** SharePoint live sync (4 master files)
+- **Stage:** Alpha -- awaiting Brad/Jonathan review

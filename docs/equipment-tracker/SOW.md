@@ -1,10 +1,11 @@
 # Statement of Work: Equipment & Fleet Tracking Tool
 
 **Project:** Pier Foundations -- Equipment & Fleet Tracker
-**Version:** 1.0
-**Date:** May 29, 2026
+**Version:** 1.2
+**Date:** May 31, 2026
 **Prepared by:** Peter (AI COO)
 **Approved by:** _Pending Brad/Jonathan review_
+**Implementation Status:** v1.0 BUILT -- deployed to pf-platform.pages.dev/platform/
 
 ---
 
@@ -101,3 +102,9 @@ This tool provides centralized equipment tracking with location, maintenance, ut
 4. Is there other equipment not mentioned in the SOPs (generators, compressors, etc.)?
 5. Who is responsible for updating equipment hours -- operators, Jonathan, or both?
 6. Does PF rent any equipment regularly that should be tracked alongside owned assets?
+
+## 10. Implementation Notes
+
+- **Platform:** pf-platform.pages.dev/platform/
+- **Data Source:** SharePoint live sync (4 master files)
+- **Stage:** Alpha -- awaiting Brad/Jonathan review

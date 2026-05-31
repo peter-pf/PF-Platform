@@ -1,8 +1,8 @@
 # Statement of Work: GUHMA Integration (Research & Specification)
 
 **Project:** Pier Foundations -- GUHMA Column Logging Integration
-**Version:** 1.1
-**Date:** May 30, 2026
+**Version:** 1.2
+**Date:** May 31, 2026
 **Prepared by:** Peter (AI COO)
 **Approved by:** _Pending Brad/Jonathan review_
 **Implementation Status:** v1.0 BUILT -- deployed to pf-platform.pages.dev/platform/
@@ -116,3 +116,9 @@ From the GUHMA Column Checking SOP, we know:
 6. How often do bucket counts need manual correction in the data files?
 7. Is there a tolerance for depth shortfall (e.g., within 6 inches is acceptable)?
 8. What pressure ranges indicate normal vs. abnormal column installation?
+
+## 10. Implementation Notes
+
+- **Platform:** pf-platform.pages.dev/platform/
+- **Data Source:** SharePoint live sync (4 master files)
+- **Stage:** Alpha -- awaiting Brad/Jonathan review

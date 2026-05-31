@@ -1,8 +1,8 @@
 # Statement of Work: Project Status Tracking Tool
 
 **Project:** Pier Foundations -- Project Status Dashboard
-**Version:** 1.1
-**Date:** May 30, 2026
+**Version:** 1.2
+**Date:** May 31, 2026
 **Prepared by:** Peter (AI COO)
 **Approved by:** _Pending Brad/Jonathan review_
 **Implementation Status:** v1.0 BUILT -- deployed to pf-platform.pages.dev/platform/
@@ -95,3 +95,9 @@ This tool provides a real-time project dashboard that automatically aggregates d
 4. Should the dashboard show financial data (margins, actual costs) or just schedule/production?
 5. How many projects does PF typically have active simultaneously?
 6. Should there be a view comparing performance across projects (benchmarking)?
+
+## 10. Implementation Notes
+
+- **Platform:** pf-platform.pages.dev/platform/
+- **Data Source:** SharePoint live sync (4 master files)
+- **Stage:** Alpha -- awaiting Brad/Jonathan review

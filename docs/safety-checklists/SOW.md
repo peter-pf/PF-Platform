@@ -1,10 +1,11 @@
 # Statement of Work: Safety Checklists Tool
 
 **Project:** Pier Foundations -- Safety Checklists & Compliance
-**Version:** 1.0
-**Date:** May 29, 2026
+**Version:** 1.2
+**Date:** May 31, 2026
 **Prepared by:** Peter (AI COO)
 **Approved by:** _Pending Brad/Jonathan review_
+**Implementation Status:** v1.0 BUILT -- deployed to pf-platform.pages.dev/platform/
 
 ---
 
@@ -93,3 +94,9 @@ This tool provides pre-shift safety checklists specific to VSC operations, equip
 4. Does PF have a safety manual or written safety program?
 5. Do GCs typically require PF-specific safety documentation at project start?
 6. Is there a designated safety officer, or is Brad the responsible party?
+
+## 10. Implementation Notes
+
+- **Platform:** pf-platform.pages.dev/platform/
+- **Data Source:** SharePoint live sync (4 master files)
+- **Stage:** Alpha -- awaiting Brad/Jonathan review

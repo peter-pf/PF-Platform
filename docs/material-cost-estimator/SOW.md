@@ -1,8 +1,8 @@
 # Statement of Work: Material Cost Estimation Tool
 
 **Project:** Pier Foundations -- Aggregate Material Cost Estimator
-**Version:** 1.1
-**Date:** May 30, 2026
+**Version:** 1.2
+**Date:** May 31, 2026
 **Prepared by:** Peter (AI COO)
 **Approved by:** _Pending Brad/Jonathan review_
 **Implementation Status:** v1.0 BUILT -- deployed to pf-platform.pages.dev/platform/
@@ -92,3 +92,9 @@ This tool provides a regional stone pricing database, supplier contact managemen
 3. Is there a minimum tonnage below which most quarries won't deliver?
 4. Does PF ever use stone other than #57 (different gradation for specific soil conditions)?
 5. How often do delivery rates change enough to require re-quoting?
+
+## 10. Implementation Notes
+
+- **Platform:** pf-platform.pages.dev/platform/
+- **Data Source:** SharePoint live sync (4 master files)
+- **Stage:** Alpha -- awaiting Brad/Jonathan review

@@ -1,10 +1,11 @@
 # Statement of Work: Subcontractor Coordination Tool
 
 **Project:** Pier Foundations -- Subcontractor Coordination & Vendor Management
-**Version:** 1.0
-**Date:** May 29, 2026
+**Version:** 1.2
+**Date:** May 31, 2026
 **Prepared by:** Peter (AI COO)
 **Approved by:** _Pending Brad/Jonathan review_
+**Implementation Status:** v1.0 BUILT -- deployed to pf-platform.pages.dev/platform/
 
 ---
 
@@ -88,3 +89,9 @@ This tool centralizes subcontractor contact information, tracks performance hist
 3. Do any vendors require advance booking (how far ahead)?
 4. Are there regional subs used only for certain states?
 5. Does PF track insurance certificates for subs currently?
+
+## 10. Implementation Notes
+
+- **Platform:** pf-platform.pages.dev/platform/
+- **Data Source:** SharePoint live sync (4 master files)
+- **Stage:** Alpha -- awaiting Brad/Jonathan review

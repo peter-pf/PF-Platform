@@ -1,10 +1,11 @@
 # Statement of Work: Punch List & Closeout Tool
 
 **Project:** Pier Foundations -- Punch List & Project Closeout
-**Version:** 1.0
-**Date:** May 29, 2026
+**Version:** 1.2
+**Date:** May 31, 2026
 **Prepared by:** Peter (AI COO)
 **Approved by:** _Pending Brad/Jonathan review_
+**Implementation Status:** v1.0 BUILT -- deployed to pf-platform.pages.dev/platform/
 
 ---
 
@@ -94,3 +95,9 @@ This tool provides an end-of-project workflow that tracks the assembly and deliv
 4. What format does the GC typically want closeout documents in (single PDF, USB, cloud link)?
 5. Is there a retention period for project documents (5 years? 10 years?)?
 6. Does Dr. Ed provide any closeout documentation beyond the approved shop drawings?
+
+## 10. Implementation Notes
+
+- **Platform:** pf-platform.pages.dev/platform/
+- **Data Source:** SharePoint live sync (4 master files)
+- **Stage:** Alpha -- awaiting Brad/Jonathan review
