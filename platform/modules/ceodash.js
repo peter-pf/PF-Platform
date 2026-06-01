@@ -61,7 +61,7 @@
 
   // ---- INLINE STYLE CONSTANTS ----
   var STAT_VALUE = 'font-size:0.88rem;font-weight:700;color:#000';
-  var STAT_LABEL = 'font-size:0.72rem;font-weight:500;text-transform:uppercase;letter-spacing:0.04em;color:#005A91';
+  var STAT_LABEL = 'font-size:0.72rem;font-weight:500;text-transform:uppercase;letter-spacing:0.04em;color:#005A91;margin-bottom:6px';
 
   // ---- RENDER ----
   var root = document.querySelector('#mod-ceodash #ceodash-app');

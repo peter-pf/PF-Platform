@@ -80,10 +80,10 @@
   // ---- STAT CARD BUILDER ----
   function statCard(label, value, extra) {
     var h = '<div class="stat-card">';
-    h += '<span style="font-size:0.72rem">' + label + '</span>';
-    h += '<span style="font-size:0.88rem;font-weight:600">' + value + '</span>';
+    h += '<div style="font-size:0.72rem;margin-bottom:6px">' + label + '</span>';
+    h += '<div style="font-size:0.88rem;font-weight:600">' + value + '</span>';
     if (extra) {
-      h += '<span style="font-size:0.72rem">' + extra + '</span>';
+      h += '<div style="font-size:0.72rem;margin-bottom:6px">' + extra + '</span>';
     }
     h += '</div>';
     return h;
@@ -94,8 +94,8 @@
     var w = Math.max(0, Math.min(safe(valuePct), 100));
     var h = '<div style="margin-top:12px">';
     h += '<div style="display:flex;justify-content:space-between;margin-bottom:4px">';
-    h += '<span style="font-size:0.72rem">' + label + '</span>';
-    h += '<span style="font-size:0.72rem">' + rightLabel + '</span>';
+    h += '<div style="font-size:0.72rem;margin-bottom:6px">' + label + '</span>';
+    h += '<div style="font-size:0.72rem;margin-bottom:6px">' + rightLabel + '</span>';
     h += '</div>';
     h += '<div class="progress-bar"><div class="progress-fill" style="width:' + w + '%"></div></div>';
     h += '</div>';
