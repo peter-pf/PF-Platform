@@ -81,7 +81,7 @@
   function statCard(label, value, extra) {
     var h = '<div class="stat-card">';
     h += '<span style="font-size:0.72rem">' + label + '</span>';
-    h += '<span style="font-size:1.1rem;font-weight:600">' + value + '</span>';
+    h += '<span style="font-size:0.88rem;font-weight:600">' + value + '</span>';
     if (extra) {
       h += '<span style="font-size:0.72rem">' + extra + '</span>';
     }

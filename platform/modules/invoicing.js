@@ -48,7 +48,7 @@
   function statCard(label, value, subtitle) {
     var h = '<div class="stat-card">';
     h += '<span style="font-size:0.72rem">' + label + '</span>';
-    h += '<span style="font-size:1.1rem;font-weight:700">' + value + '</span>';
+    h += '<span style="font-size:0.88rem;font-weight:700">' + value + '</span>';
     if (subtitle) {
       h += '<span style="font-size:0.72rem">' + subtitle + '</span>';
     }
@@ -103,7 +103,7 @@
     // DSO Target with progress bar
     html += '<div class="stat-card">';
     html += '<span style="font-size:0.72rem">DSO Target</span>';
-    html += '<span style="font-size:1.1rem;font-weight:700">' + targetDSO + ' days</span>';
+    html += '<span style="font-size:0.88rem;font-weight:700">' + targetDSO + ' days</span>';
     html += '<div class="progress-bar" style="margin-top:6px">';
     html += '<div class="progress-fill" style="width:' + dsoPct + '%;background:' + dsoColor + '"></div>';
     html += '</div>';
@@ -175,7 +175,7 @@
     buckets.forEach(function (b) {
       html += '<div class="stat-card">';
       html += '<span style="font-size:0.72rem">' + b.label + '</span>';
-      html += '<span style="font-size:1.1rem;font-weight:700">' + $(b.total) + '</span>';
+      html += '<span style="font-size:0.88rem;font-weight:700">' + $(b.total) + '</span>';
       html += '<span style="font-size:0.72rem">' + b.count + ' invoice' + (b.count !== 1 ? 's' : '') + '</span>';
       html += '</div>';
     });
