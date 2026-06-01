@@ -1,8 +1,8 @@
 # Software Requirements Specification: Pipeline Management Tool
 
 **Project:** Pier Foundations -- Pipeline Management & Opportunity Tracking
-**Version:** 1.2
-**Date:** May 31, 2026
+**Version:** 1.3
+**Date:** June 1, 2026
 **Prepared by:** Peter (AI COO)
 
 ---

@@ -1,8 +1,8 @@
 # Statement of Work: Bid & Estimate Generation Tool
 
 **Project:** Pier Foundations -- Bid & Estimate Generation Workflow
-**Version:** 1.2
-**Date:** May 31, 2026
+**Version:** 1.3
+**Date:** June 1, 2026
 **Prepared by:** Peter (AI COO)
 **Approved by:** _Pending Brad/Jonathan review_
 **Implementation Status:** v1.0 BUILT -- deployed to pf-platform.pages.dev/platform/
