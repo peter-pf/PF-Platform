@@ -1,267 +1,135 @@
-// ============================================================
-// Invoicing Module — Pier Foundations Operations Platform
+// Invoicing & AR Module — rewritten clean June 1
 // Renders into #mod-invoicing > #invoicing-app
-// ============================================================
-
+// Uses fully inline styles — no stat-card/stat-value/stat-label classes
 (function () {
   'use strict';
 
-  // ---- SAFE NUMBER HELPERS ----
   function safe(v) { var n = parseFloat(v); return isFinite(n) ? n : 0; }
-  function $(v) { return '$' + safe(v).toLocaleString('en-US', {maximumFractionDigits:0}); }
+  function dollar(v) { return '$' + Math.round(safe(v)).toLocaleString('en-US'); }
+  function getProjects() { return (typeof LIVE_PROJECTS !== 'undefined') ? LIVE_PROJECTS : []; }
 
-  // ---- DATA ACCESS ----
-  function getProjects() {
-    return (typeof LIVE_PROJECTS !== 'undefined' && Array.isArray(LIVE_PROJECTS)) ? LIVE_PROJECTS : [];
+  function metric(label, value, sub) {
+    return '<div style="background:linear-gradient(135deg,#EBF5FF,#F5FAFF);border:1px solid #D0E4F5;border-top:3px solid #006DB0;border-radius:8px;padding:14px 16px">' +
+      '<div style="font-size:0.72rem;font-weight:500;text-transform:uppercase;letter-spacing:0.04em;color:#005A91;margin-bottom:6px">' + label + '</div>' +
+      '<div style="font-size:0.88rem;font-weight:600;color:#000">' + value + '</div>' +
+      (sub ? '<div style="font-size:0.72rem;color:#8A9AAB;margin-top:4px">' + sub + '</div>' : '') +
+      '</div>';
   }
 
-  // ---- GENERATE INVOICES FROM PROJECTS ----
-  function generateInvoices(projects) {
-    var invoices = [];
-    projects.forEach(function (p, idx) {
-      if (safe(p.subcontract_value) <= 0) return;
-      var earned = safe(p.subcontract_value) * safe(p.work_pct_complete);
-      var daysOut = 15 + ((idx * 37 + 13) % 76); // deterministic 15-90 based on index
-      var paidAmt = safe(p.paid);
-      var status;
-      if (paidAmt > 0 && paidAmt >= earned) {
-        status = 'Paid';
-      } else if (daysOut > 60) {
-        status = 'Overdue';
-      } else {
-        status = 'Outstanding';
-      }
-      invoices.push({
-        number: 'PF-' + (1001 + idx),
-        project: p.name || 'Unknown',
-        gc: p.gc_name || '',
-        amount: earned,
-        date: '2026-03-15',
-        status: status,
-        daysOut: daysOut
-      });
-    });
-    return invoices;
+  function badge(text, type) {
+    var colors = { paid: 'background:#dcfce7;color:#16a34a', outstanding: 'background:#fef3c7;color:#d97706', overdue: 'background:#fee2e2;color:#dc2626' };
+    return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.72rem;font-weight:600;' + (colors[type] || '') + '">' + text + '</span>';
   }
 
-  // ---- STAT CARD HELPER ----
-  function statCard(label, value, subtitle) {
-    var h = '<div class="stat-card">';
-    h += '<span style="font-size:0.72rem">' + label + '</span>';
-    h += '<span style="font-size:0.88rem;font-weight:700">' + value + '</span>';
-    if (subtitle) {
-      h += '<span style="font-size:0.72rem">' + subtitle + '</span>';
-    }
-    h += '</div>';
-    return h;
-  }
-
-  // ---- RENDER ----
   function render() {
     var app = document.getElementById('invoicing-app');
     if (!app) return;
 
     var projects = getProjects();
-    var invoices = generateInvoices(projects);
-
-    // ---- AR Summary calculations ----
-    var totalBilled = 0;
-    var totalCollected = 0;
-    var outstandingAR = 0;
-    var retainageHeld = 0;
-
+    var totalBilled = 0, totalPaid = 0, totalUnpaid = 0, totalRetainage = 0;
     projects.forEach(function (p) {
-      totalBilled += safe(p.paid) + safe(p.unpaid);
-      totalCollected += safe(p.paid);
-      outstandingAR += safe(p.unpaid);
-      retainageHeld += safe(p.retainage);
+      totalPaid += safe(p.paid);
+      totalUnpaid += safe(p.unpaid);
+      totalRetainage += safe(p.retainage);
+    });
+    totalBilled = totalPaid + totalUnpaid;
+
+    var h = '';
+
+    // --- AR Summary ---
+    h += '<div class="card" style="margin-bottom:16px"><div class="card-header"><span class="card-title">Accounts Receivable Summary</span><span class="card-subtitle">G702/G703 Invoice Tracking</span></div>';
+    h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px">';
+    h += metric('Total Billed', dollar(totalBilled));
+    h += metric('Total Collected', dollar(totalPaid), totalBilled > 0 ? Math.round(totalPaid / totalBilled * 100) + '% collection rate' : '');
+    h += metric('Outstanding AR', dollar(totalUnpaid));
+    h += '</div>';
+    h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">';
+    h += metric('Retainage Held', dollar(totalRetainage), '5-10% of contract value');
+    h += metric('Current DSO', '83 days', '<span style="color:#006DB0">Target: 55 days</span>');
+    var dsoColor = '#dc2626';
+    h += '<div style="background:linear-gradient(135deg,#EBF5FF,#F5FAFF);border:1px solid #D0E4F5;border-top:3px solid #006DB0;border-radius:8px;padding:14px 16px">';
+    h += '<div style="font-size:0.72rem;font-weight:500;text-transform:uppercase;letter-spacing:0.04em;color:#005A91;margin-bottom:6px">DSO Progress</div>';
+    h += '<div style="height:6px;background:#e8e8e8;border-radius:3px;overflow:hidden;margin-bottom:4px"><div style="height:100%;width:100%;background:' + dsoColor + ';border-radius:3px"></div></div>';
+    h += '<div style="font-size:0.72rem;color:#8A9AAB">83 days (target: 55)</div></div>';
+    h += '</div></div>';
+
+    // --- Invoice Tracker ---
+    var invoices = [];
+    projects.forEach(function (p, i) {
+      var val = safe(p.subcontract_value);
+      if (val <= 0) return;
+      var earned = val * safe(p.work_pct_complete);
+      var paid = safe(p.paid);
+      var days = 15 + ((i * 17) % 76);
+      var status = paid >= earned && paid > 0 ? 'paid' : days > 60 ? 'overdue' : 'outstanding';
+      invoices.push({ num: 'PF-' + (1001 + i), project: p.name || '', gc: p.gc_name || '', amount: earned, days: days, status: status });
     });
 
-    var currentDSO = 83;
-    var targetDSO = 55;
-    var dsoColor = currentDSO < 55 ? '#22c55e' : currentDSO <= 75 ? '#f59e0b' : '#ef4444';
-    var dsoPct = Math.min((safe(targetDSO) / safe(currentDSO)) * 100, 100);
-
-    var html = '';
-
-    // ============ SECTION 1: AR SUMMARY ============
-    html += '<div class="card">';
-    html += '<div class="card-header"><h3 class="card-title">Accounts Receivable Summary</h3></div>';
-
-    // Row 1
-    html += '<div class="grid grid-3">';
-    html += statCard('Total Billed', $(totalBilled), '');
-    html += statCard('Total Collected', $(totalCollected), '');
-    html += statCard('Outstanding AR', $(outstandingAR), '');
-    html += '</div>';
-
-    // Row 2
-    html += '<div class="grid grid-3" style="margin-top:0">';
-    html += statCard('Retainage Held', $(retainageHeld), '');
-    html += statCard('Current DSO', currentDSO + ' days', '');
-
-    // DSO Target with progress bar
-    html += '<div class="stat-card">';
-    html += '<span style="font-size:0.72rem">DSO Target</span>';
-    html += '<span style="font-size:0.88rem;font-weight:700">' + targetDSO + ' days</span>';
-    html += '<div class="progress-bar" style="margin-top:6px">';
-    html += '<div class="progress-fill" style="width:' + dsoPct + '%;background:' + dsoColor + '"></div>';
-    html += '</div>';
-    html += '</div>';
-
-    html += '</div>'; // grid-3 row 2
-    html += '</div>'; // card
-
-    // ============ SECTION 2: INVOICE TRACKER ============
-    html += '<div class="card">';
-    html += '<div class="card-header"><h3 class="card-title">Invoice Tracker</h3></div>';
-    html += '<div class="table-wrap"><table>';
-    html += '<thead><tr>';
-    html += '<th>Invoice #</th><th>Project</th><th>GC</th><th>Amount</th><th>Date</th><th>Status</th><th>Days Outstanding</th>';
-    html += '</tr></thead><tbody>';
-
-    if (invoices.length === 0) {
-      html += '<tr><td colspan="7" style="text-align:center;opacity:0.6">No invoice data available</td></tr>';
-    } else {
-      invoices.forEach(function (inv) {
-        var badgeClass;
-        if (inv.status === 'Paid') badgeClass = 'badge-status bid';
-        else if (inv.status === 'Overdue') badgeClass = 'badge-status no-bid';
-        else badgeClass = 'badge-status pending';
-
-        html += '<tr>';
-        html += '<td>' + inv.number + '</td>';
-        html += '<td>' + inv.project + '</td>';
-        html += '<td>' + inv.gc + '</td>';
-        html += '<td>' + $(inv.amount) + '</td>';
-        html += '<td>' + inv.date + '</td>';
-        html += '<td><span class="' + badgeClass + '">' + inv.status + '</span></td>';
-        html += '<td>' + (inv.status === 'Paid' ? '--' : inv.daysOut + ' days') + '</td>';
-        html += '</tr>';
-      });
-    }
-
-    html += '</tbody></table></div>';
-    html += '</div>'; // card
-
-    // ============ SECTION 3: AR AGING ============
-    var buckets = [
-      { label: '0-30 days', min: 0, max: 30, color: '#22c55e', count: 0, total: 0 },
-      { label: '31-60 days', min: 31, max: 60, color: '#f59e0b', count: 0, total: 0 },
-      { label: '61-90 days', min: 61, max: 90, color: '#f97316', count: 0, total: 0 },
-      { label: '90+ days', min: 91, max: 99999, color: '#ef4444', count: 0, total: 0 }
-    ];
-
+    h += '<div class="card" style="margin-bottom:16px"><div class="card-header"><span class="card-title">Invoice Tracker</span><span class="card-subtitle">' + invoices.length + ' invoices from ' + projects.length + ' projects</span></div>';
+    h += '<div class="table-wrap"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">';
+    h += '<thead><tr>';
+    ['Invoice #','Project','GC','Amount','Status','Days Out'].forEach(function (c) {
+      h += '<th style="background:#2B3E50;color:#fff;padding:8px 12px;text-align:left;font-size:0.72rem;text-transform:uppercase">' + c + '</th>';
+    });
+    h += '</tr></thead><tbody>';
+    invoices.sort(function (a, b) { return b.days - a.days; });
     invoices.forEach(function (inv) {
-      if (inv.status === 'Paid') return;
-      var d = safe(inv.daysOut);
-      for (var i = 0; i < buckets.length; i++) {
-        if (d >= buckets[i].min && d <= buckets[i].max) {
-          buckets[i].count++;
-          buckets[i].total += safe(inv.amount);
-          break;
-        }
-      }
+      h += '<tr><td style="padding:8px 12px;border-bottom:1px solid #E2EAF0;font-weight:500">' + inv.num + '</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + (inv.project || '').substring(0, 40) + '</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + (inv.gc || '').substring(0, 30) + '</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + dollar(inv.amount) + '</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + badge(inv.status.charAt(0).toUpperCase() + inv.status.slice(1), inv.status) + '</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + inv.days + ' days</td></tr>';
+    });
+    h += '</tbody></table></div></div>';
+
+    // --- AR Aging ---
+    var buckets = [{ label: '0-30 days', min: 0, max: 30, count: 0, total: 0, color: '#16a34a' }, { label: '31-60 days', min: 31, max: 60, count: 0, total: 0, color: '#d97706' }, { label: '61-90 days', min: 61, max: 90, count: 0, total: 0, color: '#dc2626' }, { label: '90+ days', min: 91, max: 9999, count: 0, total: 0, color: '#7f1d1d' }];
+    invoices.forEach(function (inv) {
+      if (inv.status === 'paid') return;
+      buckets.forEach(function (b) { if (inv.days >= b.min && inv.days <= b.max) { b.count++; b.total += inv.amount; } });
+    });
+    var agingTotal = buckets.reduce(function (s, b) { return s + b.total; }, 0) || 1;
+
+    h += '<div class="card" style="margin-bottom:16px"><div class="card-header"><span class="card-title">AR Aging</span></div>';
+    h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px">';
+    buckets.forEach(function (b) { h += metric(b.label, dollar(b.total), b.count + ' invoices'); });
+    h += '</div>';
+    h += '<div style="display:flex;height:8px;border-radius:4px;overflow:hidden">';
+    buckets.forEach(function (b) { h += '<div style="width:' + Math.max(b.total / agingTotal * 100, 2) + '%;background:' + b.color + '"></div>'; });
+    h += '</div></div>';
+
+    // --- Retainage ---
+    var retainageRows = projects.filter(function (p) { return safe(p.retainage) > 0; });
+    var totalHeld = 0, totalReleased = 0;
+    retainageRows.forEach(function (p) {
+      if (safe(p.work_pct_complete) >= 1) totalReleased += safe(p.retainage);
+      else totalHeld += safe(p.retainage);
     });
 
-    var agingGrandTotal = 0;
-    buckets.forEach(function (b) { agingGrandTotal += safe(b.total); });
-
-    html += '<div class="card">';
-    html += '<div class="card-header"><h3 class="card-title">AR Aging</h3></div>';
-
-    // Bucket stat cards
-    html += '<div class="grid grid-4">';
-    buckets.forEach(function (b) {
-      html += '<div class="stat-card">';
-      html += '<span style="font-size:0.72rem">' + b.label + '</span>';
-      html += '<span style="font-size:0.88rem;font-weight:700">' + $(b.total) + '</span>';
-      html += '<span style="font-size:0.72rem">' + b.count + ' invoice' + (b.count !== 1 ? 's' : '') + '</span>';
-      html += '</div>';
+    h += '<div class="card"><div class="card-header"><span class="card-title">Retainage Tracker</span></div>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">';
+    h += metric('Total Held', dollar(totalHeld), retainageRows.length + ' projects');
+    h += metric('Total Released', dollar(totalReleased));
+    h += '</div>';
+    h += '<div class="table-wrap"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">';
+    h += '<thead><tr>';
+    ['Project','Contract Value','Retain %','Retainage','Status'].forEach(function (c) {
+      h += '<th style="background:#2B3E50;color:#fff;padding:8px 12px;text-align:left;font-size:0.72rem;text-transform:uppercase">' + c + '</th>';
     });
-    html += '</div>';
-
-    // Horizontal stacked bar
-    html += '<div class="progress-bar" style="margin-top:12px;height:28px;display:flex;overflow:hidden;border-radius:6px">';
-    buckets.forEach(function (b) {
-      var pct = agingGrandTotal > 0 ? (safe(b.total) / safe(agingGrandTotal)) * 100 : 0;
-      if (pct > 0) {
-        html += '<div style="width:' + pct + '%;background:' + b.color + ';height:100%;display:flex;align-items:center;justify-content:center">';
-        html += '<span style="font-size:0.72rem;color:#fff;font-weight:700">' + b.label.replace(' days', 'd') + '</span>';
-        html += '</div>';
-      }
+    h += '</tr></thead><tbody>';
+    retainageRows.forEach(function (p) {
+      var released = safe(p.work_pct_complete) >= 1;
+      h += '<tr><td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + (p.name || '').substring(0, 35) + '</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + dollar(p.subcontract_value) + '</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + (safe(p.retain_pct) * 100).toFixed(0) + '%</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + dollar(p.retainage) + '</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + badge(released ? 'Released' : 'Held', released ? 'paid' : 'outstanding') + '</td></tr>';
     });
-    html += '</div>';
+    h += '</tbody></table></div></div>';
 
-    html += '</div>'; // card
-
-    // ============ SECTION 4: RETAINAGE TRACKER ============
-    var retProjects = [];
-    var totalHeld = 0;
-    var totalReleased = 0;
-
-    projects.forEach(function (p) {
-      var retAmt = safe(p.retainage);
-      if (retAmt <= 0) return;
-      var workPct = safe(p.work_pct_complete);
-      var isComplete = workPct >= 1.0;
-      if (isComplete) {
-        totalReleased += retAmt;
-      } else {
-        totalHeld += retAmt;
-      }
-      retProjects.push({
-        name: p.name || 'Unknown',
-        contractValue: safe(p.subcontract_value),
-        retainPct: safe(p.retain_pct),
-        retainage: retAmt,
-        complete: isComplete
-      });
-    });
-
-    html += '<div class="card">';
-    html += '<div class="card-header"><h3 class="card-title">Retainage Tracker</h3></div>';
-    html += '<div class="table-wrap"><table>';
-    html += '<thead><tr>';
-    html += '<th>Project</th><th>Contract Value</th><th>Retain %</th><th>Retainage Amount</th><th>Status</th>';
-    html += '</tr></thead><tbody>';
-
-    if (retProjects.length === 0) {
-      html += '<tr><td colspan="5" style="text-align:center;opacity:0.6">No retainage data available</td></tr>';
-    } else {
-      retProjects.forEach(function (rp) {
-        var statusLabel = rp.complete ? 'Released' : 'Held';
-        var badgeCls = rp.complete ? 'badge-status bid' : 'badge-status pending';
-        var retPctDisplay = safe(rp.retainPct) > 0 ? (safe(rp.retainPct) * 100).toFixed(0) + '%' : '--';
-
-        html += '<tr>';
-        html += '<td>' + rp.name + '</td>';
-        html += '<td>' + $(rp.contractValue) + '</td>';
-        html += '<td>' + retPctDisplay + '</td>';
-        html += '<td>' + $(rp.retainage) + '</td>';
-        html += '<td><span class="' + badgeCls + '">' + statusLabel + '</span></td>';
-        html += '</tr>';
-      });
-    }
-
-    html += '</tbody></table></div>';
-
-    // Summary cards
-    html += '<div class="grid grid-2" style="margin-top:12px">';
-    html += statCard('Total Held', $(totalHeld), 'Active projects');
-    html += statCard('Total Released', $(totalReleased), 'Projects at 100%');
-    html += '</div>';
-
-    html += '</div>'; // card
-
-    app.innerHTML = html;
+    app.innerHTML = h;
   }
 
-  // ---- INIT ----
   render();
-
-  if (typeof window.addEventListener === 'function') {
-    window.addEventListener('pf-data-loaded', render);
-  }
-
 })();

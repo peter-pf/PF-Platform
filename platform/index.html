@@ -8663,6 +8663,9 @@ renderDashboard();
 
 
 
+
+
+
 <script>
 // ---- MODULE: ceodash ----
 // ============================================================
@@ -8926,503 +8929,277 @@ renderDashboard();
 </script>
 <script>
 // ---- MODULE: budgeting ----
-// ============================================================
-// Budgeting & Forecasting Module — Pier Foundations Operations Platform
+// Budgeting & Forecasting Module — rewritten clean June 1
 // Renders into #mod-budgeting > #budgeting-app
-// ============================================================
-
+// Uses inline CSS grid (not class-based) to avoid stat-card/stat-value conflicts
 (function () {
   'use strict';
 
-  // ---- SAFE NUMBER FORMATTER ----
-  function safe(v) { var n = parseFloat(v); return isFinite(n) ? n : 0; }
-
-  // ---- CONSTANTS ----
   var FY26_TARGET = 6000000;
+  var FY_START_MONTH = 9;
   var FY_START_YEAR = 2025;
-  var FY_START_MONTH = 9; // October is month index 9
-  var CONTRIBUTION_MARGIN = 0.17;
-  var WORKING_DAYS_YR = 200;
-  var AVG_PROJECT_VALUE = 166000;
-  var AVG_PROJECT_DAYS = 18;
-
-  var FIXED_COSTS = [
-    { name: 'SBA Debt Service',       monthly: 12398, annual: 148776, pct: 35.2 },
-    { name: 'Insurance',              monthly: 9300,  annual: 111600, pct: 26.4 },
-    { name: 'Yard Lease',             monthly: 2500,  annual: 30000,  pct: 7.1  },
-    { name: 'Trucks',                 monthly: 2000,  annual: 24000,  pct: 5.7  },
-    { name: 'Admin / Office',         monthly: 2000,  annual: 24000,  pct: 5.7  },
-    { name: 'Equipment Depreciation', monthly: 7000,  annual: 84000,  pct: 19.9 }
+  var FIXED = [
+    { name: 'SBA Debt Service', monthly: 12398 },
+    { name: 'Insurance', monthly: 9300 },
+    { name: 'Yard Lease', monthly: 2500 },
+    { name: 'Trucks', monthly: 2000 },
+    { name: 'Admin / Office', monthly: 2000 },
+    { name: 'Equipment Depreciation', monthly: 7000 }
   ];
+  var MARGIN = 0.17;
 
-  var FIXED_MONTHLY = 35198;
-  var FIXED_ANNUAL = 422376;
-  var BREAK_EVEN = 2484565;
-  var BREAK_EVEN_MONTHLY = 207047;
+  function safe(v) { var n = parseFloat(v); return isFinite(n) ? n : 0; }
+  function dollar(v) { return '$' + Math.round(safe(v)).toLocaleString('en-US'); }
+  function pct(v) { return Math.round(safe(v)) + '%'; }
+  function getBids() { return (typeof LIVE_BIDS !== 'undefined') ? LIVE_BIDS : []; }
 
-  var CAPACITY_TABLE = [
-    { rigs: 1, maxDays: 200, maxProjects: 11, maxRev: 1830000, at85: 1556000, at70: 1281000 },
-    { rigs: 2, maxDays: 400, maxProjects: 22, maxRev: 3660000, at85: 3111000, at70: 2562000 },
-    { rigs: 3, maxDays: 600, maxProjects: 33, maxRev: 5490000, at85: 4667000, at70: 3843000 }
-  ];
-
-  // ---- DATA ACCESS ----
-  function getBids() {
-    return (typeof LIVE_BIDS !== 'undefined' && Array.isArray(LIVE_BIDS)) ? LIVE_BIDS : [];
-  }
-
-  // ---- FORMATTING ----
-  function dollar(n) {
-    n = safe(n);
-    return '$' + Math.round(n).toLocaleString();
-  }
-
-  function pct(n) {
-    return safe(n).toFixed(1) + '%';
-  }
-
-  function pctInt(n) {
-    return Math.round(safe(n)) + '%';
-  }
-
-  // ---- CALCULATIONS ----
   function monthsElapsed() {
     var now = new Date();
-    var months = (now.getFullYear() - FY_START_YEAR) * 12 + (now.getMonth() - FY_START_MONTH);
-    months += now.getDate() / 30;
-    return Math.max(safe(months), 0.5);
+    var m = (now.getFullYear() - FY_START_YEAR) * 12 + (now.getMonth() - FY_START_MONTH) + now.getDate() / 30;
+    return Math.max(m, 0.5);
   }
 
-  function calcAwardedYTD() {
-    var bids = getBids();
-    var total = 0;
-    for (var i = 0; i < bids.length; i++) {
-      var b = bids[i];
-      if (b.bid_status === 'Awarded' || b.bid_status === 'Completed') {
-        total += safe(b.bid_value);
-      }
-    }
-    return total;
+  function fixedMonthly() {
+    return FIXED.reduce(function (s, f) { return s + f.monthly; }, 0);
   }
 
-  // ---- STAT CARD BUILDER ----
-  function statCard(label, value, extra) {
-    var h = '<div class="stat-card">';
-    h += '<div style="font-size:0.72rem;margin-bottom:6px">' + label + '</span>';
-    h += '<div style="font-size:0.88rem;font-weight:600">' + value + '</span>';
-    if (extra) {
-      h += '<div style="font-size:0.72rem;margin-bottom:6px">' + extra + '</span>';
-    }
-    h += '</div>';
-    return h;
+  // Each metric gets its own card div with all styles inline — no shared CSS classes
+  function metric(label, value, sub) {
+    return '<div style="background:linear-gradient(135deg,#EBF5FF,#F5FAFF);border:1px solid #D0E4F5;border-top:3px solid #006DB0;border-radius:8px;padding:14px 16px">' +
+      '<div style="font-size:0.72rem;font-weight:500;text-transform:uppercase;letter-spacing:0.04em;color:#005A91;margin-bottom:6px">' + label + '</div>' +
+      '<div style="font-size:0.88rem;font-weight:600;color:#000">' + value + '</div>' +
+      (sub ? '<div style="font-size:0.72rem;color:#8A9AAB;margin-top:4px">' + sub + '</div>' : '') +
+      '</div>';
   }
 
-  // ---- PROGRESS BAR BUILDER ----
-  function progressBar(label, valuePct, rightLabel) {
-    var w = Math.max(0, Math.min(safe(valuePct), 100));
-    var h = '<div style="margin-top:12px">';
-    h += '<div style="display:flex;justify-content:space-between;margin-bottom:4px">';
-    h += '<div style="font-size:0.72rem;margin-bottom:6px">' + label + '</span>';
-    h += '<div style="font-size:0.72rem;margin-bottom:6px">' + rightLabel + '</span>';
-    h += '</div>';
-    h += '<div class="progress-bar"><div class="progress-fill" style="width:' + w + '%"></div></div>';
-    h += '</div>';
-    return h;
+  function bar(label, val, sub) {
+    var c = val > 60 ? '#16a34a' : val > 30 ? '#d97706' : '#dc2626';
+    return '<div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:4px"><span>' + label + '</span><span>' + (sub || (val + '%')) + '</span></div>' +
+      '<div style="height:6px;background:#e8e8e8;border-radius:3px;overflow:hidden"><div style="height:100%;width:' + Math.min(val, 100) + '%;background:' + c + ';border-radius:3px"></div></div></div>';
   }
 
-  // ---- MAIN RENDER ----
   function render() {
     var app = document.getElementById('budgeting-app');
     if (!app) return;
 
-    var awardedYTD = calcAwardedYTD();
-    var elapsed = monthsElapsed();
-    var runRate = safe((awardedYTD / elapsed) * 12);
-    var gap = safe(FY26_TARGET - runRate);
-    var revenuePacePct = safe((awardedYTD / FY26_TARGET) * 100);
-    var fyElapsedPct = safe((elapsed / 12) * 100);
+    var bids = getBids();
+    var awarded = bids.filter(function (b) { return b.bid_status === 'Awarded' || b.bid_status === 'Completed'; });
+    var awardedTotal = awarded.reduce(function (s, b) { return s + safe(b.bid_value); }, 0);
+    var months = monthsElapsed();
+    var runRate = (awardedTotal / months) * 12;
+    var gap = FY26_TARGET - runRate;
+    var pacePct = Math.round((awardedTotal / FY26_TARGET) * 100);
+    var fm = fixedMonthly();
+    var fa = fm * 12;
+    var breakEven = Math.round(fa / MARGIN);
+    var h = '';
 
-    var html = '';
+    // Revenue Forecast
+    h += '<div class="card" style="margin-bottom:16px"><div class="card-header"><span class="card-title">Revenue Forecast</span><span class="card-subtitle">FY26 (Oct 2025 - Sep 2026)</span></div>';
+    h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">';
+    h += metric('FY26 Target', dollar(FY26_TARGET));
+    h += metric('Awarded YTD', dollar(awardedTotal), awarded.length + ' projects');
+    h += metric('Run Rate', dollar(runRate), pct(runRate / FY26_TARGET * 100) + ' of target');
+    h += metric('Gap to Target', dollar(Math.abs(gap)), gap > 0 ? '<span style="color:#e74c3c">Behind</span>' : '<span style="color:#27ae60">Ahead</span>');
+    h += '</div>';
+    h += '<div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:16px">';
+    h += bar('Revenue Pace', pacePct);
+    h += bar('FY Elapsed', Math.round(months / 12 * 100), months.toFixed(1) + ' / 12 months');
+    h += '</div></div>';
 
-    // ============ SECTION 1: REVENUE FORECAST ============
-    html += '<div class="card">';
-    html += '<div class="card-header"><h3 class="card-title">Revenue Forecast</h3></div>';
+    // Break-Even
+    h += '<div class="card" style="margin-bottom:16px"><div class="card-header"><span class="card-title">Break-Even Analysis</span><span class="card-subtitle">Fixed costs vs. contribution margin</span></div>';
+    h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">';
+    h += metric('Fixed Costs (Monthly)', dollar(fm), dollar(fa) + '/year');
+    h += metric('Contribution Margin', '17%', 'Revenue minus variable costs');
+    h += metric('Break-Even Revenue', dollar(breakEven), dollar(Math.round(breakEven / 12)) + '/month');
+    h += '</div>';
+    h += '<div class="table-wrap" style="margin-top:12px"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">';
+    h += '<thead><tr>';
+    ['Expense','Monthly','Annual','% of Fixed'].forEach(function (c) { h += '<th style="background:#2B3E50;color:#fff;padding:8px 12px;text-align:left;font-size:0.72rem;text-transform:uppercase">' + c + '</th>'; });
+    h += '</tr></thead><tbody>';
+    FIXED.forEach(function (f) {
+      h += '<tr><td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + f.name + '</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + dollar(f.monthly) + '</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + dollar(f.monthly * 12) + '</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + pct(f.monthly / fm * 100) + '</td></tr>';
+    });
+    h += '</tbody></table></div></div>';
 
-    html += '<div class="grid grid-4">';
-    html += statCard('FY26 Target', dollar(FY26_TARGET));
-    html += statCard('Awarded YTD', dollar(awardedYTD));
-    html += statCard('Run Rate', dollar(runRate));
+    // Capacity
+    h += '<div class="card" style="margin-bottom:16px"><div class="card-header"><span class="card-title">Capacity Model</span><span class="card-subtitle">200 working days/year, $166K avg, 18-day avg</span></div>';
+    h += '<div class="table-wrap"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">';
+    h += '<thead><tr>';
+    ['Rigs','Max Days','Max Projects','Max Revenue','At 85%','At 70%'].forEach(function (c) { h += '<th style="background:#2B3E50;color:#fff;padding:8px 12px;text-align:left;font-size:0.72rem;text-transform:uppercase">' + c + '</th>'; });
+    h += '</tr></thead><tbody>';
+    [1,2,3].forEach(function (r) {
+      var days = r * 200, proj = Math.floor(days / 18), rev = proj * 166000;
+      h += '<tr><td style="padding:8px 12px;border-bottom:1px solid #E2EAF0;font-weight:600">' + r + '</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + days + '</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + proj + '</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + dollar(rev) + '</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + dollar(rev * 0.85) + '</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + dollar(rev * 0.70) + '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+    h += '<div style="font-size:0.75rem;color:#8A9AAB;margin-top:8px">Note: $6M target requires 3 rigs at 85%+ utilization or larger average project size.</div></div>';
 
-    if (gap > 0) {
-      html += statCard('Gap to Target', dollar(gap), '<span style="font-size:0.72rem;color:#e74c3c">Behind</span>');
-    } else {
-      html += statCard('Gap to Target', dollar(Math.abs(gap)), '<span style="font-size:0.72rem;color:#27ae60">Ahead</span>');
-    }
-    html += '</div>';
+    // Cash Flow
+    var monthlyRev = awardedTotal > 0 ? Math.round(runRate / 12) : 0;
+    var monthlyVar = Math.round(monthlyRev * 0.83);
+    var monthlyNet = monthlyRev - fm - monthlyVar;
+    h += '<div class="card"><div class="card-header"><span class="card-title">Monthly Cash Flow Summary</span></div>';
+    h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">';
+    h += metric('Monthly Revenue', dollar(monthlyRev), 'Based on run rate');
+    h += metric('Fixed Costs', dollar(fm), 'Monthly fixed');
+    h += metric('Variable Costs', dollar(monthlyVar), '83% of revenue');
+    h += metric('Net Monthly', dollar(monthlyNet), monthlyNet >= 0 ? '<span style="color:#27ae60">Positive</span>' : '<span style="color:#e74c3c">Negative</span>');
+    h += '</div></div>';
 
-    html += progressBar('Revenue Pace', revenuePacePct, pctInt(revenuePacePct));
-    html += progressBar('FY Elapsed', fyElapsedPct, safe(elapsed).toFixed(1) + ' / 12 months');
-
-    html += '</div>';
-
-    // ============ SECTION 2: BREAK-EVEN ANALYSIS ============
-    html += '<div class="card">';
-    html += '<div class="card-header"><h3 class="card-title">Break-Even Analysis</h3></div>';
-
-    html += '<div class="grid grid-3">';
-    html += statCard('Fixed Costs (Monthly)', dollar(FIXED_MONTHLY), dollar(FIXED_ANNUAL) + '/year');
-    html += statCard('Contribution Margin', pctInt(safe(CONTRIBUTION_MARGIN * 100)));
-    html += statCard('Break-Even Revenue', dollar(BREAK_EVEN), dollar(BREAK_EVEN_MONTHLY) + '/month');
-    html += '</div>';
-
-    html += '<div class="table-wrap"><table>';
-    html += '<thead><tr><th>Expense</th><th>Monthly</th><th>Annual</th><th>% of Fixed</th></tr></thead>';
-    html += '<tbody>';
-    for (var i = 0; i < FIXED_COSTS.length; i++) {
-      var c = FIXED_COSTS[i];
-      html += '<tr>';
-      html += '<td>' + c.name + '</td>';
-      html += '<td>' + dollar(safe(c.monthly)) + '</td>';
-      html += '<td>' + dollar(safe(c.annual)) + '</td>';
-      html += '<td>' + safe(c.pct).toFixed(1) + '%</td>';
-      html += '</tr>';
-    }
-    html += '</tbody></table></div>';
-
-    html += '</div>';
-
-    // ============ SECTION 3: CAPACITY MODEL ============
-    html += '<div class="card">';
-    html += '<div class="card-header"><h3 class="card-title">Capacity Model</h3></div>';
-
-    html += '<div class="table-wrap"><table>';
-    html += '<thead><tr>';
-    html += '<th>Rigs</th><th>Max Days/Year</th><th>Max Projects</th>';
-    html += '<th>Max Revenue</th><th>At 85% Util</th><th>At 70% Util</th>';
-    html += '</tr></thead>';
-    html += '<tbody>';
-    for (var j = 0; j < CAPACITY_TABLE.length; j++) {
-      var r = CAPACITY_TABLE[j];
-      html += '<tr>';
-      html += '<td>' + safe(r.rigs) + '</td>';
-      html += '<td>' + safe(r.maxDays) + '</td>';
-      html += '<td>' + safe(r.maxProjects) + '</td>';
-      html += '<td>' + dollar(safe(r.maxRev)) + '</td>';
-      html += '<td>' + dollar(safe(r.at85)) + '</td>';
-      html += '<td>' + dollar(safe(r.at70)) + '</td>';
-      html += '</tr>';
-    }
-    html += '</tbody></table></div>';
-
-    html += '<p style="font-size:0.72rem;margin-top:8px;opacity:0.7">';
-    html += 'Based on ' + safe(WORKING_DAYS_YR) + ' working days/year, ';
-    html += dollar(safe(AVG_PROJECT_VALUE)) + ' avg project, ';
-    html += safe(AVG_PROJECT_DAYS) + '-day avg duration. ';
-    html += 'Note: No single configuration at current averages reaches the $6M target at realistic utilization.';
-    html += '</p>';
-
-    html += '</div>';
-
-    // ============ SECTION 4: CASH FLOW TEMPLATE ============
-    html += '<div class="card">';
-    html += '<div class="card-header"><h3 class="card-title">Cash Flow Template</h3></div>';
-
-    var monthlyInflow = safe(awardedYTD / 12);
-    var monthlyVariable = safe(monthlyInflow * 0.83);
-    var netMonthly = safe(monthlyInflow - safe(FIXED_MONTHLY) - monthlyVariable);
-
-    html += '<div class="table-wrap"><table>';
-    html += '<thead><tr><th>Category</th><th>Monthly Est</th></tr></thead>';
-    html += '<tbody>';
-    html += '<tr><td>Inflows (Revenue / 12)</td><td>' + dollar(monthlyInflow) + '</td></tr>';
-    html += '<tr><td>Outflows - Fixed</td><td>' + dollar(safe(FIXED_MONTHLY)) + '</td></tr>';
-    html += '<tr><td>Outflows - Variable (83% of revenue)</td><td>' + dollar(monthlyVariable) + '</td></tr>';
-    html += '<tr style="font-weight:600"><td>Net Monthly</td><td>' + dollar(netMonthly) + '</td></tr>';
-    html += '</tbody></table></div>';
-
-    html += '</div>';
-
-    app.innerHTML = html;
+    app.innerHTML = h;
   }
 
-  // ---- INIT ----
   render();
-
-  if (typeof window.addEventListener === 'function') {
-    window.addEventListener('pf-data-loaded', render);
-  }
-
 })();
 
 </script>
 <script>
 // ---- MODULE: invoicing ----
-// ============================================================
-// Invoicing Module — Pier Foundations Operations Platform
+// Invoicing & AR Module — rewritten clean June 1
 // Renders into #mod-invoicing > #invoicing-app
-// ============================================================
-
+// Uses fully inline styles — no stat-card/stat-value/stat-label classes
 (function () {
   'use strict';
 
-  // ---- SAFE NUMBER HELPERS ----
   function safe(v) { var n = parseFloat(v); return isFinite(n) ? n : 0; }
-  function $(v) { return '$' + safe(v).toLocaleString('en-US', {maximumFractionDigits:0}); }
+  function dollar(v) { return '$' + Math.round(safe(v)).toLocaleString('en-US'); }
+  function getProjects() { return (typeof LIVE_PROJECTS !== 'undefined') ? LIVE_PROJECTS : []; }
 
-  // ---- DATA ACCESS ----
-  function getProjects() {
-    return (typeof LIVE_PROJECTS !== 'undefined' && Array.isArray(LIVE_PROJECTS)) ? LIVE_PROJECTS : [];
+  function metric(label, value, sub) {
+    return '<div style="background:linear-gradient(135deg,#EBF5FF,#F5FAFF);border:1px solid #D0E4F5;border-top:3px solid #006DB0;border-radius:8px;padding:14px 16px">' +
+      '<div style="font-size:0.72rem;font-weight:500;text-transform:uppercase;letter-spacing:0.04em;color:#005A91;margin-bottom:6px">' + label + '</div>' +
+      '<div style="font-size:0.88rem;font-weight:600;color:#000">' + value + '</div>' +
+      (sub ? '<div style="font-size:0.72rem;color:#8A9AAB;margin-top:4px">' + sub + '</div>' : '') +
+      '</div>';
   }
 
-  // ---- GENERATE INVOICES FROM PROJECTS ----
-  function generateInvoices(projects) {
-    var invoices = [];
-    projects.forEach(function (p, idx) {
-      if (safe(p.subcontract_value) <= 0) return;
-      var earned = safe(p.subcontract_value) * safe(p.work_pct_complete);
-      var daysOut = 15 + ((idx * 37 + 13) % 76); // deterministic 15-90 based on index
-      var paidAmt = safe(p.paid);
-      var status;
-      if (paidAmt > 0 && paidAmt >= earned) {
-        status = 'Paid';
-      } else if (daysOut > 60) {
-        status = 'Overdue';
-      } else {
-        status = 'Outstanding';
-      }
-      invoices.push({
-        number: 'PF-' + (1001 + idx),
-        project: p.name || 'Unknown',
-        gc: p.gc_name || '',
-        amount: earned,
-        date: '2026-03-15',
-        status: status,
-        daysOut: daysOut
-      });
-    });
-    return invoices;
+  function badge(text, type) {
+    var colors = { paid: 'background:#dcfce7;color:#16a34a', outstanding: 'background:#fef3c7;color:#d97706', overdue: 'background:#fee2e2;color:#dc2626' };
+    return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.72rem;font-weight:600;' + (colors[type] || '') + '">' + text + '</span>';
   }
 
-  // ---- STAT CARD HELPER ----
-  function statCard(label, value, subtitle) {
-    var h = '<div class="stat-card">';
-    h += '<span style="font-size:0.72rem">' + label + '</span>';
-    h += '<span style="font-size:0.88rem;font-weight:700">' + value + '</span>';
-    if (subtitle) {
-      h += '<span style="font-size:0.72rem">' + subtitle + '</span>';
-    }
-    h += '</div>';
-    return h;
-  }
-
-  // ---- RENDER ----
   function render() {
     var app = document.getElementById('invoicing-app');
     if (!app) return;
 
     var projects = getProjects();
-    var invoices = generateInvoices(projects);
-
-    // ---- AR Summary calculations ----
-    var totalBilled = 0;
-    var totalCollected = 0;
-    var outstandingAR = 0;
-    var retainageHeld = 0;
-
+    var totalBilled = 0, totalPaid = 0, totalUnpaid = 0, totalRetainage = 0;
     projects.forEach(function (p) {
-      totalBilled += safe(p.paid) + safe(p.unpaid);
-      totalCollected += safe(p.paid);
-      outstandingAR += safe(p.unpaid);
-      retainageHeld += safe(p.retainage);
+      totalPaid += safe(p.paid);
+      totalUnpaid += safe(p.unpaid);
+      totalRetainage += safe(p.retainage);
+    });
+    totalBilled = totalPaid + totalUnpaid;
+
+    var h = '';
+
+    // --- AR Summary ---
+    h += '<div class="card" style="margin-bottom:16px"><div class="card-header"><span class="card-title">Accounts Receivable Summary</span><span class="card-subtitle">G702/G703 Invoice Tracking</span></div>';
+    h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px">';
+    h += metric('Total Billed', dollar(totalBilled));
+    h += metric('Total Collected', dollar(totalPaid), totalBilled > 0 ? Math.round(totalPaid / totalBilled * 100) + '% collection rate' : '');
+    h += metric('Outstanding AR', dollar(totalUnpaid));
+    h += '</div>';
+    h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">';
+    h += metric('Retainage Held', dollar(totalRetainage), '5-10% of contract value');
+    h += metric('Current DSO', '83 days', '<span style="color:#006DB0">Target: 55 days</span>');
+    var dsoColor = '#dc2626';
+    h += '<div style="background:linear-gradient(135deg,#EBF5FF,#F5FAFF);border:1px solid #D0E4F5;border-top:3px solid #006DB0;border-radius:8px;padding:14px 16px">';
+    h += '<div style="font-size:0.72rem;font-weight:500;text-transform:uppercase;letter-spacing:0.04em;color:#005A91;margin-bottom:6px">DSO Progress</div>';
+    h += '<div style="height:6px;background:#e8e8e8;border-radius:3px;overflow:hidden;margin-bottom:4px"><div style="height:100%;width:100%;background:' + dsoColor + ';border-radius:3px"></div></div>';
+    h += '<div style="font-size:0.72rem;color:#8A9AAB">83 days (target: 55)</div></div>';
+    h += '</div></div>';
+
+    // --- Invoice Tracker ---
+    var invoices = [];
+    projects.forEach(function (p, i) {
+      var val = safe(p.subcontract_value);
+      if (val <= 0) return;
+      var earned = val * safe(p.work_pct_complete);
+      var paid = safe(p.paid);
+      var days = 15 + ((i * 17) % 76);
+      var status = paid >= earned && paid > 0 ? 'paid' : days > 60 ? 'overdue' : 'outstanding';
+      invoices.push({ num: 'PF-' + (1001 + i), project: p.name || '', gc: p.gc_name || '', amount: earned, days: days, status: status });
     });
 
-    var currentDSO = 83;
-    var targetDSO = 55;
-    var dsoColor = currentDSO < 55 ? '#22c55e' : currentDSO <= 75 ? '#f59e0b' : '#ef4444';
-    var dsoPct = Math.min((safe(targetDSO) / safe(currentDSO)) * 100, 100);
-
-    var html = '';
-
-    // ============ SECTION 1: AR SUMMARY ============
-    html += '<div class="card">';
-    html += '<div class="card-header"><h3 class="card-title">Accounts Receivable Summary</h3></div>';
-
-    // Row 1
-    html += '<div class="grid grid-3">';
-    html += statCard('Total Billed', $(totalBilled), '');
-    html += statCard('Total Collected', $(totalCollected), '');
-    html += statCard('Outstanding AR', $(outstandingAR), '');
-    html += '</div>';
-
-    // Row 2
-    html += '<div class="grid grid-3" style="margin-top:0">';
-    html += statCard('Retainage Held', $(retainageHeld), '');
-    html += statCard('Current DSO', currentDSO + ' days', '');
-
-    // DSO Target with progress bar
-    html += '<div class="stat-card">';
-    html += '<span style="font-size:0.72rem">DSO Target</span>';
-    html += '<span style="font-size:0.88rem;font-weight:700">' + targetDSO + ' days</span>';
-    html += '<div class="progress-bar" style="margin-top:6px">';
-    html += '<div class="progress-fill" style="width:' + dsoPct + '%;background:' + dsoColor + '"></div>';
-    html += '</div>';
-    html += '</div>';
-
-    html += '</div>'; // grid-3 row 2
-    html += '</div>'; // card
-
-    // ============ SECTION 2: INVOICE TRACKER ============
-    html += '<div class="card">';
-    html += '<div class="card-header"><h3 class="card-title">Invoice Tracker</h3></div>';
-    html += '<div class="table-wrap"><table>';
-    html += '<thead><tr>';
-    html += '<th>Invoice #</th><th>Project</th><th>GC</th><th>Amount</th><th>Date</th><th>Status</th><th>Days Outstanding</th>';
-    html += '</tr></thead><tbody>';
-
-    if (invoices.length === 0) {
-      html += '<tr><td colspan="7" style="text-align:center;opacity:0.6">No invoice data available</td></tr>';
-    } else {
-      invoices.forEach(function (inv) {
-        var badgeClass;
-        if (inv.status === 'Paid') badgeClass = 'badge-status bid';
-        else if (inv.status === 'Overdue') badgeClass = 'badge-status no-bid';
-        else badgeClass = 'badge-status pending';
-
-        html += '<tr>';
-        html += '<td>' + inv.number + '</td>';
-        html += '<td>' + inv.project + '</td>';
-        html += '<td>' + inv.gc + '</td>';
-        html += '<td>' + $(inv.amount) + '</td>';
-        html += '<td>' + inv.date + '</td>';
-        html += '<td><span class="' + badgeClass + '">' + inv.status + '</span></td>';
-        html += '<td>' + (inv.status === 'Paid' ? '--' : inv.daysOut + ' days') + '</td>';
-        html += '</tr>';
-      });
-    }
-
-    html += '</tbody></table></div>';
-    html += '</div>'; // card
-
-    // ============ SECTION 3: AR AGING ============
-    var buckets = [
-      { label: '0-30 days', min: 0, max: 30, color: '#22c55e', count: 0, total: 0 },
-      { label: '31-60 days', min: 31, max: 60, color: '#f59e0b', count: 0, total: 0 },
-      { label: '61-90 days', min: 61, max: 90, color: '#f97316', count: 0, total: 0 },
-      { label: '90+ days', min: 91, max: 99999, color: '#ef4444', count: 0, total: 0 }
-    ];
-
+    h += '<div class="card" style="margin-bottom:16px"><div class="card-header"><span class="card-title">Invoice Tracker</span><span class="card-subtitle">' + invoices.length + ' invoices from ' + projects.length + ' projects</span></div>';
+    h += '<div class="table-wrap"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">';
+    h += '<thead><tr>';
+    ['Invoice #','Project','GC','Amount','Status','Days Out'].forEach(function (c) {
+      h += '<th style="background:#2B3E50;color:#fff;padding:8px 12px;text-align:left;font-size:0.72rem;text-transform:uppercase">' + c + '</th>';
+    });
+    h += '</tr></thead><tbody>';
+    invoices.sort(function (a, b) { return b.days - a.days; });
     invoices.forEach(function (inv) {
-      if (inv.status === 'Paid') return;
-      var d = safe(inv.daysOut);
-      for (var i = 0; i < buckets.length; i++) {
-        if (d >= buckets[i].min && d <= buckets[i].max) {
-          buckets[i].count++;
-          buckets[i].total += safe(inv.amount);
-          break;
-        }
-      }
+      h += '<tr><td style="padding:8px 12px;border-bottom:1px solid #E2EAF0;font-weight:500">' + inv.num + '</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + (inv.project || '').substring(0, 40) + '</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + (inv.gc || '').substring(0, 30) + '</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + dollar(inv.amount) + '</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + badge(inv.status.charAt(0).toUpperCase() + inv.status.slice(1), inv.status) + '</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + inv.days + ' days</td></tr>';
+    });
+    h += '</tbody></table></div></div>';
+
+    // --- AR Aging ---
+    var buckets = [{ label: '0-30 days', min: 0, max: 30, count: 0, total: 0, color: '#16a34a' }, { label: '31-60 days', min: 31, max: 60, count: 0, total: 0, color: '#d97706' }, { label: '61-90 days', min: 61, max: 90, count: 0, total: 0, color: '#dc2626' }, { label: '90+ days', min: 91, max: 9999, count: 0, total: 0, color: '#7f1d1d' }];
+    invoices.forEach(function (inv) {
+      if (inv.status === 'paid') return;
+      buckets.forEach(function (b) { if (inv.days >= b.min && inv.days <= b.max) { b.count++; b.total += inv.amount; } });
+    });
+    var agingTotal = buckets.reduce(function (s, b) { return s + b.total; }, 0) || 1;
+
+    h += '<div class="card" style="margin-bottom:16px"><div class="card-header"><span class="card-title">AR Aging</span></div>';
+    h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px">';
+    buckets.forEach(function (b) { h += metric(b.label, dollar(b.total), b.count + ' invoices'); });
+    h += '</div>';
+    h += '<div style="display:flex;height:8px;border-radius:4px;overflow:hidden">';
+    buckets.forEach(function (b) { h += '<div style="width:' + Math.max(b.total / agingTotal * 100, 2) + '%;background:' + b.color + '"></div>'; });
+    h += '</div></div>';
+
+    // --- Retainage ---
+    var retainageRows = projects.filter(function (p) { return safe(p.retainage) > 0; });
+    var totalHeld = 0, totalReleased = 0;
+    retainageRows.forEach(function (p) {
+      if (safe(p.work_pct_complete) >= 1) totalReleased += safe(p.retainage);
+      else totalHeld += safe(p.retainage);
     });
 
-    var agingGrandTotal = 0;
-    buckets.forEach(function (b) { agingGrandTotal += safe(b.total); });
-
-    html += '<div class="card">';
-    html += '<div class="card-header"><h3 class="card-title">AR Aging</h3></div>';
-
-    // Bucket stat cards
-    html += '<div class="grid grid-4">';
-    buckets.forEach(function (b) {
-      html += '<div class="stat-card">';
-      html += '<span style="font-size:0.72rem">' + b.label + '</span>';
-      html += '<span style="font-size:0.88rem;font-weight:700">' + $(b.total) + '</span>';
-      html += '<span style="font-size:0.72rem">' + b.count + ' invoice' + (b.count !== 1 ? 's' : '') + '</span>';
-      html += '</div>';
+    h += '<div class="card"><div class="card-header"><span class="card-title">Retainage Tracker</span></div>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">';
+    h += metric('Total Held', dollar(totalHeld), retainageRows.length + ' projects');
+    h += metric('Total Released', dollar(totalReleased));
+    h += '</div>';
+    h += '<div class="table-wrap"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">';
+    h += '<thead><tr>';
+    ['Project','Contract Value','Retain %','Retainage','Status'].forEach(function (c) {
+      h += '<th style="background:#2B3E50;color:#fff;padding:8px 12px;text-align:left;font-size:0.72rem;text-transform:uppercase">' + c + '</th>';
     });
-    html += '</div>';
-
-    // Horizontal stacked bar
-    html += '<div class="progress-bar" style="margin-top:12px;height:28px;display:flex;overflow:hidden;border-radius:6px">';
-    buckets.forEach(function (b) {
-      var pct = agingGrandTotal > 0 ? (safe(b.total) / safe(agingGrandTotal)) * 100 : 0;
-      if (pct > 0) {
-        html += '<div style="width:' + pct + '%;background:' + b.color + ';height:100%;display:flex;align-items:center;justify-content:center">';
-        html += '<span style="font-size:0.72rem;color:#fff;font-weight:700">' + b.label.replace(' days', 'd') + '</span>';
-        html += '</div>';
-      }
+    h += '</tr></thead><tbody>';
+    retainageRows.forEach(function (p) {
+      var released = safe(p.work_pct_complete) >= 1;
+      h += '<tr><td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + (p.name || '').substring(0, 35) + '</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + dollar(p.subcontract_value) + '</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + (safe(p.retain_pct) * 100).toFixed(0) + '%</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + dollar(p.retainage) + '</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + badge(released ? 'Released' : 'Held', released ? 'paid' : 'outstanding') + '</td></tr>';
     });
-    html += '</div>';
+    h += '</tbody></table></div></div>';
 
-    html += '</div>'; // card
-
-    // ============ SECTION 4: RETAINAGE TRACKER ============
-    var retProjects = [];
-    var totalHeld = 0;
-    var totalReleased = 0;
-
-    projects.forEach(function (p) {
-      var retAmt = safe(p.retainage);
-      if (retAmt <= 0) return;
-      var workPct = safe(p.work_pct_complete);
-      var isComplete = workPct >= 1.0;
-      if (isComplete) {
-        totalReleased += retAmt;
-      } else {
-        totalHeld += retAmt;
-      }
-      retProjects.push({
-        name: p.name || 'Unknown',
-        contractValue: safe(p.subcontract_value),
-        retainPct: safe(p.retain_pct),
-        retainage: retAmt,
-        complete: isComplete
-      });
-    });
-
-    html += '<div class="card">';
-    html += '<div class="card-header"><h3 class="card-title">Retainage Tracker</h3></div>';
-    html += '<div class="table-wrap"><table>';
-    html += '<thead><tr>';
-    html += '<th>Project</th><th>Contract Value</th><th>Retain %</th><th>Retainage Amount</th><th>Status</th>';
-    html += '</tr></thead><tbody>';
-
-    if (retProjects.length === 0) {
-      html += '<tr><td colspan="5" style="text-align:center;opacity:0.6">No retainage data available</td></tr>';
-    } else {
-      retProjects.forEach(function (rp) {
-        var statusLabel = rp.complete ? 'Released' : 'Held';
-        var badgeCls = rp.complete ? 'badge-status bid' : 'badge-status pending';
-        var retPctDisplay = safe(rp.retainPct) > 0 ? (safe(rp.retainPct) * 100).toFixed(0) + '%' : '--';
-
-        html += '<tr>';
-        html += '<td>' + rp.name + '</td>';
-        html += '<td>' + $(rp.contractValue) + '</td>';
-        html += '<td>' + retPctDisplay + '</td>';
-        html += '<td>' + $(rp.retainage) + '</td>';
-        html += '<td><span class="' + badgeCls + '">' + statusLabel + '</span></td>';
-        html += '</tr>';
-      });
-    }
-
-    html += '</tbody></table></div>';
-
-    // Summary cards
-    html += '<div class="grid grid-2" style="margin-top:12px">';
-    html += statCard('Total Held', $(totalHeld), 'Active projects');
-    html += statCard('Total Released', $(totalReleased), 'Projects at 100%');
-    html += '</div>';
-
-    html += '</div>'; // card
-
-    app.innerHTML = html;
+    app.innerHTML = h;
   }
 
-  // ---- INIT ----
   render();
-
-  if (typeof window.addEventListener === 'function') {
-    window.addEventListener('pf-data-loaded', render);
-  }
-
 })();
 
 </script>
