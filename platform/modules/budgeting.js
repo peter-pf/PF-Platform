@@ -6,322 +6,220 @@
 (function () {
   'use strict';
 
+  // ---- SAFE NUMBER FORMATTER ----
+  function safe(v) { var n = parseFloat(v); return isFinite(n) ? n : 0; }
+
   // ---- CONSTANTS ----
   var FY26_TARGET = 6000000;
-  var FY_START = new Date('2025-10-01'); // FY26 starts Oct 2025
-  var FY_END = new Date('2026-09-30');
-
-  // SBA Loan
-  var SBA_MONTHLY = 12398;
-
-  // Fixed costs (monthly)
-  var FIXED_COSTS = {
-    'SBA Debt Service': SBA_MONTHLY,
-    'Insurance': 9300,
-    'Yard Lease': 2500,
-    'Trucks': 2000,
-    'Admin / Office': 2000,
-    'Equipment Depreciation': 7000
-  };
-  var FIXED_MONTHLY = Object.keys(FIXED_COSTS).reduce(function (s, k) { return s + FIXED_COSTS[k]; }, 0);
-  var FIXED_ANNUAL = FIXED_MONTHLY * 12;
-
-  // Contribution margin
+  var FY_START_YEAR = 2025;
+  var FY_START_MONTH = 9; // October is month index 9
   var CONTRIBUTION_MARGIN = 0.17;
-
-  // Capacity model
   var WORKING_DAYS_YR = 200;
   var AVG_PROJECT_VALUE = 166000;
   var AVG_PROJECT_DAYS = 18;
 
+  var FIXED_COSTS = [
+    { name: 'SBA Debt Service',       monthly: 12398, annual: 148776, pct: 35.2 },
+    { name: 'Insurance',              monthly: 9300,  annual: 111600, pct: 26.4 },
+    { name: 'Yard Lease',             monthly: 2500,  annual: 30000,  pct: 7.1  },
+    { name: 'Trucks',                 monthly: 2000,  annual: 24000,  pct: 5.7  },
+    { name: 'Admin / Office',         monthly: 2000,  annual: 24000,  pct: 5.7  },
+    { name: 'Equipment Depreciation', monthly: 7000,  annual: 84000,  pct: 19.9 }
+  ];
+
+  var FIXED_MONTHLY = 35198;
+  var FIXED_ANNUAL = 422376;
+  var BREAK_EVEN = 2484565;
+  var BREAK_EVEN_MONTHLY = 207047;
+
+  var CAPACITY_TABLE = [
+    { rigs: 1, maxDays: 200, maxProjects: 11, maxRev: 1830000, at85: 1556000, at70: 1281000 },
+    { rigs: 2, maxDays: 400, maxProjects: 22, maxRev: 3660000, at85: 3111000, at70: 2562000 },
+    { rigs: 3, maxDays: 600, maxProjects: 33, maxRev: 5490000, at85: 4667000, at70: 3843000 }
+  ];
+
   // ---- DATA ACCESS ----
   function getBids() {
-    return (typeof LIVE_BIDS !== 'undefined') ? LIVE_BIDS : [];
-  }
-  function getProjects() {
-    return (typeof LIVE_PROJECTS !== 'undefined') ? LIVE_PROJECTS : [];
+    return (typeof LIVE_BIDS !== 'undefined' && Array.isArray(LIVE_BIDS)) ? LIVE_BIDS : [];
   }
 
-  // ---- HELPERS ----
-  function fmt(n) {
-    n = Number(n) || 0;
-    if (isNaN(n)) return '$0';
-    if (n >= 1000000) return '$' + (n / 1000000).toFixed(2) + 'M';
-    if (n >= 1000) return '$' + (n / 1000).toFixed(0) + 'K';
-    return '$' + n.toLocaleString();
-  }
-  function fmtFull(n) {
-    n = Number(n) || 0;
-    if (isNaN(n)) return '$0';
+  // ---- FORMATTING ----
+  function dollar(n) {
+    n = safe(n);
     return '$' + Math.round(n).toLocaleString();
   }
-  function pct(n) { n = Number(n) || 0; if (isNaN(n)) return '0%'; return Math.round(n) + '%'; }
 
+  function pct(n) {
+    return safe(n).toFixed(1) + '%';
+  }
+
+  function pctInt(n) {
+    return Math.round(safe(n)) + '%';
+  }
+
+  // ---- CALCULATIONS ----
   function monthsElapsed() {
     var now = new Date();
-    var start = FY_START;
-    var months = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
-    // Partial month
+    var months = (now.getFullYear() - FY_START_YEAR) * 12 + (now.getMonth() - FY_START_MONTH);
     months += now.getDate() / 30;
-    return Math.max(months, 0.5);
+    return Math.max(safe(months), 0.5);
   }
 
-  // ---- REVENUE CALCULATIONS ----
-  function calcRevenue() {
+  function calcAwardedYTD() {
     var bids = getBids();
-    var projects = getProjects();
-
-    // Awarded/completed revenue from bids
-    var awardedFromBids = bids.filter(function (b) {
-      return b.bid_status === 'Awarded' || b.bid_status === 'Completed';
-    });
-    var awardedRevenue = awardedFromBids.reduce(function (s, b) {
-      return s + (Number(b.bid_value) || 0);
-    }, 0);
-
-    // Also count project contract values
-    var projectRevenue = projects.reduce(function (s, p) {
-      return s + (Number(p.subcontract_value) || 0);
-    }, 0);
-
-    // Use whichever is larger (avoid double-counting)
-    var actualYTD = Math.max(awardedRevenue, projectRevenue);
-    var elapsed = monthsElapsed();
-    var runRate = (actualYTD / elapsed) * 12;
-    var gap = FY26_TARGET - runRate;
-    var pacePct = (runRate / FY26_TARGET) * 100;
-
-    return {
-      target: FY26_TARGET,
-      actualYTD: actualYTD,
-      elapsed: elapsed,
-      runRate: runRate,
-      gap: gap,
-      pacePct: pacePct,
-      awardedCount: awardedFromBids.length,
-      projectCount: projects.length
-    };
-  }
-
-  // ---- RENDER ----
-  function render() {
-    var app = document.getElementById('budgeting-app');
-    if (!app) return;
-
-    var rev = calcRevenue();
-    var breakEven = FIXED_ANNUAL / CONTRIBUTION_MARGIN;
-    var debtServiceFloor = 3720000;
-
-    // Capacity per rig
-    var rigCapacity = (WORKING_DAYS_YR / AVG_PROJECT_DAYS) * AVG_PROJECT_VALUE;
-    var rigsNeeded = Math.ceil(FY26_TARGET / rigCapacity);
-
-    // Cash flow
-    var monthlyInflow = rev.runRate / 12;
-    var monthlyVariable = monthlyInflow * 0.83;
-    var monthlyNet = monthlyInflow - FIXED_MONTHLY - monthlyVariable;
-
-    // Pace color
-    var paceColor = rev.pacePct >= 90 ? 'green' : rev.pacePct >= 70 ? 'amber' : 'red';
-
-    var html = '';
-
-    // ============ REVENUE FORECAST ============
-    html += '<div class="card">';
-    html += '<div class="card-header"><h3 class="card-title">Revenue Forecast</h3>';
-    html += '<span class="card-subtitle">FY26 (Oct 2025 - Sep 2026)</span></div>';
-
-    html += '<div class="grid grid-4">';
-    html += statCard('FY26 Target', fmtFull(rev.target), '');
-    html += statCard('Awarded YTD', fmtFull(rev.actualYTD), rev.awardedCount + ' projects');
-    html += statCard('Run Rate', fmtFull(rev.runRate), pct(rev.pacePct) + ' of target');
-    html += statCard('Gap to Target', fmtFull(Math.abs(rev.gap)), rev.gap > 0 ? 'Behind pace' : 'Ahead of pace', rev.gap > 0 ? 'down' : 'up');
-    html += '</div>';
-
-    // Progress bar
-    html += '<div style="margin-top:12px">';
-    html += '<div style="display:flex;justify-content:space-between;margin-bottom:4px">';
-    html += '<span class="stat-label">Revenue Pace</span>';
-    html += '<span class="stat-label">' + pct(Math.min(rev.pacePct, 100)) + '</span></div>';
-    html += '<div class="progress-bar"><div class="progress-fill ' + paceColor + '" style="width:' + Math.min(rev.pacePct, 100) + '%"></div></div>';
-    html += '</div>';
-
-    // Months elapsed indicator
-    var fyPctElapsed = (monthsElapsed() / 12) * 100;
-    html += '<div style="margin-top:8px">';
-    html += '<div style="display:flex;justify-content:space-between;margin-bottom:4px">';
-    html += '<span class="stat-label">FY Elapsed</span>';
-    html += '<span class="stat-label">' + monthsElapsed().toFixed(1) + ' / 12 months</span></div>';
-    html += '<div class="progress-bar"><div class="progress-fill accent" style="width:' + Math.min(fyPctElapsed, 100) + '%"></div></div>';
-    html += '</div>';
-
-    html += '</div>'; // card
-
-    // ============ BREAK-EVEN ANALYSIS ============
-    html += '<div class="card">';
-    html += '<div class="card-header"><h3 class="card-title">Break-Even Analysis</h3>';
-    html += '<span class="card-subtitle">Fixed costs vs. contribution margin</span></div>';
-
-    html += '<div class="grid grid-3">';
-    html += statCard('Fixed Costs (Monthly)', fmtFull(FIXED_MONTHLY), fmtFull(FIXED_ANNUAL) + '/year');
-    html += statCard('Contribution Margin', pct(CONTRIBUTION_MARGIN * 100), 'Revenue minus variable costs');
-    html += statCard('Break-Even Revenue', fmtFull(breakEven), fmtFull(breakEven / 12) + '/month');
-    html += '</div>';
-
-    // Fixed cost breakdown table
-    html += '<div class="table-wrap"><table>';
-    html += '<thead><tr><th>Expense</th><th>Monthly</th><th>Annual</th><th>% of Fixed</th></tr></thead><tbody>';
-    Object.keys(FIXED_COSTS).forEach(function (k) {
-      var v = FIXED_COSTS[k];
-      var annPct = (v / FIXED_MONTHLY * 100).toFixed(1);
-      html += '<tr><td>' + k + '</td><td>' + fmtFull(v) + '</td><td>' + fmtFull(v * 12) + '</td><td>' + annPct + '%</td></tr>';
-    });
-    html += '<tr style="font-weight:600"><td>Total</td><td>' + fmtFull(FIXED_MONTHLY) + '</td><td>' + fmtFull(FIXED_ANNUAL) + '</td><td>100%</td></tr>';
-    html += '</tbody></table></div>';
-
-    // Break-even visual
-    var revPctOfBE = (rev.runRate / breakEven) * 100;
-    var beColor = revPctOfBE >= 100 ? 'green' : revPctOfBE >= 80 ? 'amber' : 'red';
-    html += '<div style="margin-top:12px">';
-    html += '<div style="display:flex;justify-content:space-between;margin-bottom:4px">';
-    html += '<span class="stat-label">Run Rate vs Break-Even (' + fmtFull(breakEven) + ')</span>';
-    html += '<span class="stat-label">' + pct(revPctOfBE) + '</span></div>';
-    html += '<div class="progress-bar"><div class="progress-fill ' + beColor + '" style="width:' + Math.min(revPctOfBE, 100) + '%"></div></div>';
-    html += '</div>';
-
-    // Key thresholds
-    html += '<div class="grid grid-3" style="margin-top:12px">';
-    html += statCard('Break-Even', fmtFull(breakEven), 'Minimum to cover fixed', rev.runRate >= breakEven ? 'up' : 'down');
-    html += statCard('Debt Service Floor', fmtFull(debtServiceFloor), 'Comfortable SBA coverage', rev.runRate >= debtServiceFloor ? 'up' : 'down');
-    html += statCard('FY26 Target', fmtFull(FY26_TARGET), 'Growth objective', rev.runRate >= FY26_TARGET ? 'up' : 'down');
-    html += '</div>';
-
-    html += '</div>'; // card
-
-    // ============ CAPACITY MODEL ============
-    html += '<div class="card">';
-    html += '<div class="card-header"><h3 class="card-title">Capacity Model</h3>';
-    html += '<span class="card-subtitle">Rig utilization and theoretical output</span></div>';
-
-    html += '<div class="grid grid-4">';
-    html += statCard('Working Days/Year', WORKING_DAYS_YR.toString(), 'Weather-adjusted');
-    html += statCard('Avg Project Value', fmtFull(AVG_PROJECT_VALUE), '');
-    html += statCard('Avg Duration', AVG_PROJECT_DAYS + ' days', '');
-    html += statCard('Per-Rig Capacity', fmtFull(rigCapacity), WORKING_DAYS_YR + ' days / ' + AVG_PROJECT_DAYS + ' = ' + Math.round(WORKING_DAYS_YR / AVG_PROJECT_DAYS) + ' projects');
-    html += '</div>';
-
-    // Rig table
-    html += '<div class="table-wrap"><table>';
-    html += '<thead><tr><th>Rigs</th><th>Theoretical Max</th><th>At 85% Utilization</th><th>At 70% Utilization</th><th>Hits $6M Target?</th></tr></thead><tbody>';
-    [1, 2, 3, 4].forEach(function (rigs) {
-      var max = rigCapacity * rigs;
-      var at85 = max * 0.85;
-      var at70 = max * 0.70;
-      var hits = at85 >= FY26_TARGET;
-      html += '<tr' + (rigs === 3 ? ' style="font-weight:600"' : '') + '>';
-      html += '<td>' + rigs + ' rig' + (rigs > 1 ? 's' : '') + (rigs === 3 ? ' (current fleet)' : '') + '</td>';
-      html += '<td>' + fmtFull(max) + '</td>';
-      html += '<td>' + fmtFull(at85) + '</td>';
-      html += '<td>' + fmtFull(at70) + '</td>';
-      html += '<td><span class="badge-status ' + (hits ? 'bid' : 'no-bid') + '">' + (hits ? 'Yes' : 'No') + '</span></td>';
-      html += '</tr>';
-    });
-    html += '</tbody></table></div>';
-
-    // Utilization needed
-    var utilNeeded = (FY26_TARGET / (rigCapacity * 3)) * 100;
-    var utilColor = utilNeeded <= 85 ? 'green' : utilNeeded <= 95 ? 'amber' : 'red';
-    html += '<div style="margin-top:12px">';
-    html += '<div style="display:flex;justify-content:space-between;margin-bottom:4px">';
-    html += '<span class="stat-label">3-Rig Utilization Needed for $6M</span>';
-    html += '<span class="stat-label">' + pct(utilNeeded) + '</span></div>';
-    html += '<div class="progress-bar"><div class="progress-fill ' + utilColor + '" style="width:' + Math.min(utilNeeded, 100) + '%"></div></div>';
-    html += '</div>';
-
-    html += '</div>'; // card
-
-    // ============ CASH FLOW SUMMARY ============
-    html += '<div class="card">';
-    html += '<div class="card-header"><h3 class="card-title">Cash Flow Summary</h3>';
-    html += '<span class="card-subtitle">Monthly estimate based on run rate</span></div>';
-
-    html += '<div class="grid grid-4">';
-    html += statCard('Monthly Inflow', fmtFull(monthlyInflow), 'Based on run rate');
-    html += statCard('Fixed Outflow', fmtFull(FIXED_MONTHLY), 'See breakdown above');
-    html += statCard('Variable Outflow', fmtFull(monthlyVariable), '83% of revenue');
-    html += statCard('Net Monthly', fmtFull(monthlyNet), monthlyNet >= 0 ? 'Positive' : 'Negative', monthlyNet >= 0 ? 'up' : 'down');
-    html += '</div>';
-
-    // 13-Week Forecast Template
-    html += '<div style="margin-top:16px"><h4 class="card-title" style="font-size:14px;margin-bottom:8px">13-Week Cash Flow Forecast</h4></div>';
-
-    var weeks = [];
-    var today = new Date();
-    for (var i = 0; i < 13; i++) {
-      var d = new Date(today);
-      d.setDate(d.getDate() + i * 7);
-      weeks.push('Wk ' + (i + 1) + ' (' + (d.getMonth() + 1) + '/' + d.getDate() + ')');
+    var total = 0;
+    for (var i = 0; i < bids.length; i++) {
+      var b = bids[i];
+      if (b.bid_status === 'Awarded' || b.bid_status === 'Completed') {
+        total += safe(b.bid_value);
+      }
     }
-
-    html += '<div class="table-wrap" style="overflow-x:auto"><table style="min-width:900px">';
-    html += '<thead><tr><th>Category</th>';
-    weeks.forEach(function (w) { html += '<th style="font-size:11px;min-width:65px">' + w + '</th>'; });
-    html += '</tr></thead><tbody>';
-
-    // Inflows row
-    var weeklyInflow = monthlyInflow / 4.33;
-    html += '<tr><td>Inflows</td>';
-    weeks.forEach(function () { html += '<td>' + fmt(weeklyInflow) + '</td>'; });
-    html += '</tr>';
-
-    // Outflows row
-    var weeklyOutflow = (FIXED_MONTHLY + monthlyVariable) / 4.33;
-    html += '<tr><td>Outflows</td>';
-    weeks.forEach(function () { html += '<td>(' + fmt(weeklyOutflow) + ')</td>'; });
-    html += '</tr>';
-
-    // Net row
-    var weeklyNet = weeklyInflow - weeklyOutflow;
-    html += '<tr style="font-weight:600"><td>Net</td>';
-    var cumulative = 0;
-    weeks.forEach(function () {
-      cumulative += weeklyNet;
-      html += '<td style="color:' + (weeklyNet >= 0 ? 'var(--green)' : 'var(--red)') + '">' + fmt(weeklyNet) + '</td>';
-    });
-    html += '</tr>';
-
-    // Cumulative row
-    html += '<tr style="font-weight:600"><td>Cumulative</td>';
-    cumulative = 0;
-    weeks.forEach(function () {
-      cumulative += weeklyNet;
-      html += '<td style="color:' + (cumulative >= 0 ? 'var(--green)' : 'var(--red)') + '">' + fmt(cumulative) + '</td>';
-    });
-    html += '</tr>';
-
-    html += '</tbody></table></div>';
-
-    html += '</div>'; // card
-
-    app.innerHTML = html;
+    return total;
   }
 
-  // ---- STAT CARD HELPER ----
-  function statCard(label, value, change, direction) {
+  // ---- STAT CARD BUILDER ----
+  function statCard(label, value, extra) {
     var h = '<div class="stat-card">';
-    h += '<span class="stat-label">' + label + '</span>';
-    h += '<span class="stat-value" style="font-size:1.1rem">' + value + '</span>';
-    if (change) {
-      h += '<span class="stat-change' + (direction ? ' ' + direction : '') + '">' + change + '</span>';
+    h += '<span style="font-size:0.72rem">' + label + '</span>';
+    h += '<span style="font-size:1.1rem;font-weight:600">' + value + '</span>';
+    if (extra) {
+      h += '<span style="font-size:0.72rem">' + extra + '</span>';
     }
     h += '</div>';
     return h;
   }
 
+  // ---- PROGRESS BAR BUILDER ----
+  function progressBar(label, valuePct, rightLabel) {
+    var w = Math.max(0, Math.min(safe(valuePct), 100));
+    var h = '<div style="margin-top:12px">';
+    h += '<div style="display:flex;justify-content:space-between;margin-bottom:4px">';
+    h += '<span style="font-size:0.72rem">' + label + '</span>';
+    h += '<span style="font-size:0.72rem">' + rightLabel + '</span>';
+    h += '</div>';
+    h += '<div class="progress-bar"><div class="progress-fill" style="width:' + w + '%"></div></div>';
+    h += '</div>';
+    return h;
+  }
+
+  // ---- MAIN RENDER ----
+  function render() {
+    var app = document.getElementById('budgeting-app');
+    if (!app) return;
+
+    var awardedYTD = calcAwardedYTD();
+    var elapsed = monthsElapsed();
+    var runRate = safe((awardedYTD / elapsed) * 12);
+    var gap = safe(FY26_TARGET - runRate);
+    var revenuePacePct = safe((awardedYTD / FY26_TARGET) * 100);
+    var fyElapsedPct = safe((elapsed / 12) * 100);
+
+    var html = '';
+
+    // ============ SECTION 1: REVENUE FORECAST ============
+    html += '<div class="card">';
+    html += '<div class="card-header"><h3 class="card-title">Revenue Forecast</h3></div>';
+
+    html += '<div class="grid grid-4">';
+    html += statCard('FY26 Target', dollar(FY26_TARGET));
+    html += statCard('Awarded YTD', dollar(awardedYTD));
+    html += statCard('Run Rate', dollar(runRate));
+
+    if (gap > 0) {
+      html += statCard('Gap to Target', dollar(gap), '<span style="font-size:0.72rem;color:#e74c3c">Behind</span>');
+    } else {
+      html += statCard('Gap to Target', dollar(Math.abs(gap)), '<span style="font-size:0.72rem;color:#27ae60">Ahead</span>');
+    }
+    html += '</div>';
+
+    html += progressBar('Revenue Pace', revenuePacePct, pctInt(revenuePacePct));
+    html += progressBar('FY Elapsed', fyElapsedPct, safe(elapsed).toFixed(1) + ' / 12 months');
+
+    html += '</div>';
+
+    // ============ SECTION 2: BREAK-EVEN ANALYSIS ============
+    html += '<div class="card">';
+    html += '<div class="card-header"><h3 class="card-title">Break-Even Analysis</h3></div>';
+
+    html += '<div class="grid grid-3">';
+    html += statCard('Fixed Costs (Monthly)', dollar(FIXED_MONTHLY), dollar(FIXED_ANNUAL) + '/year');
+    html += statCard('Contribution Margin', pctInt(safe(CONTRIBUTION_MARGIN * 100)));
+    html += statCard('Break-Even Revenue', dollar(BREAK_EVEN), dollar(BREAK_EVEN_MONTHLY) + '/month');
+    html += '</div>';
+
+    html += '<div class="table-wrap"><table>';
+    html += '<thead><tr><th>Expense</th><th>Monthly</th><th>Annual</th><th>% of Fixed</th></tr></thead>';
+    html += '<tbody>';
+    for (var i = 0; i < FIXED_COSTS.length; i++) {
+      var c = FIXED_COSTS[i];
+      html += '<tr>';
+      html += '<td>' + c.name + '</td>';
+      html += '<td>' + dollar(safe(c.monthly)) + '</td>';
+      html += '<td>' + dollar(safe(c.annual)) + '</td>';
+      html += '<td>' + safe(c.pct).toFixed(1) + '%</td>';
+      html += '</tr>';
+    }
+    html += '</tbody></table></div>';
+
+    html += '</div>';
+
+    // ============ SECTION 3: CAPACITY MODEL ============
+    html += '<div class="card">';
+    html += '<div class="card-header"><h3 class="card-title">Capacity Model</h3></div>';
+
+    html += '<div class="table-wrap"><table>';
+    html += '<thead><tr>';
+    html += '<th>Rigs</th><th>Max Days/Year</th><th>Max Projects</th>';
+    html += '<th>Max Revenue</th><th>At 85% Util</th><th>At 70% Util</th>';
+    html += '</tr></thead>';
+    html += '<tbody>';
+    for (var j = 0; j < CAPACITY_TABLE.length; j++) {
+      var r = CAPACITY_TABLE[j];
+      html += '<tr>';
+      html += '<td>' + safe(r.rigs) + '</td>';
+      html += '<td>' + safe(r.maxDays) + '</td>';
+      html += '<td>' + safe(r.maxProjects) + '</td>';
+      html += '<td>' + dollar(safe(r.maxRev)) + '</td>';
+      html += '<td>' + dollar(safe(r.at85)) + '</td>';
+      html += '<td>' + dollar(safe(r.at70)) + '</td>';
+      html += '</tr>';
+    }
+    html += '</tbody></table></div>';
+
+    html += '<p style="font-size:0.72rem;margin-top:8px;opacity:0.7">';
+    html += 'Based on ' + safe(WORKING_DAYS_YR) + ' working days/year, ';
+    html += dollar(safe(AVG_PROJECT_VALUE)) + ' avg project, ';
+    html += safe(AVG_PROJECT_DAYS) + '-day avg duration. ';
+    html += 'Note: No single configuration at current averages reaches the $6M target at realistic utilization.';
+    html += '</p>';
+
+    html += '</div>';
+
+    // ============ SECTION 4: CASH FLOW TEMPLATE ============
+    html += '<div class="card">';
+    html += '<div class="card-header"><h3 class="card-title">Cash Flow Template</h3></div>';
+
+    var monthlyInflow = safe(awardedYTD / 12);
+    var monthlyVariable = safe(monthlyInflow * 0.83);
+    var netMonthly = safe(monthlyInflow - safe(FIXED_MONTHLY) - monthlyVariable);
+
+    html += '<div class="table-wrap"><table>';
+    html += '<thead><tr><th>Category</th><th>Monthly Est</th></tr></thead>';
+    html += '<tbody>';
+    html += '<tr><td>Inflows (Revenue / 12)</td><td>' + dollar(monthlyInflow) + '</td></tr>';
+    html += '<tr><td>Outflows - Fixed</td><td>' + dollar(safe(FIXED_MONTHLY)) + '</td></tr>';
+    html += '<tr><td>Outflows - Variable (83% of revenue)</td><td>' + dollar(monthlyVariable) + '</td></tr>';
+    html += '<tr style="font-weight:600"><td>Net Monthly</td><td>' + dollar(netMonthly) + '</td></tr>';
+    html += '</tbody></table></div>';
+
+    html += '</div>';
+
+    app.innerHTML = html;
+  }
+
   // ---- INIT ----
   render();
 
-  // Re-render if data loads later
   if (typeof window.addEventListener === 'function') {
     window.addEventListener('pf-data-loaded', render);
   }

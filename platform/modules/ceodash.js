@@ -1,402 +1,257 @@
 // ============================================================
 // Pier Foundations — CEO Dashboard Module
 // Renders into #mod-ceodash > #ceodash-app
-// Harvard MBA COO Framework: 6 Ops + 6 Financial KPIs
 // ============================================================
 
 (function () {
   'use strict';
 
-  // ---- DATA SOURCES (SharePoint live data with fallbacks) ----
+  // ---- DATA SOURCES ----
   var bids = (typeof LIVE_BIDS !== 'undefined') ? LIVE_BIDS : [];
   var projects = (typeof LIVE_PROJECTS !== 'undefined') ? LIVE_PROJECTS : [];
   var syncMeta = (typeof LIVE_SYNC_META !== 'undefined') ? LIVE_SYNC_META : {};
 
   // ---- CONSTANTS ----
   var FY26_TARGET = 6000000;
-  var MONTHLY_DEBT_SERVICE = 12398;
+  var MONTHLY_DEBT = 12398;
 
-  // ---- HELPERS ----
-  function fmtCurrency(v) {
-    if (v == null || v === 'None' || v === '' || isNaN(Number(v))) return '--'; v = Number(v);
-    return '$' + v.toLocaleString('en-US', { maximumFractionDigits: 0 });
-  }
+  // ---- SAFE NUMBER HELPERS ----
+  function safe(v) { var n = parseFloat(v); return isFinite(n) ? n : 0; }
+  function $(v) { return '$' + safe(v).toLocaleString('en-US', { maximumFractionDigits: 0 }); }
+  function $s(v) { v = safe(v); if (v >= 1e6) return '$' + (v / 1e6).toFixed(1) + 'M'; if (v >= 1e3) return '$' + Math.round(v / 1e3) + 'K'; return '$' + v; }
+  function pct(v) { return Math.round(safe(v) * 100) + '%'; }
 
-  function fmtShort(v) {
-    if (v == null || v === 'None' || v === '' || isNaN(Number(v))) return '--'; v = Number(v);
-    if (v >= 1000000) return '$' + (v / 1000000).toFixed(1) + 'M';
-    if (v >= 1000) return '$' + Math.round(v / 1000) + 'K';
-    return '$' + Math.round(v);
-  }
+  // ---- PIPELINE STATUSES ----
+  var PIPELINE_STATUSES = ['Will Bid', 'Submitted', 'Budget Pricing', 'Submitted - Edging', 'New Lead', 'NEED FOLLOW UP'];
+  var WON_STATUSES = ['Awarded', 'Completed'];
+  var LOST_PATTERN = /Not Awarded/i;
+  var OUTSTANDING_STATUSES = ['Submitted', 'Submitted - Edging'];
 
-  function fmtPct(v) {
-    if (v == null || v === 'None' || v === '' || isNaN(Number(v))) return '--'; v = Number(v);
-    return v.toFixed(1) + '%';
-  }
+  // ---- COMPUTED VALUES ----
+  var activeProjects = projects.filter(function (p) {
+    var w = safe(p.work_pct_complete);
+    return w > 0 && w < 1;
+  });
 
-  function fmtDate(d) {
-    if (!d) return '--';
-    var s = d.split(' ')[0]; // strip time
-    var parts = s.split('-');
-    if (parts.length < 3) return d;
-    return parts[1] + '/' + parts[2] + '/' + parts[0].slice(2);
-  }
+  var pipelineValue = bids.reduce(function (sum, b) {
+    return sum + (PIPELINE_STATUSES.indexOf(b.bid_status) >= 0 ? safe(b.bid_value) : 0);
+  }, 0);
 
-  // ---- STATUS BADGE MAPPING ----
-  function statusBadgeClass(status) {
-    if (!status) return 'pending';
-    switch (status) {
-      case 'Awarded': return 'bid';
-      case 'Completed': return 'bid';
-      case 'Submitted': return 'review';
-      case 'Submitted - Edging': return 'review';
-      case 'Will Bid': return 'active';
-      case 'New Lead': return 'active';
-      case 'NEED FOLLOW UP': return 'pending';
-      case 'Budget Pricing': return 'pending';
-      case 'Will Not Bid': return 'closed';
-      case 'Not Awarded - Not Low': return 'closed';
-      case 'Not Awarded - Canceled': return 'closed';
-      case 'Not Awarded - Low': return 'closed';
-      case "Didn't Bid to Awarded GC": return 'closed';
-      default: return 'pending';
-    }
-  }
+  var wonCount = bids.filter(function (b) { return WON_STATUSES.indexOf(b.bid_status) >= 0; }).length;
+  var lostCount = bids.filter(function (b) { return LOST_PATTERN.test(b.bid_status || ''); }).length;
+  var winRateDenom = wonCount + lostCount;
+  var winRate = winRateDenom > 0 ? Math.round((wonCount / winRateDenom) * 100) : 0;
 
-  // ---- STAT CARD BUILDER ----
-  function statCard(label, value, subtitle) {
-    return '<div class="stat-card">' +
-      '<div class="stat-label">' + label + '</div>' +
-      '<div class="stat-value" style="font-size:1.1rem">' + value + '</div>' +
-      (subtitle ? '<div class="stat-change">' + subtitle + '</div>' : '') +
-      '</div>';
-  }
+  var backlog = activeProjects.reduce(function (sum, p) {
+    return sum + safe(p.subcontract_value) * (1 - safe(p.work_pct_complete));
+  }, 0);
 
-  // ---- COMPUTE KPIs ----
-  function computeKPIs() {
-    var kpi = {};
+  var bidsOutstanding = bids.filter(function (b) { return OUTSTANDING_STATUSES.indexOf(b.bid_status) >= 0; }).length;
 
-    // --- Operations KPIs ---
+  var fy26Revenue = bids.reduce(function (sum, b) {
+    return sum + (WON_STATUSES.indexOf(b.bid_status) >= 0 ? safe(b.bid_value) : 0);
+  }, 0);
+  var fy26Pct = FY26_TARGET > 0 ? Math.min(safe(fy26Revenue) / FY26_TARGET, 1) : 0;
 
-    // 1. Active Projects: work_pct_complete > 0 and < 1.0
-    var activeProjects = projects.filter(function (p) {
-      return p.work_pct_complete > 0 && p.work_pct_complete < 1.0;
-    });
-    kpi.activeProjectCount = activeProjects.length;
+  var totalContractValue = projects.reduce(function (sum, p) { return sum + safe(p.subcontract_value); }, 0);
+  var totalCollected = projects.reduce(function (sum, p) { return sum + safe(p.paid); }, 0);
+  var outstandingAR = projects.reduce(function (sum, p) { return sum + safe(p.unpaid); }, 0);
+  var retainageHeld = projects.reduce(function (sum, p) { return sum + safe(p.retainage); }, 0);
+  var cashOwed = outstandingAR + retainageHeld;
 
-    // 2. Pipeline Value: sum bid_value for active bid statuses
-    var pipelineStatuses = [
-      'Will Bid', 'Submitted', 'Budget Pricing',
-      'Submitted - Edging', 'New Lead', 'NEED FOLLOW UP'
-    ];
-    var pipelineBids = bids.filter(function (b) {
-      return pipelineStatuses.indexOf(b.bid_status) !== -1;
-    });
-    kpi.pipelineValue = pipelineBids.reduce(function (s, b) {
-      return s + (b.bid_value || 0);
-    }, 0);
-
-    // 3. Win Rate: awarded / (awarded + not awarded)
-    var awardedBids = bids.filter(function (b) {
-      return b.bid_status === 'Awarded' || b.bid_status === 'Completed';
-    });
-    var notAwardedBids = bids.filter(function (b) {
-      return b.bid_status === 'Not Awarded - Not Low' ||
-        b.bid_status === 'Not Awarded - Canceled' ||
-        b.bid_status === 'Not Awarded - Low';
-    });
-    var decidedCount = awardedBids.length + notAwardedBids.length;
-    kpi.winRate = decidedCount > 0 ? (awardedBids.length / decidedCount) * 100 : 0;
-    kpi.winRateLabel = awardedBids.length + ' of ' + decidedCount + ' decided';
-
-    // 4. Backlog: sum of (subcontract_value * (1 - work_pct_complete)) for active projects
-    kpi.backlog = activeProjects.reduce(function (s, p) {
-      var remaining = 1 - (p.work_pct_complete || 0);
-      return s + ((p.subcontract_value || 0) * remaining);
-    }, 0);
-
-    // 5. Bids Outstanding: Submitted or Submitted - Edging
-    var outstandingBids = bids.filter(function (b) {
-      return b.bid_status === 'Submitted' || b.bid_status === 'Submitted - Edging';
-    });
-    kpi.bidsOutstanding = outstandingBids.length;
-    var outstandingValue = outstandingBids.reduce(function (s, b) {
-      return s + (b.bid_value || 0);
-    }, 0);
-    kpi.bidsOutstandingValue = outstandingValue;
-
-    // 6. FY26 Progress: awarded + completed value / $6M
-    var fy26Value = awardedBids.reduce(function (s, b) {
-      return s + (b.bid_value || 0);
-    }, 0);
-    kpi.fy26Revenue = fy26Value;
-    kpi.fy26Pct = (fy26Value / FY26_TARGET) * 100;
-
-    // --- Financial KPIs ---
-
-    // 7. Total Contract Value
-    kpi.totalContractValue = projects.reduce(function (s, p) {
-      return s + (p.subcontract_value || 0);
-    }, 0);
-
-    // 8. Total Billed (paid)
-    kpi.totalBilled = projects.reduce(function (s, p) {
-      return s + (p.paid || 0);
-    }, 0);
-
-    // 9. Total Unpaid (AR)
-    kpi.totalUnpaid = projects.reduce(function (s, p) {
-      return s + (p.unpaid || 0);
-    }, 0);
-
-    // 10. Retainage Held
-    kpi.retainageHeld = projects.reduce(function (s, p) {
-      return s + (p.retainage || 0);
-    }, 0);
-
-    // 11. Monthly Debt Service
-    kpi.monthlyDebtService = MONTHLY_DEBT_SERVICE;
-
-    // 12. Cash Needed (money owed to PF)
-    kpi.cashNeeded = kpi.totalUnpaid + kpi.retainageHeld;
-
-    // Store filtered lists for tables
-    kpi.activeProjects = activeProjects.sort(function (a, b) {
-      return (b.work_pct_complete || 0) - (a.work_pct_complete || 0);
-    });
-
-    kpi.recentBids = bids.slice().sort(function (a, b) {
-      var da = a.invite_date || '';
-      var db = b.invite_date || '';
-      return db.localeCompare(da);
-    }).slice(0, 8);
-
-    // Alerts
-    kpi.alerts = buildAlerts(kpi);
-
-    return kpi;
-  }
-
-  // ---- BUILD ALERTS ----
-  function buildAlerts(kpi) {
-    var alerts = [];
-
-    // Projects nearing completion (>80%)
-    var nearComplete = projects.filter(function (p) {
-      return p.work_pct_complete > 0.8 && p.work_pct_complete < 1.0;
-    });
-    nearComplete.forEach(function (p) {
-      alerts.push({
-        type: 'review',
-        text: p.name + ' is ' + Math.round(p.work_pct_complete * 100) + '% complete -- closeout prep needed'
-      });
-    });
-
-    // Bids needing follow up
-    var followUp = bids.filter(function (b) {
-      return b.bid_status === 'NEED FOLLOW UP';
-    });
-    followUp.forEach(function (b) {
-      alerts.push({
-        type: 'pending',
-        text: b.name + ' (' + (b.gc_name || 'Unknown GC') + ') -- needs follow up'
-      });
-    });
-
-    // Retainage > $50K
-    if (kpi.retainageHeld > 50000) {
-      alerts.push({
-        type: 'active',
-        text: 'Retainage held: ' + fmtCurrency(kpi.retainageHeld) + ' -- cash recovery opportunity'
-      });
-    }
-
-    // FY26 pace check (behind 50% at midyear)
-    if (kpi.fy26Pct < 50) {
-      alerts.push({
-        type: 'pending',
-        text: 'FY26 at ' + fmtPct(kpi.fy26Pct) + ' of $6M target -- evaluate pipeline acceleration'
-      });
-    }
-
-    return alerts;
-  }
+  // ---- INLINE STYLE CONSTANTS ----
+  var STAT_VALUE = 'font-size:1.1rem;font-weight:700;color:#000';
+  var STAT_LABEL = 'font-size:0.72rem;font-weight:500;text-transform:uppercase;letter-spacing:0.04em;color:#005A91';
 
   // ---- RENDER ----
-  function render() {
-    var root = document.getElementById('mod-ceodash');
-    if (!root) return;
+  var root = document.querySelector('#mod-ceodash #ceodash-app');
+  if (!root) return;
 
-    var kpi = computeKPIs();
+  var html = '';
 
-    var html = '<div id="ceodash-app">';
+  // ===== SECTION: Last Sync =====
+  var syncText = syncMeta.last_sync ? new Date(syncMeta.last_sync).toLocaleString() : 'No sync data';
+  html += '<div style="text-align:right;font-size:0.7rem;color:#888;margin-bottom:0.5rem">Last sync: ' + syncText + '</div>';
 
-    // ---- SYNC META ----
-    var syncLabel = syncMeta.last_sync
-      ? 'Last sync: ' + syncMeta.last_sync.replace('T', ' ').split('.')[0] + ' UTC'
-      : 'No sync data';
-    html += '<div style="text-align:right;opacity:0.5;font-size:12px;margin-bottom:12px">' + syncLabel + '</div>';
+  // ===== ROW 1: Operations KPIs =====
+  html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.75rem;margin-bottom:1rem">';
 
-    // ==== OPERATIONS KPIs (Row 1) ====
-    html += '<div class="card" style="margin-bottom:16px">';
-    html += '<div class="card-header"><span class="card-title">Operations</span><span class="card-subtitle">Real-time field metrics</span></div>';
-    html += '<div class="grid grid-3" style="padding:12px;gap:12px">';
+  html += statCard('Active Projects', activeProjects.length);
+  html += statCard('Pipeline Value', $s(pipelineValue));
+  html += statCard('Win Rate', winRate + '%');
+  html += statCard('Backlog', $s(backlog));
+  html += statCard('Bids Outstanding', bidsOutstanding);
+  html += statCardProgress('FY26 Progress', $s(fy26Revenue) + ' / ' + $s(FY26_TARGET), fy26Pct);
 
-    html += statCard('Active Projects', kpi.activeProjectCount, kpi.activeProjectCount + ' in progress');
-    html += statCard('Pipeline Value', fmtShort(kpi.pipelineValue), pipelineBidsCount() + ' active bids');
-    html += statCard('Win Rate', fmtPct(kpi.winRate), kpi.winRateLabel);
+  html += '</div>';
 
-    html += '</div>';
-    html += '<div class="grid grid-3" style="padding:0 12px 12px;gap:12px">';
+  // ===== ROW 2: Financial KPIs =====
+  html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.75rem;margin-bottom:1rem">';
 
-    html += statCard('Backlog', fmtShort(kpi.backlog), 'Work remaining ($)');
-    html += statCard('Bids Outstanding', kpi.bidsOutstanding, fmtShort(kpi.bidsOutstandingValue) + ' pending decision');
+  html += statCard('Total Contract Value', $s(totalContractValue));
+  html += statCard('Total Collected', $s(totalCollected));
+  html += statCard('Outstanding AR', $s(outstandingAR));
+  html += statCard('Retainage Held', $s(retainageHeld));
+  html += statCard('Monthly Debt', $(MONTHLY_DEBT));
+  html += statCard('Cash Owed to PF', $s(cashOwed));
 
-    // FY26 Progress with progress bar
-    var fy26Pct = Math.min(kpi.fy26Pct, 100);
-    var fy26Color = fy26Pct >= 50 ? 'green' : fy26Pct >= 30 ? 'amber' : 'red';
-    html += '<div class="stat-card">';
-    html += '<div class="stat-label">FY26 Progress</div>';
-    html += '<div class="stat-value">' + fmtPct(kpi.fy26Pct) + '</div>';
-    html += '<div class="progress-bar" style="height:6px;margin-top:4px"><div class="progress-fill ' + fy26Color + '" style="width:' + fy26Pct + '%"></div></div>';
-    html += '<div class="stat-change">' + fmtShort(kpi.fy26Revenue) + ' of $6M</div>';
-    html += '</div>';
+  html += '</div>';
 
-    html += '</div></div>';
+  // ===== ROW 3: Two side-by-side tables =====
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1rem">';
 
-    // ==== FINANCIAL KPIs (Row 2) ====
-    html += '<div class="card" style="margin-bottom:16px">';
-    html += '<div class="card-header"><span class="card-title">Financial</span><span class="card-subtitle">Cash position and obligations</span></div>';
-    html += '<div class="grid grid-3" style="padding:12px;gap:12px">';
+  // -- Left: Active Projects Table --
+  html += '<div class="stat-card" style="padding:1rem">';
+  html += '<div style="' + STAT_LABEL + ';margin-bottom:0.75rem">Active Projects</div>';
 
-    html += statCard('Total Contract Value', fmtShort(kpi.totalContractValue), projects.length + ' projects');
-    html += statCard('Total Billed', fmtShort(kpi.totalBilled), 'Cash received');
-    html += statCard('Unpaid AR', fmtShort(kpi.totalUnpaid), 'Money owed to PF');
+  var sortedActive = activeProjects.slice().sort(function (a, b) { return safe(b.work_pct_complete) - safe(a.work_pct_complete); });
 
-    html += '</div>';
-    html += '<div class="grid grid-3" style="padding:0 12px 12px;gap:12px">';
-
-    html += statCard('Retainage Held', fmtShort(kpi.retainageHeld), 'Locked until closeout');
-    html += statCard('Monthly Debt Service', fmtCurrency(kpi.monthlyDebtService), 'SBA loan @ 11%');
-    html += statCard('Cash Needed', fmtShort(kpi.cashNeeded), 'AR + retainage to collect');
-
-    html += '</div></div>';
-
-    // ==== TWO SIDE-BY-SIDE CARDS ====
-    html += '<div class="grid grid-2" style="gap:16px;margin-bottom:16px">';
-
-    // ---- Left: Active Projects Table ----
-    html += '<div class="card">';
-    html += '<div class="card-header"><span class="card-title">Active Projects</span><span class="card-subtitle">' + kpi.activeProjects.length + ' in progress</span></div>';
-    html += '<div class="table-wrap">';
-    html += '<table><thead><tr>';
-    html += '<th>Project #</th><th>Name</th><th>GC</th><th>Value</th><th>% Complete</th><th>Status</th>';
+  if (sortedActive.length === 0) {
+    html += '<div style="color:#888;font-size:0.8rem">No active projects</div>';
+  } else {
+    html += '<table style="width:100%;border-collapse:collapse;font-size:0.78rem">';
+    html += '<thead><tr style="border-bottom:1px solid #e0e0e0;text-align:left">';
+    html += '<th style="padding:0.3rem 0.4rem">Project #</th>';
+    html += '<th style="padding:0.3rem 0.4rem">Name</th>';
+    html += '<th style="padding:0.3rem 0.4rem;text-align:right">Value</th>';
+    html += '<th style="padding:0.3rem 0.4rem;text-align:center">% Complete</th>';
+    html += '<th style="padding:0.3rem 0.4rem">GC</th>';
     html += '</tr></thead><tbody>';
-
-    if (kpi.activeProjects.length === 0) {
-      html += '<tr><td colspan="6" style="text-align:center;opacity:0.5">No active projects</td></tr>';
-    } else {
-      kpi.activeProjects.forEach(function (p) {
-        var pct = Math.round((p.work_pct_complete || 0) * 100);
-        var pctColor = pct >= 80 ? 'green' : pct >= 40 ? 'amber' : '';
-        html += '<tr>';
-        html += '<td>' + (p.project_number || '--') + '</td>';
-        html += '<td>' + (p.name || '--') + '</td>';
-        html += '<td>' + truncate(p.gc_name, 20) + '</td>';
-        html += '<td>' + fmtCurrency(p.subcontract_value) + '</td>';
-        html += '<td>';
-        html += '<div class="progress-bar" style="height:6px;margin-bottom:2px"><div class="progress-fill ' + pctColor + '" style="width:' + pct + '%"></div></div>';
-        html += '<span style="font-size:11px">' + pct + '%</span>';
-        html += '</td>';
-        html += '<td><span class="badge-status ' + contractStatusBadge(p.contract_status) + '">' + (p.contract_status || '--') + '</span></td>';
-        html += '</tr>';
-      });
-    }
-
-    html += '</tbody></table></div></div>';
-
-    // ---- Right: Recent Bid Activity ----
-    html += '<div class="card">';
-    html += '<div class="card-header"><span class="card-title">Recent Bid Activity</span><span class="card-subtitle">Last 8 bids by invite date</span></div>';
-    html += '<div class="table-wrap">';
-    html += '<table><thead><tr>';
-    html += '<th>Project</th><th>GC</th><th>Status</th><th>Value</th>';
-    html += '</tr></thead><tbody>';
-
-    if (kpi.recentBids.length === 0) {
-      html += '<tr><td colspan="4" style="text-align:center;opacity:0.5">No bid data</td></tr>';
-    } else {
-      kpi.recentBids.forEach(function (b) {
-        html += '<tr>';
-        html += '<td>' + truncate(b.name, 28) + '</td>';
-        html += '<td>' + truncate(b.gc_name, 18) + '</td>';
-        html += '<td><span class="badge-status ' + statusBadgeClass(b.bid_status) + '">' + (b.bid_status || '--') + '</span></td>';
-        html += '<td>' + fmtShort(b.bid_value) + '</td>';
-        html += '</tr>';
-      });
-    }
-
-    html += '</tbody></table></div></div>';
-
-    html += '</div>'; // end grid-2
-
-    // ==== ALERTS ====
-    html += '<div class="card">';
-    html += '<div class="card-header"><span class="card-title">Quick Alerts</span><span class="card-subtitle">' + kpi.alerts.length + ' items flagged</span></div>';
-
-    if (kpi.alerts.length === 0) {
-      html += '<div style="padding:16px;opacity:0.5;text-align:center">No alerts -- all clear</div>';
-    } else {
-      html += '<div style="padding:8px 12px">';
-      kpi.alerts.forEach(function (a) {
-        html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.06)">';
-        html += '<span class="badge-status ' + a.type + '" style="flex-shrink:0">' + alertLabel(a.type) + '</span>';
-        html += '<span>' + a.text + '</span>';
-        html += '</div>';
-      });
+    sortedActive.forEach(function (p) {
+      var w = safe(p.work_pct_complete);
+      html += '<tr style="border-bottom:1px solid #f0f0f0">';
+      html += '<td style="padding:0.3rem 0.4rem">' + esc(p.project_number) + '</td>';
+      html += '<td style="padding:0.3rem 0.4rem">' + esc(p.name) + '</td>';
+      html += '<td style="padding:0.3rem 0.4rem;text-align:right">' + $(p.subcontract_value) + '</td>';
+      html += '<td style="padding:0.3rem 0.4rem;text-align:center">';
+      html += '<div style="display:flex;align-items:center;gap:0.3rem;justify-content:center">';
+      html += '<div style="width:50px;height:6px;background:#e8e8e8;border-radius:3px;overflow:hidden">';
+      html += '<div style="width:' + Math.round(w * 100) + '%;height:100%;background:#005A91;border-radius:3px"></div>';
       html += '</div>';
-    }
+      html += '<span style="font-size:0.72rem">' + pct(w) + '</span>';
+      html += '</div>';
+      html += '</td>';
+      html += '<td style="padding:0.3rem 0.4rem">' + esc(p.gc_name) + '</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+  }
+  html += '</div>';
 
+  // -- Right: Recent Bids Table --
+  html += '<div class="stat-card" style="padding:1rem">';
+  html += '<div style="' + STAT_LABEL + ';margin-bottom:0.75rem">Recent Bids</div>';
+
+  var sortedBids = bids.slice().sort(function (a, b) {
+    return (b.invite_date || '').localeCompare(a.invite_date || '');
+  }).slice(0, 8);
+
+  if (sortedBids.length === 0) {
+    html += '<div style="color:#888;font-size:0.8rem">No bids</div>';
+  } else {
+    html += '<table style="width:100%;border-collapse:collapse;font-size:0.78rem">';
+    html += '<thead><tr style="border-bottom:1px solid #e0e0e0;text-align:left">';
+    html += '<th style="padding:0.3rem 0.4rem">Project</th>';
+    html += '<th style="padding:0.3rem 0.4rem">GC</th>';
+    html += '<th style="padding:0.3rem 0.4rem;text-align:center">Status</th>';
+    html += '<th style="padding:0.3rem 0.4rem;text-align:right">Value</th>';
+    html += '</tr></thead><tbody>';
+    sortedBids.forEach(function (b) {
+      html += '<tr style="border-bottom:1px solid #f0f0f0">';
+      html += '<td style="padding:0.3rem 0.4rem">' + esc(b.name) + '</td>';
+      html += '<td style="padding:0.3rem 0.4rem">' + esc(b.gc_name) + '</td>';
+      html += '<td style="padding:0.3rem 0.4rem;text-align:center">' + badge(b.bid_status) + '</td>';
+      html += '<td style="padding:0.3rem 0.4rem;text-align:right">' + $(b.bid_value) + '</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+  }
+  html += '</div>';
+
+  html += '</div>'; // end grid-2
+
+  // ===== ALERTS =====
+  var alerts = [];
+
+  // Projects > 80% complete
+  activeProjects.forEach(function (p) {
+    if (safe(p.work_pct_complete) > 0.8) {
+      alerts.push({ color: '#e67e22', text: esc(p.name) + ' is ' + pct(p.work_pct_complete) + ' complete -- closeout soon' });
+    }
+  });
+
+  // NEED FOLLOW UP bids
+  bids.forEach(function (b) {
+    if (b.bid_status === 'NEED FOLLOW UP') {
+      alerts.push({ color: '#e74c3c', text: esc(b.name) + ' needs follow up' });
+    }
+  });
+
+  // Retainage > $50K
+  if (retainageHeld > 50000) {
+    alerts.push({ color: '#2ecc71', text: 'Total retainage ' + $(retainageHeld) + ' -- recovery opportunity' });
+  }
+
+  if (alerts.length > 0) {
+    html += '<div class="stat-card" style="padding:1rem">';
+    html += '<div style="' + STAT_LABEL + ';margin-bottom:0.75rem">Alerts</div>';
+    html += '<ul style="list-style:none;padding:0;margin:0">';
+    alerts.forEach(function (a) {
+      html += '<li style="padding:0.35rem 0;font-size:0.8rem;display:flex;align-items:center;gap:0.5rem">';
+      html += '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + a.color + ';flex-shrink:0"></span>';
+      html += a.text;
+      html += '</li>';
+    });
+    html += '</ul>';
     html += '</div>';
-
-    html += '</div>'; // end #ceodash-app
-
-    root.innerHTML = html;
   }
 
-  // ---- MINOR HELPERS ----
-  function pipelineBidsCount() {
-    var pipelineStatuses = [
-      'Will Bid', 'Submitted', 'Budget Pricing',
-      'Submitted - Edging', 'New Lead', 'NEED FOLLOW UP'
-    ];
-    return bids.filter(function (b) {
-      return pipelineStatuses.indexOf(b.bid_status) !== -1;
-    }).length;
+  root.innerHTML = html;
+
+  // ---- HELPER: stat card ----
+  function statCard(label, value) {
+    return '<div class="stat-card" style="padding:0.75rem 1rem">'
+      + '<div style="' + STAT_LABEL + '">' + label + '</div>'
+      + '<div style="' + STAT_VALUE + '">' + value + '</div>'
+      + '</div>';
   }
 
-  function truncate(str, max) {
-    if (!str) return '--';
-    return str.length > max ? str.substring(0, max - 1) + '\u2026' : str;
+  // ---- HELPER: stat card with progress bar ----
+  function statCardProgress(label, value, ratio) {
+    var w = Math.round(safe(ratio) * 100);
+    return '<div class="stat-card" style="padding:0.75rem 1rem">'
+      + '<div style="' + STAT_LABEL + '">' + label + '</div>'
+      + '<div style="' + STAT_VALUE + '">' + value + '</div>'
+      + '<div style="width:100%;height:6px;background:#e8e8e8;border-radius:3px;margin-top:0.4rem;overflow:hidden">'
+      + '<div style="width:' + w + '%;height:100%;background:#005A91;border-radius:3px"></div>'
+      + '</div>'
+      + '</div>';
   }
 
-  function contractStatusBadge(status) {
-    if (!status) return 'pending';
-    if (status.indexOf('FE') !== -1) return 'bid';
-    if (status.indexOf('Pending') !== -1) return 'review';
-    return 'active';
+  // ---- HELPER: badge ----
+  function badge(status) {
+    var s = (status || '').trim();
+    var type = 'closed';
+    if (s === 'Awarded' || s === 'Completed') type = 'bid';
+    else if (s === 'Submitted' || s === 'Submitted - Edging') type = 'review';
+    else if (s === 'Will Bid' || s === 'New Lead') type = 'active';
+    else if (s === 'Budget Pricing' || s === 'NEED FOLLOW UP') type = 'pending';
+
+    var colors = {
+      bid: 'background:#d4edda;color:#155724',
+      review: 'background:#cce5ff;color:#004085',
+      active: 'background:#fff3cd;color:#856404',
+      pending: 'background:#fce4ec;color:#7f1d1d',
+      closed: 'background:#e8e8e8;color:#555'
+    };
+
+    return '<span style="display:inline-block;padding:0.15rem 0.5rem;border-radius:4px;font-size:0.7rem;font-weight:600;' + colors[type] + '">' + esc(s) + '</span>';
   }
 
-  function alertLabel(type) {
-    switch (type) {
-      case 'review': return 'CLOSEOUT';
-      case 'pending': return 'ACTION';
-      case 'active': return 'CASH';
-      default: return 'INFO';
-    }
+  // ---- HELPER: escape HTML ----
+  function esc(v) {
+    if (v == null) return '';
+    return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
-
-  // ---- INIT ----
-  render();
 
 })();
