@@ -67,7 +67,7 @@
   function statCard(label, value, subtitle) {
     return '<div class="stat-card">' +
       '<div class="stat-label">' + label + '</div>' +
-      '<div class="stat-value">' + value + '</div>' +
+      '<div class="stat-value" style="font-size:1.1rem">' + value + '</div>' +
       (subtitle ? '<div class="stat-change">' + subtitle + '</div>' : '') +
       '</div>';
   }

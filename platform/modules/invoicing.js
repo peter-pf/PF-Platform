@@ -436,7 +436,7 @@
   function statCard(label, value, change, direction) {
     var h = '<div class="stat-card">';
     h += '<span class="stat-label">' + label + '</span>';
-    h += '<span class="stat-value">' + value + '</span>';
+    h += '<span class="stat-value" style="font-size:1.1rem">' + value + '</span>';
     if (change) {
       h += '<span class="stat-change' + (direction ? ' ' + direction : '') + '">' + change + '</span>';
     }

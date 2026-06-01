@@ -44,14 +44,18 @@
 
   // ---- HELPERS ----
   function fmt(n) {
+    n = Number(n) || 0;
+    if (isNaN(n)) return '$0';
     if (n >= 1000000) return '$' + (n / 1000000).toFixed(2) + 'M';
     if (n >= 1000) return '$' + (n / 1000).toFixed(0) + 'K';
     return '$' + n.toLocaleString();
   }
   function fmtFull(n) {
+    n = Number(n) || 0;
+    if (isNaN(n)) return '$0';
     return '$' + Math.round(n).toLocaleString();
   }
-  function pct(n) { return Math.round(n) + '%'; }
+  function pct(n) { n = Number(n) || 0; if (isNaN(n)) return '0%'; return Math.round(n) + '%'; }
 
   function monthsElapsed() {
     var now = new Date();
@@ -72,12 +76,12 @@
       return b.bid_status === 'Awarded' || b.bid_status === 'Completed';
     });
     var awardedRevenue = awardedFromBids.reduce(function (s, b) {
-      return s + (b.bid_value || 0);
+      return s + (Number(b.bid_value) || 0);
     }, 0);
 
     // Also count project contract values
     var projectRevenue = projects.reduce(function (s, p) {
-      return s + (p.subcontract_value || 0);
+      return s + (Number(p.subcontract_value) || 0);
     }, 0);
 
     // Use whichever is larger (avoid double-counting)
@@ -306,7 +310,7 @@
   function statCard(label, value, change, direction) {
     var h = '<div class="stat-card">';
     h += '<span class="stat-label">' + label + '</span>';
-    h += '<span class="stat-value">' + value + '</span>';
+    h += '<span class="stat-value" style="font-size:1.1rem">' + value + '</span>';
     if (change) {
       h += '<span class="stat-change' + (direction ? ' ' + direction : '') + '">' + change + '</span>';
     }
