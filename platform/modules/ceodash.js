@@ -18,19 +18,19 @@
 
   // ---- HELPERS ----
   function fmtCurrency(v) {
-    if (v == null || isNaN(v)) return '--';
+    if (v == null || v === 'None' || v === '' || isNaN(Number(v))) return '--'; v = Number(v);
     return '$' + v.toLocaleString('en-US', { maximumFractionDigits: 0 });
   }
 
   function fmtShort(v) {
-    if (v == null || isNaN(v)) return '--';
+    if (v == null || v === 'None' || v === '' || isNaN(Number(v))) return '--'; v = Number(v);
     if (v >= 1000000) return '$' + (v / 1000000).toFixed(1) + 'M';
     if (v >= 1000) return '$' + Math.round(v / 1000) + 'K';
     return '$' + Math.round(v);
   }
 
   function fmtPct(v) {
-    if (v == null || isNaN(v)) return '--';
+    if (v == null || v === 'None' || v === '' || isNaN(Number(v))) return '--'; v = Number(v);
     return v.toFixed(1) + '%';
   }
 
