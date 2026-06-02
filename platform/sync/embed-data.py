@@ -39,6 +39,23 @@ def load_json(filename):
         return json.load(f)
 
 
+def is_header_row(rec, header_markers):
+    """A spreadsheet header row leaks in when a value equals its column LABEL.
+    Drop the record if any (field, label) pair matches. [fixes C1/SEC data-leak]"""
+    for field, label in header_markers.items():
+        if str(rec.get(field, "")).strip() == label:
+            return True
+    return False
+
+
+def drop_header_rows(records, header_markers, label):
+    cleaned = [r for r in records if not is_header_row(r, header_markers)]
+    dropped = len(records) - len(cleaned)
+    if dropped:
+        print(f"  Dropped {dropped} header/junk row(s) from {label}")
+    return cleaned
+
+
 def main():
     print("embed-data.py — Writing live data to separate JS file")
     print(f"  Data dir: {DATA_DIR}")
@@ -50,11 +67,23 @@ def main():
     bd_master = load_json("bd-master.json")
     sync_meta = load_json("sync-meta.json")
 
+    # Strip spreadsheet header rows that leak in as fake records. [C1 fix]
+    bids = drop_header_rows(
+        bid_log.get("bids", []),
+        {"number": "Project Number", "name": "Project Name", "city_state": "City / State"},
+        "LIVE_BIDS",
+    )
+    projects = drop_header_rows(
+        project_master.get("projects", []),
+        {"project_number": "Project #", "name": "Project Name", "contract_status": "Contract Status"},
+        "LIVE_PROJECTS",
+    )
+
     blob = {
-        "LIVE_BIDS": bid_log.get("bids", []),
+        "LIVE_BIDS": bids,
         "LIVE_STONE_COSTS": bid_log.get("stone_costs", []),
         "LIVE_FY_GOALS": bid_log.get("fy_goals", {}),
-        "LIVE_PROJECTS": project_master.get("projects", []),
+        "LIVE_PROJECTS": projects,
         "LIVE_COST_CODES": project_master.get("cost_codes", []),
         "LIVE_KPIS": project_master.get("kpis", {}),
         "LIVE_ESTIMATE": estimate_template.get("line_items", []),
