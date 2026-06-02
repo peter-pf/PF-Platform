@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pier Foundations — QuickBooks Setup Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --header:#1E2A38;
+  --accent:#006DB0;
+  --accent-dark:#005A91;
+  --accent-light:#E0F0FF;
+  --text:#2B2F36;
+  --heading:#000000;
+  --muted:#5A6370;
+  --page:#F9FAFD;
+  --card:#ffffff;
+  --subtle:#F3F5F8;
+  --border:#C8D5DC;
+  --table-head:#2B3E50;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  background:var(--page);
+  color:var(--text);
+  line-height:1.6;
+  font-size:15px;
+}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+
+/* ---------- HEADER ---------- */
+.site-header{
+  background:var(--header);
+  color:#fff;
+  padding:38px 40px 30px;
+}
+.site-header .inner{max-width:1180px;margin:0 auto;}
+.site-header h1{
+  font-size:2rem;font-weight:700;color:#fff;letter-spacing:-0.5px;
+}
+.site-header .sub{
+  margin-top:8px;color:#B9C6D2;font-size:1.02rem;font-weight:400;
+}
+.access-bar{
+  background:var(--accent-dark);
+  color:#fff;
+  padding:11px 40px;
+  font-size:0.92rem;
+  border-top:1px solid rgba(255,255,255,0.08);
+}
+.access-bar .inner{max-width:1180px;margin:0 auto;}
+.access-bar code{
+  background:rgba(255,255,255,0.15);
+  padding:2px 7px;border-radius:4px;font-family:ui-monospace,Menlo,monospace;
+  font-size:0.86rem;
+}
+
+/* ---------- LAYOUT ---------- */
+.layout{
+  max-width:1180px;margin:0 auto;padding:34px 40px 80px;
+  display:grid;grid-template-columns:240px 1fr;gap:40px;align-items:start;
+}
+/* TOC */
+.toc{
+  position:sticky;top:20px;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:18px 18px 20px;
+  max-height:calc(100vh - 40px);
+  overflow-y:auto;
+}
+.toc h3{
+  font-size:0.74rem;font-weight:700;text-transform:uppercase;
+  letter-spacing:1px;color:var(--muted);margin-bottom:12px;
+}
+.toc ul{list-style:none;}
+.toc li{margin:2px 0;}
+.toc a{
+  display:block;padding:5px 8px;border-radius:6px;
+  font-size:0.86rem;color:var(--text);line-height:1.35;
+}
+.toc a:hover{background:var(--accent-light);text-decoration:none;color:var(--accent-dark);}
+
+/* CONTENT */
+.content{min-width:0;}
+.section-band{
+  display:flex;align-items:center;gap:12px;
+  margin:38px 0 16px;
+}
+.section-band:first-child{margin-top:0;}
+.section-band .badge{
+  background:var(--accent);color:#fff;
+  font-size:0.7rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+  padding:5px 11px;border-radius:20px;
+}
+.section-band h2{
+  font-size:1.35rem;font-weight:700;color:var(--heading);
+}
+
+.lead{
+  background:var(--accent-light);
+  border:1px solid #BBD9F0;
+  border-radius:10px;
+  padding:18px 22px;
+  margin-bottom:22px;
+  color:#1B3B52;
+}
+.lead p{margin:0 0 8px;}
+.lead p:last-child{margin-bottom:0;}
+.lead strong{color:var(--accent-dark);}
+
+/* CARDS */
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-left:4px solid var(--accent);
+  border-radius:10px;
+  padding:20px 24px;
+  margin-bottom:18px;
+  box-shadow:0 1px 2px rgba(30,42,56,0.04);
+}
+.card h3{
+  font-size:1.1rem;font-weight:700;color:var(--heading);
+  display:flex;align-items:baseline;gap:10px;margin-bottom:10px;
+}
+.card h3 .num{
+  color:var(--accent);font-size:0.95rem;font-weight:700;
+  min-width:22px;
+}
+.card p{margin-bottom:10px;}
+.card .label{
+  font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;
+  color:var(--muted);margin:14px 0 4px;
+}
+.card ul,.card ol{margin:0 0 4px 20px;}
+.card li{margin:4px 0;}
+
+/* CALLOUT (flag / important) */
+.callout{
+  border-radius:8px;
+  padding:14px 18px;
+  margin:14px 0;
+  font-size:0.92rem;
+  border-left:4px solid var(--accent);
+  background:var(--subtle);
+}
+.callout .tag{
+  display:inline-block;font-size:0.66rem;font-weight:700;letter-spacing:0.8px;
+  text-transform:uppercase;padding:2px 8px;border-radius:4px;margin-right:8px;
+  background:var(--accent);color:#fff;
+}
+.callout.warn{
+  background:#FFF3D6;border-left-color:#9A6B00;color:#5A4100;
+}
+.callout.warn .tag{background:#9A6B00;}
+.callout.rec{
+  background:#E2F4E4;border-left-color:#1E7A33;color:#13501F;
+}
+.callout.rec .tag{background:#1E7A33;}
+.callout strong{font-weight:700;}
+
+/* TABLE */
+table{
+  width:100%;border-collapse:collapse;margin:8px 0 4px;
+  font-size:0.9rem;
+}
+th{
+  background:var(--table-head);color:#fff;text-align:left;
+  padding:9px 12px;font-weight:600;font-size:0.82rem;
+}
+td{padding:8px 12px;border-bottom:1px solid var(--border);vertical-align:top;}
+tr:nth-child(even) td{background:var(--subtle);}
+td.code,th.code{font-family:ui-monospace,Menlo,monospace;font-size:0.84rem;white-space:nowrap;}
+.tbl-cap{font-size:0.78rem;color:var(--muted);margin:4px 0 16px;font-style:italic;}
+
+/* CODE BLOCK */
+pre{
+  background:#1E2A38;color:#D7E3EE;
+  border-radius:8px;padding:16px 18px;margin:10px 0 6px;
+  overflow-x:auto;font-family:ui-monospace,Menlo,monospace;
+  font-size:0.82rem;line-height:1.55;
+}
+pre .c{color:#7E97AC;}
+
+/* FOOTER */
+.site-footer{
+  background:var(--header);color:#B9C6D2;text-align:center;
+  padding:26px 20px;font-size:0.88rem;
+}
+.site-footer a{color:#7FC2EA;}
+
+/* RESPONSIVE */
+@media (max-width:860px){
+  .layout{grid-template-columns:1fr;padding:24px 20px 60px;}
+  .toc{position:static;max-height:none;}
+  .site-header,.access-bar{padding-left:20px;padding-right:20px;}
+}
+
+/* PRINT */
+@media print{
+  body{background:#fff;font-size:11.5px;}
+  .toc{display:none;}
+  .layout{display:block;max-width:100%;padding:0;}
+  .site-header{padding:18px 0;}
+  .access-bar{background:#fff;color:#000;border:1px solid var(--border);}
+  .access-bar code{background:#eee;}
+  .card,.callout{break-inside:avoid;box-shadow:none;}
+  .section-band{break-after:avoid;}
+  pre{background:#f3f3f3;color:#000;border:1px solid var(--border);}
+  pre .c{color:#666;}
+  a{color:#000;text-decoration:none;}
+}
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="inner">
+    <h1>Pier Foundations — QuickBooks Setup Guide</h1>
+    <div class="sub">Chart of accounts, job costing &amp; reporting configuration | June 2026</div>
+  </div>
+</header>
+<div class="access-bar">
+  <div class="inner">A ready-to-implement guide for setting up QuickBooks so the chart of accounts and job costing align with the platform's cost codes (<code>5000</code>–<code>7900</code>). Built from PF's CPA-level accounting research.</div>
+</div>
+
+<div class="layout">
+
+  <!-- TABLE OF CONTENTS -->
+  <nav class="toc">
+    <h3>Contents</h3>
+    <ul>
+      <li><a href="#s1">1. Before You Start</a></li>
+      <li><a href="#s2">2. Chart of Accounts</a></li>
+      <li><a href="#s3">3. Job Costing Setup</a></li>
+      <li><a href="#s4">4. Progress Invoicing &amp; WIP</a></li>
+      <li><a href="#s5">5. Essential Reports</a></li>
+      <li><a href="#s6">6. Platform Integration</a></li>
+      <li><a href="#s7">7. Tax-Smart Account Setup</a></li>
+    </ul>
+  </nav>
+
+  <main class="content">
+
+  <div class="lead">
+    <p><strong>Why this guide exists.</strong> When PF connects QuickBooks to the platform, the two systems need to speak the same language. This guide configures QuickBooks so its chart of accounts and job-cost structure mirror the platform's cost-code system (<strong>5000–7900</strong>) used in the master estimate template — making future integration clean and automatic.</p>
+    <p>Set this up <strong>once, correctly, before recording more transactions.</strong> Retrofitting a chart of accounts after months of data is painful. Doing it now is straightforward.</p>
+  </div>
+
+  <!-- SECTION 1 -->
+  <div class="section-band" id="s1">
+    <span class="badge">Section 1</span>
+    <h2>Before You Start</h2>
+  </div>
+
+  <div class="card">
+    <h3><span class="num">1.1</span> What's Needed From Brad</h3>
+    <table>
+      <thead><tr><th>Item</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td><strong>QuickBooks version &amp; edition</strong></td><td>Determines which features are available (progress invoicing, native job costing). See the recommendation in 1.2.</td></tr>
+        <tr><td><strong>Admin login</strong></td><td>Required to create accounts, set up Customer:Job hierarchy, and configure reports.</td></tr>
+        <tr><td><strong>Confirmation: new file or existing?</strong></td><td>A fresh company file is ideal. If an existing file has transactions, we restructure the chart of accounts carefully and remap.</td></tr>
+        <tr><td><strong>Bank &amp; credit card details</strong></td><td>To connect bank feeds for daily transaction import and monthly reconciliation.</td></tr>
+        <tr><td><strong>Workers' comp class codes &amp; rates</strong></td><td>Critical for correct labor burden — see Section 3 (PF's current 18% burden is likely understated).</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3><span class="num">1.2</span> QuickBooks Online vs. Desktop</h3>
+    <p>For a specialty foundation contractor doing job-costed, progress-billed work, <strong>QuickBooks Desktop has materially better native construction features</strong> than QuickBooks Online.</p>
+    <table>
+      <thead><tr><th>Feature</th><th>QB Desktop (Premier Contractor / Enterprise)</th><th>QB Online</th></tr></thead>
+      <tbody>
+        <tr><td>Customer:Job hierarchy</td><td>Native, multi-level</td><td>Projects feature (newer, less mature)</td></tr>
+        <tr><td>Progress invoicing from estimates</td><td>Built in</td><td>Limited</td></tr>
+        <tr><td>Job Profitability reports</td><td>Built in, detailed</td><td>Basic project profitability</td></tr>
+        <tr><td>Estimates vs. Actuals</td><td>Built in</td><td>Not native</td></tr>
+        <tr><td>Estimate-to-invoice-to-job-cost link</td><td>Tight integration</td><td>Looser</td></tr>
+        <tr><td>Access</td><td>Desktop / hosted</td><td>Anywhere, browser-based</td></tr>
+      </tbody>
+    </table>
+    <div class="callout rec">
+      <span class="tag">Recommendation</span>
+      <strong>QuickBooks Desktop Premier (Contractor Edition)</strong> for PF's current size, or <strong>Enterprise</strong> if more than three simultaneous users or higher transaction volume is expected. Desktop's native job costing and WIP-friendly reporting are worth the trade-off versus QBO's anywhere-access convenience. If remote access matters, host the Desktop file (Intuit hosting or a third-party host) rather than dropping to QBO.
+    </div>
+    <p class="tbl-cap">Note: QuickBooks Online still works and integrates with the platform — but expect to lean more on the external WIP spreadsheet workflow (Section 4) because QBO lacks Estimates vs. Actuals.</p>
+  </div>
+
+  <!-- SECTION 2 -->
+  <div class="section-band" id="s2">
+    <span class="badge">Section 2</span>
+    <h2>Chart of Accounts</h2>
+  </div>
+
+  <div class="lead">
+    <p>This chart of accounts aligns with PF's existing <strong>5000–7900 cost-code system</strong> from the master estimate template. Set up exactly as shown so that platform cost codes map 1:1 to QuickBooks accounts. Account numbers must be enabled in QuickBooks (Preferences → Accounting → Use account numbers).</p>
+  </div>
+
+  <div class="card">
+    <h3><span class="num">2.1</span> Assets &mdash; 1000–1999</h3>
+    <table>
+      <thead><tr><th class="code">No.</th><th>Account</th><th>Type</th></tr></thead>
+      <tbody>
+        <tr><td class="code">1000</td><td>Checking — Operating</td><td>Bank</td></tr>
+        <tr><td class="code">1010</td><td>Checking — Payroll</td><td>Bank</td></tr>
+        <tr><td class="code">1020</td><td>Savings</td><td>Bank</td></tr>
+        <tr><td class="code">1200</td><td>Accounts Receivable</td><td>Accounts Receivable</td></tr>
+        <tr><td class="code">1210</td><td>Retainage Receivable</td><td>Other Current Asset</td></tr>
+        <tr><td class="code">1230</td><td>Costs in Excess of Billings (WIP Asset / under-billed)</td><td>Other Current Asset</td></tr>
+        <tr><td class="code">1300</td><td>Prepaid Insurance</td><td>Other Current Asset</td></tr>
+        <tr><td class="code">1310</td><td>Prepaid Other</td><td>Other Current Asset</td></tr>
+        <tr><td class="code">1500</td><td>Equipment — Heavy (Cat 336, excavators)</td><td>Fixed Asset</td></tr>
+        <tr><td class="code">1510</td><td>Equipment — Support (vibroflots, jacks)</td><td>Fixed Asset</td></tr>
+        <tr><td class="code">1520</td><td>Vehicles (F-450, F-550, trailer)</td><td>Fixed Asset</td></tr>
+        <tr><td class="code">1530</td><td>Office Equipment</td><td>Fixed Asset</td></tr>
+        <tr><td class="code">1540</td><td>Leasehold Improvements</td><td>Fixed Asset</td></tr>
+        <tr><td class="code">1600</td><td>Accumulated Depreciation — Equipment</td><td>Fixed Asset (contra)</td></tr>
+        <tr><td class="code">1610</td><td>Accumulated Depreciation — Vehicles</td><td>Fixed Asset (contra)</td></tr>
+        <tr><td class="code">1620</td><td>Accumulated Depreciation — Office</td><td>Fixed Asset (contra)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3><span class="num">2.2</span> Liabilities &mdash; 2000–2999</h3>
+    <table>
+      <thead><tr><th class="code">No.</th><th>Account</th><th>Type</th></tr></thead>
+      <tbody>
+        <tr><td class="code">2000</td><td>Accounts Payable</td><td>Accounts Payable</td></tr>
+        <tr><td class="code">2010</td><td>Retainage Payable (to subs)</td><td>Other Current Liability</td></tr>
+        <tr><td class="code">2020</td><td>Billings in Excess of Costs (WIP Liability / over-billed)</td><td>Other Current Liability</td></tr>
+        <tr><td class="code">2100</td><td>Credit Card — Company</td><td>Credit Card</td></tr>
+        <tr><td class="code">2200</td><td>Accrued Wages</td><td>Other Current Liability</td></tr>
+        <tr><td class="code">2210</td><td>Accrued Payroll Taxes</td><td>Other Current Liability</td></tr>
+        <tr><td class="code">2220</td><td>Accrued Workers' Comp</td><td>Other Current Liability</td></tr>
+        <tr><td class="code">2300</td><td>Current Portion — SBA Loan</td><td>Other Current Liability</td></tr>
+        <tr><td class="code">2310</td><td>Current Portion — Equipment Notes</td><td>Other Current Liability</td></tr>
+        <tr><td class="code">2400</td><td>SBA Loan (Long-Term)</td><td>Long Term Liability</td></tr>
+        <tr><td class="code">2410</td><td>Equipment Notes (Long-Term)</td><td>Long Term Liability</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3><span class="num">2.3</span> Equity &mdash; 3000–3999</h3>
+    <table>
+      <thead><tr><th class="code">No.</th><th>Account</th><th>Type</th></tr></thead>
+      <tbody>
+        <tr><td class="code">3000</td><td>Members' Equity — Brad (33.4%)</td><td>Equity</td></tr>
+        <tr><td class="code">3010</td><td>Members' Equity — Jonathan (33.3%)</td><td>Equity</td></tr>
+        <tr><td class="code">3020</td><td>Members' Equity — Derek (33.3%)</td><td>Equity</td></tr>
+        <tr><td class="code">3100</td><td>Members' Distributions — Brad</td><td>Equity</td></tr>
+        <tr><td class="code">3110</td><td>Members' Distributions — Jonathan</td><td>Equity</td></tr>
+        <tr><td class="code">3120</td><td>Members' Distributions — Derek</td><td>Equity</td></tr>
+        <tr><td class="code">3200</td><td>Retained Earnings</td><td>Equity</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3><span class="num">2.4</span> Income &mdash; 4000–4999</h3>
+    <table>
+      <thead><tr><th class="code">No.</th><th>Account</th><th>Type</th></tr></thead>
+      <tbody>
+        <tr><td class="code">4000</td><td>Contract Revenue</td><td>Income</td></tr>
+        <tr><td class="code">4010</td><td>Change Order Revenue</td><td>Income</td></tr>
+        <tr><td class="code">4020</td><td>Time &amp; Material Revenue</td><td>Income</td></tr>
+        <tr><td class="code">4100</td><td>Other Income (equipment rental, etc.)</td><td>Income</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3><span class="num">2.5</span> Direct Costs / COGS &mdash; 5000–5999</h3>
+    <p>These are the accounts that map directly to platform cost-code line items in the master estimate. All should be of type <strong>Cost of Goods Sold</strong>.</p>
+    <table>
+      <thead><tr><th class="code">No.</th><th>Account</th><th>Maps to estimate</th></tr></thead>
+      <tbody>
+        <tr><td class="code">5000</td><td>Direct Labor (header)</td><td>Labor section</td></tr>
+        <tr><td class="code">5050</td><td>Labor — Crew Wages</td><td>5050</td></tr>
+        <tr><td class="code">5060</td><td>Labor — Per Diem</td><td>5060</td></tr>
+        <tr><td class="code">5070</td><td>Labor — Travel (mileage, fuel)</td><td>5070</td></tr>
+        <tr><td class="code">5080</td><td>Labor — Overtime Premium</td><td>5080</td></tr>
+        <tr><td class="code">5100</td><td>Direct Materials (header)</td><td>Materials section</td></tr>
+        <tr><td class="code">5110</td><td>Stone (#57 washed)</td><td>5110</td></tr>
+        <tr><td class="code">5120</td><td>Geotextile / Pipe</td><td>5120</td></tr>
+        <tr><td class="code">5130</td><td>Other Materials</td><td>5130</td></tr>
+        <tr><td class="code">5200</td><td>Direct Equipment (header)</td><td>Equipment section</td></tr>
+        <tr><td class="code">5210</td><td>Rig Operation (fuel, fluids)</td><td>5210</td></tr>
+        <tr><td class="code">5220</td><td>Equipment Mobilization / Demob</td><td>5220</td></tr>
+        <tr><td class="code">5230</td><td>Equipment Rental (if any)</td><td>5230</td></tr>
+        <tr><td class="code">5300</td><td>Direct Subcontractor (header)</td><td>Sub section</td></tr>
+        <tr><td class="code">5310</td><td>Surveying / Layout (Miller)</td><td>5310</td></tr>
+        <tr><td class="code">5320</td><td>Trucking / Hauling (Paddacks, Stephan)</td><td>5320</td></tr>
+        <tr><td class="code">5330</td><td>Spoils Disposal</td><td>5330</td></tr>
+        <tr><td class="code">5400</td><td>Other Direct (header)</td><td>Other section</td></tr>
+        <tr><td class="code">5410</td><td>Permits</td><td>5410</td></tr>
+        <tr><td class="code">5420</td><td>Testing / QA</td><td>5420</td></tr>
+      </tbody>
+    </table>
+    <p class="tbl-cap">Header accounts (5000, 5100, 5200, 5300, 5400) are parent/summary accounts; post transactions to the numbered sub-accounts beneath them.</p>
+  </div>
+
+  <div class="card">
+    <h3><span class="num">2.6</span> Indirect / Overhead &mdash; 6000–6999</h3>
+    <table>
+      <thead><tr><th class="code">No.</th><th>Account</th><th>Type</th></tr></thead>
+      <tbody>
+        <tr><td class="code">6000</td><td>Indirect Labor (shop, prep)</td><td>Expense</td></tr>
+        <tr><td class="code">6100</td><td>Small Tools &amp; Supplies</td><td>Expense</td></tr>
+        <tr><td class="code">6200</td><td>Equipment Depreciation</td><td>Expense</td></tr>
+        <tr><td class="code">6300</td><td>Equipment Insurance</td><td>Expense</td></tr>
+        <tr><td class="code">6400</td><td>Safety Equipment / Training</td><td>Expense</td></tr>
+        <tr><td class="code">6500</td><td>Vehicle Fuel &amp; Maintenance</td><td>Expense</td></tr>
+        <tr><td class="code">6600</td><td>Yard Expense</td><td>Expense</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3><span class="num">2.7</span> G&amp;A &mdash; 7000–7999</h3>
+    <table>
+      <thead><tr><th class="code">No.</th><th>Account</th><th>Type</th></tr></thead>
+      <tbody>
+        <tr><td class="code">7000</td><td>Officer / Partner Compensation</td><td>Expense</td></tr>
+        <tr><td class="code">7100</td><td>Office Staff Salaries</td><td>Expense</td></tr>
+        <tr><td class="code">7200</td><td>Office Rent</td><td>Expense</td></tr>
+        <tr><td class="code">7300</td><td>Professional Fees (CPA, Legal)</td><td>Expense</td></tr>
+        <tr><td class="code">7400</td><td>Insurance (GL, Umbrella, E&amp;O)</td><td>Expense</td></tr>
+        <tr><td class="code">7500</td><td>Bonding Expense</td><td>Expense</td></tr>
+        <tr><td class="code">7600</td><td>Software / Technology</td><td>Expense</td></tr>
+        <tr><td class="code">7700</td><td>Marketing / BD</td><td>Expense</td></tr>
+        <tr><td class="code">7800</td><td>Interest Expense</td><td>Expense</td></tr>
+        <tr><td class="code">7900</td><td>Depreciation — Non-Equipment</td><td>Expense</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3><span class="num">2.8</span> Other Income / Expense &mdash; 8000–8999</h3>
+    <table>
+      <thead><tr><th class="code">No.</th><th>Account</th><th>Type</th></tr></thead>
+      <tbody>
+        <tr><td class="code">8000</td><td>Interest Income</td><td>Other Income</td></tr>
+        <tr><td class="code">8100</td><td>Interest Expense (non-operating)</td><td>Other Expense</td></tr>
+        <tr><td class="code">8200</td><td>Gain / Loss on Equipment Sale</td><td>Other Income/Expense</td></tr>
+        <tr><td class="code">8300</td><td>Other Income / Expense</td><td>Other Income/Expense</td></tr>
+      </tbody>
+    </table>
+    <div class="callout">
+      <span class="tag">Key alignment</span>
+      The 5000–5999 direct-cost accounts are the backbone. Every line in the platform's master estimate posts to one of these accounts, so estimated cost and actual cost can be compared apples-to-apples. <strong>Do not invent new account numbers outside this scheme</strong> — if a new cost type appears, slot it into the nearest open number within the right range.
+    </div>
+  </div>
+
+  <!-- SECTION 3 -->
+  <div class="section-band" id="s3">
+    <span class="badge">Section 3</span>
+    <h2>Job Costing Setup</h2>
+  </div>
+
+  <div class="card">
+    <h3><span class="num">3.1</span> Customer:Job Hierarchy</h3>
+    <p>In construction QuickBooks, <strong>each project is a Job under a Customer</strong>. This is what makes every cost and dollar of revenue traceable to a specific project.</p>
+    <ul>
+      <li><strong>Customer</strong> = the general contractor or owner (e.g., "Weigand Construction").</li>
+      <li><strong>Job</strong> = the specific project (e.g., "Weigand Construction:Project Zodiac — Fort Wayne").</li>
+      <li>Every invoice, bill, check, and timesheet must be tagged to the Customer:Job. <strong>No transaction goes un-jobbed.</strong></li>
+      <li>Use a consistent naming convention: <code>GC Name : Project Name — City</code>. This keeps reports legible and matches the platform's pipeline naming.</li>
+    </ul>
+    <div class="callout">
+      <span class="tag">Discipline</span>
+      Code costs to the job <strong>at the time of entry</strong>, not in a batch later. Batch-coding from memory is where job-cost accuracy goes to die.
+    </div>
+  </div>
+
+  <div class="card">
+    <h3><span class="num">3.2</span> Mapping Cost Codes to Estimate Line Items</h3>
+    <p>The platform's master estimate produces line items by cost code. In QuickBooks, mirror this with <strong>Items</strong> (Service / Inventory-type items) that each point to the matching 5000-series account.</p>
+    <table>
+      <thead><tr><th>Platform estimate line</th><th>QB Item</th><th>Posts to account</th></tr></thead>
+      <tbody>
+        <tr><td>Crew labor</td><td>Labor:Crew</td><td class="code">5050</td></tr>
+        <tr><td>#57 stone</td><td>Material:Stone</td><td class="code">5110</td></tr>
+        <tr><td>Rig fuel &amp; operation</td><td>Equip:Rig</td><td class="code">5210</td></tr>
+        <tr><td>Mobilization</td><td>Equip:Mob</td><td class="code">5220</td></tr>
+        <tr><td>Surveying / layout</td><td>Sub:Survey</td><td class="code">5310</td></tr>
+        <tr><td>Trucking</td><td>Sub:Trucking</td><td class="code">5320</td></tr>
+        <tr><td>Spoils disposal</td><td>Sub:Spoils</td><td class="code">5330</td></tr>
+        <tr><td>Permits</td><td>Other:Permits</td><td class="code">5410</td></tr>
+        <tr><td>Testing / QA</td><td>Other:Testing</td><td class="code">5420</td></tr>
+      </tbody>
+    </table>
+    <p class="tbl-cap">Using Items (not posting directly to accounts) is what enables the Estimates vs. Actuals report — estimates and actuals both flow through the same Items.</p>
+  </div>
+
+  <div class="card">
+    <h3><span class="num">3.3</span> Labor Burden Setup</h3>
+    <div class="callout warn">
+      <span class="tag">Flag</span>
+      PF's current <strong>18% labor burden is very likely understated.</strong> For a specialty foundation contractor with high-risk workers' comp class codes, true burden is typically <strong>35–45%</strong> once workers' comp is included. An 18% figure usually captures only payroll taxes (FICA + FUTA + SUTA) and omits workers' comp entirely — which means every bid is under-costing labor by 15–30 percentage points and quietly eroding net profit.
+    </div>
+    <p class="label">Components of a correct burden</p>
+    <table>
+      <thead><tr><th>Component</th><th>Typical rate</th></tr></thead>
+      <tbody>
+        <tr><td>FICA (Social Security + Medicare)</td><td>7.65%</td></tr>
+        <tr><td>FUTA</td><td>0.6%</td></tr>
+        <tr><td>SUTA (Indiana)</td><td>2.5–5.4%</td></tr>
+        <tr><td>Workers' Comp (foundation work — high-risk class)</td><td>8–15%</td></tr>
+        <tr><td>General Liability (labor portion)</td><td>2–4%</td></tr>
+        <tr><td>PTO / Holiday</td><td>3–5%</td></tr>
+        <tr><td>Health Insurance</td><td>Per employee (est. $500–800/mo)</td></tr>
+        <tr><td><strong>Total burden (with workers' comp)</strong></td><td><strong>35–45%</strong></td></tr>
+      </tbody>
+    </table>
+    <p class="label">How to set it up in QuickBooks</p>
+    <ul>
+      <li>Enable <strong>payroll item tracking</strong> so employer taxes post automatically to the job via timesheets.</li>
+      <li>Add a <strong>burden cost item</strong> (or use QB's "billable time + costs" with a markup) to load workers' comp, GL, and PTO onto job labor.</li>
+      <li><strong>Recalculate burden by class code semi-annually</strong> using actual workers' comp rates from Brad, and feed that figure back into the platform's estimate template.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3><span class="num">3.4</span> Equipment Cost Allocation</h3>
+    <p>PF owns its rigs (~$1.63M in fixed assets). To get true job profitability, charge an <strong>internal equipment rate</strong> to each project based on hours on-site.</p>
+    <pre><span class="c"># Internal hourly rate per major unit</span>
+Ownership cost/hr = (Depreciation + Insurance + Storage) / Annual hours available
+Operating cost/hr = (Annual fuel + maintenance) / Annual hours used
+Internal rate     = Ownership cost/hr + Operating cost/hr
+
+<span class="c"># Example — Cat 336 (~$600K asset, 7-yr life)</span>
+Ownership ≈ $96,700/yr  ÷ 1,500 hrs = $64.47/hr
+Operating ≈ $45–60/hr
+<span class="c">Internal rate ≈ $110–125/hr</span></pre>
+    <ul>
+      <li>Log equipment hours per project (date, project, hours, operator).</li>
+      <li>Post the internal rate to the job (debit job equipment cost, credit an equipment-recovery account) so each project carries its real equipment cost.</li>
+      <li>Keep depreciation, insurance, and maintenance in the 6200–6500 overhead accounts; the internal rate is what allocates them to jobs.</li>
+    </ul>
+  </div>
+
+  <!-- SECTION 4 -->
+  <div class="section-band" id="s4">
+    <span class="badge">Section 4</span>
+    <h2>Progress Invoicing &amp; WIP</h2>
+  </div>
+
+  <div class="card">
+    <h3><span class="num">4.1</span> Progress Invoicing Setup</h3>
+    <ol>
+      <li>Create an <strong>Estimate</strong> for each project — the full contract value, broken into line items by Item/cost code.</li>
+      <li>Turn on progress invoicing (Edit → Preferences → Jobs &amp; Estimates → "Create invoices from a list of multiple estimates" / progress invoicing).</li>
+      <li>To bill, create an <strong>Invoice from the Estimate</strong> and select a percentage or specific amount to bill this period.</li>
+      <li>QuickBooks tracks original estimate, billed-to-date, and remaining automatically.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h3><span class="num">4.2</span> Retainage Tracking (5–10%)</h3>
+    <p>Retainage is money earned but withheld until completion. It must be tracked separately, not buried in A/R.</p>
+    <ul>
+      <li>On each progress invoice, add a <strong>negative "Retainage" line item</strong> (5–10%) that posts to <strong>1210 Retainage Receivable</strong>.</li>
+      <li>This moves the withheld amount out of regular A/R so aging reports stay accurate.</li>
+      <li>When retainage is released, reclassify it from <strong>1210</strong> back to <strong>1200 Accounts Receivable</strong>, then collect.</li>
+    </ul>
+    <pre><span class="c"># At billing (10% retainage on $166,000)</span>
+DR 1200 Accounts Receivable     $149,400
+DR 1210 Retainage Receivable     $16,600
+   CR 4000 Contract Revenue              $166,000
+
+<span class="c"># At retainage release</span>
+DR 1200 Accounts Receivable      $16,600
+   CR 1210 Retainage Receivable          $16,600</pre>
+    <div class="callout">
+      <span class="tag">Cash impact</span>
+      At $6M revenue and 10% retainage, up to <strong>$600K can be tied up at once</strong>. Track release dates per contract and submit closeout docs immediately at substantial completion — retainage is earned money, not a bonus.
+    </div>
+  </div>
+
+  <div class="card">
+    <h3><span class="num">4.3</span> Producing a WIP Schedule</h3>
+    <p>QuickBooks does <strong>not</strong> produce a Work-in-Progress schedule natively. Build it by exporting QB job data and adding cost-to-complete:</p>
+    <ol>
+      <li>Run <strong>Job Profitability Detail</strong> (revenue + actual cost per project) and export to Excel monthly.</li>
+      <li>Run <strong>Estimates vs. Actuals</strong> for current cost estimates.</li>
+      <li>Add columns: <em>Estimated Total Cost, Cost-to-Complete, % Complete, Earned Revenue, Over/(Under) Billed.</em></li>
+      <li>Update <strong>Cost-to-Complete from the project manager</strong> (the field, not accounting) each month.</li>
+    </ol>
+    <p class="label">WIP schedule structure</p>
+    <table>
+      <thead><tr><th>Project</th><th>Contract</th><th>Est. Cost</th><th>Cost to Date</th><th>% Compl</th><th>Earned Rev</th><th>Billed</th><th>Over/(Under)</th></tr></thead>
+      <tbody>
+        <tr><td>ABC Warehouse</td><td>$210,000</td><td>$176,000</td><td>$132,000</td><td>75.0%</td><td>$157,500</td><td>$145,000</td><td>($12,500)</td></tr>
+        <tr><td>DEF Data Ctr</td><td>$340,000</td><td>$285,000</td><td>$57,000</td><td>20.0%</td><td>$68,000</td><td>$85,000</td><td>$17,000</td></tr>
+        <tr><td>GHI Retail</td><td>$125,000</td><td>$105,000</td><td>$94,500</td><td>90.0%</td><td>$112,500</td><td>$100,000</td><td>($12,500)</td></tr>
+      </tbody>
+    </table>
+    <p class="tbl-cap">% Complete = Cost to Date / Estimated Total Cost. Earned Revenue = % Complete × Contract. Under-billed projects (negative) should be billed immediately; persistent over-billing draws surety scrutiny.</p>
+  </div>
+
+  <!-- SECTION 5 -->
+  <div class="section-band" id="s5">
+    <span class="badge">Section 5</span>
+    <h2>Essential Reports</h2>
+  </div>
+
+  <div class="card">
+    <h3><span class="num">5.1</span> Reports PF Needs &amp; How Often</h3>
+    <table>
+      <thead><tr><th>Report</th><th>Frequency</th><th>QuickBooks Path</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td>Job Profitability Summary</td><td>Weekly</td><td>Reports → Jobs, Time &amp; Mileage</td><td>Margin by project at a glance</td></tr>
+        <tr><td>Job Profitability Detail</td><td>Monthly</td><td>Reports → Jobs, Time &amp; Mileage</td><td>Every cost by code per job; feeds WIP</td></tr>
+        <tr><td>Estimates vs. Actuals</td><td>Per project</td><td>Reports → Jobs, Time &amp; Mileage</td><td>Estimating accuracy / fade detection</td></tr>
+        <tr><td>A/R Aging Summary</td><td>Weekly</td><td>Reports → Customers &amp; Receivables</td><td>Collections — attack the 83-day DSO</td></tr>
+        <tr><td>A/R Aging Detail</td><td>Monthly</td><td>Reports → Customers &amp; Receivables</td><td>Invoice-level overdue tracking</td></tr>
+        <tr><td>Profit &amp; Loss by Job</td><td>Monthly</td><td>Reports → Company &amp; Financial</td><td>Which jobs make money</td></tr>
+        <tr><td>Balance Sheet</td><td>Monthly</td><td>Reports → Company &amp; Financial</td><td>Working capital, equity for bonding</td></tr>
+        <tr><td>Statement of Cash Flows</td><td>Monthly</td><td>Reports → Company &amp; Financial</td><td>Cash reality vs. accrual income</td></tr>
+      </tbody>
+    </table>
+    <div class="callout rec">
+      <span class="tag">Priority</span>
+      <strong>A/R Aging weekly</strong> and a <strong>monthly WIP schedule</strong> are the two highest-leverage habits. With an 83-day DSO and a fixed SBA payment, collections discipline is survival infrastructure — and the WIP schedule is the single document sureties and banks rely on most.
+    </div>
+  </div>
+
+  <!-- SECTION 6 -->
+  <div class="section-band" id="s6">
+    <span class="badge">Section 6</span>
+    <h2>Platform Integration (Future)</h2>
+  </div>
+
+  <div class="card">
+    <h3><span class="num">6.1</span> How QuickBooks Will Flow Into the Platform</h3>
+    <p>Once the chart of accounts above is in place, QuickBooks data feeds the platform's <strong>Financial modules</strong>:</p>
+    <table>
+      <thead><tr><th>Platform module</th><th>Pulls from QuickBooks</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Budget &amp; Forecast</strong></td><td>Estimates (contract values) + actual costs by 5000-series code → budget vs. actual</td></tr>
+        <tr><td><strong>Invoicing &amp; AR</strong></td><td>Progress invoices, A/R aging, retainage (1210) → collections dashboard</td></tr>
+        <tr><td><strong>Pipeline / Bids</strong></td><td>Estimate line items map back to platform cost codes for win/loss margin analysis</td></tr>
+        <tr><td><strong>Command Center</strong></td><td>WIP over/under-billed position and DSO surfaced as health metrics</td></tr>
+      </tbody>
+    </table>
+    <div class="callout">
+      <span class="tag">Why it's clean</span>
+      The platform's cost codes <strong>already mirror this QuickBooks structure</strong> (5000–7900). Because the estimate template, the QuickBooks accounts, and the platform modules all use the same numbering, integration is a direct mapping — no translation layer, no reconciliation guesswork. <strong>Set up the chart of accounts correctly now and integration becomes plumbing, not a project.</strong>
+    </div>
+    <p class="label">Connection approach (when built)</p>
+    <ul>
+      <li><strong>QB Desktop:</strong> export reports to CSV/Excel on a schedule, or use the QuickBooks Web Connector / a sync tool to push data to the platform.</li>
+      <li><strong>QB Online:</strong> use the QuickBooks Online API (OAuth) for live read access to accounts, invoices, and job data.</li>
+      <li>Either way, the 5000–7900 account numbers are the join key between systems.</li>
+    </ul>
+  </div>
+
+  <!-- SECTION 7 -->
+  <div class="section-band" id="s7">
+    <span class="badge">Section 7</span>
+    <h2>Tax-Smart Account Setup</h2>
+  </div>
+
+  <div class="card">
+    <h3><span class="num">7.1</span> Set These Up Now to Support the Tax Strategy</h3>
+    <p>A few tracking decisions made at setup save thousands at tax time. Configure these from day one rather than reconstructing later.</p>
+    <table>
+      <thead><tr><th>Set up</th><th>Why it matters</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Section 179 / bonus depreciation equipment tracking</strong><br><span class="tbl-cap">Fixed-asset list with purchase date, cost, in-service date per unit (1500/1510/1520)</span></td>
+          <td>OBBBA permanently restored <strong>100% bonus depreciation</strong> and raised Section 179 to ~$2.5M. PF's $1.63M equipment base can be fully expensed — but only with clean per-asset records and in-service dates.</td>
+        </tr>
+        <tr>
+          <td><strong>Off-road diesel fuel tracking</strong><br><span class="tbl-cap">Sub-account or class to separate clear (undyed) off-road diesel in 5210 / 6500</span></td>
+          <td>Federal fuel tax credit of <strong>$0.243/gallon</strong> for clear diesel burned in off-road equipment (Form 4136). At 20K–40K gal/yr off-road, that's <strong>$4,860–9,720/yr</strong> — a dollar-for-dollar credit. Requires usage logs separating off-road from on-road.</td>
+        </tr>
+        <tr>
+          <td><strong>R&amp;D expense tracking</strong><br><span class="tbl-cap">Class or tag for qualifying activities (installation-method development, GUHMA software, test columns)</span></td>
+          <td>VSC technique development, the GUHMA QA/QC software, and test-column work likely qualify for the <strong>Section 41 R&amp;D credit</strong> (~7–10% of qualifying spend). Post-2025, domestic R&amp;E is also immediately deductible — a double benefit. Needs contemporaneous records.</td>
+        </tr>
+        <tr>
+          <td><strong>Multi-state tracking</strong><br><span class="tbl-cap">Class/location per state: IN, OH, MI, IL, KY, WI</span></td>
+          <td>Sending crews and equipment into a state creates <strong>nexus</strong> and filing obligations. Illinois has no reciprocity with Indiana; Ohio has the CAT gross-receipts tax. Tag revenue and payroll by state at entry so multi-state returns are mechanical, not forensic.</td>
+        </tr>
+        <tr>
+          <td><strong>De minimis safe harbor &amp; capitalization policy</strong><br><span class="tbl-cap">Written policy expensing items under $2,500/invoice</span></td>
+          <td>A written capitalization policy in place at the start of the tax year lets PF immediately expense small tools and parts under $2,500 — simpler books, faster deductions.</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="callout">
+      <span class="tag">How to track in QuickBooks</span>
+      Use <strong>Classes</strong> (QB Desktop/Online) for state and for R&amp;D so a single transaction can be both job-costed and tax-tagged. Keep the <strong>Fixed Asset Item List</strong> meticulous for depreciation. Have a construction-specialized CPA confirm the R&amp;D credit and multi-state filings — these are high-value, documentation-dependent positions.
+    </div>
+  </div>
+
+  </main>
+</div>
+
+<footer class="site-footer">
+  Pier Foundations | QuickBooks Setup Guide | Peter (AI COO)
+</footer>
+
+</body>
+</html>
