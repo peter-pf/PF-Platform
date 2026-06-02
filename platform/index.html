@@ -751,6 +751,133 @@ window.esc = function(v) {
 };
 </script>
 
+<script>
+// ============================================================
+// CANONICAL KPI HELPERS (window.kpi) — single source of truth
+// Implements docs/platform-data-integrity/KPI-DEFINITIONS.md.
+// Every module that displays win rate, FY booked revenue, active
+// projects, pipeline value, or project financials MUST call these.
+// No module recomputes these formulas inline. Pure functions over
+// LIVE_BIDS / LIVE_PROJECTS with null/NaN guards.
+// ============================================================
+(function () {
+  'use strict';
+
+  function safe(v) { var n = parseFloat(v); return isFinite(n) ? n : 0; }
+  function str(s) { return (s == null ? '' : String(s)).trim(); }
+
+  // ---- STATUS CLASSIFIERS (the ONLY place status strings are matched) ----
+  // Won  = Awarded, Completed
+  // Lost = Not Awarded (any variant: "Not Awarded - Low/Not Low/Canceled")
+  // No-bid = "Didn't Bid to Awarded GC"  (EXCLUDED from win rate)
+  // Pipeline = Submitted / Will Bid / Budget Pricing / etc. (not yet decided)
+  function isWon(status)      { return /^(Awarded|Completed)$/i.test(str(status)); }
+  function isLost(status)     { return /^Not Awarded/i.test(str(status)); }
+  function isNoBid(status)    { return /^Didn't Bid/i.test(str(status)); }
+  function isPipeline(status) {
+    return /^(Submitted|Will Bid|Budget Pricing|New Lead|NEED FOLLOW UP)/i.test(str(status));
+  }
+  // Executed contract = "Subcontract FE" / "Contract FE" (Fully Executed).
+  // NOT "...need FE", NOT LOI, NOT "Sent Contract Back with Comments".
+  function isExecutedContract(status) {
+    return /(^|\s)(Subcontract|Contract)\s+FE$/i.test(str(status));
+  }
+
+  function getBids(bids)         { return bids || (typeof LIVE_BIDS    !== 'undefined' ? LIVE_BIDS    : []); }
+  function getProjects(projects) { return projects || (typeof LIVE_PROJECTS !== 'undefined' ? LIVE_PROJECTS : []); }
+
+  window.kpi = {
+    fyGoal: (typeof LIVE_FY_GOALS !== 'undefined' && LIVE_FY_GOALS['FY26 Goal']) || 6000000,
+
+    isWon: isWon, isLost: isLost, isNoBid: isNoBid,
+    isPipeline: isPipeline, isExecutedContract: isExecutedContract,
+
+    // 1. Win Rate — won / (won + lost). "Didn't Bid" and pipeline EXCLUDED.
+    // Returns { won, lost, denom, pct } (pct is 0-100, rounded).
+    winRate: function (bids) {
+      bids = getBids(bids);
+      var won = 0, lost = 0;
+      bids.forEach(function (b) {
+        if (isWon(b.bid_status)) won++;
+        else if (isLost(b.bid_status)) lost++;
+      });
+      var denom = won + lost;
+      return { won: won, lost: lost, denom: denom, pct: denom > 0 ? Math.round(won / denom * 100) : 0 };
+    },
+
+    // 2. FY26 Booked Revenue — sum(bid_value) where Awarded|Completed.
+    // Returns { value, goal, pct } (pct is 0-100, rounded).
+    fyBookedRevenue: function (bids) {
+      bids = getBids(bids);
+      var value = bids.reduce(function (s, b) { return s + (isWon(b.bid_status) ? safe(b.bid_value) : 0); }, 0);
+      var goal = window.kpi.fyGoal;
+      return { value: value, goal: goal, pct: goal > 0 ? Math.round(value / goal * 100) : 0 };
+    },
+
+    // 3. Active Projects — executed contract AND 0 <= work_pct_complete < 1.
+    // Returns the array of matching project records (use .length for the count).
+    activeProjects: function (projects) {
+      projects = getProjects(projects);
+      return projects.filter(function (p) {
+        var w = safe(p.work_pct_complete);
+        return isExecutedContract(p.contract_status) && w >= 0 && w < 1;
+      });
+    },
+
+    // 5. Pipeline Value — sum(bid_value) over in-pipeline bids; unpriced
+    // (null bid_value) counted separately. Returns { value, total, priced, unpriced }.
+    pipelineValue: function (bids) {
+      bids = getBids(bids);
+      var value = 0, total = 0, priced = 0;
+      bids.forEach(function (b) {
+        if (!isPipeline(b.bid_status)) return;
+        total++;
+        if (typeof b.bid_value === 'number' && isFinite(b.bid_value)) { priced++; value += b.bid_value; }
+      });
+      return { value: value, total: total, priced: priced, unpriced: total - priced };
+    },
+
+    // 4. Company Financials — sum across LIVE_PROJECTS. Single source of truth;
+    // no module hardcodes a project's financials. Returns paid/unpaid/retainage/billed.
+    companyFinancials: function (projects) {
+      projects = getProjects(projects);
+      var paid = 0, unpaid = 0, retainage = 0, contract = 0;
+      projects.forEach(function (p) {
+        paid += safe(p.paid);
+        unpaid += safe(p.unpaid);
+        retainage += safe(p.retainage);
+        contract += safe(p.subcontract_value);
+      });
+      return { paid: paid, unpaid: unpaid, retainage: retainage, billed: paid + unpaid, contract: contract };
+    },
+
+    // Per-project financials straight from the live record (matched by project_number).
+    // Returns { paid, unpaid, retainage, billed } or null if not found.
+    projectFinancials: function (projectNumber, projects) {
+      projects = getProjects(projects);
+      var rec = null;
+      projects.forEach(function (p) { if (str(p.project_number) === str(projectNumber)) rec = p; });
+      if (!rec) return null;
+      var paid = safe(rec.paid), unpaid = safe(rec.unpaid);
+      return { paid: paid, unpaid: unpaid, retainage: safe(rec.retainage), billed: paid + unpaid };
+    }
+  };
+
+  // ---- HONESTY BADGE for modules that show illustrative SAMPLE data with no
+  // live SharePoint backing. Returns an HTML string to prepend to the module's
+  // render output so the data is never mistaken for real records.
+  window.sampleBadge = function (note) {
+    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;' +
+      'padding:6px 12px;border:1px solid #E0C36A;background:#FFF8E1;border-radius:6px;' +
+      'font-size:0.72rem;color:#8A6D00;font-weight:600">' +
+      '<span style="display:inline-block;padding:1px 7px;border-radius:3px;background:#E0A100;' +
+      'color:#fff;letter-spacing:0.03em">SAMPLE DATA</span>' +
+      '<span style="font-weight:500;color:#8A6D00">' + (note ? window.esc(note) : 'Illustrative — not live SharePoint data') + '</span>' +
+      '</div>';
+  };
+})();
+</script>
+
 
 <!-- SIDEBAR -->
 <aside class="sidebar" id="sidebar">
@@ -1095,25 +1222,22 @@ function renderDashboard() {
   var fyGoals = (typeof LIVE_FY_GOALS !== 'undefined') ? LIVE_FY_GOALS : {};
   var syncMeta = (typeof LIVE_SYNC_META !== 'undefined') ? LIVE_SYNC_META : {};
 
-  // Active bid statuses (in-progress, not terminal)
-  var activeBidStatuses = ['Submitted', 'Will Bid', 'Budget Pricing', 'Submitted - Edging', 'New Lead', 'NEED FOLLOW UP'];
-  var activeBids = bids.filter(function(b) { return activeBidStatuses.indexOf(b.bid_status) !== -1; });
+  // ---- KPIs via shared helpers (single source of truth: window.kpi) ----
+  // Active bids = in-pipeline (not yet decided). Same classifier the helpers use.
+  var activeBids = bids.filter(function(b) { return window.kpi.isPipeline(b.bid_status); });
 
-  // Pipeline = all bids that are active + awarded (not lost/canceled)
-  var pipelineStatuses = ['Submitted', 'Will Bid', 'Budget Pricing', 'Submitted - Edging', 'Awarded', 'New Lead', 'NEED FOLLOW UP'];
-  var pipelineBids = bids.filter(function(b) { return pipelineStatuses.indexOf(b.bid_status) !== -1; });
-  var pipelineValue = pipelineBids.reduce(function(sum, b) { return sum + (typeof b.bid_value === 'number' ? b.bid_value : 0); }, 0);
+  // Pipeline value (shared helper: priced/total reported honestly)
+  var pipeline = window.kpi.pipelineValue(bids);
+  var pipelineValue = pipeline.value;
 
-  // Awarded bids for FY revenue tracking
-  var awardedBids = bids.filter(function(b) { return b.bid_status === 'Awarded'; });
-  var awardedValue = awardedBids.reduce(function(sum, b) { return sum + (typeof b.bid_value === 'number' ? b.bid_value : 0); }, 0);
-  var fy26Goal = fyGoals['FY26 Goal'] || 6000000;
-  var revenueProgress = Math.round((awardedValue / fy26Goal) * 100);
+  // FY26 booked revenue (shared helper: Awarded + Completed vs goal)
+  var fyRev = window.kpi.fyBookedRevenue(bids);
+  var awardedValue = fyRev.value;
+  var fy26Goal = fyRev.goal;
+  var revenueProgress = fyRev.pct;
 
-  // Active projects (exclude null/header rows)
-  var activeProjects = projects.filter(function(p) {
-    return p.name && p.contract_status && p.contract_status !== 'Contract Status';
-  });
+  // Active projects (shared helper: executed contract AND 0 <= pct < 1)
+  var activeProjects = window.kpi.activeProjects(projects);
 
   // Format currency
   function fmtCurrency(v) {
@@ -1133,7 +1257,7 @@ function renderDashboard() {
     '<div class="stat-card">' +
       '<div class="stat-label">Pipeline Value</div>' +
       '<div class="stat-value">' + fmtCurrency(pipelineValue) + '</div>' +
-      '<div class="stat-change">' + pipelineBids.length + ' active bids</div>' +
+      '<div class="stat-change">' + pipeline.priced + ' priced / ' + pipeline.total + ' bids</div>' +
     '</div>' +
     '<div class="stat-card">' +
       '<div class="stat-label">Active Projects</div>' +
@@ -2643,70 +2767,94 @@ try {
 (function () {
   'use strict';
 
-  // ---- BID DATA ----
-  // Modeled from Jonathan's Project_Bid_Log.xlsx
-  var BIDS = [
-    { id:'26-001', name:'POET Shelbyville (Garbin)', city:'Shelbyville', state:'IN', sf:28000, lf:17003, cols:1865, stoneTN:680, duration:17, feed:'Bottom', tax:'Exempt', inviteDate:'2025-10-12', dueDate:'2025-10-28', submitted:'2025-10-27', status:'Awarded', value:343037, gc:'POET D&C', contact:'Mike Harrison', email:'mharrison@poetdc.com', phone:'317-555-0142', engineer:'Garbin', prelimFee:3500, designCompleted:'2025-10-20' },
-    { id:'26-002', name:'The Granary (Garbin)', city:'Noblesville', state:'IN', sf:32000, lf:17656, cols:1593, stoneTN:710, duration:18, feed:'Bottom', tax:'Exempt', inviteDate:'2025-11-03', dueDate:'2025-11-18', submitted:'2025-11-17', status:'Awarded', value:326200, gc:'Flaherty & Collins', contact:'Sarah Webb', email:'swebb@flaherty.com', phone:'317-555-0198', engineer:'Garbin', prelimFee:3500, designCompleted:'2025-11-10' },
-    { id:'26-003', name:'IU Launch Accelerator', city:'Indianapolis', state:'IN', sf:18500, lf:12200, cols:980, stoneTN:488, duration:12, feed:'Bottom', tax:'Exempt', inviteDate:'2025-12-01', dueDate:'2025-12-15', submitted:'2025-12-14', status:'Awarded', value:285200, gc:'Pepper Construction', contact:'Tom Reynolds', email:'treynolds@pepperconstruction.com', phone:'317-555-0211', engineer:'Garbin', prelimFee:3500, designCompleted:'2025-12-08' },
-    { id:'26-004', name:'Stadium Flats', city:'South Bend', state:'IN', sf:9200, lf:6800, cols:612, stoneTN:272, duration:7, feed:'Top', tax:'Taxable', inviteDate:'2026-01-10', dueDate:'2026-01-24', submitted:'2026-01-23', status:'Awarded', value:137879, gc:'Weigand Construction', contact:'Dave Weigand', email:'dweigand@weigandco.com', phone:'574-555-0133', engineer:'Garbin', prelimFee:3500, designCompleted:'2026-01-17' },
-    { id:'26-005', name:'Airport Hangar Expansion', city:'Terre Haute', state:'IN', sf:22000, lf:11400, cols:920, stoneTN:456, duration:11, feed:'Bottom', tax:'Exempt', inviteDate:'2026-01-20', dueDate:'2026-02-05', submitted:'2026-02-04', status:'Awarded', value:223897, gc:'Garmong Construction', contact:'Brian Garmong', email:'bgarmong@garmong.com', phone:'812-555-0177', engineer:'Garbin', prelimFee:3500, designCompleted:'2026-01-28' },
-    { id:'26-006', name:'Wabash Place', city:'Terre Haute', state:'IN', sf:16000, lf:9800, cols:840, stoneTN:392, duration:10, feed:'Bottom', tax:'Exempt', inviteDate:'2026-02-01', dueDate:'2026-02-14', submitted:'2026-02-13', status:'Awarded', value:192000, gc:'Hannig Construction', contact:'Jeff Hannig', email:'jhannig@hannig.com', phone:'812-555-0155', engineer:'Garbin', prelimFee:3500, designCompleted:'2026-02-07' },
-    { id:'26-007', name:'Dollar General Distribution', city:'Strongsville', state:'OH', sf:12500, lf:7200, cols:580, stoneTN:288, duration:7, feed:'Top', tax:'Taxable', inviteDate:'2026-02-15', dueDate:'2026-03-01', submitted:'2026-02-28', status:'Awarded', value:108000, gc:'Bowen Engineering', contact:'Rick Bowen', email:'rbowen@bowenengineering.com', phone:'216-555-0199', engineer:'Independent', prelimFee:0, designCompleted:'' },
-    { id:'26-008', name:'Parkview Health Regional (Garbin)', city:'West Lafayette', state:'IN', sf:14000, lf:6194, cols:496, stoneTN:248, duration:6, feed:'Bottom', tax:'Exempt', inviteDate:'2026-03-10', dueDate:'2026-03-28', submitted:'', status:'Will Bid', value:175000, gc:'FA Wilhelm', contact:'Joe Wilhelm', email:'jwilhelm@fawilhelm.com', phone:'317-555-0166', engineer:'Garbin', prelimFee:3500, designCompleted:'' },
-    { id:'26-009', name:'Amazon Fulfillment Center', city:'Whitestown', state:'IN', sf:85000, lf:42000, cols:3200, stoneTN:1680, duration:42, feed:'Bottom', tax:'Exempt', inviteDate:'2026-03-01', dueDate:'2026-03-20', submitted:'2026-03-19', status:'Submitted', value:890000, gc:'Hensel Phelps', contact:'Amy Chen', email:'achen@henselphelps.com', phone:'317-555-0244', engineer:'Garbin', prelimFee:5000, designCompleted:'2026-03-12' },
-    { id:'26-010', name:'Google Data Center — Phase 1', city:'Fort Wayne', state:'IN', sf:120000, lf:58000, cols:4400, stoneTN:2320, duration:58, feed:'Bottom', tax:'Exempt', inviteDate:'', dueDate:'', submitted:'', status:'New Lead', value:1800000, gc:'Mortenson', contact:'Dan Mortenson', email:'dmortenson@mortenson.com', phone:'612-555-0188', engineer:'TBD', prelimFee:0, designCompleted:'' },
-    { id:'26-011', name:'Meta Data Center', city:'Lebanon', state:'IN', sf:95000, lf:48000, cols:3600, stoneTN:1920, duration:48, feed:'Bottom', tax:'Exempt', inviteDate:'', dueDate:'', submitted:'', status:'New Lead', value:1450000, gc:'Turner Construction', contact:'Lisa Park', email:'lpark@tcco.com', phone:'212-555-0299', engineer:'TBD', prelimFee:0, designCompleted:'' },
-    { id:'26-012', name:'Elanco HQ Expansion (Garbin)', city:'Greenfield', state:'IN', sf:18000, lf:9600, cols:780, stoneTN:384, duration:10, feed:'Bottom', tax:'Exempt', inviteDate:'2026-03-15', dueDate:'2026-04-01', submitted:'2026-03-31', status:'Submitted', value:245000, gc:'Messer Construction', contact:'Pat Messer', email:'pmesser@messer.com', phone:'513-555-0177', engineer:'Garbin', prelimFee:3500, designCompleted:'2026-03-22' },
-    { id:'26-013', name:'Subaru Expansion Lot B', city:'Lafayette', state:'IN', sf:42000, lf:22000, cols:1700, stoneTN:880, duration:22, feed:'Bottom', tax:'Exempt', inviteDate:'2026-02-20', dueDate:'2026-03-10', submitted:'2026-03-09', status:'Submitted', value:520000, gc:'Shiel Sexton', contact:'Chris Shiel', email:'cshiel@shielsexton.com', phone:'317-555-0122', engineer:'Garbin', prelimFee:5000, designCompleted:'2026-02-28' },
-    { id:'26-014', name:'Meijer Cold Storage', city:'Tipp City', state:'OH', sf:16000, lf:8400, cols:700, stoneTN:336, duration:8, feed:'Top', tax:'Taxable', inviteDate:'2026-04-01', dueDate:'2026-04-15', submitted:'2026-04-14', status:'Submitted - Edging', value:198000, gc:'Danis Building', contact:'Troy Danis', email:'tdanis@danisbuilding.com', phone:'937-555-0144', engineer:'Independent', prelimFee:0, designCompleted:'' },
-    { id:'26-015', name:'Cummins Testing Facility (Garbin)', city:'Columbus', state:'IN', sf:24000, lf:13200, cols:1060, stoneTN:528, duration:13, feed:'Bottom', tax:'Exempt', inviteDate:'2026-04-10', dueDate:'2026-04-28', submitted:'', status:'Will Bid', value:310000, gc:'Hunt Construction', contact:'Kevin Hunt', email:'khunt@huntconstruction.com', phone:'317-555-0203', engineer:'Garbin', prelimFee:3500, designCompleted:'' },
-    { id:'26-016', name:'Purdue Ag Sciences Building', city:'West Lafayette', state:'IN', sf:11000, lf:5800, cols:464, stoneTN:232, duration:6, feed:'Bottom', tax:'Exempt', inviteDate:'2026-04-05', dueDate:'2026-04-20', submitted:'2026-04-19', status:'Not Awarded - Not Low', value:158000, gc:'Kettelhut Construction', contact:'Carl Kettelhut', email:'ckettelhut@kettelhut.com', phone:'765-555-0188', engineer:'Independent', prelimFee:0, designCompleted:'' },
-    { id:'26-017', name:'Indiana Packers Expansion', city:'Delphi', state:'IN', sf:38000, lf:19600, cols:1540, stoneTN:784, duration:20, feed:'Bottom', tax:'Exempt', inviteDate:'2026-03-25', dueDate:'2026-04-10', submitted:'2026-04-09', status:'Not Awarded - Canceled', value:0, gc:'Gray Construction', contact:'Mark Gray', email:'mgray@grayconstruction.com', phone:'859-555-0133', engineer:'Garbin', prelimFee:3500, designCompleted:'2026-04-01' },
-    { id:'26-018', name:'Rivian Service Center', city:'Normal', state:'IL', sf:8500, lf:4200, cols:340, stoneTN:168, duration:4, feed:'Top', tax:'Taxable', inviteDate:'2026-04-20', dueDate:'2026-05-05', submitted:'', status:'Will Not Bid', value:95000, gc:'Power Construction', contact:'Jim Power', email:'jpower@powerconstruction.net', phone:'312-555-0211', engineer:'Independent', prelimFee:0, designCompleted:'' },
-    { id:'26-019', name:'Stellantis Lot Rehab', city:'Kokomo', state:'IN', sf:52000, lf:26000, cols:2080, stoneTN:1040, duration:26, feed:'Bottom', tax:'Exempt', inviteDate:'2026-05-01', dueDate:'2026-05-15', submitted:'2026-05-14', status:'Submitted', value:620000, gc:'Tonn and Blank', contact:'Steve Tonn', email:'stonn@tonnandblank.com', phone:'260-555-0177', engineer:'Garbin', prelimFee:5000, designCompleted:'2026-05-08' },
-    { id:'26-020', name:'FedEx Sorting Hub', city:'Plainfield', state:'IN', sf:72000, lf:36000, cols:2880, stoneTN:1440, duration:36, feed:'Bottom', tax:'Exempt', inviteDate:'2026-05-10', dueDate:'2026-05-28', submitted:'', status:'NEED FOLLOW UP', value:780000, gc:'Clayco', contact:'Bob Clark', email:'bclark@claycorp.com', phone:'314-555-0266', engineer:'TBD', prelimFee:0, designCompleted:'' },
-    { id:'26-021', name:'ToyotaIN Logistics', city:'Princeton', state:'IN', sf:30000, lf:15600, cols:1248, stoneTN:624, duration:16, feed:'Bottom', tax:'Exempt', inviteDate:'2026-05-15', dueDate:'2026-06-01', submitted:'', status:'Budget Pricing', value:365000, gc:'Lend Lease', contact:'Anna Lend', email:'alend@lendlease.com', phone:'212-555-0300', engineer:'TBD', prelimFee:0, designCompleted:'' },
-    { id:'26-022', name:'Ball State Rec Center', city:'Muncie', state:'IN', sf:9800, lf:5100, cols:408, stoneTN:204, duration:5, feed:'Top', tax:'Exempt', inviteDate:'2026-05-20', dueDate:'2026-06-05', submitted:'', status:'Will Bid', value:128000, gc:'Bruns-Gutzwiller', contact:'Dean Bruns', email:'dbruns@brunsgutzwiller.com', phone:'513-555-0188', engineer:'Garbin', prelimFee:3500, designCompleted:'' },
-    { id:'26-023', name:'Rolls-Royce Test Stand (Garbin)', city:'Indianapolis', state:'IN', sf:6500, lf:3400, cols:272, stoneTN:136, duration:3, feed:'Bottom', tax:'Exempt', inviteDate:'2026-01-05', dueDate:'2026-01-20', submitted:'2026-01-19', status:"Didn't Bid to Awarded GC", value:88000, gc:'Harley Ellis Devereaux', contact:'N/A', email:'', phone:'', engineer:'Garbin', prelimFee:3500, designCompleted:'2026-01-12' },
-    { id:'25-018', name:'Heartland Crossing Retail', city:'Camby', state:'IN', sf:14500, lf:7600, cols:608, stoneTN:304, duration:8, feed:'Top', tax:'Taxable', inviteDate:'2025-09-10', dueDate:'2025-09-25', submitted:'2025-09-24', status:'Completed', value:165800, gc:'Hagerman Group', contact:'Bill Hagerman', email:'bhagerman@hagerman.com', phone:'317-555-0144', engineer:'Garbin', prelimFee:3500, designCompleted:'2025-09-18' }
-  ];
+  // ---- BID DATA (LIVE — adapted from LIVE_BIDS so the pipeline table,
+  // counts and KPIs all reflect the single source of truth) ----
+  // Maps the live bid schema (bid_status / bid_value / number / city_state)
+  // onto the field names this module's table/detail UI expects. No sample
+  // data: every row is a live record.
+  function splitCityState(cs) {
+    cs = (cs == null ? '' : String(cs)).trim();
+    var i = cs.lastIndexOf(',');
+    if (i === -1) return { city: cs, state: '' };
+    return { city: cs.slice(0, i).trim(), state: cs.slice(i + 1).trim() };
+  }
+  function isoDate(d) {
+    d = (d == null ? '' : String(d)).trim();
+    if (!d) return '';
+    return d.split(' ')[0]; // "2026-05-29 00:00:00" -> "2026-05-29"
+  }
+  function num(v) { return (typeof v === 'number' && isFinite(v)) ? v : null; }
+
+  var LIVE_BID_SRC = (typeof LIVE_BIDS !== 'undefined') ? LIVE_BIDS : [];
+  var BIDS = LIVE_BID_SRC.map(function (b, idx) {
+    var loc = splitCityState(b.city_state);
+    var id = (b.number && String(b.number).trim() && String(b.number).trim() !== 'x')
+      ? String(b.number).trim()
+      : 'L-' + (idx + 1); // stable synthetic id for rows whose bid # is blank/'x'
+    return {
+      id: id,
+      name: b.name || '',
+      city: loc.city,
+      state: loc.state,
+      sf: num(b.total_sf),
+      lf: num(b.total_lf),
+      cols: num(b.total_columns),
+      stoneTN: num(b.total_stone_tn),
+      duration: num(b.duration_days),
+      feed: b.feed_type || '',
+      tax: b.tax || '',
+      inviteDate: isoDate(b.invite_date),
+      dueDate: isoDate(b.due_date),
+      submitted: isoDate(b.date_submitted),
+      status: b.bid_status || '',
+      value: num(b.bid_value),
+      gc: b.gc_name || '',
+      contact: b.gc_contact || '',
+      email: b.gc_email || '',
+      phone: b.gc_phone != null ? String(b.gc_phone) : '',
+      engineer: b.engineer || '',
+      prelimFee: b.prelim_fee || '',
+      designCompleted: ''
+    };
+  });
 
   // ---- FY GOALS ----
   var FY = {
     fy25Goal: 3000000,
-    fy26Goal: 6000000,
-    fy26Actual: 0, // calculated below
+    fy26Goal: window.kpi.fyGoal,
+    fy26Actual: 0, // calculated below via window.kpi
     winRate: 0,
     winRateGarbin: 0,
+    wonCount: 0,
     totalPipeline: 0,
+    pipelinePriced: 0,
+    pipelineTotal: 0,
     avgAward: 0
   };
 
-  // ---- CALCULATIONS ----
+  // ---- CALCULATIONS (all via shared window.kpi helpers — no inline formulas) ----
   function recalcFY() {
-    var awarded = BIDS.filter(function(b){ return b.status === 'Awarded' || b.status === 'Completed'; });
-    FY.fy26Actual = awarded.reduce(function(s,b){ return s + b.value; }, 0);
+    // FY26 booked revenue (Awarded + Completed)
+    var fyRev = window.kpi.fyBookedRevenue(LIVE_BID_SRC);
+    FY.fy26Actual = fyRev.value;
 
-    var submitted = BIDS.filter(function(b){
-      return b.status === 'Submitted' || b.status === 'Submitted - Edging' ||
-             b.status === 'Awarded' || b.status === 'Completed' ||
-             b.status === 'Not Awarded - Not Low' || b.status === 'Not Awarded - Canceled' ||
-             b.status === 'Not Awarded - Low' || b.status === "Didn't Bid to Awarded GC";
-    });
-    FY.winRate = submitted.length > 0 ? (awarded.length / submitted.length * 100) : 0;
+    // Win rate: won / (won + lost), "Didn't Bid" & pipeline excluded
+    var wr = window.kpi.winRate(LIVE_BID_SRC);
+    FY.winRate = wr.pct;
+    FY.wonCount = wr.won;
 
-    var garbinSubmitted = submitted.filter(function(b){ return b.engineer === 'Garbin'; });
-    var garbinAwarded = awarded.filter(function(b){ return b.engineer === 'Garbin'; });
-    FY.winRateGarbin = garbinSubmitted.length > 0 ? (garbinAwarded.length / garbinSubmitted.length * 100) : 0;
+    // Garbin-engineered win rate (same classifiers, scoped to Garbin prelims)
+    var garbin = LIVE_BID_SRC.filter(function(b){ return /Garbin/i.test(b.engineer || ''); });
+    var gwr = window.kpi.winRate(garbin);
+    FY.winRateGarbin = gwr.pct;
 
-    var activePipeline = BIDS.filter(function(b){
-      return b.status !== 'Will Not Bid' && b.status !== 'Not Awarded - Canceled' &&
-             b.status !== 'Not Awarded - Not Low' && b.status !== 'Not Awarded - Low' &&
-             b.status !== "Didn't Bid to Awarded GC" && b.status !== 'Completed';
-    });
-    FY.totalPipeline = activePipeline.reduce(function(s,b){ return s + b.value; }, 0);
-    FY.avgAward = awarded.length > 0 ? Math.round(FY.fy26Actual / awarded.length) : 0;
+    // Pipeline value (in-pipeline bids; priced vs total reported honestly)
+    var pv = window.kpi.pipelineValue(LIVE_BID_SRC);
+    FY.totalPipeline = pv.value;
+    FY.pipelinePriced = pv.priced;
+    FY.pipelineTotal = pv.total;
+
+    FY.avgAward = wr.won > 0 ? Math.round(FY.fy26Actual / wr.won) : 0;
   }
 
   // ---- STATUS HELPERS ----
@@ -2835,9 +2983,9 @@ try {
     // ---- Summary Stats ----
     html += '<div class="grid grid-4" style="margin-bottom:16px">';
     html += statCard('Active Bids', activeBids.length, activeBids.length + ' needing action');
-    html += statCard('Pipeline Value', fmtCurrencyShort(FY.totalPipeline), 'All non-closed bids');
-    html += statCard('Win Rate', FY.winRate.toFixed(1) + '%', FY.winRateGarbin.toFixed(1) + '% with Garbin prelim');
-    html += statCard('Avg. Award', fmtCurrencyShort(FY.avgAward), BIDS.filter(function(b){ return b.status === 'Awarded' || b.status === 'Completed'; }).length + ' projects won');
+    html += statCard('Pipeline Value', fmtCurrencyShort(FY.totalPipeline), FY.pipelinePriced + ' priced / ' + FY.pipelineTotal + ' bids');
+    html += statCard('Win Rate', FY.winRate + '%', FY.winRateGarbin + '% with Garbin prelim');
+    html += statCard('Avg. Award', fmtCurrencyShort(FY.avgAward), FY.wonCount + ' projects won');
     html += '</div>';
 
     // ---- Filter Tabs ----
@@ -3150,6 +3298,32 @@ try {
     }
   ];
 
+  // ---- OVERRIDE per-project financials with LIVE data (single source of truth) ----
+  // Each project's checklist "Financials" section (Amount Billed / Paid /
+  // Retainage Held) is overwritten from LIVE_PROJECTS via the shared helper,
+  // matched by project number. No project carries a hardcoded financial figure.
+  // (POET 26-002 now reads paid $130,837 / unpaid $212,200 / retainage $0 —
+  // NOT the old hardcoded $186,612 / $23,327.)
+  (function () {
+    function money(v) { return '$' + Math.round(v).toLocaleString('en-US'); }
+    PROJECTS_2026.forEach(function (proj) {
+      var fin = window.kpi.projectFinancials(proj.id);
+      if (!fin) return; // no live record -> leave as-is
+      if (proj.checklist) {
+        proj.checklist.forEach(function (section) {
+          if (section.section !== 'Financials') return;
+          section.fields.forEach(function (f) {
+            if (f.field === 'Amount Billed')  f.value = money(fin.billed);
+            else if (f.field === 'Amount Paid')    f.value = money(fin.paid);
+            else if (f.field === 'Retainage Held') f.value = money(fin.retainage);
+          });
+        });
+      }
+      // Live financials available on the project record for any other use.
+      proj.liveFin = fin;
+    });
+  })();
+
   var PROJECTS_2025 = [
     { id: '25-001', name: 'Circle Centre Redevelopment', gc: 'Shiel Sexton', value: 187500, city: 'Indianapolis', state: 'IN', status: 'Completed' },
     { id: '25-002', name: 'Amazon Whitestown DC', gc: 'Hensel Phelps', value: 245000, city: 'Whitestown', state: 'IN', status: 'Completed' },
@@ -3281,17 +3455,16 @@ try {
   }
 
   function financialsSummary() {
-    var totalContract = PROJECTS_2026.reduce(function (s, p) { return s + p.value; }, 0);
-    // Estimate paid/unpaid from POET data as reference
-    var totalBilled = 233265;
-    var totalPaid = 186612;
-    var totalRetainage = 23327 + (140700 * 0.05 * 0) + 0 + 0 + 0;
+    // Company-wide financials are summed from LIVE_PROJECTS via the shared
+    // helper — never hardcoded. (Kills the old POET-as-company-total bug:
+    // billed 233265 / paid 186612 / retainage 23327 are GONE.)
+    var fin = window.kpi.companyFinancials();
     return {
-      totalContract: totalContract,
-      totalBilled: totalBilled,
-      totalPaid: totalPaid,
-      totalUnpaid: totalBilled - totalPaid,
-      totalRetainage: totalRetainage
+      totalContract: fin.contract,
+      totalBilled: fin.billed,
+      totalPaid: fin.paid,
+      totalUnpaid: fin.unpaid,
+      totalRetainage: fin.retainage
     };
   }
 
@@ -3604,8 +3777,12 @@ try {
     var app = document.getElementById('projects-app');
     if (!app) return;
 
+    // Financials (summary + per-project) are LIVE from SharePoint via window.kpi.
+    // Operational checklist details (safety, equipment, site readiness, etc.) are illustrative.
+    var html = window.sampleBadge('Financials are live; operational checklist details are illustrative');
+
     // Tabs
-    var html = '' +
+    html += '' +
       '<div class="tabs">' +
         '<div class="tab' + (currentTab === 'active' ? ' active' : '') + '" onclick="window._projectsTab(\'active\')">2026 Active</div>' +
         '<div class="tab' + (currentTab === 'completed' ? ' active' : '') + '" onclick="window._projectsTab(\'completed\')">2025 Completed</div>' +
@@ -3921,7 +4098,8 @@ try {
     var sorted = sortData(data);
     var stats = computeStats(PIER_DATA); // always compute from full dataset
 
-    app.innerHTML = renderSummary(stats) + renderFilterTabs(stats) + renderTable(sorted) + renderThresholds();
+    app.innerHTML = window.sampleBadge('Pier logs are illustrative (modeled on POET) — not live SharePoint data') +
+      renderSummary(stats) + renderFilterTabs(stats) + renderTable(sorted) + renderThresholds();
   }
 
   function renderSummary(s) {
@@ -4363,12 +4541,13 @@ try {
     const app = document.getElementById('modulus-app');
     if (!app) return;
 
+    var badge = window.sampleBadge('Modulus test records are illustrative — not live SharePoint data');
     if (currentView === 'history') {
-      app.innerHTML = renderHistory();
+      app.innerHTML = badge + renderHistory();
     } else if (currentView === 'detail') {
-      app.innerHTML = renderDetail(selectedTestId);
+      app.innerHTML = badge + renderDetail(selectedTestId);
     } else if (currentView === 'newtest') {
-      app.innerHTML = renderNewTestForm();
+      app.innerHTML = badge + renderNewTestForm();
     }
 
     bindEvents();
@@ -5666,7 +5845,7 @@ try {
   }
 
   function render() {
-    container.innerHTML = `
+    container.innerHTML = window.sampleBadge('Proposals are illustrative — not live SharePoint data') + `
       <div class="grid grid-3" style="margin-bottom:16px">
         <div class="stat-card">
           <div class="stat-label">Total Proposals</div>
@@ -6001,7 +6180,7 @@ try {
 
     var stats = calcStats();
     var filtered = filterCOs();
-    var html = '';
+    var html = window.sampleBadge('Change orders are illustrative — not live SharePoint data');
 
     // ---- Summary Stats ----
     html += '<div class="grid grid-4" style="margin-bottom:16px">';
@@ -6418,7 +6597,7 @@ try {
     var stats = getStats();
     var filtered = getFiltered();
 
-    var html = '';
+    var html = window.sampleBadge('Equipment financials and service history are illustrative — not live SharePoint data');
 
     // ---- STATS ROW ----
     html += '<div class="grid grid-4" style="margin-bottom:20px">';
@@ -6917,7 +7096,7 @@ try {
     var app = document.getElementById('safety-app');
     if (!app) return;
 
-    var html = '';
+    var html = window.sampleBadge('Inspection progress and toolbox-talk log entries are illustrative — not live data');
 
     // ---- TABS ----
     html += '<div class="card" style="margin-bottom:0;border-radius:8px 8px 0 0">';
@@ -7642,7 +7821,7 @@ try {
     var app = document.getElementById('dailylogs-app');
     if (!app) return;
 
-    var html = '';
+    var html = window.sampleBadge('Daily logs are illustrative (modeled on POET) — not live SharePoint data');
 
     // Tabs
     html += '<div class="card" style="margin-bottom:0;border-radius:8px 8px 0 0">';
@@ -8082,7 +8261,7 @@ try {
     var stoneCount = VENDORS.filter(function (v) { return v.service === 'Stone Supplier'; }).length;
     var withProjects = VENDORS.filter(function (v) { return v.projects.length > 0; }).length;
 
-    var html = '';
+    var html = window.sampleBadge('Vendor-to-project associations are illustrative — not live SharePoint data');
 
     // ---- STAT CARDS ----
     html += '<div class="grid grid-4">';
@@ -8287,7 +8466,7 @@ try {
       return days !== null && days <= 14 && days > 0;
     }).length;
 
-    var html = '';
+    var html = window.sampleBadge('Permit records are illustrative templates — not live SharePoint data');
 
     // ---- STAT CARDS ----
     html += '<div class="grid grid-4">';
@@ -8521,7 +8700,7 @@ try {
       }
     });
 
-    var html = '';
+    var html = window.sampleBadge('Closeout records are illustrative — not live SharePoint data');
 
     // ---- STAT CARDS ----
     html += '<div class="grid grid-4">';
@@ -8712,26 +8891,18 @@ try {
   function $s(v) { v = safe(v); if (v >= 1e6) return '$' + (v / 1e6).toFixed(1) + 'M'; if (v >= 1e3) return '$' + Math.round(v / 1e3) + 'K'; return '$' + v; }
   function pct(v) { return Math.round(safe(v) * 100) + '%'; }
 
-  // ---- PIPELINE STATUSES ----
-  var PIPELINE_STATUSES = ['Will Bid', 'Submitted', 'Budget Pricing', 'Submitted - Edging', 'New Lead', 'NEED FOLLOW UP'];
-  var WON_STATUSES = ['Awarded', 'Completed'];
-  var LOST_PATTERN = /Not Awarded/i;
+  // ---- COMPUTED VALUES (all 4 cross-tab KPIs via shared window.kpi helpers) ----
   var OUTSTANDING_STATUSES = ['Submitted', 'Submitted - Edging'];
 
-  // ---- COMPUTED VALUES ----
-  var activeProjects = projects.filter(function (p) {
-    var w = safe(p.work_pct_complete);
-    return w > 0 && w < 1;
-  });
+  // Active projects: executed contract AND 0 <= pct < 1 (shared helper)
+  var activeProjects = window.kpi.activeProjects(projects);
 
-  var pipelineValue = bids.reduce(function (sum, b) {
-    return sum + (PIPELINE_STATUSES.indexOf(b.bid_status) >= 0 ? safe(b.bid_value) : 0);
-  }, 0);
+  // Pipeline value (shared helper)
+  var pipelineInfo = window.kpi.pipelineValue(bids);
+  var pipelineValue = pipelineInfo.value;
 
-  var wonCount = bids.filter(function (b) { return WON_STATUSES.indexOf(b.bid_status) >= 0; }).length;
-  var lostCount = bids.filter(function (b) { return LOST_PATTERN.test(b.bid_status || ''); }).length;
-  var winRateDenom = wonCount + lostCount;
-  var winRate = winRateDenom > 0 ? Math.round((wonCount / winRateDenom) * 100) : 0;
+  // Win rate (shared helper)
+  var winRate = window.kpi.winRate(bids).pct;
 
   var backlog = activeProjects.reduce(function (sum, p) {
     return sum + safe(p.subcontract_value) * (1 - safe(p.work_pct_complete));
@@ -8739,15 +8910,17 @@ try {
 
   var bidsOutstanding = bids.filter(function (b) { return OUTSTANDING_STATUSES.indexOf(b.bid_status) >= 0; }).length;
 
-  var fy26Revenue = bids.reduce(function (sum, b) {
-    return sum + (WON_STATUSES.indexOf(b.bid_status) >= 0 ? safe(b.bid_value) : 0);
-  }, 0);
-  var fy26Pct = FY26_TARGET > 0 ? Math.min(safe(fy26Revenue) / FY26_TARGET, 1) : 0;
+  // FY26 booked revenue (shared helper)
+  var fyRev = window.kpi.fyBookedRevenue(bids);
+  var fy26Revenue = fyRev.value;
+  var fy26Pct = fyRev.goal > 0 ? Math.min(fyRev.value / fyRev.goal, 1) : 0;
 
-  var totalContractValue = projects.reduce(function (sum, p) { return sum + safe(p.subcontract_value); }, 0);
-  var totalCollected = projects.reduce(function (sum, p) { return sum + safe(p.paid); }, 0);
-  var outstandingAR = projects.reduce(function (sum, p) { return sum + safe(p.unpaid); }, 0);
-  var retainageHeld = projects.reduce(function (sum, p) { return sum + safe(p.retainage); }, 0);
+  // Company financials (shared helper)
+  var companyFin = window.kpi.companyFinancials(projects);
+  var totalContractValue = companyFin.contract;
+  var totalCollected = companyFin.paid;
+  var outstandingAR = companyFin.unpaid;
+  var retainageHeld = companyFin.retainage;
   var cashOwed = outstandingAR + retainageHeld;
 
   // ---- INLINE STYLE CONSTANTS ----
@@ -9008,8 +9181,10 @@ try {
     if (!app) return;
 
     var bids = getBids();
-    var awarded = bids.filter(function (b) { return b.bid_status === 'Awarded' || b.bid_status === 'Completed'; });
-    var awardedTotal = awarded.reduce(function (s, b) { return s + safe(b.bid_value); }, 0);
+    // FY26 booked revenue via shared helper (Awarded + Completed) — same value
+    // every other tab shows. wonCount drives the "N projects" sub-label.
+    var awardedTotal = window.kpi.fyBookedRevenue(bids).value;
+    var awardedCount = window.kpi.winRate(bids).won;
     var months = monthsElapsed();
     var runRate = (awardedTotal / months) * 12;
     var gap = FY26_TARGET - runRate;
@@ -9023,7 +9198,7 @@ try {
     h += '<div class="card" style="margin-bottom:16px"><div class="card-header"><span class="card-title">Revenue Forecast</span><span class="card-subtitle">FY26 (Oct 2025 - Sep 2026)</span></div>';
     h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">';
     h += metric('FY26 Target', dollar(FY26_TARGET));
-    h += metric('Awarded YTD', dollar(awardedTotal), awarded.length + ' projects');
+    h += metric('Awarded YTD', dollar(awardedTotal), awardedCount + ' projects');
     h += metric('Run Rate', dollar(runRate), pct(runRate / FY26_TARGET * 100) + ' of target');
     h += metric('Gap to Target', dollar(Math.abs(gap)), gap > 0 ? '<span style="color:#e74c3c">Behind</span>' : '<span style="color:#27ae60">Ahead</span>');
     h += '</div>';
@@ -9122,13 +9297,10 @@ try {
     if (!app) return;
 
     var projects = getProjects();
-    var totalBilled = 0, totalPaid = 0, totalUnpaid = 0, totalRetainage = 0;
-    projects.forEach(function (p) {
-      totalPaid += safe(p.paid);
-      totalUnpaid += safe(p.unpaid);
-      totalRetainage += safe(p.retainage);
-    });
-    totalBilled = totalPaid + totalUnpaid;
+    // Company financials via shared helper (same totals as CEO Dashboard / Projects)
+    var companyFin = window.kpi.companyFinancials(projects);
+    var totalPaid = companyFin.paid, totalUnpaid = companyFin.unpaid,
+        totalRetainage = companyFin.retainage, totalBilled = companyFin.billed;
 
     var h = '';
 
