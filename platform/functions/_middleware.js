@@ -1,17 +1,19 @@
 // Cloudflare Pages Functions middleware — server-side authentication
 // This runs BEFORE any page is served. No client-side bypass possible.
 
-const VALID_CREDENTIALS = {
-  username: 'pf',
-  password: 'PierFoundations2024'
-};
-
 // Paths that don't require auth
 const PUBLIC_PATHS = ['/favicon.ico', '/robots.txt'];
 
 export async function onRequest(context) {
-  const { request } = context;
+  const { request, env } = context;
   const url = new URL(request.url);
+
+  // Credentials from environment variables (set on the CF Pages project).
+  // Fallback to defaults only if env vars are not configured.
+  const VALID_CREDENTIALS = {
+    username: env.PF_AUTH_USER || 'pf',
+    password: env.PF_AUTH_PASS || 'PierFoundations2024'
+  };
 
   // Skip auth for public paths
   if (PUBLIC_PATHS.some(p => url.pathname === p)) {

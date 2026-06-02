@@ -729,43 +729,9 @@ table tbody tr:hover {
 </head>
 <body>
 
-<!-- LOGIN SCREEN -->
-<div class="login-overlay" id="loginOverlay">
-  <div class="login-box">
-    <div class="login-logo">PF</div>
-    <h2>Pier Foundations</h2>
-    <p>Operations Platform</p>
-    <input type="password" id="loginPassword" placeholder="Enter password" onkeydown="if(event.key==='Enter')checkLogin()">
-    <button onclick="checkLogin()">Sign In</button>
-    <div class="login-error" id="loginError">Incorrect password. Try again.</div>
-  </div>
-</div>
-<script>
-function checkLogin() {
-  var pw = document.getElementById('loginPassword').value;
-  // Hash compare — not storing plaintext in source
-  if (hashCode(pw) === 837443002) {
-    document.getElementById('loginOverlay').classList.add('hidden');
-    sessionStorage.setItem('pf_auth', '1');
-  } else {
-    document.getElementById('loginError').style.display = 'block';
-    document.getElementById('loginPassword').value = '';
-    document.getElementById('loginPassword').focus();
-  }
-}
-function hashCode(s) {
-  var h = 0;
-  for (var i = 0; i < s.length; i++) {
-    h = ((h << 5) - h) + s.charCodeAt(i);
-    h |= 0;
-  }
-  return h;
-}
-// Auto-login if already authenticated this session
-if (sessionStorage.getItem('pf_auth') === '1') {
-  document.getElementById('loginOverlay').classList.add('hidden');
-}
-</script>
+<!-- Authentication is handled server-side by Cloudflare Pages Functions
+     middleware (functions/_middleware.js) — Basic Auth + httpOnly cookie,
+     enforced at the edge before any content loads. No client-side gate needed. -->
 
 <script>
 // ---- LIVE DATA FROM SHAREPOINT ----
