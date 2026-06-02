@@ -25,9 +25,9 @@ On June 2, 2026 a three-agent code triple-check (correctness, security, QA) revi
 **Files changed:** `platform/functions/_middleware.js`, `platform/functions/api/data.js`
 **Secrets set on CF Pages (production):** `PF_AUTH_USER`, `PF_AUTH_PASS`, `PF_TOKEN_SECRET`
 
-### Phase B — Output safety / XSS (PENDING)
+### Phase B — Output safety / XSS (COMPLETE, deployed & verified June 2, 2026)
 
-7. **Escape all data at `innerHTML` sites (SEC-004 / XSS-1, XSS-2).** ~30 render sites in `index.html` concatenate SharePoint free-text into `innerHTML` without escaping. Standardize on one escape helper and apply uniformly. Requires its own self-check (inject a `<script>`/`onerror` payload into a test record, confirm it renders inert).
+7. **Escape all data at `innerHTML` sites (SEC-004 / XSS-1, XSS-2).** DONE. Standardized on one global helper `window.esc` (handles null/undefined; escapes `& < > " '`); the two pre-existing helpers now delegate to it. **132 data-derived insertion points wrapped** across all 18 modules. Function-arg-as-classname and filter/comparison logic left raw (only displayed values escaped) so no behavior changed. **Self-check:** injected `<img src=x onerror="window.__XSS_FIRED=true">` and `<b>TAGTEST</b>` into test records, rendered headless — payload did NOT fire and renders as escaped text; a CONTROL run on the unfixed code DID fire (proving the test detects XSS); no-regression run shows 156 bids/18 projects rendering with zero console errors. Production re-verified: `window.esc` deployed, auth still enforced.
 
 ### Phase C — Backlog (when relevant)
 
@@ -42,8 +42,8 @@ On June 2, 2026 a three-agent code triple-check (correctness, security, QA) revi
 - [x] Production secrets configured (fail-closed)
 - [x] External verification suite passing
 - [x] Security SRS + SOW (this document)
+- [x] XSS escaping pass (Phase B) — 132 sites, verified
 - [ ] New credentials delivered to Brad / team
-- [ ] XSS escaping pass (Phase B)
 
 ## Acceptance Criteria
 
@@ -51,7 +51,7 @@ On June 2, 2026 a three-agent code triple-check (correctness, security, QA) revi
 - Forged or tampered tokens are rejected. (MET)
 - No known/default credential grants access. (MET)
 - No secrets in source. (MET)
-- Free-text data cannot execute script in another user's session. (Phase B — open)
+- Free-text data cannot execute script in another user's session. (MET — Phase B verified)
 
 ## Self-Check Discipline (per Brad, June 2, 2026)
 

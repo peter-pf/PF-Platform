@@ -735,6 +735,21 @@ table tbody tr:hover {
 
 <!-- Live data loaded from separate file (blocks + executes before modules) -->
 <script src="/data/live-data.js"></script>
+<script>
+// ---- CANONICAL HTML ESCAPE HELPER (global, SEC-004 stored-XSS fix) ----
+// Defined at global scope so every inlined module can call window.esc().
+// Handles null/undefined -> '' and escapes & < > " '. All data-derived
+// values rendered via innerHTML/html+= MUST be wrapped with esc().
+window.esc = function(v) {
+  if (v == null) return '';
+  return String(v)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+};
+</script>
 
 
 <!-- SIDEBAR -->
@@ -1150,9 +1165,9 @@ function renderDashboard() {
       : 'pending';
     var valStr = typeof b.bid_value === 'number' ? '$' + b.bid_value.toLocaleString() : '--';
     return '<tr>' +
-      '<td style="font-weight:500">' + (b.name || '') + '</td>' +
-      '<td>' + (b.gc_name || '') + '</td>' +
-      '<td><span class="badge-status ' + statusClass + '">' + (b.bid_status || '') + '</span></td>' +
+      '<td style="font-weight:500">' + esc(b.name) + '</td>' +
+      '<td>' + esc(b.gc_name) + '</td>' +
+      '<td><span class="badge-status ' + statusClass + '">' + esc(b.bid_status) + '</span></td>' +
       '<td>' + valStr + '</td>' +
     '</tr>';
   }).join('');
@@ -1167,8 +1182,8 @@ function renderDashboard() {
       : 'pending';
     var valStr = typeof p.subcontract_value === 'number' ? '$' + p.subcontract_value.toLocaleString() : '--';
     return '<tr>' +
-      '<td style="font-weight:500">' + (p.name || '') + '</td>' +
-      '<td>' + (p.city_state || '') + '</td>' +
+      '<td style="font-weight:500">' + esc(p.name) + '</td>' +
+      '<td>' + esc(p.city_state) + '</td>' +
       '<td><span class="badge-status ' + statusClass + '">' + statusLabel + '</span></td>' +
       '<td>' + valStr + '</td>' +
       '<td>' +
@@ -1620,7 +1635,7 @@ try {
     html += '<option value="">' + (placeholder || '-- Select --') + '</option>';
     for (var i = 0; i < options.length; i++) {
       var sel = selected === options[i].value ? ' selected' : '';
-      html += '<option value="' + options[i].value + '"' + sel + '>' + options[i].label + '</option>';
+      html += '<option value="' + options[i].value + '"' + sel + '>' + esc(options[i].label) + '</option>';
     }
     html += '</select>';
     return html;
@@ -1632,7 +1647,7 @@ try {
       var checked = selected === options[i].value ? ' checked' : '';
       html += '<label style="display:flex;align-items:center;gap:4px;font-size:0.82rem;cursor:pointer">';
       html += '<input type="radio" name="' + name + '" value="' + options[i].value + '"' + checked + ' data-field="' + name + '"> ';
-      html += options[i].label + '</label>';
+      html += esc(options[i].label) + '</label>';
     }
     html += '</div>';
     return html;
@@ -1647,7 +1662,7 @@ try {
       html += '<button type="button" class="' + cls + '" ';
       html += 'data-multi="' + name + '" data-value="' + options[i].value + '" ';
       html += 'style="padding:6px 12px;font-size:0.78rem">';
-      html += options[i].label + '</button>';
+      html += esc(options[i].label) + '</button>';
     }
     html += '</div>';
     return html;
@@ -1715,7 +1730,7 @@ try {
         '<div class="grid grid-2">' +
           '<div class="form-group">' +
             '<label class="form-label">Project Location *</label>' +
-            '<input class="form-input" type="text" data-field="location" value="' + (d.location || '') + '" placeholder="City, State">' +
+            '<input class="form-input" type="text" data-field="location" value="' + esc(d.location) + '" placeholder="City, State">' +
           '</div>' +
           '<div class="form-group">' +
             '<label class="form-label">Distance from Yard (miles)</label>' +
@@ -1857,7 +1872,7 @@ try {
           '<div class="score-ring ' + rec.color + '" style="width:48px;height:48px;font-size:1rem">' +
             scores.total +
           '</div>' +
-          '<span class="badge-status ' + rec.cls + '" style="font-size:0.78rem">' + rec.label + '</span>' +
+          '<span class="badge-status ' + rec.cls + '" style="font-size:0.78rem">' + esc(rec.label) + '</span>' +
         '</div>' +
         (dq.length > 0 ? '<div style="font-size:0.72rem;color:var(--red);margin-top:6px">Disqualifier triggered</div>' : '') +
       '</div>';
@@ -1908,7 +1923,7 @@ try {
         '<div class="score-ring ' + rec.color + '" style="width:96px;height:96px;font-size:2rem;margin-bottom:8px">' +
           scores.total +
         '</div>' +
-        '<span class="badge-status ' + rec.cls + '" style="font-size:0.88rem;padding:4px 14px">' + rec.label + '</span>' +
+        '<span class="badge-status ' + rec.cls + '" style="font-size:0.88rem;padding:4px 14px">' + esc(rec.label) + '</span>' +
         '<div style="font-size:0.72rem;color:var(--text-3);margin-top:6px">Confidence: ' + rec.confidence + '</div>' +
       '</div>';
 
@@ -1979,7 +1994,7 @@ try {
 
     for (var k = 0; k < details.length; k++) {
       html += '<div class="stat-card" style="padding:10px 14px">' +
-        '<div class="stat-label">' + details[k].label + '</div>' +
+        '<div class="stat-label">' + esc(details[k].label) + '</div>' +
         '<div style="font-size:0.88rem;font-weight:600;color:var(--text-0);margin-top:2px;text-transform:capitalize">' + details[k].value + '</div>' +
       '</div>';
     }
@@ -2019,7 +2034,7 @@ try {
         '<td style="font-weight:500">' + (h.projectName || '--') + '</td>' +
         '<td>' + (h.gcName || '--') + '</td>' +
         '<td><div class="score-ring ' + rec.color + '" style="width:36px;height:36px;font-size:0.78rem">' + h.score + '</div></td>' +
-        '<td><span class="badge-status ' + rec.cls + '">' + rec.label + '</span></td>' +
+        '<td><span class="badge-status ' + rec.cls + '">' + esc(rec.label) + '</span></td>' +
         '<td>' + (h.distance ? h.distance + ' mi' : '--') + '</td>' +
         '<td><button class="btn btn-secondary" style="padding:4px 8px;font-size:0.72rem" onclick="window._feasDeleteHistory(' + i + ')">Remove</button></td>' +
       '</tr>';
@@ -2076,7 +2091,7 @@ try {
         var bgColor = stepActive ? 'var(--accent)' : stepDone ? 'var(--green)' : 'var(--bg-2)';
         var textColor = stepActive || stepDone ? 'white' : 'var(--text-3)';
         html += '<div style="flex:1;text-align:center;padding:8px 4px;border-radius:6px;background:' + bgColor + ';color:' + textColor + ';font-size:0.75rem;font-weight:600;cursor:pointer" onclick="window._feasGoStep(' + s + ')">';
-        html += '<span>' + steps[s].icon + '</span> ' + steps[s].title;
+        html += '<span>' + steps[s].icon + '</span> ' + esc(steps[s].title);
         html += '</div>';
       }
       html += '</div>';
@@ -2084,7 +2099,7 @@ try {
 
     // Step content
     html += '<div class="card">';
-    html += '<div class="card-header"><span class="card-title">' + steps[quickMode ? 0 : currentStep].title + '</span></div>';
+    html += '<div class="card-header"><span class="card-title">' + esc(steps[quickMode ? 0 : currentStep].title) + '</span></div>';
     html += renderStepContent(steps[quickMode ? 0 : currentStep].id);
     html += '</div>';
 
@@ -2176,7 +2191,7 @@ try {
         '<div class="score-ring ' + rec.color + '" style="width:48px;height:48px;font-size:1rem">' +
           scores.total +
         '</div>' +
-        '<span class="badge-status ' + rec.cls + '" style="font-size:0.78rem">' + rec.label + '</span>' +
+        '<span class="badge-status ' + rec.cls + '" style="font-size:0.78rem">' + esc(rec.label) + '</span>' +
       '</div>' +
       (dq.length > 0 ? '<div style="font-size:0.72rem;color:var(--red);margin-top:6px">Disqualifier triggered</div>' : '');
   }
@@ -2372,8 +2387,8 @@ try {
   function buildSummary(stats) {
     if (!stats.cheapest) return '';
     return '<div class="grid grid-4" style="margin-bottom:20px">' +
-      statCard('Cheapest Supplier', fmt(stats.cheapest.total) + '/TN', stats.cheapest.supplier + ' — ' + stats.cheapest.city + ', ' + stats.cheapest.state) +
-      statCard('Most Expensive', fmt(stats.expensive.total) + '/TN', stats.expensive.supplier + ' — ' + stats.expensive.city + ', ' + stats.expensive.state) +
+      statCard('Cheapest Supplier', fmt(stats.cheapest.total) + '/TN', esc(stats.cheapest.supplier) + ' — ' + esc(stats.cheapest.city) + ', ' + esc(stats.cheapest.state)) +
+      statCard('Most Expensive', fmt(stats.expensive.total) + '/TN', esc(stats.expensive.supplier) + ' — ' + esc(stats.expensive.city) + ', ' + esc(stats.expensive.state)) +
       statCard('Average Cost', fmt(stats.avg) + '/TN', 'Across ' + (currentFilter === 'ALL' ? 'all states' : currentFilter) + ' suppliers') +
       statCard('Cost Range', fmt(stats.min) + ' — ' + fmt(stats.max), 'Spread: ' + fmt(stats.max - stats.min) + '/TN') +
     '</div>';
@@ -2413,7 +2428,7 @@ try {
     cols.forEach(function (c) {
       var arrow = '';
       if (sortCol === c.key) arrow = sortAsc ? ' &#9650;' : ' &#9660;';
-      thead += '<th style="cursor:pointer" data-sort="' + c.key + '">' + c.label + arrow + '</th>';
+      thead += '<th style="cursor:pointer" data-sort="' + c.key + '">' + esc(c.label) + arrow + '</th>';
     });
     thead += '</tr>';
 
@@ -2423,9 +2438,9 @@ try {
                        cheapByState[r.state].city === r.city;
       var rowStyle = isCheapest ? ' style="background:var(--green-light)"' : '';
       tbody += '<tr' + rowStyle + '>';
-      tbody += '<td style="font-weight:500">' + r.supplier + '</td>';
-      tbody += '<td>' + r.city + '</td>';
-      tbody += '<td>' + r.state + '</td>';
+      tbody += '<td style="font-weight:500">' + esc(r.supplier) + '</td>';
+      tbody += '<td>' + esc(r.city) + '</td>';
+      tbody += '<td>' + esc(r.state) + '</td>';
       tbody += '<td>' + fmt(r.stoneRate) + '</td>';
       tbody += '<td>' + fmt(r.haulRate) + '</td>';
       tbody += '<td>' + fmt(r.tax) + '</td>';
@@ -2448,7 +2463,7 @@ try {
   function buildEstimator() {
     var options = '';
     SUPPLIERS.forEach(function (s, i) {
-      options += '<option value="' + i + '">' + s.supplier + ' — ' + s.city + ', ' + s.state + ' (' + fmt(s.total) + '/TN)</option>';
+      options += '<option value="' + i + '">' + esc(s.supplier) + ' — ' + esc(s.city) + ', ' + esc(s.state) + ' (' + fmt(s.total) + '/TN)</option>';
     });
 
     return '<div class="card" style="margin-top:8px">' +
@@ -2507,7 +2522,7 @@ try {
       '<div class="grid grid-4" style="margin-bottom:12px">' +
         statCard('Total LF', lf.toLocaleString() + ' LF', '') +
         statCard('Tons Required', tons.toFixed(1) + ' TN', lf.toLocaleString() + ' LF x ' + TONS_PER_LF + ' TN/LF') +
-        statCard('Supplier', s.supplier, s.city + ', ' + s.state) +
+        statCard('Supplier', esc(s.supplier), esc(s.city) + ', ' + esc(s.state)) +
         statCard('Total Material Cost', fmt(totalCost), fmt(s.total) + '/TN x ' + tons.toFixed(1) + ' TN') +
       '</div>' +
       '<div class="card" style="padding:16px;margin-bottom:0">' +
@@ -2866,9 +2881,9 @@ try {
       html += '  <td style="font-weight:500;white-space:nowrap;color:var(--accent)">' + b.id + '</td>';
       html += '  <td style="font-weight:500">' + escHtml(b.name) + '</td>';
       html += '  <td>' + escHtml(b.gc) + '</td>';
-      html += '  <td style="white-space:nowrap">' + b.city + ', ' + b.state + '</td>';
+      html += '  <td style="white-space:nowrap">' + esc(b.city) + ', ' + esc(b.state) + '</td>';
       html += '  <td style="white-space:nowrap">' + fmtDate(b.dueDate) + '</td>';
-      html += '  <td><span class="badge-status ' + statusBadgeClass(b.status) + '">' + b.status + '</span></td>';
+      html += '  <td><span class="badge-status ' + statusBadgeClass(b.status) + '">' + esc(b.status) + '</span></td>';
       html += '  <td style="font-weight:600;white-space:nowrap">' + fmtCurrency(b.value) + '</td>';
       html += '</tr>';
 
@@ -2937,13 +2952,13 @@ try {
     // Column 3: Contact & Engineering
     html += '<div>';
     html += '<div style="font-weight:600;font-size:0.78rem;color:var(--text-0);margin-bottom:8px">Contact & Engineering</div>';
-    html += detailRow('GC', b.gc);
-    html += detailRow('Contact', b.contact || '--');
+    html += detailRow('GC', esc(b.gc));
+    html += detailRow('Contact', esc(b.contact) || '--');
     if (b.email) {
-      html += detailRow('Email', '<a href="mailto:' + b.email + '" style="color:var(--blue);text-decoration:none">' + b.email + '</a>');
+      html += detailRow('Email', '<a href="mailto:' + esc(b.email) + '" style="color:var(--blue);text-decoration:none">' + esc(b.email) + '</a>');
     }
-    html += detailRow('Phone', b.phone || '--');
-    html += detailRow('Engineer', b.engineer || '--');
+    html += detailRow('Phone', esc(b.phone) || '--');
+    html += detailRow('Engineer', esc(b.engineer) || '--');
     html += detailRow('Prelim Fee', b.prelimFee ? fmtCurrency(b.prelimFee) : '--');
     html += detailRow('Design Done', fmtDate(b.designCompleted));
     html += '</div>';
@@ -2960,8 +2975,7 @@ try {
   }
 
   function escHtml(str) {
-    if (!str) return '';
-    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    return window.esc(str);
   }
 
   // ---- GLOBAL HANDLERS ----
@@ -3233,9 +3247,9 @@ try {
   }
 
   function location(p) {
-    if (p.city && p.state) return p.city + ', ' + p.state;
-    if (p.city) return p.city;
-    if (p.state) return p.state;
+    if (p.city && p.state) return esc(p.city) + ', ' + esc(p.state);
+    if (p.city) return esc(p.city);
+    if (p.state) return esc(p.state);
     return 'TBD';
   }
 
@@ -3361,12 +3375,12 @@ try {
         '<div class="card" style="cursor:pointer" onclick="window._projectsToggleDetail(\'' + p.id + '\')">' +
           '<div class="card-header">' +
             '<div>' +
-              '<div class="card-title">' + p.name + '</div>' +
+              '<div class="card-title">' + esc(p.name) + '</div>' +
               '<div class="card-subtitle">' + p.id + '</div>' +
             '</div>' +
-            '<span class="badge-status ' + statusClass(p.status) + '">' + p.status + '</span>' +
+            '<span class="badge-status ' + statusClass(p.status) + '">' + esc(p.status) + '</span>' +
           '</div>' +
-          '<div style="font-size:0.82rem;color:var(--text-2);margin-bottom:8px">' + p.gc + '</div>' +
+          '<div style="font-size:0.82rem;color:var(--text-2);margin-bottom:8px">' + esc(p.gc) + '</div>' +
           '<div style="font-size:0.78rem;color:var(--text-3);margin-bottom:12px">' + location(p) + '</div>' +
           '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
             '<span style="font-size:1.1rem;font-weight:700;color:var(--text-0)">' + fmt(p.value) + '</span>' +
@@ -3406,8 +3420,8 @@ try {
       html += '' +
         '<tr style="cursor:pointer" onclick="window._projectsToggleDetail(\'' + p.id + '\')">' +
           '<td style="font-weight:500">' + p.id + '</td>' +
-          '<td style="font-weight:500">' + p.name + '</td>' +
-          '<td>' + p.gc + '</td>' +
+          '<td style="font-weight:500">' + esc(p.name) + '</td>' +
+          '<td>' + esc(p.gc) + '</td>' +
           '<td>' + fmt(p.value) + '</td>' +
           '<td>' +
             '<div style="display:flex;align-items:center;gap:8px">' +
@@ -3419,7 +3433,7 @@ try {
           '</td>' +
           '<td>' + location(p) + '</td>' +
           '<td>' + (p.duration ? p.duration + ' days' : '-') + '</td>' +
-          '<td><span class="badge-status ' + statusClass(p.status) + '">' + p.status + '</span></td>' +
+          '<td><span class="badge-status ' + statusClass(p.status) + '">' + esc(p.status) + '</span></td>' +
         '</tr>';
     });
 
@@ -3437,8 +3451,8 @@ try {
       '<div class="card" style="margin-top:16px;border-left:3px solid var(--accent)">' +
         '<div class="card-header">' +
           '<div>' +
-            '<div class="card-title">' + project.name + ' - Project Dashboard</div>' +
-            '<div class="card-subtitle">' + project.id + ' | ' + project.gc + ' | ' + location(project) + '</div>' +
+            '<div class="card-title">' + esc(project.name) + ' - Project Dashboard</div>' +
+            '<div class="card-subtitle">' + project.id + ' | ' + esc(project.gc) + ' | ' + location(project) + '</div>' +
           '</div>' +
           '<button class="btn btn-secondary" onclick="window._projectsToggleDetail(null)">Close</button>' +
         '</div>' +
@@ -3573,10 +3587,10 @@ try {
       html += '' +
         '<tr>' +
           '<td style="font-weight:500">' + p.id + '</td>' +
-          '<td>' + p.name + '</td>' +
-          '<td>' + p.gc + '</td>' +
+          '<td>' + esc(p.name) + '</td>' +
+          '<td>' + esc(p.gc) + '</td>' +
           '<td>' + fmt(p.value) + '</td>' +
-          '<td>' + (p.city && p.state ? p.city + ', ' + p.state : '-') + '</td>' +
+          '<td>' + (p.city && p.state ? esc(p.city) + ', ' + esc(p.state) : '-') + '</td>' +
           '<td><span class="badge-status closed">Completed</span></td>' +
         '</tr>';
     });
@@ -4488,7 +4502,7 @@ try {
             <tbody>
               <tr><td style="font-weight:500;color:var(--text-2);width:45%">Job</td><td>${t.job}</td></tr>
               <tr><td style="font-weight:500;color:var(--text-2)">Job Number</td><td>${t.jobNumber}</td></tr>
-              <tr><td style="font-weight:500;color:var(--text-2)">Location</td><td>${t.location}</td></tr>
+              <tr><td style="font-weight:500;color:var(--text-2)">Location</td><td>${esc(t.location)}</td></tr>
               <tr><td style="font-weight:500;color:var(--text-2)">Pier Tested</td><td>${t.pier}</td></tr>
               <tr><td style="font-weight:500;color:var(--text-2)">Test Date</td><td>${formatDate(t.date)}</td></tr>
               <tr><td style="font-weight:500;color:var(--text-2)">Tested By</td><td>${t.testedBy}</td></tr>
@@ -4497,7 +4511,7 @@ try {
               <tr><td style="font-weight:500;color:var(--text-2)">Design Modulus (Kp)</td><td>${t.designModulus} pci</td></tr>
               <tr><td style="font-weight:500;color:var(--text-2)">Design Load</td><td>${t.designLoad} kips</td></tr>
               <tr><td style="font-weight:500;color:var(--text-2)">Max Test Load (150%)</td><td>${t.maxTestLoad} kips</td></tr>
-              <tr><td style="font-weight:500;color:var(--text-2)">Jack Type</td><td>${JACK_CAL[t.jackType].label}</td></tr>
+              <tr><td style="font-weight:500;color:var(--text-2)">Jack Type</td><td>${esc(JACK_CAL[t.jackType].label)}</td></tr>
               <tr><td style="font-weight:500;color:var(--text-2)">Jack Cal Factor</td><td>${t.jackCalFactor} psi/kip</td></tr>
             </tbody>
           </table>
@@ -5247,7 +5261,7 @@ try {
     est.categories.forEach(function (cat) {
       html += '<div class="card">';
       html += '<div class="card-header">';
-      html += '<span class="card-title">' + cat.label + ' (' + cat.code + ')</span>';
+      html += '<span class="card-title">' + esc(cat.label) + ' (' + esc(cat.code) + ')</span>';
       html += '<span class="card-subtitle" style="font-weight:600;color:var(--text-0)">' + fmt(cat.subtotal) + '</span>';
       html += '</div>';
       html += '<div class="table-wrap">';
@@ -5257,9 +5271,9 @@ try {
       cat.items.forEach(function (item) {
         var qtyStr = typeof item.qty === 'number' ? (item.qty % 1 === 0 ? fmtInt(item.qty) : item.qty.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')) : item.qty;
         html += '<tr>';
-        html += '<td>' + item.desc + '</td>';
+        html += '<td>' + esc(item.desc) + '</td>';
         html += '<td style="text-align:right">' + qtyStr + '</td>';
-        html += '<td>' + item.unit + '</td>';
+        html += '<td>' + esc(item.unit) + '</td>';
         html += '<td style="text-align:right">' + fmt(item.rate) + '</td>';
         html += '<td style="text-align:right;font-weight:500">' + fmt(item.total) + '</td>';
         html += '</tr>';
@@ -5284,7 +5298,7 @@ try {
     markupKeys.forEach(function (key) {
       var m = est.markups[key];
       html += '<tr>';
-      html += '<td>' + m.label + '</td>';
+      html += '<td>' + esc(m.label) + '</td>';
       html += '<td style="text-align:right">' + (m.pct !== null ? pct(m.pct) : 'Flat') + '</td>';
       html += '<td style="text-align:right;font-weight:500">' + fmt(m.amount) + '</td>';
       html += '</tr>';
@@ -5360,8 +5374,8 @@ try {
       var barColor = spent > 0.9 ? 'red' : spent > 0.7 ? 'amber' : 'green';
 
       html += '<tr>';
-      html += '<td style="font-family:monospace;font-size:0.78rem;color:var(--text-3)">' + cat.code + '</td>';
-      html += '<td style="font-weight:500">' + cat.name + '</td>';
+      html += '<td style="font-family:monospace;font-size:0.78rem;color:var(--text-3)">' + esc(cat.code) + '</td>';
+      html += '<td style="font-weight:500">' + esc(cat.name) + '</td>';
       html += '<td style="text-align:right">' + fmt(cat.budget) + '</td>';
       html += '<td style="text-align:right">' + fmt(cat.actual) + '</td>';
       html += '<td style="text-align:right;' + varClass + ';font-weight:500">' + (variance >= 0 ? '+' : '') + fmt(variance) + '</td>';
@@ -5725,12 +5739,12 @@ try {
               ${proposals.map(p => `
                 <tr>
                   <td style="font-weight:500">${p.id}</td>
-                  <td>${p.project}</td>
-                  <td>${p.gc}</td>
-                  <td>${p.location}</td>
+                  <td>${esc(p.project)}</td>
+                  <td>${esc(p.gc)}</td>
+                  <td>${esc(p.location)}</td>
                   <td>${p.date}</td>
                   <td>${fmt(p.value)}</td>
-                  <td><span class="badge-status ${statusClass(p.status)}">${p.status}</span></td>
+                  <td><span class="badge-status ${statusClass(p.status)}">${esc(p.status)}</span></td>
                   <td>
                     <button class="btn btn-secondary" style="padding:4px 8px;font-size:0.72rem" onclick="viewProposal('${p.id}')">View</button>
                   </td>
@@ -5775,7 +5789,7 @@ try {
     detail.innerHTML = `
       <div class="card" style="margin-top:16px">
         <div class="card-header">
-          <span class="card-title">${p.project} — Proposal ${p.id}</span>
+          <span class="card-title">${esc(p.project)} — Proposal ${p.id}</span>
           <button class="btn btn-secondary" onclick="document.getElementById('proposalDetail').style.display='none'">Close</button>
         </div>
         <div class="grid grid-4" style="margin-bottom:16px">
@@ -5797,10 +5811,10 @@ try {
           </div>
         </div>
         <div style="padding:8px 0">
-          <strong>General Contractor:</strong> ${p.gc}<br>
-          <strong>Location:</strong> ${p.location}<br>
-          <strong>Engineer:</strong> ${p.engineer}<br>
-          <strong>Scope:</strong> ${p.scope}
+          <strong>General Contractor:</strong> ${esc(p.gc)}<br>
+          <strong>Location:</strong> ${esc(p.location)}<br>
+          <strong>Engineer:</strong> ${esc(p.engineer)}<br>
+          <strong>Scope:</strong> ${esc(p.scope)}
         </div>
         <div style="margin-top:16px">
           <div class="card-subtitle" style="margin-bottom:8px">Proposal Sections</div>
@@ -6048,7 +6062,7 @@ try {
     ];
     filters.forEach(function (f) {
       var cls = 'tab' + (currentFilter === f.key ? ' active' : '');
-      html += '<button class="' + cls + '" onclick="window.__CO_filter(\'' + f.key + '\')">' + f.label + '</button>';
+      html += '<button class="' + cls + '" onclick="window.__CO_filter(\'' + f.key + '\')">' + esc(f.label) + '</button>';
     });
     html += '  </div>';
 
@@ -6125,11 +6139,11 @@ try {
     filtered.forEach(function (co) {
       html += '      <tr>';
       html += '        <td><strong>' + co.id + '</strong></td>';
-      html += '        <td>' + co.project + '</td>';
-      html += '        <td>' + co.description + '</td>';
+      html += '        <td>' + esc(co.project) + '</td>';
+      html += '        <td>' + esc(co.description) + '</td>';
       html += '        <td>' + co.reason + '</td>';
       html += '        <td style="text-align:right">' + fmtCurrency(co.amount) + '</td>';
-      html += '        <td><span class="badge-status ' + statusBadgeClass(co.status) + '">' + co.status + '</span></td>';
+      html += '        <td><span class="badge-status ' + statusBadgeClass(co.status) + '">' + esc(co.status) + '</span></td>';
       html += '        <td>' + fmtDate(co.dateSubmitted) + '</td>';
       html += '        <td>' + fmtDate(co.dateResolved) + '</td>';
       html += '      </tr>';
@@ -6477,11 +6491,11 @@ try {
     filtered.forEach(function (eq) {
       var isExpanded = expandedRow === eq.id;
       html += '<tr style="cursor:pointer" onclick="window._eqExpand(\'' + eq.id + '\')">';
-      html += '<td style="font-weight:600;color:var(--text-0)">' + eq.name + '<div style="font-size:0.7rem;color:var(--text-3);font-weight:400">' + eq.role + '</div></td>';
+      html += '<td style="font-weight:600;color:var(--text-0)">' + esc(eq.name) + '<div style="font-size:0.7rem;color:var(--text-3);font-weight:400">' + esc(eq.role) + '</div></td>';
       html += '<td><span class="badge-status ' + (eq.type === 'Owned' ? 'active' : 'pending') + '">' + eq.type + '</span></td>';
       html += '<td>' + eq.category + '</td>';
-      html += '<td><span class="badge-status ' + statusBadgeClass(eq.status) + '">' + eq.status + '</span></td>';
-      html += '<td>' + (eq.project || '<span style="color:var(--text-3)">--</span>') + '</td>';
+      html += '<td><span class="badge-status ' + statusBadgeClass(eq.status) + '">' + esc(eq.status) + '</span></td>';
+      html += '<td>' + (esc(eq.project) || '<span style="color:var(--text-3)">--</span>') + '</td>';
       html += '<td>' + (eq.nextService || '<span style="color:var(--text-3)">N/A</span>') + '</td>';
       html += '<td>' + maintenanceBadge(eq) + '</td>';
       html += '<td style="font-size:0.75rem;color:var(--text-3)">' + (isExpanded ? '&#9650;' : '&#9660;') + '</td>';
@@ -6562,7 +6576,7 @@ try {
         html += '<tr>';
         html += '<td>' + h.date + '</td>';
         html += '<td><span class="badge-status ' + typeClass + '">' + h.type + '</span></td>';
-        html += '<td>' + h.desc + '</td>';
+        html += '<td>' + esc(h.desc) + '</td>';
         html += '<td style="font-weight:600">' + fmt(h.cost) + '</td>';
         html += '</tr>';
       });
@@ -6596,8 +6610,8 @@ try {
       html += '<tr>';
       html += '<td style="font-weight:600;color:var(--text-0)">' + r.item + '</td>';
       html += '<td style="font-weight:700;color:var(--accent)">' + fmt(r.rate) + '</td>';
-      html += '<td>' + r.unit + '</td>';
-      html += '<td style="font-size:0.78rem;color:var(--text-2)">' + r.notes + '</td>';
+      html += '<td>' + esc(r.unit) + '</td>';
+      html += '<td style="font-size:0.78rem;color:var(--text-2)">' + esc(r.notes) + '</td>';
       html += '</tr>';
     });
 
@@ -6623,13 +6637,13 @@ try {
     html += '<div class="grid grid-2">';
     TRANSPORT.forEach(function (t) {
       html += '<div class="card" style="margin-bottom:0">';
-      html += '<div style="font-weight:700;font-size:0.95rem;color:var(--text-0);margin-bottom:4px">' + t.company + '</div>';
-      html += '<div style="font-size:0.82rem;color:var(--text-2);margin-bottom:12px">' + t.role + '</div>';
-      html += '<div style="font-size:0.82rem"><strong>Contact:</strong> ' + t.contact + '</div>';
+      html += '<div style="font-weight:700;font-size:0.95rem;color:var(--text-0);margin-bottom:4px">' + esc(t.company) + '</div>';
+      html += '<div style="font-size:0.82rem;color:var(--text-2);margin-bottom:12px">' + esc(t.role) + '</div>';
+      html += '<div style="font-size:0.82rem"><strong>Contact:</strong> ' + esc(t.contact) + '</div>';
       if (t.phone) {
-        html += '<div style="font-size:0.82rem;margin-top:4px"><strong>Phone:</strong> ' + t.phone + '</div>';
+        html += '<div style="font-size:0.82rem;margin-top:4px"><strong>Phone:</strong> ' + esc(t.phone) + '</div>';
       }
-      html += '<div style="font-size:0.78rem;color:var(--text-3);margin-top:8px;font-style:italic">' + t.notes + '</div>';
+      html += '<div style="font-size:0.78rem;color:var(--text-3);margin-top:8px;font-style:italic">' + esc(t.notes) + '</div>';
       html += '</div>';
     });
     html += '</div>';
@@ -6673,11 +6687,11 @@ try {
       overdue.forEach(function (eq) {
         var daysOver = Math.abs(daysBetween(today(), eq.nextService));
         html += '<tr>';
-        html += '<td style="font-weight:600;color:var(--text-0)">' + eq.name + '</td>';
+        html += '<td style="font-weight:600;color:var(--text-0)">' + esc(eq.name) + '</td>';
         html += '<td>' + eq.nextService + '</td>';
         html += '<td style="font-weight:700;color:var(--red)">' + daysOver + ' days</td>';
         html += '<td>' + (eq.lastService || 'N/A') + '</td>';
-        html += '<td><span class="badge-status ' + statusBadgeClass(eq.status) + '">' + eq.status + '</span></td>';
+        html += '<td><span class="badge-status ' + statusBadgeClass(eq.status) + '">' + esc(eq.status) + '</span></td>';
         html += '</tr>';
       });
       html += '</tbody></table></div>';
@@ -6699,10 +6713,10 @@ try {
       dueSoon.forEach(function (eq) {
         var daysLeft = daysBetween(today(), eq.nextService);
         html += '<tr>';
-        html += '<td style="font-weight:600;color:var(--text-0)">' + eq.name + '</td>';
+        html += '<td style="font-weight:600;color:var(--text-0)">' + esc(eq.name) + '</td>';
         html += '<td>' + eq.nextService + '</td>';
         html += '<td style="font-weight:600;color:var(--amber)">' + daysLeft + ' days</td>';
-        html += '<td><span class="badge-status ' + statusBadgeClass(eq.status) + '">' + eq.status + '</span></td>';
+        html += '<td><span class="badge-status ' + statusBadgeClass(eq.status) + '">' + esc(eq.status) + '</span></td>';
         html += '</tr>';
       });
       html += '</tbody></table></div>';
@@ -6728,7 +6742,7 @@ try {
       var barClass = pct >= 100 ? 'red' : pct >= 75 ? 'amber' : 'green';
 
       html += '<tr>';
-      html += '<td style="font-weight:600;color:var(--text-0)">' + eq.name + '</td>';
+      html += '<td style="font-weight:600;color:var(--text-0)">' + esc(eq.name) + '</td>';
       html += '<td>' + (eq.lastService || 'N/A') + '</td>';
       html += '<td>' + eq.nextService + '</td>';
       html += '<td style="min-width:120px"><div class="progress-bar"><div class="progress-fill ' + barClass + '" style="width:' + pct + '%"></div></div>';
@@ -6917,7 +6931,7 @@ try {
     ];
     for (var t = 0; t < tabs.length; t++) {
       var cls = currentView === tabs[t].id ? 'btn btn-primary' : 'btn btn-secondary';
-      html += '<button class="' + cls + '" onclick="window.__safetyView(\'' + tabs[t].id + '\')">' + tabs[t].label + '</button>';
+      html += '<button class="' + cls + '" onclick="window.__safetyView(\'' + tabs[t].id + '\')">' + esc(tabs[t].label) + '</button>';
     }
     html += '</div></div>';
 
@@ -6985,7 +6999,7 @@ try {
       html += '<tr>';
       html += '<td><strong>' + PPE[p].item + '</strong></td>';
       html += '<td>' + PPE[p].required + '</td>';
-      html += '<td style="font-size:0.82rem">' + PPE[p].notes + '</td>';
+      html += '<td style="font-size:0.82rem">' + esc(PPE[p].notes) + '</td>';
       html += '</tr>';
     }
     html += '</tbody></table></div></div>';
@@ -6999,7 +7013,7 @@ try {
       html += '<tr>';
       html += '<td><strong>' + OSHA[o].requirement + '</strong></td>';
       html += '<td>' + OSHA[o].who + '</td>';
-      html += '<td style="font-size:0.82rem">' + OSHA[o].notes + '</td>';
+      html += '<td style="font-size:0.82rem">' + esc(OSHA[o].notes) + '</td>';
       html += '</tr>';
     }
     html += '</tbody></table></div></div>';
@@ -7016,9 +7030,9 @@ try {
       html += '<td><strong>' + talk.topic + '</strong></td>';
       html += '<td>' + talk.presenter + '</td>';
       html += '<td>' + talk.attendees + '</td>';
-      html += '<td>' + talk.project + '</td>';
+      html += '<td>' + esc(talk.project) + '</td>';
       html += '</tr>';
-      html += '<tr style="display:none"><td colspan="5" style="background:var(--bg-main);padding:12px;font-size:0.82rem">' + talk.notes + '</td></tr>';
+      html += '<tr style="display:none"><td colspan="5" style="background:var(--bg-main);padding:12px;font-size:0.82rem">' + esc(talk.notes) + '</td></tr>';
     }
     html += '</tbody></table></div></div>';
 
@@ -7031,9 +7045,9 @@ try {
       var ec = EMERGENCY_CONTACTS[e];
       var bold = e === 0 ? ' style="color:var(--red);font-weight:600"' : '';
       html += '<tr' + bold + '>';
-      html += '<td><strong>' + ec.name + '</strong></td>';
-      html += '<td>' + ec.phone + '</td>';
-      html += '<td>' + ec.role + '</td>';
+      html += '<td><strong>' + esc(ec.name) + '</strong></td>';
+      html += '<td>' + esc(ec.phone) + '</td>';
+      html += '<td>' + esc(ec.role) + '</td>';
       html += '</tr>';
     }
     html += '</tbody></table></div></div>';
@@ -7173,7 +7187,7 @@ try {
 
     html += '<div style="padding:0 16px 16px">';
     html += '<div class="form-group"><label class="form-label">Description of Incident</label>';
-    html += '<textarea class="form-input" rows="4" placeholder="What happened? Be specific about actions, conditions, and sequence of events." onchange="window.__safetyIncident(\'description\', this.value)">' + incidentForm.description + '</textarea></div>';
+    html += '<textarea class="form-input" rows="4" placeholder="What happened? Be specific about actions, conditions, and sequence of events." onchange="window.__safetyIncident(\'description\', this.value)">' + esc(incidentForm.description) + '</textarea></div>';
     html += '</div>';
 
     html += '<div class="grid grid-2" style="padding:0 16px 16px">';
@@ -7235,7 +7249,7 @@ try {
       html += '<div style="display:flex;align-items:center;gap:6px;padding:4px 0">';
       html += '<input type="checkbox" style="cursor:pointer">';
       html += '<span style="width:12px;height:12px;border-radius:2px;background:' + mt.color + ';display:inline-block"></span>';
-      html += '<span style="font-size:0.82rem">' + mt.label + '</span>';
+      html += '<span style="font-size:0.82rem">' + esc(mt.label) + '</span>';
       html += '</div>';
     }
     html += '</div></div></div>';
@@ -7640,7 +7654,7 @@ try {
     for (var t = 0; t < tabs.length; t++) {
       var cls = currentView === tabs[t].id || (currentView === 'detail' && tabs[t].id === 'history')
         ? 'btn btn-primary' : 'btn btn-secondary';
-      html += '<button class="' + cls + '" onclick="window.__dailyView(\'' + tabs[t].id + '\')">' + tabs[t].label + '</button>';
+      html += '<button class="' + cls + '" onclick="window.__dailyView(\'' + tabs[t].id + '\')">' + esc(tabs[t].label) + '</button>';
     }
     if (currentView === 'detail') {
       html += '<button class="btn btn-secondary" onclick="window.__dailyView(\'history\')" style="margin-left:auto">Back to History</button>';
@@ -7754,7 +7768,7 @@ try {
 
     // Header
     html += '<div class="card" style="margin-top:16px">';
-    html += '<div class="card-header"><span class="card-title">' + log.project + '</span><span class="card-subtitle">Daily Log ' + log.id + ' | ' + fmtDate(log.date) + ' | Job #' + log.jobNumber + '</span></div>';
+    html += '<div class="card-header"><span class="card-title">' + esc(log.project) + '</span><span class="card-subtitle">Daily Log ' + log.id + ' | ' + fmtDate(log.date) + ' | Job #' + log.jobNumber + '</span></div>';
 
     // Top-level info
     html += '<div class="grid grid-3" style="padding:12px 16px">';
@@ -7825,7 +7839,7 @@ try {
       html += '</div>';
     }
     if (log.delays.notes) {
-      html += '<div style="padding:0 16px 12px;font-size:0.85rem">' + log.delays.notes + '</div>';
+      html += '<div style="padding:0 16px 12px;font-size:0.85rem">' + esc(log.delays.notes) + '</div>';
     }
     html += '</div>';
 
@@ -7844,7 +7858,7 @@ try {
     // Notes
     html += '<div class="card" style="margin-top:16px">';
     html += '<div class="card-header"><span class="card-title">Field Notes</span><span class="card-subtitle">Soil conditions, GC communications, observations</span></div>';
-    html += '<div style="padding:12px 16px;font-size:0.88rem;line-height:1.6">' + log.notes + '</div>';
+    html += '<div style="padding:12px 16px;font-size:0.88rem;line-height:1.6">' + esc(log.notes) + '</div>';
     html += '<div style="padding:0 16px 12px;font-size:0.82rem;color:var(--text-muted)">' + log.photos + ' photos attached</div>';
     html += '</div>';
 
@@ -8113,13 +8127,13 @@ try {
     VENDORS.forEach(function (v) {
       html += '<tr>';
       html += '<td>' + serviceIcon(v.service) + '</td>';
-      html += '<td><strong>' + v.name + '</strong></td>';
-      html += '<td>' + v.service + '</td>';
-      html += '<td>' + v.contact + '</td>';
-      html += '<td>' + v.phone + '</td>';
-      html += '<td>' + (v.email ? '<a href="mailto:' + v.email + '">' + v.email + '</a>' : '--') + '</td>';
+      html += '<td><strong>' + esc(v.name) + '</strong></td>';
+      html += '<td>' + esc(v.service) + '</td>';
+      html += '<td>' + esc(v.contact) + '</td>';
+      html += '<td>' + esc(v.phone) + '</td>';
+      html += '<td>' + (v.email ? '<a href="mailto:' + esc(v.email) + '">' + esc(v.email) + '</a>' : '--') + '</td>';
       html += '<td>' + v.rate + '</td>';
-      html += '<td><span class="badge-status ' + statusClass(v.status) + '">' + v.status + '</span></td>';
+      html += '<td><span class="badge-status ' + statusClass(v.status) + '">' + esc(v.status) + '</span></td>';
       html += '<td>' + (v.projects.length > 0 ? v.projects.join(', ') : '<span style="color:var(--text-3)">None</span>') + '</td>';
       html += '</tr>';
     });
@@ -8135,7 +8149,7 @@ try {
     html += '<tbody>';
     VENDORS.forEach(function (v) {
       if (v.notes) {
-        html += '<tr><td><strong>' + v.name + '</strong></td><td>' + v.service + '</td><td>' + v.notes + '</td></tr>';
+        html += '<tr><td><strong>' + esc(v.name) + '</strong></td><td>' + esc(v.service) + '</td><td>' + esc(v.notes) + '</td></tr>';
       }
     });
     html += '</tbody></table></div></div>';
@@ -8313,13 +8327,13 @@ try {
       }
 
       html += '<tr' + rowStyle + '>';
-      html += '<td><strong>' + p.project + '</strong></td>';
+      html += '<td><strong>' + esc(p.project) + '</strong></td>';
       html += '<td>' + p.type + '</td>';
       html += '<td><span class="badge-status ' + displayStatusClass + '">' + displayStatus + '</span></td>';
       html += '<td>' + fmtDate(p.issueDate) + '</td>';
       html += '<td>' + fmtDate(p.expDate) + '</td>';
       html += '<td>' + daysText + '</td>';
-      html += '<td>' + p.notes + '</td>';
+      html += '<td>' + esc(p.notes) + '</td>';
       html += '</tr>';
     });
 
@@ -8537,15 +8551,15 @@ try {
       var pct = phaseProgress(p.phase);
 
       html += '<tr>';
-      html += '<td><strong>' + p.name + '</strong><br><span style="font-size:0.75rem;color:var(--text-3)">' + p.bidId + '</span></td>';
-      html += '<td>' + p.gc + '</td>';
+      html += '<td><strong>' + esc(p.name) + '</strong><br><span style="font-size:0.75rem;color:var(--text-3)">' + esc(p.bidId) + '</span></td>';
+      html += '<td>' + esc(p.gc) + '</td>';
       html += '<td><span class="badge-status ' + phaseBadgeClass(p.phase) + '">' + p.phase + '</span></td>';
       html += '<td><div class="progress-bar"><div class="progress-fill' + (pct === 100 ? ' green' : pct >= 50 ? ' amber' : '') + '" style="width:' + pct + '%"></div></div><span style="font-size:0.72rem;color:var(--text-3)">' + pct + '%</span></td>';
       html += '<td>' + (p.phase === 'Complete' ? '--' : p.daysInPhase + ' days') + '</td>';
       html += '<td>' + fmtCurrency(p.retainageAmount) + '</td>';
       html += '<td>' + (p.retainageRate * 100) + '%</td>';
       html += '<td><span class="badge-status ' + (p.retainageReleased ? 'active' : 'pending') + '">' + (p.retainageReleased ? 'Released' : 'Held') + '</span></td>';
-      html += '<td>' + p.notes + '</td>';
+      html += '<td>' + esc(p.notes) + '</td>';
       html += '</tr>';
     });
 
@@ -8558,7 +8572,7 @@ try {
     PROJECTS.forEach(function (p) {
       html += '<div style="margin-bottom:20px;padding:16px;border:1px solid var(--border);border-radius:var(--radius)">';
       html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
-      html += '<strong>' + p.name + '</strong>';
+      html += '<strong>' + esc(p.name) + '</strong>';
 
       var checked = p.checklist.filter(function (c) { return c; }).length;
       var total = p.checklist.length;
@@ -8925,10 +8939,9 @@ try {
     return '<span style="display:inline-block;padding:0.15rem 0.5rem;border-radius:4px;font-size:0.7rem;font-weight:600;' + colors[type] + '">' + esc(s) + '</span>';
   }
 
-  // ---- HELPER: escape HTML ----
+  // ---- HELPER: escape HTML (delegates to canonical window.esc) ----
   function esc(v) {
-    if (v == null) return '';
-    return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    return window.esc(v);
   }
 
 })();
@@ -9031,7 +9044,7 @@ try {
     ['Expense','Monthly','Annual','% of Fixed'].forEach(function (c) { h += '<th style="background:#2B3E50;color:#fff;padding:8px 12px;text-align:left;font-size:0.72rem;text-transform:uppercase">' + c + '</th>'; });
     h += '</tr></thead><tbody>';
     FIXED.forEach(function (f) {
-      h += '<tr><td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + f.name + '</td>';
+      h += '<tr><td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + esc(f.name) + '</td>';
       h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + dollar(f.monthly) + '</td>';
       h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + dollar(f.monthly * 12) + '</td>';
       h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + pct(f.monthly / fm * 100) + '</td></tr>';
@@ -9101,7 +9114,7 @@ try {
 
   function badge(text, type) {
     var colors = { paid: 'background:#dcfce7;color:#16a34a', outstanding: 'background:#fef3c7;color:#d97706', overdue: 'background:#fee2e2;color:#dc2626' };
-    return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.72rem;font-weight:600;' + (colors[type] || '') + '">' + text + '</span>';
+    return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.72rem;font-weight:600;' + (colors[type] || '') + '">' + esc(text) + '</span>';
   }
 
   function render() {
@@ -9158,8 +9171,8 @@ try {
     invoices.sort(function (a, b) { return b.days - a.days; });
     invoices.forEach(function (inv) {
       h += '<tr><td style="padding:8px 12px;border-bottom:1px solid #E2EAF0;font-weight:500">' + inv.num + '</td>';
-      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + (inv.project || '').substring(0, 40) + '</td>';
-      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + (inv.gc || '').substring(0, 30) + '</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + esc(inv.project).substring(0, 40) + '</td>';
+      h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + esc(inv.gc).substring(0, 30) + '</td>';
       h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + dollar(inv.amount) + '</td>';
       h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + badge(inv.status.charAt(0).toUpperCase() + inv.status.slice(1), inv.status) + '</td>';
       h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + inv.days + ' days</td></tr>';
@@ -9203,7 +9216,7 @@ try {
     h += '</tr></thead><tbody>';
     retainageRows.forEach(function (p) {
       var released = safe(p.work_pct_complete) >= 1;
-      h += '<tr><td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + (p.name || '').substring(0, 35) + '</td>';
+      h += '<tr><td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + esc(p.name).substring(0, 35) + '</td>';
       h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + dollar(p.subcontract_value) + '</td>';
       h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + (safe(p.retain_pct) * 100).toFixed(0) + '%</td>';
       h += '<td style="padding:8px 12px;border-bottom:1px solid #E2EAF0">' + dollar(p.retainage) + '</td>';

@@ -7,7 +7,7 @@
 
 ---
 
-## Implementation Status: Auth hardening built, deployed, and verified June 2, 2026. XSS hardening pending.
+## Implementation Status: Auth + XSS hardening built, deployed, and verified June 2, 2026.
 
 ## 1. Overview
 
@@ -43,8 +43,8 @@ This SRS captures the security requirements the platform must meet. It was creat
 
 | # | Requirement | Status |
 |---|-------------|--------|
-| XSS-1 | All data-derived values (especially free-text SharePoint fields: project names, GC contacts, notes) are HTML-escaped at every `innerHTML` insertion point | PENDING |
-| XSS-2 | A single shared escape helper is used uniformly across all modules | PENDING |
+| XSS-1 | All data-derived values (especially free-text SharePoint fields: project names, GC contacts, notes) are HTML-escaped at every `innerHTML` insertion point | DONE (132 sites escaped) |
+| XSS-2 | A single shared escape helper is used uniformly across all modules | DONE (`window.esc`) |
 | XSS-3 | A Content-Security-Policy header is evaluated as defense-in-depth | BACKLOG |
 
 ### 2.4 Future Write Endpoints (not yet built)
@@ -83,7 +83,7 @@ All tests run against the live production deployment after the hardening deploy:
 | SEC-001 forgeable token | AUTH-4, AUTH-5 | FIXED |
 | SEC-002 open `/api/` + CORS `*` | AUTH-1, DATA-2 | FIXED |
 | SEC-003 hardcoded credential fallback | AUTH-7, AUTH-8 | FIXED |
-| SEC-004 stored XSS via raw innerHTML | XSS-1, XSS-2 | PENDING |
+| SEC-004 stored XSS via raw innerHTML | XSS-1, XSS-2 | FIXED |
 | SEC-005 financial data cacheable | DATA-1 | FIXED |
 | SEC-008 verbose error leak | DATA-4 | FIXED |
 | SEC-006 no CSRF | CSRF-1 | BACKLOG (no write endpoints) |
