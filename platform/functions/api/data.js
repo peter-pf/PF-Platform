@@ -19,10 +19,13 @@ export async function onRequestGet(context) {
   // In production, this would call Graph API directly
   // The key improvement: data is served via API, not embedded in HTML
 
+  // [SEC-002] No wildcard CORS — this is a same-origin internal tool.
+  // [SEC-005] Auth-gated data must not be cached by shared CDNs.
+  // Note: this endpoint is also protected by _middleware.js (the blanket
+  // /api/ auth-skip was removed), so requests already carry a valid token.
   const headers = {
     'Content-Type': 'application/json',
-    'Cache-Control': 'public, max-age=300', // 5 minute cache
-    'Access-Control-Allow-Origin': '*',
+    'Cache-Control': 'private, no-store',
   };
 
   try {
@@ -44,9 +47,11 @@ export async function onRequestGet(context) {
     return new Response(JSON.stringify(response), { headers });
 
   } catch (error) {
+    // [SEC-008] Don't leak internal error details to the client.
+    console.error('api/data error:', error);
     return new Response(JSON.stringify({
       status: 'error',
-      message: error.message
+      message: 'An internal error occurred.'
     }), {
       status: 500,
       headers
