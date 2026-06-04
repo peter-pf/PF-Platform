@@ -30,3 +30,6 @@ Read subcontract PDF -> extract the 19 fields (verify checkboxes visually) -> in
 
 ## Build path
 Visual-first: build the dashboard module UI (with Tether + Melanie) for partners to review; approve; then connect backend (store records, auto-extract pipeline). Per the Build Sequence Principle.
+
+## Visual module — BUILT (mockup for review) 2026-06-04
+subcontracts.html: list + detail layout (scales to many records), light theme, amber accent only on active item + risk flags (per Brad design prefs). All 19 fields rendered, grouped into Overview / Contracting Party / Contact / Financial Terms / Compliance / Insurance / Billing / Safety / Risk Exposure. Populated with Shiel Sexton (live example). Wired into platform sidebar (Subcontracts) + embedded; verified headless (9 cards, 9 risk flags, no console errors). VISUAL-FIRST: pending Brad/Jonathan + Tether/Melanie review; backend (storage + auto-extract pipeline) AFTER green-light.
