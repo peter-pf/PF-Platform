@@ -1238,7 +1238,26 @@ function showModule(id) {
   document.getElementById('pageTitle').textContent = moduleTitles[id] || id;
   // Lazy-load embedded document iframes on first view (keeps initial load light).
   var frame = document.querySelector('#mod-' + id + ' iframe.doc-frame');
-  if (frame && !frame.src && frame.dataset.src) { frame.src = frame.dataset.src; }
+  if (frame && !frame.dataset.loaded && frame.dataset.src) {
+    frame.dataset.loaded = '1';
+    var url = frame.dataset.src;
+    if (url.charAt(0) === '/') {
+      // Same-origin protected doc: fetch with the existing session cookie and render
+      // inline via srcdoc. The frame never makes its own authed request, so the browser
+      // can't pop a Basic-Auth password dialog inside the platform.
+      fetch(url, { credentials: 'same-origin' })
+        .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(function(html){ frame.srcdoc = html; })
+        .catch(function(e){
+          frame.dataset.loaded = '';
+          frame.srcdoc = '<body style="font-family:system-ui,sans-serif;padding:32px;color:#444">'
+            + '<h2>Couldn\'t load this document</h2><p>' + e.message
+            + '. Please refresh the platform and sign in again, then reopen this document.</p></body>';
+        });
+    } else {
+      frame.src = url; // external open site — plain embed
+    }
+  }
   // Close mobile sidebar
   document.getElementById('sidebar').classList.remove('open');
 }
