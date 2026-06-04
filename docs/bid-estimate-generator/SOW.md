@@ -139,3 +139,19 @@ This tool digitizes and partially automates the Estimating SOP, providing a guid
 1. Excel template received. 2. Dr. Ed's format never changes. 3. Contingency 2.5%. 4. Helical uses a different template/workflow — not pursued now. 5. Project days adjusted manually by Jonathan for weather/site. 6. Review usually just an email unless a large project.
 
 **Status:** Rebuilt, deployed, verified. Pending Jonathan's review of the live module against more examples.
+
+## 12. Independent Verification Pass (June 4, 2026)
+
+Per Brad's mandate, two independent agents double-checked the rebuild after deploy.
+
+**QA-engineer — PASS ("trust it on real bids"):** independently re-implemented computeEstimate and reconciled every line item to the template. Project total $88,164.48 vs template $88,149.89 = +0.0166%; the entire $14.59 gap traced to the template hand-rounding stone to 440 TN vs the module's geometry-derived 440.24 TN. Diameter (1.5625x stone for 30"), spoils (1.5x/2.0x), markup chain, and engineering fees all confirmed. No division-by-zero/NaN/crash on any input incl. a 500,000 LF job.
+
+**Code reviewer — APPROVED FOR PRODUCTION:** no CRITICAL/HIGH; XSS discipline (esc()) honored, no secrets in repo, division guards consistent, the de-circularized markup formula correct.
+
+**Hardening applied from their findings:**
+- Estimator: negative inputs now clamped to 0 (defense-in-depth; UI already requires LF & columns > 0).
+- Email helper (tools/pf_email.py, not in this repo): added network timeouts + clean error handling, reply-all (keeps all thread participants), hardened .env parsing.
+
+**Re-verified after hardening:** example still returns $88,164.48; no console errors.
+
+**Non-blocking backlog (future):** UI guard so a blank form shows "enter quantities" rather than the fixed-cost floor; rename cosmetic `rentalCompressorWeeks`→`Days`; prune dead legacy defaults; wrap hardcoded safety-module strings in esc() for consistency.

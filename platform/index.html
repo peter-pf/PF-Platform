@@ -5342,9 +5342,11 @@ try {
 
   // ---- COMPUTE ESTIMATE ----
   function computeEstimate(params) {
-    var totalLF = params.totalLF || 0;
-    var totalColumns = params.totalColumns || 0;
-    var diameter = params.diameter || 24;
+    // Clamp inputs to non-negative; diameter falls back to 24 if invalid. [robustness:
+    // negative quantities are garbage-in, so floor them at 0 rather than price them.]
+    var totalLF = Math.max(0, params.totalLF || 0);
+    var totalColumns = Math.max(0, params.totalColumns || 0);
+    var diameter = (params.diameter > 0) ? params.diameter : 24;
 
     // Use custom rates if provided, otherwise template-anchored defaults
     var rates = Object.assign({}, DEFAULTS, params.rates || {});
