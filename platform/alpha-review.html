@@ -1104,8 +1104,9 @@ document.addEventListener('keydown', function(e) {
 </script>
 
 
-<div style="position:fixed;bottom:24px;right:24px;z-index:999;">
+<div style="position:fixed;bottom:24px;right:24px;z-index:999;display:flex;gap:10px;">
   <button id="saveBtn" onclick="saveAnswers()" style="background:#006DB0;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-family:'Inter',sans-serif;font-size:0.88rem;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(0,109,176,0.3);">Save All Answers</button>
+  <button id="sendBtn" onclick="sendAnswersToPeter()" style="background:#16a34a;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-family:'Inter',sans-serif;font-size:0.88rem;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(22,163,74,0.3);">Send Answers to Peter</button>
 </div>
 
 <script>
@@ -1121,6 +1122,40 @@ function saveAnswers() {
   btn.textContent = 'Saved!';
   btn.style.background = '#16a34a';
   setTimeout(function() { btn.textContent = 'Save All Answers'; btn.style.background = '#006DB0'; }, 2000);
+}
+
+// Gather every answer with the question it belongs to, into readable text.
+function gatherAnswersText() {
+  var inputs = document.querySelectorAll('.answer-input');
+  var lines = ['Pier Foundations - Alpha Review Answers', ''];
+  var n = 0;
+  inputs.forEach(function(inp) {
+    var val = (inp.value || '').trim();
+    if (!val) return;
+    n++;
+    // find the question text this input sits under
+    var q = inp.closest('li') || inp.parentElement;
+    var qtext = q ? q.innerText.replace(val, '').replace(/\s+/g, ' ').trim().slice(0, 200) : ('Question ' + n);
+    lines.push(n + '. ' + qtext);
+    lines.push('   ANSWER: ' + val);
+    lines.push('');
+  });
+  if (n === 0) lines.push('(No answers entered yet.)');
+  return lines.join('\n');
+}
+
+// Email the answers to Peter (no backend needed) + copy to clipboard as backup.
+function sendAnswersToPeter() {
+  saveAnswers();
+  var text = gatherAnswersText();
+  // clipboard backup (in case the mail client doesn't open)
+  try { navigator.clipboard && navigator.clipboard.writeText(text); } catch (e) {}
+  var subject = 'PF Alpha Review - My Answers';
+  var mailto = 'mailto:peter@pierfoundations.com?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(text);
+  window.location.href = mailto;
+  var btn = document.getElementById('sendBtn');
+  btn.textContent = 'Opening email... (answers also copied)';
+  setTimeout(function() { btn.textContent = 'Send Answers to Peter'; }, 4000);
 }
 
 // Load saved answers on page load

@@ -91,3 +91,10 @@ We are entering **Stage 2 — Alpha**. All 15 modules are built and deployed. Br
 3. Platform moves to **UAT** — Jonathan uses it on the next real bid
 4. After UAT approval, platform enters **Beta** — daily use for 2 weeks
 5. After Beta, Peter writes the platform manual and we go to **Production v1.0**
+
+---
+
+## Alpha Feedback Delivery Fix (June 4, 2026)
+**Gap found:** the Alpha Review page saved reviewer answers to browser localStorage ONLY — feedback never reached Peter (no backend/email delivery). Jonathan's saved alpha answers were stranded on his device.
+**Fix:** added a "Send Answers to Peter" button that gathers every answer + its question and opens a pre-filled email to peter@pierfoundations.com (clipboard backup; no backend needed). Deployed to all alpha-review origins (pf-platform, pf-alpha-review, pf-sprint-reports). Reviewers' localStorage-saved answers reload on reopen, so prior answers are recoverable.
+**Note:** same localStorage-only pattern exists in the COO checklist (self-assessment, lower stakes — no delivery needed). Future: a proper backend would let feedback persist server-side across devices.
