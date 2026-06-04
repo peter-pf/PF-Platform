@@ -155,3 +155,6 @@ Per Brad's mandate, two independent agents double-checked the rebuild after depl
 **Re-verified after hardening:** example still returns $88,164.48; no console errors.
 
 **Non-blocking backlog (future):** UI guard so a blank form shows "enter quantities" rather than the fixed-cost floor; rename cosmetic `rentalCompressorWeeks`→`Days`; prune dead legacy defaults; wrap hardcoded safety-module strings in esc() for consistency.
+
+## 13. Stage Clarification (June 4, 2026)
+The "approved for production" in sec.12 is the code REVIEWER's code-safety verdict, not the platform's release stage. Actual stage: **ALPHA**. The estimating rebuild has passed internal build + independent verification; it still must go through UAT/stress testing (Jonathan + Derek), then Beta (2 weeks live use), before Production (v1.0). Per docs/PLATFORM-RELEASE-STAGES.md.
