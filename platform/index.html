@@ -668,6 +668,19 @@ table tbody tr:hover {
 .module-view { display: none; }
 .module-view.active { display: block; }
 
+/* ---- EMBEDDED DOCUMENT VIEWER ---- */
+.doc-frame {
+  width: 100%;
+  height: calc(100vh - var(--topbar-h) - 48px);
+  border: 1px solid var(--border, #e2e2e2);
+  border-radius: 8px;
+  background: #fff;
+  display: block;
+}
+@media (max-width: 768px) {
+  .doc-frame { height: calc(100vh - var(--topbar-h) - 100px); }
+}
+
 /* ---- EMPTY STATE ---- */
 .empty-state {
   text-align: center;
@@ -960,23 +973,23 @@ window.esc = function(v) {
       <a class="nav-item" data-module="docs" onclick="showModule('docs')">
         <span class="nav-icon">&#128196;</span> SOW/SRS Docs
       </a>
-      <a class="nav-item" onclick="window.open('https://pf-sop-additions.pages.dev','_blank')">
+      <a class="nav-item" data-module="sopadditions" onclick="showModule('sopadditions')">
         <span class="nav-icon">&#9998;</span> SOP Additions
         <span class="badge">38</span>
       </a>
-      <a class="nav-item" onclick="window.open('https://pf-alpha-review.pages.dev','_blank')">
+      <a class="nav-item" data-module="alphareview" onclick="showModule('alphareview')">
         <span class="nav-icon">&#9670;</span> Alpha Review
       </a>
-      <a class="nav-item" onclick="window.open('https://pf-sprint-reports.pages.dev','_blank')">
+      <a class="nav-item" data-module="sprintreports" onclick="showModule('sprintreports')">
         <span class="nav-icon">&#9632;</span> Sprint Reports
       </a>
-      <a class="nav-item" onclick="window.open('/manual.html','_blank')">
+      <a class="nav-item" data-module="manual" onclick="showModule('manual')">
         <span class="nav-icon">&#128214;</span> User Manual
       </a>
-      <a class="nav-item" onclick="window.open('/training.html','_blank')">
+      <a class="nav-item" data-module="training" onclick="showModule('training')">
         <span class="nav-icon">&#127891;</span> Training Guides
       </a>
-      <a class="nav-item" onclick="window.open('/quickbooks-guide.html','_blank')">
+      <a class="nav-item" data-module="quickbooks" onclick="showModule('quickbooks')">
         <span class="nav-icon">&#128178;</span> QuickBooks Setup
       </a>
     </div>
@@ -1122,6 +1135,14 @@ document.addEventListener('click', function(e) {
   </div>
 
   <!-- DOCS -->
+  <!-- Embedded document viewers (open in-platform via iframe, lazy-loaded on first view) -->
+  <div class="module-view" id="mod-manual"><iframe class="doc-frame" data-src="/manual.html" title="User Manual"></iframe></div>
+  <div class="module-view" id="mod-training"><iframe class="doc-frame" data-src="/training.html" title="Training Guides"></iframe></div>
+  <div class="module-view" id="mod-quickbooks"><iframe class="doc-frame" data-src="/quickbooks-guide.html" title="QuickBooks Setup"></iframe></div>
+  <div class="module-view" id="mod-sopadditions"><iframe class="doc-frame" data-src="https://pf-sop-additions.pages.dev" title="SOP Additions"></iframe></div>
+  <div class="module-view" id="mod-alphareview"><iframe class="doc-frame" data-src="https://pf-alpha-review.pages.dev" title="Alpha Review"></iframe></div>
+  <div class="module-view" id="mod-sprintreports"><iframe class="doc-frame" data-src="https://pf-sprint-reports.pages.dev" title="Sprint Reports"></iframe></div>
+
   <div class="module-view" id="mod-docs">
     <div class="card">
       <div class="card-header">
@@ -1200,7 +1221,13 @@ const moduleTitles = {
   closeout: 'Punch List & Closeout',
   ceodash: 'CEO Dashboard',
   budgeting: 'Budget & Forecast',
-  invoicing: 'Invoicing & AR'
+  invoicing: 'Invoicing & AR',
+  manual: 'User Manual',
+  training: 'Training Guides',
+  quickbooks: 'QuickBooks Setup',
+  sopadditions: 'SOP Additions',
+  alphareview: 'Alpha Review',
+  sprintreports: 'Sprint Reports'
 };
 
 function showModule(id) {
@@ -1209,6 +1236,9 @@ function showModule(id) {
   document.getElementById('mod-' + id).classList.add('active');
   document.querySelector(`[data-module="${id}"]`).classList.add('active');
   document.getElementById('pageTitle').textContent = moduleTitles[id] || id;
+  // Lazy-load embedded document iframes on first view (keeps initial load light).
+  var frame = document.querySelector('#mod-' + id + ' iframe.doc-frame');
+  if (frame && !frame.src && frame.dataset.src) { frame.src = frame.dataset.src; }
   // Close mobile sidebar
   document.getElementById('sidebar').classList.remove('open');
 }
