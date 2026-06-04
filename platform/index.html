@@ -5178,62 +5178,112 @@ try {
 
   // ---- RATE STRUCTURE (from POET Turnover Budget, $343,037 contract) ----
 
+  // ============================================================
+  // DEFAULTS re-anchored to "26-0422 Master Budget Estimate
+  // Template PF.xlsm" -> "Detailed Budget " sheet (data_only).
+  // Every rate below ties to a specific template cell so the
+  // module reproduces the template's $70,102.60 construction
+  // cost and $88,149.89 project total for the example inputs.
+  // The old rates were ~1.5x high: inflated Garbin fees
+  // (28000/5040 vs template 8500/1000), inflated mob/testing,
+  // a flat tonsPerLF=0.209 that ignored diameter (~1.54x stone),
+  // and percentage markups applied to construction instead of
+  // the template's grossed-up (circular) contract-value chain.
+  // ============================================================
   var DEFAULTS = {
-    // Key formulas
-    lfPerDay: 1000,           // Working days = Total LF / 1,000
-    tonsPerLF: 0.209,         // Stone consumption rate
-    tonsPerCY: 1.805,         // Stone CY = tons / 1.805
+    // Key formulas / geometry
+    lfPerDay: 1000,           // Working days = Total LF / 1,000 (OH Calcs C7)
+    tonsPerCY: 27,            // (unused legacy) kept for safety; CY conversion handled below
+    stoneTonsPerCY: 1.164,    // Tons per CY of #57 stone (template: 400 TN / 343.66 CY, Detailed H14/H15)
+    stoneWastePct: 0.10,      // Billed tons = placed tons x 1.10 (template bills 440 vs 400 placed, J33/J34)
 
     // Professional Services (5050-5053)
-    garbinBaseFee: 28000,     // Garbin Engineering Base Fee (1 LS)
-    garbinBidFee: 5040,       // Garbin Bidding Fee (1 LS)
-    surveyPerColumn: 8.50,    // Surveying & Staking (MLS, $8-9/col avg)
+    garbinBaseFee: 8500,      // Garbin Engineering Base Fee, Detailed L24 (1 LS)
+    garbinBidFee: 1000,       // Garbin Bidding Fee, Detailed L26 (1 LS)
+    garbinPerSF: 0.03,        // Garbin additional $/SF over a size threshold, Detailed L25 (0 in example)
+    garbinSFThreshold: 0,     // SF above which per-SF fee applies (J25=0 in example -> no add'l)
+    materialTestingLS: 0,     // 5052 Material Testing, Detailed L27 (0 in example)
+    surveyLS: 0,              // 5053 Surveying & Staking lump sum, Detailed L28 (0 in example, "Need Quote")
 
-    // Materials (5110)
-    stonePerTon: 18.19,       // Stone $/ton
-    truckingPerTon: 5.885,    // Trucking $/ton
+    // Materials (5110) - billed by tonnage (placed tons x waste), Detailed L33/L34
+    stonePerTon: 33.17,       // Stone $/ton, Detailed L33
+    truckingPerTon: 6.42,     // Trucking to site $/ton, Detailed L34
 
-    // Testing (5190)
-    modulusTestQty: 3,        // Number of modulus tests
-    modulusTestRate: 1500,    // $/test
+    // Testing (5190) - Agg Pier Modulus, Detailed L57
+    modulusTestQty: 1,        // Modulus tests, Detailed J57
+    modulusTestRate: 1000,    // $/test, Detailed L57
 
-    // Labor (5220)
-    operatorLeadRate: 1000,   // Operator #1 Lead $/day
-    operator2Rate: 650,       // Operator #2 $/day
-    operator3Rate: 650,       // Operator #3 $/day
-    tripsHomePer6Days: 1,     // 1 trip home per 6 working days
-    travelTripCost: 2300,     // $/trip
-    laborBurdenPct: 0.18,     // 18% burden
-    hotelPerNight: 165,        // $/night
-    mealsPerDay: 50,          // $/day
-    crewSize: 3,              // 3 crew members for hotel/meals
-    mileageDistance: 750,     // miles round trip
-    mileageRate: 0.70,        // $/mile
+    // Employee Labor (5220), Detailed rows 77-81
+    operatorLeadRate: 1000,   // Operator #1 Lead $/day, Detailed L77
+    operator2Rate: 650,       // Operator #2 $/day, Detailed L78
+    operator3Rate: 650,       // Operator #3 $/day, Detailed L79
+    crewTravelTrips: 2,       // Site Crew Travel trips, Detailed J80
+    crewTravelTripCost: 2300, // $/trip, Detailed L80
 
-    // Equipment (5400-5430)
-    mobVSCPerTrip: 2310,      // Mob VSC Rig $/trip
-    mobPredrillPerTrip: 1685, // Mob Predrill $/trip
-    mobFallOffPerTrip: 1225,  // Mob Fall Off $/trip
-    mobTrips: 6,              // Number of mob trips
-    mobMiscQty: 3,            // Misc mob items
-    mobMiscRate: 1500,        // $/ea
-    vscRigDaily: 500,         // VSC Rig $/day
-    cat308Daily: 250,         // CAT 308 $/day
-    trailerToolingDaily: 68,  // Trailer & Tooling $/day
-    loaderWeeklyRate: 1423,   // Rental 299 loader $/week each
-    loaderCount: 2,           // Number of loaders
-    maintenanceHrsPerDay: 1,  // Maintenance hours per working day
-    maintenanceRate: 100,     // $/hr
-    fuelVSCDaily: 275,        // Fuel VSC $/day
-    fuelCAT308Daily: 275,     // Fuel CAT 308 $/day
-    fuelLoaderDaily: 80,      // Fuel Loader $/day
+    // Employee Labor Burden (5230) - per-day $ adders, Detailed rows 83-85
+    burdenLeadPerDay: 180,    // Lead burden $/day, Detailed L83
+    burden2PerDay: 117,       // Operator #2 burden $/day, Detailed L84
+    burden3PerDay: 117,       // Operator #3 burden $/day, Detailed L85
 
-    // Markups
-    overheadPct: 0.0542,      // OH (GC+GR): 5.42%
-    insuranceFlat: 7200,      // Insurance flat fee
-    commissionPct: 0.0265,    // Commissions: 2.65%
-    contingencyPct: 0.0201,   // Contingency: 2.01%
-    profitPct: 0.04           // Profit: 4.00%
+    // Job Travel Costs (5300), Detailed rows 91-94
+    rainDayPer4: 0.25,        // 1 rain day per ~4 working days (drives hotel/meals days)
+    crewSize: 3,              // crew members
+    mileageDistance: 500,     // round-trip office crew miles, Detailed J91
+    mileageRate: 0.70,        // $/mile, Detailed L91
+    hotelDays: 9,             // hotel days (workingDays incl rain) x ~crew, Detailed J92
+    hotelPerNight: 165,       // $/day, Detailed L92
+    mealDays: 9,              // meal/per-diem days, Detailed J94
+    mealsPerDay: 50,          // $/day, Detailed L94
+
+    // Mobilization (5405) - 2 trips per piece (mob + demob), Detailed rows 97-101
+    mobTrips: 2,              // trips per piece, Detailed J97-J100
+    mobVSCPerTrip: 3000,      // VSC Rig $/trip, Detailed L97
+    mobPredrillPerTrip: 1750, // Predrill $/trip, Detailed L98
+    mobTruckPerTrip: 1250,    // F450/F550 haul PF trailer $/trip, Detailed L99
+    mobFallOffPerTrip: 1250,  // Fall Off testing beams $/trip, Detailed L100
+    mobMiscQty: 1,            // Misc mob, Detailed J101
+    mobMiscRate: 1000,        // $/ea, Detailed L101
+
+    // Equipment - Owned Asset (5409), Detailed rows 104-106 ($/day)
+    trailerToolingDaily: 75,  // Trailer and Tooling $/day, Detailed L104
+    vscRigDaily: 850,         // VSC Rig owned $/day, Detailed L105
+    cat308Daily: 425,         // CAT 308 w/ drill owned $/day, Detailed L106
+
+    // Equipment Rental (5410), Detailed rows 109/116-118
+    rentalCompressorWeeks: 1.5, // 375 CFM compressor days, Detailed J109 (priced as days here)
+    rentalCompressorDaily: 380, // $/day, Detailed L109
+    loaderWeeklyRate: 1423,   // 299 VSC Loader $/wk each, Detailed L116/L117
+    loaderCount: 2,           // loaders (spoils + rig assist), Detailed rows 116-117
+    rentalAllowanceQty: 2,    // delivery/mob fees per rental piece, Detailed J118
+    rentalAllowanceRate: 1000,// $/ea, Detailed L118
+
+    // Maintenance (5420), Detailed row 130
+    maintenanceHrsPerDay: 1,  // 1 hr/day, Detailed (J130 = 3 for 3 days)
+    maintenanceRate: 100,     // $/hr, Detailed L130
+
+    // Fuel (5430), Detailed rows 139/140/143 ($/day)
+    fuelVSCDaily: 275,        // VSC Rig fuel $/day, Detailed L139
+    fuelLoaderDaily: 80,      // 908 VSC Loader fuel $/day, Detailed L140
+    fuelCAT308Daily: 275,     // CAT 308 fuel $/day, Detailed L143
+
+    // ----- Markup chain (Detailed rows 154-167) -----
+    // OH and Insurance are FIXED dollar build-ups in the template
+    // (OH Calcs sheet G22 = 7373.66; Insurance = 1200), NOT % of
+    // construction. We model them as a fraction of construction
+    // cost so they scale with project size, calibrated to the
+    // example: 7373.66/70102.60 and 1200/70102.60.
+    overheadPct: 0.10518,     // OH Calcs G22 / construction (7373.66 / 70102.60)
+    insurancePct: 0.01712,    // Insurance / construction (1200 / 70102.60), Detailed P156
+    insuranceFlat: 1200,      // Insurance flat $ (Detailed P156) - used when useFlatOHIns=true
+    overheadFlat: 7373.66,    // OH flat $ (OH Calcs G22) - used when useFlatOHIns=true
+    useFlatOHIns: false,      // if true, use flat OH/insurance $ instead of % (template-exact)
+
+    // Commissions / Contingency / Profit are % of the GROSSED-UP
+    // contract value (circular ref in template). Implemented as
+    // PROJECT_TOTAL = (construction + OH + insurance) / (1 - sumRates).
+    commissionPct: 0.035,     // Commissions, Detailed N163 (3.5%)
+    contingencyPct: 0.0225,   // Contingency, Detailed N164 (2.25%)  [Jonathan: 2.5% optional]
+    profitPct: 0.05           // Profit, Detailed N165 (5.0%)
   };
 
   // POET reference budget vs actual data
@@ -5296,126 +5346,182 @@ try {
     var totalColumns = params.totalColumns || 0;
     var diameter = params.diameter || 24;
 
-    // Derived quantities
-    var workingDays = Math.ceil(totalLF / DEFAULTS.lfPerDay);
-    var stoneTons = totalLF * DEFAULTS.tonsPerLF;
-    var stoneCY = stoneTons / DEFAULTS.tonsPerCY;
-    var travelTrips = Math.ceil(workingDays / 6) * DEFAULTS.tripsHomePer6Days;
-    var hotelNights = workingDays * DEFAULTS.crewSize;
-    var mealDays = workingDays * DEFAULTS.crewSize;
-    var loaderWeeks = Math.ceil(workingDays / 5);
-
-    // Use custom rates if provided, otherwise defaults
+    // Use custom rates if provided, otherwise template-anchored defaults
     var rates = Object.assign({}, DEFAULTS, params.rates || {});
 
-    // ----- Professional Services (5050-5053) -----
+    // ----- Derived quantities -----
+    // Working days: LF / 1,000 (PF rule of thumb, OH Calcs C7). The
+    // template's example rounds 2,955 LF to 3 days, so we round up.
+    var workingDays = totalLF > 0 ? Math.max(1, Math.ceil(totalLF / rates.lfPerDay)) : 0;
+
+    // Rain days: 1 per FULL 4 working days (floor). The template's
+    // 3-day example adds 0 rain days, so hotel/meal days = 3 working
+    // x 3 crew = 9, matching Detailed J92/J94 = 9.
+    var rainDays = Math.floor(workingDays / 4);
+    var fieldDays = workingDays + rainDays;
+
+    // ----- STONE & SPOILS (diameter-driven) -----
+    // Stone CY = cross-sectional area x LF / 27, area = pi/4 * d^2.
+    // This makes 30" columns consume (30/24)^2 = 1.5625x the stone of
+    // 24" columns for the same LF (the QA-flagged missing effect).
+    var diaFt = diameter / 12;
+    var stoneCY = (Math.PI / 4) * diaFt * diaFt * totalLF / 27;
+    var stoneTonsPlaced = stoneCY * rates.stoneTonsPerCY;     // placed tonnage
+    var stoneTonsBilled = stoneTonsPlaced * (1 + rates.stoneWastePct); // billed w/ waste
+    var stoneTons = stoneTonsPlaced; // reported "stone required" = placed
+    // Spoils (excavated material hauled off): rule of thumb 1.5x LF for
+    // 24" and 2x LF for 30". Carried for reporting; cost is in loaders.
+    var spoilsFactor = diameter >= 30 ? 2.0 : 1.5;
+    var spoilsLF = totalLF * spoilsFactor;
+
+    var loaderWeeks = workingDays > 0 ? Math.ceil(workingDays / 5) : 0;
+
+    // ============================================================
+    // CONSTRUCTION COST BUILD-UP (mirrors "Detailed Budget ")
+    // ============================================================
+
+    // ----- 5050-5053 Professional Services -----
+    var garbinPerSFCost = Math.max(0, (rates.garbinSFThreshold || 0)) * rates.garbinPerSF;
     var profServices = {
-      label: 'Professional Services',
-      code: '5050-5053',
+      label: 'Professional Services', code: '5050-5053',
       items: [
         { desc: 'Garbin Engineering Base Fee', qty: 1, unit: 'LS', rate: rates.garbinBaseFee, total: rates.garbinBaseFee },
+        { desc: 'Garbin Additional ($/SF)', qty: 1, unit: 'LS', rate: garbinPerSFCost, total: garbinPerSFCost },
         { desc: 'Garbin Bidding Fee', qty: 1, unit: 'LS', rate: rates.garbinBidFee, total: rates.garbinBidFee },
-        { desc: 'Surveying & Staking (MLS)', qty: totalColumns, unit: 'COL', rate: rates.surveyPerColumn, total: totalColumns * rates.surveyPerColumn }
+        { desc: 'Material Testing', qty: 1, unit: 'LS', rate: rates.materialTestingLS, total: rates.materialTestingLS },
+        { desc: 'Surveying & Staking (Layout)', qty: 1, unit: 'LS', rate: rates.surveyLS, total: rates.surveyLS }
       ]
     };
     profServices.subtotal = profServices.items.reduce(function (s, i) { return s + i.total; }, 0);
 
-    // ----- Materials (5110) -----
+    // ----- 5110 Stone Materials (billed by tonnage incl. waste) -----
     var materials = {
-      label: 'Materials',
-      code: '5110',
+      label: 'Stone Materials', code: '5110',
       items: [
-        { desc: 'Stone (#57 washed)', qty: stoneTons, unit: 'TN', rate: rates.stonePerTon, total: stoneTons * rates.stonePerTon },
-        { desc: 'Trucking', qty: stoneTons, unit: 'TN', rate: rates.truckingPerTon, total: stoneTons * rates.truckingPerTon }
+        { desc: 'VSC Stone (#57 washed)', qty: stoneTonsBilled, unit: 'TN', rate: rates.stonePerTon, total: stoneTonsBilled * rates.stonePerTon },
+        { desc: 'Trucking to Site', qty: stoneTonsBilled, unit: 'TN', rate: rates.truckingPerTon, total: stoneTonsBilled * rates.truckingPerTon }
       ]
     };
     materials.subtotal = materials.items.reduce(function (s, i) { return s + i.total; }, 0);
 
-    // ----- Testing (5190) -----
+    // ----- 5190 Ground Improvement Testing -----
     var testing = {
-      label: 'Testing',
-      code: '5190',
+      label: 'Agg Pier Testing', code: '5190',
       items: [
         { desc: 'Modulus Test', qty: rates.modulusTestQty, unit: 'EA', rate: rates.modulusTestRate, total: rates.modulusTestQty * rates.modulusTestRate }
       ]
     };
     testing.subtotal = testing.items.reduce(function (s, i) { return s + i.total; }, 0);
 
-    // ----- Labor (5220) -----
-    var rawLaborCost = (rates.operatorLeadRate + rates.operator2Rate + rates.operator3Rate) * workingDays;
-    var travelCost = travelTrips * rates.travelTripCost;
-    var burdenCost = rawLaborCost * rates.laborBurdenPct;
-    var hotelCost = hotelNights * rates.hotelPerNight;
-    var mealCost = mealDays * rates.mealsPerDay;
-    var mileageCost = rates.mileageDistance * rates.mileageRate;
-
+    // ----- 5220 Employee Labor + 5230 Burden -----
     var labor = {
-      label: 'Labor',
-      code: '5220',
+      label: 'Employee Labor & Burden', code: '5220-5230',
       items: [
-        { desc: 'Operator #1 Lead', qty: workingDays, unit: 'DAY', rate: rates.operatorLeadRate, total: workingDays * rates.operatorLeadRate },
+        { desc: 'Operator #1 - Onsite Lead', qty: workingDays, unit: 'DAY', rate: rates.operatorLeadRate, total: workingDays * rates.operatorLeadRate },
         { desc: 'Operator #2', qty: workingDays, unit: 'DAY', rate: rates.operator2Rate, total: workingDays * rates.operator2Rate },
         { desc: 'Operator #3', qty: workingDays, unit: 'DAY', rate: rates.operator3Rate, total: workingDays * rates.operator3Rate },
-        { desc: 'Travel Days', qty: travelTrips, unit: 'TRIP', rate: rates.travelTripCost, total: travelCost },
-        { desc: 'Labor Burden (18%)', qty: 1, unit: 'LS', rate: burdenCost, total: burdenCost },
-        { desc: 'Hotel', qty: hotelNights, unit: 'NIGHT', rate: rates.hotelPerNight, total: hotelCost },
-        { desc: 'Meals', qty: mealDays, unit: 'DAY', rate: rates.mealsPerDay, total: mealCost },
-        { desc: 'Mileage', qty: rates.mileageDistance, unit: 'MI', rate: rates.mileageRate, total: mileageCost }
+        { desc: 'Site Crew Travel Days', qty: rates.crewTravelTrips, unit: 'TRIP', rate: rates.crewTravelTripCost, total: rates.crewTravelTrips * rates.crewTravelTripCost },
+        { desc: 'Burden - Lead', qty: workingDays, unit: 'DAY', rate: rates.burdenLeadPerDay, total: workingDays * rates.burdenLeadPerDay },
+        { desc: 'Burden - Operator #2', qty: workingDays, unit: 'DAY', rate: rates.burden2PerDay, total: workingDays * rates.burden2PerDay },
+        { desc: 'Burden - Operator #3', qty: workingDays, unit: 'DAY', rate: rates.burden3PerDay, total: workingDays * rates.burden3PerDay }
       ]
     };
     labor.subtotal = labor.items.reduce(function (s, i) { return s + i.total; }, 0);
 
-    // ----- Equipment (5400-5430) -----
-    var equipment = {
-      label: 'Equipment',
-      code: '5400-5430',
+    // ----- 5300 Job Travel Costs -----
+    // hotel/meal days in the template = fieldDays x crew; in the example
+    // 3 days x 3 crew = 9 (rain=0 for a 3-day job).
+    var hotelMealDays = fieldDays * rates.crewSize;
+    var travel = {
+      label: 'Job Travel Costs', code: '5300',
       items: [
-        { desc: 'Mob VSC Rig', qty: rates.mobTrips, unit: 'TRIP', rate: rates.mobVSCPerTrip, total: rates.mobTrips * rates.mobVSCPerTrip },
-        { desc: 'Mob Predrill', qty: rates.mobTrips, unit: 'TRIP', rate: rates.mobPredrillPerTrip, total: rates.mobTrips * rates.mobPredrillPerTrip },
-        { desc: 'Mob Fall Off', qty: rates.mobTrips, unit: 'TRIP', rate: rates.mobFallOffPerTrip, total: rates.mobTrips * rates.mobFallOffPerTrip },
-        { desc: 'Mob Misc', qty: rates.mobMiscQty, unit: 'EA', rate: rates.mobMiscRate, total: rates.mobMiscQty * rates.mobMiscRate },
-        { desc: 'VSC Rig Daily', qty: workingDays, unit: 'DAY', rate: rates.vscRigDaily, total: workingDays * rates.vscRigDaily },
-        { desc: 'CAT 308', qty: workingDays, unit: 'DAY', rate: rates.cat308Daily, total: workingDays * rates.cat308Daily },
-        { desc: 'Trailer & Tooling', qty: workingDays, unit: 'DAY', rate: rates.trailerToolingDaily, total: workingDays * rates.trailerToolingDaily },
-        { desc: 'Rental 299 Loaders (x' + rates.loaderCount + ')', qty: loaderWeeks, unit: 'WK', rate: rates.loaderWeeklyRate * rates.loaderCount, total: loaderWeeks * rates.loaderWeeklyRate * rates.loaderCount },
-        { desc: 'Maintenance', qty: workingDays * rates.maintenanceHrsPerDay, unit: 'HR', rate: rates.maintenanceRate, total: workingDays * rates.maintenanceHrsPerDay * rates.maintenanceRate },
-        { desc: 'Fuel VSC Rig', qty: workingDays, unit: 'DAY', rate: rates.fuelVSCDaily, total: workingDays * rates.fuelVSCDaily },
-        { desc: 'Fuel CAT 308', qty: workingDays, unit: 'DAY', rate: rates.fuelCAT308Daily, total: workingDays * rates.fuelCAT308Daily },
-        { desc: 'Fuel Loader', qty: workingDays, unit: 'DAY', rate: rates.fuelLoaderDaily, total: workingDays * rates.fuelLoaderDaily }
+        { desc: 'Mileage / Office Crew Travel', qty: rates.mileageDistance, unit: 'MI', rate: rates.mileageRate, total: rates.mileageDistance * rates.mileageRate },
+        { desc: 'Hotel / Housing', qty: hotelMealDays, unit: 'DAY', rate: rates.hotelPerNight, total: hotelMealDays * rates.hotelPerNight },
+        { desc: 'Meals / Per Diem', qty: hotelMealDays, unit: 'DAY', rate: rates.mealsPerDay, total: hotelMealDays * rates.mealsPerDay }
+      ]
+    };
+    travel.subtotal = travel.items.reduce(function (s, i) { return s + i.total; }, 0);
+
+    // ----- 5400-5430 Equipment (Mob, Owned, Rental, Maint, Fuel) -----
+    var equipment = {
+      label: 'Equipment', code: '5400-5430',
+      items: [
+        // Mobilization (5405) - trips per piece
+        { desc: 'Mob - VSC Rig', qty: rates.mobTrips, unit: 'EA', rate: rates.mobVSCPerTrip, total: rates.mobTrips * rates.mobVSCPerTrip },
+        { desc: 'Mob - Predrill', qty: rates.mobTrips, unit: 'EA', rate: rates.mobPredrillPerTrip, total: rates.mobTrips * rates.mobPredrillPerTrip },
+        { desc: 'Mob - F450/F550 (PF Trailer)', qty: rates.mobTrips, unit: 'EA', rate: rates.mobTruckPerTrip, total: rates.mobTrips * rates.mobTruckPerTrip },
+        { desc: 'Mob - Fall Off (test beams)', qty: rates.mobTrips, unit: 'EA', rate: rates.mobFallOffPerTrip, total: rates.mobTrips * rates.mobFallOffPerTrip },
+        { desc: 'Mob - Misc', qty: rates.mobMiscQty, unit: 'EA', rate: rates.mobMiscRate, total: rates.mobMiscQty * rates.mobMiscRate },
+        // Owned asset (5409) - $/day
+        { desc: 'Trailer & Tooling (Owned)', qty: workingDays, unit: 'DAY', rate: rates.trailerToolingDaily, total: workingDays * rates.trailerToolingDaily },
+        { desc: 'VSC Rig (Owned)', qty: workingDays, unit: 'DAY', rate: rates.vscRigDaily, total: workingDays * rates.vscRigDaily },
+        { desc: 'CAT 308 w/ drill (Owned)', qty: workingDays, unit: 'DAY', rate: rates.cat308Daily, total: workingDays * rates.cat308Daily },
+        // Rental (5410)
+        { desc: '375 CFM Air Compressor (Rental)', qty: rates.rentalCompressorWeeks, unit: 'DAY', rate: rates.rentalCompressorDaily, total: rates.rentalCompressorWeeks * rates.rentalCompressorDaily },
+        { desc: '299 VSC Loaders (x' + rates.loaderCount + ')', qty: loaderWeeks * rates.loaderCount, unit: 'WK', rate: rates.loaderWeeklyRate, total: loaderWeeks * rates.loaderCount * rates.loaderWeeklyRate },
+        { desc: 'Rental Delivery/Mob Allowance', qty: rates.rentalAllowanceQty, unit: 'EA', rate: rates.rentalAllowanceRate, total: rates.rentalAllowanceQty * rates.rentalAllowanceRate },
+        // Maintenance (5420)
+        { desc: 'Maintenance / Repairs', qty: workingDays * rates.maintenanceHrsPerDay, unit: 'HR', rate: rates.maintenanceRate, total: workingDays * rates.maintenanceHrsPerDay * rates.maintenanceRate },
+        // Fuel (5430) - $/day
+        { desc: 'Fuel - VSC Rig', qty: workingDays, unit: 'DAY', rate: rates.fuelVSCDaily, total: workingDays * rates.fuelVSCDaily },
+        { desc: 'Fuel - 908 VSC Loader', qty: workingDays, unit: 'DAY', rate: rates.fuelLoaderDaily, total: workingDays * rates.fuelLoaderDaily },
+        { desc: 'Fuel - CAT 308', qty: workingDays, unit: 'DAY', rate: rates.fuelCAT308Daily, total: workingDays * rates.fuelCAT308Daily }
       ]
     };
     equipment.subtotal = equipment.items.reduce(function (s, i) { return s + i.total; }, 0);
 
-    // ----- Construction Costs Subtotal -----
-    var constructionCost = profServices.subtotal + materials.subtotal + testing.subtotal + labor.subtotal + equipment.subtotal;
+    // ----- Construction Costs Subtotal (Detailed P154) -----
+    var constructionCost = profServices.subtotal + materials.subtotal + testing.subtotal +
+      labor.subtotal + travel.subtotal + equipment.subtotal;
 
-    // ----- Markups -----
-    var overhead = constructionCost * rates.overheadPct;
-    var insurance = rates.insuranceFlat;
-    var commissions = constructionCost * rates.commissionPct;
-    var contingency = constructionCost * rates.contingencyPct;
-    var profit = constructionCost * rates.profitPct;
+    // ============================================================
+    // MARKUP CHAIN (Detailed rows 154-167)
+    //   CONSTRUCTION
+    //   + OH (fixed-$ build-up, modeled as % of construction)
+    //   + Insurance (fixed-$, modeled as % of construction)
+    //   = TOTAL OF ABOVE
+    //   + Commissions + Contingency + Profit  (% of grossed-up
+    //     contract value -> circular ref in the template)
+    //   = PROJECT TOTAL
+    // PROJECT_TOTAL = TOTAL_OF_ABOVE / (1 - (comm+cont+profit))
+    // ============================================================
+    var overhead = rates.useFlatOHIns ? rates.overheadFlat : constructionCost * rates.overheadPct;
+    var insurance = rates.useFlatOHIns ? rates.insuranceFlat : constructionCost * rates.insurancePct;
+    var totalOfAbove = constructionCost + overhead + insurance;
+
+    var grossRate = rates.commissionPct + rates.contingencyPct + rates.profitPct;
+    var projectTotal = grossRate < 1 ? totalOfAbove / (1 - grossRate) : totalOfAbove;
+
+    var commissions = projectTotal * rates.commissionPct;
+    var contingency = projectTotal * rates.contingencyPct;
+    var profit = projectTotal * rates.profitPct;
+
     var totalMarkups = overhead + insurance + commissions + contingency + profit;
-    var markupFactor = constructionCost > 0 ? (constructionCost + totalMarkups) / constructionCost : 0;
-
-    var projectTotal = constructionCost + totalMarkups;
+    var markupFactor = constructionCost > 0 ? projectTotal / constructionCost : 0;
 
     // Key ratios
     var perLF = totalLF > 0 ? projectTotal / totalLF : 0;
     var perColumn = totalColumns > 0 ? projectTotal / totalColumns : 0;
     var perDay = workingDays > 0 ? projectTotal / workingDays : 0;
+    var perSF = (params.footprintSF && params.footprintSF > 0) ? projectTotal / params.footprintSF : 0;
 
     return {
       params: params,
+      diameter: diameter,
       workingDays: workingDays,
+      rainDays: rainDays,
       stoneTons: stoneTons,
+      stoneTonsBilled: stoneTonsBilled,
       stoneCY: stoneCY,
-      travelTrips: travelTrips,
-      categories: [profServices, materials, testing, labor, equipment],
+      spoilsLF: spoilsLF,
+      spoilsFactor: spoilsFactor,
+      travelTrips: rates.crewTravelTrips,
+      categories: [profServices, materials, testing, labor, travel, equipment],
       constructionCost: constructionCost,
+      totalOfAbove: totalOfAbove,
       markups: {
-        overhead: { label: 'OH (GC+GR)', pct: rates.overheadPct, amount: overhead },
-        insurance: { label: 'Insurance', pct: null, amount: insurance },
+        overhead: { label: 'OH (GC+GR)', pct: rates.useFlatOHIns ? null : rates.overheadPct, amount: overhead },
+        insurance: { label: 'Insurance', pct: rates.useFlatOHIns ? null : rates.insurancePct, amount: insurance },
         commissions: { label: 'Commissions', pct: rates.commissionPct, amount: commissions },
         contingency: { label: 'Contingency', pct: rates.contingencyPct, amount: contingency },
         profit: { label: 'Profit', pct: rates.profitPct, amount: profit }
@@ -5426,7 +5532,8 @@ try {
       ratios: {
         perLF: perLF,
         perColumn: perColumn,
-        perDay: perDay
+        perDay: perDay,
+        perSF: perSF
       }
     };
   }

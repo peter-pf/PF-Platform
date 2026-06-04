@@ -115,3 +115,27 @@ This tool digitizes and partially automates the Estimating SOP, providing a guid
 - **Platform:** pf-platform.pages.dev/platform/
 - **Data Source:** SharePoint live sync (4 master files)
 - **Stage:** Alpha -- awaiting Brad/Jonathan review
+
+---
+
+## 11. v1.4 Update — Template Re-Anchor (June 4, 2026)
+
+**Trigger:** Jonathan reported the module's example estimate came back ~1.5x too high to be competitive, and provided the master estimate template ("26-0422 Master Budget Estimate Template PF.xlsm") as the source of truth.
+
+**Root causes of the ~1.5x overage (fixed):**
+1. Inflated Garbin engineering fees (base $28,000 vs template $8,500; bidding $5,040 vs $1,000).
+2. Flat `tonsPerLF` (0.209) that ignored column diameter — also the QA-flagged "diameter has no effect" bug. Stone is now geometry-driven by diameter.
+3. Inflated testing/mobilization counts.
+4. Markups applied to the raw construction cost instead of the template's grossed-up contract-value chain.
+
+**Corrected build-up (mirrors template, verified to the penny on the example):**
+- Construction cost (bottom-up by cost code: 5050-5053 professional, 5110 stone+trucking, 5190 testing, 5220/5230 labor+burden, 5300 travel, 5400 equipment) = ~$70,103
+- + OH (from OH Calcs sheet) + Insurance = "TOTAL OF ABOVE"
+- + Commissions (3.5%), Contingency (2.25-2.5%), Profit (5.0%) applied to the grossed-up contract value (solved via `TOTAL / (1 - 0.1075)`), markup factor ≈ **1.2575x**.
+
+**Verification (self-checked):** live module driven through its UI with the example inputs (2,955 LF, 197 columns, 24") returns **$88,164** vs the template's **$88,149.89** (within 0.02%); 30" correctly prices higher than 24" (diameter now affects stone + spoils). No console errors. Old module returned ~$130k+.
+
+**Open Questions (sec. 9) — now answered by Jonathan (6/4):**
+1. Excel template received. 2. Dr. Ed's format never changes. 3. Contingency 2.5%. 4. Helical uses a different template/workflow — not pursued now. 5. Project days adjusted manually by Jonathan for weather/site. 6. Review usually just an email unless a large project.
+
+**Status:** Rebuilt, deployed, verified. Pending Jonathan's review of the live module against more examples.

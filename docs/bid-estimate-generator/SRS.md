@@ -249,3 +249,8 @@ Estimate Workflow Created
 5. What is the typical Dr. Ed prelim turnaround -- is 5 business days still the minimum?
 6. Does the estimate template ever get customized per project, or is it always the same template?
 7. How are prevailing wage projects handled differently in the estimate?
+
+---
+
+## Update — v1.4 Template Re-Anchor (June 4, 2026)
+Estimating calculation re-anchored to the master template. Construction cost is now a bottom-up build-up by cost code; markups (OH, insurance, commissions 3.5%, contingency 2.5%, profit 5%) follow the template's grossed-up contract-value chain (factor ~1.2575x). Column diameter now drives stone volume + spoils (fixes prior "diameter has no effect" defect). Verified: live module returns $88,164 for the example vs template $88,149.89 (0.02%). Previously ~1.5x high. See SOW sec. 11.
