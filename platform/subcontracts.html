@@ -60,6 +60,7 @@ a{color:var(--ink)}
   <div class="list" id="scList"></div>
   <div class="detail" id="scDetail"></div>
 </div>
+<script src="/data/insurance-baseline.js"></script>
 <script>
 // One record per subcontract (scales to many). This is the 19-field data model.
 var SUBCONTRACTS = [
@@ -79,6 +80,20 @@ var SUBCONTRACTS = [
   contactAP:"Accounting (ATTN: Millikin) — sscap@shielsexton.com",
   contactPhone:"Not listed in subcontract",
   insurance:"CGL $1M/occ, $2M agg, $2M products-comp (incl. XCU underground). Auto $1M CSL. WC statutory + Employers Liability $1M. Umbrella/Excess $5M occ / $5M agg ($10k retention). Additional Insured CG2010 10 01 + CG2037 (GC + Owner); waiver of subrogation; primary & non-contributory. COI via myCOI Central required BEFORE mobilization.",
+  insuranceCompliance:[
+    {item:"CGL — Each Occurrence", required:"$1M/occ", ours:"$1M/occ", status:"compliant"},
+    {item:"CGL — General Aggregate", required:"$2M", ours:"$2M (per project)", status:"compliant", note:"Per-project aggregate is stronger than a blanket aggregate."},
+    {item:"CGL — Products/Completed Ops", required:"$2M", ours:"$2M", status:"compliant"},
+    {item:"XCU (explosion/collapse/underground)", required:"Included", ours:"Not stated on COI", status:"verify", note:"Confirm with MJ that the CGL has no XCU exclusion — relevant to our underground work."},
+    {item:"Automobile Liability", required:"$1M CSL (any auto)", ours:"Hired/Non-Owned only ($1M)", status:"gap", note:"COI shows HNOA, not a $1M owned-auto CSL. If PF runs no titled vehicles, ask the GC to accept HNOA; otherwise broker must add auto CSL before mobilization."},
+    {item:"Workers Compensation", required:"Statutory", ours:"Statutory (Liberty Mutual)", status:"compliant"},
+    {item:"Employers Liability", required:"$1M", ours:"$1M / $1M / $1M", status:"compliant"},
+    {item:"Umbrella / Excess", required:"$5M occ / $5M agg", ours:"$8M total ($3M + $5M excess)", status:"compliant", note:"Coverage exceeds requirement; retention $0 vs $10k allowed."},
+    {item:"Additional Insured (CG 20 10 + CG 20 37)", required:"GC + Owner", ours:"Endorsement — not on COI face", status:"verify", note:"Broker to issue AI endorsement naming Shiel Sexton + Owner."},
+    {item:"Waiver of Subrogation", required:"Yes", ours:"Endorsement — not on COI face", status:"verify"},
+    {item:"Primary & Non-Contributory", required:"Yes", ours:"Endorsement — not on COI face", status:"verify"},
+    {item:"COI delivery (myCOI Central)", required:"Before mobilization", ours:"Action — submit COI", status:"action", note:"Upload the job-specific COI with endorsements via myCOI Central prior to mobilizing."}
+  ],
   billing:"AIA G702 & G703. Pencil copy to PM (csteffen@) by the 20th; approved pay app received by Accounting by NOON the 24th of each month (late = next month). Lien waiver must accompany every pay app. No change-order billing without a fully executed CO; COs itemized on G703. Attach monthly man-hours.",
   safety:"Attachment C — Safety Summary. Project-specific safety plan required; competent foreman/superintendent on site daily; named on-site daily safety lead required.",
   liquidatedDamages:{value:"None specified", flag:"good", note:"LD field blank. Confirm no LD flow-down from prime contract."},
@@ -162,6 +177,34 @@ function selectSC(i){
     +'</div>';
   // Insurance / Billing / Safety (full)
   h+='<div class="card full"><h3>Insurance Requirements</h3><div class="v" style="font-size:.88rem">'+esc(s.insurance)+'</div></div>';
+  // Insurance compliance vs PF baseline coverage (COI)
+  if (s.insuranceCompliance && s.insuranceCompliance.length) {
+    var meta={
+      compliant:{lbl:'Compliant', mark:'&#10003;', col:'#2f7d4a'},
+      gap:{lbl:'Needs Attention', mark:'&#10007;', col:'#b3261e'},
+      verify:{lbl:'Verify with Broker', mark:'&#9888;', col:'#9a6a06'},
+      action:{lbl:'Action Required', mark:'&#9679;', col:'#9a6a06'}
+    };
+    var counts={compliant:0,gap:0,verify:0,action:0};
+    s.insuranceCompliance.forEach(function(c){ if(counts[c.status]!=null) counts[c.status]++; });
+    h+='<div class="card full"><h3>Insurance Compliance vs PF Baseline Coverage</h3>';
+    h+='<div class="v" style="font-size:.8rem;color:#6b7178;margin-bottom:10px">Each contract requirement compared to PF\'s current COI ('
+      + (window.PF_INSURANCE_BASELINE? esc(window.PF_INSURANCE_BASELINE.broker)+', as of '+esc(window.PF_INSURANCE_BASELINE.asOf) : 'baseline')
+      + '). '+counts.compliant+' compliant · '+counts.gap+' needs attention · '+counts.verify+' to verify · '+counts.action+' action.</div>';
+    ['gap','verify','action','compliant'].forEach(function(st){
+      var rows=s.insuranceCompliance.filter(function(c){return c.status===st;});
+      if(!rows.length) return;
+      rows.forEach(function(c){
+        h+='<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px solid #eee">';
+        h+='<span style="color:'+meta[st].col+';font-weight:700;flex:0 0 16px">'+meta[st].mark+'</span>';
+        h+='<div style="flex:1;font-size:.86rem"><b>'+esc(c.item)+'</b> — requires '+esc(c.required)+'; we carry '+esc(c.ours)+'.';
+        if(c.note) h+=' <span style="color:#6b7178">'+esc(c.note)+'</span>';
+        h+='</div></div>';
+      });
+    });
+    h+='<div class="v" style="font-size:.74rem;color:#6b7178;margin-top:8px">Business-level comparison, not an insurance or legal opinion. Confirm endorsement items with MJ Insurance before mobilizing.</div>';
+    h+='</div>';
+  }
   h+='<div class="card"><h3>Billing Procedures</h3><div class="v" style="font-size:.88rem">'+esc(s.billing)+'</div></div>';
   h+='<div class="card"><h3>Safety Instructions</h3><div class="v" style="font-size:.88rem">'+esc(s.safety)+'</div></div>';
   // Risk
