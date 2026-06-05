@@ -139,6 +139,11 @@ def main():
             upcoming.append(b)
     upcoming.sort(key=lambda b: b["dueDate"])
 
+    # Win rate from the full bid log: awarded / (awarded + not-awarded). Decided bids only.
+    won = sum(1 for b in bids if b["statusNorm"] in ("awarded", "completed"))
+    lost = sum(1 for b in bids if "not awarded" in b["statusNorm"])
+    win_rate = round(won / (won + lost) * 100) if (won + lost) else 0
+
     data = {
         "asOf": ASOF.isoformat(),
         "generatedAt": ASOF.isoformat(),
@@ -158,6 +163,9 @@ def main():
             "outstandingAllCount": len(submitted),
             "bidWindowDays": WINDOW_DAYS,
             "activeProjectsCount": len(active_projects),
+            "winRate": win_rate,
+            "wonCount": won,
+            "lostCount": lost,
             "fy26Goal": 5250000,
         },
         "wip": wip,

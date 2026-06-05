@@ -6,57 +6,45 @@
 (function () {
   'use strict';
 
-  // ---- DATA SOURCES ----
-  var bids = (typeof LIVE_BIDS !== 'undefined') ? LIVE_BIDS : [];
-  var projects = (typeof LIVE_PROJECTS !== 'undefined') ? LIVE_PROJECTS : [];
+  // ---- DATA SOURCE: master-derived, same as the main dashboard (single source of truth) ----
+  var P = (typeof window !== 'undefined' && window.PF_PROJECTS) ? window.PF_PROJECTS : null;
   var syncMeta = (typeof LIVE_SYNC_META !== 'undefined') ? LIVE_SYNC_META : {};
 
   // ---- CONSTANTS ----
-  var FY26_TARGET = 6000000;
   var MONTHLY_DEBT = 12398;
 
   // ---- SAFE NUMBER HELPERS ----
   function safe(v) { var n = parseFloat(v); return isFinite(n) ? n : 0; }
   function $(v) { return '$' + safe(v).toLocaleString('en-US', { maximumFractionDigits: 0 }); }
-  function $s(v) { v = safe(v); if (v >= 1e6) return '$' + (v / 1e6).toFixed(1) + 'M'; if (v >= 1e3) return '$' + Math.round(v / 1e3) + 'K'; return '$' + v; }
+  function $s(v) { v = safe(v); if (v >= 1e6) return '$' + (v / 1e6).toFixed(2) + 'M'; if (v >= 1e3) return '$' + Math.round(v / 1e3) + 'K'; return '$' + v; }
   function pct(v) { return Math.round(safe(v) * 100) + '%'; }
 
-  // ---- PIPELINE STATUSES ----
-  var PIPELINE_STATUSES = ['Will Bid', 'Submitted', 'Budget Pricing', 'Submitted - Edging', 'New Lead', 'NEED FOLLOW UP'];
-  var WON_STATUSES = ['Awarded', 'Completed'];
-  var LOST_PATTERN = /Not Awarded/i;
-  var OUTSTANDING_STATUSES = ['Submitted', 'Submitted - Edging'];
+  var root = document.querySelector('#mod-ceodash #ceodash-app');
+  if (!root) return;
+  if (!P) { root.innerHTML = '<div style="color:#888;padding:1rem">Project data unavailable (projects-data.js not loaded).</div>'; return; }
 
-  // ---- COMPUTED VALUES ----
-  var activeProjects = projects.filter(function (p) {
-    var w = safe(p.work_pct_complete);
-    return w > 0 && w < 1;
-  });
+  // ---- COMPUTED VALUES (from PF_PROJECTS — match the main dashboard exactly) ----
+  var K = P.kpis || {};
+  var wip = P.wip || [];
+  var completed = P.completed || [];
+  var outstanding = P.outstandingBids || [];
+  var activeProjects = wip.filter(function (p) { return p.phase === 'active'; });
 
-  var pipelineValue = bids.reduce(function (sum, b) {
-    return sum + (PIPELINE_STATUSES.indexOf(b.bid_status) >= 0 ? safe(b.bid_value) : 0);
-  }, 0);
-
-  var wonCount = bids.filter(function (b) { return WON_STATUSES.indexOf(b.bid_status) >= 0; }).length;
-  var lostCount = bids.filter(function (b) { return LOST_PATTERN.test(b.bid_status || ''); }).length;
-  var winRateDenom = wonCount + lostCount;
-  var winRate = winRateDenom > 0 ? Math.round((wonCount / winRateDenom) * 100) : 0;
+  var FY26_TARGET = safe(K.fy26Goal);            // consistent with the dashboard ($5.25M)
+  var pipelineValue = safe(K.pipelineValue);      // awarded, not yet complete
+  var winRate = safe(K.winRate);                  // from full bid log: awarded/(awarded+not awarded)
+  var bidsOutstanding = safe(K.outstandingBidsCount);
+  var fy26Revenue = safe(K.fy26Revenue);          // completed in FY
+  var fy26Pct = FY26_TARGET > 0 ? Math.min(fy26Revenue / FY26_TARGET, 1) : 0;
 
   var backlog = activeProjects.reduce(function (sum, p) {
-    return sum + safe(p.subcontract_value) * (1 - safe(p.work_pct_complete));
+    return sum + safe(p.value) * (1 - safe(p.pctComplete));
   }, 0);
 
-  var bidsOutstanding = bids.filter(function (b) { return OUTSTANDING_STATUSES.indexOf(b.bid_status) >= 0; }).length;
-
-  var fy26Revenue = bids.reduce(function (sum, b) {
-    return sum + (WON_STATUSES.indexOf(b.bid_status) >= 0 ? safe(b.bid_value) : 0);
-  }, 0);
-  var fy26Pct = FY26_TARGET > 0 ? Math.min(safe(fy26Revenue) / FY26_TARGET, 1) : 0;
-
-  var totalContractValue = projects.reduce(function (sum, p) { return sum + safe(p.subcontract_value); }, 0);
-  var totalCollected = projects.reduce(function (sum, p) { return sum + safe(p.paid); }, 0);
-  var outstandingAR = projects.reduce(function (sum, p) { return sum + safe(p.unpaid); }, 0);
-  var retainageHeld = projects.reduce(function (sum, p) { return sum + safe(p.retainage); }, 0);
+  var totalContractValue = pipelineValue + safe(K.completedValue);
+  var totalCollected = safe(K.paidTotal);
+  var outstandingAR = safe(K.arTotal);
+  var retainageHeld = safe(K.retainDue);
   var cashOwed = outstandingAR + retainageHeld;
 
   // ---- INLINE STYLE CONSTANTS ----
@@ -64,9 +52,6 @@
   var STAT_LABEL = 'font-size:0.72rem;font-weight:500;text-transform:uppercase;letter-spacing:0.04em;color:#005A91;margin-bottom:6px';
 
   // ---- RENDER ----
-  var root = document.querySelector('#mod-ceodash #ceodash-app');
-  if (!root) return;
-
   var html = '';
 
   // ===== SECTION: Last Sync =====
@@ -104,7 +89,7 @@
   html += '<div class="stat-card" style="padding:1rem">';
   html += '<div style="' + STAT_LABEL + ';margin-bottom:0.75rem">Active Projects</div>';
 
-  var sortedActive = activeProjects.slice().sort(function (a, b) { return safe(b.work_pct_complete) - safe(a.work_pct_complete); });
+  var sortedActive = activeProjects.slice().sort(function (a, b) { return safe(b.pctComplete) - safe(a.pctComplete); });
 
   if (sortedActive.length === 0) {
     html += '<div style="color:#888;font-size:0.8rem">No active projects</div>';
@@ -118,11 +103,11 @@
     html += '<th style="padding:0.3rem 0.4rem">GC</th>';
     html += '</tr></thead><tbody>';
     sortedActive.forEach(function (p) {
-      var w = safe(p.work_pct_complete);
+      var w = safe(p.pctComplete);
       html += '<tr style="border-bottom:1px solid #f0f0f0">';
-      html += '<td style="padding:0.3rem 0.4rem">' + esc(p.project_number) + '</td>';
+      html += '<td style="padding:0.3rem 0.4rem">' + esc(p.projectNo) + '</td>';
       html += '<td style="padding:0.3rem 0.4rem">' + esc(p.name) + '</td>';
-      html += '<td style="padding:0.3rem 0.4rem;text-align:right">' + $(p.subcontract_value) + '</td>';
+      html += '<td style="padding:0.3rem 0.4rem;text-align:right">' + $(p.value) + '</td>';
       html += '<td style="padding:0.3rem 0.4rem;text-align:center">';
       html += '<div style="display:flex;align-items:center;gap:0.3rem;justify-content:center">';
       html += '<div style="width:50px;height:6px;background:#e8e8e8;border-radius:3px;overflow:hidden">';
@@ -131,23 +116,21 @@
       html += '<span style="font-size:0.72rem">' + pct(w) + '</span>';
       html += '</div>';
       html += '</td>';
-      html += '<td style="padding:0.3rem 0.4rem">' + esc(p.gc_name) + '</td>';
+      html += '<td style="padding:0.3rem 0.4rem">' + esc(p.gc) + '</td>';
       html += '</tr>';
     });
     html += '</tbody></table>';
   }
   html += '</div>';
 
-  // -- Right: Recent Bids Table --
+  // -- Right: Outstanding Bids Table (live submitted) --
   html += '<div class="stat-card" style="padding:1rem">';
-  html += '<div style="' + STAT_LABEL + ';margin-bottom:0.75rem">Recent Bids</div>';
+  html += '<div style="' + STAT_LABEL + ';margin-bottom:0.75rem">Outstanding Bids</div>';
 
-  var sortedBids = bids.slice().sort(function (a, b) {
-    return (b.invite_date || '').localeCompare(a.invite_date || '');
-  }).slice(0, 8);
+  var sortedBids = outstanding.slice(0, 8);
 
   if (sortedBids.length === 0) {
-    html += '<div style="color:#888;font-size:0.8rem">No bids</div>';
+    html += '<div style="color:#888;font-size:0.8rem">No outstanding bids</div>';
   } else {
     html += '<table style="width:100%;border-collapse:collapse;font-size:0.78rem">';
     html += '<thead><tr style="border-bottom:1px solid #e0e0e0;text-align:left">';
@@ -159,9 +142,9 @@
     sortedBids.forEach(function (b) {
       html += '<tr style="border-bottom:1px solid #f0f0f0">';
       html += '<td style="padding:0.3rem 0.4rem">' + esc(b.name) + '</td>';
-      html += '<td style="padding:0.3rem 0.4rem">' + esc(b.gc_name) + '</td>';
-      html += '<td style="padding:0.3rem 0.4rem;text-align:center">' + badge(b.bid_status) + '</td>';
-      html += '<td style="padding:0.3rem 0.4rem;text-align:right">' + $(b.bid_value) + '</td>';
+      html += '<td style="padding:0.3rem 0.4rem">' + esc(b.gc) + '</td>';
+      html += '<td style="padding:0.3rem 0.4rem;text-align:center">' + badge(b.status) + '</td>';
+      html += '<td style="padding:0.3rem 0.4rem;text-align:right">' + $(b.value) + '</td>';
       html += '</tr>';
     });
     html += '</tbody></table>';
@@ -175,16 +158,14 @@
 
   // Projects > 80% complete
   activeProjects.forEach(function (p) {
-    if (safe(p.work_pct_complete) > 0.8) {
-      alerts.push({ color: '#e67e22', text: esc(p.name) + ' is ' + pct(p.work_pct_complete) + ' complete -- closeout soon' });
+    if (safe(p.pctComplete) > 0.8) {
+      alerts.push({ color: '#e67e22', text: esc(p.name) + ' is ' + pct(p.pctComplete) + ' complete -- closeout soon' });
     }
   });
 
-  // NEED FOLLOW UP bids
-  bids.forEach(function (b) {
-    if (b.bid_status === 'NEED FOLLOW UP') {
-      alerts.push({ color: '#e74c3c', text: esc(b.name) + ' needs follow up' });
-    }
+  // Bids due within 7 days (CEO follow-up)
+  (P.upcomingBids || []).forEach(function (b) {
+    alerts.push({ color: '#e74c3c', text: esc(b.name) + ' bid due ' + esc(b.dueDate) + ' (' + esc(b.status) + ')' });
   });
 
   // Retainage > $50K

@@ -19,6 +19,9 @@ window.PF_PROJECTS = {
     "outstandingAllCount": 51,
     "bidWindowDays": 90,
     "activeProjectsCount": 6,
+    "winRate": 45,
+    "wonCount": 18,
+    "lostCount": 22,
     "fy26Goal": 5250000
   },
   "wip": [

@@ -3,8 +3,48 @@
 (function() {
   'use strict';
 
-  // ---- SAMPLE TEST DATA ----
+  // ---- TEST DATA ----
+  // Real field tests first; remaining entries are demo data pending real results.
   const TESTS = [
+    {
+      id: 'MT-26005-Tp1',
+      job: 'Southwark Metals',
+      jobNumber: '26-005',
+      location: 'Hernando, MS',
+      pier: 'Tp1',
+      date: '2026-06-04',
+      testedBy: 'John Willis',
+      apLength: 19,
+      apDiameter: 2.5,
+      diameterInches: 30,
+      designModulus: 150,
+      designLoad: 56,
+      maxTestLoad: 84,
+      jackType: 'small',
+      jackCalFactor: 49.84,
+      measuredModulus: 247.19,
+      ratio: 1.65,
+      pass: true,
+      loading: [
+        { pct: 5,   load: 2.8,  gagePressure: 139.55,  deflection: 0.000, stress: 3.96 },
+        { pct: 10,  load: 5.6,  gagePressure: 279.10,  deflection: 0.095, stress: 7.92 },
+        { pct: 25,  load: 14.0, gagePressure: 697.76,  deflection: 0.135, stress: 19.81 },
+        { pct: 50,  load: 28.0, gagePressure: 1395.52, deflection: 0.208, stress: 39.61 },
+        { pct: 75,  load: 42.0, gagePressure: 2093.28, deflection: 0.260, stress: 59.42 },
+        { pct: 100, load: 56.0, gagePressure: 2791.04, deflection: 0.321, stress: 79.22 },
+        { pct: 125, load: 70.0, gagePressure: 3488.80, deflection: 0.404, stress: 99.03 },
+        { pct: 150, load: 84.0, gagePressure: 4186.56, deflection: 0.522, stress: 118.84 }
+      ],
+      unloading: [
+        { pct: 125, load: 70.0, deflection: 0.464 },
+        { pct: 100, load: 56.0, deflection: 0.409 },
+        { pct: 75,  load: 42.0, deflection: 0.328 },
+        { pct: 50,  load: 28.0, deflection: 0.242 },
+        { pct: 25,  load: 14.0, deflection: 0.183 },
+        { pct: 10,  load: 5.6,  deflection: 0.122 },
+        { pct: 0,   load: 0.0,  deflection: 0.051 }
+      ]
+    },
     {
       id: 'MT-001',
       job: 'POET',
@@ -42,45 +82,6 @@
         { pct: 25,  load: 21.5,  deflection: 0.163 },
         { pct: 10,  load: 8.6,   deflection: 0.119 },
         { pct: 0,   load: 0.0,   deflection: 0.088 }
-      ]
-    },
-    {
-      id: 'MT-002',
-      job: 'FedEx Hub',
-      jobNumber: '26-005',
-      location: 'Indianapolis, IN',
-      pier: 'Tp03',
-      date: '2026-05-12',
-      testedBy: 'John Willis',
-      apLength: 12,
-      apDiameter: 2.0,
-      diameterInches: 24,
-      designModulus: 120,
-      designLoad: 64,
-      maxTestLoad: 96,
-      jackType: 'small',
-      jackCalFactor: 49.84,
-      measuredModulus: 298.40,
-      ratio: 2.49,
-      pass: true,
-      loading: [
-        { pct: 5,   load: 3.2,  gagePressure: 159.5, deflection: 0.000, stress: 7.19 },
-        { pct: 10,  load: 6.4,  gagePressure: 319.0, deflection: 0.008, stress: 14.38 },
-        { pct: 25,  load: 16.0, gagePressure: 797.4, deflection: 0.048, stress: 35.95 },
-        { pct: 50,  load: 32.0, gagePressure: 1594.9,deflection: 0.098, stress: 71.90 },
-        { pct: 75,  load: 48.0, gagePressure: 2392.3,deflection: 0.165, stress: 107.86 },
-        { pct: 100, load: 64.0, gagePressure: 3189.8,deflection: 0.230, stress: 143.81 },
-        { pct: 125, load: 80.0, gagePressure: 3987.2,deflection: 0.365, stress: 179.76 },
-        { pct: 150, load: 96.0, gagePressure: 4784.6,deflection: 0.520, stress: 215.71 }
-      ],
-      unloading: [
-        { pct: 125, load: 80.0, deflection: 0.468 },
-        { pct: 100, load: 64.0, deflection: 0.380 },
-        { pct: 75,  load: 48.0, deflection: 0.282 },
-        { pct: 50,  load: 32.0, deflection: 0.165 },
-        { pct: 25,  load: 16.0, deflection: 0.125 },
-        { pct: 10,  load: 6.4,  deflection: 0.092 },
-        { pct: 0,   load: 0.0,  deflection: 0.070 }
       ]
     },
     {
