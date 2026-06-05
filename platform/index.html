@@ -748,6 +748,7 @@ table tbody tr:hover {
 
 <!-- Live data loaded from separate file (blocks + executes before modules) -->
 <script src="/data/live-data.js"></script>
+<script src="/data/projects-data.js"></script>
 <script>
 // ---- CANONICAL HTML ESCAPE HELPER (global, SEC-004 stored-XSS fix) ----
 // Defined at global scope so every inlined module can call window.esc().
@@ -1069,33 +1070,32 @@ document.addEventListener('click', function(e) {
 
   <!-- DASHBOARD -->
   <div class="module-view active" id="mod-dashboard">
-    <div class="color-legend">
-      <span style="font-weight:600;color:var(--text-2)">Status Key:</span>
-      <span class="legend-item"><span class="legend-dot" style="background:var(--green)"></span> Active / Bid / Pass</span>
-      <span class="legend-item"><span class="legend-dot" style="background:var(--amber)"></span> Review / Pending</span>
-      <span class="legend-item"><span class="legend-dot" style="background:var(--red)"></span> No-Bid / Fail / Overdue</span>
-      <span class="legend-item"><span class="legend-dot" style="background:var(--text-3)"></span> Closed / Archived</span>
-    </div>
+    <!-- Top summary bar: Total FY26 Sales to date (Revenue + Pipeline) -->
+    <div class="card" id="fy26SummaryBar" style="margin-bottom:18px"></div>
+
+    <!-- Headline KPI tiles -->
     <div class="grid grid-4" id="dashboardStats">
-      <!-- Populated by JS -->
+      <!-- Populated by renderDashboard() -->
     </div>
+
+    <!-- Upcoming bids (next 7 days) + Active projects -->
     <div style="margin-top:20px" class="grid grid-2">
       <div class="card">
         <div class="card-header">
-          <span class="card-title">Recent Bids</span>
-          <span class="card-subtitle">From Bid Log</span>
+          <span class="card-title">Upcoming Bids</span>
+          <span class="card-subtitle">Due within 7 days</span>
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Project</th><th>GC</th><th>Status</th><th>Value</th></tr></thead>
-            <tbody id="recentBids"></tbody>
+            <thead><tr><th>Project</th><th>GC</th><th>Due</th><th>Status</th></tr></thead>
+            <tbody id="upcomingBids"></tbody>
           </table>
         </div>
       </div>
       <div class="card">
         <div class="card-header">
           <span class="card-title">Active Projects</span>
-          <span class="card-subtitle">From Project Master</span>
+          <span class="card-subtitle" id="activeProjectsSub">Currently in the field</span>
         </div>
         <div class="table-wrap">
           <table>
@@ -1103,6 +1103,48 @@ document.addEventListener('click', function(e) {
             <tbody id="activeProjects"></tbody>
           </table>
         </div>
+      </div>
+    </div>
+
+    <!-- Recent (live) submitted bids -->
+    <div style="margin-top:20px" class="card">
+      <div class="card-header">
+        <span class="card-title">Recent Bids</span>
+        <span class="card-subtitle" id="recentBidsSub">Submitted &amp; Submitted&#8211;Edging</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Project</th><th>GC</th><th>Status</th><th>Due</th><th>Value</th></tr></thead>
+          <tbody id="recentBids"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Upcoming (awarded, not yet started) projects -->
+    <div style="margin-top:20px" class="card">
+      <div class="card-header">
+        <span class="card-title">Upcoming Projects</span>
+        <span class="card-subtitle">Awarded &#8212; not yet started</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Project</th><th>Location</th><th>GC</th><th>Status</th><th>Start</th><th>Value</th></tr></thead>
+          <tbody id="upcomingProjects"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Completed (FY26) -->
+    <div style="margin-top:20px" class="card">
+      <div class="card-header">
+        <span class="card-title">Completed Projects (FY26)</span>
+        <span class="card-subtitle" id="completedSub">Calendar year to date</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Project</th><th>Location</th><th>GC</th><th>Completed</th><th>Value</th></tr></thead>
+          <tbody id="completedProjects"></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -1289,110 +1331,170 @@ function showModule(id) {
 // ---- LIVE DASHBOARD (data from LIVE_BIDS / LIVE_PROJECTS injected by embed-data.py) ----
 
 function renderDashboard() {
-  // ---- Compute stats from live data ----
-  var bids = (typeof LIVE_BIDS !== 'undefined') ? LIVE_BIDS : [];
-  var projects = (typeof LIVE_PROJECTS !== 'undefined') ? LIVE_PROJECTS : [];
-  var fyGoals = (typeof LIVE_FY_GOALS !== 'undefined') ? LIVE_FY_GOALS : {};
+  // ---- Source of truth: master-derived data (sync/extract-projects.py) ----
+  var P = (typeof window !== 'undefined' && window.PF_PROJECTS) ? window.PF_PROJECTS : null;
   var syncMeta = (typeof LIVE_SYNC_META !== 'undefined') ? LIVE_SYNC_META : {};
+  var bids = (typeof LIVE_BIDS !== 'undefined') ? LIVE_BIDS : [];
 
-  // ---- KPIs via shared helpers (single source of truth: window.kpi) ----
-  // Active bids = in-pipeline (not yet decided). Same classifier the helpers use.
-  var activeBids = bids.filter(function(b) { return window.kpi.isPipeline(b.bid_status); });
-
-  // Pipeline value (shared helper: priced/total reported honestly)
-  var pipeline = window.kpi.pipelineValue(bids);
-  var pipelineValue = pipeline.value;
-
-  // FY26 booked revenue (shared helper: Awarded + Completed vs goal)
-  var fyRev = window.kpi.fyBookedRevenue(bids);
-  var awardedValue = fyRev.value;
-  var fy26Goal = fyRev.goal;
-  var revenueProgress = fyRev.pct;
-
-  // Active projects (shared helper: executed contract AND 0 <= pct < 1)
-  var activeProjects = window.kpi.activeProjects(projects);
-
-  // Format currency
-  function fmtCurrency(v) {
-    if (v >= 1000000) return '$' + (v / 1000000).toFixed(1) + 'M';
+  // Helpers
+  function E(s) {
+    s = (s == null) ? '' : String(s);
+    if (typeof esc === 'function') return esc(s);
+    // Fail closed: if the canonical esc() is missing, escape here rather than emit raw.
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function money(v) {
+    v = +v || 0;
+    if (v >= 1000000) return '$' + (v / 1000000).toFixed(2) + 'M';
     if (v >= 1000) return '$' + (v / 1000).toFixed(0) + 'K';
-    return '$' + v.toLocaleString();
+    return '$' + Math.round(v).toLocaleString();
+  }
+  function full(v) { return '$' + Math.round(+v || 0).toLocaleString(); }
+  function dt(s) {
+    if (!s) return '--';
+    var m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? (+m[2]) + '/' + (+m[3]) + '/' + m[1].slice(2) : E(s);
+  }
+  function pctStr(frac) { return Math.round((+frac || 0) * 100); }
+  function emptyRow(cols, msg) { return '<tr><td colspan="' + cols + '" style="color:var(--text-3);text-align:center;padding:14px">' + msg + '</td></tr>'; }
+
+  if (!P) {
+    // Master data not loaded — leave a clear note rather than silently showing nothing.
+    var sb = document.getElementById('fy26SummaryBar');
+    if (sb) sb.innerHTML = '<div style="color:var(--text-3)">Project data unavailable (projects-data.js not loaded).</div>';
+    return;
   }
 
-  // ---- Stat cards ----
-  var stats = document.getElementById('dashboardStats');
-  stats.innerHTML =
+  var K = P.kpis || {};
+  var wip = P.wip || [];
+  var completed = P.completed || [];
+  var outstanding = P.outstandingBids || [];
+  var upcoming = P.upcomingBids || [];
+  var activeProjects = wip.filter(function (p) { return p.phase === 'active'; });
+  var upcomingProjects = wip.filter(function (p) { return p.phase === 'awarded'; });
+
+  // ---- Top summary bar: Total FY26 Sales to date (Revenue + Pipeline) ----
+  var goal = +K.fy26Goal || 0;
+  var sales = +K.totalFy26Sales || 0;
+  var pctGoal = goal ? Math.round(sales / goal * 100) : 0;
+  var toGo = Math.max(goal - sales, 0);
+  document.getElementById('fy26SummaryBar').innerHTML =
+    '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:18px">' +
+      '<div>' +
+        '<div style="font-size:.78rem;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3)">Total FY26 Sales to Date</div>' +
+        '<div style="font-size:2.3rem;font-weight:700;line-height:1.1">' + money(sales) + '</div>' +
+        '<div style="font-size:.85rem;color:var(--text-2)">FY26 Revenue ' + money(K.fy26Revenue) + ' &#43; Pipeline ' + money(K.pipelineValue) + '</div>' +
+      '</div>' +
+      '<div style="min-width:240px;flex:1;max-width:440px">' +
+        '<div style="display:flex;justify-content:space-between;font-size:.8rem;color:var(--text-2);margin-bottom:5px">' +
+          '<span>' + pctGoal + '% of ' + money(goal) + ' goal</span>' +
+          '<span>' + money(toGo) + ' to go</span>' +
+        '</div>' +
+        '<div class="progress-bar" style="height:10px"><div class="progress-fill accent" style="width:' + Math.min(pctGoal, 100) + '%"></div></div>' +
+      '</div>' +
+    '</div>';
+
+  // ---- Headline KPI tiles ----
+  document.getElementById('dashboardStats').innerHTML =
     '<div class="stat-card">' +
-      '<div class="stat-label">Active Bids</div>' +
-      '<div class="stat-value">' + activeBids.length + '</div>' +
-      '<div class="stat-change">' + bids.length + ' total in bid log</div>' +
+      '<div class="stat-label">Outstanding Bids</div>' +
+      '<div class="stat-value">' + money(K.outstandingBidsValue) + '</div>' +
+      '<div class="stat-change">' + (K.outstandingBidsCount || 0) + ' live bids submitted</div>' +
     '</div>' +
     '<div class="stat-card">' +
       '<div class="stat-label">Pipeline Value</div>' +
-      '<div class="stat-value">' + fmtCurrency(pipelineValue) + '</div>' +
-      '<div class="stat-change">' + pipeline.priced + ' priced / ' + pipeline.total + ' bids</div>' +
-    '</div>' +
-    '<div class="stat-card">' +
-      '<div class="stat-label">Active Projects</div>' +
-      '<div class="stat-value">' + activeProjects.length + '</div>' +
-      '<div class="stat-change">' + fmtCurrency(activeProjects.reduce(function(s,p){ return s + (p.subcontract_value || 0); }, 0)) + ' total value</div>' +
+      '<div class="stat-value">' + money(K.pipelineValue) + '</div>' +
+      '<div class="stat-change">' + (K.pipelineCount || 0) + ' awarded, not yet complete</div>' +
     '</div>' +
     '<div class="stat-card">' +
       '<div class="stat-label">FY26 Revenue</div>' +
-      '<div class="stat-value">' + fmtCurrency(awardedValue) + '</div>' +
-      '<div class="stat-change">' + revenueProgress + '% of ' + fmtCurrency(fy26Goal) + ' goal</div>' +
+      '<div class="stat-value">' + money(K.fy26Revenue) + '</div>' +
+      '<div class="stat-change">' + (K.completedCount || 0) + ' completed &#183; ' + pctStr(goal ? K.fy26Revenue / goal : 0) + '% of goal</div>' +
+    '</div>' +
+    '<div class="stat-card">' +
+      '<div class="stat-label">AR Outstanding</div>' +
+      '<div class="stat-value">' + money(K.arTotal) + '</div>' +
+      '<div class="stat-change">' + money(K.retainDue) + ' retainage due</div>' +
     '</div>';
 
-  // ---- Recent bids (last 5 by invite_date) ----
-  var recentBids = bids
-    .filter(function(b) { return b.name && b.bid_status && b.bid_status !== 'Bid Status'; })
-    .sort(function(a, b) {
-      var da = a.invite_date || '';
-      var db = b.invite_date || '';
-      return da < db ? 1 : da > db ? -1 : 0;
-    })
-    .slice(0, 5);
+  // ---- Upcoming bids (due within 7 days) ----
+  document.getElementById('upcomingBids').innerHTML = upcoming.length
+    ? upcoming.map(function (b) {
+        return '<tr>' +
+          '<td style="font-weight:500">' + E(b.name) + '</td>' +
+          '<td>' + E(b.gc) + '</td>' +
+          '<td>' + dt(b.dueDate) + '</td>' +
+          '<td style="color:var(--text-2)">' + E(b.status) + '</td>' +
+        '</tr>';
+      }).join('')
+    : emptyRow(4, 'No bids due in the next 7 days');
 
-  var bidsTable = document.getElementById('recentBids');
-  bidsTable.innerHTML = recentBids.map(function(b) {
-    var statusClass = b.bid_status === 'Awarded' ? 'bid'
-      : b.bid_status === 'Submitted' || b.bid_status === 'Submitted - Edging' ? 'review'
-      : b.bid_status === 'Will Bid' || b.bid_status === 'Budget Pricing' ? 'pending'
-      : b.bid_status === 'Completed' ? 'active'
-      : 'pending';
-    var valStr = typeof b.bid_value === 'number' ? '$' + b.bid_value.toLocaleString() : '--';
-    return '<tr>' +
-      '<td style="font-weight:500">' + esc(b.name) + '</td>' +
-      '<td>' + esc(b.gc_name) + '</td>' +
-      '<td><span class="badge-status ' + statusClass + '">' + esc(b.bid_status) + '</span></td>' +
-      '<td>' + valStr + '</td>' +
-    '</tr>';
-  }).join('');
+  // ---- Active projects (in the field) ----
+  document.getElementById('activeProjects').innerHTML = activeProjects.length
+    ? activeProjects.map(function (p) {
+        var pct = pctStr(p.pctComplete);
+        return '<tr>' +
+          '<td style="font-weight:500">' + E(p.name) + '</td>' +
+          '<td>' + E(p.cityState) + '</td>' +
+          '<td style="color:var(--text-2)">' + E(p.status) + '</td>' +
+          '<td>' + full(p.value) + '</td>' +
+          '<td>' +
+            '<div style="display:flex;align-items:center;gap:8px">' +
+              '<div class="progress-bar" style="width:80px"><div class="progress-fill accent" style="width:' + pct + '%"></div></div>' +
+              '<span style="font-size:0.75rem;color:var(--text-3)">' + pct + '%</span>' +
+            '</div>' +
+          '</td>' +
+        '</tr>';
+      }).join('')
+    : emptyRow(5, 'No active projects');
+  var apc = document.getElementById('activeProjectsSub');
+  if (apc) apc.textContent = activeProjects.length + ' in the field';
 
-  // ---- Active projects ----
-  var projTable = document.getElementById('activeProjects');
-  projTable.innerHTML = activeProjects.slice(0, 8).map(function(p) {
-    var pct = typeof p.work_pct_complete === 'number' ? Math.round(p.work_pct_complete * 100) : 0;
-    var statusLabel = p.contract_status || '';
-    var statusClass = statusLabel.indexOf('FE') !== -1 ? 'active'
-      : statusLabel.indexOf('LOI') !== -1 ? 'review'
-      : 'pending';
-    var valStr = typeof p.subcontract_value === 'number' ? '$' + p.subcontract_value.toLocaleString() : '--';
-    return '<tr>' +
-      '<td style="font-weight:500">' + esc(p.name) + '</td>' +
-      '<td>' + esc(p.city_state) + '</td>' +
-      '<td><span class="badge-status ' + statusClass + '">' + statusLabel + '</span></td>' +
-      '<td>' + valStr + '</td>' +
-      '<td>' +
-        '<div style="display:flex;align-items:center;gap:8px">' +
-          '<div class="progress-bar" style="width:80px">' +
-            '<div class="progress-fill ' + (pct > 60 ? 'green' : pct > 30 ? 'amber' : 'accent') + '" style="width:' + pct + '%"></div>' +
-          '</div>' +
-          '<span style="font-size:0.75rem;color:var(--text-3)">' + pct + '%</span>' +
-        '</div>' +
-      '</td>' +
-    '</tr>';
-  }).join('');
+  // ---- Recent (live) submitted bids ----
+  document.getElementById('recentBids').innerHTML = outstanding.length
+    ? outstanding.slice(0, 10).map(function (b) {
+        return '<tr>' +
+          '<td style="font-weight:500">' + E(b.name) + '</td>' +
+          '<td>' + E(b.gc) + '</td>' +
+          '<td style="color:var(--text-2)">' + E(b.status) + '</td>' +
+          '<td>' + dt(b.dueDate) + '</td>' +
+          '<td>' + full(b.value) + '</td>' +
+        '</tr>';
+      }).join('')
+    : emptyRow(5, 'No live submitted bids');
+  var rbSub = document.getElementById('recentBidsSub');
+  if (rbSub) rbSub.textContent = 'Submitted — ' + (K.outstandingBidsCount || 0) + ' live of ' + (K.outstandingAllCount || 0) +
+    ' total (' + money(K.outstandingBidsValue) + ')';
+
+  // ---- Upcoming (awarded, not yet started) projects ----
+  document.getElementById('upcomingProjects').innerHTML = upcomingProjects.length
+    ? upcomingProjects.map(function (p) {
+        return '<tr>' +
+          '<td style="font-weight:500">' + E(p.name) + '</td>' +
+          '<td>' + E(p.cityState) + '</td>' +
+          '<td>' + E(p.gc) + '</td>' +
+          '<td style="color:var(--text-2)">' + E(p.status) + '</td>' +
+          '<td>' + dt(p.startDate) + '</td>' +
+          '<td>' + full(p.value) + '</td>' +
+        '</tr>';
+      }).join('')
+    : emptyRow(6, 'No awarded projects awaiting start');
+
+  // ---- Completed (FY26) ----
+  document.getElementById('completedProjects').innerHTML = completed.length
+    ? completed.map(function (p) {
+        return '<tr>' +
+          '<td style="font-weight:500">' + E(p.name) + '</td>' +
+          '<td>' + E(p.cityState) + '</td>' +
+          '<td>' + E(p.gc) + '</td>' +
+          '<td>' + dt(p.completionDate) + '</td>' +
+          '<td>' + full(p.value) + '</td>' +
+        '</tr>';
+      }).join('')
+    : emptyRow(5, 'No completed projects this year');
+  var cSub = document.getElementById('completedSub');
+  if (cSub) cSub.textContent = (K.completedCount || 0) + ' projects · ' + money(K.completedValue);
 
   // ---- Update topbar data status ----
   var dataStatusEl = document.getElementById('dataStatus');
