@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pier Foundations — Build Log</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f6f7f8;--card:#fff;--ink:#1c1f23;--muted:#6b7178;--line:#e6e8eb;--accent:#f59e0b;--accent-soft:#fef3e2;--done:#2f7d4a}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:14.5px;line-height:1.55}
+.wrap{display:flex;min-height:100vh}
+/* nav */
+.nav{flex:0 0 220px;border-right:1px solid var(--line);background:var(--card);padding:22px 0;position:sticky;top:0;height:100vh;overflow-y:auto}
+.nav .brand{padding:0 20px 14px;border-bottom:1px solid var(--line)}
+.nav .brand .t{font-weight:700;font-size:1.05rem}
+.nav .brand .s{font-size:.78rem;color:var(--muted);margin-top:2px}
+.nav a{display:block;padding:9px 20px;color:var(--muted);text-decoration:none;font-size:.9rem;font-weight:500;border-left:3px solid transparent;cursor:pointer}
+.nav a:hover{background:#fafbfc;color:var(--ink)}
+.nav a.active{color:var(--ink);border-left-color:var(--accent);background:var(--accent-soft)}
+/* main */
+.main{flex:1;padding:28px 34px 70px;max-width:1000px}
+h1{font-size:1.6rem;font-weight:700;letter-spacing:-.01em}
+.lead{color:var(--muted);margin:6px 0 20px;max-width:74ch}
+.stats{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:26px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 18px;min-width:120px}
+.stat .n{font-size:1.5rem;font-weight:700}
+.stat .l{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:2px}
+.sprint{margin-bottom:30px}
+.sprint-hd{display:flex;align-items:baseline;gap:12px;border-bottom:2px solid var(--accent);padding-bottom:8px;margin-bottom:14px;flex-wrap:wrap}
+.sprint-hd h2{font-size:1.2rem;font-weight:700}
+.sprint-hd .range{color:var(--muted);font-size:.85rem}
+.sprint-hd .badge{margin-left:auto;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:3px 10px;border-radius:6px}
+.badge.done{background:#e9f3ec;color:var(--done)} .badge.active{background:var(--accent-soft);color:#9a6a06}
+.day{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin-bottom:11px}
+.day h3{font-size:.95rem;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.day h3 .tag{font-size:.7rem;color:var(--accent);font-weight:700;background:var(--accent-soft);padding:2px 8px;border-radius:5px}
+.day ul{list-style:none}
+.day li{position:relative;padding-left:20px;margin:5px 0;font-size:.9rem}
+.day li:before{content:"✓";position:absolute;left:0;color:var(--done);font-weight:700;font-size:.8rem}
+.day li.open:before{content:"○";color:var(--muted)}
+.foot{color:var(--muted);font-size:.78rem;margin-top:24px;border-top:1px solid var(--line);padding-top:12px}
+@media(max-width:760px){.nav{display:none}.main{padding:20px 16px 60px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="nav">
+    <div class="brand"><div class="t">PF Build Log</div><div class="s">Everything Peter has built</div></div>
+    <div id="navLinks"></div>
+  </div>
+  <div class="main">
+    <h1>Pier Foundations — Build Log</h1>
+    <p class="lead">A running record of everything built for Pier Foundations since Peter came online, organized by sprint. Maintained by Peter as part of every dev cycle.</p>
+    <div class="stats" id="stats"></div>
+    <div id="sprints"></div>
+    <div class="foot" id="foot"></div>
+  </div>
+</div>
+<script>
+var SPRINTS = [
+{
+  id:"sprint1", name:"Sprint 1 — Foundation", range:"Days 1–3 · late May 2026", status:"done",
+  days:[
+    {t:"Day 1 — Foundation", items:["Platform scaffold + sidebar navigation","SharePoint data connection (Microsoft Graph)","Core dashboard with live KPIs","Initial module framework"]},
+    {t:"Day 2 — Build-Out", items:["Bid pipeline, estimating, material costs modules","Active projects + QA/QC (GUHMA) modules","Feasibility / no-go tool","Proposals + documentation modules"]},
+    {t:"Day 3 — Integration", items:["Modules wired to live data","Public website (dark, glass) ","Command center + strategic report","SOP additions portal (38 items)"]},
+    {t:"Bonus", items:["Alpha review walkthrough portal","Sprint reporting portal","Extra modules beyond original scope"]}
+  ]
+},
+{
+  id:"sprint2", name:"Sprint 2 — Data, Financials & Polish", range:"Days 4–6 · late May 2026", status:"done",
+  days:[
+    {t:"Day 4 — Data Integration + Financial Framework", items:["Financial modules (budgeting, invoicing/AR)","CEO dashboard","Cost-code + estimate framework"]},
+    {t:"Day 5 — Polish + Integrations + Manual", items:["Server-side authentication","Platform user manual","Alpha review answer-capture"]},
+    {t:"Day 6 — QuickBooks Prep + Training + Cleanup", items:["QuickBooks setup guide","Role training guides","Cleanup + Tether's 33-item checklist"]}
+  ]
+},
+{
+  id:"sprint3", name:"Sprint 3 — Hardening, Data Truth & Operations", range:"Jun 2–5, 2026", status:"active",
+  days:[
+    {t:"Security & Data Integrity", items:[
+      "Hardened auth — signed (HMAC) session tokens, fail-closed credentials, locked /api, password rotated",
+      "Escaped all data-rendering (stored-XSS fix) across 18 modules",
+      "Centralized KPIs — one source of truth so every tab agrees (win rate, revenue, active projects, financials)",
+      "Stripped junk header rows from live data; removed credentials from all docs",
+      "Independent triple-check (correctness + security + QA) — caught a forgeable token before it shipped"]},
+    {t:"Estimator Rebuild", items:[
+      "Re-anchored estimating to PF's master template — fixed ~1.5x overpricing",
+      "Bottom-up cost build-up by cost code + correct markup chain; diameter now drives stone & spoils",
+      "Verified to within 0.02% of the template; independently QA-passed"]},
+    {t:"In-Platform Docs & Onboarding", items:[
+      "All documents open inside the platform (no external tabs, no password prompts)",
+      "COO Knowledge Checklist (87 items)",
+      "'Meet Peter' one-pager + role-level onboarding (Exec / Estimating / BD / Admin)"]},
+    {t:"Email & Communications", items:[
+      "Microsoft Graph email — read + send, scoped to Peter's mailbox (App Access Policy)",
+      "Formatted-HTML email tool with auto-signature; retired stored password",
+      "Inbox-check routine (~17 min) + weekly Brainiac skills scan"]},
+    {t:"Legal & Subcontracts", items:[
+      "Full Shiel Sexton subcontract review (with independent legal-review verification)",
+      "Subcontract data model (19 fields) + visual Subcontracts module in the platform"]},
+    {t:"QA/QC — GUHMA Tool", items:[
+      "Real Southwark column check (74 columns) — caught pier 126 not installed; validated by Jonathan",
+      "Bucket-vs-hand-log reconciliation + flag rules (depth, refusal, install time) — approved to automate"]},
+    {t:"Identity, Team & Process", items:[
+      "Authored Peter's North Star (approved by Brad)",
+      "Product Team charter + Visuals-First build principle",
+      "Standing BOOPs: dev-cycle, self-check, triple-check, intel-verification, branding, post-build verification"]},
+    {t:"Real Business Data", items:[
+      "Received & mapped the 3 master spreadsheets (Project Master, BD Master, Bid Log)",
+      "Plan set: rebuild dashboard + project data from masters; daily 5pm auto-sync from SharePoint",
+      "Declined to scrape ConstructConnect — chose a clean lead-screening path instead"]}
+  ]
+},
+{
+  id:"next", name:"Up Next", range:"Sprint 4 — planned", status:"active",
+  days:[
+    {t:"Planned", items:[
+      "Rebuild dashboard + project data from the master spreadsheets (mirror PF Dashboard tab)",
+      "GUHMA bucket auto-reconciliation + daily adjusted-pier report",
+      "Daily 5pm auto-sync from SharePoint masters",
+      "Estimator tweaks (equipment rates, risk weight, pipeline=LOI)",
+      "Connect platform backend after visual green-light (Tether + Melanie)"].map(function(x){return x;})
+  ], open:true}
+];
+
+function render(){
+  var nav=document.getElementById('navLinks'), sp=document.getElementById('sprints');
+  var nh='', sh='', totalItems=0, doneSprints=0;
+  SPRINTS.forEach(function(s){
+    nh+='<a onclick="document.getElementById(\''+s.id+'\').scrollIntoView({behavior:\'smooth\'})">'+s.name.split(' — ')[0]+'</a>';
+    if(s.status==='done') doneSprints++;
+    var dayHtml='';
+    s.days.forEach(function(d){
+      var li='';
+      d.items.forEach(function(it){ totalItems++; li+='<li'+(s.id==='next'?' class="open"':'')+'>'+it+'</li>'; });
+      dayHtml+='<div class="day"><h3>'+d.t+'</h3><ul>'+li+'</ul></div>';
+    });
+    sh+='<div class="sprint" id="'+s.id+'"><div class="sprint-hd"><h2>'+s.name+'</h2>'
+       +'<span class="range">'+s.range+'</span>'
+       +'<span class="badge '+(s.status==='done'?'done':'active')+'">'+(s.status==='done'?'Complete':'In progress')+'</span></div>'
+       +dayHtml+'</div>';
+  });
+  nav.innerHTML=nh; sp.innerHTML=sh;
+  document.getElementById('stats').innerHTML=
+     '<div class="stat"><div class="n">'+SPRINTS.length+'</div><div class="l">Sprints</div></div>'
+    +'<div class="stat"><div class="n">'+totalItems+'</div><div class="l">Deliverables logged</div></div>'
+    +'<div class="stat"><div class="n">'+doneSprints+'</div><div class="l">Sprints complete</div></div>';
+  document.getElementById('foot').textContent='Maintained by Peter (AI COO) · Updated as part of every dev cycle · pierfoundations.com';
+}
+render();
+</script>
+</body>
+</html>
