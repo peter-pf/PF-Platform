@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Production</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f6f7f8;--card:#fff;--ink:#1c1f23;--muted:#6b7178;--line:#e6e8eb;--accent:#f59e0b;--accent-soft:#fef3e2}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5;padding:24px}
+h1{font-size:1.5rem;font-weight:700}
+.lead{color:var(--muted);margin:6px 0 20px;max-width:80ch}
+.cards{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:22px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;min-width:150px}
+.card .n{font-size:1.7rem;font-weight:700;line-height:1.1}
+.card .l{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:4px}
+.card .s{font-size:.78rem;color:var(--muted);margin-top:3px}
+.card.hl{border-color:var(--accent);background:var(--accent-soft)}
+h2{font-size:1.1rem;font-weight:700;margin:24px 0 10px;border-bottom:2px solid var(--accent);padding-bottom:6px}
+table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:.86rem}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line)}
+th{background:#fafbfc;font-size:.72rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+td.num,th.num{text-align:right}
+tr:last-child td{border-bottom:none}
+.tot{font-weight:700;background:#fafbfc}
+.note{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;padding:12px 16px;margin-top:18px;font-size:.86rem;color:var(--ink)}
+.foot{color:var(--muted);font-size:.76rem;margin-top:22px;border-top:1px solid var(--line);padding-top:10px}
+.tag{display:inline-block;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#9a6a06;background:var(--accent-soft);padding:2px 8px;border-radius:5px;margin-left:8px}
+</style>
+</head>
+<body>
+<h1>Daily Production <span class="tag">Mockup — for review</span></h1>
+<p class="lead">Crew production by project and by day, from GUHMA install logs. Headline rates feed scheduling and estimating. Active jobs update as each day's columns are checked.</p>
+<div class="cards" id="cards"></div>
+
+<h2>Active Job — Southwark Metals (26-005)</h2>
+<table><thead><tr><th>Install Date</th><th class="num">Columns</th><th class="num">LF</th><th class="num">Avg / column</th></tr></thead><tbody id="swBody"></tbody></table>
+
+<h2>Completed Projects — Historical</h2>
+<table><thead><tr><th>Project</th><th class="num">Columns</th><th class="num">Total LF</th><th class="num">Days</th><th class="num">Cols/Day</th><th class="num">LF/Day</th></tr></thead><tbody id="projBody"></tbody></table>
+
+<div class="note" id="estNote"></div>
+<div class="foot" id="foot"></div>
+
+<script src="/data/production-data.js"></script>
+<script>
+(function(){
+  var P = window.PF_PRODUCTION; if(!P){document.body.insertAdjacentHTML('beforeend','<p>Data unavailable.</p>');return;}
+  function n(x){return (Math.round(x)).toLocaleString();}
+  var h=P.headline;
+  document.getElementById('cards').innerHTML =
+    '<div class="card hl"><div class="n">'+n(h.lfPerDay)+'</div><div class="l">LF / Production Day</div><div class="s">range '+n(h.minLfDay)+'–'+n(h.maxLfDay)+'</div></div>'+
+    '<div class="card hl"><div class="n">'+h.colsPerDay+'</div><div class="l">Columns / Day</div><div class="s">blended avg</div></div>'+
+    '<div class="card"><div class="n">'+n(h.lf)+'</div><div class="l">Total LF Installed</div><div class="s">'+h.projects+' projects</div></div>'+
+    '<div class="card"><div class="n">'+n(h.cols)+'</div><div class="l">Columns Installed</div><div class="s">over '+h.days+' install-days</div></div>';
+  // Southwark
+  var sw=P.southwark, swTot={cols:0,lf:0};
+  document.getElementById('swBody').innerHTML = sw.byday.map(function(d){
+    swTot.cols+=d.cols; swTot.lf+=d.lf;
+    return '<tr><td>'+d.date+'</td><td class="num">'+d.cols+'</td><td class="num">'+n(d.lf)+'</td><td class="num">'+(d.lf/d.cols).toFixed(1)+' ft</td></tr>';
+  }).join('') + '<tr class="tot"><td>Total ('+sw.byday.length+' days)</td><td class="num">'+swTot.cols+'</td><td class="num">'+n(swTot.lf)+'</td><td class="num">'+n(swTot.lf/sw.byday.length)+' LF/day</td></tr>';
+  // Projects
+  document.getElementById('projBody').innerHTML = P.projects.map(function(p){
+    return '<tr><td>'+p.project+'</td><td class="num">'+n(p.cols)+'</td><td class="num">'+n(p.lf)+'</td><td class="num">'+p.days+'</td><td class="num">'+p.colsDay+'</td><td class="num">'+n(p.lfDay)+'</td></tr>';
+  }).join('') + '<tr class="tot"><td>Total / Blended</td><td class="num">'+n(h.cols)+'</td><td class="num">'+n(h.lf)+'</td><td class="num">'+h.days+'</td><td class="num">'+h.colsPerDay+'</td><td class="num">'+n(h.lfPerDay)+'</td></tr>';
+  document.getElementById('estNote').innerHTML = '<b>Estimating use:</b> a job’s total LF ÷ ~'+n(h.lfPerDay)+' LF/day ≈ field (install) days. Add mobilization, layout, and travel separately. Use the range ('+n(h.minLfDay)+'–'+n(h.maxLfDay)+' LF/day) to bracket conservative vs. optimistic schedules. Sample sizes per project are small (1–6 days) and tighten as more jobs close.';
+  document.getElementById('foot').textContent='Source: GUHMA install logs from completed projects + active jobs · Generated '+P.generated+' · Maintained by Peter';
+})();
+</script>
+</body>
+</html>
