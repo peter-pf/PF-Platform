@@ -67,6 +67,93 @@ tr:last-child td{border-bottom:none}
     '<div class="stat"><div class="n">'+h.states+'</div><div class="l">States Covered</div></div>'+
     '<div class="stat"><div class="n">'+h.transportQuotes+'</div><div class="l">Transport Quotes</div></div>';
   document.getElementById('gap').innerHTML='<b>Transport gap closed (6/8):</b> parsed 1,004 Outlook .msg quotes — recovered '+h.transportQuotes+' transport rates (Stephan, Paddacks &amp; others). Stone and transport pricing are both captured now.';
+
+  // ---- Pricing Map (Leaflet) ----
+  (function initMap(){
+    var mapEl=document.getElementById('map');
+    var noteEl=document.getElementById('mapnote');
+    if(!mapEl) return;
+    // Degrade gracefully if Leaflet failed to load.
+    if(typeof L==='undefined'){
+      mapEl.style.display='none';
+      if(noteEl) noteEl.textContent='Map unavailable — could not load the mapping library (check your connection).';
+      return;
+    }
+    // Only keep locations with valid numeric coordinates.
+    var locs=(P.locations||[]).filter(function(l){
+      return l && typeof l.lat==='number' && typeof l.lng==='number' &&
+             isFinite(l.lat) && isFinite(l.lng);
+    });
+    var unmatched=(typeof P.locationsUnmatched==='number')?P.locationsUnmatched:0;
+    if(!locs.length){
+      mapEl.style.display='none';
+      if(noteEl) noteEl.textContent='No mapped locations yet'+(unmatched?(' — '+unmatched+' locations not yet geocoded.'):'.');
+      return;
+    }
+    var map=L.map(mapEl,{scrollWheelZoom:false}).setView([40.5,-86.0],5); // Midwest default
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      maxZoom:18,
+      attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+    // Enable wheel zoom only after a click (keeps page scroll smooth inside iframe).
+    map.on('click',function(){map.scrollWheelZoom.enable();});
+
+    function fmtRange(lo,hi){
+      if(lo==null&&hi==null) return '';
+      if(lo!=null&&hi!=null&&lo!==hi) return '$'+lo+'–$'+hi+'/ton';
+      var v=(lo!=null)?lo:hi; return '$'+v+'/ton';
+    }
+    // Marker size scales with total activity (stone + transport quotes). Amber only.
+    var maxAct=1;
+    locs.forEach(function(l){var a=(l.stoneCount||0)+(l.transCount||0); if(a>maxAct) maxAct=a;});
+    var bounds=[];
+    locs.forEach(function(l){
+      var act=(l.stoneCount||0)+(l.transCount||0);
+      var radius=7+Math.round(11*Math.sqrt(act/maxAct)); // 7..18px, sqrt keeps it clean
+      var marker=L.circleMarker([l.lat,l.lng],{
+        radius:radius,
+        color:'#b45309',        // amber-700 stroke
+        weight:1.5,
+        fillColor:'#f59e0b',    // brand amber fill
+        fillOpacity:0.78
+      }).addTo(map);
+      bounds.push([l.lat,l.lng]);
+
+      // Popup — built for "what did nearby jobs cost".
+      var parts=[];
+      parts.push('<div style="font-weight:700;font-size:.95rem;margin-bottom:4px">'+esc(l.loc)+'</div>');
+      if(l.stoneCount){
+        var rng=fmtRange(l.stoneLow,l.stoneHigh);
+        parts.push('<div style="margin-bottom:3px"><b>Stone:</b> '+l.stoneCount+' quote'+(l.stoneCount>1?'s':'')+
+          (rng?(' · '+esc(rng)+' delivered'):'')+'</div>');
+        if(l.vendors&&l.vendors.length){
+          parts.push('<div style="font-size:.78rem;color:#6b7178;margin-bottom:5px">Vendors: '+
+            l.vendors.map(function(v){return esc(v);}).join(', ')+'</div>');
+        }
+      }
+      if(l.transCount){
+        parts.push('<div style="margin-bottom:3px"><b>Transport:</b> '+l.transCount+' quote'+(l.transCount>1?'s':'')+'</div>');
+        if(l.carriers&&l.carriers.length){
+          parts.push('<div style="font-size:.78rem;color:#6b7178">Carriers: '+
+            l.carriers.map(function(c){return esc(c);}).join(', ')+'</div>');
+        }
+      }
+      if(!l.stoneCount&&!l.transCount){
+        parts.push('<div style="font-size:.8rem;color:#6b7178">No quote detail on file.</div>');
+      }
+      marker.bindPopup('<div style="min-width:170px;max-width:260px;font-family:Inter,sans-serif">'+parts.join('')+'</div>');
+    });
+
+    if(bounds.length===1){ map.setView(bounds[0],9); }
+    else { map.fitBounds(bounds,{padding:[30,30]}); }
+
+    if(noteEl){
+      noteEl.innerHTML='<b>'+locs.length+'</b> location'+(locs.length>1?'s':'')+' mapped'+
+        (unmatched?(' · '+unmatched+' not yet mapped (small towns / unparsed addresses)'):'')+
+        ' — marker size reflects how many quotes we have nearby. Click a marker for vendor &amp; carrier detail.';
+    }
+  })();
+
   document.getElementById('regBody').innerHTML=P.regions.map(function(r){
     return '<tr><td><b>'+esc(r.state)+'</b></td><td class="num">'+r.quotes+'</td><td class="num">'+money(r.delivLow)+'</td><td class="num">'+money(r.delivHigh)+'</td><td class="num">'+r.vendors+'</td><td class="num">'+r.cities+'</td></tr>';
   }).join('');
