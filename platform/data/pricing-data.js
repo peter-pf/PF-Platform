@@ -9894,5 +9894,1309 @@ window.PF_PRICING = {
    "quoteDate": "2026-04-24",
    "project": "01 - Preconstruction"
   }
- ]
+ ],
+ "locations": [
+  {
+   "loc": "Noblesville",
+   "lat": 40.04559,
+   "lng": -86.0086,
+   "stoneCount": 5,
+   "transCount": 0,
+   "stoneLow": 26.95,
+   "stoneHigh": 43.55,
+   "vendors": [
+    "IMI (Irving Materials)",
+    "Martin Marietta"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Dayton",
+   "lat": 39.75895,
+   "lng": -84.19161,
+   "stoneCount": 1,
+   "transCount": 0,
+   "stoneLow": 33.85,
+   "stoneHigh": 33.85,
+   "vendors": [
+    "Melvin Stone"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Shelbyville",
+   "lat": 35.48341,
+   "lng": -86.46027,
+   "stoneCount": 3,
+   "transCount": 0,
+   "stoneLow": 22.5,
+   "stoneHigh": 27.15,
+   "vendors": [
+    "New Point Stone Co",
+    "Rush County Stone",
+    "US Aggregates"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Hernando",
+   "lat": 34.82399,
+   "lng": -89.9937,
+   "stoneCount": 1,
+   "transCount": 0,
+   "stoneLow": 37.23,
+   "stoneHigh": 37.23,
+   "vendors": [
+    "Martin Marietta"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "South Bend",
+   "lat": 41.68338,
+   "lng": -86.25001,
+   "stoneCount": 5,
+   "transCount": 0,
+   "stoneLow": 35.5,
+   "stoneHigh": 37.25,
+   "vendors": [
+    "Amrize (Holcim)",
+    "IMI (Irving Materials)",
+    "StoneCo",
+    "WP Mining / West Plains"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Terre Haute",
+   "lat": 39.4667,
+   "lng": -87.41391,
+   "stoneCount": 4,
+   "transCount": 0,
+   "stoneLow": 27.5,
+   "stoneHigh": 31.0,
+   "vendors": [
+    "Heidelberg Materials",
+    "Martin Marietta",
+    "Mill Creek Aggregates",
+    "S&G Excavating"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Indianapolis",
+   "lat": 39.76838,
+   "lng": -86.15804,
+   "stoneCount": 15,
+   "transCount": 0,
+   "stoneLow": 28.52,
+   "stoneHigh": 39.1,
+   "vendors": [
+    "Heidelberg Materials",
+    "IMI (Irving Materials)",
+    "Martin Marietta"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Columbus",
+   "lat": 39.96118,
+   "lng": -82.99879,
+   "stoneCount": 7,
+   "transCount": 0,
+   "stoneLow": 29.3,
+   "stoneHigh": 32.4,
+   "vendors": [
+    "Olen Corporation",
+    "Shelly Co"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Westfield",
+   "lat": 42.12509,
+   "lng": -72.74954,
+   "stoneCount": 6,
+   "transCount": 0,
+   "stoneLow": 28.0,
+   "stoneHigh": 35.5,
+   "vendors": [
+    "IMI (Irving Materials)",
+    "Martin Marietta"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Batavia",
+   "lat": 41.85003,
+   "lng": -88.31257,
+   "stoneCount": 3,
+   "transCount": 0,
+   "stoneLow": 30.2,
+   "stoneHigh": 32.75,
+   "vendors": [
+    "Hilltop Companies",
+    "Melvin Stone (N KY Agg)",
+    "Rogers Group (Arch Materials)"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Cincinnati",
+   "lat": 39.12711,
+   "lng": -84.51439,
+   "stoneCount": 1,
+   "transCount": 0,
+   "stoneLow": 28.5,
+   "stoneHigh": 28.5,
+   "vendors": [
+    "Martin Marietta"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Trenton",
+   "lat": 40.21705,
+   "lng": -74.74294,
+   "stoneCount": 5,
+   "transCount": 0,
+   "stoneLow": 26.0,
+   "stoneHigh": 55.3,
+   "vendors": [
+    "Martin Marietta",
+    "Melvin Stone",
+    "Olen Corporation"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Louisville",
+   "lat": 38.25424,
+   "lng": -85.75941,
+   "stoneCount": 4,
+   "transCount": 0,
+   "stoneLow": 20.94,
+   "stoneHigh": 26.02,
+   "vendors": [
+    "Heidelberg Materials",
+    "IMI (Irving Materials)",
+    "Rogers Group"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Marion",
+   "lat": 42.03417,
+   "lng": -91.59768,
+   "stoneCount": 1,
+   "transCount": 0,
+   "stoneLow": 24.15,
+   "stoneHigh": 24.15,
+   "vendors": [
+    "IMI (Irving Materials)"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Fishers",
+   "lat": 39.95559,
+   "lng": -86.01387,
+   "stoneCount": 2,
+   "transCount": 0,
+   "stoneLow": 26.4,
+   "stoneHigh": 37.05,
+   "vendors": [
+    "IMI (Irving Materials)",
+    "Martin Marietta"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Kalamazoo",
+   "lat": 42.29171,
+   "lng": -85.58723,
+   "stoneCount": 4,
+   "transCount": 0,
+   "stoneLow": 35.75,
+   "stoneHigh": 53.6,
+   "vendors": [
+    "Amrize (Holcim)",
+    "High Grade Materials",
+    "StoneCo"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Fort Wayne",
+   "lat": 41.1306,
+   "lng": -85.12886,
+   "stoneCount": 2,
+   "transCount": 0,
+   "stoneLow": 25.05,
+   "stoneHigh": 25.05,
+   "vendors": [
+    "Heidelberg Materials",
+    "IMI (Irving Materials)"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Franklin",
+   "lat": 35.92506,
+   "lng": -86.86889,
+   "stoneCount": 1,
+   "transCount": 0,
+   "stoneLow": 18.8,
+   "stoneHigh": 18.8,
+   "vendors": [
+    "Payne & Dolan (Walbec)"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Milford",
+   "lat": 41.22232,
+   "lng": -73.0565,
+   "stoneCount": 2,
+   "transCount": 0,
+   "stoneLow": 38.75,
+   "stoneHigh": 38.75,
+   "vendors": [
+    "StoneCo"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Albertville",
+   "lat": 34.26783,
+   "lng": -86.20878,
+   "stoneCount": 1,
+   "transCount": 0,
+   "stoneLow": 42.55,
+   "stoneHigh": 42.55,
+   "vendors": [
+    "Martin Marietta"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Youngstown",
+   "lat": 41.09978,
+   "lng": -80.64952,
+   "stoneCount": 1,
+   "transCount": 0,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [
+    "Heidelberg Materials"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Woodburn",
+   "lat": 45.14373,
+   "lng": -122.85537,
+   "stoneCount": 2,
+   "transCount": 0,
+   "stoneLow": 32.0,
+   "stoneHigh": 32.0,
+   "vendors": [
+    "Heidelberg Materials",
+    "ShellyCo (Stoneco)"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Silver Lake",
+   "lat": 34.08668,
+   "lng": -118.27023,
+   "stoneCount": 3,
+   "transCount": 0,
+   "stoneLow": 24.75,
+   "stoneHigh": 29.7,
+   "vendors": [
+    "Heidelberg Materials",
+    "IMI (Irving Materials)",
+    "WP Mining / West Plains"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Covington",
+   "lat": 39.08367,
+   "lng": -84.50855,
+   "stoneCount": 1,
+   "transCount": 0,
+   "stoneLow": 29.95,
+   "stoneHigh": 29.95,
+   "vendors": [
+    "Melvin Stone"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Ames",
+   "lat": 42.03471,
+   "lng": -93.61994,
+   "stoneCount": 1,
+   "transCount": 0,
+   "stoneLow": 42.59,
+   "stoneHigh": 42.59,
+   "vendors": [
+    "Martin Marietta"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Nashville",
+   "lat": 36.16589,
+   "lng": -86.78444,
+   "stoneCount": 2,
+   "transCount": 0,
+   "stoneLow": 32.85,
+   "stoneHigh": 33.35,
+   "vendors": [
+    "Rogers Group",
+    "US Aggregates"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Wheaton",
+   "lat": 41.86614,
+   "lng": -88.10701,
+   "stoneCount": 4,
+   "transCount": 0,
+   "stoneLow": 25.91,
+   "stoneHigh": 38.13,
+   "vendors": [
+    "Amrize (Holcim)",
+    "Beverly Materials (90 West)",
+    "Heidelberg Materials",
+    "Vulcan Materials"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Hamilton",
+   "lat": 39.3995,
+   "lng": -84.56134,
+   "stoneCount": 3,
+   "transCount": 0,
+   "stoneLow": 31.3,
+   "stoneHigh": 34.9,
+   "vendors": [
+    "Martin Marietta",
+    "Melvin Stone",
+    "Welch Sand & Gravel"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Memphis",
+   "lat": 35.14953,
+   "lng": -90.04898,
+   "stoneCount": 1,
+   "transCount": 0,
+   "stoneLow": 40.2,
+   "stoneHigh": 40.2,
+   "vendors": [
+    "Vulcan Materials"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Waterford",
+   "lat": 42.69303,
+   "lng": -83.41181,
+   "stoneCount": 1,
+   "transCount": 0,
+   "stoneLow": 41.0,
+   "stoneHigh": 41.0,
+   "vendors": [
+    "StoneCo"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Madison",
+   "lat": 43.07305,
+   "lng": -89.40123,
+   "stoneCount": 2,
+   "transCount": 0,
+   "stoneLow": 17.5,
+   "stoneHigh": 24.0,
+   "vendors": [
+    "Payne & Dolan (Walbec)",
+    "Yahara Materials"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "West Lafayette",
+   "lat": 40.42587,
+   "lng": -86.90807,
+   "stoneCount": 3,
+   "transCount": 0,
+   "stoneLow": 33.85,
+   "stoneHigh": 36.5,
+   "vendors": [
+    "IMI (Irving Materials)",
+    "Rogers Group",
+    "US Aggregates"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Perrysburg",
+   "lat": 41.557,
+   "lng": -83.62716,
+   "stoneCount": 3,
+   "transCount": 0,
+   "stoneLow": 22.5,
+   "stoneHigh": 24.3,
+   "vendors": [
+    "Area Aggregates",
+    "Green Earth (transport DBE)",
+    "ShellyCo (Stoneco)"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Evansville",
+   "lat": 37.97476,
+   "lng": -87.55585,
+   "stoneCount": 2,
+   "transCount": 0,
+   "stoneLow": 32.21,
+   "stoneHigh": 32.6,
+   "vendors": [
+    "Cave Quarries",
+    "Mulzer Crushed Stone"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Rockford",
+   "lat": 42.27113,
+   "lng": -89.094,
+   "stoneCount": 4,
+   "transCount": 0,
+   "stoneLow": 18.0,
+   "stoneHigh": 28.62,
+   "vendors": [
+    "Beverly Materials (90 West)",
+    "Heidelberg Materials",
+    "Rogers Logistics (Roscoe IL)",
+    "Vulcan Materials"
+   ],
+   "carriers": []
+  },
+  {
+   "loc": "Indianapolis, IN",
+   "lat": 39.76838,
+   "lng": -86.15804,
+   "stoneCount": 0,
+   "transCount": 76,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Trenton, OH",
+   "lat": 40.21705,
+   "lng": -74.74294,
+   "stoneCount": 0,
+   "transCount": 8,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Louisville, KY",
+   "lat": 38.25424,
+   "lng": -85.75941,
+   "stoneCount": 0,
+   "transCount": 24,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking",
+    "nugentsand.com"
+   ]
+  },
+  {
+   "loc": "Marion, IN",
+   "lat": 40.55837,
+   "lng": -85.65914,
+   "stoneCount": 0,
+   "transCount": 6,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Noblesville, IN",
+   "lat": 40.04559,
+   "lng": -86.0086,
+   "stoneCount": 0,
+   "transCount": 13,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Fishers, IN",
+   "lat": 39.95559,
+   "lng": -86.01387,
+   "stoneCount": 0,
+   "transCount": 9,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Kalamazoo, MI",
+   "lat": 42.29171,
+   "lng": -85.58723,
+   "stoneCount": 0,
+   "transCount": 14,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Royal Oak, MI",
+   "lat": 42.48948,
+   "lng": -83.14465,
+   "stoneCount": 0,
+   "transCount": 6,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Columbus, OH",
+   "lat": 39.96118,
+   "lng": -82.99879,
+   "stoneCount": 0,
+   "transCount": 9,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Cincinnati, OH",
+   "lat": 39.12711,
+   "lng": -84.51439,
+   "stoneCount": 0,
+   "transCount": 6,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Fort Dodge, IA",
+   "lat": 42.49747,
+   "lng": -94.16802,
+   "stoneCount": 0,
+   "transCount": 3,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Moline, IL",
+   "lat": 41.5067,
+   "lng": -90.51513,
+   "stoneCount": 0,
+   "transCount": 1,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Fitchburg, WI",
+   "lat": 42.96083,
+   "lng": -89.46984,
+   "stoneCount": 0,
+   "transCount": 3,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Franklin, IN",
+   "lat": 39.48061,
+   "lng": -86.05499,
+   "stoneCount": 0,
+   "transCount": 6,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Dublin, OH",
+   "lat": 40.09923,
+   "lng": -83.11408,
+   "stoneCount": 0,
+   "transCount": 15,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Muncie, IN",
+   "lat": 40.19338,
+   "lng": -85.38636,
+   "stoneCount": 0,
+   "transCount": 3,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Westfield, IN",
+   "lat": 40.04282,
+   "lng": -86.12749,
+   "stoneCount": 0,
+   "transCount": 33,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "New Haven, IN",
+   "lat": 41.0706,
+   "lng": -85.01441,
+   "stoneCount": 0,
+   "transCount": 3,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Labanon, IN",
+   "lat": 40.04837,
+   "lng": -86.46917,
+   "stoneCount": 0,
+   "transCount": 15,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Boston, MI",
+   "lat": 42.35843,
+   "lng": -71.05977,
+   "stoneCount": 0,
+   "transCount": 3,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Knoxville, TN",
+   "lat": 35.96064,
+   "lng": -83.92074,
+   "stoneCount": 0,
+   "transCount": 6,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Hampton, GA",
+   "lat": 37.02987,
+   "lng": -76.34522,
+   "stoneCount": 0,
+   "transCount": 7,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Princeton, IN",
+   "lat": 25.53844,
+   "lng": -80.40894,
+   "stoneCount": 0,
+   "transCount": 7,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Franklin, WI",
+   "lat": 42.88863,
+   "lng": -88.03842,
+   "stoneCount": 0,
+   "transCount": 5,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Albertville, MN",
+   "lat": 34.26783,
+   "lng": -86.20878,
+   "stoneCount": 0,
+   "transCount": 5,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Youngstown, OH",
+   "lat": 41.09978,
+   "lng": -80.64952,
+   "stoneCount": 0,
+   "transCount": 5,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Bloomington, IN",
+   "lat": 39.16533,
+   "lng": -86.52639,
+   "stoneCount": 0,
+   "transCount": 6,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Silver Lake, IN",
+   "lat": 34.08668,
+   "lng": -118.27023,
+   "stoneCount": 0,
+   "transCount": 5,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Covington, KY",
+   "lat": 39.08367,
+   "lng": -84.50855,
+   "stoneCount": 0,
+   "transCount": 5,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Nashville, IN",
+   "lat": 36.16589,
+   "lng": -86.78444,
+   "stoneCount": 0,
+   "transCount": 7,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Wheaton, IL",
+   "lat": 41.86614,
+   "lng": -88.10701,
+   "stoneCount": 0,
+   "transCount": 5,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Milford, MI",
+   "lat": 41.22232,
+   "lng": -73.0565,
+   "stoneCount": 0,
+   "transCount": 3,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Hamilton, OH",
+   "lat": 39.3995,
+   "lng": -84.56134,
+   "stoneCount": 0,
+   "transCount": 5,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Memphis, TN",
+   "lat": 35.14953,
+   "lng": -90.04898,
+   "stoneCount": 0,
+   "transCount": 6,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Madison, WI",
+   "lat": 43.07305,
+   "lng": -89.40123,
+   "stoneCount": 0,
+   "transCount": 6,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking",
+    "mandtsandfill.com"
+   ]
+  },
+  {
+   "loc": "Roanoke, IN",
+   "lat": 37.27097,
+   "lng": -79.94143,
+   "stoneCount": 0,
+   "transCount": 3,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Perrysburg, OH",
+   "lat": 41.557,
+   "lng": -83.62716,
+   "stoneCount": 0,
+   "transCount": 32,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking",
+    "aisequip.com"
+   ]
+  },
+  {
+   "loc": "Evansville, IN",
+   "lat": 37.97476,
+   "lng": -87.55585,
+   "stoneCount": 0,
+   "transCount": 5,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Rockford, IL",
+   "lat": 42.27113,
+   "lng": -89.094,
+   "stoneCount": 0,
+   "transCount": 5,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Dayton, OH",
+   "lat": 39.75895,
+   "lng": -84.19161,
+   "stoneCount": 0,
+   "transCount": 15,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Bay City, MI",
+   "lat": 43.59447,
+   "lng": -83.88886,
+   "stoneCount": 0,
+   "transCount": 5,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Danville, KY",
+   "lat": 37.64563,
+   "lng": -84.77217,
+   "stoneCount": 0,
+   "transCount": 3,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Strongsville, OH",
+   "lat": 41.3145,
+   "lng": -81.83569,
+   "stoneCount": 0,
+   "transCount": 3,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Wayne, IN",
+   "lat": 40.92538,
+   "lng": -74.27654,
+   "stoneCount": 0,
+   "transCount": 12,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Stephan Trucking",
+    "heidelbergmaterials.com"
+   ]
+  },
+  {
+   "loc": "Terre Haute, IN",
+   "lat": 39.4667,
+   "lng": -87.41391,
+   "stoneCount": 0,
+   "transCount": 14,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Lansing, MI",
+   "lat": 42.73253,
+   "lng": -84.55553,
+   "stoneCount": 0,
+   "transCount": 2,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Carmel, IN",
+   "lat": 39.97837,
+   "lng": -86.11804,
+   "stoneCount": 0,
+   "transCount": 6,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Bend, IN",
+   "lat": 44.05817,
+   "lng": -121.31531,
+   "stoneCount": 0,
+   "transCount": 6,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Battle Creek, MI",
+   "lat": 42.3173,
+   "lng": -85.17816,
+   "stoneCount": 0,
+   "transCount": 3,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Shelbyville, IN",
+   "lat": 39.52144,
+   "lng": -85.77692,
+   "stoneCount": 0,
+   "transCount": 5,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Hernando, MS",
+   "lat": 34.82399,
+   "lng": -89.9937,
+   "stoneCount": 0,
+   "transCount": 6,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks",
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "South Bend, IN",
+   "lat": 41.68338,
+   "lng": -86.25001,
+   "stoneCount": 0,
+   "transCount": 2,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks"
+   ]
+  },
+  {
+   "loc": "Batavia, OH",
+   "lat": 41.85003,
+   "lng": -88.31257,
+   "stoneCount": 0,
+   "transCount": 4,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks"
+   ]
+  },
+  {
+   "loc": "Grand Rapids, MI",
+   "lat": 42.96336,
+   "lng": -85.66809,
+   "stoneCount": 0,
+   "transCount": 3,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Paddacks"
+   ]
+  },
+  {
+   "loc": "Elkhart, IN",
+   "lat": 41.68199,
+   "lng": -85.97667,
+   "stoneCount": 0,
+   "transCount": 2,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "Stephan Trucking"
+   ]
+  },
+  {
+   "loc": "Cleveland, OH",
+   "lat": 41.4995,
+   "lng": -81.69541,
+   "stoneCount": 0,
+   "transCount": 2,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "gmail.com"
+   ]
+  },
+  {
+   "loc": "Peoria, IL",
+   "lat": 40.69365,
+   "lng": -89.58899,
+   "stoneCount": 0,
+   "transCount": 2,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "heidelbergmaterials.com"
+   ]
+  },
+  {
+   "loc": "INDIANAPOLIS, IN",
+   "lat": 39.76838,
+   "lng": -86.15804,
+   "stoneCount": 0,
+   "transCount": 1,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "browningrep.com"
+   ]
+  },
+  {
+   "loc": "Fairland, IN",
+   "lat": 39.07622,
+   "lng": -76.95775,
+   "stoneCount": 0,
+   "transCount": 1,
+   "stoneLow": null,
+   "stoneHigh": null,
+   "vendors": [],
+   "carriers": [
+    "brookfieldmaterials.com"
+   ]
+  }
+ ],
+ "locationsUnmatched": 41
 };

@@ -1,9 +1,21 @@
 # PF Platform — Product Team Charter
 
-**Version:** 1.0
-**Date:** June 4, 2026
+**Version:** 2.0
+**Date:** June 8, 2026
 **Owner:** Peter (AI COO)
-**Status:** Proposed — for Brad's review
+**Status:** ACTIVE — approved by Brad 2026-06-08
+
+---
+
+## Operating principle — Whole-Task Delegation (Brad, 2026-06-08)
+
+**Delegate tasks in their ENTIRETY. Specialists can only train and grow when given a complete task end-to-end — not sliced-up fragments Peter stitches together.**
+
+Brad's correction (6/8): Peter had been delegating the data *mining* but hand-building the modules himself, becoming the bottleneck and denying the team the reps that build their expertise and memory. Going forward:
+- **Peter conducts; he does NOT build.** No hand-coding modules, no manual data-wrangling, no doing the minutiae. Peter decides what/when/why, specs the task, supervises, synthesizes, runs the dev-cycle, and talks to Brad/Jonathan/Derek.
+- **Each task goes to ONE owner as a complete unit** — e.g., "build the pricing map feature: geocode, build the UI, wire the data, self-check, make it deploy-ready" — not "here's the geocoded file, now add a div."
+- The owner does the whole build; verification agents check it; Peter orchestrates and reports.
+- This is how the team gets trained and how Peter scales.
 
 ---
 
