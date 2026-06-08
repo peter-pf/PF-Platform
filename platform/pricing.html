@@ -41,8 +41,12 @@ tr:last-child td{border-bottom:none}
 <input class="search" id="search" placeholder="Search state, city, vendor, material…">
 <table><thead><tr><th>State</th><th>City</th><th>Vendor</th><th>Material</th><th>Washed</th><th class="num">FOB</th><th class="num">Haul</th><th class="num">Delivered</th><th>Date</th></tr></thead><tbody id="stoneBody"></tbody></table>
 
-<h2>Transport / Hauling</h2>
-<table><thead><tr><th>State</th><th>Carrier</th><th>Origin</th><th>Dest</th><th class="num">Rate</th><th>Date</th></tr></thead><tbody id="transBody"></tbody></table>
+<h2>Transport / Hauling — Equipment Mobilization</h2>
+<div class="note" id="transNote"></div>
+<table><thead><tr><th>Equipment Move</th><th class="num">Quotes</th><th class="num">Low</th><th class="num">Median</th><th class="num">High</th></tr></thead><tbody id="equipBody"></tbody></table>
+<h2>All Transport Quotes</h2>
+<input class="search" id="tsearch" placeholder="Search destination, carrier, equipment…">
+<table><thead><tr><th>Destination</th><th>Carrier</th><th>Equipment / Move</th><th class="num">Rate</th><th>Basis</th><th>Date</th></tr></thead><tbody id="transBody"></tbody></table>
 
 <div class="foot" id="foot"></div>
 <script src="/data/pricing-data.js"></script>
@@ -56,7 +60,7 @@ tr:last-child td{border-bottom:none}
     '<div class="stat hl"><div class="n">'+h.stoneQuotes+'</div><div class="l">Stone Quotes</div></div>'+
     '<div class="stat"><div class="n">'+h.states+'</div><div class="l">States Covered</div></div>'+
     '<div class="stat"><div class="n">'+h.transportQuotes+'</div><div class="l">Transport Quotes</div></div>';
-  document.getElementById('gap').innerHTML='<b>Known gap:</b> '+esc(h.msgGap)+'. Stone pricing is well captured; standalone hauling rate sheets are pending a .msg email parser — being addressed.';
+  document.getElementById('gap').innerHTML='<b>Transport gap closed (6/8):</b> parsed 1,004 Outlook .msg quotes — recovered '+h.transportQuotes+' transport rates (Stephan, Paddacks &amp; others). Stone and transport pricing are both captured now.';
   document.getElementById('regBody').innerHTML=P.regions.map(function(r){
     return '<tr><td><b>'+esc(r.state)+'</b></td><td class="num">'+r.quotes+'</td><td class="num">'+money(r.delivLow)+'</td><td class="num">'+money(r.delivHigh)+'</td><td class="num">'+r.vendors+'</td><td class="num">'+r.cities+'</td></tr>';
   }).join('');
@@ -70,10 +74,21 @@ tr:last-child td{border-bottom:none}
   }
   document.getElementById('search').oninput=function(){renderStone(this.value);};
   renderStone('');
-  document.getElementById('transBody').innerHTML=(P.transport.length?P.transport.map(function(t){
-    return '<tr><td>'+esc(t.state)+'</td><td>'+esc(t.vendor)+'</td><td>'+esc(t.origin||'')+'</td><td>'+esc(t.dest||'')+'</td><td class="num">'+money(t.haul||t.materialPrice)+'</td><td>'+esc(t.quoteDate||'')+'</td></tr>';
-  }).join(''):'<tr><td colspan="6" class="muted" style="text-align:center;padding:12px">Transport rate sheets pending .msg parser (Stephan, Paddacks)</td></tr>');
-  document.getElementById('foot').textContent='Source: vendor quotes (SharePoint) · '+h.stoneQuotes+' stone quotes across '+h.states+' states · Generated '+P.generated+' · Auto-updates Saturdays from new Bid Sent projects · Maintained by Peter';
+  document.getElementById('transNote').innerHTML=esc(P.transportNote||'');
+  document.getElementById('equipBody').innerHTML=(P.equipment||[]).map(function(e){
+    return '<tr><td>'+esc(e.item)+'</td><td class="num">'+e.count+'</td><td class="num">'+money(e.low)+'</td><td class="num">'+money(e.median)+'</td><td class="num">'+money(e.high)+'</td></tr>';
+  }).join('');
+  function renderTrans(filter){
+    filter=(filter||'').toLowerCase();
+    var f=(P.transport||[]).filter(function(t){return !filter||((t.destination||'')+' '+(t.vendor||'')+' '+(t.material||'')).toLowerCase().indexOf(filter)>=0;});
+    f.sort(function(a,b){return (b.quoteDate||'')<(a.quoteDate||'')?-1:1;});
+    document.getElementById('transBody').innerHTML=f.slice(0,400).map(function(t){
+      return '<tr><td>'+esc(t.destination||t.city||'')+'</td><td>'+esc(t.vendor)+'</td><td>'+esc(t.material||'')+'</td><td class="num">'+money(t.rate)+'</td><td>'+esc((t.rateBasis||'').replace(' (flat)',''))+'</td><td>'+esc(t.quoteDate||'')+'</td></tr>';
+    }).join('')||'<tr><td colspan="6" class="muted" style="text-align:center;padding:12px">No matches</td></tr>';
+  }
+  document.getElementById('tsearch').oninput=function(){renderTrans(this.value);};
+  renderTrans('');
+  document.getElementById('foot').textContent='Source: vendor quotes (SharePoint) · '+h.stoneQuotes+' stone + '+h.transportQuotes+' transport quotes · Generated '+P.generated+' · Auto-updates Saturdays from new Bid Sent projects · Maintained by Peter';
 })();
 </script>
 </body>
