@@ -20,3 +20,7 @@ Live at pf-platform.pages.dev → "Stone & Transport Pricing". Committed/pushed.
 ## Out of scope / follow-ups
 - .msg parser (extract-msg in venv) → targeted Stephan/Paddacks transport re-mine.
 - Image-only quotes manual review. Estimating-tool integration.
+
+## Update 2026-06-08 — Transport gap closed
+Parsed 1,004 Outlook .msg vendor emails via `extract-msg` (isolated venv) → recovered **711 transport records** (Stephan 386, Paddacks 239, others 86). Merged into pricing-database.json (840 total).
+**Key finding:** Stephan/Paddacks quote **flat equipment-mobilization fees per rig** from the Monroeville yard (vibro/98k setup, 80k excavator, gooseneck, predrill, fall-off, step-deck) — NOT per-ton hauling. Module now shows an equipment-mob rate summary (e.g., vibro setup median ~$2,690) + searchable transport table. Per-ton hauling captured for other carriers (50 records).
