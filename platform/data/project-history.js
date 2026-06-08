@@ -62,7 +62,13 @@ window.PF_PROJECT_HISTORY = {
     "bidVsActualLF": -1149.6,
     "designVsSubmittalNotes": "PF job no 25-121; design xlsx job 24-265"
    },
-   "notes": null
+   "notes": null,
+   "projectTeam": {
+    "architect": "Progress Studio, LLC",
+    "structuralEOR": "Progress Studio, LLC",
+    "civilEngineer": "JQOL (Quality of Life)",
+    "geotechEngineer": "Alt & Witzig"
+   }
   },
   {
    "projectNo": "25-025",
@@ -117,7 +123,13 @@ window.PF_PROJECT_HISTORY = {
     "bidVsActualLF": null,
     "designVsSubmittalNotes": "PF job no 25-266; design xlsx job Pier Foundations - Retainer"
    },
-   "notes": "No GUHMA production data matched for this project number."
+   "notes": "No GUHMA production data matched for this project number.",
+   "projectTeam": {
+    "architect": "SGA Design Group, P.C.",
+    "structuralEOR": null,
+    "civilEngineer": "Civil & Environmental Consultants, Inc.",
+    "geotechEngineer": "ECS"
+   }
   },
   {
    "projectNo": "25-001",
@@ -172,7 +184,13 @@ window.PF_PROJECT_HISTORY = {
     "bidVsActualLF": null,
     "designVsSubmittalNotes": null
    },
-   "notes": "No AP Preliminary Design xlsx in folder; design fields unavailable (older project, PDF-only)."
+   "notes": "No AP Preliminary Design xlsx in folder; design fields unavailable (older project, PDF-only).",
+   "projectTeam": {
+    "architect": "ms consultants, inc.",
+    "structuralEOR": "ms consultants, inc.",
+    "civilEngineer": "DLZ",
+    "geotechEngineer": "Geotechnical Consultants, Inc."
+   }
   },
   {
    "projectNo": "25-023",
@@ -227,7 +245,13 @@ window.PF_PROJECT_HISTORY = {
     "bidVsActualLF": null,
     "designVsSubmittalNotes": null
    },
-   "notes": "No GUHMA production data matched for this project number. No AP Preliminary Design xlsx in folder; design fields unavailable (older project, PDF-only)."
+   "notes": "No GUHMA production data matched for this project number. No AP Preliminary Design xlsx in folder; design fields unavailable (older project, PDF-only).",
+   "projectTeam": {
+    "architect": null,
+    "structuralEOR": null,
+    "civilEngineer": null,
+    "geotechEngineer": "Alt & Witzig"
+   }
   },
   {
    "projectNo": "26-006",
@@ -282,7 +306,13 @@ window.PF_PROJECT_HISTORY = {
     "bidVsActualLF": 0.0,
     "designVsSubmittalNotes": "PF job no 26-159; design xlsx job Pier Foundations (Retainer)"
    },
-   "notes": null
+   "notes": null,
+   "projectTeam": {
+    "architect": "Driven Design Studio PLLC",
+    "structuralEOR": "Bogdani Consulting",
+    "civilEngineer": "Mitten State Engineering",
+    "geotechEngineer": "PSI / Intertek"
+   }
   },
   {
    "projectNo": "25-022",
@@ -337,7 +367,13 @@ window.PF_PROJECT_HISTORY = {
     "bidVsActualLF": null,
     "designVsSubmittalNotes": "PF job no 25-247; design xlsx job Pier Foundations (Retainer)"
    },
-   "notes": "No GUHMA production data matched for this project number."
+   "notes": "No GUHMA production data matched for this project number.",
+   "projectTeam": {
+    "architect": "Ware Malcomb",
+    "structuralEOR": "Ware Malcomb",
+    "civilEngineer": null,
+    "geotechEngineer": "Geotechnical Consultants, Inc."
+   }
   },
   {
    "projectNo": "24-039",
@@ -392,7 +428,13 @@ window.PF_PROJECT_HISTORY = {
     "bidVsActualLF": null,
     "designVsSubmittalNotes": null
    },
-   "notes": "No AP Preliminary Design xlsx in folder; design fields unavailable (older project, PDF-only)."
+   "notes": "No AP Preliminary Design xlsx in folder; design fields unavailable (older project, PDF-only).",
+   "projectTeam": {
+    "architect": null,
+    "structuralEOR": "GPD Group, Inc.",
+    "civilEngineer": "Wohlwend Engineering",
+    "geotechEngineer": "David V. Lewin Corp."
+   }
   },
   {
    "projectNo": "25-014",
@@ -447,7 +489,13 @@ window.PF_PROJECT_HISTORY = {
     "bidVsActualLF": null,
     "designVsSubmittalNotes": null
    },
-   "notes": "No AP Preliminary Design xlsx in folder; design fields unavailable (older project, PDF-only)."
+   "notes": "No AP Preliminary Design xlsx in folder; design fields unavailable (older project, PDF-only).",
+   "projectTeam": {
+    "architect": "Garmann/Miller & Associates, Inc.",
+    "structuralEOR": "Shell + Meyer Associates, Inc.",
+    "civilEngineer": "Makeever & Associates",
+    "geotechEngineer": "Bowser-Morner"
+   }
   },
   {
    "projectNo": "25-018",
@@ -502,7 +550,13 @@ window.PF_PROJECT_HISTORY = {
     "bidVsActualLF": null,
     "designVsSubmittalNotes": "PF job no 25-231; design xlsx job Pier Foundations (Retainer)"
    },
-   "notes": "No GUHMA production data matched for this project number."
+   "notes": "No GUHMA production data matched for this project number.",
+   "projectTeam": {
+    "architect": "HED",
+    "structuralEOR": null,
+    "civilEngineer": "PEA Group",
+    "geotechEngineer": "PEA Group"
+   }
   },
   {
    "projectNo": "24-045",
@@ -557,7 +611,13 @@ window.PF_PROJECT_HISTORY = {
     "bidVsActualLF": null,
     "designVsSubmittalNotes": null
    },
-   "notes": "No AP Preliminary Design xlsx in folder; design fields unavailable (older project, PDF-only)."
+   "notes": "No AP Preliminary Design xlsx in folder; design fields unavailable (older project, PDF-only).",
+   "projectTeam": {
+    "architect": "HDJ Inc.",
+    "structuralEOR": "Pierce Engineers, Inc.",
+    "civilEngineer": "Wolverine Engineers & Surveyors, Inc.",
+    "geotechEngineer": "McDowell & Associates"
+   }
   },
   {
    "projectNo": "25-027",
@@ -612,7 +672,13 @@ window.PF_PROJECT_HISTORY = {
     "bidVsActualLF": -9165.6,
     "designVsSubmittalNotes": "PF job no 25-282; design xlsx job Pier Foundations - Retainer"
    },
-   "notes": "Actual LF (3148.4) is 26% of design LF (12314.0) \u2014 likely partial/phased install in production data or design covered slab+foundation."
+   "notes": "Actual LF (3148.4) is 26% of design LF (12314.0) \u2014 likely partial/phased install in production data or design covered slab+foundation.",
+   "projectTeam": {
+    "architect": "BSA LifeStructures",
+    "structuralEOR": "SmithGroup",
+    "civilEngineer": null,
+    "geotechEngineer": "Patriot Engineering"
+   }
   },
   {
    "projectNo": "25-021",
@@ -667,7 +733,13 @@ window.PF_PROJECT_HISTORY = {
     "bidVsActualLF": null,
     "designVsSubmittalNotes": "PF job no 25-248; design xlsx job Retainer (Pier Foundations)"
    },
-   "notes": "No GUHMA production data matched for this project number."
+   "notes": "No GUHMA production data matched for this project number.",
+   "projectTeam": {
+    "architect": null,
+    "structuralEOR": "MA Design",
+    "civilEngineer": null,
+    "geotechEngineer": "Geotechnical Consultants, Inc."
+   }
   },
   {
    "projectNo": "24-019",
@@ -722,7 +794,13 @@ window.PF_PROJECT_HISTORY = {
     "bidVsActualLF": null,
     "designVsSubmittalNotes": "PF job no 25-151; design xlsx job 24-275"
    },
-   "notes": "No GUHMA production data matched for this project number."
+   "notes": "No GUHMA production data matched for this project number.",
+   "projectTeam": {
+    "architect": "MKM architecture + design",
+    "structuralEOR": "Engineered Building Systems",
+    "civilEngineer": "Engineering Resources, Inc. (ERI)",
+    "geotechEngineer": "Alt & Witzig"
+   }
   },
   {
    "projectNo": "25-003",
@@ -777,7 +855,13 @@ window.PF_PROJECT_HISTORY = {
     "bidVsActualLF": null,
     "designVsSubmittalNotes": null
    },
-   "notes": "No AP Preliminary Design xlsx in folder; design fields unavailable (older project, PDF-only)."
+   "notes": "No AP Preliminary Design xlsx in folder; design fields unavailable (older project, PDF-only).",
+   "projectTeam": {
+    "architect": "Garmann/Miller & Associates, Inc.",
+    "structuralEOR": "Jezerinac Geers & Associates, Inc.",
+    "civilEngineer": null,
+    "geotechEngineer": "Patriot Engineering"
+   }
   },
   {
    "projectNo": "24-041",
@@ -832,7 +916,13 @@ window.PF_PROJECT_HISTORY = {
     "bidVsActualLF": null,
     "designVsSubmittalNotes": null
    },
-   "notes": "No AP Preliminary Design xlsx in folder; design fields unavailable (older project, PDF-only)."
+   "notes": "No AP Preliminary Design xlsx in folder; design fields unavailable (older project, PDF-only).",
+   "projectTeam": {
+    "architect": "Purohit Architects, Inc.",
+    "structuralEOR": "Purohit Architects, Inc.",
+    "civilEngineer": "Miller Land Surveying, Inc.",
+    "geotechEngineer": "GME Testing"
+   }
   },
   {
    "projectNo": "26-004",
@@ -887,7 +977,13 @@ window.PF_PROJECT_HISTORY = {
     "bidVsActualLF": 433.2,
     "designVsSubmittalNotes": "PF job no 26-154; design xlsx job Pier Foundations - Retainer"
    },
-   "notes": "Actual LF (989.2) exceeds design LF (556.0) by 78% \u2014 field overruns or added scope."
+   "notes": "Actual LF (989.2) exceeds design LF (556.0) by 78% \u2014 field overruns or added scope.",
+   "projectTeam": {
+    "architect": "Hafer",
+    "structuralEOR": "Larson Engineering, Inc.",
+    "civilEngineer": null,
+    "geotechEngineer": "SME"
+   }
   },
   {
    "projectNo": "26-002",
@@ -942,7 +1038,13 @@ window.PF_PROJECT_HISTORY = {
     "bidVsActualLF": null,
     "designVsSubmittalNotes": "PF job no 26-129; design xlsx job Retainer"
    },
-   "notes": "No GUHMA production data matched for this project number."
+   "notes": "No GUHMA production data matched for this project number.",
+   "projectTeam": {
+    "architect": null,
+    "structuralEOR": "POET Design & Construction, Inc.",
+    "civilEngineer": null,
+    "geotechEngineer": "Patriot Engineering"
+   }
   },
   {
    "projectNo": "25-024",
@@ -997,7 +1099,13 @@ window.PF_PROJECT_HISTORY = {
     "bidVsActualLF": null,
     "designVsSubmittalNotes": "PF job no 25-262; design xlsx job Retainer - Pier Foundations"
    },
-   "notes": "No GUHMA production data matched for this project number."
+   "notes": "No GUHMA production data matched for this project number.",
+   "projectTeam": {
+    "architect": "CSO Architects, Inc.",
+    "structuralEOR": null,
+    "civilEngineer": "Civil & Environmental Consultants, Inc.",
+    "geotechEngineer": "Alt & Witzig"
+   }
   },
   {
    "projectNo": "25-020",
@@ -1052,7 +1160,13 @@ window.PF_PROJECT_HISTORY = {
     "bidVsActualLF": 791.3,
     "designVsSubmittalNotes": "PF job no 25-212; design xlsx job 25-212"
    },
-   "notes": null
+   "notes": null,
+   "projectTeam": {
+    "architect": "RATIO",
+    "structuralEOR": "Fink Roberts & Petrie, Inc.",
+    "civilEngineer": "CEC, Inc. (Civil & Environmental Consultants)",
+    "geotechEngineer": "Atlas"
+   }
   },
   {
    "projectNo": "25-019",
@@ -1107,7 +1221,13 @@ window.PF_PROJECT_HISTORY = {
     "bidVsActualLF": -793.5,
     "designVsSubmittalNotes": "PF job no 25-233; design xlsx job Pier Foundations - Retainer"
    },
-   "notes": null
+   "notes": null,
+   "projectTeam": {
+    "architect": "RATIO",
+    "structuralEOR": "McComas / O'Donnell & Naccarato",
+    "civilEngineer": "Kimley-Horn",
+    "geotechEngineer": "APEC"
+   }
   },
   {
    "projectNo": "25-015",
@@ -1162,7 +1282,13 @@ window.PF_PROJECT_HISTORY = {
     "bidVsActualLF": null,
     "designVsSubmittalNotes": "PF job no 25-148; design xlsx job 25-148"
    },
-   "notes": "No GUHMA production data matched for this project number."
+   "notes": "No GUHMA production data matched for this project number.",
+   "projectTeam": {
+    "architect": "The Architecture Studio, Inc.",
+    "structuralEOR": "Nehil-Sivak Structural Engineers",
+    "civilEngineer": "Abonmarche",
+    "geotechEngineer": "Jones Petrie Rafinski"
+   }
   },
   {
    "projectNo": "25-016",
@@ -1217,7 +1343,13 @@ window.PF_PROJECT_HISTORY = {
     "bidVsActualLF": null,
     "designVsSubmittalNotes": null
    },
-   "notes": "No AP Preliminary Design xlsx in folder; design fields unavailable (older project, PDF-only)."
+   "notes": "No AP Preliminary Design xlsx in folder; design fields unavailable (older project, PDF-only).",
+   "projectTeam": {
+    "architect": "Woolpert, Inc.",
+    "structuralEOR": "Woolpert, Inc.",
+    "civilEngineer": "Woolpert, Inc.",
+    "geotechEngineer": "CTL Engineering"
+   }
   },
   {
    "projectNo": "26-003",
@@ -1272,7 +1404,13 @@ window.PF_PROJECT_HISTORY = {
     "bidVsActualLF": 149.2,
     "designVsSubmittalNotes": "PF job no 26-134; design xlsx job Retainer (Pier Foundations)"
    },
-   "notes": null
+   "notes": null,
+   "projectTeam": {
+    "architect": "Dimit Architects, LLC",
+    "structuralEOR": "Jezerinac Geers & Associates, Inc.",
+    "civilEngineer": "Riverstone Engineering",
+    "geotechEngineer": "Wertz Geotechnical Engineering"
+   }
   },
   {
    "projectNo": "25-026",
@@ -1327,7 +1465,13 @@ window.PF_PROJECT_HISTORY = {
     "bidVsActualLF": null,
     "designVsSubmittalNotes": "PF job no 25-281; design xlsx job Retainer (Pier Foundations)"
    },
-   "notes": "No GUHMA production data matched for this project number."
+   "notes": "No GUHMA production data matched for this project number.",
+   "projectTeam": {
+    "architect": "American Structurepoint, Inc.",
+    "structuralEOR": "American Structurepoint, Inc.",
+    "civilEngineer": "American Structurepoint, Inc.",
+    "geotechEngineer": "Alt & Witzig"
+   }
   },
   {
    "projectNo": "25-017",
@@ -1382,7 +1526,13 @@ window.PF_PROJECT_HISTORY = {
     "bidVsActualLF": null,
     "designVsSubmittalNotes": "PF job no 25-242; design xlsx job Retainer - Pier Foundations"
    },
-   "notes": "No GUHMA production data matched for this project number."
+   "notes": "No GUHMA production data matched for this project number.",
+   "projectTeam": {
+    "architect": "STUDIO Architecture",
+    "structuralEOR": "JPS Consulting Engineers",
+    "civilEngineer": null,
+    "geotechEngineer": "Patriot Engineering"
+   }
   }
  ]
 };
