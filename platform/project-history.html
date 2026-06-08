@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Project History</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f6f7f8;--card:#fff;--ink:#1c1f23;--muted:#6b7178;--line:#e6e8eb;--accent:#f59e0b;--accent-soft:#fef3e2}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5;padding:20px}
+h1{font-size:1.45rem;font-weight:700}
+.tag{display:inline-block;font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#9a6a06;background:var(--accent-soft);padding:2px 8px;border-radius:5px;margin-left:8px;vertical-align:middle}
+.lead{color:var(--muted);margin:6px 0 16px;max-width:85ch}
+.cards{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:12px 16px;min-width:120px}
+.stat.hl{border-color:var(--accent);background:var(--accent-soft)}
+.stat .n{font-size:1.4rem;font-weight:700}.stat .l{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:3px}
+.wrap{display:flex;gap:16px;align-items:flex-start}
+.list{flex:0 0 300px;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;max-height:78vh;overflow-y:auto}
+.search{width:100%;border:none;border-bottom:1px solid var(--line);padding:10px 14px;font-family:inherit;font-size:.9rem;outline:none}
+.li{padding:9px 14px;border-bottom:1px solid var(--line);cursor:pointer}
+.li:hover{background:#fafbfc}.li.active{background:var(--accent-soft);border-left:3px solid var(--accent)}
+.li .t{font-weight:600;font-size:.88rem}.li .s{font-size:.76rem;color:var(--muted)}
+.detail{flex:1;min-width:0}
+.grp{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin-bottom:14px}
+.grp h3{font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:var(--accent);border-bottom:1px solid var(--line);padding-bottom:6px;margin-bottom:10px}
+.row{display:flex;padding:4px 0;font-size:.88rem;border-bottom:1px solid #f4f5f6}
+.row .k{flex:0 0 190px;color:var(--muted)}.row .v{flex:1}
+.muted{color:var(--muted);font-style:italic}
+.foot{color:var(--muted);font-size:.75rem;margin-top:16px;border-top:1px solid var(--line);padding-top:10px}
+@media(max-width:760px){.wrap{flex-direction:column}.list{flex:auto;width:100%}}
+</style>
+</head>
+<body>
+<h1>Project History <span class="tag">Mockup — for review</span></h1>
+<p class="lead">Searchable database of completed projects — ground conditions, design, actual production, and commercials. The reference we query on every new bid. Fields the source files didn't contain are marked "not in source."</p>
+<div class="cards" id="cards"></div>
+<div class="wrap">
+  <div class="list"><input class="search" id="search" placeholder="Search project, GC, city…"><div id="listBody"></div></div>
+  <div class="detail" id="detail"></div>
+</div>
+<div class="foot" id="foot"></div>
+<script src="/data/project-history.js"></script>
+<script>
+(function(){
+  var D=window.PF_PROJECT_HISTORY; if(!D){document.body.insertAdjacentHTML('beforeend','<p>Data unavailable.</p>');return;}
+  function esc(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  function n(x){return (x==null||x==='')?null:(typeof x==='number'?Math.round(x).toLocaleString():String(x));}
+  function money(x){return x==null?null:'$'+Math.round(x).toLocaleString();}
+  var P=D.projects.slice().sort(function(a,b){return (a.projectNo<b.projectNo?1:-1);});
+  var h=D.headline;
+  document.getElementById('cards').innerHTML=
+    '<div class="stat hl"><div class="n">'+h.projects+'</div><div class="l">Completed Projects</div></div>'+
+    '<div class="stat"><div class="n">'+n(h.totalActualLF)+'</div><div class="l">Total LF Installed</div></div>'+
+    '<div class="stat"><div class="n">'+money(h.totalContractValue)+'</div><div class="l">Total Contract Value</div></div>'+
+    '<div class="stat"><div class="n">'+h.withProduction+' / '+h.withDesign+'</div><div class="l">w/ Production / Design data</div></div>';
+  function val(x,suffix){ x=n(x); return x==null?'<span class="muted">not in source</span>':(esc(x)+(suffix||'')); }
+  function rows(pairs){return pairs.map(function(p){return '<div class="row"><div class="k">'+p[0]+'</div><div class="v">'+p[1]+'</div></div>';}).join('');}
+  function detail(p){
+    var g=p.ground||{},de=p.design||{},a=p.actualProduction||{},c=p.commercial||{},cal=p.calibration||{};
+    var dd=de.designDepths||{};
+    var soil = g.soilSummary ? esc(g.soilSummary) : '<span class="muted">See geotech report ('+esc(g.geotechFirm||'firm n/a')+')</span>';
+    var h='<div class="grp"><h3>'+esc(p.projectNo)+' — '+esc(p.name)+'</h3>'+rows([
+        ['GC',val(p.gc)],['Location',val(p.cityState)],['Building type',val(p.buildingType)],['Year',val(p.year)]])+'</div>';
+    h+='<div class="grp"><h3>Ground Conditions</h3>'+rows([
+        ['Geotech firm',val(g.geotechFirm)],['Soil summary',soil],
+        ['Water table',val(g.waterTableDepth)],['Depth to refusal/rock',val(g.depthToRefusalOrRock)]])+'</div>';
+    h+='<div class="grp"><h3>Design</h3>'+rows([
+        ['Column type',val(de.columnType)],['Diameter',val(de.diameters)],
+        ['Column count',val(de.columnCount)],['Total design LF',val(de.totalDesignLF,' LF')],
+        ['Design depths',val(dd.minBelowWG?(dd.minBelowWG+'–'+dd.maxBelowWG+' ft'):null)],
+        ['Allowable bearing',val(de.bearingCapacityPSF,' psf')],['Allowable settlement',val(de.allowableSettlementIn,' in')]])+'</div>';
+    h+='<div class="grp"><h3>Actual Production (GUHMA)</h3>'+rows([
+        ['Columns installed',val(a.totalColumns)],['Total LF',val(a.totalLF,' LF')],
+        ['Install days',val(a.installDays)],['Columns/day',val(a.colsPerDay)],['LF/day',val(a.lfPerDay)],
+        ['Avg depth',val(a.avgDepthFt,' ft')]])+'</div>';
+    h+='<div class="grp"><h3>Commercial</h3>'+rows([
+        ['Final contract value',val(money(c.finalContractValue))],['Bid price',val(money(c.bidPrice))],
+        ['VSC component (bid)',val(money(c.bidVSCComponent))],['$ / LF',val(c.dollarsPerLF?('$'+c.dollarsPerLF):null)],
+        ['$ / column',val(c.dollarsPerColumn?('$'+c.dollarsPerColumn):null)],['Completed',val(c.completedDate)]])+'</div>';
+    var calNote = cal.designVsSubmittalNotes||p.notes;
+    if(cal.bidVsActualLF!=null || calNote){
+      h+='<div class="grp"><h3>Calibration</h3>'+rows([
+        ['Bid vs actual LF',val(cal.bidVsActualLF!=null?(cal.bidVsActualLF+' LF'):null)],
+        ['Notes',calNote?esc(calNote):'<span class="muted">—</span>']])+'</div>';
+    }
+    return h;
+  }
+  function renderList(filter){
+    filter=(filter||'').toLowerCase();
+    var f=P.filter(function(p){return !filter || (p.projectNo+' '+p.name+' '+(p.gc||'')+' '+(p.cityState||'')).toLowerCase().indexOf(filter)>=0;});
+    document.getElementById('listBody').innerHTML=f.map(function(p,i){
+      return '<div class="li" data-no="'+esc(p.projectNo)+'"><div class="t">'+esc(p.projectNo)+' · '+esc(p.name)+'</div><div class="s">'+esc(p.gc||'')+' — '+esc(p.cityState||'')+'</div></div>';
+    }).join('') || '<div class="li"><span class="muted">No matches</span></div>';
+    Array.prototype.forEach.call(document.querySelectorAll('.li[data-no]'),function(el){
+      el.onclick=function(){select(el.getAttribute('data-no'));};
+    });
+    if(f.length) select(f[0].projectNo);
+  }
+  function select(no){
+    var p=P.find(function(x){return x.projectNo===no;}); if(!p)return;
+    Array.prototype.forEach.call(document.querySelectorAll('.li'),function(e){e.classList.toggle('active',e.getAttribute('data-no')===no);});
+    document.getElementById('detail').innerHTML=detail(p);
+  }
+  document.getElementById('search').oninput=function(){renderList(this.value);};
+  document.getElementById('foot').textContent='Source: completed-project folders (geotech, design, submittal) + GUHMA logs + project master · '+D.count+' projects · Generated '+D.generated+' · Maintained by Peter';
+  renderList('');
+})();
+</script>
+</body>
+</html>
