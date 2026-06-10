@@ -125,7 +125,7 @@ window.PF_PRODUCTION = {
     }
   ],
   "southwark": {
-    "project": "26-007 - Southwark Metals (active)",
+    "project": "26-005 - Southwark Metals (active)",
     "byday": [
       {
         "date": "2026-06-04",
@@ -158,7 +158,7 @@ window.PF_PRODUCTION = {
     {
       "rank": 1,
       "date": "2026-06-08",
-      "project": "26-007 - Southwark Metals",
+      "project": "26-005 - Southwark Metals",
       "cols": 140,
       "lf": 2645,
       "active": true
@@ -166,7 +166,7 @@ window.PF_PRODUCTION = {
     {
       "rank": 2,
       "date": "2026-06-09",
-      "project": "26-007 - Southwark Metals",
+      "project": "26-005 - Southwark Metals",
       "cols": 130,
       "lf": 2280,
       "active": true
@@ -182,7 +182,7 @@ window.PF_PRODUCTION = {
     {
       "rank": 4,
       "date": "2026-06-05",
-      "project": "26-007 - Southwark Metals",
+      "project": "26-005 - Southwark Metals",
       "cols": 121,
       "lf": 2121,
       "active": true
