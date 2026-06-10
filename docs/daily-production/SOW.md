@@ -41,3 +41,12 @@
 **Self-check (no browser, per standing rule):** ran the page's exact render logic in `node` against the real data — confirmed 5 rows, strictly descending, correct values, 2 active-job rows flagged, #1 styled. All passed.
 
 **Deploy:** `wrangler pages deploy .` from inside a clean copy of `platform/` → pf-platform (Compiled Worker + Functions bundle OK). Pushed to repo branch `website-build-20260609`.
+
+---
+
+## v1.2 — Double-count correction (2026-06-10, Jonathan caught it)
+**Issue:** Jonathan flagged Terre Haute (25-016) showing 658 columns; real count is ~329. Root cause: `aggregate.py` used `columns_installed = len(rows)` (counted parsed .guh FILES, not unique columns). Three projects had multiple files per column: Terre Haute 1.99x, Grand Vista 1.44x, Fostoria 1.40x (most projects were 1.00x and unaffected).
+**Fix:** Re-aggregated `production-history.json` and regenerated `data/production-data.js` counting UNIQUE columns per (project, date), LF = sum of max-depth per unique column.
+**Impact:** Terre Haute 658->331 cols. Headline 3,451->3,001 cols, 47,907->41,301 LF, LF/day 1,019->879. **Top-5 corrected: the inflated Terre Haute days dropped out and Southwark 6/8 (2,645 LF) is now the true #1 all-time record day** — Jonathan was right that Monday was record-breaking.
+**Self-check:** node render of corrected data — 5 rows, strictly descending, #1 = Southwark 6/8, Terre Haute = 331. Passed.
+**Follow-up:** fix `aggregate.py` line 34 to `len(set(col))` so future re-runs don't reintroduce the double-count.
