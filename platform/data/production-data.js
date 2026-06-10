@@ -8,7 +8,7 @@ window.PF_PRODUCTION = {
     "lfPerDay": 879,
     "colsPerDay": 63.9,
     "minLfDay": 525,
-    "maxLfDay": 2645
+    "maxLfDay": 1879
   },
   "projects": [
     {
