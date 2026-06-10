@@ -145,3 +145,10 @@ window.PF_PRODUCTION = {
     ]
   }
 };
+
+
+/* --- All-time top production days + current Southwark (added 2026-06-10, Peter) --- */
+window.PF_PRODUCTION.topDays = [{"rank": 1, "date": "2025-06-12", "project": "25-016 - Terre Haute Airport Hanger - Hannig", "cols": 178, "lf": 2786, "active": false}, {"rank": 2, "date": "2026-06-08", "project": "26-007 - Southwark Metals", "cols": 140, "lf": 2646, "active": true}, {"rank": 3, "date": "2025-06-13", "project": "25-016 - Terre Haute Airport Hanger - Hannig", "cols": 174, "lf": 2593, "active": false}, {"rank": 4, "date": "2026-06-09", "project": "26-007 - Southwark Metals", "cols": 130, "lf": 2280, "active": true}, {"rank": 5, "date": "2026-04-16", "project": "26-003 - The Canopy - PrideOne", "cols": 143, "lf": 2206, "active": false}];
+window.PF_PRODUCTION.southwark.byday = [{"date": "2026-06-04", "cols": 72, "lf": 1330}, {"date": "2026-06-05", "cols": 121, "lf": 2121}, {"date": "2026-06-06", "cols": 51, "lf": 960}, {"date": "2026-06-08", "cols": 140, "lf": 2646}, {"date": "2026-06-09", "cols": 130, "lf": 2280}];
+window.PF_PRODUCTION.headline.maxLfDay = 2786;
+window.PF_PRODUCTION.headline.minLfDay = 525; /* curated min, excludes partial/mobilization days */

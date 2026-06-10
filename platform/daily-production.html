@@ -34,6 +34,9 @@ tr:last-child td{border-bottom:none}
 <p class="lead">Crew production by project and by day, from GUHMA install logs. Headline rates feed scheduling and estimating. Active jobs update as each day's columns are checked.</p>
 <div class="cards" id="cards"></div>
 
+<h2>Top 5 Production Days <span style="font-weight:400;font-size:.82rem;color:var(--muted)">— all-time, ranked by LF installed</span></h2>
+<table><thead><tr><th>Rank</th><th>Date</th><th>Project</th><th class="num">Columns</th><th class="num">LF Installed</th></tr></thead><tbody id="topDaysBody"></tbody></table>
+
 <h2>Active Job — Southwark Metals (26-005)</h2>
 <table><thead><tr><th>Install Date</th><th class="num">Columns</th><th class="num">LF</th><th class="num">Avg / column</th></tr></thead><tbody id="swBody"></tbody></table>
 
@@ -54,6 +57,16 @@ tr:last-child td{border-bottom:none}
     '<div class="card hl"><div class="n">'+h.colsPerDay+'</div><div class="l">Columns / Day</div><div class="s">blended avg</div></div>'+
     '<div class="card"><div class="n">'+n(h.lf)+'</div><div class="l">Total LF Installed</div><div class="s">'+h.projects+' projects</div></div>'+
     '<div class="card"><div class="n">'+n(h.cols)+'</div><div class="l">Columns Installed</div><div class="s">over '+h.days+' install-days</div></div>';
+  // Top 5 production days (all-time, by LF)
+  if(P.topDays){
+    document.getElementById('topDaysBody').innerHTML = P.topDays.map(function(d){
+      var dt = new Date(d.date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+      var hl = d.active ? ' style="background:var(--accent-soft)"' : '';
+      var tag = d.active ? ' <span class="tag">active job</span>' : '';
+      var rk = d.rank===1 ? '<td style="font-weight:700;color:#9a6a06">1</td>' : '<td>'+d.rank+'</td>';
+      return '<tr'+hl+'>'+rk+'<td>'+dt+'</td><td>'+d.project+tag+'</td><td class="num">'+d.cols+'</td><td class="num">'+n(d.lf)+'</td></tr>';
+    }).join('');
+  }
   // Southwark
   var sw=P.southwark, swTot={cols:0,lf:0};
   document.getElementById('swBody').innerHTML = sw.byday.map(function(d){
