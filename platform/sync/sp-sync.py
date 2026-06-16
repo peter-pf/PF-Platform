@@ -38,7 +38,7 @@ DRIVE_ID = os.environ.get("SP_DRIVE_ID", "")
 FILES = {
     "bid_log": "016ISVH6Y7M7KQIB5C5FDLNKI5H3IZFXRK",
     "project_master": "016ISVH64J5UAFQWEW6NC3FJBZVMTVLLX6",
-    "estimate_template": "016ISVH63NJBJ4O6UAUBGJ66O246RALYBJ",
+    "estimate_template": "016ISVH663FGSAGIO5URDLAGAONDPYEBFZ",
     "bd_master": "016ISVH67CTBZWYBZMDREITDFK2XCIWMKM",
     "production_calcs": "016ISVH6Y5EAOIMTDZL5D2IGNUKRZ7LFAC",
     "project_readiness": "016ISVH6Z7SPMXRXECJZALGGG5UEGBVKJU",
@@ -345,7 +345,13 @@ def main():
     print("\nDownloading from SharePoint...")
     bid_log_path = download_file(token, FILES["bid_log"], "Project_Bid_Log.xlsx")
     project_master_path = download_file(token, FILES["project_master"], "PF_Project_Master.xlsx")
-    estimate_path = download_file(token, FILES["estimate_template"], "Master_Budget_Estimate_Template.xlsm")
+    # Estimate template is non-fatal: if it's renamed/moved (404), keep the last good
+    # estimate-template.json and let the rest of the portal data refresh succeed.
+    try:
+        estimate_path = download_file(token, FILES["estimate_template"], "Master_Budget_Estimate_Template.xlsm")
+    except Exception as e:
+        print(f"  WARN: estimate template download failed ({e}); keeping existing estimate-template.json")
+        estimate_path = None
     bd_path = download_file(token, FILES["bd_master"], "PF_BD_Master.xlsm")
 
     # Extract data from all 4
@@ -357,9 +363,15 @@ def main():
     project_data = extract_project_master(project_master_path)
     print(f"  {len(project_data['projects'])} projects, {len(project_data['cost_codes'])} cost codes")
 
-    print("Extracting estimate template...")
-    estimate_data = extract_estimate_template(estimate_path)
-    print(f"  {len(estimate_data['line_items'])} line items, {len(estimate_data['oh_items'])} OH items")
+    estimate_data = None
+    if estimate_path:
+        print("Extracting estimate template...")
+        try:
+            estimate_data = extract_estimate_template(estimate_path)
+            print(f"  {len(estimate_data['line_items'])} line items, {len(estimate_data['oh_items'])} OH items")
+        except Exception as e:
+            print(f"  WARN: estimate template extract failed ({e}); keeping existing estimate-template.json")
+            estimate_data = None
 
     print("Extracting BD master...")
     bd_data = extract_bd_master(bd_path)
@@ -376,9 +388,12 @@ def main():
         json.dump(project_data, f, indent=2, default=str)
     print(f"  Wrote: data/project-master.json")
 
-    with open(os.path.join(OUTPUT_DIR, "estimate-template.json"), "w") as f:
-        json.dump(estimate_data, f, indent=2, default=str)
-    print(f"  Wrote: data/estimate-template.json")
+    if estimate_data is not None:
+        with open(os.path.join(OUTPUT_DIR, "estimate-template.json"), "w") as f:
+            json.dump(estimate_data, f, indent=2, default=str)
+        print(f"  Wrote: data/estimate-template.json")
+    else:
+        print(f"  Skipped: data/estimate-template.json (kept existing)")
 
     with open(os.path.join(OUTPUT_DIR, "bd-master.json"), "w") as f:
         json.dump(bd_data, f, indent=2, default=str)
