@@ -891,6 +891,17 @@ window.esc = function(v) {
       '<span style="font-weight:500;color:#8A6D00">' + (note ? window.esc(note) : 'Illustrative — not live SharePoint data') + '</span>' +
       '</div>';
   };
+
+  // Green companion badge for modules that DO render live SharePoint-synced data.
+  window.liveBadge = function (note) {
+    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;' +
+      'padding:6px 12px;border:1px solid #9FD6A9;background:#EEF8EF;border-radius:6px;' +
+      'font-size:0.72rem;color:#1E6B33;font-weight:600">' +
+      '<span style="display:inline-block;padding:1px 7px;border-radius:3px;background:#2E8B45;' +
+      'color:#fff;letter-spacing:0.03em">LIVE DATA</span>' +
+      '<span style="font-weight:500;color:#1E6B33">' + (note ? window.esc(note) : 'Live SharePoint-synced data') + '</span>' +
+      '</div>';
+  };
 })();
 </script>
 
@@ -2793,8 +2804,12 @@ try {
 (function () {
   'use strict';
 
-  // ---- SUPPLIER DATA (from Jonathan's Bid Log) ----
-  const SUPPLIERS = [
+  // ---- SUPPLIER DATA ----
+  // Live source: LIVE_STONE_COSTS (SharePoint-synced, schema stone_rate/haul_rate/tax/total).
+  // Falls back to this hand-entered list (from Jonathan's Bid Log) only if the live
+  // global is missing. The "Average" summary row and any row without a state are
+  // dropped (they are computed rollups, not selectable suppliers).
+  const SUPPLIERS_FALLBACK = [
     { supplier: 'Heidelberg',          city: 'Fort Wayne',      state: 'IN', stoneRate: 17.00, haulRate:  5.00, tax: 1.54, total: 23.54 },
     { supplier: 'Heidelberg',          city: 'Castleton',       state: 'IN', stoneRate: 21.00, haulRate: 12.10, tax: 2.32, total: 35.42 },
     { supplier: 'Heidelberg',          city: 'Downtown Indy',   state: 'IN', stoneRate: 21.00, haulRate:  7.95, tax: 2.03, total: 30.98 },
@@ -2813,6 +2828,35 @@ try {
     { supplier: '(unknown)',           city: 'Robinson',        state: 'IL', stoneRate: 17.00, haulRate: 11.00, tax: 1.96, total: 29.96 },
     { supplier: 'Martin Marietta',     city: 'Liberty',         state: 'NC', stoneRate: 35.00, haulRate:  0.00, tax: 2.45, total: 37.45 },
   ];
+
+  // Prefer the live SharePoint-synced stone costs. Map snake_case -> the shape the
+  // renderer already expects, and drop the "Average" rollup / any row missing a state.
+  var SUPPLIERS;
+  var SUPPLIERS_IS_LIVE = false;
+  (function () {
+    var live = (typeof window !== 'undefined' && Array.isArray(window.LIVE_STONE_COSTS))
+      ? window.LIVE_STONE_COSTS : null;
+    if (live && live.length) {
+      var mapped = live
+        .filter(function (s) {
+          return s && s.state && s.city &&
+                 String(s.supplier || '').toLowerCase() !== 'average';
+        })
+        .map(function (s) {
+          return {
+            supplier:  s.supplier,
+            city:      String(s.city || '').trim(),
+            state:     s.state,
+            stoneRate: Number(s.stone_rate) || 0,
+            haulRate:  Number(s.haul_rate) || 0,
+            tax:       Number(s.tax) || 0,
+            total:     Number(s.total) || 0
+          };
+        });
+      if (mapped.length) { SUPPLIERS = mapped; SUPPLIERS_IS_LIVE = true; }
+    }
+    if (!SUPPLIERS) { SUPPLIERS = SUPPLIERS_FALLBACK; }
+  })();
 
   // Stone consumption from POET prelim design
   const TONS_PER_LF = 0.209;
@@ -2875,7 +2919,12 @@ try {
       return 0;
     });
 
-    app.innerHTML = buildSummary(stats) +
+    var badge = SUPPLIERS_IS_LIVE
+      ? window.liveBadge('Stone costs are live SharePoint-synced supplier quotes (LIVE_STONE_COSTS)')
+      : window.sampleBadge('Stone costs are illustrative — live source unavailable');
+
+    app.innerHTML = badge +
+      buildSummary(stats) +
       buildFilterBar() +
       buildTable(sorted, cheapByState) +
       buildEstimator();
