@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crew Scheduling</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f6f7f8; --card:#fff; --ink:#1c1f23; --muted:#6b7178; --line:#e6e8eb;
+  --accent:#f59e0b; --accent-soft:#fef3e2; --accent-deep:#9a6a06;
+  --alert:#b42318; --alert-soft:#fbe4e2; --ok:#1a7f55; --ok-soft:#e3f5ec;
+  --lane:#fafbfc; --bar:#3c4450; --bar-muted:#aab1ba; --grid:#eef0f2; --today:#1c1f23;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5;padding:24px}
+h1{font-size:1.5rem;font-weight:700}
+.lead{color:var(--muted);margin:6px 0 18px;max-width:90ch}
+.tag{display:inline-block;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--accent-deep);background:var(--accent-soft);padding:2px 8px;border-radius:5px;margin-left:8px;vertical-align:middle}
+h2{font-size:1.05rem;font-weight:700;margin:30px 0 12px;border-bottom:2px solid var(--accent);padding-bottom:6px}
+h2 .sub{font-weight:400;font-size:.8rem;color:var(--muted);margin-left:6px}
+
+/* TOOLBAR */
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:16px}
+.btn{font:inherit;font-size:.82rem;font-weight:600;border:1px solid var(--line);background:#fff;color:var(--ink);padding:7px 14px;border-radius:7px;cursor:pointer;transition:background .12s,border-color .12s}
+.btn:hover{background:#f2f3f5}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#1c1f23}
+.btn.primary:hover{background:#e08c05}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.save-state{font-size:.78rem;color:var(--muted);margin-left:auto}
+.save-state.dirty{color:var(--accent-deep);font-weight:600}
+.save-state.saved{color:var(--ok);font-weight:600}
+.save-state.error{color:var(--alert);font-weight:600}
+.src-badge{font-size:.7rem;font-weight:600;padding:2px 8px;border-radius:5px}
+.src-badge.kv{background:var(--ok-soft);color:var(--ok)}
+.src-badge.seed{background:var(--accent-soft);color:var(--accent-deep)}
+
+/* KPI CARDS */
+.cards{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:15px 18px;min-width:160px}
+.card .n{font-size:1.6rem;font-weight:700;line-height:1.1}
+.card .l{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:4px}
+.card .s{font-size:.76rem;color:var(--muted);margin-top:3px}
+.card.alert{border-color:var(--alert);background:var(--alert-soft)}
+.card.alert .n{color:var(--alert)}
+
+/* GANTT */
+.gantt-wrap{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.gantt-scroll{overflow-x:auto}
+.gantt{position:relative;min-width:900px}
+.g-months,.g-weeks{display:flex;border-bottom:1px solid var(--line)}
+.g-corner{flex:0 0 240px;border-right:1px solid var(--line);background:#fafbfc}
+.g-month{flex:1;text-align:center;font-size:.74rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:7px 0;border-left:1px solid var(--line)}
+.g-week{flex:1;text-align:center;font-size:.66rem;color:var(--muted);padding:4px 0;border-left:1px solid var(--grid)}
+.g-week:first-child{border-left:none}
+.lane-row{display:flex;border-bottom:1px solid var(--line)}
+.lane-row:last-child{border-bottom:none}
+.lane-label{flex:0 0 240px;border-right:1px solid var(--line);padding:10px 14px;background:var(--lane);position:relative}
+.lane-label.inactive{background:repeating-linear-gradient(45deg,#fafbfc,#fafbfc 8px,#f2f3f5 8px,#f2f3f5 16px)}
+.lane-label .crew{font-weight:700;font-size:.92rem}
+.lane-label .meta{font-size:.72rem;color:var(--muted);margin-top:2px}
+.lane-label .badge{display:inline-block;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:1px 7px;border-radius:4px;margin-top:6px}
+.lane-label .badge.on{background:var(--accent-soft);color:var(--accent-deep)}
+.lane-label .badge.off{background:#eef0f2;color:var(--muted)}
+.lane-track{position:relative;flex:1;min-height:74px}
+.grid-line{position:absolute;top:0;bottom:0;width:1px;background:var(--grid)}
+.today-line{position:absolute;top:0;bottom:0;width:2px;background:var(--today);z-index:5}
+.today-flag{position:absolute;top:0;transform:translateX(-50%);background:var(--today);color:#fff;font-size:.6rem;font-weight:700;padding:1px 6px;border-radius:0 0 4px 4px;white-space:nowrap;z-index:6}
+/* job/mobilization bar */
+.bar{position:absolute;height:26px;border-radius:5px;display:flex;align-items:center;padding:0 8px;font-size:.72rem;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;cursor:grab;box-shadow:0 1px 2px rgba(0,0,0,.12);user-select:none;touch-action:none}
+.bar:active{cursor:grabbing}
+.bar.dragging{z-index:20;opacity:.92;box-shadow:0 4px 14px rgba(0,0,0,.28)}
+.bar .lbl{overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+.bar.b-completed{background:var(--bar-muted)}
+.bar.b-finalized{background:var(--bar)}
+.bar.b-loi{background:#5a6470}
+.bar.b-likely{background:#7a828c}
+.bar.b-running{background:#aab1ba;color:#1c1f23}
+.bar.is-done{background:#cdd2d8 !important;color:#6b7178 !important;text-decoration:line-through;cursor:default;box-shadow:none;opacity:.85}
+.bar.conflict{outline:2px solid var(--alert);outline-offset:1px;box-shadow:0 0 0 3px var(--alert-soft)}
+/* per-bar action chips appear on hover */
+.bar .acts{position:absolute;right:2px;top:-20px;display:none;gap:3px}
+.bar:hover .acts{display:flex}
+.chip{font-size:.6rem;font-weight:700;background:#1c1f23;color:#fff;border:none;border-radius:4px;padding:2px 5px;cursor:pointer;pointer-events:auto;opacity:.92}
+.chip:hover{opacity:1;background:var(--accent);color:#1c1f23}
+.mk{position:absolute;width:0;height:0;z-index:4;pointer-events:none}
+.mk-mob{font-size:.78rem;line-height:1;color:var(--accent-deep);font-weight:700}
+.mk-stake{font-size:.74rem;line-height:1;color:var(--accent-deep)}
+.empty-note{padding:14px;color:var(--muted);font-size:.82rem}
+
+.legend{display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin:10px 2px 0;font-size:.74rem;color:var(--muted)}
+.legend .sw{display:inline-block;width:16px;height:11px;border-radius:3px;margin-right:5px;vertical-align:middle}
+.legend .item{display:flex;align-items:center}
+
+#tip{position:fixed;z-index:50;pointer-events:none;background:#1c1f23;color:#fff;font-size:.74rem;line-height:1.45;padding:9px 11px;border-radius:7px;max-width:280px;box-shadow:0 6px 20px rgba(0,0,0,.25);opacity:0;transition:opacity .1s}
+#tip b{color:var(--accent)}
+#tip .row{display:flex;justify-content:space-between;gap:14px}
+#tip .k{color:#aab1ba}
+
+table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:.84rem}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line)}
+th{background:#fafbfc;font-size:.7rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+td.num,th.num{text-align:right}
+tr:last-child td{border-bottom:none}
+.tot{font-weight:700;background:#fafbfc}
+tr.is-completed td{color:var(--muted)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:7px;vertical-align:middle}
+.row-alert td{background:var(--alert-soft)}
+.row-alert td:first-child{box-shadow:inset 3px 0 0 var(--alert)}
+.note{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;padding:12px 16px;margin-top:16px;font-size:.84rem}
+.note.alert{border-left-color:var(--alert)}
+.foot{color:var(--muted);font-size:.74rem;margin-top:24px;border-top:1px solid var(--line);padding-top:10px}
+.muted{color:var(--muted)}
+
+/* modal (split / edit) */
+.modal-back{position:fixed;inset:0;background:rgba(28,31,35,.45);display:none;align-items:center;justify-content:center;z-index:80}
+.modal-back.open{display:flex}
+.modal{background:#fff;border-radius:12px;padding:22px 24px;width:380px;max-width:92vw;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.modal h3{font-size:1rem;margin-bottom:4px}
+.modal .sub{color:var(--muted);font-size:.8rem;margin-bottom:16px}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin-bottom:4px}
+.field input{width:100%;font:inherit;font-size:.86rem;padding:8px 10px;border:1px solid var(--line);border-radius:7px}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+</style>
+</head>
+<body>
+<h1>Crew Scheduling <span class="tag">Editable draft</span></h1>
+<p class="lead">Crew-based schedule and the single source of truth for crew dates. Drag a bar to change its start (snaps to day, the end recomputes from working days on a Mon-Sat week). Mark a mobilization done to grey it out and drop it from conflict checks. Split a project into a second mobilization for return trips. Save to persist for everyone.</p>
+
+<div class="toolbar">
+  <button class="btn primary" id="saveBtn" disabled>Save schedule</button>
+  <button class="btn" id="reloadBtn">Reload saved</button>
+  <span class="src-badge" id="srcBadge">loading...</span>
+  <span class="save-state" id="saveState">Loading schedule...</span>
+</div>
+
+<div class="cards" id="kpiCards"></div>
+
+<h2>Crew Timeline <span class="sub" id="windowLabel"></span></h2>
+<div class="gantt-wrap">
+  <div class="gantt-scroll"><div class="gantt" id="gantt"></div></div>
+</div>
+<div class="legend" id="legend"></div>
+
+<h2>Conflicts <span class="sub">— same crew, overlapping dates (done mobilizations excluded)</span></h2>
+<div id="conflictArea"></div>
+
+<h2>Capacity <span class="sub">— scheduled demand vs available crew-days in the window</span></h2>
+<div id="capacityArea"></div>
+
+<h2>Status Buckets <span class="sub">— LF and column rollups (awarded + probable)</span></h2>
+<table id="bucketTable">
+  <thead><tr><th>Bucket</th><th class="num">Jobs</th><th class="num">Total LF</th><th class="num">Columns</th><th class="num">Value</th></tr></thead>
+  <tbody id="bucketBody"></tbody>
+</table>
+
+<h2>Unscheduled <span class="sub">— awarded/probable, no active mobilization with a date</span></h2>
+<div id="unschedArea"></div>
+
+<div class="foot" id="foot"></div>
+<div id="tip"></div>
+
+<!-- split / edit modal -->
+<div class="modal-back" id="modalBack">
+  <div class="modal">
+    <h3 id="modalTitle">Add mobilization</h3>
+    <div class="sub" id="modalSub"></div>
+    <div class="field"><label>Label</label><input id="mLabel" type="text" maxlength="80"></div>
+    <div class="field"><label>Start date</label><input id="mStart" type="date"></div>
+    <div class="field"><label>Working days (Mon-Sat)</label><input id="mDays" type="number" min="1" max="200"></div>
+    <div class="field"><label>Columns</label><input id="mCols" type="number" min="0" max="100000"></div>
+    <div class="modal-actions">
+      <button class="btn" id="modalCancel">Cancel</button>
+      <button class="btn primary" id="modalSave">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- Fallback seed: used only if /api/schedule has no stored state and is unreachable. -->
+<script src="/data/schedule-seed.js"></script>
+<script>
+(function(){
+  "use strict";
+  // ---------- helpers ----------
+  function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+  var DAY=86400000;
+  function d(s){return new Date(s+'T00:00:00');}
+  // M3: a date string is valid only if it round-trips to a real calendar date.
+  function validDate(s){
+    if(!s||!/^\d{4}-\d{2}-\d{2}$/.test(s))return false;
+    var dt=new Date(s+'T00:00:00');
+    if(isNaN(dt.getTime()))return false;
+    return iso(dt)===s; // rejects 2026-13-99 / 2026-02-31 rollovers
+  }
+  function iso(dt){var y=dt.getFullYear(),m=String(dt.getMonth()+1).padStart(2,'0'),da=String(dt.getDate()).padStart(2,'0');return y+'-'+m+'-'+da;}
+  function n(x){return (x==null||isNaN(x))?'--':Math.round(x).toLocaleString();}
+  function money(x){return (x==null)?'--':'$'+Math.round(x).toLocaleString();}
+  function fmt(dt){return dt.toLocaleDateString('en-US',{month:'short',day:'numeric'});}
+  function addDays(dt,k){return new Date(dt.getTime()+k*DAY);}
+  function isSunday(dt){return dt.getDay()===0;}
+  function prevWorkday(dt){var c=addDays(dt,-1);while(isSunday(c))c=addDays(c,-1);return c;}
+  // working-day -> calendar end (inclusive). Mon-Sat count, skip Sunday.
+  function workEnd(startIso,workDays){
+    if(!startIso||!workDays||workDays<=0)return startIso;
+    var cur=d(startIso),counted=0;
+    while(true){ if(!isSunday(cur)){counted++; if(counted>=workDays)return iso(cur);} cur=addDays(cur,1); }
+  }
+
+  // ---------- state ----------
+  var STATE=null;        // {version,jobs,crews,meta}
+  var SOURCE='';         // 'kv' | 'seed'
+  var dirty=false;
+
+  function setDirty(v){
+    dirty=v;
+    var ss=document.getElementById('saveState');
+    var sb=document.getElementById('saveBtn');
+    if(v){ss.textContent='Unsaved changes';ss.className='save-state dirty';sb.disabled=false;}
+    else {sb.disabled=true;}
+  }
+
+  // ---------- load ----------
+  function applyState(state,source){
+    STATE=state; SOURCE=source;
+    var badge=document.getElementById('srcBadge');
+    if(source==='kv'){badge.textContent='Saved state (KV)';badge.className='src-badge kv';}
+    else{badge.textContent='Seed (not yet saved)';badge.className='src-badge seed';}
+    setDirty(false);
+    document.getElementById('saveState').textContent = source==='kv' ? 'Loaded saved schedule' : 'Loaded seed schedule';
+    document.getElementById('saveState').className='save-state';
+    document.getElementById('saveBtn').disabled = (source==='kv');
+    render();
+  }
+
+  function loadSeedFallback(){
+    var seed = window.SCHEDULE_SEED || null;
+    if(!seed){document.body.insertAdjacentHTML('beforeend','<p class="empty-note">Schedule data unavailable.</p>');return;}
+    applyState(JSON.parse(JSON.stringify(seed)),'seed');
+  }
+
+  function load(){
+    document.getElementById('saveState').textContent='Loading schedule...';
+    fetch('/api/schedule',{headers:{'Accept':'application/json'},credentials:'same-origin'})
+      .then(function(r){return r.ok?r.json():Promise.reject(r.status);})
+      .then(function(j){
+        if(j && j.seeded && j.state){ applyState(j.state,'kv'); }
+        else { loadSeedFallback(); }
+      })
+      .catch(function(){ loadSeedFallback(); });
+  }
+
+  // ---------- save ----------
+  function save(){
+    if(!STATE)return;
+    var ss=document.getElementById('saveState');
+    var sb=document.getElementById('saveBtn');
+    sb.disabled=true; ss.textContent='Saving...'; ss.className='save-state';
+    fetch('/api/schedule',{
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      credentials:'same-origin',
+      body:JSON.stringify(STATE)
+    })
+    .then(function(r){return r.json().then(function(b){return {status:r.status,ok:r.ok,b:b};});})
+    .then(function(res){
+      // LOW-1: another editor saved since we loaded -> do NOT clobber.
+      if(res.status===409){
+        ss.textContent='Schedule changed since you loaded it — reload before saving';ss.className='save-state error';
+        sb.disabled=false; return;
+      }
+      if(res.ok && res.b && res.b.saved){
+        // H1/M1: re-apply the server's NORMALIZED echoed state so in-memory STATE
+        // exactly matches what was stored (no UI/KV drift). Includes the new
+        // version stamp used for the next concurrency check.
+        if(res.b.state){ applyState(res.b.state,'kv'); }
+        ss.textContent='Saved '+new Date().toLocaleTimeString();ss.className='save-state saved';
+        setDirty(false);
+      } else {
+        ss.textContent='Save failed: '+(res.b&&res.b.message?res.b.message:'unknown');ss.className='save-state error';
+        sb.disabled=false;
+      }
+    })
+    .catch(function(){ ss.textContent='Save failed: network/endpoint unavailable';ss.className='save-state error';sb.disabled=false; });
+  }
+
+  // ---------- derive scheduled "segments" from state ----------
+  // A mobilization becomes a draggable BAR if it has a VALID start date.
+  // C2: work_days is read as max(1,...) everywhere (bar length, demand, KPI) so
+  //     there is never a 0-vs-1 disagreement with the server/modal.
+  // M3: a mob with an invalid date is skipped as a bar (won't NaN the render)
+  //     and surfaced in the undated list so it stays editable.
+  // C1: a mob that is DONE but has NO/invalid start must not vanish -- it goes
+  //     into the undated list with an Undo control so it can be toggled back.
+  function segments(){
+    var segs=[];
+    STATE.jobs.forEach(function(j){
+      (j.mobilizations||[]).forEach(function(m,mi){
+        if(!validDate(m.start))return;
+        var wd=Math.max(1,m.work_days||1);
+        var end=workEnd(m.start,wd);
+        segs.push({job:j,mob:m,mobIndex:mi,start:m.start,end:end,workDays:wd,
+          done:(j.done||m.done),crew:j.crew});
+      });
+    });
+    return segs;
+  }
+  // Mobs that have no bar (no valid start) but still exist -- including done ones
+  // -- so they remain visible and controllable. Each entry can be toggled.
+  function undatedMobs(){
+    var list=[];
+    STATE.jobs.forEach(function(j){
+      (j.mobilizations||[]).forEach(function(m,mi){
+        if(!validDate(m.start)) list.push({job:j,mob:m,mobIndex:mi});
+      });
+    });
+    return list;
+  }
+  // A project is "unscheduled" (for the Unscheduled table) only if it has NO
+  // dated bar at all and is not done.
+  function isUnscheduled(j){
+    var hasDated=(j.mobilizations||[]).some(function(m){return validDate(m.start);});
+    return !hasDated;
+  }
+
+  // ---------- render ----------
+  var GEO=null; // {minD,maxD,totalDays,nWeeks,pct}
+  function render(){
+    var segs=segments();
+    var bucketMeta={}; (STATE.meta.buckets||[]).forEach(function(b){bucketMeta[b.id]=b;});
+
+    // window
+    var minD=null,maxD=null;
+    segs.forEach(function(sg){var s=d(sg.start),e=d(sg.end);if(!minD||s<minD)minD=s;if(!maxD||e>maxD)maxD=e;});
+    var today=new Date();today.setHours(0,0,0,0);
+    if(!minD){minD=maxD=today;}
+    if(today<minD)minD=today; if(today>maxD)maxD=today;
+    minD=addDays(minD,-6); maxD=addDays(maxD,6);
+    while(minD.getDay()!==1)minD=addDays(minD,-1);
+    var totalDays=Math.round((maxD-minD)/DAY)+1;
+    var nWeeks=Math.ceil(totalDays/7);
+    function pct(dt){return ((dt-minD)/DAY)/totalDays*100;}
+    GEO={minD:minD,maxD:maxD,totalDays:totalDays,nWeeks:nWeeks,pct:pct};
+    document.getElementById('windowLabel').textContent='— '+fmt(minD)+' to '+fmt(maxD)+' ('+totalDays+' days)';
+
+    // conflicts: exclude done segments
+    function overlap(a,b){return d(a.start)<=d(b.end)&&d(b.start)<=d(a.end);}
+    var conflictable=segs.filter(function(sg){return !sg.done && sg.crew && bucketOf(sg.job)!=='completed';});
+    var conflictPairs=[],conflictSet={};
+    for(var i=0;i<conflictable.length;i++)for(var k=i+1;k<conflictable.length;k++){
+      var A=conflictable[i],B=conflictable[k];
+      if(A.crew&&A.crew===B.crew&&overlap(A,B)){
+        conflictPairs.push([A,B]);
+        conflictSet[segKey(A)]=true;conflictSet[segKey(B)]=true;
+      }
+    }
+    function inConflict(sg){return !!conflictSet[segKey(sg)];}
+
+    // ----- gantt -----
+    var g=document.getElementById('gantt'); g.innerHTML='';
+    var months=[],cur=new Date(minD);
+    while(cur<=maxD){var key=cur.getFullYear()+'-'+cur.getMonth();var label=cur.toLocaleDateString('en-US',{month:'short',year:'numeric'});var last=months[months.length-1];if(last&&last.key===key)last.days++;else months.push({key:key,label:label,days:1});cur=addDays(cur,1);}
+    var monthsHtml='<div class="g-corner"></div>';
+    months.forEach(function(m){monthsHtml+='<div class="g-month" style="flex:'+m.days+'">'+esc(m.label)+'</div>';});
+    g.insertAdjacentHTML('beforeend','<div class="g-months">'+monthsHtml+'</div>');
+    var weeksHtml='<div class="g-corner"></div>';
+    for(var w=0;w<nWeeks;w++){var ws=addDays(minD,w*7);weeksHtml+='<div class="g-week">'+esc(fmt(ws))+'</div>';}
+    g.insertAdjacentHTML('beforeend','<div class="g-weeks">'+weeksHtml+'</div>');
+
+    function trackDecor(track){
+      for(var w=1;w<nWeeks;w++){var gl=document.createElement('div');gl.className='grid-line';gl.style.left=(w*7/totalDays*100)+'%';track.appendChild(gl);}
+      if(today>=minD&&today<=maxD){var tl=document.createElement('div');tl.className='today-line';tl.style.left=pct(today)+'%';track.appendChild(tl);}
+    }
+
+    (STATE.crews||[]).forEach(function(crew){
+      var row=document.createElement('div');row.className='lane-row';
+      var laneSegs=segs.filter(function(sg){return sg.crew===crew.id;});
+      var badge=crew.active?'<span class="badge on">Active</span>':'<span class="badge off">From '+esc(crew.activeFrom)+'</span>';
+      row.innerHTML='<div class="lane-label'+(crew.active?'':' inactive')+'">'
+        +'<div class="crew">'+esc(crew.lead)+'</div>'
+        +'<div class="meta">'+esc(crew.equipmentSet)+'</div>'
+        +'<div class="meta">'+esc(crew.men)+' men &middot; '+laneSegs.length+' mobs</div>'
+        +badge+'</div>';
+      var track=document.createElement('div');track.className='lane-track';
+      trackDecor(track);
+
+      // stack to avoid overlap
+      var rows=[];
+      laneSegs.sort(function(a,b){return d(a.start)-d(b.start);});
+      laneSegs.forEach(function(sg){
+        var placed=false;
+        for(var r=0;r<rows.length;r++){
+          var fits=rows[r].every(function(o){return d(sg.start)>d(o.end)||d(sg.end)<d(o.start);});
+          if(fits){rows[r].push(sg);sg._row=r;placed=true;break;}
+        }
+        if(!placed){sg._row=rows.length;rows.push([sg]);}
+      });
+      var rowH=40,padTop=10;
+      track.style.minHeight=(rows.length*rowH+padTop+10)+'px';
+
+      laneSegs.forEach(function(sg){
+        var s=d(sg.start),e=d(sg.end);
+        var left=pct(s),width=Math.max(((e-s)/DAY+1)/totalDays*100,1.2);
+        var top=padTop+sg._row*rowH;
+        var bar=document.createElement('div');
+        bar.className='bar b-'+bucketOf(sg.job)+(sg.done?' is-done':'')+(inConflict(sg)?' conflict':'');
+        bar.style.left=left+'%';bar.style.width=width+'%';bar.style.top=top+'px';
+        var label=sg.job.name+( (sg.job.mobilizations.length>1)?(' — '+sg.mob.label):'' );
+        bar.innerHTML='<span class="lbl">'+esc(label)+'</span>'
+          +'<span class="acts">'
+            +'<button class="chip" data-act="done">'+(sg.done?'Undone':'Done')+'</button>'
+            +'<button class="chip" data-act="split">Split</button>'
+          +'</span>';
+        bar._seg=sg;
+        attachTip(bar,sg,inConflict(sg),bucketMeta);
+        if(!sg.done) attachDrag(bar,sg);
+        attachChips(bar,sg);
+        track.appendChild(bar);
+
+        // mob marker (only if active segment)
+        if(!sg.done){
+          var mob=document.createElement('div');mob.className='mk mk-mob';
+          mob.style.left='calc('+left+'% - 4px)';mob.style.top=(top-12)+'px';mob.textContent='✕';track.appendChild(mob);
+          var stk=prevWorkday(s);
+          if(stk>=minD){var sm=document.createElement('div');sm.className='mk mk-stake';sm.style.left='calc('+pct(stk)+'% + 1px)';sm.style.top=(top-12)+'px';sm.textContent='△';track.appendChild(sm);}
+        }
+      });
+
+      if(laneSegs.length===0){
+        var en=document.createElement('div');en.className='empty-note';en.style.position='relative';en.style.zIndex='2';
+        en.textContent=crew.active?'No mobilizations assigned.':'Crew not active yet — add jobs once online.';
+        track.appendChild(en);
+      }
+      row.appendChild(track);g.appendChild(row);
+    });
+    if(today>=minD&&today<=maxD){
+      var firstTrack=g.querySelector('.lane-track');
+      if(firstTrack){var tf=document.createElement('div');tf.className='today-flag';tf.style.left=pct(today)+'%';tf.textContent='TODAY';tf.style.zIndex='7';firstTrack.appendChild(tf);}
+    }
+
+    renderLegend();
+    renderKpis(segs,conflictPairs);
+    renderConflicts(conflictPairs);
+    renderCapacity(segs,minD,maxD);
+    renderBuckets(bucketMeta);
+    renderUnscheduled(bucketMeta);
+    renderFoot();
+  }
+
+  function bucketOf(job){ return (job.done)?'completed':(job.bucket||'running'); }
+  function segKey(sg){return (sg.job.id||sg.job.name)+'#'+sg.mobIndex;}
+
+  function renderLegend(){
+    var legendDefs=[['b-finalized','Contract Finalized'],['b-loi','Verbal / LOI'],['b-likely','Likely Award'],['b-running','In the Running'],['b-completed','Completed / Done']];
+    var lh=legendDefs.map(function(L){var c={'b-finalized':'var(--bar)','b-loi':'#5a6470','b-likely':'#7a828c','b-running':'#aab1ba','b-completed':'var(--bar-muted)'}[L[0]];return '<span class="item"><span class="sw" style="background:'+c+'"></span>'+L[1]+'</span>';}).join('');
+    lh+='<span class="item"><span class="sw" style="background:#fff;outline:2px solid var(--alert);outline-offset:-1px"></span>Conflict</span>';
+    lh+='<span class="item" style="color:var(--accent-deep);font-weight:700">✕ Mob/Demob</span>';
+    lh+='<span class="item" style="color:var(--accent-deep)">△ Staking/Layout</span>';
+    document.getElementById('legend').innerHTML=lh;
+  }
+
+  function renderKpis(segs,conflictPairs){
+    var activeCrews=(STATE.crews||[]).filter(function(c){return c.active;}).length;
+    var activeSegs=segs.filter(function(sg){return !sg.done;});
+    // C2: demand uses the SAME clamped workDays (>=1) that the bar length uses.
+    var totalDemand=activeSegs.reduce(function(a,sg){return a+(sg.workDays||1);},0);
+    var doneCount=segs.filter(function(sg){return sg.done;}).length;
+    var html=''
+      +'<div class="card"><div class="n">'+activeSegs.length+'</div><div class="l">Active Mobilizations</div><div class="s">'+doneCount+' done</div></div>'
+      +'<div class="card"><div class="n">'+activeCrews+'</div><div class="l">Active Crews</div><div class="s">of '+(STATE.crews||[]).length+' defined</div></div>'
+      +'<div class="card"><div class="n">'+n(totalDemand)+'</div><div class="l">Scheduled Job-Days</div><div class="s">working days of demand</div></div>'
+      +'<div class="card'+(conflictPairs.length?' alert':'')+'"><div class="n">'+conflictPairs.length+'</div><div class="l">Schedule Conflicts</div><div class="s">'+(conflictPairs.length?'needs sequencing':'clear')+'</div></div>';
+    document.getElementById('kpiCards').innerHTML=html;
+  }
+
+  function renderConflicts(conflictPairs){
+    var ca=document.getElementById('conflictArea');
+    if(conflictPairs.length===0){ca.innerHTML='<div class="note">No overlapping active mobilizations in any crew lane.</div>';return;}
+    var rows=conflictPairs.map(function(p){
+      var A=p[0],B=p[1];var crew=(STATE.crews||[]).filter(function(c){return c.id===A.crew;})[0];
+      var os=Math.max(d(A.start),d(B.start)),oe=Math.min(d(A.end),d(B.end));var od=Math.round((oe-os)/DAY)+1;
+      function nm(sg){return sg.job.name+(sg.job.mobilizations.length>1?(' ('+sg.mob.label+')'):'');}
+      // #7: two overlapping mobs of the SAME project still conflict (one crew
+      // can't run both at once) -- label them clearly as same-project mobs.
+      var sameJob=(A.job===B.job);
+      return '<tr class="row-alert"><td>'+esc(crew?crew.lead:A.crew)+(sameJob?' <span class="tag" style="margin-left:0">same project</span>':'')+'</td>'
+        +'<td>'+esc(nm(A))+'<div class="muted" style="font-size:.74rem">'+fmt(d(A.start))+'–'+fmt(d(A.end))+'</div></td>'
+        +'<td>'+esc(nm(B))+'<div class="muted" style="font-size:.74rem">'+fmt(d(B.start))+'–'+fmt(d(B.end))+'</div></td>'
+        +'<td class="num">'+od+' day'+(od===1?'':'s')+'</td></tr>';
+    }).join('');
+    ca.innerHTML='<table><thead><tr><th>Crew</th><th>Mob A</th><th>Mob B</th><th class="num">Overlap</th></tr></thead><tbody>'+rows+'</tbody></table>'
+      +'<div class="note alert"><b>'+conflictPairs.length+' overlap'+(conflictPairs.length===1?'':'s')+' in one crew lane.</b> Drag a bar to resequence, mark a mobilization done, or bring a second crew online.</div>';
+  }
+
+  function renderCapacity(segs,minD,maxD){
+    var cap=document.getElementById('capacityArea');
+    function workdaysBetween(a,b){var c=new Date(a),cnt=0;while(c<=b){if(!isSunday(c))cnt++;c=addDays(c,1);}return cnt;}
+    var anyOver=false;
+    var capRows=(STATE.crews||[]).map(function(crew){
+      var laneSegs=segs.filter(function(sg){return sg.crew===crew.id&&!sg.done;});
+      // C2: same clamped workDays as the bar (>=1) -> no 0-vs-1 capacity mismatch.
+      var demand=laneSegs.reduce(function(a,sg){return a+(sg.workDays||1);},0);
+      var winStart=new Date(Math.max(minD,d(crew.activeFrom)));
+      var avail=crew.active?workdaysBetween(winStart>maxD?maxD:winStart,maxD):0;
+      var util=avail>0?Math.round(demand/avail*100):(demand>0?999:0);
+      var over=crew.active&&demand>avail; if(over)anyOver=true;
+      return '<tr'+(over?' class="row-alert"':'')+'><td>'+esc(crew.lead)+(crew.active?'':' <span class="muted">(inactive)</span>')+'</td>'
+        +'<td class="num">'+demand+'</td><td class="num">'+(crew.active?avail:'—')+'</td>'
+        +'<td class="num">'+(crew.active?util+'%':'—')+'</td>'
+        +'<td>'+(over?'<b style="color:var(--alert)">OVER-BOOKED</b>':(crew.active?'OK':'Not online'))+'</td></tr>';
+    }).join('');
+    cap.innerHTML='<table><thead><tr><th>Crew</th><th class="num">Demand (job-days)</th><th class="num">Available (work-days)</th><th class="num">Utilization</th><th>Status</th></tr></thead><tbody>'+capRows+'</tbody></table>';
+    if(anyOver){cap.insertAdjacentHTML('beforeend','<div class="note alert"><b>Add-a-crew signal.</b> Active demand exceeds one lane’s capacity in this window. Flip a crew’s <code>active</code> flag and rebalance mobilizations to the new lane.</div>');}
+  }
+
+  function renderBuckets(bucketMeta){
+    var order=(STATE.meta.buckets||[]).map(function(b){return b.id;});
+    // H2: a done job rolls up under 'completed'. Guarantee that bucket exists in
+    // the aggregation AND in the display order regardless of meta.buckets, so a
+    // done job's LF/columns/value is NEVER silently excluded from the totals.
+    if(order.indexOf('completed')===-1)order.unshift('completed');
+    var agg={};order.forEach(function(b){agg[b]={jobs:0,lf:0,cols:0,val:0};});
+    STATE.jobs.forEach(function(j){var b=bucketOf(j);var a=agg[b];if(!a){a=agg[b]={jobs:0,lf:0,cols:0,val:0};order.push(b);}a.jobs++;a.lf+=(j.lf||0);a.cols+=(j.columns||0);a.val+=(j.value||0);});
+    var colorOf={completed:'var(--bar-muted)',finalized:'var(--bar)',loi:'#5a6470',likely:'#7a828c',running:'#aab1ba'};
+    var bb=document.getElementById('bucketBody');var tot={jobs:0,lf:0,cols:0,val:0};
+    bb.innerHTML=order.map(function(b){
+      var a=agg[b];tot.jobs+=a.jobs;tot.lf+=a.lf;tot.cols+=a.cols;tot.val+=a.val;
+      var cls=b==='completed'?' class="is-completed"':'';
+      var bm=bucketMeta[b]||(b==='completed'?{label:'Projects Completed',awarded:true}:{label:b,awarded:false});
+      return '<tr'+cls+'><td><span class="dot" style="background:'+colorOf[b]+'"></span>'+esc(bm.label)+(bm.awarded?'':' <span class="muted" style="font-size:.72rem">(probable)</span>')+'</td>'
+        +'<td class="num">'+a.jobs+'</td><td class="num">'+n(a.lf)+'</td><td class="num">'+n(a.cols)+'</td><td class="num">'+money(a.val)+'</td></tr>';
+    }).join('')
+      +'<tr class="tot"><td>Overall</td><td class="num">'+tot.jobs+'</td><td class="num">'+n(tot.lf)+'</td><td class="num">'+n(tot.cols)+'</td><td class="num">'+money(tot.val)+'</td></tr>';
+    var awarded={lf:0,cols:0,val:0},probable={lf:0,cols:0,val:0};
+    STATE.jobs.forEach(function(j){var bid=bucketOf(j);
+      var m=bucketMeta[bid]||(bid==='completed'?{awarded:true}:null);
+      if(!m)return; // unknown probable-side bucket -> not counted (matches table)
+      var t=m.awarded?awarded:probable;t.lf+=(j.lf||0);t.cols+=(j.columns||0);t.val+=(j.value||0);});
+    var old=document.getElementById('awProbNote'); if(old)old.remove();
+    document.getElementById('bucketTable').insertAdjacentHTML('afterend',
+      '<div class="note" id="awProbNote"><b>Awarded</b> (completed + finalized + LOI): '+n(awarded.lf)+' LF &middot; '+money(awarded.val)
+      +' &nbsp;|&nbsp; <b>Probable</b> (likely + in the running): '+n(probable.lf)+' LF &middot; '+money(probable.val)+'.</div>');
+  }
+
+  function renderUnscheduled(bucketMeta){
+    var un=STATE.jobs.filter(function(j){return isUnscheduled(j)&&!j.done;});
+    var ua=document.getElementById('unschedArea');
+    var html='';
+    if(un.length===0){html+='<div class="note">All awarded/probable jobs have a dated mobilization.</div>';}
+    else{
+      html+='<table><thead><tr><th>Project</th><th>Location</th><th>Bucket</th><th class="num">LF</th><th class="num">Columns</th><th class="num">Value</th></tr></thead><tbody>'
+        +un.map(function(j){var bm=bucketMeta[bucketOf(j)];return '<tr><td>'+esc(j.name)+'</td><td>'+esc(j.city_state||'—')+'</td><td>'+esc(bm?bm.label:bucketOf(j))+'</td><td class="num">'+n(j.lf)+'</td><td class="num">'+n(j.columns)+'</td><td class="num">'+money(j.value)+'</td></tr>';}).join('')
+        +'</tbody></table>';
+    }
+    // C1: mobs without a valid date (including DONE ones) stay visible AND
+    // controllable here so a done+undated mob can always be toggled back, and an
+    // undated mob can be given a date via Edit. Never silently invisible.
+    var um=undatedMobs();
+    if(um.length){
+      html+='<div style="margin-top:14px"><b style="font-size:.84rem">Mobilizations without a date</b>'
+        +'<div class="muted" style="font-size:.76rem;margin:2px 0 8px">No bar shown (no/invalid start). Set a date or toggle done. Controls keep them editable.</div>'
+        +'<table><thead><tr><th>Project</th><th>Mobilization</th><th class="num">Columns</th><th>State</th><th>Actions</th></tr></thead><tbody>'
+        +um.map(function(u,ix){
+          var doneTxt=u.mob.done?'<span style="color:var(--ok);font-weight:600">Done</span>':'<span class="muted">Open</span>';
+          return '<tr><td>'+esc(u.job.name)+'</td><td>'+esc(u.mob.label||'—')+'</td><td class="num">'+n(u.mob.columns)+'</td><td>'+doneTxt+'</td>'
+            +'<td><button class="btn umtoggle" data-um="'+ix+'" style="padding:3px 10px;font-size:.74rem">'+(u.mob.done?'Mark open':'Mark done')+'</button> '
+            +'<button class="btn umdate" data-um="'+ix+'" style="padding:3px 10px;font-size:.74rem">Set date</button></td></tr>';
+        }).join('')
+        +'</tbody></table></div>';
+    }
+    ua.innerHTML=html;
+    // wire undated-mob controls (event handlers, not inline) against current list
+    var listRef=um;
+    ua.querySelectorAll('.umtoggle').forEach(function(btn){
+      btn.addEventListener('click',function(){
+        var u=listRef[parseInt(btn.getAttribute('data-um'),10)];if(!u)return;
+        u.mob.done=!u.mob.done;
+        u.job.done=(u.job.mobilizations||[]).every(function(m){return m.done;});
+        setDirty(true);render();
+      });
+    });
+    ua.querySelectorAll('.umdate').forEach(function(btn){
+      btn.addEventListener('click',function(){
+        var u=listRef[parseInt(btn.getAttribute('data-um'),10)];if(!u)return;
+        openEditMob(u.job,u.mobIndex);
+      });
+    });
+  }
+
+  function renderFoot(){
+    document.getElementById('foot').innerHTML='Source: '+esc(STATE.meta.source||'KV store')+' &middot; Work week: '+esc(STATE.meta.work_week||'Mon-Sat')+' &middot; '+(STATE.meta.updated?('Updated '+esc(STATE.meta.updated)):'')+' &middot; Editable source of truth (Save persists for all)';
+  }
+
+  // ---------- tooltip ----------
+  var tip=document.getElementById('tip');
+  function attachTip(el,sg,conflict,bucketMeta){
+    var j=sg.job;var crew=(STATE.crews||[]).filter(function(c){return c.id===j.crew;})[0];
+    el.addEventListener('mousemove',function(ev){
+      if(el.classList.contains('dragging'))return;
+      var bm=bucketMeta[bucketOf(j)];
+      tip.innerHTML='<b>'+esc(j.name)+'</b> <span style="color:#aab1ba">('+esc(j.number)+')</span><br>'
+        +'<span class="muted">'+esc(j.city_state||'')+(j.gc_name?' &middot; '+esc(j.gc_name):'')+'</span>'
+        +'<div class="row"><span class="k">Mobilization</span><span>'+esc(sg.mob.label)+(sg.done?' (done)':'')+'</span></div>'
+        +'<div class="row"><span class="k">Dates</span><span>'+fmt(d(sg.start))+' – '+fmt(d(sg.end))+' ('+esc(sg.workDays)+' wd)</span></div>'
+        +'<div class="row"><span class="k">Cols this mob</span><span>'+n(sg.mob.columns)+'</span></div>'
+        +'<div class="row"><span class="k">LF / Cols total</span><span>'+n(j.lf)+' / '+n(j.columns)+'</span></div>'
+        +'<div class="row"><span class="k">Crew / Men</span><span>'+(crew?esc(crew.lead)+' / '+esc(crew.men):'—')+'</span></div>'
+        +'<div class="row"><span class="k">Value</span><span>'+money(j.value)+'</span></div>'
+        +'<div class="row"><span class="k">Status</span><span>'+esc(bm?bm.label:bucketOf(j))+'</span></div>'
+        +(conflict?'<div style="color:#ff8a7a;margin-top:4px;font-weight:600">⚠ Crew conflict</div>':'')
+        +'<div style="color:#aab1ba;margin-top:4px;font-size:.7rem">Drag to move &middot; hover for Done / Split</div>';
+      var x=ev.clientX+14,y=ev.clientY+14;
+      if(x+290>window.innerWidth)x=ev.clientX-290; if(y+200>window.innerHeight)y=ev.clientY-200;
+      tip.style.left=x+'px';tip.style.top=y+'px';tip.style.opacity='1';
+    });
+    el.addEventListener('mouseleave',function(){tip.style.opacity='0';});
+  }
+
+  // ---------- drag to change start (snap to day) ----------
+  function attachDrag(bar,sg){
+    bar.addEventListener('pointerdown',function(ev){
+      if(ev.target.classList&&ev.target.classList.contains('chip'))return; // chip clicks not drags
+      ev.preventDefault();
+      var track=bar.parentNode; var trackW=track.getBoundingClientRect().width;
+      var pxPerDay=trackW/GEO.totalDays;
+      var startX=ev.clientX; var origStart=d(sg.start); var moved=false;
+      bar.classList.add('dragging'); tip.style.opacity='0';
+      bar.setPointerCapture(ev.pointerId);
+      function move(e){
+        var dx=e.clientX-startX; var dDays=Math.round(dx/pxPerDay);
+        if(dDays!==0)moved=true;
+        var newStart=addDays(origStart,dDays);
+        var leftPct=GEO.pct(newStart);
+        bar.style.left=leftPct+'%';
+        bar.querySelector('.lbl').textContent=fmt(newStart)+'  '+sg.job.name;
+      }
+      function up(e){
+        bar.releasePointerCapture(ev.pointerId);
+        bar.classList.remove('dragging');
+        bar.removeEventListener('pointermove',move);
+        bar.removeEventListener('pointerup',up);
+        if(moved){
+          var dx=e.clientX-startX; var dDays=Math.round(dx/pxPerDay);
+          if(dDays!==0){
+            var newStart=iso(addDays(origStart,dDays));
+            sg.mob.start=newStart;
+            setDirty(true);
+          }
+        }
+        render(); // recompute end/window/conflicts
+      }
+      bar.addEventListener('pointermove',move);
+      bar.addEventListener('pointerup',up);
+    });
+  }
+
+  // ---------- chips: mark done / split ----------
+  function attachChips(bar,sg){
+    bar.querySelectorAll('.chip').forEach(function(ch){
+      ch.addEventListener('click',function(ev){
+        ev.stopPropagation();
+        var act=ch.getAttribute('data-act');
+        if(act==='done'){
+          sg.mob.done=!sg.mob.done;
+          // if all mobs done -> mark project done; else not.
+          var allDone=(sg.job.mobilizations||[]).every(function(m){return m.done;});
+          sg.job.done=allDone;
+          setDirty(true);render();
+        } else if(act==='split'){
+          openSplit(sg.job);
+        }
+      });
+    });
+  }
+
+  // ---------- split / edit modal ----------
+  var modalCtx=null; // {job, mode:'add'|'edit', mobIndex?}
+  function openSplit(job){
+    modalCtx={job:job,mode:'add'};
+    document.getElementById('modalTitle').textContent='Add mobilization';
+    document.getElementById('modalSub').textContent=job.name;
+    var last=(job.mobilizations||[])[job.mobilizations.length-1];
+    var defStart=(last&&validDate(last.start))?iso(addDays(d(last.start),14)):iso(new Date());
+    document.getElementById('mLabel').value='Mobilization '+((job.mobilizations||[]).length+1);
+    document.getElementById('mStart').value=defStart;
+    document.getElementById('mDays').value=2;
+    document.getElementById('mCols').value=0;
+    document.getElementById('modalSave').textContent='Add';
+    document.getElementById('modalBack').classList.add('open');
+  }
+  // C1: edit an existing mobilization (e.g. give an undated/done mob a real date).
+  function openEditMob(job,mobIndex){
+    var m=(job.mobilizations||[])[mobIndex]; if(!m)return;
+    modalCtx={job:job,mode:'edit',mobIndex:mobIndex};
+    document.getElementById('modalTitle').textContent='Edit mobilization';
+    document.getElementById('modalSub').textContent=job.name;
+    document.getElementById('mLabel').value=m.label||'Mobilization';
+    document.getElementById('mStart').value=validDate(m.start)?m.start:iso(new Date());
+    document.getElementById('mDays').value=Math.max(1,m.work_days||1);
+    document.getElementById('mCols').value=Math.max(0,m.columns||0);
+    document.getElementById('modalSave').textContent='Save';
+    document.getElementById('modalBack').classList.add('open');
+  }
+  function closeModal(){document.getElementById('modalBack').classList.remove('open');modalCtx=null;}
+  document.getElementById('modalCancel').addEventListener('click',closeModal);
+  document.getElementById('modalBack').addEventListener('click',function(e){if(e.target.id==='modalBack')closeModal();});
+  document.getElementById('modalSave').addEventListener('click',function(){
+    if(!modalCtx)return;
+    var label=document.getElementById('mLabel').value.replace(/[<>]/g,'').slice(0,80)||'Mobilization';
+    var start=document.getElementById('mStart').value;
+    var wd=Math.max(1,Math.min(200,parseInt(document.getElementById('mDays').value,10)||1));
+    var cols=Math.max(0,parseInt(document.getElementById('mCols').value,10)||0);
+    if(!validDate(start)){alert('Please enter a valid calendar date.');return;}
+    if(modalCtx.mode==='edit'){
+      var m=modalCtx.job.mobilizations[modalCtx.mobIndex];
+      m.start=start;m.work_days=wd;m.columns=cols;m.label=label;
+    } else {
+      modalCtx.job.mobilizations.push({start:start,work_days:wd,columns:cols,label:label,done:false});
+    }
+    // a fresh-dated/added active mob means the project is not necessarily done;
+    // recompute from all mobs.
+    modalCtx.job.done=(modalCtx.job.mobilizations||[]).every(function(mm){return mm.done;});
+    setDirty(true);closeModal();render();
+  });
+
+  // ---------- toolbar ----------
+  document.getElementById('saveBtn').addEventListener('click',save);
+  document.getElementById('reloadBtn').addEventListener('click',function(){
+    if(dirty&&!confirm('Discard unsaved changes and reload the saved schedule?'))return;
+    load();
+  });
+  window.addEventListener('beforeunload',function(e){if(dirty){e.preventDefault();e.returnValue='';}});
+
+  // ---------- go ----------
+  load();
+})();
+</script>
+</body>
+</html>

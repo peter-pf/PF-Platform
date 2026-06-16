@@ -1,0 +1,543 @@
+/* GENERATED seed fallback for the editable scheduler -- KV is authoritative once seeded. */
+window.SCHEDULE_SEED = {
+  "version": 1,
+  "jobs": [
+    {
+      "id": "26-002",
+      "number": "26-002",
+      "name": "POET",
+      "crew": "crew-1",
+      "bucket": "finalized",
+      "status_raw": "Subcontract FE",
+      "city_state": "Shelbyville, IN",
+      "gc_name": "POET Design & Construction, Inc.",
+      "lf": 17003,
+      "columns": 1865,
+      "feed": "Top",
+      "value": 343037.07,
+      "mobilizations": [
+        {
+          "start": "2026-04-06",
+          "work_days": 4,
+          "columns": 1865,
+          "label": "Mobilization 1",
+          "done": false
+        }
+      ],
+      "done": false
+    },
+    {
+      "id": "26-001",
+      "number": "26-001",
+      "name": "WPAFB - Visiting Quarters",
+      "crew": "crew-1",
+      "bucket": "finalized",
+      "status_raw": "Subcontract FE",
+      "city_state": "Wright Patterson Air Force Base, OH",
+      "gc_name": "Messer Construction Co.",
+      "lf": 6435,
+      "columns": 556,
+      "feed": "Top",
+      "value": 140700,
+      "mobilizations": [
+        {
+          "start": "2026-06-01",
+          "work_days": 6,
+          "columns": 556,
+          "label": "Mobilization 1",
+          "done": false
+        }
+      ],
+      "done": false
+    },
+    {
+      "id": "26-005",
+      "number": "26-005",
+      "name": "Southwark Metals",
+      "crew": "crew-1",
+      "bucket": "completed",
+      "status_raw": "Subcontract FE",
+      "city_state": "Hernando, MS",
+      "gc_name": "The Peterson Company",
+      "lf": 8973,
+      "columns": 514,
+      "feed": "Top",
+      "value": 291749,
+      "mobilizations": [
+        {
+          "start": "2026-06-01",
+          "work_days": 5,
+          "columns": 514,
+          "label": "Mobilization 1",
+          "done": false
+        }
+      ],
+      "done": false
+    },
+    {
+      "id": "26-007",
+      "number": "26-007",
+      "name": "Madison Style District Parking Garage",
+      "crew": "crew-1",
+      "bucket": "finalized",
+      "status_raw": "Subcontract FE",
+      "city_state": "South Bend, IN",
+      "gc_name": "FA Wilhelm",
+      "lf": 11351,
+      "columns": 680,
+      "feed": "Top",
+      "value": 327021,
+      "mobilizations": [
+        {
+          "start": "2026-05-11",
+          "work_days": 10,
+          "columns": 680,
+          "label": "Mobilization 1",
+          "done": true
+        },
+        {
+          "start": "2026-06-22",
+          "work_days": 2,
+          "columns": 120,
+          "label": "Utility relocation return",
+          "done": false
+        }
+      ],
+      "done": false
+    },
+    {
+      "id": "26-008",
+      "number": "26-008",
+      "name": "INAW Terre Haute WTF GAC Addition",
+      "crew": "crew-1",
+      "bucket": "finalized",
+      "status_raw": "Sent Signed Copy back, need FE",
+      "city_state": "Terre Haute, IN",
+      "gc_name": "Reynolds Construction, LLC",
+      "lf": 3158,
+      "columns": 159,
+      "feed": "Top",
+      "value": 91700,
+      "mobilizations": [
+        {
+          "start": "2026-06-18",
+          "work_days": 4,
+          "columns": 159,
+          "label": "Mobilization 1",
+          "done": false
+        }
+      ],
+      "done": false
+    },
+    {
+      "id": "26-009",
+      "number": "26-009",
+      "name": "International School of IN - New International Plaza",
+      "crew": "crew-1",
+      "bucket": "finalized",
+      "status_raw": "Sent Signed Copy back, need FE, & CO B4 Mob",
+      "city_state": "Indianapolis, IN",
+      "gc_name": "Gilliatte General Constructors",
+      "lf": 800,
+      "columns": 40,
+      "feed": "Top",
+      "value": 96700,
+      "mobilizations": [
+        {
+          "start": "2026-06-18",
+          "work_days": 2,
+          "columns": 40,
+          "label": "Mobilization 1",
+          "done": false
+        }
+      ],
+      "done": false
+    },
+    {
+      "id": "26-010",
+      "number": "26-010",
+      "name": "Founders Park II",
+      "crew": "crew-1",
+      "bucket": "finalized",
+      "status_raw": "Subcontract FE",
+      "city_state": "Columbus, OH",
+      "gc_name": "Daimler",
+      "lf": 2060,
+      "columns": 206,
+      "feed": "Top",
+      "value": 70915,
+      "mobilizations": [
+        {
+          "start": "2026-06-22",
+          "work_days": 2,
+          "columns": 206,
+          "label": "Mobilization 1",
+          "done": false
+        }
+      ],
+      "done": false
+    },
+    {
+      "id": "26-011",
+      "number": "26-011",
+      "name": "Indy Housing Hub",
+      "crew": "crew-1",
+      "bucket": "finalized",
+      "status_raw": "Subcontract FE",
+      "city_state": "Indianapolis, IN",
+      "gc_name": "Shiel Sexton",
+      "lf": 2564,
+      "columns": 243,
+      "feed": "Top",
+      "value": 69700,
+      "mobilizations": [
+        {
+          "start": "2026-06-27",
+          "work_days": 2,
+          "columns": 243,
+          "label": "Mobilization 1",
+          "done": false
+        }
+      ],
+      "done": false
+    },
+    {
+      "id": "26-012",
+      "number": "26-012",
+      "name": "Warrick Place",
+      "crew": "crew-1",
+      "bucket": "loi",
+      "status_raw": "LOI Received, released for shops",
+      "city_state": "Indianapolis, IN",
+      "gc_name": "Flaherty & Collins",
+      "lf": 1800,
+      "columns": 180,
+      "feed": "Top",
+      "value": 99200,
+      "mobilizations": [
+        {
+          "start": "2026-07-01",
+          "work_days": 2,
+          "columns": 180,
+          "label": "Mobilization 1",
+          "done": false
+        }
+      ],
+      "done": false
+    },
+    {
+      "id": "26-014",
+      "number": "26-014",
+      "name": "TPS Dayton",
+      "crew": "crew-1",
+      "bucket": "loi",
+      "status_raw": "LOI Received, released for shops",
+      "city_state": "Dayton, OH",
+      "gc_name": "Brackett Builders Inc.",
+      "lf": 2140,
+      "columns": 214,
+      "feed": "Top",
+      "value": 62700,
+      "mobilizations": [],
+      "done": false
+    },
+    {
+      "id": "26-015",
+      "number": "26-015",
+      "name": "Schaff CPA",
+      "crew": "crew-1",
+      "bucket": "loi",
+      "status_raw": "LOI Received, released for shops",
+      "city_state": "Westfield, IN",
+      "gc_name": "Patterson Horth Inc.",
+      "lf": 1062,
+      "columns": 76,
+      "feed": "Top",
+      "value": 56700,
+      "mobilizations": [],
+      "done": false
+    },
+    {
+      "id": "26-016",
+      "number": "26-016",
+      "name": "Filager Campus II",
+      "crew": "crew-1",
+      "bucket": "loi",
+      "status_raw": "LOI Received, not released for shops",
+      "city_state": "Batavia, OH",
+      "gc_name": "Graybach, LLC",
+      "lf": 1779,
+      "columns": 125,
+      "feed": "Top",
+      "value": 75700,
+      "mobilizations": [
+        {
+          "start": "2026-08-01",
+          "work_days": 2,
+          "columns": 125,
+          "label": "Mobilization 1",
+          "done": false
+        }
+      ],
+      "done": false
+    },
+    {
+      "id": "26-013",
+      "number": "26-013",
+      "name": "Park & Poplar",
+      "crew": "crew-1",
+      "bucket": "running",
+      "status_raw": "",
+      "city_state": "Westfield, IN",
+      "gc_name": "Old Town",
+      "lf": 13397,
+      "columns": 1044,
+      "feed": "Top",
+      "value": 398500,
+      "mobilizations": [
+        {
+          "start": "2026-08-15",
+          "work_days": 15,
+          "columns": 1044,
+          "label": "Mobilization 1",
+          "done": false
+        }
+      ],
+      "done": false
+    },
+    {
+      "id": "25-026",
+      "number": "25-026",
+      "name": "The Granary",
+      "crew": "crew-1",
+      "bucket": "loi",
+      "status_raw": "Signed LOI",
+      "city_state": "Noblesville, IN",
+      "gc_name": "Flaherty & Collins",
+      "lf": 15584,
+      "columns": 1349,
+      "feed": "Top",
+      "value": 326200,
+      "mobilizations": [
+        {
+          "start": "2026-08-20",
+          "work_days": 14,
+          "columns": 1349,
+          "label": "Mobilization 1",
+          "done": false
+        }
+      ],
+      "done": false
+    },
+    {
+      "id": "26-017",
+      "number": "26-017",
+      "name": "Molto Canal Point Bldg C",
+      "crew": "crew-1",
+      "bucket": "loi",
+      "status_raw": "LOI",
+      "city_state": "Winchester, OH",
+      "gc_name": "Paul Hemmer",
+      "lf": 9690,
+      "columns": 472,
+      "feed": "Top",
+      "value": 239900,
+      "mobilizations": [],
+      "done": false
+    },
+    {
+      "id": "25-022",
+      "number": "25-022",
+      "name": "Benjamin II - Rev 2",
+      "crew": "crew-1",
+      "bucket": "completed",
+      "status_raw": "Contract FE",
+      "city_state": "Franklinton, OH",
+      "gc_name": "Elford, Inc.",
+      "lf": null,
+      "columns": null,
+      "feed": null,
+      "value": 53702,
+      "mobilizations": [
+        {
+          "start": "2026-01-20",
+          "work_days": 1,
+          "columns": 0,
+          "label": "Mobilization 1",
+          "done": false
+        }
+      ],
+      "done": false
+    },
+    {
+      "id": "25-027",
+      "number": "25-027",
+      "name": "IU project",
+      "crew": "crew-1",
+      "bucket": "completed",
+      "status_raw": "Subcontract FE",
+      "city_state": "Indianapolis, IN",
+      "gc_name": "F.A. Wilhelm Construction",
+      "lf": 9840,
+      "columns": 543,
+      "feed": "Top",
+      "value": 285200,
+      "mobilizations": [
+        {
+          "start": "2026-03-23",
+          "work_days": 10,
+          "columns": 543,
+          "label": "Mobilization 1",
+          "done": false
+        }
+      ],
+      "done": false
+    },
+    {
+      "id": "26-003",
+      "number": "26-003",
+      "name": "The Canopy Apartments",
+      "crew": "crew-1",
+      "bucket": "finalized",
+      "status_raw": "Subcontract FE",
+      "city_state": "Cleveland, OH",
+      "gc_name": "Pride One",
+      "lf": 7222,
+      "columns": 463,
+      "feed": "Top",
+      "value": 155000,
+      "mobilizations": [
+        {
+          "start": "2026-04-13",
+          "work_days": 5,
+          "columns": 463,
+          "label": "Mobilization 1",
+          "done": false
+        }
+      ],
+      "done": false
+    },
+    {
+      "id": "25-015",
+      "number": "25-015",
+      "name": "Stadium Flats",
+      "crew": "crew-1",
+      "bucket": "finalized",
+      "status_raw": "Subcontract FE",
+      "city_state": "South Bend, IN",
+      "gc_name": "Real America, LLC",
+      "lf": 3434,
+      "columns": 341,
+      "feed": "Top",
+      "value": 126179,
+      "mobilizations": [
+        {
+          "start": "2026-04-20",
+          "work_days": 2,
+          "columns": 341,
+          "label": "Mobilization 1",
+          "done": false
+        }
+      ],
+      "done": false
+    },
+    {
+      "id": "26-004",
+      "number": "26-004",
+      "name": "Old National Bank",
+      "crew": "crew-1",
+      "bucket": "finalized",
+      "status_raw": "Subcontract FE",
+      "city_state": "Grand Rapids, MI",
+      "gc_name": "Kalleward",
+      "lf": 952,
+      "columns": 78,
+      "feed": "Top",
+      "value": 57700,
+      "mobilizations": [
+        {
+          "start": "2026-05-11",
+          "work_days": 2,
+          "columns": 78,
+          "label": "Mobilization 1",
+          "done": true
+        }
+      ],
+      "done": true
+    },
+    {
+      "id": "26-006",
+      "number": "26-006",
+      "name": "Battle Creek Fire Station #3",
+      "crew": "crew-1",
+      "bucket": "finalized",
+      "status_raw": "Subcontract FE",
+      "city_state": "Battle Creek, MI",
+      "gc_name": "Schweitzer Inc.",
+      "lf": 1536,
+      "columns": 192,
+      "feed": "Top",
+      "value": 99797,
+      "mobilizations": [
+        {
+          "start": "2026-04-22",
+          "work_days": 2,
+          "columns": 192,
+          "label": "Mobilization 1",
+          "done": false
+        }
+      ],
+      "done": false
+    }
+  ],
+  "crews": [
+    {
+      "id": "crew-1",
+      "lead": "John W",
+      "equipmentSet": "Cat 336 + vibro / 80K excavator / F550",
+      "men": 4,
+      "activeFrom": "2026-01-01",
+      "active": true
+    },
+    {
+      "id": "crew-2",
+      "lead": "TBD",
+      "equipmentSet": "Second rig (planned)",
+      "men": 4,
+      "activeFrom": "2026-12-31",
+      "active": false
+    }
+  ],
+  "meta": {
+    "source": "Seeded from project-master + bid-log, with CEO corrections",
+    "work_week": "Mon-Sat (Sunday off); duration_days are working days",
+    "buckets": [
+      {
+        "id": "completed",
+        "label": "Projects Completed",
+        "awarded": true
+      },
+      {
+        "id": "finalized",
+        "label": "Contract Finalized",
+        "awarded": true
+      },
+      {
+        "id": "loi",
+        "label": "Verbal Award / LOI",
+        "awarded": true
+      },
+      {
+        "id": "likely",
+        "label": "Likely Award (pending call)",
+        "awarded": false
+      },
+      {
+        "id": "running",
+        "label": "In the Running",
+        "awarded": false
+      }
+    ],
+    "seeded": "2026-06-15 18:15 UTC"
+  }
+};

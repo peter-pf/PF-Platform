@@ -749,6 +749,8 @@ table tbody tr:hover {
 <!-- Live data loaded from separate file (blocks + executes before modules) -->
 <script src="/data/live-data.js"></script>
 <script src="/data/projects-data.js"></script>
+<!-- Embedded crew-schedule seed: graceful fallback for the dashboard widgets if /api/schedule is unreachable. Live KV is the source of truth. -->
+<script src="/data/schedule-seed.js"></script>
 <script>
 // ---- CANONICAL HTML ESCAPE HELPER (global, SEC-004 stored-XSS fix) ----
 // Defined at global scope so every inlined module can call window.esc().
@@ -953,6 +955,9 @@ window.esc = function(v) {
       <a class="nav-item" data-module="projecthistory" onclick="showModule('projecthistory')">
         <span class="nav-icon">&#9707;</span> Project History
       </a>
+      <a class="nav-item" data-module="schedule" onclick="showModule('schedule')">
+        <span class="nav-icon">&#128197;</span> Crew Schedule
+      </a>
       <a class="nav-item" data-module="pricing" onclick="showModule('pricing')">
         <span class="nav-icon">&#9878;</span> Stone &amp; Transport Pricing
       </a>
@@ -1013,6 +1018,15 @@ window.esc = function(v) {
       </a>
       <a class="nav-item" data-module="onboarding" onclick="showModule('onboarding')">
         <span class="nav-icon">&#127891;</span> Role Onboarding
+      </a>
+    </div>
+    <div class="nav-section">
+      <div class="nav-section-label" onclick="this.parentElement.classList.toggle('collapsed')">Tools</div>
+      <a class="nav-item" href="/design-studio/" target="_blank" rel="noopener noreferrer" title="Open PF Design Studio in a new tab">
+        <span class="nav-icon">&#9998;</span> Design Studio <span style="opacity:.45;font-size:.75em">&#8599;</span>
+      </a>
+      <a class="nav-item" href="https://trello.com/b/qh7giGys" target="_blank" rel="noopener noreferrer" title="Open the Trello content board in a new tab">
+        <span class="nav-icon">&#9636;</span> Content Board <span style="opacity:.45;font-size:.75em">&#8599;</span>
       </a>
     </div>
   </nav>
@@ -1085,6 +1099,17 @@ document.addEventListener('click', function(e) {
     <!-- Headline KPI tiles -->
     <div class="grid grid-4" id="dashboardStats">
       <!-- Populated by renderDashboard() -->
+    </div>
+
+    <!-- Live crew-schedule summary (reads /api/schedule — one source of truth) -->
+    <div style="margin-top:20px" class="card">
+      <div class="card-header">
+        <span class="card-title" style="cursor:pointer" onclick="showModule('schedule')">Crew Schedule &#8599;</span>
+        <span class="card-subtitle">Live from the scheduler &#8212; click to open</span>
+      </div>
+      <div id="dashScheduleWidget">
+        <div style="color:var(--text-3);padding:8px 0">Loading schedule&#8230;</div>
+      </div>
     </div>
 
     <!-- Upcoming bids (next 7 days) + Active projects -->
@@ -1210,6 +1235,7 @@ document.addEventListener('click', function(e) {
   <div class="module-view" id="mod-projecthistory"><iframe class="doc-frame" data-src="/project-history.html" title="Project History"></iframe></div>
   <div class="module-view" id="mod-pricing"><iframe class="doc-frame" data-src="/pricing.html" data-interactive="1" title="Stone & Transport Pricing"></iframe></div>
   <div class="module-view" id="mod-coochecklist"><iframe class="doc-frame" data-src="/coo-checklist.html" data-interactive="1" title="COO Knowledge Checklist"></iframe></div>
+  <div class="module-view" id="mod-schedule"><iframe class="doc-frame" data-src="/schedule.html" data-interactive="1" title="Crew Schedule"></iframe></div>
   <div class="module-view" id="mod-cheatsheet"><iframe class="doc-frame" data-src="/peter-cheatsheet.html" title="Meet Peter"></iframe></div>
   <div class="module-view" id="mod-onboarding"><iframe class="doc-frame" data-src="/onboarding.html" title="Role Onboarding"></iframe></div>
 
@@ -1282,6 +1308,7 @@ const moduleTitles = {
   modulus: 'Modulus Testing',
   dailyproduction: 'Daily Production',
   projecthistory: 'Project History',
+  schedule: 'Crew Schedule',
   pricing: 'Stone & Transport Pricing',
   proposals: 'Proposals',
   docs: 'Documentation',
@@ -1525,6 +1552,165 @@ function renderDashboard() {
 }
 
 renderDashboard();
+</script>
+
+<script>
+// ---- SHARED: live crew-schedule summary widget (reads /api/schedule) ----
+// One source of truth: the same KV-backed state the full scheduler edits.
+// READ-ONLY here. Surfaces, per crew: current/active job, next mobilization +
+// start date, and utilization (scheduled work-days in the current window).
+// Never throws, never blanks the dashboard: any failure -> embedded seed
+// (window.SCHEDULE_SEED if schedule-seed.js is loaded) -> neutral note.
+(function () {
+  'use strict';
+  var DAY = 86400000;
+  function E(v) { return window.esc(v); } // canonical escape; KV data is untrusted
+  function vDate(s) {
+    if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+    var dt = new Date(s + 'T00:00:00');
+    if (isNaN(dt.getTime())) return false;
+    var y = dt.getFullYear(), m = String(dt.getMonth() + 1).padStart(2, '0'), d = String(dt.getDate()).padStart(2, '0');
+    return (y + '-' + m + '-' + d) === s;
+  }
+  function d(s) { return new Date(s + 'T00:00:00'); }
+  function isSun(dt) { return dt.getDay() === 0; }
+  function fmtDate(s) {
+    if (!vDate(s)) return '--';
+    return d(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+  // working-day -> inclusive calendar end (Mon-Sat, skip Sunday) — matches scheduler
+  function workEnd(startIso, wd) {
+    if (!vDate(startIso) || !wd || wd <= 0) return startIso;
+    var cur = d(startIso), c = 0;
+    while (true) { if (!isSun(cur)) { c++; if (c >= wd) return cur; } cur = new Date(cur.getTime() + DAY); }
+  }
+  function workdaysBetween(a, b) { var c = new Date(a), n = 0; while (c <= b) { if (!isSun(c)) n++; c = new Date(c.getTime() + DAY); } return n; }
+  function addDays(dt, k) { return new Date(dt.getTime() + k * DAY); }
+
+  // Build per-crew summary rows from a {jobs,crews,meta} state object.
+  // Utilization MUST reconcile with schedule.html's Capacity panel, so the
+  // window construction and the demand/avail math below are copied BYTE-FAITHFULLY
+  // from schedule.html: window setup ~L333-339 (min/max over ALL dated segs incl
+  // done, today-merge, -6/+6 pad, snap minD to Monday) and renderCapacity ~L500-505
+  // (lane = non-done segs, demand = sum workDays>=1, winStart = max(minD,activeFrom),
+  // avail = workdaysBetween(min(winStart,maxD),maxD), util = round(demand/avail*100)).
+  function summarize(state) {
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    // collect ALL dated segments (done included) -- the scheduler's segments()
+    // pushes every mob with a valid start regardless of done, and the window
+    // min/max spans them. We must match that or the denominator differs.
+    var segs = [];
+    (state.jobs || []).forEach(function (j) {
+      (j.mobilizations || []).forEach(function (m) {
+        if (!vDate(m.start)) return;
+        var wd = Math.max(1, (+m.work_days || 1));
+        segs.push({ job: j, crew: j.crew, start: m.start, end: workEnd(m.start, wd), wd: wd,
+          done: (j.done || m.done), label: m.label });
+      });
+    });
+
+    // ---- WINDOW (byte-faithful to schedule.html ~L333-339) ----
+    // minD/maxD over ALL dated segs (done included), then merge today, pad -6/+6,
+    // snap minD back to Monday. avail's denominator derives from this window.
+    var minD = null, maxD = null;
+    segs.forEach(function (sg) { var s = d(sg.start), e = sg.end; if (!minD || s < minD) minD = s; if (!maxD || e > maxD) maxD = e; });
+    if (!minD) { minD = maxD = today; }
+    if (today < minD) minD = today; if (today > maxD) maxD = today;
+    minD = addDays(minD, -6); maxD = addDays(maxD, 6);
+    while (minD.getDay() !== 1) minD = addDays(minD, -1);
+
+    var crews = (state.crews || []);
+    if (!crews.length) return [];
+    return crews.map(function (crew) {
+      // lane = this crew's non-done dated segs (schedule.html renderCapacity L500)
+      var lane = segs.filter(function (sg) { return sg.crew === crew.id && !sg.done; });
+      // demand = sum of clamped workDays (L502)
+      var demand = lane.reduce(function (a, sg) { return a + (sg.wd || 1); }, 0);
+      // avail: per-crew window start clamped to activeFrom, intersected with maxD (L503-504)
+      var winStart = new Date(Math.max(minD, d(crew.activeFrom)));
+      var avail = crew.active ? workdaysBetween(winStart > maxD ? maxD : winStart, maxD) : 0;
+      // util (L505): same formula incl the 999 sentinel for active+demand-but-no-avail.
+      // For an INACTIVE crew we surface '--' (avail '—' in the panel) -> util=null.
+      var util = crew.active ? (avail > 0 ? Math.round(demand / avail * 100) : (demand > 0 ? 999 : 0)) : null;
+
+      // ---- summary-only columns (today-relative; not part of capacity parity) ----
+      var active = lane.filter(function (sg) { return d(sg.start) <= today && sg.end >= today; })
+                       .sort(function (a, b) { return d(a.start) - d(b.start); })[0] || null;
+      var next = lane.filter(function (sg) { return d(sg.start) > today; })
+                     .sort(function (a, b) { return d(a.start) - d(b.start); })[0] || null;
+
+      return { lead: crew.lead || crew.id, active: crew.active, current: active, next: next,
+        demand: demand, util: util };
+    });
+  }
+
+  function renderInto(el, state, sourceLabel) {
+    if (!el) return;
+    var rows = summarize(state);
+    if (!rows.length) { el.innerHTML = '<div style="color:var(--text-3,#888);padding:8px 0">No crews configured.</div>'; return; }
+    var h = '<div class="table-wrap"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">'
+      + '<thead><tr style="text-align:left;border-bottom:1px solid var(--line,#e0e0e0)">'
+      + '<th style="padding:6px 8px">Crew</th>'
+      + '<th style="padding:6px 8px">Current Job</th>'
+      + '<th style="padding:6px 8px">Next Mobilization</th>'
+      + '<th style="padding:6px 8px">Starts</th>'
+      + '<th style="padding:6px 8px;text-align:right">Utilization</th>'
+      + '</tr></thead><tbody>';
+    rows.forEach(function (r) {
+      var curName = r.current ? r.current.job.name : (r.active ? 'Open' : 'Not online');
+      var nextName = r.next ? (r.next.job.name + (r.next.label ? ' — ' + r.next.label : '')) : '--';
+      var nextStart = r.next ? fmtDate(r.next.start) : '--';
+      var util = (r.util == null) ? '--' : (r.util + '%');
+      var over = (r.util != null && r.util > 100);
+      h += '<tr style="border-bottom:1px solid var(--line,#f0f0f0)">'
+        + '<td style="padding:6px 8px;font-weight:600">' + E(r.lead) + '</td>'
+        + '<td style="padding:6px 8px">' + E(curName) + '</td>'
+        + '<td style="padding:6px 8px">' + E(nextName) + '</td>'
+        + '<td style="padding:6px 8px">' + E(nextStart) + '</td>'
+        + '<td style="padding:6px 8px;text-align:right' + (over ? ';color:#b42318;font-weight:700' : '') + '">' + E(util) + (over ? ' (over)' : '') + '</td>'
+        + '</tr>';
+    });
+    h += '</tbody></table></div>';
+    h += '<div style="font-size:0.72rem;color:var(--text-3,#888);margin-top:6px">Source: ' + E(sourceLabel) + '</div>';
+    el.innerHTML = h;
+  }
+
+  // Cache one fetch and fan out to any number of target elements.
+  var _statePromise = null;
+  function getState() {
+    if (_statePromise) return _statePromise;
+    _statePromise = fetch('/api/schedule', { cache: 'no-store', credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (j) {
+        if (j && j.seeded && j.state && Array.isArray(j.state.jobs)) {
+          return { state: j.state, source: 'Live scheduler (KV)' };
+        }
+        throw new Error('no-kv-state');
+      })
+      .catch(function () {
+        // graceful fallback to embedded seed if present
+        var seed = (window.SCHEDULE_SEED && Array.isArray(window.SCHEDULE_SEED.jobs)) ? window.SCHEDULE_SEED : null;
+        if (seed) return { state: JSON.parse(JSON.stringify(seed)), source: 'Embedded seed (scheduler not yet saved)' };
+        return null; // signal: nothing to show
+      });
+    return _statePromise;
+  }
+
+  // Public: render the live summary into the given element id. Safe to call
+  // before or after the element exists; no-op if element missing.
+  window.pfScheduleWidget = function (elId) {
+    var el = document.getElementById(elId);
+    if (!el) return;
+    getState().then(function (res) {
+      if (!res) { el.innerHTML = '<div style="color:var(--text-3,#888);padding:8px 0">Schedule unavailable.</div>'; return; }
+      try { renderInto(el, res.state, res.source); }
+      catch (e) { el.innerHTML = '<div style="color:var(--text-3,#888);padding:8px 0">Schedule unavailable.</div>'; }
+    });
+  };
+
+  // Render the main-dashboard widget now (container is in mod-dashboard).
+  window.pfScheduleWidget('dashScheduleWidget');
+})();
 </script>
 
 <script>
@@ -9333,6 +9519,12 @@ try {
 
   html += '</div>'; // end grid-2
 
+  // ===== LIVE CREW SCHEDULE (reads /api/schedule — one source of truth) =====
+  html += '<div class="stat-card" style="padding:1rem;margin-bottom:1rem">';
+  html += '<div style="' + STAT_LABEL + ';margin-bottom:0.75rem;cursor:pointer" onclick="showModule(\'schedule\')">Crew Schedule &#8599;</div>';
+  html += '<div id="ceodashScheduleWidget"><div style="color:#888;font-size:0.8rem">Loading schedule&#8230;</div></div>';
+  html += '</div>';
+
   // ===== ALERTS =====
   var alerts = [];
 
@@ -9370,6 +9562,10 @@ try {
   }
 
   root.innerHTML = html;
+
+  // Populate the live crew-schedule summary (read-only, /api/schedule). Safe:
+  // never throws, falls back to embedded seed / neutral note.
+  if (typeof window.pfScheduleWidget === 'function') window.pfScheduleWidget('ceodashScheduleWidget');
 
   // ---- HELPER: stat card ----
   function statCard(label, value) {
