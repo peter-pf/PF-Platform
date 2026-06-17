@@ -621,6 +621,58 @@ table tbody tr:hover {
   margin: 0;
 }
 
+/* ---- DATA-DRIVEN INDEX VIEWS (Awarded Projects, PF COI) ---- */
+.pf-index-root { max-width: 1100px; }
+.pf-index-head { margin-bottom: 14px; }
+.pf-index-head h2 {
+  font-size: 1.35rem; font-weight: 700; margin: 0 0 6px; color: var(--text-1);
+}
+.pf-index-sub { font-size: 0.9rem; line-height: 1.5; color: var(--text-2); margin: 0; }
+.pf-index-meta { font-size: 0.76rem; color: var(--text-3); margin-top: 6px; }
+.pf-index-meta a { color: var(--accent); text-decoration: none; }
+.pf-index-meta a:hover { text-decoration: underline; }
+.pf-table-wrap {
+  border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+  background: var(--bg-0); margin-top: 14px;
+}
+.pf-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.pf-table th {
+  text-align: left; padding: 10px 14px; background: var(--bg-2);
+  color: var(--text-2); font-weight: 600; font-size: 0.76rem;
+  text-transform: uppercase; letter-spacing: 0.03em;
+  border-bottom: 1px solid var(--border);
+}
+.pf-table td {
+  padding: 10px 14px; border-bottom: 1px solid var(--border-light);
+  color: var(--text-1); vertical-align: top;
+}
+.pf-table tr:last-child td { border-bottom: none; }
+.pf-table tr:hover td { background: var(--bg-1); }
+.pf-table td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pf-pill {
+  display: inline-block; padding: 2px 9px; border-radius: 20px;
+  font-size: 0.72rem; font-weight: 600; background: var(--accent-light);
+  color: var(--accent-dark); white-space: nowrap;
+}
+.pf-pill.hp { background: #EFE7FB; color: #5B3FA0; }
+.pf-record-link {
+  color: var(--accent); font-weight: 600; text-decoration: none; cursor: pointer;
+}
+.pf-record-link:hover { text-decoration: underline; }
+.pf-record-muted { color: var(--text-3); font-size: 0.8rem; font-style: italic; }
+.pf-coi-pdf {
+  display: inline-block; margin-top: 14px; padding: 8px 16px;
+  background: var(--accent); color: #fff; border-radius: 8px;
+  font-size: 0.85rem; font-weight: 600; text-decoration: none;
+}
+.pf-coi-pdf:hover { background: var(--accent-dark); }
+.pf-index-note {
+  font-size: 0.85rem; color: var(--text-2); background: var(--bg-2);
+  border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0;
+  padding: 10px 14px; margin: 0 0 8px;
+}
+.pf-index-foot { font-size: 0.78rem; color: var(--text-3); margin-top: 12px; }
+
 /* ---- QUICK ACTION BUTTON ---- */
 .fab {
   position: fixed;
@@ -980,6 +1032,10 @@ table tbody tr:hover {
 <script src="/data/progress-data.js"></script>
 <!-- Per-project RECORD DETAIL data (sync/build-project-record.py). POET 26-002 = reference template. READ-ONLY v1. -->
 <script src="/data/project-record-poet.js"></script>
+<!-- Awarded Projects index (sync/build-awarded-index.py): Awarded rows from the Project Bid Log (Agg Pier + Helical sheets). -->
+<script src="/data/awarded-projects.js"></script>
+<!-- PF standard COI coverages (sync/build-pf-coi.py): our yardstick for checking new project COI requirements. -->
+<script src="/data/pf-coi.js"></script>
 <!-- Embedded crew-schedule seed: graceful fallback for the dashboard widgets if /api/schedule is unreachable. Live KV is the source of truth. -->
 <script src="/data/schedule-seed.js"></script>
 <script>
@@ -1354,7 +1410,7 @@ window.progress = (function () {
       <div class="nav-sub collapsed">
         <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Projects</div>
         <a class="nav-item" data-module="projects" onclick="showModule('projects')">Active Projects Summary</a>
-        <a class="nav-item" data-module="projecthistory" onclick="showModule('projecthistory')">Project History</a>
+        <a class="nav-item" data-module="projecthistory" onclick="showModule('projecthistory')">Projects Completed</a>
         <a class="nav-item" data-module="awarded-projects" onclick="showModule('awarded-projects')">Awarded Projects</a>
         <a class="nav-item" data-module="project-poet" onclick="showModule('project-poet')">26-002 POET Biosciences</a>
       </div>
@@ -1371,19 +1427,12 @@ window.progress = (function () {
         <a class="nav-item" data-module="subcontracts" onclick="showModule('subcontracts')">Subcontracts</a>
       </div>
 
-      <!-- 5d) QA/QC & Field Tools (transitional) -->
+      <!-- 5c2) Insurance -->
       <div class="nav-sub collapsed">
-        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">QA/QC &amp; Field Tools</div>
-        <a class="nav-item" data-module="guhma" onclick="showModule('guhma')">QA/QC - GUHMA</a>
-        <a class="nav-item" data-module="modulus" onclick="showModule('modulus')">Modulus Testing</a>
-        <a class="nav-item" data-module="dailyproduction" onclick="showModule('dailyproduction')">Daily Production</a>
-        <a class="nav-item" data-module="dailylogs" onclick="showModule('dailylogs')">Daily Logs</a>
+        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Insurance</div>
+        <a class="nav-item" data-module="pf-coi" onclick="showModule('pf-coi')">PF COI</a>
       </div>
 
-      <div class="nav-sub collapsed">
-        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Permits</div>
-        <a class="nav-item" data-module="permits" onclick="showModule('permits')">Permits</a>
-      </div>
       <div class="nav-sub collapsed">
         <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Subcontractors</div>
         <a class="nav-item" data-module="subs" onclick="showModule('subs')">Subcontractors</a>
@@ -1391,6 +1440,42 @@ window.progress = (function () {
       <div class="nav-sub collapsed">
         <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Equipment</div>
         <a class="nav-item" data-module="equipment" onclick="showModule('equipment')">Equipment</a>
+      </div>
+    </div>
+
+    <!-- 5.5) FIELD OPERATIONS -->
+    <div class="nav-section collapsed">
+      <div class="nav-section-label" onclick="this.parentElement.classList.toggle('collapsed')">Field Operations</div>
+
+      <!-- Projects (link to existing Active Projects Summary) -->
+      <a class="nav-item" data-module="projects" onclick="showModule('projects')">
+        <span class="nav-icon">&#9635;</span> Projects
+      </a>
+
+      <!-- Daily Reports -->
+      <div class="nav-sub collapsed">
+        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Daily Reports</div>
+        <a class="nav-item" data-module="dailyproduction" onclick="showModule('dailyproduction')">Daily Production</a>
+        <a class="nav-item" data-module="dailylogs" onclick="showModule('dailylogs')">Daily Logs</a>
+      </div>
+
+      <!-- TimeSheets (placeholder) -->
+      <div class="nav-sub collapsed">
+        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">TimeSheets</div>
+        <a class="nav-item" data-module="fo-timesheets" onclick="showModule('fo-timesheets')">TimeSheets</a>
+      </div>
+
+      <!-- Safety (also linked under Project Management) -->
+      <div class="nav-sub collapsed">
+        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Safety</div>
+        <a class="nav-item" data-module="safety" onclick="showModule('safety')">Safety</a>
+      </div>
+
+      <!-- QA/QC -->
+      <div class="nav-sub collapsed">
+        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">QA/QC</div>
+        <a class="nav-item" data-module="guhma" onclick="showModule('guhma')">QA/QC - GUHMA</a>
+        <a class="nav-item" data-module="modulus" onclick="showModule('modulus')">Modulus Testing</a>
       </div>
     </div>
 
@@ -1679,7 +1764,6 @@ document.addEventListener('click', function(e) {
   <!-- SUBCONTRACTORS -->
   <div class="module-view" id="mod-subs"><div id="subs-app"></div></div>
   <!-- PERMITS -->
-  <div class="module-view" id="mod-permits"><div id="permits-app"></div></div>
   <!-- CLOSEOUT -->
   <!-- CEO DASHBOARD -->
   <div class="module-view" id="mod-ceodash"><div id="ceodash-app"></div></div>
@@ -1748,8 +1832,19 @@ document.addEventListener('click', function(e) {
     <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9650;</div><h2>Helical Pilings — Not Awarded</h2><p>This list will populate as we go.</p></div>
   </div>
 
+  <!-- Awarded Projects index — populated client-side by initAwardedProjects() from window.PF_AWARDED (data/awarded-projects.js). -->
   <div class="module-view" id="mod-awarded-projects">
-    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9635;</div><h2>Awarded Projects</h2><p>Populates from Preconstruction &rarr; Awarded; per-project detail view coming in Phase 2.</p></div>
+    <div id="awardedRoot" class="pf-index-root"></div>
+  </div>
+
+  <!-- Field Operations: TimeSheets placeholder -->
+  <div class="module-view" id="mod-fo-timesheets">
+    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9201;</div><h2>TimeSheets</h2><p>TimeSheets &mdash; to be built out.</p></div>
+  </div>
+
+  <!-- Insurance: PF COI — populated client-side by initPfCoi() from window.PF_COI (data/pf-coi.js). -->
+  <div class="module-view" id="mod-pf-coi">
+    <div id="pfCoiRoot" class="pf-index-root"></div>
   </div>
 
   <!-- PROJECT RECORD DETAIL VIEW (Phase 2 v1, READ-ONLY) — POET 26-002 is the reference template. -->
@@ -1784,7 +1879,7 @@ const moduleTitles = {
   guhma: 'QA/QC - GUHMA',
   modulus: 'Modulus Testing',
   dailyproduction: 'Daily Production',
-  projecthistory: 'Project History',
+  projecthistory: 'Projects Completed',
   schedule: 'Crew Schedule',
   pricing: 'Stone & Transport Pricing',
   proposals: 'Proposals',
@@ -1793,7 +1888,6 @@ const moduleTitles = {
   safety: 'Safety',
   dailylogs: 'Daily Logs',
   subs: 'Subcontractors',
-  permits: 'Permits & Inspections',
   ceodash: 'CEO Dashboard',
   budgeting: 'Budget & Forecast',
   invoicing: 'Invoicing & AR',
@@ -1825,6 +1919,8 @@ const moduleTitles = {
   'precon-hp-awarded': 'Helical Pilings — Awarded',
   'precon-hp-not-awarded': 'Helical Pilings — Not Awarded',
   'awarded-projects': 'Awarded Projects',
+  'fo-timesheets': 'TimeSheets',
+  'pf-coi': 'PF COI — Standard Coverages',
   'project-poet': '26-002 POET Biosciences',
   'schedule-awarded': 'Awarded Projects Schedule',
   'financials-wip': 'WIP & Cashflow',
@@ -9031,171 +9127,6 @@ try {
   console.error("Module subs failed to load:", e);
 }
 </script>
-<script>
-// ---- MODULE: permits ----
-try {
-// ============================================================
-// Pier Foundations — Permitting & Inspections Module
-// Renders into #mod-permits > #permits-app
-// ============================================================
-
-(function () {
-  'use strict';
-
-  // ---- PERMIT DATA ----
-  var PERMITS = [
-    { id: 1, project: 'POET Shelbyville', type: 'Utility Locate (811)', status: 'Active', issueDate: '2026-05-15', expDate: '2026-05-29', notes: 'Ticket #IN26-84201. Marked clear — no conflicts. Renew before mobilization if delayed.' },
-    { id: 2, project: 'POET Shelbyville', type: 'Building Permit', status: 'Active', issueDate: '2026-04-28', expDate: '2027-04-28', notes: 'Pulled by POET D&C (GC). PF verified — subcontractor scope covered under master permit.' },
-    { id: 3, project: 'POET Shelbyville', type: 'DOT Oversize Transport', status: 'Active', issueDate: '2026-05-10', expDate: '2026-06-10', notes: 'Cat 336 transport from Monroeville yard. Paddacks handling — route approved on US-36.' },
-    { id: 4, project: 'The Granary', type: 'Utility Locate (811)', status: 'Expired', issueDate: '2026-03-01', expDate: '2026-03-15', notes: 'EXPIRED — must renew before any additional site work. Original ticket #IN26-71044.' },
-    { id: 5, project: 'The Granary', type: 'Building Permit', status: 'Active', issueDate: '2026-02-15', expDate: '2027-02-15', notes: 'Pulled by Flaherty & Collins. PF scope covered. Hamilton County.' },
-    { id: 6, project: 'The Granary', type: 'Environmental', status: 'Active', issueDate: '2026-02-01', expDate: '2026-08-01', notes: 'Wetland-adjacent site. 50ft buffer zone maintained. IDEM stormwater permit under GC.' },
-    { id: 7, project: 'Stadium Flats', type: 'Utility Locate (811)', status: 'Pending', issueDate: '', expDate: '', notes: 'Not yet requested. Must call 811 minimum 2 business days before mobilization.' },
-    { id: 8, project: 'Stadium Flats', type: 'Building Permit', status: 'Active', issueDate: '2026-04-10', expDate: '2027-04-10', notes: 'Pulled by Weigand Construction. St. Joseph County. PF verified scope inclusion.' },
-    { id: 9, project: 'Stadium Flats', type: 'DOT Oversize Transport', status: 'Pending', issueDate: '', expDate: '', notes: 'Needed for Cat 336 transport to South Bend. Apply 5 business days before move.' },
-    { id: 10, project: 'POET Shelbyville', type: 'OSHA Inspection', status: 'Active', issueDate: '2026-05-20', expDate: '', notes: 'Unannounced visit 5/20. No citations. Inspector noted good PPE compliance and trench shoring.' },
-    { id: 11, project: 'The Granary', type: 'County Inspection', status: 'Active', issueDate: '2026-04-05', expDate: '', notes: 'Hamilton County foundation inspection passed. Inspector: R. Thompson. No deficiencies.' }
-  ];
-
-  var nextId = PERMITS.length + 1;
-
-  // ---- HELPERS ----
-  function statusClass(status) {
-    switch (status) {
-      case 'Active': return 'active';
-      case 'Expired': return 'no-bid';
-      case 'Pending': return 'pending';
-      default: return 'pending';
-    }
-  }
-
-  function fmtDate(d) {
-    if (!d) return '--';
-    var parts = d.split('-');
-    return parts[1] + '/' + parts[2] + '/' + parts[0].slice(2);
-  }
-
-  function isExpired(expDate) {
-    if (!expDate) return false;
-    return new Date(expDate) < new Date();
-  }
-
-  function daysUntilExpiry(expDate) {
-    if (!expDate) return null;
-    var diff = new Date(expDate) - new Date();
-    return Math.ceil(diff / (1000 * 60 * 60 * 24));
-  }
-
-  // ---- RENDER ----
-  function render() {
-    var container = document.getElementById('permits-app');
-    if (!container) return;
-
-    var activeCount = PERMITS.filter(function (p) { return p.status === 'Active'; }).length;
-    var expiredCount = PERMITS.filter(function (p) { return p.status === 'Expired'; }).length;
-    var pendingCount = PERMITS.filter(function (p) { return p.status === 'Pending'; }).length;
-
-    // Count expiring soon (within 14 days)
-    var expiringSoon = PERMITS.filter(function (p) {
-      if (p.status !== 'Active' || !p.expDate) return false;
-      var days = daysUntilExpiry(p.expDate);
-      return days !== null && days <= 14 && days > 0;
-    }).length;
-
-    var html = window.sampleBadge('Permit records are illustrative templates — not live SharePoint data');
-
-    // ---- STAT CARDS ----
-    html += '<div class="grid grid-4">';
-    html += '<div class="stat-card"><div class="stat-label">Total Permits</div><div class="stat-value">' + PERMITS.length + '</div></div>';
-    html += '<div class="stat-card"><div class="stat-label">Active</div><div class="stat-value">' + activeCount + '</div></div>';
-    html += '<div class="stat-card"><div class="stat-label">Pending</div><div class="stat-value">' + pendingCount + '</div></div>';
-    html += '<div class="stat-card"><div class="stat-label">Expired / Expiring Soon</div><div class="stat-value">' + expiredCount + (expiringSoon > 0 ? ' / ' + expiringSoon : '') + '</div></div>';
-    html += '</div>';
-
-    // ---- PERMIT TRACKER TABLE ----
-    html += '<div class="card">';
-    html += '<div class="card-header"><div><span class="card-title">Permit & Inspection Tracker</span><br><span class="card-subtitle">Utility locates, building permits, environmental, OSHA, DOT, and inspections</span></div></div>';
-    html += '<div class="table-wrap"><table>';
-    html += '<thead><tr><th>Project</th><th>Permit Type</th><th>Status</th><th>Issue Date</th><th>Expiration</th><th>Days Left</th><th>Notes</th></tr></thead>';
-    html += '<tbody>';
-
-    PERMITS.forEach(function (p) {
-      var days = daysUntilExpiry(p.expDate);
-      var daysText = '--';
-      var rowStyle = '';
-
-      if (p.status === 'Expired' || (days !== null && days <= 0)) {
-        daysText = '<strong style="color:var(--red)">EXPIRED</strong>';
-        rowStyle = ' style="background:var(--red-light)"';
-      } else if (days !== null && days <= 14) {
-        daysText = '<strong style="color:var(--amber)">' + days + ' days</strong>';
-      } else if (days !== null) {
-        daysText = days + ' days';
-      }
-
-      // Override status display for auto-expired
-      var displayStatus = p.status;
-      var displayStatusClass = statusClass(p.status);
-      if (p.status === 'Active' && days !== null && days <= 0) {
-        displayStatus = 'Expired';
-        displayStatusClass = 'no-bid';
-      }
-
-      html += '<tr' + rowStyle + '>';
-      html += '<td><strong>' + esc(p.project) + '</strong></td>';
-      html += '<td>' + p.type + '</td>';
-      html += '<td><span class="badge-status ' + displayStatusClass + '">' + displayStatus + '</span></td>';
-      html += '<td>' + fmtDate(p.issueDate) + '</td>';
-      html += '<td>' + fmtDate(p.expDate) + '</td>';
-      html += '<td>' + daysText + '</td>';
-      html += '<td>' + esc(p.notes) + '</td>';
-      html += '</tr>';
-    });
-
-    html += '</tbody></table></div></div>';
-
-    // ---- PERMIT TYPE REFERENCE ----
-    html += '<div class="card">';
-    html += '<div class="card-header"><span class="card-title">Permit Type Reference</span><span class="card-subtitle">VSC-specific permitting requirements</span></div>';
-    html += '<div class="table-wrap"><table>';
-    html += '<thead><tr><th>Type</th><th>Responsibility</th><th>Validity</th><th>Lead Time</th><th>Notes</th></tr></thead>';
-    html += '<tbody>';
-    html += '<tr><td><strong>Utility Locate (811)</strong></td><td>PF Crew</td><td>14 days</td><td>2 business days</td><td>Required before ANY excavation. Call 811 — free service. Must renew if work extends past 14 days.</td></tr>';
-    html += '<tr><td><strong>Building Permit</strong></td><td>GC (PF verifies)</td><td>12 months typical</td><td>Varies by county</td><td>Usually pulled by GC. PF must verify subcontractor scope is covered under master permit.</td></tr>';
-    html += '<tr><td><strong>Environmental</strong></td><td>GC / Owner</td><td>6 months typical</td><td>30+ days</td><td>Rare for VSC. Required for wetland-adjacent sites. IDEM stormwater permits under GC.</td></tr>';
-    html += '<tr><td><strong>OSHA Inspection</strong></td><td>N/A (unannounced)</td><td>N/A</td><td>N/A</td><td>Track all OSHA visits and outcomes. Maintain PPE compliance, trench shoring, and fall protection.</td></tr>';
-    html += '<tr><td><strong>County/Township</strong></td><td>Varies</td><td>Varies</td><td>Varies</td><td>Foundation inspections, setback verifications. Coordinate with GC on scheduling.</td></tr>';
-    html += '<tr><td><strong>DOT Oversize Transport</strong></td><td>Hauler / PF</td><td>30 days typical</td><td>5 business days</td><td>Required for Cat 336 (98K lbs) transport. Route approval needed. Paddacks or Stephan handles.</td></tr>';
-    html += '</tbody></table></div></div>';
-
-    container.innerHTML = html;
-  }
-
-  // ---- INIT ----
-  render();
-
-  // Re-render when module becomes visible
-  var observer = new MutationObserver(function (mutations) {
-    mutations.forEach(function (m) {
-      if (m.type === 'attributes' && m.attributeName === 'class') {
-        var el = m.target;
-        if (el.id === 'mod-permits' && el.classList.contains('active')) {
-          render();
-        }
-      }
-    });
-  });
-
-  var modEl = document.getElementById('mod-permits');
-  if (modEl) {
-    observer.observe(modEl, { attributes: true });
-  }
-})();
-
-} catch(e) {
-  console.error("Module permits failed to load:", e);
-}
-</script>
 
 
 
@@ -10110,6 +10041,155 @@ try {
     if (document.readyState !== 'loading') render();
   } catch(e) {
     console.error("Project record view failed to load:", e);
+  }
+})();
+</script>
+
+<!-- ============================================================ -->
+<!-- AWARDED PROJECTS INDEX — renders window.PF_AWARDED into        -->
+<!-- #awardedRoot as a clean table. POET (26-002) links to its      -->
+<!-- record; others without a built record show a muted note.       -->
+<!-- ALL data-derived strings rendered via window.esc.              -->
+<!-- ============================================================ -->
+<script>
+(function(){
+  try {
+    var E = window.esc;
+    function money(v){
+      if (v == null || v === '') return '';
+      var n = +v; if (!isFinite(n)) return '';
+      return '$' + Math.round(n).toLocaleString();
+    }
+    function render(){
+      var root = document.getElementById('awardedRoot');
+      if (!root) return;
+      var D = window.PF_AWARDED;
+      if (!D || !D.projects) {
+        root.innerHTML = '<div class="pf-placeholder"><div class="pf-placeholder-icon">&#9635;</div>'
+          + '<h2>Awarded Projects</h2><p>Index data not loaded. Run '
+          + '<code>sync/build-awarded-index.py</code> to generate '
+          + '<code>data/awarded-projects.js</code>.</p></div>';
+        return;
+      }
+      var list = D.projects.slice();
+      // Sort by project number ascending (stable, string compare works for NN-NNN form).
+      list.sort(function(a,b){ return String(a.number).localeCompare(String(b.number)); });
+
+      var srcLink = D.source_url
+        ? '<a href="' + E(D.source_url) + '" target="_blank" rel="noopener noreferrer">Project Bid Log</a>'
+        : E(D.source || '');
+
+      var html = '<div class="pf-index-head">'
+        + '<h2>Awarded Projects</h2>'
+        + '<p class="pf-index-sub">Every project marked <strong>Awarded</strong> in the Project Bid Log '
+        + '(Aggregate Piers and Helical Pilings). Open a built record where available.</p>'
+        + '<div class="pf-index-meta">Source: ' + srcLink
+        + ' &middot; ' + E(D.generated || '') + ' &middot; ' + list.length + ' awarded</div>'
+        + '</div>';
+
+      html += '<div class="pf-table-wrap"><table class="pf-table"><thead><tr>'
+        + '<th>#</th><th>Project</th><th>City / State</th><th>General Contractor</th>'
+        + '<th>Value</th><th>Discipline</th><th>Record</th>'
+        + '</tr></thead><tbody>';
+
+      list.forEach(function(p){
+        var isHp = /helical/i.test(p.discipline || '');
+        var pill = '<span class="pf-pill' + (isHp ? ' hp' : '') + '">' + E(p.discipline || '') + '</span>';
+        var rec;
+        if (p.record) {
+          // Build a safe onclick: the record id comes from a server-side allow-list (RECORD_LINKS).
+          rec = '<a class="pf-record-link" onclick="showModule(\'' + E(p.record) + '\')">Open record</a>';
+        } else {
+          rec = '<span class="pf-record-muted">record being built</span>';
+        }
+        html += '<tr>'
+          + '<td class="num">' + E(p.number) + '</td>'
+          + '<td>' + E(p.name) + '</td>'
+          + '<td>' + E(p.city_state) + '</td>'
+          + '<td>' + E(p.gc) + '</td>'
+          + '<td class="num">' + E(money(p.value)) + '</td>'
+          + '<td>' + pill + '</td>'
+          + '<td>' + rec + '</td>'
+          + '</tr>';
+      });
+
+      html += '</tbody></table></div>';
+      html += '<div class="pf-index-foot">Awarded projects flow into Project Management. '
+        + 'As each project record is built it becomes openable here.</div>';
+      root.innerHTML = html;
+    }
+    document.addEventListener('DOMContentLoaded', render);
+    if (document.readyState !== 'loading') render();
+  } catch(e) {
+    console.error("Awarded projects index failed to load:", e);
+  }
+})();
+</script>
+
+<!-- ============================================================ -->
+<!-- PF COI — renders window.PF_COI into #pfCoiRoot as a coverage   -->
+<!-- table. Our standard coverages: the yardstick for checking new  -->
+<!-- project COI requirements. ALL strings via window.esc.          -->
+<!-- ============================================================ -->
+<script>
+(function(){
+  try {
+    var E = window.esc;
+    function render(){
+      var root = document.getElementById('pfCoiRoot');
+      if (!root) return;
+      var D = window.PF_COI;
+      if (!D || !D.coverages) {
+        root.innerHTML = '<div class="pf-placeholder"><div class="pf-placeholder-icon">&#128737;</div>'
+          + '<h2>PF COI</h2><p>Coverage data not loaded. Run '
+          + '<code>sync/build-pf-coi.py</code> to generate <code>data/pf-coi.js</code>.</p></div>';
+        return;
+      }
+      var srcLink = D.source_url
+        ? '<a href="' + E(D.source_url) + '" target="_blank" rel="noopener noreferrer">PF Insurance Policies</a>'
+        : E(D.source || '');
+
+      var html = '<div class="pf-index-head">'
+        + '<h2>PF COI &mdash; Standard Coverages</h2>'
+        + '<p class="pf-index-sub">Our standard coverages &mdash; used to check new project COI requirements.</p>'
+        + '<div class="pf-index-meta">Broker: ' + E(D.broker || '') + ' &middot; Source: ' + srcLink
+        + ' &middot; ' + E(D.generated || '') + '</div>'
+        + '</div>';
+
+      html += '<div class="pf-table-wrap"><table class="pf-table"><thead><tr>'
+        + '<th>Coverage</th><th>Carrier</th><th>Each Occurrence</th><th>Aggregate</th>'
+        + '<th>Policy #</th><th>Effective</th>'
+        + '</tr></thead><tbody>';
+
+      (D.coverages || []).forEach(function(c){
+        var occ = c.each_occurrence ? E(c.each_occurrence) : '<span class="pf-record-muted">&mdash;</span>';
+        var agg = c.aggregate ? E(c.aggregate) : '<span class="pf-record-muted">&mdash;</span>';
+        html += '<tr>'
+          + '<td>' + E(c.type) + '</td>'
+          + '<td>' + E(c.carrier) + '</td>'
+          + '<td class="num">' + occ + '</td>'
+          + '<td class="num">' + agg + '</td>'
+          + '<td>' + E(c.policy_number) + '</td>'
+          + '<td class="num">' + E(c.effective) + '</td>'
+          + '</tr>';
+      });
+
+      html += '</tbody></table></div>';
+
+      if (D.coi_pdf_url) {
+        html += '<a class="pf-coi-pdf" href="' + E(D.coi_pdf_url) + '" target="_blank" rel="noopener noreferrer">'
+          + '&#128196; View current COI (PDF)</a>';
+      }
+      if (D.policy_folders && D.policy_folders.length) {
+        html += '<div class="pf-index-foot">Policy files on SharePoint: '
+          + D.policy_folders.map(function(f){ return E(f); }).join(' &middot; ') + '</div>';
+      }
+      root.innerHTML = html;
+    }
+    document.addEventListener('DOMContentLoaded', render);
+    if (document.readyState !== 'loading') render();
+  } catch(e) {
+    console.error("PF COI view failed to load:", e);
   }
 })();
 </script>
