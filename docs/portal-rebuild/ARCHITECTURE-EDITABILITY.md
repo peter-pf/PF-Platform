@@ -21,5 +21,16 @@ Instead of opening SharePoint in a new tab, render the file inside the portal in
 - Good first targets: the COI PDF, invoices on the Budget vs Actual lines, approved drawings, project photos.
 - Tradeoffs: file size/performance and the auth proxy; fine for targeted spots, not for embedding everything.
 
+## Confirmed direction & phasing (Brad 2026-06-17)
+Goal: the whole team lives in the portal. Jonathan, Derek (primarily for NEW OPPORTUNITIES), and Brad enter information directly into the portal, and the portal BACKFILLS the spreadsheets. Confirmed feasible.
+
+**Two-phase rollout (Brad's sequencing, matches the recommendation above):**
+1. **Phase 1 — Excel → Portal (now):** pull from the Excel masters (Bid Log, Project Master, Turnover Budget, Timesheets, etc.) to POPULATE the portal. This is what we are building today. Get it all working and accurate first.
+2. **Phase 2 — Portal → Excel (after Phase 1 is solid):** flip the flow. New opportunities and updates get entered IN the portal, and Peter writes them BACK into the source spreadsheets via Microsoft Graph (e.g., a new opportunity form appends a row to the Project Bid Log and creates the project record; project edits backfill the Project Master). At that point the PORTAL is the system of record and the spreadsheets become the synced output/backup.
+
+**Key intake example:** "New Opportunity" entry in the portal (Jonathan/Derek) → saved in the portal store → Peter appends the row to `Project Bid Log.xlsx` (correct tab: Agg vs Helical) and seeds the project record. Same write-back pattern for project-record edits → Project Master, and Budget vs Actual edits → Turnover Budget input cells.
+
+Possibility confirmed: yes (Graph Excel write API + our ReadWrite permissions). Set-up: yes, as Phase 2, built incrementally on the proven schedule-style editable+persist pattern, with an audit log of every change.
+
 ## Status
-Framework agreed in principle; detailed scope (which sections become editable first, which files embed where) to be worked through with Brad. Start with the schedule-style editable pattern on one section as the proof, then expand.
+Framework agreed; Phase 1 (Excel→portal population) in progress now. Phase 2 (portal→Excel backfill) starts once Phase 1 is solid. Start the write-back with one section (e.g. New Opportunity intake) as the proof, then expand.
