@@ -106,6 +106,14 @@ General: **log every email/document transfer (date + time) into the project log 
 
 ---
 
+## PROJECT LIFECYCLE — Preconstruction → Project (Brad 2026-06-17)
+A job flows through one lifecycle:
+1. **Preconstruction pipeline**: the job moves through the stages (Actively Bidding → Budget Pricing → Feasibility Review → Submitted Bids → Awarded / Not Awarded), bucketed by the Bid Log's column-A section.
+2. **On AWARD it graduates OUT of Preconstruction and INTO the Project section** (Project Management → Projects → the project record). The "Awarded" stage is the handoff point.
+3. **Documents come with it**: when it lands in the Project section, its documents populate the record — subcontract / contract, the contract drawings, any drawings in the folder, geotech, submittals — "all of them." (This is the document-sourced population workflow in PROJECT-RECORD-SCHEMA.md.)
+4. **The Project section is where the execution WORKFLOW gets built out** to complete the project: submittal management, mobilization prep, install, QA/QC, testing, as-builts, closeout — the Peter Workflow automations operate here.
+So: Preconstruction = win the work; Project section = do the work, document-fed and workflow-driven. (Already reflected: Awarded pipeline + Awarded Projects index link into the project record; POET is the first built record.)
+
 ## PROPOSED PHASING (for confirmation)
 - **Phase 1 — Nav skeleton:** the reconciled 8-header collapsible IA with nested subcategories + placeholders. Concrete, low-risk, already asked for.
 - **Phase 2 — Project Record backbone:** PM → Projects → per-project 10 subsections; start read-only pulling existing BD/estimating/subcontract data, then make editable. Everything else hangs on this.
