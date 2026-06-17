@@ -1084,6 +1084,43 @@ table tbody tr:hover {
 .pr-field-value.empty { color: var(--text-3); }
 .pr-field-src { font-size: 0.66rem; color: var(--text-3); font-style: italic; }
 
+/* ---- BUDGET vs ACTUAL (job-cost tracker) ---- */
+.ba-wrap { max-width: 1100px; }
+.ba-note { font-size: 0.78rem; color: var(--text-3); margin: 0 0 14px; line-height: 1.5; }
+.ba-summary { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
+.ba-kpi { flex: 1 1 150px; background: var(--bg-0); border: 1px solid var(--border-light);
+  border-radius: var(--radius); padding: 12px 14px; box-shadow: var(--shadow-sm); }
+.ba-kpi-label { font-size: 0.7rem; font-weight: 600; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: 0.03em; }
+.ba-kpi-value { font-size: 1.15rem; font-weight: 700; color: var(--text-1); margin-top: 3px; }
+.ba-table { width: 100%; border-collapse: collapse; background: var(--bg-0);
+  border: 1px solid var(--border-light); border-radius: var(--radius); overflow: hidden;
+  font-size: 0.85rem; }
+.ba-table th { text-align: left; font-size: 0.7rem; font-weight: 600; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: 0.03em; padding: 9px 12px;
+  background: var(--bg-2); border-bottom: 1px solid var(--border); }
+.ba-table th.num, .ba-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.ba-table td { padding: 7px 12px; border-bottom: 1px solid var(--border-light);
+  color: var(--text-1); vertical-align: top; }
+.ba-grp-row td { background: var(--bg-3); font-weight: 700; color: var(--text-0);
+  border-top: 2px solid var(--border); }
+.ba-sub-row td { background: var(--bg-1); font-weight: 600; color: var(--text-1); }
+.ba-sub-row td.ba-desc { padding-left: 22px; }
+.ba-leaf-row td.ba-desc { padding-left: 34px; }
+.ba-code { color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ba-var.fav { color: var(--green); font-weight: 600; }
+.ba-var.over { color: var(--amber); font-weight: 600; }
+.ba-blank { color: var(--text-3); }
+.ba-inv { display: inline-block; margin-top: 2px; font-size: 0.72rem; }
+.ba-inv a { color: var(--accent); text-decoration: none; }
+.ba-inv a:hover { text-decoration: underline; }
+.ba-inv .ba-inv-file::before { content: "\1F4C4"; margin-right: 3px; }
+.ba-inv .ba-inv-folder::before { content: "\1F4C1"; margin-right: 3px; }
+.ba-vendor { color: var(--text-2); }
+.ba-rownotes { color: var(--text-3); font-size: 0.78rem; }
+.ba-grand td { background: var(--bg-2); font-weight: 800; color: var(--text-0);
+  border-top: 2px solid var(--border); font-size: 0.92rem; }
+
 .pr-subhead {
   font-size: 0.8rem; font-weight: 700; color: var(--accent-dark);
   text-transform: uppercase; letter-spacing: 0.04em;
@@ -1136,6 +1173,8 @@ table tbody tr:hover {
 <script src="/data/progress-data.js"></script>
 <!-- Per-project RECORD DETAIL data (sync/build-project-record.py). POET 26-002 = reference template. READ-ONLY v1. -->
 <script src="/data/project-record-poet.js"></script>
+<!-- Per-project Budget vs Actual job-cost tracker (sync/build-budget-actual.py). POET 26-002. INTERNAL financial data. -->
+<script src="/data/budget-actual-poet.js"></script>
 <!-- Awarded Projects index (sync/build-awarded-index.py): Awarded rows from the Project Bid Log (Agg Pier + Helical sheets). -->
 <script src="/data/awarded-projects.js"></script>
 <!-- PF standard COI coverages (sync/build-pf-coi.py): our yardstick for checking new project COI requirements. -->
@@ -1519,6 +1558,12 @@ window.progress = (function () {
         <a class="nav-item" data-module="projecthistory" onclick="showModule('projecthistory')">Projects Completed</a>
         <a class="nav-item" data-module="awarded-projects" onclick="showModule('awarded-projects')">Awarded Projects</a>
         <a class="nav-item" data-module="project-poet" onclick="showModule('project-poet')">26-002 POET Biosciences</a>
+      </div>
+
+      <!-- 5a2) Financials (per-project) — INTERNAL job-cost tracking. NOT field-facing. -->
+      <div class="nav-sub collapsed">
+        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Financials</div>
+        <a class="nav-item" data-module="budget-actual-poet" onclick="showModule('budget-actual-poet')">Budget vs Actual &mdash; 26-002 POET</a>
       </div>
 
       <!-- 5b) Safety -->
@@ -1968,6 +2013,13 @@ document.addEventListener('click', function(e) {
     <div id="prRoot" class="pr-root"></div>
   </div>
 
+  <!-- BUDGET vs ACTUAL (Project Management -> Financials) — INTERNAL job-cost tracker. -->
+  <!-- Populated client-side by initBudgetActual() from window.PF_BUDGET_ACTUAL_POET     -->
+  <!-- (data/budget-actual-poet.js). FINANCIAL data — NOT reachable from fo-projects.     -->
+  <div class="module-view" id="mod-budget-actual-poet">
+    <div id="baRoot" class="pr-root"></div>
+  </div>
+
   <!-- FIELD OPERATIONS: PROJECTS (FIELD VIEW) — operational info only, NO FINANCIALS. -->
   <!-- List (window.PF_AWARDED + window.PF_PROGRESS) -> field detail (window.PF_PROJECT_POET, financials stripped). -->
   <!-- Renderer: see "FIELD-FACING PROJECTS VIEW" script near bottom of body. -->
@@ -2046,6 +2098,7 @@ const moduleTitles = {
   'fo-projects': 'Projects — Field',
   'pf-coi': 'PF COI — Standard Coverages',
   'project-poet': '26-002 POET Biosciences',
+  'budget-actual-poet': 'Budget vs Actual — 26-002 POET',
   'schedule-awarded': 'Awarded Projects Schedule',
   'financials-wip': 'WIP & Cashflow',
   'pf-dashboard': 'PF Dashboard'
@@ -10124,6 +10177,11 @@ try {
       html += card(9, 'QA / QC', qaMeta, qaNote + fields(qaRows) + linkRow(L.qaqc));
 
       // ----- 10. Financials -----
+      var jobCostLink = (window.PF_BUDGET_ACTUAL_POET)
+        ? '<div class="pr-links"><a class="pr-link" href="#" '
+          + 'onclick="showModule(\'budget-actual-poet\');return false;">'
+          + 'Budget vs Actual &mdash; Job Cost Report &rarr;</a></div>'
+        : '';
       html += card(10, 'Financials', null,
         fields([
           field('Subcontract / Bid Value', bid.bid_total_value ? ('$'+bid.bid_total_value) : '', 'Bid Log'),
@@ -10135,7 +10193,7 @@ try {
           field('Retainage Paid', ''),
           field('Vendor Invoices', ''),
           field('Job Cost Report', '')
-        ]) + linkRow(L.financials));
+        ]) + jobCostLink + linkRow(L.financials));
 
       // ----- 11. Project Closeout -----
       html += card(11, 'Project Closeout', null,
@@ -10165,6 +10223,126 @@ try {
     if (document.readyState !== 'loading') render();
   } catch(e) {
     console.error("Project record view failed to load:", e);
+  }
+})();
+</script>
+
+<!-- ============================================================ -->
+<!-- BUDGET vs ACTUAL — renders window.PF_BUDGET_ACTUAL_POET into   -->
+<!-- #baRoot as a grouped job-cost table. INTERNAL financial data.  -->
+<!-- Cost Code | Description | Budget | Actual | Variance | Vendor  -->
+<!-- | Notes, with category subtotals + grand total. Variance is    -->
+<!-- the only colored column (green favorable / amber over).         -->
+<!-- ALL data-derived strings rendered via window.esc.              -->
+<!-- ============================================================ -->
+<script>
+(function(){
+  try {
+    var D = window.PF_BUDGET_ACTUAL_POET;
+    if (!D) return;
+    var E = window.esc;
+
+    // Money formatter: blank stays blank (never "$0.00" for a missing value).
+    function money(v){
+      if (v === null || v === undefined || v === '') return '';
+      var n = Number(v);
+      if (isNaN(n)) return '';
+      return '$' + n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+    }
+    function moneyCell(v){
+      var m = money(v);
+      return m ? E(m) : '<span class="ba-blank">&mdash;</span>';
+    }
+    // Variance cell — the ONLY colored column. favorable (under budget) = green,
+    // over budget = amber. Zero / blank = neutral.
+    function varCell(v){
+      if (v === null || v === undefined || v === '') return '<span class="ba-blank">&mdash;</span>';
+      var n = Number(v);
+      if (isNaN(n)) return '<span class="ba-blank">&mdash;</span>';
+      var cls = n < 0 ? 'over' : (n > 0 ? 'fav' : '');
+      var m = money(Math.abs(n));
+      var sign = n < 0 ? '(' + E(m) + ')' : E(m);
+      return '<span class="ba-var ' + cls + '">' + sign + '</span>';
+    }
+    function invCell(inv){
+      if (!inv || !inv.url) return '';
+      var icon = inv.match === 'file' ? 'ba-inv-file' : 'ba-inv-folder';
+      return '<div class="ba-inv"><a class="' + icon + '" href="' + E(inv.url)
+           + '" target="_blank" rel="noopener">' + E(inv.label || 'Invoice') + '</a></div>';
+    }
+
+    function render(){
+      var root = document.getElementById('baRoot');
+      if (!root) return;
+      var gt = D.grand_total || {};
+      var h = '<div class="ba-wrap">';
+
+      // header / KPIs
+      h += '<div class="ba-summary">'
+        + '<div class="ba-kpi"><div class="ba-kpi-label">Project</div><div class="ba-kpi-value">'
+        + E(D.name || '') + ' &middot; ' + E(D.job || '') + '</div></div>'
+        + '<div class="ba-kpi"><div class="ba-kpi-label">Budget</div><div class="ba-kpi-value">'
+        + (money(gt.budget) ? E(money(gt.budget)) : '&mdash;') + '</div></div>'
+        + '<div class="ba-kpi"><div class="ba-kpi-label">Actual to Date</div><div class="ba-kpi-value">'
+        + (money(gt.actual) ? E(money(gt.actual)) : '&mdash;') + '</div></div>'
+        + '<div class="ba-kpi"><div class="ba-kpi-label">Variance (Remaining)</div><div class="ba-kpi-value">'
+        + varCell(gt.variance) + '</div></div>'
+        + '</div>';
+
+      if (D.data_note) h += '<p class="ba-note">' + E(D.data_note) + '</p>';
+
+      h += '<table class="ba-table"><thead><tr>'
+        + '<th>Cost Code</th><th>Description</th>'
+        + '<th class="num">Budget</th><th class="num">Actual</th><th class="num">Variance</th>'
+        + '<th>Vendor / Supplier</th><th>Notes</th>'
+        + '</tr></thead><tbody>';
+
+      (D.groups || []).forEach(function(g){
+        var st = g.subtotal || {};
+        // category header row (carries the category subtotal)
+        h += '<tr class="ba-grp-row">'
+          + '<td class="ba-code"></td>'
+          + '<td class="ba-desc">' + E(g.title || '') + '</td>'
+          + '<td class="num">' + moneyCell(st.budget) + '</td>'
+          + '<td class="num">' + moneyCell(st.actual) + '</td>'
+          + '<td class="num">' + varCell(st.variance) + '</td>'
+          + '<td></td><td></td>'
+          + '</tr>';
+        (g.rows || []).forEach(function(row){
+          var isSub = !!row.is_subtotal;
+          var rowCls = isSub ? 'ba-sub-row' : 'ba-leaf-row';
+          var notesHtml = row.notes ? '<span class="ba-rownotes">' + E(row.notes) + '</span>' : '';
+          h += '<tr class="' + rowCls + '">'
+            + '<td class="ba-code">' + E(row.cost_code || '') + '</td>'
+            + '<td class="ba-desc">' + E(row.description || '')
+            +   (isSub ? '' : invCell(row.invoice)) + '</td>'
+            + '<td class="num">' + moneyCell(row.budget) + '</td>'
+            + '<td class="num">' + moneyCell(row.actual) + '</td>'
+            + '<td class="num">' + varCell(row.variance) + '</td>'
+            + '<td class="ba-vendor">' + E(row.vendor || '') + '</td>'
+            + '<td>' + notesHtml + '</td>'
+            + '</tr>';
+        });
+      });
+
+      // grand total row
+      h += '<tr class="ba-grand">'
+        + '<td class="ba-code"></td>'
+        + '<td class="ba-desc">' + E(gt.label || 'Total') + '</td>'
+        + '<td class="num">' + moneyCell(gt.budget) + '</td>'
+        + '<td class="num">' + moneyCell(gt.actual) + '</td>'
+        + '<td class="num">' + varCell(gt.variance) + '</td>'
+        + '<td></td><td></td>'
+        + '</tr>';
+
+      h += '</tbody></table></div>';
+      root.innerHTML = h;
+    }
+
+    document.addEventListener('DOMContentLoaded', render);
+    if (document.readyState !== 'loading') render();
+  } catch(e) {
+    console.error("Budget vs Actual view failed to load:", e);
   }
 })();
 </script>
