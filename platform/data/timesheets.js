@@ -2,7 +2,7 @@
 // Field Operations weekly timesheets (hours by Cost Code + Job #).
 // Source: SharePoint 05 - Field Operations / Timesheets / 2026 PF Timesheets.xlsx
 window.PF_TIMESHEETS = {
-  "generated": "2026-06-17T20:18:34.432499+00:00Z",
+  "generated": "2026-06-17T20:35:19.548236+00:00Z",
   "source_file": "2026 PF Timesheets.xlsx",
   "source_url": "https://pierfoundations.sharepoint.com/sites/pf/_layouts/15/Doc.aspx?sourcedoc=%7B50A1B444-FFF3-4E03-82E6-B9BFFEA04D3E%7D&file=2026%20PF%20Timesheets.xlsx&action=default&mobileredirect=true",
   "cost_code_names": {
@@ -82,6 +82,69 @@ window.PF_TIMESHEETS = {
     "7635": "Non Job Per Diem"
   },
   "latest_week_with_hours": "6.14-6.20",
+  "year": "2026",
+  "by_employee_year": [
+    {
+      "name": "John Willis",
+      "number": "1",
+      "title": "Field Operations Manager",
+      "regular": 754.0,
+      "ot": 43.5,
+      "total": 797.5,
+      "per_diem_nights": 48
+    },
+    {
+      "name": "Seth Willis",
+      "number": "2",
+      "title": "Operator",
+      "regular": 387.0,
+      "ot": 175.0,
+      "total": 562.0,
+      "per_diem_nights": 44
+    },
+    {
+      "name": "Jordan Lemay",
+      "number": "3",
+      "title": "Operator",
+      "regular": 375.0,
+      "ot": 166.0,
+      "total": 541.0,
+      "per_diem_nights": 42
+    },
+    {
+      "name": "Evan Obregon",
+      "number": "2",
+      "title": "Operator",
+      "regular": 37.0,
+      "ot": 8.0,
+      "total": 45.0,
+      "per_diem_nights": 3
+    },
+    {
+      "name": "Seth Willis",
+      "number": "3",
+      "title": "Operator",
+      "regular": 37.0,
+      "ot": 8.0,
+      "total": 45.0,
+      "per_diem_nights": 3
+    },
+    {
+      "name": "Kyle Williams",
+      "number": "4",
+      "title": "Operator",
+      "regular": 8.0,
+      "ot": 6.0,
+      "total": 14.0,
+      "per_diem_nights": 0
+    }
+  ],
+  "year_grand_total": {
+    "regular": 1598.0,
+    "ot": 406.5,
+    "total": 2004.5,
+    "per_diem_nights": 140
+  },
   "weeks": [
     {
       "week_label": "2.1-2.7",

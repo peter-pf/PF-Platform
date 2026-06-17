@@ -355,6 +355,60 @@ def _parse_block(ws, r0, maxr):
     }
 
 
+def aggregate_by_employee_year(weeks):
+    """Sum across ALL weekly sheets, per employee (keyed by name + number), for the
+    whole year: Regular, OT, Total hours and Per Diem nights. Returns a list of
+    employee rows (sorted by Total desc) plus a grand-total row."""
+    acc = {}      # key -> row dict
+    order = []    # preserve first-seen order for stable tie-breaks
+    g_reg = g_ot = g_total = 0.0
+    g_pd = 0
+
+    for w in weeks:
+        for e in w.get("employees", []):
+            name = (e.get("name") or "").strip()
+            if not name:
+                continue
+            number = (e.get("number") or "").strip()
+            t = e.get("totals", {}) or {}
+            reg = float(t.get("regular", 0) or 0)
+            ot = float(t.get("ot", 0) or 0)
+            total = float(t.get("total", 0) or 0)
+            pd = int(t.get("per_diem_nights", 0) or 0)
+
+            key = (name.lower(), number.lower())
+            if key not in acc:
+                acc[key] = {"name": name, "number": number, "title": e.get("title", "") or "",
+                            "regular": 0.0, "ot": 0.0, "total": 0.0, "per_diem_nights": 0}
+                order.append(key)
+            row = acc[key]
+            row["regular"] += reg
+            row["ot"] += ot
+            row["total"] += total
+            row["per_diem_nights"] += pd
+            # keep the first non-empty title we encounter for this employee
+            if not row["title"] and (e.get("title") or "").strip():
+                row["title"] = e["title"].strip()
+
+            g_reg += reg
+            g_ot += ot
+            g_total += total
+            g_pd += pd
+
+    rows = []
+    for key in order:
+        r = acc[key]
+        rows.append({"name": r["name"], "number": r["number"], "title": r["title"],
+                     "regular": round(r["regular"], 2), "ot": round(r["ot"], 2),
+                     "total": round(r["total"], 2),
+                     "per_diem_nights": r["per_diem_nights"]})
+    rows.sort(key=lambda x: (-x["total"], x["name"].lower()))
+
+    grand = {"regular": round(g_reg, 2), "ot": round(g_ot, 2),
+             "total": round(g_total, 2), "per_diem_nights": g_pd}
+    return rows, grand
+
+
 def _week_sort_key(label):
     """Chronological sort key from a 'M.D-M.D' label using the START date.
     Assumes calendar year of the workbook (2026); only relative order matters."""
@@ -389,12 +443,34 @@ def assemble(token):
     item = get_item_by_path(token, SP_FILE)
     source_url = (item or {}).get("webUrl", "")
 
+    # Annual per-employee aggregation across ALL weekly sheets.
+    by_employee_year, year_grand_total = aggregate_by_employee_year(weeks)
+
+    # Year label: derive from the workbook file name ("2026 PF Timesheets.xlsx"),
+    # falling back to a week_start year, then the current UTC year.
+    year_label = ""
+    m = re.match(r"\s*(\d{4})", "2026 PF Timesheets.xlsx")
+    if m:
+        year_label = m.group(1)
+    if not year_label:
+        for w in weeks:
+            ws = w.get("week_start", "")
+            ym = re.match(r"^(\d{4})-", ws)
+            if ym:
+                year_label = ym.group(1)
+                break
+    if not year_label:
+        year_label = str(datetime.now(timezone.utc).year)
+
     return {
         "generated": datetime.now(timezone.utc).isoformat() + "Z",
         "source_file": "2026 PF Timesheets.xlsx",
         "source_url": source_url,
         "cost_code_names": cost_codes,
         "latest_week_with_hours": latest_with_hours,
+        "year": year_label,
+        "by_employee_year": by_employee_year,
+        "year_grand_total": year_grand_total,
         "weeks": weeks,
     }
 
@@ -415,6 +491,24 @@ def _summary(data, only_latest=True):
     print(f"TimeSheets assembled: {len(data['weeks'])} week sheets, "
           f"{len(data['cost_code_names'])} cost codes mapped.")
     print(f"Latest week WITH hours: {data['latest_week_with_hours']!r}")
+
+    # ---- ANNUAL PER-EMPLOYEE SUMMARY (proof for self-check) ----
+    print(f"\n=== ANNUAL SUMMARY — {data.get('year','')} (across all {len(data['weeks'])} weeks) ===")
+    print(f"  {'Employee':<26} {'#':<8} {'Reg':>9} {'OT':>8} {'Total':>9} {'PD':>4}")
+    for r in data.get("by_employee_year", []):
+        print(f"  {r['name']:<26} {str(r['number']):<8} "
+              f"{r['regular']:>9} {r['ot']:>8} {r['total']:>9} {r['per_diem_nights']:>4}")
+    g = data.get("year_grand_total", {})
+    print(f"  {'GRAND TOTAL':<26} {'':<8} "
+          f"{g.get('regular',0):>9} {g.get('ot',0):>8} {g.get('total',0):>9} {g.get('per_diem_nights',0):>4}")
+    # cross-check: sum of weekly totals should equal the grand total
+    wk_reg = round(sum(w['totals']['regular'] for w in data['weeks']), 2)
+    wk_ot = round(sum(w['totals']['ot'] for w in data['weeks']), 2)
+    wk_total = round(sum(w['totals']['total'] for w in data['weeks']), 2)
+    wk_pd = sum(w['totals']['per_diem_nights'] for w in data['weeks'])
+    print(f"  SUM-OF-WEEKLY-TOTALS:        "
+          f"{wk_reg:>9} {wk_ot:>8} {wk_total:>9} {wk_pd:>4}  "
+          f"-> match={'YES' if (wk_reg==g.get('regular') and wk_ot==g.get('ot') and wk_total==g.get('total') and wk_pd==g.get('per_diem_nights')) else 'NO'}")
     target = data["latest_week_with_hours"]
     for w in data["weeks"]:
         if only_latest and w["week_label"] != target:

@@ -755,6 +755,22 @@ table tbody tr:hover {
 .ts-foot { font-size: 0.78rem; color: var(--text-3); margin-top: 8px; }
 .ts-foot a { color: var(--accent); text-decoration: none; }
 .ts-foot a:hover { text-decoration: underline; }
+/* annual summary table */
+.ts-sum-wrap { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--bg-0); margin-top: 4px; }
+.ts-sum-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.ts-sum-table th {
+  text-align: left; padding: 10px 14px; background: var(--bg-1); color: var(--text-3);
+  font-weight: 600; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em;
+  border-bottom: 1px solid var(--border-light);
+}
+.ts-sum-table td { padding: 10px 14px; border-bottom: 1px solid var(--border-light);
+  color: var(--text-1); vertical-align: middle; }
+.ts-sum-table td.num { font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.ts-sum-table .emp-nm { font-weight: 600; }
+.ts-sum-table .emp-meta { color: var(--text-3); font-size: 0.78rem; }
+.ts-sum-table tfoot td { font-weight: 700; background: var(--bg-1);
+  border-top: 2px solid var(--border); border-bottom: none; }
+.ts-sum-table tbody tr:last-child td { border-bottom: none; }
 @media (max-width: 820px) {
   .ts-stats { grid-template-columns: repeat(2, 1fr); }
   .ts-alloc { grid-template-columns: 1fr; }
@@ -1549,10 +1565,11 @@ window.progress = (function () {
         <a class="nav-item" data-module="dailylogs" onclick="showModule('dailylogs')">Daily Logs</a>
       </div>
 
-      <!-- TimeSheets (placeholder) -->
+      <!-- TimeSheets (dropdown: Weekly + Summary) -->
       <div class="nav-sub collapsed">
         <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">TimeSheets</div>
-        <a class="nav-item" data-module="fo-timesheets" onclick="showModule('fo-timesheets')">TimeSheets</a>
+        <a class="nav-item" data-module="fo-timesheets" onclick="showModule('fo-timesheets')">Weekly</a>
+        <a class="nav-item" data-module="ts-summary" onclick="showModule('ts-summary')">Summary</a>
       </div>
 
       <!-- Safety (also linked under Project Management) -->
@@ -1933,6 +1950,13 @@ document.addEventListener('click', function(e) {
     <div id="tsRoot" class="pf-index-root ts-root"></div>
   </div>
 
+  <!-- Field Operations: TimeSheets — Summary. Annual per-employee roll-up -->
+  <!-- (Reg / OT / Total hours + Per Diem nights) from window.PF_TIMESHEETS  -->
+  <!-- .by_employee_year. Rendered by the TS-SUMMARY script near body end.   -->
+  <div class="module-view" id="mod-ts-summary">
+    <div id="tsSummaryRoot" class="pf-index-root ts-root"></div>
+  </div>
+
   <!-- Insurance: PF COI — populated client-side by initPfCoi() from window.PF_COI (data/pf-coi.js). -->
   <div class="module-view" id="mod-pf-coi">
     <div id="pfCoiRoot" class="pf-index-root"></div>
@@ -2017,7 +2041,8 @@ const moduleTitles = {
   'precon-hp-awarded': 'Helical Pilings — Awarded',
   'precon-hp-not-awarded': 'Helical Pilings — Not Awarded',
   'awarded-projects': 'Awarded Projects',
-  'fo-timesheets': 'TimeSheets',
+  'fo-timesheets': 'TimeSheets — Weekly',
+  'ts-summary': 'TimeSheets — Summary',
   'fo-projects': 'Projects — Field',
   'pf-coi': 'PF COI — Standard Coverages',
   'project-poet': '26-002 POET Biosciences',
@@ -10847,6 +10872,100 @@ try {
     if (document.readyState !== 'loading') render();
   } catch(e) {
     console.error("TimeSheets panel failed to load:", e);
+  }
+})();
+</script>
+
+<!-- ============================================================ -->
+<!-- TIMESHEETS — SUMMARY (Field Operations). Renders the ANNUAL    -->
+<!-- per-employee roll-up (window.PF_TIMESHEETS.by_employee_year):  -->
+<!-- one row per employee with Regular / OT / Total hours + Per     -->
+<!-- Diem nights, plus a grand-total footer. ALL strings via esc.   -->
+<!-- ============================================================ -->
+<script>
+(function(){
+  try {
+    var E = window.esc;
+    function hrs(v){
+      var n = +v; if (!isFinite(n) || n === 0) return '<span class="ts-zero">0</span>';
+      return (n % 1 === 0) ? String(n) : n.toFixed(2).replace(/\.?0+$/,'');
+    }
+    function plain(v){ var n=+v; if(!isFinite(n)) return '0'; return (n%1===0)?String(n):n.toFixed(2).replace(/\.?0+$/,''); }
+
+    function render(){
+      var el = document.getElementById('tsSummaryRoot');
+      if (!el) return;
+      var D = window.PF_TIMESHEETS;
+      if (!D || !D.by_employee_year){
+        el.innerHTML = '<div class="pf-placeholder"><div class="pf-placeholder-icon">&#9201;</div>'
+          + '<h2>TimeSheets &mdash; Summary</h2><p>Summary data not loaded. Run '
+          + '<code>sync/build-timesheets.py</code> to generate <code>data/timesheets.js</code>.</p></div>';
+        return;
+      }
+
+      var year = E(D.year || '');
+      var rows = D.by_employee_year || [];
+      var g = D.year_grand_total || {regular:0, ot:0, total:0, per_diem_nights:0};
+      var weekCount = D.weeks ? D.weeks.length : 0;
+
+      var srcLink = D.source_url
+        ? '<a href="' + E(D.source_url) + '" target="_blank" rel="noopener noreferrer">' + E(D.source_file || '2026 PF Timesheets.xlsx') + '</a>'
+        : E(D.source_file || '');
+
+      var html = '<div class="pf-index-head">'
+        + '<h2>TimeSheets &mdash; Summary</h2>'
+        + '<p class="pf-index-sub">Annual per-employee hours for <strong>' + year + '</strong> '
+        + '&mdash; Regular, Overtime, Total, and Per Diem nights summed across every weekly sheet.</p>'
+        + '<div class="pf-index-meta">Source: ' + srcLink
+        + ' &middot; ' + E(D.generated || '') + ' &middot; ' + weekCount + ' weeks</div>'
+        + '</div>';
+
+      html += '<div class="ts-sum-wrap"><table class="ts-sum-table"><thead><tr>'
+        + '<th>Employee</th>'
+        + '<th style="text-align:right">Regular Hours</th>'
+        + '<th style="text-align:right">OT Hours</th>'
+        + '<th style="text-align:right">Total Hours</th>'
+        + '<th style="text-align:right">Per Diem Nights</th>'
+        + '</tr></thead><tbody>';
+
+      if (!rows.length){
+        html += '<tr><td colspan="5" style="text-align:center;color:var(--text-3);padding:18px">No timesheet hours logged yet for ' + year + '.</td></tr>';
+      }
+      rows.forEach(function(r){
+        var meta = [];
+        if (r.number) meta.push('#' + E(String(r.number)));
+        if (r.title) meta.push(E(r.title));
+        html += '<tr>'
+          + '<td><span class="emp-nm">' + E(r.name) + '</span>'
+          + (meta.length ? ' <span class="emp-meta">&middot; ' + meta.join(' &middot; ') + '</span>' : '')
+          + '</td>'
+          + '<td class="num">' + hrs(r.regular) + '</td>'
+          + '<td class="num">' + (r.ot ? '<span class="ts-ot">' + hrs(r.ot) + '</span>' : hrs(r.ot)) + '</td>'
+          + '<td class="num"><strong>' + hrs(r.total) + '</strong></td>'
+          + '<td class="num">' + plain(r.per_diem_nights) + '</td>'
+          + '</tr>';
+      });
+
+      html += '</tbody><tfoot><tr>'
+        + '<td>Grand Total</td>'
+        + '<td class="num">' + hrs(g.regular) + '</td>'
+        + '<td class="num">' + (g.ot ? '<span class="ts-ot">' + hrs(g.ot) + '</span>' : hrs(g.ot)) + '</td>'
+        + '<td class="num">' + hrs(g.total) + '</td>'
+        + '<td class="num">' + plain(g.per_diem_nights) + '</td>'
+        + '</tr></tfoot></table></div>';
+
+      html += '<div class="ts-foot">Read-only annual roll-up synced from ' + srcLink
+        + '. Each row sums that employee\'s weekly totals across all ' + weekCount
+        + ' sheets. Employees are keyed by name and employee number, so a reused or '
+        + 'reassigned number appears as a separate row. See the Weekly view for day-level detail.</div>';
+
+      el.innerHTML = html;
+    }
+
+    document.addEventListener('DOMContentLoaded', render);
+    if (document.readyState !== 'loading') render();
+  } catch(e) {
+    console.error("TimeSheets Summary panel failed to load:", e);
   }
 })();
 </script>
