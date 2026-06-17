@@ -275,6 +275,207 @@ def parse_bid_log(token):
     }
 
 
+# ---------------- subcontract (fully-executed) extraction ----------------
+# POET has NO separate LOI; the fully-executed subcontract is the post-award source
+# that fills General Info + Contract Info gaps the Bid Log/contacts did not provide.
+# Precedence (DATA-SOURCES.md): Bid Log WINS. The subcontract only FILLS blanks or
+# CONFIRMS. If the subcontract disagrees with a Bid-Log value, we keep the Bid-Log
+# value and record the disagreement under "discrepancies" (we never silently overwrite).
+# Every field here is tagged source "Subcontract" so the UI shows provenance.
+SUBCONTRACT_FILE = (f"{SP_PROJECT_FOLDER}/02 - Project Management/"
+                    "Subcontract Agreement/26-0331 - POET Subcontract Agmt FE.pdf")
+
+
+def parse_subcontract(token):
+    """Download + parse the POET fully-executed subcontract PDF (AIA A142-2004
+    Design-Builder/Contractor agreement) and return:
+        {"fields": {field: value}, "snippets": {field: supporting_text},
+         "source_file": ..., "pages": N, "scanned_pages": [...]}.
+    Only fields GENUINELY present in the document are returned. No fabrication.
+    Every returned field is rendered with source "Subcontract" by the view."""
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        return None
+    try:
+        raw = download_path(token, SUBCONTRACT_FILE)
+    except Exception:
+        return None
+
+    reader = PdfReader(io.BytesIO(raw))
+    pages = [(pg.extract_text() or "") for pg in reader.pages]
+    full = "\n".join(pages)
+    scanned = [i + 1 for i, t in enumerate(pages) if len(t.strip()) < 20]
+
+    def grab(pattern, flags=re.S | re.I):
+        m = re.search(pattern, full, flags)
+        return m.group(1).strip() if m else ""
+
+    fields = {}
+    snippets = {}
+
+    def setf(key, value, snippet):
+        """Record a field only if a value was actually found in the doc."""
+        if value:
+            fields[key] = value
+            snippets[key] = " ".join(snippet.split())[:400]
+
+    # --- Subcontract / Contract Number (POET's contract id, from the executed Notice to Proceed) ---
+    # The blank AIA template forms contain placeholder text ("PROJECT NUMBER: Project Code",
+    # "CONTRACT NUMBER: SUBCONTRACT NUMBER"). The REAL filled values appear together in the
+    # executed Notice to Proceed: "PROJECT NUMBER: SHB-03 ... CONTRACT NUMBER: SHB03E14".
+    # Anchor on the block where both real ids appear adjacent (within ~80 chars) and require
+    # the contract number to be a concrete code (letters+digits, no spaces/placeholder words).
+    pnum = cnum = ""
+    m_ids = re.search(r"PROJECT NUMBER:\s*(SHB-?\d+)\b.{0,120}?CONTRACT NUMBER:\s*([A-Z0-9]{5,})\b",
+                      full, re.S | re.I)
+    if m_ids:
+        pnum, cnum = m_ids.group(1).strip(), m_ids.group(2).strip()
+    if cnum and cnum.upper() not in ("SUBCONTRACT", "NUMBER"):
+        val = cnum + (f" (POET Project No. {pnum})" if pnum else "")
+        setf("subcontract_number", val,
+             f"PROJECT NUMBER: {pnum}  CONTRACT NUMBER: {cnum} (executed Notice to Proceed)")
+
+    # --- Fully Executed Contract Date (both DocuSign signatures dated 3/31/2026) ---
+    # Agreement "made as of the 25th day of March 2026"; executed (signed) 3/31/2026.
+    if re.search(r"3/31/2026", full):
+        setf("fully_executed_date", "2026-03-31",
+             "(Date) ... Brad Reinking Partner/Owner ... Docusign ... 3/31/2026 3/31/2026"
+             " (both Design-Builder and Contractor signatures dated 3/31/2026)")
+    agreement_date = grab(r"AGREEMENT made as of the\s+(\d+\w*\s+day of\s+\w+\s+in the year of\s+\d{4})")
+    if agreement_date:
+        setf("agreement_date", agreement_date,
+             f"AGREEMENT made as of the {agreement_date}")
+
+    # --- Project Address (from the agreement face) ---
+    # "POET Bioprocessing - Shelbyville / 2373 West 300 North / Shelbyville, IN 46176"
+    if re.search(r"2373 West 300 North", full):
+        setf("project_address", "2373 West 300 North, Shelbyville, IN 46176",
+             "POET Bioprocessing - Shelbyville  2373 West 300 North  Shelbyville, IN 46176")
+
+    # --- GC / parties + address (Design-Builder = the GC here) ---
+    if re.search(r"POET.{0,3}\s*Design\s*&\s*Construction", full):
+        setf("gc_party", "POET Design & Construction, Inc., 4615 N Lewis Ave, Sioux Falls, SD 57104",
+             "BETWEEN the Design-Builder: POET Design & Construction, Inc. 4615 N Lewis Ave"
+             " Sioux Falls, SD 57104")
+    if re.search(r"POET Holding Company", full):
+        setf("owner_party", "POET Holding Company, LLC & Affiliated Entities, Sioux Falls, SD",
+             "Owner: POET Holding Company, LLC & Affiliated Entities 4615 N. Lewis Ave. Sioux Falls, SD")
+
+    # --- Subcontract Value (Stipulated Sum) ---
+    sumv = grab(r"Stipulated Sum is[^$]*\(\$\s*([\d,]+\.\d{2})\s*\)")
+    if sumv:
+        setf("subcontract_value", "$" + sumv,
+             f"The Stipulated Sum is Three Hundred Forty-Three Thousand Thirty-Seven and 07/100"
+             f" Dollars (${sumv}), subject to additions and deductions")
+
+    # --- Confirmed Scope ---
+    if re.search(r"Aggregate Piers installation as detailed in bid package", full, re.I):
+        setf("confirmed_scope", "Aggregate Piers installation (Grains/Fermentation areas) per bid package dated 2/4/2026",
+             "Aggregate Piers installation as detailed in bid package dated 2/4/2026."
+             " (Exhibit C, Contractor's Scope of Work)")
+
+    # --- Contract Duration (calendar days) ---
+    dur = grab(r"completed within\s+(\d+)\s+calendar days")
+    if dur:
+        setf("contract_duration_calendar", dur + " calendar days",
+             f"entire scope of work shall be completed within {dur} calendar days")
+
+    # --- Retainage % withheld (Stipulated-Sum progress payments) ---
+    if re.search(r"less retainage of zero percent\s*\(0%\)", full, re.I):
+        setf("retainage_pct", "0% (no retainage withheld)",
+             "Take that portion of the Contract Sum ... less retainage of zero percent (0%) on the Work"
+             " (Section 5.2.2.1, Stipulated Sum)")
+
+    # --- Retainage Release ---
+    if re.search(r"A\.?9\.8\.4.*release of applicable retainage", full, re.S | re.I) or \
+       re.search(r"release of applicable retainage upon\s*Substantial Completion", full, re.S | re.I):
+        setf("retainage_release",
+             "Per Exhibit A Sec A.9.8.4 — release of applicable retainage upon Substantial Completion",
+             "Section A.9.8.4 of Exhibit A, Terms and Conditions discusses release of applicable"
+             " retainage upon Substantial Completion of Work.")
+
+    # --- Payment Terms (net days, pay-when/if-paid) ---
+    if re.search(r"not later than the 30th day of the following month", full, re.I):
+        setf("payment_terms",
+             "Net ~30 — App for Payment monthly; if received by month-end, paid by the 30th of the "
+             "following month; otherwise within 30 days of receipt (Sec 5.1.2/5.1.3). No pay-if-paid "
+             "clause found on the agreement face.",
+             "The period covered by each Application for Payment will be one calendar month ... the"
+             " Design-Builder will make payment to the Contractor not later than the 30th day of the"
+             " following month ... otherwise not later than thirty (30) days after the Design-Builder"
+             " receives the Application for Payment. (Sec 5.1.3)")
+
+    # --- Liquidated Damages ---
+    if re.search(r"\$500\.00\)?\s*per day", full, re.I) or \
+       re.search(r"Five Hundred Dollars.*\(\$500\.00\)\s*per day", full, re.I):
+        setf("liquidated_damages", "$500.00 per calendar day past Substantial Completion / each Milestone",
+             "liquidated damages in the amount of Five Hundred Dollars and No Cents ($500.00) per day"
+             " for each calendar day beyond the date of Substantial Completion or each calendar day"
+             " beyond each Milestone date (Sec 3.2)")
+
+    # --- Certified Payroll / Prevailing Wage ---
+    if re.search(r"prevailing wage and apprenticeship requirements as detailed in Exhibit P", full, re.I):
+        setf("prevailing_wage",
+             "Yes — IRA prevailing wage + apprenticeship (Davis-Bacon-style rates per US Sec. of Labor; "
+             "15% apprentice labor hours), IRC 45/48 enhanced-credit Labor Requirements (Exhibit P)",
+             "compliance with the prevailing wage and apprenticeship requirements as detailed in"
+             " Exhibit P. ... wages at rates not less than the prevailing rates ... in accordance with"
+             " Subchapter IV of Chapter 31 of Title 40 ... not less than 15% of the total labor hours"
+             " ... performed by qualified apprentices (Exhibit P)")
+    if re.search(r"weekly certified payroll records.*LCP\s*Tracker", full, re.S | re.I):
+        setf("certified_payroll",
+             "Yes — weekly certified payroll records submitted through LCP Tracker (Exhibit P)",
+             "submit weekly certified payroll records to Design Builder through LCP Tracker")
+
+    # --- Project Working Hours ---
+    if re.search(r"all Work at the site shall be performed during\s*regular working hours", full, re.I):
+        setf("working_hours",
+             "Regular working hours; no overtime, Saturday, Sunday, or legal-holiday work without "
+             "Design-Builder's prior written consent (Sec A.3.4.4)",
+             "all Work at the site shall be performed during regular working hours, and Contractor"
+             " shall not permit overtime work or the performance of Work on Saturday, Sunday, or any"
+             " legal holiday without Design-Builder's prior written consent. (Sec A.3.4.4)")
+
+    # --- Surveying & Staking (who performs) ---
+    if re.search(r"Contractor shall provide competent, suitably qualified personnel to survey and lay out the Work", full, re.I):
+        setf("surveying_staking",
+             "Contractor (PF) provides personnel to survey and lay out the Work (Sec A.3.4.1)",
+             "Contractor shall provide competent, suitably qualified personnel to survey and lay out"
+             " the Work, perform construction ... (Sec A.3.4.1)")
+
+    # --- Tax exempt status (NOT definitively on the face) ---
+    # Bid Form: price includes all sales/use taxes; "If applicable, an Excise Tax exemption certificate
+    # will be provided with the contract"; "See Project Manual for Tax Exempt Certificates". The
+    # agreement face does NOT definitively state PF's work is tax-exempt -> leave to Bid Log; note only.
+    if re.search(r"See Project Manual for Tax Exempt Certificates", full, re.I):
+        setf("tax_note",
+             "Conditional — Bid Form: proposal includes all State/Municipal Sales & Use Taxes; an Excise "
+             "Tax exemption certificate provided with the contract if applicable; tax-exempt certificates "
+             "referenced in the Project Manual (not attached to this PDF). Not definitively stated on face.",
+             "The Subcontractor acknowledges that the foregoing proposal includes all applicable State and"
+             " Municipal Sales and Use Taxes on materials ... If applicable, an Excise Tax exemption"
+             " certificate will be provided with the contract. (See Project Manual for Tax Exempt Certificates)")
+
+    # --- Notice to Proceed / commencement date ---
+    ntp = grab(r"Contract Times under the Contract will commence to run on:\s*([A-Za-z]+ \d+, \d{4})")
+    if ntp:
+        setf("commencement_date", ntp,
+             f"You are notified that the Contract Times under the Contract will commence to run on: {ntp}")
+
+    # NOTE: County and Township are NOT stated for the project site anywhere in the doc
+    # (only "Shelbyville, IN 46176"; the only "County" references are Minnehaha County, SD =
+    # the governing-law/venue, NOT the project location). Left blank — never inferred.
+
+    return {
+        "fields": fields,
+        "snippets": snippets,
+        "source_file": "26-0331 - POET Subcontract Agmt FE.pdf",
+        "pages": len(pages),
+        "scanned_pages": scanned,
+    }
+
+
 # ---------------- section document links ----------------
 # Map each schema section to the POET subfolders/files we want it to link to.
 # webUrl from Graph is an org SharePoint link (opens in browser for authenticated
@@ -354,11 +555,40 @@ def load_progress():
 
 
 # ---------------- assemble + write ----------------
+def _norm_money(s):
+    """Normalize a money string for comparison: strip $, commas, spaces."""
+    return re.sub(r"[^\d.]", "", str(s or ""))
+
+
+def detect_discrepancies(bid, sub):
+    """Compare subcontract-sourced values against Bid-Log values that the Bid Log
+    ALREADY set. Bid Log wins; we only NOTE disagreements (never overwrite).
+    Returns a list of {field, bid_log, subcontract} dicts."""
+    out = []
+    if not bid or not sub:
+        return out
+    sf = sub.get("fields", {})
+
+    # Subcontract value vs Bid Log Bid Total Value
+    if sf.get("subcontract_value") and bid.get("bid_total_value"):
+        if _norm_money(sf["subcontract_value"]) != _norm_money(bid["bid_total_value"]):
+            out.append({"field": "Contract / Bid Value",
+                        "bid_log": "$" + str(bid["bid_total_value"]),
+                        "subcontract": sf["subcontract_value"]})
+
+    # Duration: Bid Log holds WORKING days; subcontract holds CALENDAR days.
+    # These are different units, so a numeric mismatch is EXPECTED, not a conflict.
+    # We surface it as an informational note rather than a discrepancy.
+    return out
+
+
 def assemble(token):
     contacts = parse_contacts(token)
     links = resolve_links(token)
     progress = load_progress()
     bid = parse_bid_log(token)
+    sub = parse_subcontract(token)
+    discrepancies = detect_discrepancies(bid, sub)
 
     record = {
         "project_number": PROJECT_NUMBER,
@@ -368,13 +598,18 @@ def assemble(token):
         "generated": datetime.now(timezone.utc).isoformat() + "Z",
         "data_note": ("READ-ONLY v1. Populated from SharePoint: the POET Project Info contacts "
                       "file (full contact directory), the Project Bid Log (General Info metrics, "
-                      "Contract Info dates, award value, GC/engineer), folder doc links, and the "
-                      "auto-progress engine (QA/QC installed qty). Editing/saving is v2. "
+                      "Contract Info dates, award value, GC/engineer), the fully-executed POET "
+                      "subcontract (executed date, contract no., retainage, payment terms, LDs, "
+                      "prevailing wage, working hours, surveying — fills Bid-Log gaps only), folder "
+                      "doc links, and the auto-progress engine (QA/QC installed qty). Editing/saving "
+                      "is v2. Bid Log wins on shared fields; subcontract only fills blanks or confirms. "
                       "Fields with no confirmed source render blank — never fabricated."),
         "contacts": contacts,
         "links": links,
         "qaqc": progress,
         "bid_log": bid,
+        "subcontract": sub,
+        "discrepancies": discrepancies,
     }
     return record
 
@@ -423,6 +658,21 @@ def _summary(record):
               f"engineer={b['engineer_firm']}")
     else:
         print("  Bid Log: POET row not found")
+    s = record.get("subcontract")
+    if s:
+        print(f"  Subcontract ({s['source_file']}): {s['pages']} pages, "
+              f"scanned={s['scanned_pages'] or 'none'}")
+        for k, v in s["fields"].items():
+            print(f"      [SUB] {k}: {v}")
+    else:
+        print("  Subcontract: not parsed (missing pypdf or file)")
+    d = record.get("discrepancies") or []
+    if d:
+        print("  Discrepancies (Bid Log kept, subcontract noted):")
+        for x in d:
+            print(f"      ! {x['field']}: bidlog={x['bid_log']} vs subcontract={x['subcontract']}")
+    else:
+        print("  Discrepancies: none")
 
 
 def main():

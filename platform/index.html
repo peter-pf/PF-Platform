@@ -9878,6 +9878,8 @@ try {
       var g = (D.contacts && D.contacts.groups) || {};
       var L = D.links || {};
       var q = D.qaqc || null;
+      var SF = (D.subcontract && D.subcontract.fields) || {}; // subcontract-sourced fields
+      var SS = 'Subcontract'; // source tag for subcontract-derived fields
 
       // ----- header -----
       var status = bid.bid_status || '';
@@ -9891,18 +9893,31 @@ try {
 
       html += '<div class="pr-note">'+E(D.data_note || '')+'</div>';
 
+      // ----- Bid-Log vs Subcontract discrepancy banner (Bid Log kept; disagreement noted) -----
+      var disc = D.discrepancies || [];
+      if (disc.length) {
+        var dh = '<div class="pr-note" style="border-left:3px solid #d98a00">'
+          + '<strong>Bid Log vs Subcontract:</strong> the estimating Bid Log value is kept; '
+          + 'the subcontract differs on '+disc.length+' field'+(disc.length>1?'s':'')+': ';
+        dh += disc.map(function(x){
+          return E(x.field)+' (Bid Log '+E(x.bid_log)+' vs Subcontract '+E(x.subcontract)+')';
+        }).join('; ');
+        dh += '.</div>';
+        html += dh;
+      }
+
       // ----- 1. General Info -----
       html += card(1, 'General Info', null,
         fields([
-          field('General Contractor', bid.gc_name, 'Bid Log'),
-          field('GC Project Number / Contract No.', ''),
+          field('General Contractor', bid.gc_name || SF.gc_party, bid.gc_name ? 'Bid Log' : SS),
+          field('GC Project Number / Contract No.', SF.subcontract_number, SS),
           field('GC Project Manager', (g.gc&&g.gc[0]?g.gc[0].name:''), 'Contacts'),
-          field('Site Superintendent', ''),
-          field('Project Address', bid.address, 'Bid Log'),
+          field('Site Superintendent', (function(){var s=(g.gc||[]).find(function(c){return /super/i.test(c.scope||'');});return s?s.name:'';})(), 'Contacts'),
+          field('Project Address', bid.address || SF.project_address, bid.address ? 'Bid Log' : SS),
           field('City / State', bid.city_state, 'Bid Log'),
           field('County', ''),
           field('Township', ''),
-          field('Project Scope', 'Aggregate Piers', 'Bid Log sheet'),
+          field('Project Scope', SF.confirmed_scope || 'Aggregate Piers', SF.confirmed_scope ? SS : 'Bid Log sheet'),
           field('Site Size (Acres)', bid.site_acres, 'Bid Log'),
           field('Total SF (Bldg Pad)', bid.total_sf, 'Bid Log'),
           field('Total Piers (Qty)', bid.total_columns, 'Bid Log'),
@@ -9912,9 +9927,11 @@ try {
           field('Estimated Spoils (CY)', ''),
           field('Top Feed or Bottom Feed', bid.feed_type, 'Bid Log'),
           field('Projected PF Start Date', bid.projected_start, 'Bid Log'),
+          field('Commencement Date (NTP)', SF.commencement_date, SS),
           field('Contract Duration (working days)', bid.duration_days, 'Bid Log'),
+          field('Contract Duration (calendar days)', SF.contract_duration_calendar, SS),
           field('Estimated Project Completion', ''),
-          field('Bid / Subcontract Value', bid.bid_total_value ? ('$'+bid.bid_total_value) : '', 'Bid Log'),
+          field('Subcontract / Bid Value', bid.bid_total_value ? ('$'+bid.bid_total_value) : SF.subcontract_value, bid.bid_total_value ? 'Bid Log' : SS),
           field('Award Status', bid.bid_status, 'Bid Log')
         ]) + linkRow(L.general), true);
 
@@ -9925,22 +9942,29 @@ try {
       // ----- 3. Contract Info -----
       html += card(3, 'Contract Info', null,
         fields([
-          field('LOI / NOI Date', ''),
+          field('LOI / NOI Date', '(POET issued no separate LOI — fully-executed subcontract used)'),
           field('Bid Invite Date', bid.invite_date, 'Bid Log'),
           field('Bid Due Date', bid.due_date, 'Bid Log'),
           field('Date Submitted', bid.date_submitted, 'Bid Log'),
           field('Prelim Completed By', bid.design_completed_date, 'Bid Log'),
-          field('Fully Executed Contract Date', ''),
+          field('Subcontract Number', SF.subcontract_number, SS),
+          field('Agreement Date (face)', SF.agreement_date, SS),
+          field('Fully Executed Contract Date', SF.fully_executed_date, SS),
+          field('Subcontract Value', SF.subcontract_value, SS),
           field('Tax Exempt? / Tax', bid.tax, 'Bid Log'),
+          field('Tax Status (per subcontract)', SF.tax_note, SS),
           field('If not Tax Exempt, Sales Tax Rate', ''),
-          field('Certified Payroll?', ''),
-          field('Prevailing Wage? Rate?', bid.wage_req, 'Bid Log'),
+          field('Certified Payroll?', SF.certified_payroll, SS),
+          field('Prevailing Wage? Rate?', SF.prevailing_wage || bid.wage_req, SF.prevailing_wage ? SS : 'Bid Log'),
           field('Minimum Insurance Requirement', bid.min_insurance_req, 'Bid Log'),
-          field('Retainage % Withheld', ''),
-          field('Retainage Release', ''),
-          field('Surveying & Staking', (function(){var s=(g.engineering||[]).find(function(c){return /survey/i.test(c.scope||'');});return s?s.company:'';})(), 'Contacts'),
+          field('Retainage % Withheld', SF.retainage_pct, SS),
+          field('Retainage Release', SF.retainage_release, SS),
+          field('Payment Terms', SF.payment_terms, SS),
+          field('Liquidated Damages', SF.liquidated_damages, SS),
+          field('Surveying & Staking (who performs)', SF.surveying_staking, SS),
+          field('Surveyor', (function(){var s=(g.engineering||[]).find(function(c){return /survey/i.test(c.scope||'');});return s?s.company:'';})(), 'Contacts'),
           field('Anticipated Spoils (CY)', ''),
-          field('Project Working Hours', ''),
+          field('Project Working Hours', SF.working_hours, SS),
           field('Date COI Sent to GC', ''),
           field('Date W9 Sent to GC', '')
         ]) + linkRow(L.contract));

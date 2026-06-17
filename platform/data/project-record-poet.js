@@ -7,8 +7,8 @@ window.PF_PROJECT_POET = {
   "project_name": "POET Biosciences",
   "location": "Shelbyville, IN",
   "sp_folder": "04 - Project Management/02 - Projects/26-002 - POET Projects - POET",
-  "generated": "2026-06-17T19:19:59.698404+00:00Z",
-  "data_note": "READ-ONLY v1. Populated from SharePoint: the POET Project Info contacts file (full contact directory), the Project Bid Log (General Info metrics, Contract Info dates, award value, GC/engineer), folder doc links, and the auto-progress engine (QA/QC installed qty). Editing/saving is v2. Fields with no confirmed source render blank \u2014 never fabricated.",
+  "generated": "2026-06-17T19:52:47.892793+00:00Z",
+  "data_note": "READ-ONLY v1. Populated from SharePoint: the POET Project Info contacts file (full contact directory), the Project Bid Log (General Info metrics, Contract Info dates, award value, GC/engineer), the fully-executed POET subcontract (executed date, contract no., retainage, payment terms, LDs, prevailing wage, working hours, surveying \u2014 fills Bid-Log gaps only), folder doc links, and the auto-progress engine (QA/QC installed qty). Editing/saving is v2. Bid Log wins on shared fields; subcontract only fills blanks or confirms. Fields with no confirmed source render blank \u2014 never fabricated.",
   "contacts": {
     "title": "Poet Biosciences Shelbyville, IN - Pier Foundations Contact Log",
     "groups": {
@@ -398,5 +398,53 @@ window.PF_PROJECT_POET = {
     "design_paid_date": "2026-02-01",
     "source_file": "01 - Admin/13 - Master Spreadsheets/Project Bid Log.xlsx",
     "source_sheet": "Agg Pier Bid Log"
-  }
+  },
+  "subcontract": {
+    "fields": {
+      "subcontract_number": "SHB03E14 (POET Project No. SHB-03)",
+      "fully_executed_date": "2026-03-31",
+      "agreement_date": "25th day of March in the year of 2026",
+      "project_address": "2373 West 300 North, Shelbyville, IN 46176",
+      "gc_party": "POET Design & Construction, Inc., 4615 N Lewis Ave, Sioux Falls, SD 57104",
+      "owner_party": "POET Holding Company, LLC & Affiliated Entities, Sioux Falls, SD",
+      "subcontract_value": "$343,037.07",
+      "confirmed_scope": "Aggregate Piers installation (Grains/Fermentation areas) per bid package dated 2/4/2026",
+      "contract_duration_calendar": "134 calendar days",
+      "retainage_pct": "0% (no retainage withheld)",
+      "retainage_release": "Per Exhibit A Sec A.9.8.4 \u2014 release of applicable retainage upon Substantial Completion",
+      "payment_terms": "Net ~30 \u2014 App for Payment monthly; if received by month-end, paid by the 30th of the following month; otherwise within 30 days of receipt (Sec 5.1.2/5.1.3). No pay-if-paid clause found on the agreement face.",
+      "liquidated_damages": "$500.00 per calendar day past Substantial Completion / each Milestone",
+      "prevailing_wage": "Yes \u2014 IRA prevailing wage + apprenticeship (Davis-Bacon-style rates per US Sec. of Labor; 15% apprentice labor hours), IRC 45/48 enhanced-credit Labor Requirements (Exhibit P)",
+      "certified_payroll": "Yes \u2014 weekly certified payroll records submitted through LCP Tracker (Exhibit P)",
+      "working_hours": "Regular working hours; no overtime, Saturday, Sunday, or legal-holiday work without Design-Builder's prior written consent (Sec A.3.4.4)",
+      "surveying_staking": "Contractor (PF) provides personnel to survey and lay out the Work (Sec A.3.4.1)",
+      "tax_note": "Conditional \u2014 Bid Form: proposal includes all State/Municipal Sales & Use Taxes; an Excise Tax exemption certificate provided with the contract if applicable; tax-exempt certificates referenced in the Project Manual (not attached to this PDF). Not definitively stated on face.",
+      "commencement_date": "March 30, 2026"
+    },
+    "snippets": {
+      "subcontract_number": "PROJECT NUMBER: SHB-03 CONTRACT NUMBER: SHB03E14 (executed Notice to Proceed)",
+      "fully_executed_date": "(Date) ... Brad Reinking Partner/Owner ... Docusign ... 3/31/2026 3/31/2026 (both Design-Builder and Contractor signatures dated 3/31/2026)",
+      "agreement_date": "AGREEMENT made as of the 25th day of March in the year of 2026",
+      "project_address": "POET Bioprocessing - Shelbyville 2373 West 300 North Shelbyville, IN 46176",
+      "gc_party": "BETWEEN the Design-Builder: POET Design & Construction, Inc. 4615 N Lewis Ave Sioux Falls, SD 57104",
+      "owner_party": "Owner: POET Holding Company, LLC & Affiliated Entities 4615 N. Lewis Ave. Sioux Falls, SD",
+      "subcontract_value": "The Stipulated Sum is Three Hundred Forty-Three Thousand Thirty-Seven and 07/100 Dollars ($343,037.07), subject to additions and deductions",
+      "confirmed_scope": "Aggregate Piers installation as detailed in bid package dated 2/4/2026. (Exhibit C, Contractor's Scope of Work)",
+      "contract_duration_calendar": "entire scope of work shall be completed within 134 calendar days",
+      "retainage_pct": "Take that portion of the Contract Sum ... less retainage of zero percent (0%) on the Work (Section 5.2.2.1, Stipulated Sum)",
+      "retainage_release": "Section A.9.8.4 of Exhibit A, Terms and Conditions discusses release of applicable retainage upon Substantial Completion of Work.",
+      "payment_terms": "The period covered by each Application for Payment will be one calendar month ... the Design-Builder will make payment to the Contractor not later than the 30th day of the following month ... otherwise not later than thirty (30) days after the Design-Builder receives the Application for Payment. (Sec 5.1.3)",
+      "liquidated_damages": "liquidated damages in the amount of Five Hundred Dollars and No Cents ($500.00) per day for each calendar day beyond the date of Substantial Completion or each calendar day beyond each Milestone date (Sec 3.2)",
+      "prevailing_wage": "compliance with the prevailing wage and apprenticeship requirements as detailed in Exhibit P. ... wages at rates not less than the prevailing rates ... in accordance with Subchapter IV of Chapter 31 of Title 40 ... not less than 15% of the total labor hours ... performed by qualified apprentices (Exhibit P)",
+      "certified_payroll": "submit weekly certified payroll records to Design Builder through LCP Tracker",
+      "working_hours": "all Work at the site shall be performed during regular working hours, and Contractor shall not permit overtime work or the performance of Work on Saturday, Sunday, or any legal holiday without Design-Builder's prior written consent. (Sec A.3.4.4)",
+      "surveying_staking": "Contractor shall provide competent, suitably qualified personnel to survey and lay out the Work, perform construction ... (Sec A.3.4.1)",
+      "tax_note": "The Subcontractor acknowledges that the foregoing proposal includes all applicable State and Municipal Sales and Use Taxes on materials ... If applicable, an Excise Tax exemption certificate will be provided with the contract. (See Project Manual for Tax Exempt Certificates)",
+      "commencement_date": "You are notified that the Contract Times under the Contract will commence to run on: March 30, 2026"
+    },
+    "source_file": "26-0331 - POET Subcontract Agmt FE.pdf",
+    "pages": 424,
+    "scanned_pages": []
+  },
+  "discrepancies": []
 };

@@ -32,6 +32,13 @@ Brad confirmed sources 2026-06-17. Until PF's own BD software ships, the portal 
 - Income: 4100 Agg Pier, 4200 Helical Piling, 4900 Retainage. Management 6000s, Professional Fees 7000s, Insurance 7100s, Overhead 7200s. Full list (158 rows) in the workbook — reference there, do not duplicate.
 - Used in Phase 6 (Company Financials, built ON TOP of QuickBooks per Brad's decision) and the per-project Financials/Job Cost Report.
 
+## Field source precedence — General Info & Contract Info (Brad 2026-06-17)
+For each project-record field, fill in this order, first available wins:
+1. **Estimating side (Bid Log)** — primary for General Info (scope, qty/LF, dates, value, GC, engineer).
+2. **LOI** — once issued and saved to the project folder, fills gaps the estimating side lacks.
+3. **Subcontract agreement** — extrapolate remaining fields (executed date, subcontract #, retainage, payment terms, LDs, confirmed scope, county/township, tax status, working hours) from the fully-executed subcontract.
+Tag each field with its source in the UI. Never fabricate — leave blank if no source has it. (POET has a fully-executed subcontract "26-0331 - POET Subcontract Agmt FE.pdf" and no separate LOI.)
+
 ## Already-built engines (reuse)
 - **Auto %-complete** (`data/progress-data.js`): installed columns + LF per project from GUHMA logs → QA/QC section + completion %.
 - **Subcontract review** (subcontracts.html + review docs): extracted contract terms + risk flags → Subcontract + Contract Info + the clickable risk dashboard (Phase 4).
