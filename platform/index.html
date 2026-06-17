@@ -1537,8 +1537,8 @@ window.progress = (function () {
     <div class="nav-section collapsed">
       <div class="nav-section-label" onclick="this.parentElement.classList.toggle('collapsed')">Field Operations</div>
 
-      <!-- Projects (link to existing Active Projects Summary) -->
-      <a class="nav-item" data-module="projects" onclick="showModule('projects')">
+      <!-- Projects (FIELD view — operational only, NO financials) -->
+      <a class="nav-item" data-module="fo-projects" onclick="showModule('fo-projects')">
         <span class="nav-icon">&#9635;</span> Projects
       </a>
 
@@ -1944,6 +1944,13 @@ document.addEventListener('click', function(e) {
     <div id="prRoot" class="pr-root"></div>
   </div>
 
+  <!-- FIELD OPERATIONS: PROJECTS (FIELD VIEW) — operational info only, NO FINANCIALS. -->
+  <!-- List (window.PF_AWARDED + window.PF_PROGRESS) -> field detail (window.PF_PROJECT_POET, financials stripped). -->
+  <!-- Renderer: see "FIELD-FACING PROJECTS VIEW" script near bottom of body. -->
+  <div class="module-view" id="mod-fo-projects">
+    <div id="foProjRoot" class="pr-root"></div>
+  </div>
+
   <div class="module-view" id="mod-schedule-awarded">
     <div class="pf-placeholder"><div class="pf-placeholder-icon">&#128197;</div><h2>Awarded Projects Schedule</h2><p>Two-way sync with Awarded Projects coming.</p></div>
   </div>
@@ -2011,6 +2018,7 @@ const moduleTitles = {
   'precon-hp-not-awarded': 'Helical Pilings — Not Awarded',
   'awarded-projects': 'Awarded Projects',
   'fo-timesheets': 'TimeSheets',
+  'fo-projects': 'Projects — Field',
   'pf-coi': 'PF COI — Standard Coverages',
   'project-poet': '26-002 POET Biosciences',
   'schedule-awarded': 'Awarded Projects Schedule',
@@ -10213,6 +10221,396 @@ try {
     if (document.readyState !== 'loading') render();
   } catch(e) {
     console.error("Awarded projects index failed to load:", e);
+  }
+})();
+</script>
+
+<!-- ============================================================ -->
+<!-- FIELD-FACING PROJECTS VIEW (Field Operations -> Projects)      -->
+<!-- Renders into #foProjRoot. List (PF_AWARDED + PF_PROGRESS) ->   -->
+<!-- field detail (PF_PROJECT_POET, FINANCIALS STRIPPED).           -->
+<!--                                                                -->
+<!-- HARD RULE: NO FINANCIALS. The detail renderer builds field     -->
+<!-- cards ONLY from a NON-financial allow-list of source fields.   -->
+<!-- The Financials schema section and every dollar/commercial      -->
+<!-- field (subcontract value, retainage, payment terms, LDs, pay   -->
+<!-- apps, change orders, job cost, margins, price-per-anything)    -->
+<!-- are never read into the view. List shows NO value column.      -->
+<!-- ALL data-derived strings rendered via window.esc.              -->
+<!-- ============================================================ -->
+<script>
+(function(){
+  try {
+    var E = window.esc; // canonical escape helper
+
+    // ---------- shared field renderers (mirror project-record style) ----------
+    function field(label, val, src){
+      var v = (val === undefined || val === null || String(val).trim() === "") ? "" : String(val);
+      var cls = v ? "pr-field-value" : "pr-field-value empty";
+      var shown = v ? E(v) : "&mdash;";
+      var srcHtml = (src && v) ? '<span class="pr-field-src">'+E(src)+'</span>' : '';
+      return '<div class="pr-field"><span class="pr-field-label">'+E(label)+'</span>'
+           + '<span class="'+cls+'">'+shown+'</span>'+srcHtml+'</div>';
+    }
+    function fields(rows){ return '<div class="pr-fields">'+rows.join('')+'</div>'; }
+    function subhead(t){ return '<div class="pr-subhead">'+E(t)+'</div>'; }
+
+    // Strip dollar amounts and price-per-unit phrases from free-text (e.g. vendor notes)
+    // so commercial pricing never leaks into the field view.
+    function scrubMoney(s){
+      if (!s) return '';
+      var t = String(s);
+      // remove "$22.50/TN", "$1,200 per pier", "$15-20/LF", bare "$343,037.07", etc.
+      t = t.replace(/\$\s?\d[\d,]*(?:\.\d+)?\s*(?:[-–]\s*\d[\d,]*(?:\.\d+)?)?\s*(?:\/\s*\w+|per\s+\w+)?/gi, '[price omitted]');
+      // collapse leftover separators around the redaction
+      t = t.replace(/\s*[-–]\s*\[price omitted\]/g, ' [price omitted]');
+      return t;
+    }
+
+    function contactBlock(c){
+      var lines = [];
+      if (c.phone) lines.push('<span>Office: '+E(c.phone)+'</span>');
+      if (c.cell)  lines.push('<span>Cell: '+E(c.cell)+'</span>');
+      if (c.email) lines.push('<span>Email: <a href="mailto:'+E(c.email)+'">'+E(c.email)+'</a></span>');
+      if (c.address) lines.push('<span>'+E(c.address)+'</span>');
+      var noteTxt = scrubMoney(c.notes);
+      if (noteTxt) lines.push('<span>Note: '+E(noteTxt)+'</span>');
+      var top = '<div class="pr-contact-top">';
+      if (c.scope) top += '<span class="pr-contact-scope">'+E(c.scope)+'</span>';
+      if (c.name)  top += '<span class="pr-contact-name">'+E(c.name)+'</span>';
+      if (c.company) top += '<span class="pr-contact-co">'+E(c.company)+'</span>';
+      top += '</div>';
+      return '<div class="pr-contact">'+top
+           + (lines.length ? '<div class="pr-contact-lines">'+lines.join('')+'</div>' : '')
+           + '</div>';
+    }
+    function contactList(arr){
+      if (!arr || !arr.length) return '<div class="pr-empty-note">No contacts recorded for this group yet.</div>';
+      return arr.map(contactBlock).join('');
+    }
+    function linkRow(links){
+      if (!links || !links.length) return '';
+      var out = links.map(function(l){
+        if (l.found && l.url) {
+          return '<a class="pr-link" href="'+E(l.url)+'" target="_blank" rel="noopener noreferrer">&#128193; '+E(l.label)+'</a>';
+        }
+        return '<span class="pr-link missing" title="Folder not found in SharePoint">&#128193; '+E(l.label)+'</span>';
+      }).join('');
+      return '<div class="pr-subhead">Documents</div><div class="pr-links">'+out+'</div>';
+    }
+    function card(num, title, meta, bodyHtml, open){
+      var metaHtml = meta ? '<span class="pr-card-meta">'+E(meta)+'</span>' : '';
+      return '<div class="pr-card'+(open?' open':'')+'">'
+        + '<div class="pr-card-head" onclick="this.parentElement.classList.toggle(\'open\')">'
+        +   '<span class="pr-card-num">'+E(String(num))+'</span>'
+        +   '<span class="pr-card-title">'+E(title)+'</span>'
+        +   metaHtml
+        +   '<span class="pr-chev">&#9654;</span>'
+        + '</div>'
+        + '<div class="pr-card-body">'+bodyHtml+'</div>'
+        + '</div>';
+    }
+
+    // ---------- progress lookup (% complete by project number) ----------
+    function progressFor(num){
+      var P = window.PF_PROGRESS && window.PF_PROGRESS.projects;
+      if (!P) return null;
+      return P[num] || null;
+    }
+    function pctLabel(pr){
+      if (!pr) return '';
+      if (pr.pct_lf != null) return Math.round(pr.pct_lf) + '%';
+      // baseline pending -> show installed counts, never a fabricated %
+      if (pr.installed_columns != null) return pr.installed_columns + ' cols installed';
+      return 'baseline pending';
+    }
+    function dt(s){
+      if (!s) return '';
+      var m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+      return m ? (+m[2]) + '/' + (+m[3]) + '/' + m[1] : String(s);
+    }
+
+    // ===================== LIST VIEW (NO $ COLUMN) =====================
+    function renderList(){
+      var root = document.getElementById('foProjRoot');
+      if (!root) return;
+      var D = window.PF_AWARDED;
+      if (!D || !D.projects) {
+        root.innerHTML = '<div class="pf-placeholder"><div class="pf-placeholder-icon">&#9635;</div>'
+          + '<h2>Projects &mdash; Field</h2><p>Project list data not loaded.</p></div>';
+        return;
+      }
+      // Field crew works active/awarded jobs. Show the awarded list; field columns only.
+      var list = D.projects.slice();
+      list.sort(function(a,b){ return String(a.number).localeCompare(String(b.number)); });
+
+      var html = '<div class="pf-index-head">'
+        + '<h2>Projects &mdash; Field</h2>'
+        + '<p class="pf-index-sub">Operational view for the field team. Scope, schedule, safety, '
+        + 'site readiness, equipment, material and QA/QC &mdash; <strong>no financials</strong>.</p>'
+        + '<div class="pf-index-meta">' + list.length + ' active / awarded projects</div>'
+        + '</div>';
+
+      html += '<div class="pf-table-wrap"><table class="pf-table"><thead><tr>'
+        + '<th>#</th><th>Project</th><th>City / State</th><th>Scope</th>'
+        + '<th>Projected Start</th><th>% Complete</th><th></th>'
+        + '</tr></thead><tbody>';
+
+      list.forEach(function(p){
+        var pr = progressFor(p.number);
+        // Scope (piers / LF) — pulled from the per-project record where built, else discipline.
+        var scope;
+        if (p.record === 'project-poet' && window.PF_PROJECT_POET && window.PF_PROJECT_POET.bid_log) {
+          var b = window.PF_PROJECT_POET.bid_log;
+          scope = (b.total_columns ? b.total_columns + ' piers' : '')
+                + (b.total_lf ? ' / ' + b.total_lf + ' LF' : '');
+          if (!scope.trim()) scope = p.discipline || '';
+        } else {
+          scope = p.discipline || '';
+        }
+        var projStart = (p.record === 'project-poet' && window.PF_PROJECT_POET && window.PF_PROJECT_POET.bid_log)
+          ? dt(window.PF_PROJECT_POET.bid_log.projected_start) : '';
+        var pct = pctLabel(pr);
+
+        var openCell;
+        if (p.record === 'project-poet') {
+          openCell = '<a class="pf-record-link" onclick="window.foProjOpen(\'26-002\')">Open field detail</a>';
+        } else {
+          openCell = '<span class="pf-record-muted">details coming</span>';
+        }
+        html += '<tr>'
+          + '<td class="num">' + E(p.number) + '</td>'
+          + '<td>' + E(p.name) + '</td>'
+          + '<td>' + E(p.city_state) + '</td>'
+          + '<td>' + E(scope) + '</td>'
+          + '<td>' + E(projStart) + '</td>'
+          + '<td class="num">' + (pct ? E(pct) : '&mdash;') + '</td>'
+          + '<td>' + openCell + '</td>'
+          + '</tr>';
+      });
+      html += '</tbody></table></div>';
+      html += '<div class="pf-index-foot">Field view &mdash; financial data is intentionally omitted. '
+        + 'For commercial/financial details see Project Management.</div>';
+      root.innerHTML = html;
+    }
+
+    // ===================== DETAIL VIEW (POET, FINANCIALS STRIPPED) =====================
+    // Builds ONLY from a non-financial allow-list of fields. No dollar/commercial field
+    // is read into the rendered output. Verified by the FINANCIAL-LEAK self-check.
+    function renderDetailPOET(){
+      var root = document.getElementById('foProjRoot');
+      if (!root) return;
+      var D = window.PF_PROJECT_POET;
+      if (!D) {
+        root.innerHTML = '<div class="pr-note">POET field record not loaded.</div>';
+        return;
+      }
+      var bid = D.bid_log || {};
+      var g = (D.contacts && D.contacts.groups) || {};
+      var L = D.links || {};
+      var q = D.qaqc || null;
+      var SF = (D.subcontract && D.subcontract.fields) || {};
+      var SS = 'Subcontract';
+
+      // ----- header + back link -----
+      var status = bid.bid_status || '';
+      var html = '<div style="margin-bottom:14px">'
+        + '<a class="pf-record-link" onclick="window.foProjBack()">&#8592; Back to Projects</a></div>';
+      html += '<div class="pr-header">'
+        + '<div class="pr-num">PF Project '+E(D.project_number)+' &middot; Field View</div>'
+        + '<h1>'+E(D.project_name)
+        +   (status ? '<span class="pr-badge">'+E(status)+'</span>' : '')
+        + '</h1>'
+        + '<div class="pr-loc">'+E(D.location || bid.city_state || '')+'</div>'
+        + '</div>';
+      html += '<div class="pr-note">Field operations view &mdash; operational information only. '
+        + 'Financial and commercial details are intentionally excluded from this view.</div>';
+
+      // ----- 1. General Info (NO value/$ fields) -----
+      html += card(1, 'General Info', null,
+        fields([
+          field('General Contractor', bid.gc_name, 'Bid Log'),
+          field('GC Project Manager', (g.gc&&g.gc[0]?g.gc[0].name:''), 'Contacts'),
+          field('Site Superintendent', (function(){var s=(g.gc||[]).find(function(c){return /super/i.test(c.scope||'');});return s?s.name:'';})(), 'Contacts'),
+          field('Project Address', bid.address, 'Bid Log'),
+          field('City / State', bid.city_state, 'Bid Log'),
+          field('County', ''),
+          field('Township', ''),
+          field('Project Scope', SF.confirmed_scope || 'Aggregate Piers', SF.confirmed_scope ? SS : 'Bid Log'),
+          field('Total Piers (Qty)', bid.total_columns, 'Bid Log'),
+          field('Total LF', bid.total_lf, 'Bid Log'),
+          field('Column Diameter', ''),
+          field('Estimated Stone (TN)', bid.total_stone_tn, 'Bid Log'),
+          field('Estimated Spoils (CY)', ''),
+          field('Top Feed or Bottom Feed', bid.feed_type, 'Bid Log'),
+          field('Projected PF Start Date', bid.projected_start, 'Bid Log'),
+          field('Commencement Date (NTP)', SF.commencement_date, SS),
+          field('Contract Duration (working days)', bid.duration_days, 'Bid Log'),
+          field('Contract Duration (calendar days)', SF.contract_duration_calendar, SS),
+          field('Estimated Project Completion', '')
+        ]) + linkRow(L.general), true);
+
+      // ----- 2. PF Team -----
+      html += card(2, 'PF Team', (g.pf_team?g.pf_team.length+' members':null),
+        contactList(g.pf_team));
+
+      // ----- 3. Contract Info (OPERATIONAL fields ONLY — no $/retainage/payment/LD) -----
+      html += card(3, 'Contract Info (Operational)', null,
+        fields([
+          field('LOI / NOI Date', '(POET issued no separate LOI — fully-executed subcontract used)'),
+          field('Fully Executed Contract Date', SF.fully_executed_date, SS),
+          field('Certified Payroll?', SF.certified_payroll, SS),
+          field('Prevailing Wage? Rate?', SF.prevailing_wage || bid.wage_req, SF.prevailing_wage ? SS : 'Bid Log'),
+          field('Project Working Hours', SF.working_hours, SS),
+          field('Surveying & Staking (who performs)', SF.surveying_staking, SS),
+          field('Surveyor', (function(){var s=(g.engineering||[]).find(function(c){return /survey/i.test(c.scope||'');});return s?s.company:'';})(), 'Contacts'),
+          field('Date COI Sent to GC', ''),
+          field('Date W9 Sent to GC', '')
+        ]));
+
+      // ----- 4. Engineering & Design -----
+      html += card(4, 'Engineering & Design',
+        (g.engineering?g.engineering.length+' contacts':null),
+        subhead('Engineering & Design Contacts') + contactList(g.engineering)
+        + fields([
+            field('AP Design Firm', bid.engineer_firm, 'Bid Log'),
+            field('Design Completed Date', bid.design_completed_date, 'Bid Log'),
+            field('Release Date to Start Submittals', ''),
+            field('Finish Floor Elevation (FFE)', ''),
+            field('Confirmed Working Grade Elevation', ''),
+            field('Unfactored Service Loads (DL + LL)', ''),
+            field('Submittals Received from Engineering', ''),
+            field('Submittals Sent to GC', ''),
+            field('Submittals Approved & Returned', ''),
+            field('Shop Drawings Ready for Pickup', ''),
+            field('Jack to Be Used for Testing (Big/Small)', '')
+          ]) + linkRow(L.engineering));
+
+      // ----- 5. Project Safety -----
+      html += card(5, 'Project Safety', null,
+        fields([
+          field('Site Specific Safety Plan (SSSP)', 'On file (see link)', 'SharePoint'),
+          field('Safety Consultant', (function(){var s=(g.vendors||[]).find(function(c){return /safety/i.test(c.scope||'');});return s?(s.company+(s.name?' / '+s.name:'')):'';})(), 'Contacts'),
+          field('Material Safety Data Sheets (MSDS)', ''),
+          field('Toolbox Talks Prepared', ''),
+          field('Jobsite Safety Analysis (JSA)', ''),
+          field('Daily Equipment Checklist', ''),
+          field('Hand Log Sheets', ''),
+          field('Locate Ticket # (Excavator ID)', ''),
+          field('Date Locates Called In', ''),
+          field('Date Ticket Cleared to Start', ''),
+          field('Date Ticket Expires', '')
+        ]) + linkRow(L.safety));
+
+      // ----- 6. Site Readiness -----
+      html += card(6, 'Site Readiness', null,
+        fields([
+          field('Mod Load Test Report', ''),
+          field('Mod Test Jack Calibration Report', ''),
+          field('Bldg Pad Passed Proof Roll Report', ''),
+          field('Building Pad Elevation at Staking', ''),
+          field('Bldg Pad Prep Notes', ''),
+          field('Project Files in PM & Field OneDrive', ''),
+          field('Field Ops Mgr Jobsite Visit w/ GC', '')
+        ]) + linkRow(L.site));
+
+      // ----- 7. Equipment -----
+      var equipVendors = (g.vendors||[]).filter(function(c){return /equipment|rental|trucking|transport/i.test(c.scope||'');});
+      html += card(7, 'Equipment', null,
+        subhead('PF Equipment Mobilization to Site')
+        + fields([
+            field('Predrill Rig (Sany)', ''),
+            field('Mast, Vibro Rig (Deere 350G)', ''),
+            field('PF Parts Load - Gooseneck Trailer', ''),
+            field('Fall Off Load', '')
+          ])
+        + subhead('Rental Equipment & Transport (vendors)')
+        + contactList(equipVendors));
+
+      // ----- 8. Material -----
+      var matVendors = (g.vendors||[]).filter(function(c){return /stone|aggregate|fuel/i.test(c.scope||'');});
+      html += card(8, 'Material', null,
+        subhead('Stone / Fuel Vendors')
+        + contactList(matVendors)
+        + subhead('Material Detail')
+        + fields([
+            field('Stone Material Approved by Eng', ''),
+            field('Stone Material Name/Nomenclature', (function(){var s=matVendors.find(function(c){return /stone|aggregate/i.test(c.scope||'');});return s&&s.notes?scrubMoney(s.notes):'';})(), 'Contacts note'),
+            field('Stone Material Qty (TN)', bid.total_stone_tn, 'Bid Log'),
+            field('Stone Delivery Setup/Ordered', ''),
+            field('Concrete Mix (Rigid Inclusions)', ''),
+            field('Helical Material Approved by Eng', ''),
+            field('Fuel Tank/Containment', ''),
+            field('Fuel Delivery', '')
+          ]) + linkRow(L.material));
+
+      // ----- 9. QA / QC (installed quantities + % complete — NO financials) -----
+      var qaRows, qaMeta = null;
+      if (q) {
+        qaRows = [
+          field('Installed Columns', q.installed_columns, 'Auto-progress (GUHMA)'),
+          field('Installed LF', q.installed_lf, 'Auto-progress (GUHMA)'),
+          field('Design Columns (baseline)', q.design_columns, 'Baseline pending'),
+          field('Design LF (baseline)', q.design_lf, 'Baseline pending'),
+          field('% Complete (Columns)', q.pct_columns, 'Withheld - baseline pending'),
+          field('% Complete (LF)', q.pct_lf, 'Withheld - baseline pending'),
+          field('Redrill Logs', q.redrill_logs, 'Auto-progress'),
+          field('Last Log Date', q.last_log_date, 'Auto-progress'),
+          field('Modulus Load Test', ''),
+          field('Handlogs vs GUHMA Data Checks', '')
+        ];
+        qaMeta = q.installed_columns + ' cols / ' + q.installed_lf + ' LF';
+      } else {
+        qaRows = [ field('Installed Columns', ''), field('Installed LF', ''), field('Modulus Load Test', ''), field('Handlogs vs GUHMA Data Checks', '') ];
+      }
+      var qaNote = '<div class="pr-empty-note">Baseline pending &mdash; approved Garbin design totals not yet confirmed, so % complete is withheld (installed quantities shown).</div>';
+      html += card(9, 'QA / QC', qaMeta, qaNote + fields(qaRows) + linkRow(L.qaqc));
+
+      // ----- 10. Project Closeout (NO financial closeout items) -----
+      html += card(10, 'Project Closeout', null,
+        fields([
+          field('Final As Built Dwgs to Garbin Geo', ''),
+          field('Column Logs from Rig (PDF) to Garbin', ''),
+          field('Modulus Load Test - Passed - to Garbin', ''),
+          field('Certified Payroll Submitted', ''),
+          field('Final As Built Dwgs from Garbin Geo', ''),
+          field('PF Check Garbin As Builts vs PF', ''),
+          field('Final As Built Dwgs Sent to GC', '')
+        ]));
+
+      root.innerHTML = html;
+
+      // Owner + GC contacts appended into General Info card.
+      var genCard = root.querySelector('.pr-card .pr-card-body');
+      if (genCard && g.owner && g.owner.length) {
+        genCard.insertAdjacentHTML('beforeend', subhead('Owner') + contactList(g.owner) + subhead('General Contractor Contacts') + contactList(g.gc));
+      }
+      // scroll to top of module
+      root.scrollIntoView({block:'start'});
+    }
+
+    // ---------- view switching (within the fo-projects module) ----------
+    window.foProjOpen = function(num){
+      if (num === '26-002') renderDetailPOET();
+    };
+    window.foProjBack = function(){ renderList(); };
+
+    // ---------- init: show list whenever the module is opened ----------
+    function init(){
+      // render the list on load; showModule swaps module visibility but the
+      // content persists, so we (re)render the list each time the nav is clicked.
+      renderList();
+    }
+    document.addEventListener('DOMContentLoaded', init);
+    if (document.readyState !== 'loading') init();
+
+    // Re-render the LIST when the user navigates (back) to the fo-projects nav item,
+    // so they always land on the list rather than a stale detail view.
+    document.querySelectorAll('[data-module="fo-projects"]').forEach(function(el){
+      el.addEventListener('click', function(){ renderList(); });
+    });
+  } catch(e) {
+    console.error("Field-facing projects view failed to load:", e);
   }
 })();
 </script>
