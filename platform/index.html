@@ -672,6 +672,24 @@ table tbody tr:hover {
   padding: 10px 14px; margin: 0 0 8px;
 }
 .pf-index-foot { font-size: 0.78rem; color: var(--text-3); margin-top: 12px; }
+/* Preconstruction stage panels */
+.pf-count-badge {
+  display: inline-block; min-width: 20px; padding: 1px 8px; margin-left: 8px;
+  background: var(--bg-2); color: var(--text-2); border-radius: 11px;
+  font-size: 0.72rem; font-weight: 600; vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+}
+.pf-empty-state {
+  padding: 28px 18px; text-align: center; color: var(--text-3);
+  background: var(--bg-1); border: 1px dashed var(--border, #ddd);
+  border-radius: 10px; font-size: 0.88rem; line-height: 1.5;
+}
+.pf-tag-completed {
+  display: inline-block; margin-left: 6px; padding: 1px 7px;
+  background: #E6F4EA; color: #1E7A38; border-radius: 9px;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em;
+  text-transform: uppercase; vertical-align: middle;
+}
 
 /* ---- TIMESHEETS (Field Operations) ---- */
 .ts-root { max-width: 1180px; }
@@ -1177,6 +1195,8 @@ table tbody tr:hover {
 <script src="/data/budget-actual-poet.js"></script>
 <!-- Awarded Projects index (sync/build-awarded-index.py): Awarded rows from the Project Bid Log (Agg Pier + Helical sheets). -->
 <script src="/data/awarded-projects.js"></script>
+<!-- Preconstruction pipeline (sync/build-precon-pipeline.py): every Project Bid Log row bucketed by Bid Status into stage panels. -->
+<script src="/data/precon-pipeline.js"></script>
 <!-- PF standard COI coverages (sync/build-pf-coi.py): our yardstick for checking new project COI requirements. -->
 <script src="/data/pf-coi.js"></script>
 <!-- Field Operations weekly timesheets (sync/build-timesheets.py): hours allocated by Cost Code + Job # per week. -->
@@ -1946,42 +1966,45 @@ document.addEventListener('click', function(e) {
     <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9993;</div><h2>Outreach</h2><p>Business Development — to be built out.</p></div>
   </div>
 
+  <!-- Preconstruction stage panels — populated client-side by initPrecon() from -->
+  <!-- window.PF_PRECON (data/precon-pipeline.js, built by sync/build-precon-pipeline.py). -->
+  <!-- Each mount carries data-disc (ap|hp) + data-bucket; one shared renderer fills it. -->
   <div class="module-view" id="mod-precon-ap-actively-bidding">
-    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9670;</div><h2>Aggregate Piers — Actively Bidding</h2><p>This list will populate as we go.</p></div>
+    <div class="pf-index-root precon-mount" data-disc="ap" data-bucket="actively_bidding"></div>
   </div>
   <div class="module-view" id="mod-precon-ap-budget-pricing">
-    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9670;</div><h2>Aggregate Piers — Budget Pricing</h2><p>This list will populate as we go.</p></div>
+    <div class="pf-index-root precon-mount" data-disc="ap" data-bucket="budget_pricing"></div>
   </div>
   <div class="module-view" id="mod-precon-ap-feasibility-review">
-    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9670;</div><h2>Aggregate Piers — Feasibility Review</h2><p>This list will populate as we go.</p></div>
+    <div class="pf-index-root precon-mount" data-disc="ap" data-bucket="feasibility_review"></div>
   </div>
   <div class="module-view" id="mod-precon-ap-submitted-bids">
-    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9670;</div><h2>Aggregate Piers — Submitted Bids</h2><p>This list will populate as we go.</p></div>
+    <div class="pf-index-root precon-mount" data-disc="ap" data-bucket="submitted_bids"></div>
   </div>
   <div class="module-view" id="mod-precon-ap-awarded">
-    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9670;</div><h2>Aggregate Piers — Awarded</h2><p>This list will populate as we go.</p></div>
+    <div class="pf-index-root precon-mount" data-disc="ap" data-bucket="awarded"></div>
   </div>
   <div class="module-view" id="mod-precon-ap-not-awarded">
-    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9670;</div><h2>Aggregate Piers — Not Awarded</h2><p>This list will populate as we go.</p></div>
+    <div class="pf-index-root precon-mount" data-disc="ap" data-bucket="not_awarded"></div>
   </div>
 
   <div class="module-view" id="mod-precon-hp-actively-bidding">
-    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9650;</div><h2>Helical Pilings — Actively Bidding</h2><p>This list will populate as we go.</p></div>
+    <div class="pf-index-root precon-mount" data-disc="hp" data-bucket="actively_bidding"></div>
   </div>
   <div class="module-view" id="mod-precon-hp-budget-pricing">
-    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9650;</div><h2>Helical Pilings — Budget Pricing</h2><p>This list will populate as we go.</p></div>
+    <div class="pf-index-root precon-mount" data-disc="hp" data-bucket="budget_pricing"></div>
   </div>
   <div class="module-view" id="mod-precon-hp-feasibility-review">
-    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9650;</div><h2>Helical Pilings — Feasibility Review</h2><p>This list will populate as we go.</p></div>
+    <div class="pf-index-root precon-mount" data-disc="hp" data-bucket="feasibility_review"></div>
   </div>
   <div class="module-view" id="mod-precon-hp-submitted-bids">
-    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9650;</div><h2>Helical Pilings — Submitted Bids</h2><p>This list will populate as we go.</p></div>
+    <div class="pf-index-root precon-mount" data-disc="hp" data-bucket="submitted_bids"></div>
   </div>
   <div class="module-view" id="mod-precon-hp-awarded">
-    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9650;</div><h2>Helical Pilings — Awarded</h2><p>This list will populate as we go.</p></div>
+    <div class="pf-index-root precon-mount" data-disc="hp" data-bucket="awarded"></div>
   </div>
   <div class="module-view" id="mod-precon-hp-not-awarded">
-    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9650;</div><h2>Helical Pilings — Not Awarded</h2><p>This list will populate as we go.</p></div>
+    <div class="pf-index-root precon-mount" data-disc="hp" data-bucket="not_awarded"></div>
   </div>
 
   <!-- Awarded Projects index — populated client-side by initAwardedProjects() from window.PF_AWARDED (data/awarded-projects.js). -->
@@ -10424,6 +10447,122 @@ try {
     if (document.readyState !== 'loading') render();
   } catch(e) {
     console.error("Awarded projects index failed to load:", e);
+  }
+})();
+</script>
+
+<!-- ============================================================ -->
+<!-- PRECONSTRUCTION STAGE PANELS — renders window.PF_PRECON into    -->
+<!-- the 12 stage mounts (.precon-mount[data-disc][data-bucket]).    -->
+<!-- One shared renderer parameterized by (discipline, bucket).      -->
+<!-- Clean table: Project #, Name, City/State, GC, Value, Due Date.  -->
+<!-- Count in the header; empty-state message for empty buckets.     -->
+<!-- Awarded bucket: built records link to showModule(); completed   -->
+<!-- jobs show a "Completed" tag. ALL strings via window.esc.        -->
+<!-- ============================================================ -->
+<script>
+(function(){
+  try {
+    var E = window.esc;
+    var DISC_LABEL = { ap: 'Aggregate Piers', hp: 'Helical Pilings' };
+    var BUCKET_LABEL = {
+      actively_bidding: 'Actively Bidding',
+      budget_pricing: 'Budget Pricing',
+      feasibility_review: 'Feasibility Review',
+      submitted_bids: 'Submitted Bids',
+      awarded: 'Awarded',
+      not_awarded: 'Not Awarded'
+    };
+    function money(v){
+      if (v == null || v === '') return '';
+      var n = +v; if (!isFinite(n)) return '';
+      return '$' + Math.round(n).toLocaleString();
+    }
+    function renderMount(mount){
+      var disc = mount.getAttribute('data-disc');
+      var bucket = mount.getAttribute('data-bucket');
+      var D = window.PF_PRECON;
+      var title = (DISC_LABEL[disc] || disc) + ' &mdash; ' + (BUCKET_LABEL[bucket] || bucket);
+
+      if (!D || !D[disc] || !D[disc][bucket]) {
+        mount.innerHTML = '<div class="pf-placeholder"><div class="pf-placeholder-icon">&#9635;</div>'
+          + '<h2>' + title + '</h2><p>Pipeline data not loaded. Run '
+          + '<code>sync/build-precon-pipeline.py</code> to generate '
+          + '<code>data/precon-pipeline.js</code>.</p></div>';
+        return;
+      }
+
+      var list = D[disc][bucket].slice();
+      // Stable sort by project number ascending; blank numbers fall to the end.
+      list.sort(function(a,b){
+        var an = String(a.number||''), bn = String(b.number||'');
+        if (!an && !bn) return 0;
+        if (!an) return 1;
+        if (!bn) return -1;
+        return an.localeCompare(bn);
+      });
+
+      var srcLink = D.source_url
+        ? '<a href="' + E(D.source_url) + '" target="_blank" rel="noopener noreferrer">Project Bid Log</a>'
+        : E(D.source || '');
+
+      var html = '<div class="pf-index-head">'
+        + '<h2>' + title + ' <span class="pf-count-badge">' + list.length + '</span></h2>'
+        + '<div class="pf-index-meta">Source: ' + srcLink
+        + ' &middot; ' + E(D.generated || '') + '</div>'
+        + '</div>';
+
+      if (!list.length) {
+        html += '<div class="pf-empty-state">No jobs currently in '
+          + E(BUCKET_LABEL[bucket] || bucket) + ' for ' + E(DISC_LABEL[disc] || disc)
+          + '. Jobs appear here automatically as their Bid Status updates in the Project Bid Log.</div>';
+        mount.innerHTML = html;
+        return;
+      }
+
+      html += '<div class="pf-table-wrap"><table class="pf-table"><thead><tr>'
+        + '<th>#</th><th>Project</th><th>City / State</th><th>General Contractor</th>'
+        + '<th>Value</th><th>Due Date</th>'
+        + (bucket === 'awarded' ? '<th>Record</th>' : '')
+        + '</tr></thead><tbody>';
+
+      list.forEach(function(p){
+        var nameCell = E(p.name);
+        if (p.completed) {
+          nameCell += ' <span class="pf-tag-completed">Completed</span>';
+        }
+        var row = '<tr>'
+          + '<td class="num">' + E(p.number) + '</td>'
+          + '<td>' + nameCell + '</td>'
+          + '<td>' + E(p.city_state) + '</td>'
+          + '<td>' + E(p.gc) + '</td>'
+          + '<td class="num">' + E(money(p.value)) + '</td>'
+          + '<td>' + E(p.due_date) + '</td>';
+        if (bucket === 'awarded') {
+          var rec;
+          if (p.record) {
+            // record id comes from the server-side RECORD_LINKS allow-list.
+            rec = '<a class="pf-record-link" onclick="showModule(\'' + E(p.record) + '\')">Open record</a>';
+          } else {
+            rec = '<span class="pf-record-muted">record being built</span>';
+          }
+          row += '<td>' + rec + '</td>';
+        }
+        row += '</tr>';
+        html += row;
+      });
+
+      html += '</tbody></table></div>';
+      mount.innerHTML = html;
+    }
+    function renderAll(){
+      var mounts = document.querySelectorAll('.precon-mount');
+      for (var i = 0; i < mounts.length; i++) renderMount(mounts[i]);
+    }
+    document.addEventListener('DOMContentLoaded', renderAll);
+    if (document.readyState !== 'loading') renderAll();
+  } catch(e) {
+    console.error("Preconstruction pipeline panels failed to load:", e);
   }
 })();
 </script>
