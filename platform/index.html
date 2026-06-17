@@ -532,6 +532,95 @@ table tbody tr:hover {
   display: none;
 }
 
+/* ---- NESTED COLLAPSE (Level 2: subcategory, Level 3: sub-subcategory) ---- */
+/* A nav-sub groups a subcategory label + its items inside a top-level nav-section.
+   A nav-subsub nests one level deeper (used by Preconstruction). Indentation per
+   level keeps the hierarchy legible; chevron + collapse mechanics mirror level 1. */
+.nav-sub, .nav-subsub {
+  margin: 2px 0;
+}
+.nav-sub-label, .nav-subsub-label {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: rgba(255,255,255,0.5);
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+.nav-sub-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  padding: 7px 8px 5px 18px;
+}
+.nav-subsub-label {
+  font-size: 0.7rem;
+  padding: 6px 8px 5px 30px;
+  color: rgba(255,255,255,0.42);
+}
+.nav-sub-label:hover, .nav-subsub-label:hover {
+  background: rgba(255,255,255,0.05);
+  color: #ffffff;
+}
+.nav-sub-label::after, .nav-subsub-label::after {
+  content: '\25BE';
+  font-size: 0.72rem;
+  transition: transform 0.2s ease;
+  opacity: 0.7;
+}
+.nav-sub.collapsed > .nav-sub-label::after,
+.nav-subsub.collapsed > .nav-subsub-label::after {
+  transform: rotate(-90deg);
+}
+/* Hide children of a collapsed subcategory / sub-subcategory */
+.nav-sub.collapsed > .nav-item,
+.nav-sub.collapsed > .nav-subsub {
+  display: none;
+}
+.nav-subsub.collapsed > .nav-item {
+  display: none;
+}
+/* Indent nav-items by nesting level so the tree reads clearly */
+.nav-sub > .nav-item { padding-left: 26px; }
+.nav-subsub > .nav-item { padding-left: 38px; font-size: 0.8rem; }
+/* When a TOP-LEVEL section is collapsed, hide its subcategories too */
+.nav-section.collapsed .nav-sub,
+.nav-section.collapsed .nav-subsub {
+  display: none;
+}
+
+/* ---- PHASE 1 PLACEHOLDER PANELS ---- */
+.pf-placeholder {
+  max-width: 560px;
+  margin: 64px auto;
+  padding: 48px 40px;
+  text-align: center;
+  background: var(--surface, #fff);
+  border: 1px dashed rgba(0,0,0,0.12);
+  border-radius: 12px;
+}
+.pf-placeholder-icon {
+  font-size: 2.4rem;
+  color: var(--accent);
+  opacity: 0.8;
+  margin-bottom: 14px;
+}
+.pf-placeholder h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0 0 10px;
+  color: var(--text, #1a1a1a);
+}
+.pf-placeholder p {
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--muted, #666);
+  margin: 0;
+}
+
 /* ---- QUICK ACTION BUTTON ---- */
 .fab {
   position: fixed;
@@ -1008,104 +1097,12 @@ window.progress = (function () {
     <div class="brand-text">Pier Foundations</div>
   </div>
   <nav class="sidebar-nav">
-    <div class="nav-section">
-      <div class="nav-section-label">Overview</div>
-      <a class="nav-item active" data-module="dashboard" onclick="showModule('dashboard')">
-        <span class="nav-icon">&#9632;</span> Dashboard
-      </a>
-      <a class="nav-item" data-module="ceodash" onclick="showModule('ceodash')">
-        <span class="nav-icon">&#9670;</span> CEO Dashboard
-      </a>
-    </div>
-    <div class="nav-section">
-      <div class="nav-section-label" onclick="this.parentElement.classList.toggle('collapsed')">Financial</div>
-      <a class="nav-item" data-module="budgeting" onclick="showModule('budgeting')">
-        <span class="nav-icon">&#9650;</span> Budget & Forecast
-      </a>
-      <a class="nav-item" data-module="invoicing" onclick="showModule('invoicing')">
-        <span class="nav-icon">&#9644;</span> Invoicing & AR
-      </a>
-    </div>
-    <div class="nav-section">
-      <div class="nav-section-label" onclick="this.parentElement.classList.toggle('collapsed')">Bidding</div>
-      <a class="nav-item" data-module="feasibility" onclick="showModule('feasibility')">
-        <span class="nav-icon">&#9670;</span> Feasibility Tool
-      </a>
-      <a class="nav-item" data-module="pipeline" onclick="showModule('pipeline')">
-        <span class="nav-icon">&#9679;</span> Bid Pipeline
-      </a>
-      <a class="nav-item" data-module="estimating" onclick="showModule('estimating')">
-        <span class="nav-icon">&#9650;</span> Estimating
-      </a>
-      <a class="nav-item" data-module="materials" onclick="showModule('materials')">
-        <span class="nav-icon">&#9644;</span> Material Costs
-      </a>
-    </div>
-    <div class="nav-section">
-      <div class="nav-section-label" onclick="this.parentElement.classList.toggle('collapsed')">Field Operations</div>
-      <a class="nav-item" data-module="projects" onclick="showModule('projects')">
-        <span class="nav-icon">&#9635;</span> Active Projects
-      </a>
-      <a class="nav-item" data-module="subcontracts" onclick="showModule('subcontracts')">
-        <span class="nav-icon">&#128196;</span> Subcontracts
-      </a>
-      <a class="nav-item" data-module="guhma" onclick="showModule('guhma')">
-        <span class="nav-icon">&#9881;</span> QA/QC - GUHMA
-      </a>
-      <a class="nav-item" data-module="modulus" onclick="showModule('modulus')">
-        <span class="nav-icon">&#8942;</span> Modulus Testing
-      </a>
-      <a class="nav-item" data-module="dailyproduction" onclick="showModule('dailyproduction')">
-        <span class="nav-icon">&#9650;</span> Daily Production
-      </a>
-      <a class="nav-item" data-module="projecthistory" onclick="showModule('projecthistory')">
-        <span class="nav-icon">&#9707;</span> Project History
-      </a>
-      <a class="nav-item" data-module="schedule" onclick="showModule('schedule')">
-        <span class="nav-icon">&#128197;</span> Crew Schedule
-      </a>
-      <a class="nav-item" data-module="pricing" onclick="showModule('pricing')">
-        <span class="nav-icon">&#9878;</span> Stone &amp; Transport Pricing
-      </a>
-      <a class="nav-item" data-module="dailylogs" onclick="showModule('dailylogs')">
-        <span class="nav-icon">&#9998;</span> Daily Logs
-      </a>
-      <a class="nav-item" data-module="safety" onclick="showModule('safety')">
-        <span class="nav-icon">&#9888;</span> Safety
-      </a>
-      <a class="nav-item" data-module="equipment" onclick="showModule('equipment')">
-        <span class="nav-icon">&#9881;</span> Equipment
-      </a>
-      <a class="nav-item" data-module="changeorders" onclick="showModule('changeorders')">
-        <span class="nav-icon">&#9650;</span> Change Orders
-      </a>
-      <a class="nav-item" data-module="subs" onclick="showModule('subs')">
-        <span class="nav-icon">&#9679;</span> Subcontractors
-      </a>
-      <a class="nav-item" data-module="permits" onclick="showModule('permits')">
-        <span class="nav-icon">&#9635;</span> Permits
-      </a>
-      <a class="nav-item" data-module="closeout" onclick="showModule('closeout')">
-        <span class="nav-icon">&#9632;</span> Closeout
-      </a>
-    </div>
-    <div class="nav-section">
-      <div class="nav-section-label" onclick="this.parentElement.classList.toggle('collapsed')">Documents</div>
-      <a class="nav-item" data-module="proposals" onclick="showModule('proposals')">
-        <span class="nav-icon">&#9998;</span> Proposals
-      </a>
-      <a class="nav-item" data-module="docs" onclick="showModule('docs')">
-        <span class="nav-icon">&#128196;</span> SOW/SRS Docs
-      </a>
-      <a class="nav-item" data-module="sopadditions" onclick="showModule('sopadditions')">
-        <span class="nav-icon">&#9998;</span> SOP Additions
-        <span class="badge">38</span>
-      </a>
-      <a class="nav-item" data-module="alphareview" onclick="showModule('alphareview')">
-        <span class="nav-icon">&#9670;</span> Alpha Review
-      </a>
-      <a class="nav-item" data-module="sprintreports" onclick="showModule('sprintreports')">
-        <span class="nav-icon">&#9632;</span> Sprint Reports
+
+    <!-- 1) PF ADMIN -->
+    <div class="nav-section collapsed">
+      <div class="nav-section-label" onclick="this.parentElement.classList.toggle('collapsed')">PF Admin</div>
+      <a class="nav-item" data-module="pfadmin" onclick="showModule('pfadmin')">
+        <span class="nav-icon">&#9881;</span> PF Admin Home
       </a>
       <a class="nav-item" data-module="manual" onclick="showModule('manual')">
         <span class="nav-icon">&#128214;</span> User Manual
@@ -1113,8 +1110,8 @@ window.progress = (function () {
       <a class="nav-item" data-module="training" onclick="showModule('training')">
         <span class="nav-icon">&#127891;</span> Training Guides
       </a>
-      <a class="nav-item" data-module="quickbooks" onclick="showModule('quickbooks')">
-        <span class="nav-icon">&#128178;</span> QuickBooks Setup
+      <a class="nav-item" data-module="onboarding" onclick="showModule('onboarding')">
+        <span class="nav-icon">&#127891;</span> Role Onboarding
       </a>
       <a class="nav-item" data-module="coochecklist" onclick="showModule('coochecklist')">
         <span class="nav-icon">&#9989;</span> COO Knowledge Checklist
@@ -1122,12 +1119,22 @@ window.progress = (function () {
       <a class="nav-item" data-module="cheatsheet" onclick="showModule('cheatsheet')">
         <span class="nav-icon">&#128100;</span> Meet Peter (1-Pager)
       </a>
-      <a class="nav-item" data-module="onboarding" onclick="showModule('onboarding')">
-        <span class="nav-icon">&#127891;</span> Role Onboarding
+      <a class="nav-item" data-module="sopadditions" onclick="showModule('sopadditions')">
+        <span class="nav-icon">&#9998;</span> SOP Additions
+        <span class="badge">38</span>
       </a>
-    </div>
-    <div class="nav-section">
-      <div class="nav-section-label" onclick="this.parentElement.classList.toggle('collapsed')">Tools</div>
+      <a class="nav-item" data-module="docs" onclick="showModule('docs')">
+        <span class="nav-icon">&#128196;</span> SOW/SRS Docs
+      </a>
+      <a class="nav-item" data-module="alphareview" onclick="showModule('alphareview')">
+        <span class="nav-icon">&#9670;</span> Alpha Review
+      </a>
+      <a class="nav-item" data-module="sprintreports" onclick="showModule('sprintreports')">
+        <span class="nav-icon">&#9632;</span> Sprint Reports
+      </a>
+      <a class="nav-item" data-module="quickbooks" onclick="showModule('quickbooks')">
+        <span class="nav-icon">&#128178;</span> QuickBooks Setup
+      </a>
       <a class="nav-item" href="/design-studio/" target="_blank" rel="noopener noreferrer" title="Open PF Design Studio in a new tab">
         <span class="nav-icon">&#9998;</span> Design Studio <span style="opacity:.45;font-size:.75em">&#8599;</span>
       </a>
@@ -1135,6 +1142,159 @@ window.progress = (function () {
         <span class="nav-icon">&#9636;</span> Content Board <span style="opacity:.45;font-size:.75em">&#8599;</span>
       </a>
     </div>
+
+    <!-- 2) DASHBOARD -->
+    <div class="nav-section">
+      <div class="nav-section-label" onclick="this.parentElement.classList.toggle('collapsed')">Dashboard</div>
+      <a class="nav-item active" data-module="dashboard" onclick="showModule('dashboard')">
+        <span class="nav-icon">&#9632;</span> Dashboard
+      </a>
+      <a class="nav-item" data-module="ceodash" onclick="showModule('ceodash')">
+        <span class="nav-icon">&#9670;</span> CEO Dashboard
+      </a>
+    </div>
+
+    <!-- 3) BUSINESS DEVELOPMENT (placeholders — Derek builds) -->
+    <div class="nav-section collapsed">
+      <div class="nav-section-label" onclick="this.parentElement.classList.toggle('collapsed')">Business Development</div>
+      <a class="nav-item" data-module="bd-leads" onclick="showModule('bd-leads')">
+        <span class="nav-icon">&#9679;</span> Leads
+      </a>
+      <a class="nav-item" data-module="bd-targets" onclick="showModule('bd-targets')">
+        <span class="nav-icon">&#9678;</span> Target Accounts
+      </a>
+      <a class="nav-item" data-module="bd-outreach" onclick="showModule('bd-outreach')">
+        <span class="nav-icon">&#9993;</span> Outreach
+      </a>
+    </div>
+
+    <!-- 4) PRECONSTRUCTION (3 levels) -->
+    <div class="nav-section collapsed">
+      <div class="nav-section-label" onclick="this.parentElement.classList.toggle('collapsed')">Preconstruction</div>
+
+      <!-- 4a) Aggregate Piers -->
+      <div class="nav-sub collapsed">
+        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Aggregate Piers</div>
+        <a class="nav-item" data-module="precon-ap-actively-bidding" onclick="showModule('precon-ap-actively-bidding')">Actively Bidding</a>
+        <a class="nav-item" data-module="precon-ap-budget-pricing" onclick="showModule('precon-ap-budget-pricing')">Budget Pricing</a>
+        <a class="nav-item" data-module="precon-ap-feasibility-review" onclick="showModule('precon-ap-feasibility-review')">Feasibility Review</a>
+        <a class="nav-item" data-module="precon-ap-submitted-bids" onclick="showModule('precon-ap-submitted-bids')">Submitted Bids</a>
+        <a class="nav-item" data-module="precon-ap-awarded" onclick="showModule('precon-ap-awarded')">Awarded</a>
+        <a class="nav-item" data-module="precon-ap-not-awarded" onclick="showModule('precon-ap-not-awarded')">Not Awarded</a>
+      </div>
+
+      <!-- 4b) Helical Pilings -->
+      <div class="nav-sub collapsed">
+        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Helical Pilings</div>
+        <a class="nav-item" data-module="precon-hp-actively-bidding" onclick="showModule('precon-hp-actively-bidding')">Actively Bidding</a>
+        <a class="nav-item" data-module="precon-hp-budget-pricing" onclick="showModule('precon-hp-budget-pricing')">Budget Pricing</a>
+        <a class="nav-item" data-module="precon-hp-feasibility-review" onclick="showModule('precon-hp-feasibility-review')">Feasibility Review</a>
+        <a class="nav-item" data-module="precon-hp-submitted-bids" onclick="showModule('precon-hp-submitted-bids')">Submitted Bids</a>
+        <a class="nav-item" data-module="precon-hp-awarded" onclick="showModule('precon-hp-awarded')">Awarded</a>
+        <a class="nav-item" data-module="precon-hp-not-awarded" onclick="showModule('precon-hp-not-awarded')">Not Awarded</a>
+      </div>
+
+      <!-- 4c) Estimating & Tools (existing working tools) -->
+      <div class="nav-sub collapsed">
+        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Estimating &amp; Tools</div>
+        <a class="nav-item" data-module="feasibility" onclick="showModule('feasibility')">Feasibility Tool</a>
+        <a class="nav-item" data-module="pipeline" onclick="showModule('pipeline')">Bid Pipeline</a>
+        <a class="nav-item" data-module="estimating" onclick="showModule('estimating')">Estimating</a>
+        <a class="nav-item" data-module="materials" onclick="showModule('materials')">Material Costs</a>
+        <a class="nav-item" data-module="pricing" onclick="showModule('pricing')">Stone &amp; Transport Pricing</a>
+        <a class="nav-item" data-module="proposals" onclick="showModule('proposals')">Proposals</a>
+      </div>
+    </div>
+
+    <!-- 5) PROJECT MANAGEMENT -->
+    <div class="nav-section collapsed">
+      <div class="nav-section-label" onclick="this.parentElement.classList.toggle('collapsed')">Project Management</div>
+
+      <!-- 5a) Projects -->
+      <div class="nav-sub collapsed">
+        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Projects</div>
+        <a class="nav-item" data-module="projects" onclick="showModule('projects')">Active Projects</a>
+        <a class="nav-item" data-module="projecthistory" onclick="showModule('projecthistory')">Project History</a>
+        <a class="nav-item" data-module="awarded-projects" onclick="showModule('awarded-projects')">Awarded Projects</a>
+      </div>
+
+      <!-- 5b) Safety -->
+      <div class="nav-sub collapsed">
+        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Safety</div>
+        <a class="nav-item" data-module="safety" onclick="showModule('safety')">Safety</a>
+      </div>
+
+      <!-- 5c) Subcontracts -->
+      <div class="nav-sub collapsed">
+        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Subcontracts</div>
+        <a class="nav-item" data-module="subcontracts" onclick="showModule('subcontracts')">Subcontracts</a>
+      </div>
+
+      <!-- 5d) QA/QC & Field Tools (transitional) -->
+      <div class="nav-sub collapsed">
+        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">QA/QC &amp; Field Tools</div>
+        <a class="nav-item" data-module="guhma" onclick="showModule('guhma')">QA/QC - GUHMA</a>
+        <a class="nav-item" data-module="modulus" onclick="showModule('modulus')">Modulus Testing</a>
+        <a class="nav-item" data-module="dailyproduction" onclick="showModule('dailyproduction')">Daily Production</a>
+        <a class="nav-item" data-module="dailylogs" onclick="showModule('dailylogs')">Daily Logs</a>
+      </div>
+
+      <!-- 5e) Change Orders / Permits / Closeout / Subcontractors / Equipment -->
+      <div class="nav-sub collapsed">
+        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Change Orders</div>
+        <a class="nav-item" data-module="changeorders" onclick="showModule('changeorders')">Change Orders</a>
+      </div>
+      <div class="nav-sub collapsed">
+        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Permits</div>
+        <a class="nav-item" data-module="permits" onclick="showModule('permits')">Permits</a>
+      </div>
+      <div class="nav-sub collapsed">
+        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Closeout</div>
+        <a class="nav-item" data-module="closeout" onclick="showModule('closeout')">Closeout</a>
+      </div>
+      <div class="nav-sub collapsed">
+        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Subcontractors</div>
+        <a class="nav-item" data-module="subs" onclick="showModule('subs')">Subcontractors</a>
+      </div>
+      <div class="nav-sub collapsed">
+        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Equipment</div>
+        <a class="nav-item" data-module="equipment" onclick="showModule('equipment')">Equipment</a>
+      </div>
+    </div>
+
+    <!-- 6) PROJECTS SCHEDULE -->
+    <div class="nav-section collapsed">
+      <div class="nav-section-label" onclick="this.parentElement.classList.toggle('collapsed')">Projects Schedule</div>
+      <a class="nav-item" data-module="schedule" onclick="showModule('schedule')">
+        <span class="nav-icon">&#128197;</span> Crew Schedule
+      </a>
+      <a class="nav-item" data-module="schedule-awarded" onclick="showModule('schedule-awarded')">
+        <span class="nav-icon">&#9707;</span> Awarded Projects Schedule
+      </a>
+    </div>
+
+    <!-- 7) COMPANY FINANCIALS -->
+    <div class="nav-section collapsed">
+      <div class="nav-section-label" onclick="this.parentElement.classList.toggle('collapsed')">Company Financials</div>
+      <a class="nav-item" data-module="budgeting" onclick="showModule('budgeting')">
+        <span class="nav-icon">&#9650;</span> Budget & Forecast
+      </a>
+      <a class="nav-item" data-module="invoicing" onclick="showModule('invoicing')">
+        <span class="nav-icon">&#9644;</span> Invoicing & AR
+      </a>
+      <a class="nav-item" data-module="financials-wip" onclick="showModule('financials-wip')">
+        <span class="nav-icon">&#9636;</span> WIP & Cashflow
+      </a>
+    </div>
+
+    <!-- 8) PF DASHBOARD -->
+    <div class="nav-section collapsed">
+      <div class="nav-section-label" onclick="this.parentElement.classList.toggle('collapsed')">PF Dashboard</div>
+      <a class="nav-item" data-module="pf-dashboard" onclick="showModule('pf-dashboard')">
+        <span class="nav-icon">&#9707;</span> PF Dashboard
+      </a>
+    </div>
+
   </nav>
 </aside>
 
@@ -1399,6 +1559,82 @@ document.addEventListener('click', function(e) {
   <!-- INVOICING -->
   <div class="module-view" id="mod-invoicing"><div id="invoicing-app"></div></div>
 
+  <!-- ============================================================ -->
+  <!-- PHASE 1 PLACEHOLDER PANELS (nav skeleton — to be built out)  -->
+  <!-- Each is registered in showModule + moduleTitles.            -->
+  <!-- ============================================================ -->
+  <div class="module-view" id="mod-pfadmin">
+    <div class="pf-placeholder">
+      <div class="pf-placeholder-icon">&#9881;</div>
+      <h2>PF Admin</h2>
+      <p>Sections coming soon — building out as we go.</p>
+    </div>
+  </div>
+
+  <div class="module-view" id="mod-bd-leads">
+    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9679;</div><h2>Leads</h2><p>Business Development — to be built out.</p></div>
+  </div>
+  <div class="module-view" id="mod-bd-targets">
+    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9678;</div><h2>Target Accounts</h2><p>Business Development — to be built out.</p></div>
+  </div>
+  <div class="module-view" id="mod-bd-outreach">
+    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9993;</div><h2>Outreach</h2><p>Business Development — to be built out.</p></div>
+  </div>
+
+  <div class="module-view" id="mod-precon-ap-actively-bidding">
+    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9670;</div><h2>Aggregate Piers — Actively Bidding</h2><p>This list will populate as we go.</p></div>
+  </div>
+  <div class="module-view" id="mod-precon-ap-budget-pricing">
+    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9670;</div><h2>Aggregate Piers — Budget Pricing</h2><p>This list will populate as we go.</p></div>
+  </div>
+  <div class="module-view" id="mod-precon-ap-feasibility-review">
+    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9670;</div><h2>Aggregate Piers — Feasibility Review</h2><p>This list will populate as we go.</p></div>
+  </div>
+  <div class="module-view" id="mod-precon-ap-submitted-bids">
+    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9670;</div><h2>Aggregate Piers — Submitted Bids</h2><p>This list will populate as we go.</p></div>
+  </div>
+  <div class="module-view" id="mod-precon-ap-awarded">
+    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9670;</div><h2>Aggregate Piers — Awarded</h2><p>This list will populate as we go.</p></div>
+  </div>
+  <div class="module-view" id="mod-precon-ap-not-awarded">
+    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9670;</div><h2>Aggregate Piers — Not Awarded</h2><p>This list will populate as we go.</p></div>
+  </div>
+
+  <div class="module-view" id="mod-precon-hp-actively-bidding">
+    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9650;</div><h2>Helical Pilings — Actively Bidding</h2><p>This list will populate as we go.</p></div>
+  </div>
+  <div class="module-view" id="mod-precon-hp-budget-pricing">
+    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9650;</div><h2>Helical Pilings — Budget Pricing</h2><p>This list will populate as we go.</p></div>
+  </div>
+  <div class="module-view" id="mod-precon-hp-feasibility-review">
+    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9650;</div><h2>Helical Pilings — Feasibility Review</h2><p>This list will populate as we go.</p></div>
+  </div>
+  <div class="module-view" id="mod-precon-hp-submitted-bids">
+    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9650;</div><h2>Helical Pilings — Submitted Bids</h2><p>This list will populate as we go.</p></div>
+  </div>
+  <div class="module-view" id="mod-precon-hp-awarded">
+    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9650;</div><h2>Helical Pilings — Awarded</h2><p>This list will populate as we go.</p></div>
+  </div>
+  <div class="module-view" id="mod-precon-hp-not-awarded">
+    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9650;</div><h2>Helical Pilings — Not Awarded</h2><p>This list will populate as we go.</p></div>
+  </div>
+
+  <div class="module-view" id="mod-awarded-projects">
+    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9635;</div><h2>Awarded Projects</h2><p>Populates from Preconstruction &rarr; Awarded; per-project detail view coming in Phase 2.</p></div>
+  </div>
+
+  <div class="module-view" id="mod-schedule-awarded">
+    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#128197;</div><h2>Awarded Projects Schedule</h2><p>Two-way sync with Awarded Projects coming.</p></div>
+  </div>
+
+  <div class="module-view" id="mod-financials-wip">
+    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9636;</div><h2>WIP, PF Cost Codes & Cashflow</h2><p>WIP, PF cost codes, cashflow forecasting — to be built out (on top of QuickBooks).</p></div>
+  </div>
+
+  <div class="module-view" id="mod-pf-dashboard">
+    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9707;</div><h2>PF Dashboard</h2><p>To be built from the PF Project Master &ldquo;PF Dashboard&rdquo; tab.</p></div>
+  </div>
+
 </main>
 
 <script>
@@ -1437,7 +1673,28 @@ const moduleTitles = {
   coochecklist: 'COO Knowledge Checklist',
   subcontracts: 'Subcontracts',
   cheatsheet: 'Meet Peter (One-Pager)',
-  onboarding: 'Role Onboarding'
+  onboarding: 'Role Onboarding',
+  // ---- Phase 1 placeholders ----
+  pfadmin: 'PF Admin',
+  'bd-leads': 'Business Development — Leads',
+  'bd-targets': 'Business Development — Target Accounts',
+  'bd-outreach': 'Business Development — Outreach',
+  'precon-ap-actively-bidding': 'Aggregate Piers — Actively Bidding',
+  'precon-ap-budget-pricing': 'Aggregate Piers — Budget Pricing',
+  'precon-ap-feasibility-review': 'Aggregate Piers — Feasibility Review',
+  'precon-ap-submitted-bids': 'Aggregate Piers — Submitted Bids',
+  'precon-ap-awarded': 'Aggregate Piers — Awarded',
+  'precon-ap-not-awarded': 'Aggregate Piers — Not Awarded',
+  'precon-hp-actively-bidding': 'Helical Pilings — Actively Bidding',
+  'precon-hp-budget-pricing': 'Helical Pilings — Budget Pricing',
+  'precon-hp-feasibility-review': 'Helical Pilings — Feasibility Review',
+  'precon-hp-submitted-bids': 'Helical Pilings — Submitted Bids',
+  'precon-hp-awarded': 'Helical Pilings — Awarded',
+  'precon-hp-not-awarded': 'Helical Pilings — Not Awarded',
+  'awarded-projects': 'Awarded Projects',
+  'schedule-awarded': 'Awarded Projects Schedule',
+  'financials-wip': 'WIP & Cashflow',
+  'pf-dashboard': 'PF Dashboard'
 };
 
 function showModule(id) {

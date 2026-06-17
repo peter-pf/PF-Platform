@@ -1,0 +1,64 @@
+# Project Record Schema (Phase 2) — from PF Project Master → "Project Dashboard" tab
+
+**Source:** SharePoint `01 - Admin / 13 - Master Spreadsheets / PF Project Master.xlsx`, sheet **Project Dashboard**, columns A (section) → B (field group) → C (sub-field). Brad (2026-06-17): "All of this content we would want reflected... somewhere in the portal." This is the AUTHORITATIVE per-project record structure for Project Management → Projects → {project}. Supersedes the paraphrased 10-subsection list in VISION-AND-ROADMAP.md.
+
+Header fields: **PF Project Number**, **Project Name**.
+
+Related sheets in the same workbook (for later phases): `PF Dashboard`, `Project Schedule`, `2026/2025 WIP & Completed Projects`, `Accounts`, `PF Cost Codes`, `Completed`, `WIP`, `Archived Projects`.
+
+## Sections & fields
+
+### 1. General Info
+- General Contractor → Project Manager; Site Superintendent; GC Project Number / Contract No.
+- Project Address; County; Township; Project Scope; Projected PF Start Date; Contract Duration (working days); Estimated Project Completion; Total Piers (Qty); Total LF; Column Diameter; Estimated Stone (TN); Estimated Spoils (CY); Top Feed or Bottom Feed.
+
+### 2. PF Team
+- Project Manager; Field Operation Mgr; Operator 2; Operator 3; Equipment; Precon / Estimating.
+
+### 3. Contract Info
+- LOI / NOI Date; Bid Invite Date; Bid Due Date; Prelim Completed By; Fully Executed Contract Date.
+- Tax Exempt?; If not Tax Exempt, Sales Tax Rate; Certified Payroll?; Prevailing Wage? Rate?; Retainage % Amount Withheld?; Retainage Release; Surveying & Staking; Anticipated Spoils (CY); Project Working Hours; Date COI Sent to GC; Date W9 Sent to GC.
+
+### 4. Engineering & Design
+- Release Date to Start Submittals from GC.
+- Items needed for Submittal Completion → CAD Files for Structural Fndtn; Full Structural PDF set; Civil Grading Plan PDF; Finish Floor Elevation (FFE); Confirmed Working Grade Elevation; Unfactored Service Loads (DL + LL); Sent Job Number to Shop Dwg Eng.
+- Submittals Received from Engineering; Submittals Sent to GC; Submittals Approved & Returned from GC; Submittals & Shop Dwgs Saved to Files; Submittals & Shop Dwgs Sent to Print; Shop Drawings Ready for pickup; Docs Sent to Surveyor / Layout.
+- Files: Approved AP Shop Dwgs (CAD); Approved AP Shop Dwgs (PDF); Civil Drawings (PDF); Civil Drawings (CAD); PDF File for Original Survey; Structural Foundations (PDF).
+- Testing Requirements → Jack to Be Used for Testing (Big/Small).
+
+### 5. Project Safety
+- Site Specific Safety Plan (SSSP); Other Misc. Safety Docs; Material Safety Data Sheets (MSDS); Toolbox Talks Prepared for Site Team; Jobsite Safety Analysis (JSA); Daily Equipment Checklist; Hand Log Sheets.
+- Utility Locates → Locate Ticket # (Excavator ID); Date Locates Need Called In By; Date Locates Actually Called In; Date Ticket Cleared to Start; Date Ticket Expires.
+
+### 6. Site Readiness
+- Field Paperwork → Mod Load Test Report; Mod Test Jack Calibration Report.
+- Mobilization Preparation → Bldg Pad Passed Proof Roll Report; Building Pad Elevation at Staking; Bldg Pad Prep Notes.
+- Project Files in PM & Field OneDrive Folder; Field Operations Mgr Jobsite Visit w/ GC.
+
+### 7. Equipment
+- PF Equipment Mobilization to Site → Predrill Rig (Sany); Mast, Vibro Rig (Deere 350G); PF Parts Load - Gooseneck Trailer; Fall Off Load.
+- Rental Equipment Needed - Notes → Track Loader (CAT 289 or 299); Mini Excavator; Telehandler; Air Compressor.
+
+### 8. Material
+- Aggregate Piers - Notes → Stone Material Approved by Eng; Stone Material Name/Nomenclature; Stone Material Qty (TN); Stone Delivery Setup/Ordered.
+- Rigid Inclusions → Concrete Mix; Concrete Pump.
+- Helical Piles → Helical Material Approved by Eng; Helical Material Qty; Helical Delivery Setup/Ordered.
+- Equipment Fuel → Fuel Tank/Containment; Fuel Delivery.
+
+### 9. QA / QC
+- Handlogs vs GUHMA Data Checks; Modulus Load Test. *(ties to the shipped auto %-complete engine)*
+
+### 10. Financials
+- Invoicing / Pay Application → Prepare G702 & G703 for Invoicing; Prepare Lien Waiver (if app); Submit G702, G703, Lien Waiver; Invoice Due by Date of Month.
+- Retainage Billing Invoiced → Retainage Paid.
+
+### 11. Project Closeout
+- Final As Built Dwgs to Garbin Geo; Column Logs from Rig (PDF) to Garbin; Modulus Load Test - Passed - to Garbin; Certified Payroll Jobs - Certified Payroll; Final As Built Dwgs from Garbin Geo → PF Check Garbin As Builts vs PF; Final As Built Dwgs Sent to GC.
+
+### Notes
+- Free-text project notes field.
+
+## Build notes (Phase 2)
+- Each section becomes a collapsible card in the project detail view; each field editable + clickable (Brad's requirement). Many fields are date/status trackers (good for the workflow engine + project log).
+- Several fields auto-populate from data we already hold: pier/LF/stone/spoils/column-diameter from estimating; QA/QC from the auto %-complete engine; subcontract-derived fields (retainage, payment terms, scope) from the subcontract review.
+- C-column sub-field labels were partially truncated on read; re-pull exact text from the sheet when wiring fields.
