@@ -35,3 +35,18 @@ Brad confirmed sources 2026-06-17. Until PF's own BD software ships, the portal 
 ## Already-built engines (reuse)
 - **Auto %-complete** (`data/progress-data.js`): installed columns + LF per project from GUHMA logs → QA/QC section + completion %.
 - **Subcontract review** (subcontracts.html + review docs): extracted contract terms + risk flags → Subcontract + Contract Info + the clickable risk dashboard (Phase 4).
+
+## Financials: WIP, Completed, job/company cost (Brad 2026-06-17)
+Definitions:
+- **WIP (Work in Progress)** = a running total of all work **awarded but not yet completed**. Lives in the Financials section. *(This also resolves Jonathan's open pipeline question — "pipeline value = awarded but not yet completed" = WIP.)*
+- On completion a project **moves from WIP to "Completed Projects"** (rename: use **Completed Projects** instead of "Project History").
+- **Completed Projects** view = total completed to date, AND broken out by year (2025, 2026, future years).
+
+Data sources:
+- **PF Project Master.xlsx** tabs: `WIP`, `Completed`, `2026 WIP & Completed Projects`, `2025 WIP & Completed Projects` → the job-cost / WIP / completed figures (per-project and per-year).
+- **PF Financials Budget.xlsx** (true job + company cost tracking): SharePoint `01 - Admin / 03 - Financials / Accounting / PF Financials Budget` (workbook name "PF Financials Budget"). Tabs:
+  - **Chase Cking Cashflow** — most costs incurred (materials, equipment, travel, overhead, etc.).
+  - **State Bank Cashflow** — primarily employee labor costs.
+  - Together these track cost-to-job and company cashflow; reconcile against PF Cost Codes.
+- Build per Brad's decision: financials layered **on top of QuickBooks** (not replacing QB). Phase 6/7.
+

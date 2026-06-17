@@ -100,8 +100,8 @@ General: **log every email/document transfer (date + time) into the project log 
 4. **Source of truth:** need access to the "PF Project Master" (and its "PF Dashboard" tab) to model the project record + dashboard accurately.
 5. **Requirements owners:** Jonathan for workflow/testing/as-built/SOP details; Derek for BD + Communications import; Brad for financials/accounting + PF Admin.
 
-## JONATHAN (LJ) — to discuss with Brad
-- Pipeline: add a "Completed" section tracking completed value vs pipeline value (in estimating/pipeline), or fold into Active Projects (Field Ops), or both? Working definition "Pipeline value = awarded but not yet completed." Peter holding this change until Brad weighs in — it affects a couple of dashboard numbers and we want alignment first.
+## JONATHAN (LJ) — RESOLVED 2026-06-17
+- Pipeline "completed vs pipeline value" question is answered by Brad's WIP definition: **WIP = awarded but not yet completed** (lives in Financials); on completion it moves to **Completed Projects** (total to date + by year). So "pipeline value" = WIP. See DATA-SOURCES.md "Financials: WIP, Completed".
 
 ---
 
