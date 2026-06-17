@@ -73,6 +73,27 @@ Build path: a repeatable per-project extractor that reads the project folder's d
 ## Editability (Brad 2026-06-17)
 The record must be EDITABLE and user-friendly, not just read-only data. Make every cell editable with save (Phase 2 write-back per [[ARCHITECTURE-EDITABILITY]] — portal becomes system of record, backfills the source docs). The project record is a good proof-of-concept for the editable pattern. The clickable email/contact links are good; extend that user-friendliness with inline editing.
 
+## Per-job subcontract analysis (Brad 2026-06-17) — replaces the standalone Subcontracts tab
+Direction: KEEP the subcontract analysis TOOL, but run it PER JOB inside each project record, and RETIRE the standalone "Subcontracts" tab/module (subcontracts.html) — "not super useful." Each job holds its OWN contract within it, and the tool extrapolates everything from that contract into the project record's Subcontract/Contract section:
+- Project scope / scope-of-work summary
+- Contract terms & language (summarized)
+- Insurance requirements → once the project COI is issued, check it against our PF COI and produce a report IN that job (gap report)
+- Dates: contract date, project start date, commencement date
+- Liquidated damages (LDs) if any
+- Contract duration (how many days we have to do the work)
+- Total subcontract value
+*(Already proven on POET: 19 fields auto-extracted. Generalize per project.)*
+**Migration caution:** the standalone Subcontracts tab currently holds the reviewed Shiel / Park & Poplar / Schaff data. Don't delete that data until those jobs' per-job records hold their subcontract analysis, or it's preserved. Sequence: build per-job subcontract section → migrate existing reviews → then retire the tab.
+
+## Field source map (Brad 2026-06-17) — where each field is pulled from
+- **General Contractor** ← bid documents + the contract/contract agreement (multiple sources).
+- **GC Project Number / Contract No.** ← the subcontract agreement.
+- **GC Project Manager** ← email correspondence (get Peter connected to email, or Brad forwards relevant emails).
+- (Plus the Bid Log / estimating, subcontract, submittals, drawings, geotech per the document-sourced workflow above.)
+
+## Intake workflow (Brad 2026-06-17)
+When the contract comes in, **Brad forwards the contract email to Peter** → Peter ADDS it to the project AND ANALYZES it (same as the subcontracts tool), extracting the fields above into the project record. (Email-driven intake; pairs with the document-sourced population.)
+
 ## Build notes (Phase 2)
 - Each section becomes a collapsible card in the project detail view; each field editable + clickable (Brad's requirement). Many fields are date/status trackers (good for the workflow engine + project log).
 - Several fields auto-populate from data we already hold: pier/LF/stone/spoils/column-diameter from estimating; QA/QC from the auto %-complete engine; subcontract-derived fields (retainage, payment terms, scope) from the subcontract review.
