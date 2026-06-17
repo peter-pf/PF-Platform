@@ -50,3 +50,11 @@ Data sources:
   - Together these track cost-to-job and company cashflow; reconcile against PF Cost Codes.
 - Build per Brad's decision: financials layered **on top of QuickBooks** (not replacing QB). Phase 6/7.
 
+## Proposal / Bid Template (PF standard)
+- File: SharePoint `03 - Estimating / 01 - Aggregate Piers` (latest "Pier Foundations - Bid Template.docx"). Copy saved at `portal_uploads/from-portal/portal_20260617_192843_26-0422PierFoundations-BidTemplate.docx`. Jonathan is the owner.
+- Structure: Proposed Work · Project Bid Documents · Base Bid Pricing (per building/area) · Additional Pricing Options (layout, mob/demob, alt scopes, helicals) · Scope of Work · Project Workflow & Durations · Clarifications · Exclusions · General Terms & Conditions (Exhibit A) · Insurance limits table.
+- **Submittal Items Needed** (canonical list, due to PF within 1 wk of NTP/LOI — drives the submittal workflow, Phase 5, and the Engineering & Design section): Structural Foundation Plan (CAD) · Civil Grading Plan (CAD) · Full Structural (PDF) · Full Civil (PDF) · Design Service Loads (DL+LL) · Any additional geotech reports (post-bid) · Site Grade Elevation during PF install (±3"). *(If PF does staking/layout, also Survey/Site Control PDF + Civil Site Plan CAD per the workflow spec.)*
+- **PF standard commercial terms** (the BASELINE to compare GC subcontracts against in the clickable risk dashboard, Phase 4): Payment net-30, payment not withheld for others' delays · No retainage (final pay due on completion if any) · No liquidated/delay damages on PF · Changed Site Conditions clause (PF entitled to CO for differing subsurface) · Bond excluded unless stated · Proposal to be attached/referenced in the subcontract. Deviations in a GC sub (e.g. Schaaf: pay-if-paid, retainage, LDs flow-down, no DSC clause, personal guaranty) = the "risk exposure" items to surface.
+- **Insurance limits PF proposes:** CGL $1M/occ, $2M agg, $2M products-comp/op · Auto (hired/non-owned) $1M · Umbrella $3M/occ + $5M excess layer · Professional Liability + Workers Comp.
+- Uses: submittal workflow (Phase 5), proposal auto-build (ties to [[estimating-module-spec]] — Peter pre-builds ~80% of the proposal), and subcontract risk comparison (Phase 4).
+
