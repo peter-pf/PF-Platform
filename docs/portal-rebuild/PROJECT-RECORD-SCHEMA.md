@@ -58,6 +58,21 @@ Related sheets in the same workbook (for later phases): `PF Dashboard`, `Project
 ### Notes
 - Free-text project notes field.
 
+## Naming convention (Brad 2026-06-17)
+Projects are `YY-NNN - Project Name` where YY = 2-digit year (the year establishes the prefix) and NNN = 3-digit project number. POET = `26-002 - POET`. 2026 jobs = `26-NNN - Name`; 2027 jobs = `27-NNN - Name`. Portal records + folders follow this.
+
+## Document-sourced population workflow (Brad 2026-06-17) — the repeatable intake
+Goal: ultimately the record's fields are EXTRACTED from the project's source documents, not hand-keyed, and this repeats for every new project. Brad will show where each document type lives on a typical project. Source docs to extract from:
+- **Contract / subcontract** → Contract Info, General Info (parties, dates, value, retainage, payment, LDs, scope). *(Already proven on POET: 19 fields auto-extracted from the executed subcontract.)*
+- **Submittal documents** → Engineering & Design (submittal items, drawings, testing requirements).
+- **Original contract drawings** (structural foundation, civil) + **geotech report** → General Info (scope, loads), Engineering & Design, Site Readiness.
+- Bid Log / estimating → General Info (already wired).
+
+Build path: a repeatable per-project extractor that reads the project folder's documents and populates General Info, PF Team, Contract Info, Engineering & Design, Project Safety, Site Readiness, etc. Generalize the POET subcontract extractor to take `--project NN-NNN` and run across the project's document set. NEXT INPUT NEEDED FROM BRAD: a walkthrough of where each document type lives in a typical project folder, so the extractor knows where to look.
+
+## Editability (Brad 2026-06-17)
+The record must be EDITABLE and user-friendly, not just read-only data. Make every cell editable with save (Phase 2 write-back per [[ARCHITECTURE-EDITABILITY]] — portal becomes system of record, backfills the source docs). The project record is a good proof-of-concept for the editable pattern. The clickable email/contact links are good; extend that user-friendliness with inline editing.
+
 ## Build notes (Phase 2)
 - Each section becomes a collapsible card in the project detail view; each field editable + clickable (Brad's requirement). Many fields are date/status trackers (good for the workflow engine + project log).
 - Several fields auto-populate from data we already hold: pier/LF/stone/spoils/column-diameter from estimating; QA/QC from the auto %-complete engine; subcontract-derived fields (retainage, payment terms, scope) from the subcontract review.
