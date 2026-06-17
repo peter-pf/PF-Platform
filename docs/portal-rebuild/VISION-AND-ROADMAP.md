@@ -101,7 +101,8 @@ General: **log every email/document transfer (date + time) into the project log 
 5. **Requirements owners:** Jonathan for workflow/testing/as-built/SOP details; Derek for BD + Communications import; Brad for financials/accounting + PF Admin.
 
 ## JONATHAN (LJ) — RESOLVED 2026-06-17
-- Pipeline "completed vs pipeline value" question is answered by Brad's WIP definition: **WIP = awarded but not yet completed** (lives in Financials); on completion it moves to **Completed Projects** (total to date + by year). So "pipeline value" = WIP. See DATA-SOURCES.md "Financials: WIP, Completed".
+- Definition: **WIP = awarded but not yet completed** (= "pipeline value"); on completion it moves to **Completed Projects** (total to date + by year). See DATA-SOURCES.md "Financials: WIP, Completed".
+- **Placement (Brad's call):** track completed value vs pipeline value in **BOTH** the estimating side (Preconstruction / Bid Pipeline) **AND** Project Management → Active Projects. Both surfaces show pipeline (awarded-not-completed) and completed value; keep the numbers driven from one source (Bid Log award status + auto-progress completion) so they agree.
 
 ---
 
