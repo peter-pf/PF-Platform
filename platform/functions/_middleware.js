@@ -28,7 +28,11 @@ import {
 } from './lib/auth.js';
 
 // Paths that don't require auth at all.
-const PUBLIC_PATHS = ['/favicon.ico', '/robots.txt', '/login.html'];
+// NOTE: Cloudflare Pages serves "foo.html" at the clean URL "/foo" (308), so we
+// allow-list BOTH forms for the non-sensitive auth/denied pages. /denied is here
+// (not sensitive) so a denied-area redirect can't loop for an authenticated user.
+const PUBLIC_PATHS = ['/favicon.ico', '/robots.txt',
+  '/login.html', '/login', '/denied.html', '/denied'];
 
 // Paths that bypass the SESSION gate (they ARE the auth surface).
 const AUTH_ENDPOINTS = ['/api/login', '/api/logout'];
@@ -103,6 +107,7 @@ export async function onRequest(context) {
                         !path.startsWith('/api/') && areaForPath(path) === 'general';
         const allowedForReset =
           path === RESET_PAGE ||
+          path === '/reset-password' ||   // clean-URL form of RESET_PAGE
           path === RESET_ENDPOINT ||
           path === '/api/logout' ||
           isAsset;

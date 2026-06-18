@@ -21,7 +21,7 @@
 // Tunables
 // ---------------------------------------------------------------------------
 export const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12h working session
-export const PBKDF2_ITERATIONS = 210000;           // OWASP 2023 floor for PBKDF2-HMAC-SHA256
+export const PBKDF2_ITERATIONS = 100000;           // Cloudflare Workers Web Crypto caps PBKDF2 at 100000
 const PBKDF2_HASH = 'SHA-256';
 const PBKDF2_KEYLEN_BYTES = 32;                    // 256-bit derived key
 const SALT_BYTES = 16;

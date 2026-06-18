@@ -22,7 +22,7 @@ import { dirname, join } from 'node:path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // ---- MUST MATCH functions/lib/auth.js -------------------------------------
-const PBKDF2_ITERATIONS = 210000;
+const PBKDF2_ITERATIONS = 100000; // match runtime cap (Cloudflare Workers max)
 const PBKDF2_HASH = 'SHA-256';
 const PBKDF2_KEYLEN_BYTES = 32;
 const SALT_BYTES = 16;
