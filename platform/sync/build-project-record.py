@@ -612,8 +612,17 @@ def load_progress():
 
 # ---------------- assemble + write ----------------
 def _norm_money(s):
-    """Normalize a money string for comparison: strip $, commas, spaces."""
-    return re.sub(r"[^\d.]", "", str(s or ""))
+    """Normalize a money string for NUMERIC comparison: strip $, commas, spaces, then
+    compare by value so '398500' and '$398,500.00' are recognized as EQUAL (same
+    dollar amount, different formatting) and do NOT produce a false discrepancy."""
+    digits = re.sub(r"[^\d.]", "", str(s or ""))
+    if not digits:
+        return ""
+    try:
+        # canonical numeric string: drops trailing .00 / formatting differences
+        return repr(float(digits))
+    except ValueError:
+        return digits
 
 
 def detect_discrepancies(bid, sub):
@@ -778,6 +787,28 @@ PROJECT_DEEP = {
         # page-1 fingerprint we REQUIRE before trusting the doc (we've been
         # burned by mislabeled subcontracts) — must contain the owner + GC.
         "verify_tokens": ["Schaaf CPA Group", "Patterson Horth"],
+    },
+    "26-013": {
+        "name": "Park & Poplar (Garbin)",
+        "location": "Westfield, IN",
+        "sp_folder": ("04 - Project Management/02 - Projects/"
+                      "26-013 - Park & Poplar - OldTown"),
+        # NOTE: this subcontract is a DRAFT (not executed). The SharePoint copy is
+        # byte-identical to the local /tmp DRAFT (size 1,089,789). It uses Old Town
+        # Construction's own "Subcontractor Agreement" form (§-numbered body with a
+        # page-1 PROJECT/SUBCONTRACT-SUM/CONTRACTOR/SUBCONTRACTOR/OWNER block) — a
+        # different form than POET (AIA A142) or Schaaf (Patterson Horth header).
+        "subcontract_path": ("04 - Project Management/02 - Projects/"
+                             "26-013 - Park & Poplar - OldTown/"
+                             "02 - Project Management/Subcontract Agreement/"
+                             "Pier Foundations - Park and Poplar Subcontract (6-11-26) DRAFT.pdf"),
+        "subcontract_file": "Pier Foundations - Park and Poplar Subcontract (6-11-26) DRAFT.pdf",
+        "extractor": "pp",
+        # page-1 fingerprint REQUIRED before trusting the doc — owner + GC + project.
+        "verify_tokens": ["Park & Poplar", "Old Town Construction"],
+        # DRAFT (not executed): no signatures, blank Subcontractor reps. Carried on
+        # the merged record so the view shows DRAFT status (matches analysis block).
+        "execution_status": "DRAFT — needs signature",
     },
 }
 
@@ -996,6 +1027,233 @@ def parse_subcontract_schaaf(full):
     }
 
 
+def parse_subcontract_pp(full):
+    """Extract the Park & Poplar / Old Town Construction subcontract field set from
+    the already-loaded full PDF text. Same return shape + snippet discipline as the
+    POET/Schaaf parsers. This is Old Town Construction's own "Subcontractor Agreement"
+    form: a page-1 block (PROJECT DATE / SUBCONTRACT SUM / CONTRACTOR / SUBCONTRACTOR /
+    OWNER / ARCHITECT) plus a §-numbered body. THIS DOCUMENT IS A DRAFT (unsigned,
+    blank signature lines, blank Subcontractor reps). NO fabrication; a field is only
+    set when a value is genuinely found in the document."""
+    # Collapse pypdf line wraps so multi-word phrases (and the page-1 block) match on
+    # a single normalized string. Hand-written snippets below are literals.
+    flat = _collapse_ws(full)
+
+    fields = {}
+    snippets = {}
+
+    def setf(key, value, snippet):
+        if value:
+            fields[key] = value
+            snippets[key] = " ".join(snippet.split())[:400]
+
+    def grab(pattern, flags=re.S | re.I):
+        m = re.search(pattern, flat, flags)
+        return m.group(1).strip() if m else ""
+
+    # --- Subcontract / Project number ---
+    # This DRAFT has NO assigned subcontract/contract number (the analysis block
+    # records "DRAFT (not yet numbered)"). The page-1 block carries PROJECT + DATE +
+    # SUBCONTRACT SUM but no contract number field. Leave blank — never fabricate.
+
+    # --- Contract / agreement date (page-1 block: "PROJECT DATE: 6/11/2026") ---
+    cdate = grab(r"PROJECT\s*DATE\s*:\s*(\d{1,2}/\d{1,2}/\d{4})")
+    if cdate:
+        setf("agreement_date", _norm_date(cdate),
+             f"PROJECT  DATE: {cdate} (page-1 block). Draft footer: 'Last updated 5/27/2026 (BAR)'.")
+
+    # --- DRAFT status note (no signatures; unsigned) ---
+    # Signature page (pg 19) has blank "(Signature) ... Date: Date:" lines and §1.2
+    # Subcontractor Representative fields are blank — this is an unsigned DRAFT.
+    if re.search(r"This Subcontract is effective as of the day and year first written above", flat, re.I):
+        setf("fully_executed_date",
+             "Not executed — DRAFT (signature page blank; §1.2 Subcontractor reps blank)",
+             "This Subcontract is effective as of the day and year first written above. "
+             "CONTRACTOR: SUBCONTRACTOR: (Signature) (Signature) (Printed name and title) "
+             "(Printed name and title) Date: Date: (signature page left blank — unsigned DRAFT)")
+
+    # --- Parties (CONTRACTOR = GC; SUBCONTRACTOR = PF; OWNER; ARCHITECT) ---
+    if re.search(r"Old Town Construction", flat, re.I):
+        setf("gc_party",
+             "Old Town Construction, LLC (Contractor/GC), 525 North End Dr., Suite 100, "
+             "Carmel, IN 46032 — Rep: Patrick Groogan / VP Construction Joel Scheele",
+             "CONTRACTOR Name: Old Town Construction Street: 525 North End Dr., Suite 100 "
+             "City/State/Zip: Carmel, IN, 46032. Contractor's Project Representative(s) are "
+             "Vice President of Construction Joel Scheele and: Name: Patrick Groogan (§1.1, page 1)")
+    if re.search(r"Park & Poplar Residential", flat, re.I):
+        setf("owner_party",
+             "Park & Poplar Residential LLC (Owner), 525 North End Drive, Suite 100, "
+             "Carmel, IN 46032 — AFFILIATE of Contractor (§1.4)",
+             "OWNER Name: Park & Poplar Residential LLC Street: 525 North End Drive, Suite 100 "
+             "Carmel, IN 46032. §1.4 Owner Affiliation: Contractor and Owner may be affiliated "
+             "entities ... Subcontractor waives any claim or defense based upon the relationship.")
+
+    # --- Project address (page-1 block) ---
+    if re.search(r"Westfield Blvd\s*/\s*Park Street", flat, re.I):
+        setf("project_address", "Westfield Blvd / Park Street, Westfield, IN",
+             "Project Name: Park & Poplar  Project Address: Westfield Blvd/Park Street, "
+             "Westfield IN (page-1 block)")
+
+    # --- Subcontract value (page-1 block: "SUBCONTRACT SUM: $398,500.00") ---
+    val = grab(r"SUBCONTRACT\s*SUM\s*:\s*\$?\s*([\d,]+\.\d{2})")
+    if val:
+        setf("subcontract_value", "$" + val,
+             f"SUBCONTRACT SUM: ${val} (page-1 block). 'The Subcontract Sum is a fixed, firm, "
+             "and all-inclusive price ... includes all applicable federal, state, county, "
+             "municipal and local taxes ... All price escalation is included.'")
+
+    # --- Confirmed scope (Exhibit B Scope of Work — VSC + Helical Piers) ---
+    if re.search(r"Agg and Helical Pier scopes", flat, re.I):
+        setf("confirmed_scope",
+             "Vibratory Stone Columns (VSC) + Galvanized Helical Piers — full design-build "
+             "scope: submittals signed/sealed by licensed engineer, VSC & helical layout, "
+             "furnish & install at design locations, move spoils outside building footprint, "
+             "verification testing. All-inclusive of labor, material, taxes, insurance, "
+             "supervision, equipment (Exhibit B Scope of Work).",
+             "complete professional execution of Agg and Helical Pier scopes ... 3. Provide VSC "
+             "and Helical Pier Layout ... 4. Furnish and install Vibratory Stone Columns (VSC) at "
+             "design locations. 5. Furnish and install Galvanized Helical Piers at design "
+             "locations. 6. Spoils will be moved outside of building footprint by this "
+             "subcontractor. 7. Provide verification testing as required (Exhibit B)")
+
+    # --- Retainage % (§4.4 progress payments: 'less retainage of ten percent (10%)') ---
+    if re.search(r"less retainage of ten percent\s*\(10%\)", flat, re.I):
+        setf("retainage_pct",
+             "10% withheld on completed Work AND on stored materials (§4.4)",
+             "Take that portion of the Subcontract Sum properly allocable to completed Work ... "
+             "less retainage of ten percent (10%); (b) ... materials and equipment delivered and "
+             "suitably stored ... less retainage of ten percent (10%) (§4.4)")
+
+    # --- Retainage release / final payment conditions (§4.8, pay-when-paid) ---
+    if re.search(r"Contractor receives final payment from Owner for Subcontractor", flat, re.I):
+        setf("retainage_release",
+             "Final payment (which releases retainage) is contingent on, among other conditions, "
+             "Contractor receiving final payment from Owner for the Subcontractor's Work (§4.8(d)) "
+             "— Owner is Contractor's affiliate. Retainage may be held until final payment.",
+             "(d) Contractor receives final payment from Owner for Subcontractor's Work. (§4.8 "
+             "final payment conditions — preceded by close-out submissions: warranties, O&M "
+             "manuals, As-Builts, keys and other close-out submissions)")
+
+    # --- Payment terms (PAY-WHEN-PAID: progress payment 10 days after GC paid by Owner) ---
+    if re.search(r"within ten\s*\(10\)\s*days of Contractor.?s receipt of payment from the Owner", flat, re.I):
+        setf("payment_terms",
+             "PAY-WHEN-PAID — Application for Payment due by the 15th of each month (§4.3); "
+             "Contractor makes progress payments within 10 days of Contractor's RECEIPT of "
+             "payment from the Owner (§4.4). Final payment expressly conditioned on Contractor "
+             "receiving final Owner payment (§4.8(d)). Owner is Contractor's affiliate (§1.4). "
+             "If undisputed amounts unpaid 30 days past due, Subcontractor may stop work on 7 "
+             "days' notice (§4.9).",
+             "On or before the 15th day of each month ('Invoice Due Date'), the Subcontractor "
+             "shall ... submit ... an Application for Payment (§4.3). ... Contractor shall make "
+             "progress payments to the Subcontractor within ten (10) days of Contractor's receipt "
+             "of payment from the Owner. (§4.4)")
+
+    # --- Liquidated damages (proportional flow-down + Contractor's own actual delay damages) ---
+    if re.search(r"Contractor may assess liquidated damages against the Subcontractor in proportion", flat, re.I):
+        setf("liquidated_damages",
+             "Proportional flow-down — if the Prime Contract provides LDs against Contractor and "
+             "they are assessed, Contractor may assess LDs against Subcontractor in proportion to "
+             "its share of delay responsibility (capped at the amount assessed against "
+             "Contractor). PLUS Contractor may separately assess its OWN actual delay damages "
+             "(extended general conditions, acceleration costs, other actual damages) — these are "
+             "uncapped. (LDs / Delay sections). COUNSEL-FLAGGED: ask for an aggregate cap.",
+             "If the Prime Contract provides for liquidated damages against Contractor, and such "
+             "damages are assessed, Contractor may assess liquidated damages against the "
+             "Subcontractor in proportion to the Subcontractor's share of responsibility for the "
+             "delay, not to exceed the amount assessed against Contractor. ... Contractor may "
+             "suffer its own damages ... including without limitation, extended general "
+             "conditions, acceleration costs, and other actual damages ... assessed to "
+             "Subcontractor.")
+
+    # --- Bonds (§3.5: payment & performance bonds NOT required — 'No [X]') ---
+    if re.search(r"required to provide payment and performance bonds\?.{0,60}No\s*\[\s*_*X", flat, re.I):
+        setf("bonds_required",
+             "No — payment & performance bonds NOT required (§3.5 'No [X]' checked).",
+             "§ 3.5 Bonds: Is Subcontractor required to provide payment and performance bonds? "
+             "[Check One] Yes [____] No [__X__] (bonds not required)")
+
+    # --- Insurance requirements (§7/§9/§14.9 stack) ---
+    if re.search(r"Comprehensive General Liability insurance written on an ISO occurrence form", flat, re.I):
+        setf("insurance_requirements",
+             "Heavier than PF baseline. CGL (ISO occurrence): $2,000,000 BI/PD per occurrence, "
+             "$5,000,000 general aggregate PER PROJECT (CG 25 03 endorsement), $2,000,000 "
+             "products & completed operations aggregate. Employer's Liability $1,000,000 each "
+             "accident / $1,000,000 disease. Excess/Umbrella $5,000,000. Contractors Pollution "
+             "Liability $1,000,000/occurrence & $2,000,000 aggregate (triggered by "
+             "excavation/earthwork; 3-yr tail if claims-made). Professional Liability $2,000,000 "
+             "per claim / $4,000,000 aggregate (structural/design-build) or $1,000,000 / "
+             "$2,000,000 for other trades (§14.9). Best A- or better; additional-insured, "
+             "primary & noncontributory, waiver of subrogation; deductibles/SIRs borne by "
+             "Subcontractor.",
+             "Comprehensive General Liability insurance written on an ISO occurrence form ... "
+             "$2,000,000 Bodily Injury/Personal Injury per person and Property Damage per "
+             "occurrence, and $5,000,000 general aggregate per project and $2,000,000 products "
+             "and completed operations aggregate. ... Excess/umbrella liability ... at least "
+             "$5,000,000. ... Contractors Pollution Liability ... $1,000,000 per occurrence and "
+             "$2,000,000 aggregate. ... professional liability coverage with limits of not less "
+             "than $2,000,000 per claim and $4,000,000 in the aggregate (§14.9)")
+
+    # --- Certified payroll / labor standards (E-Verify; no prevailing-wage/cert-payroll clause) ---
+    if re.search(r"E-\s*Verify program", flat, re.I):
+        setf("certified_payroll",
+             "No certified-payroll requirement found on the agreement face. Labor compliance is "
+             "E-Verify + Form I-9 employment-eligibility verification (records produced within 24 "
+             "hours of request), flowed down to lower-tier subs.",
+             "Subcontractor shall verify the employment eligibility of all workers through proper "
+             "completion and retention of Form I-9s and participation in the E-Verify program, "
+             "and shall make such records available for inspection within 24 hours of request by "
+             "Contractor.")
+    # No prevailing-wage clause appears in this DRAFT — leave SF.prevailing_wage blank.
+
+    # --- Project working hours / superintendent presence (§3.7) ---
+    if re.search(r"English-speaking superintendent, foreman, or other site supervisor who shall be onsite", flat, re.I):
+        setf("working_hours",
+             "No fixed clock-hours clause on the face. Subcontractor must furnish (in writing, "
+             "for Contractor approval) an English-speaking superintendent/foreman/site supervisor "
+             "ONSITE whenever Subcontractor is performing Work; rep must attend all jobsite "
+             "safety, production and coordination meetings starting two weeks before commencement "
+             "through final completion (§3.7).",
+             "§ 3.7 Superintendent: The Subcontractor shall ... furnish in writing to Contractor "
+             "the name and qualifications of a proposed English-speaking superintendent, foreman, "
+             "or other site supervisor who shall be onsite whenever Subcontractor is performing "
+             "Work.")
+
+    # --- Surveying & staking / layout (Exhibit B — Subcontractor provides VSC/Helical layout) ---
+    if re.search(r"Provide VSC and Helical Pier Layout for the Scope of Work", flat, re.I):
+        setf("surveying_staking",
+             "Subcontractor (PF) provides VSC and Helical Pier layout for its scope (Exhibit B "
+             "item 3). Subcontractor must also maintain an authorized onsite superintendent/"
+             "foreman (§3.7).",
+             "3. Provide VSC and Helical Pier Layout for the Scope of Work. (Exhibit B, Scope of "
+             "Work)")
+
+    # --- Tax (all-inclusive lump sum includes all taxes; no tax-exempt clause) ---
+    if re.search(r"includes all applicable federal, state, county, municipal and local taxes", flat, re.I):
+        setf("tax_note",
+             "Subcontract Sum is all-inclusive and INCLUDES all applicable federal, state, "
+             "county, municipal and local taxes (sales, consumer, use and similar) plus all "
+             "tariffs and all price escalation (§4.1 / Scope). No tax-exempt certificate or "
+             "exemption clause appears on the agreement face.",
+             "The Subcontract Sum is a fixed, firm, and all-inclusive price ... includes all "
+             "applicable federal, state, county, municipal and local taxes including but not "
+             "limited to all applicable sales, consumer, use and similar taxes, and all tariffs "
+             "applicable to the Work. All price escalation is included in the Subcontract Sum.")
+
+    # --- Personal / performance guaranty ---
+    # No personal-guaranty clause found in this DRAFT (unlike Schaaf). The analysis
+    # block notes bonds are NOT required (§3.5). Leave SF.personal_guaranty blank.
+
+    # NOTE: contract duration in calendar days is NOT stated as a single figure on the
+    # agreement face; the schedule lives in Exhibit H (Project Schedule). The analysis
+    # block references a ~23-day critical-path window from that schedule. Left blank
+    # here (no single verbatim "N calendar days" value to quote) — never inferred.
+
+    return {
+        "fields": fields,
+        "snippets": snippets,
+    }
+
+
 def _norm_date(mdy):
     """MM/DD/YYYY -> YYYY-MM-DD; pass through anything unexpected."""
     m = re.match(r"(\d{1,2})/(\d{1,2})/(\d{4})", mdy.strip())
@@ -1007,6 +1265,7 @@ def _norm_date(mdy):
 
 EXTRACTORS = {
     "schaaf": parse_subcontract_schaaf,
+    "pp": parse_subcontract_pp,
 }
 
 
@@ -1108,7 +1367,19 @@ def deepen_project(token, num):
     sub, proof = deep_extract_subcontract(token, cfg)
 
     rec = records[num]
+
+    # SURGICAL FIELD MERGE — only ADD/UPDATE the subcontract, discrepancies, item_id
+    # (carried inside sub), execution_status, generated, and data_note. EVERY other
+    # field of this record is left exactly as-is. In particular the rich `analysis`
+    # block (verdict, risks, execution_status, key_terms, ...) migrated from the
+    # standalone Subcontracts review is NOT touched — we never overwrite or drop it.
     rec["subcontract"] = sub
+
+    # Surface a top-level execution_status on the record so the contract's
+    # signed/draft state is queryable on the record itself (this DRAFT = unsigned).
+    # The analysis block keeps its own execution_status independently (unchanged).
+    if cfg.get("execution_status"):
+        rec["execution_status"] = cfg["execution_status"]
 
     # discrepancy: Bid Log value vs subcontract Stipulated/Subcontract Sum (Bid Log wins)
     bid = rec.get("bid_log") or {}
@@ -1125,15 +1396,18 @@ def deepen_project(token, num):
 
     # refresh the data_note + generated stamp to reflect the deepening
     rec["generated"] = datetime.now(timezone.utc).isoformat() + "Z"
+    draft_prefix = ("DRAFT subcontract (not executed). " if cfg.get("execution_status")
+                    and "DRAFT" in cfg["execution_status"].upper() else "")
     rec["data_note"] = (
+        draft_prefix +
         "READ-ONLY. Bulk-populated from data we already hold (Bid Log metrics/dates/award, "
         "Project Info contacts, folder doc links, auto-progress QA/QC) AND deepened to POET level "
-        "with a fresh per-job subcontract extraction (executed dates, contract no., parties, value, "
-        "scope, retainage, payment terms incl. pay-if-paid, liquidated damages, personal guaranty, "
-        "certified payroll, insurance, working hours, surveying, tax) — each with a verbatim PDF "
-        "snippet. Bid Log wins on shared fields; the subcontract only fills blanks or confirms, and "
-        "any disagreement is noted, never silently overwritten. Fields with no confirmed source "
-        "render blank — never fabricated.")
+        "with a fresh per-job subcontract extraction (dates, parties, value, scope, retainage, "
+        "payment terms incl. pay-when/if-paid, liquidated damages, bonds, certified payroll/labor, "
+        "insurance, working hours, surveying, tax) — each with a verbatim PDF snippet. Bid Log wins "
+        "on shared fields; the subcontract only fills blanks or confirms, and any disagreement is "
+        "noted, never silently overwritten. The migrated subcontract analysis (verdict + risks) is "
+        "preserved. Fields with no confirmed source render blank — never fabricated.")
 
     header = _bulk_header_lines(orig_txt)
     _write_bulk(data, header)

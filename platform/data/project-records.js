@@ -2618,30 +2618,54 @@ window.PF_PROJECT_RECORDS = {
         "counterparty": "Shiel Sexton Concrete LLC (General Contractor)",
         "amount": "$69,700.00",
         "doc_url": "https://pierfoundations.sharepoint.com/:b:/s/pf/IQBGVczyG8v6Tq3v-YEm9LoQAQowmhZCcpYOutnRf9S5b-A",
-        "execution_status": "UNKNOWN — verify",
+        "execution_status": "UNKNOWN \u2014 verify",
         "verdict": "YELLOW",
-        "summary": "Shiel Sexton subcontract for VSC / aggregate piers at the Indianapolis Low Barrier Shelter. Commercial terms are workable but carry the usual GC-favorable cautions: pay-when-paid with no outer limit, 10% retainage released only after slab-on-grade (another trade), tight 2-day cure / 7-day claim-notice windows, and no differing-site-conditions clause. Insurance has two real gaps to close before mobilization (XCU underground confirmation and owned-auto coverage). No RED items — no personal guaranty, no pay-if-paid, no design-build PL exposure.",
+        "summary": "Shiel Sexton subcontract for VSC / aggregate piers at the Indianapolis Low Barrier Shelter. Commercial terms are workable but carry the usual GC-favorable cautions: pay-when-paid with no outer limit, 10% retainage released only after slab-on-grade (another trade), tight 2-day cure / 7-day claim-notice windows, and no differing-site-conditions clause. Insurance has two real gaps to close before mobilization (XCU underground confirmation and owned-auto coverage). No RED items \u2014 no personal guaranty, no pay-if-paid, no design-build PL exposure.",
         "key_terms": [
-          { "k": "Subcontract Amount", "v": "$69,700.00 — includes all applicable taxes & permits" },
-          { "k": "Liquidated Damages", "v": "None specified (LD field blank). Confirm no LD flow-down from prime." },
-          { "k": "Retainage", "v": "10% — released after the LATER of slab-on-grade completion OR 90 days after pier install (held past PF demob)." },
-          { "k": "Payment Terms", "v": "Pay-when-paid — paid 11 working days after GC is paid by Owner; no outer time limit (pay-if-paid risk)." },
-          { "k": "Pay App Due", "v": "Noon on the 24th of each month (pencil copy by the 20th)." },
-          { "k": "Bonds", "v": "Not required." },
-          { "k": "Warranty", "v": "1 year from substantial completion." },
-          { "k": "Disputes", "v": "Indiana law; mediation then AAA arbitration in Indianapolis." }
+          {
+            "k": "Subcontract Amount",
+            "v": "$69,700.00 \u2014 includes all applicable taxes & permits"
+          },
+          {
+            "k": "Liquidated Damages",
+            "v": "None specified (LD field blank). Confirm no LD flow-down from prime."
+          },
+          {
+            "k": "Retainage",
+            "v": "10% \u2014 released after the LATER of slab-on-grade completion OR 90 days after pier install (held past PF demob)."
+          },
+          {
+            "k": "Payment Terms",
+            "v": "Pay-when-paid \u2014 paid 11 working days after GC is paid by Owner; no outer time limit (pay-if-paid risk)."
+          },
+          {
+            "k": "Pay App Due",
+            "v": "Noon on the 24th of each month (pencil copy by the 20th)."
+          },
+          {
+            "k": "Bonds",
+            "v": "Not required."
+          },
+          {
+            "k": "Warranty",
+            "v": "1 year from substantial completion."
+          },
+          {
+            "k": "Disputes",
+            "v": "Indiana law; mediation then AAA arbitration in Indianapolis."
+          }
         ],
         "insurance_summary": "CGL $1M/occ, $2M agg, $2M products-comp (incl. XCU underground). Auto $1M CSL. WC statutory + EL $1M. Umbrella/Excess $5M occ / $5M agg. Additional Insured CG2010 10 01 + CG2037 (GC + Owner); waiver of subrogation; primary & non-contributory. COI via myCOI Central required BEFORE mobilization. Two gaps vs PF baseline: XCU underground not stated on COI (mission-critical for our work) and owned-auto coverage (PF runs titled vehicles; HNOA does not cover them).",
         "scope_summary": "Design and install Aggregate Piers / Vibratory Stone Columns (VSC) per proposal dated 4/20/26 and contract documents dated 3/12/26. PF provides engineer signed & sealed submittals, furnishes & installs VSC at design locations, and provides verification testing per PF design.",
         "risks": [
-          "Retainage (10%) released only after slab-on-grade — another trade's work — so PF's final ~$6,970 is held past demob.",
-          "Pay-when-paid with no outer limit — owner-nonpayment risk can shift to PF (pay-if-paid).",
+          "Retainage (10%) released only after slab-on-grade \u2014 another trade's work \u2014 so PF's final ~$6,970 is held past demob.",
+          "Pay-when-paid with no outer limit \u2014 owner-nonpayment risk can shift to PF (pay-if-paid).",
           "Only 2 working days to cure any deficiency (incl. schedule) before GC self-corrects and back-charges cost + overhead + profit + attorney fees.",
           "7 working days (or less) to give written notice of any claim/change, or it is waived. Signed CO required before changed work.",
-          "Broad indemnity with duty to defend (Indiana IC 26-2-5 limits it) — attorney review recommended.",
-          "No differing-site-conditions clause — unforeseen subsurface risk currently sits on PF.",
-          "Final lien waiver waives delay/acceleration/extra-work claims (even unknown) — reserve open claims before signing.",
-          "Prime contract flows down but was not provided — request and confirm no LD passthrough.",
+          "Broad indemnity with duty to defend (Indiana IC 26-2-5 limits it) \u2014 attorney review recommended.",
+          "No differing-site-conditions clause \u2014 unforeseen subsurface risk currently sits on PF.",
+          "Final lien waiver waives delay/acceleration/extra-work claims (even unknown) \u2014 reserve open claims before signing.",
+          "Prime contract flows down but was not provided \u2014 request and confirm no LD passthrough.",
           "Completion date left blank; GC-revisable schedule; 'time is of the essence.'"
         ]
       },
@@ -3026,8 +3050,8 @@ window.PF_PROJECT_RECORDS = {
       "discipline": "Aggregate Piers",
       "sp_folder": "04 - Project Management/02 - Projects/26-013 - Park & Poplar - OldTown",
       "folder_found": true,
-      "generated": "2026-06-18T00:19:32.286600+00:00Z",
-      "data_note": "READ-ONLY. Bulk-populated from data we already hold: the Project Bid Log (General Info metrics, Contract Info dates, award value, GC/engineer), the project's Project Info contacts file (if present), folder doc links (folders that exist), and the auto-progress engine (QA/QC installed qty). Per-job subcontract extraction is run separately as each contract is forwarded (POET is the reference deep record). Fields with no confirmed source render blank \u2014 never fabricated.",
+      "generated": "2026-06-18T02:35:18.472537+00:00Z",
+      "data_note": "DRAFT subcontract (not executed). READ-ONLY. Bulk-populated from data we already hold (Bid Log metrics/dates/award, Project Info contacts, folder doc links, auto-progress QA/QC) AND deepened to POET level with a fresh per-job subcontract extraction (dates, parties, value, scope, retainage, payment terms incl. pay-when/if-paid, liquidated damages, bonds, certified payroll/labor, insurance, working hours, surveying, tax) \u2014 each with a verbatim PDF snippet. Bid Log wins on shared fields; the subcontract only fills blanks or confirms, and any disagreement is noted, never silently overwritten. The migrated subcontract analysis (verdict + risks) is preserved. Fields with no confirmed source render blank \u2014 never fabricated.",
       "contacts": {
         "title": "Park & Poplar - Pier Foundations Contact Log",
         "groups": {
@@ -3388,7 +3412,50 @@ window.PF_PROJECT_RECORDS = {
         "design_completed_date": "2026-04-27",
         "design_paid_date": "2026-04-01"
       },
-      "subcontract": null,
+      "subcontract": {
+        "fields": {
+          "agreement_date": "2026-06-11",
+          "fully_executed_date": "Not executed \u2014 DRAFT (signature page blank; \u00a71.2 Subcontractor reps blank)",
+          "gc_party": "Old Town Construction, LLC (Contractor/GC), 525 North End Dr., Suite 100, Carmel, IN 46032 \u2014 Rep: Patrick Groogan / VP Construction Joel Scheele",
+          "owner_party": "Park & Poplar Residential LLC (Owner), 525 North End Drive, Suite 100, Carmel, IN 46032 \u2014 AFFILIATE of Contractor (\u00a71.4)",
+          "project_address": "Westfield Blvd / Park Street, Westfield, IN",
+          "subcontract_value": "$398,500.00",
+          "confirmed_scope": "Vibratory Stone Columns (VSC) + Galvanized Helical Piers \u2014 full design-build scope: submittals signed/sealed by licensed engineer, VSC & helical layout, furnish & install at design locations, move spoils outside building footprint, verification testing. All-inclusive of labor, material, taxes, insurance, supervision, equipment (Exhibit B Scope of Work).",
+          "retainage_pct": "10% withheld on completed Work AND on stored materials (\u00a74.4)",
+          "retainage_release": "Final payment (which releases retainage) is contingent on, among other conditions, Contractor receiving final payment from Owner for the Subcontractor's Work (\u00a74.8(d)) \u2014 Owner is Contractor's affiliate. Retainage may be held until final payment.",
+          "payment_terms": "PAY-WHEN-PAID \u2014 Application for Payment due by the 15th of each month (\u00a74.3); Contractor makes progress payments within 10 days of Contractor's RECEIPT of payment from the Owner (\u00a74.4). Final payment expressly conditioned on Contractor receiving final Owner payment (\u00a74.8(d)). Owner is Contractor's affiliate (\u00a71.4). If undisputed amounts unpaid 30 days past due, Subcontractor may stop work on 7 days' notice (\u00a74.9).",
+          "liquidated_damages": "Proportional flow-down \u2014 if the Prime Contract provides LDs against Contractor and they are assessed, Contractor may assess LDs against Subcontractor in proportion to its share of delay responsibility (capped at the amount assessed against Contractor). PLUS Contractor may separately assess its OWN actual delay damages (extended general conditions, acceleration costs, other actual damages) \u2014 these are uncapped. (LDs / Delay sections). COUNSEL-FLAGGED: ask for an aggregate cap.",
+          "bonds_required": "No \u2014 payment & performance bonds NOT required (\u00a73.5 'No [X]' checked).",
+          "insurance_requirements": "Heavier than PF baseline. CGL (ISO occurrence): $2,000,000 BI/PD per occurrence, $5,000,000 general aggregate PER PROJECT (CG 25 03 endorsement), $2,000,000 products & completed operations aggregate. Employer's Liability $1,000,000 each accident / $1,000,000 disease. Excess/Umbrella $5,000,000. Contractors Pollution Liability $1,000,000/occurrence & $2,000,000 aggregate (triggered by excavation/earthwork; 3-yr tail if claims-made). Professional Liability $2,000,000 per claim / $4,000,000 aggregate (structural/design-build) or $1,000,000 / $2,000,000 for other trades (\u00a714.9). Best A- or better; additional-insured, primary & noncontributory, waiver of subrogation; deductibles/SIRs borne by Subcontractor.",
+          "certified_payroll": "No certified-payroll requirement found on the agreement face. Labor compliance is E-Verify + Form I-9 employment-eligibility verification (records produced within 24 hours of request), flowed down to lower-tier subs.",
+          "working_hours": "No fixed clock-hours clause on the face. Subcontractor must furnish (in writing, for Contractor approval) an English-speaking superintendent/foreman/site supervisor ONSITE whenever Subcontractor is performing Work; rep must attend all jobsite safety, production and coordination meetings starting two weeks before commencement through final completion (\u00a73.7).",
+          "surveying_staking": "Subcontractor (PF) provides VSC and Helical Pier layout for its scope (Exhibit B item 3). Subcontractor must also maintain an authorized onsite superintendent/foreman (\u00a73.7).",
+          "tax_note": "Subcontract Sum is all-inclusive and INCLUDES all applicable federal, state, county, municipal and local taxes (sales, consumer, use and similar) plus all tariffs and all price escalation (\u00a74.1 / Scope). No tax-exempt certificate or exemption clause appears on the agreement face."
+        },
+        "snippets": {
+          "agreement_date": "PROJECT DATE: 6/11/2026 (page-1 block). Draft footer: 'Last updated 5/27/2026 (BAR)'.",
+          "fully_executed_date": "This Subcontract is effective as of the day and year first written above. CONTRACTOR: SUBCONTRACTOR: (Signature) (Signature) (Printed name and title) (Printed name and title) Date: Date: (signature page left blank \u2014 unsigned DRAFT)",
+          "gc_party": "CONTRACTOR Name: Old Town Construction Street: 525 North End Dr., Suite 100 City/State/Zip: Carmel, IN, 46032. Contractor's Project Representative(s) are Vice President of Construction Joel Scheele and: Name: Patrick Groogan (\u00a71.1, page 1)",
+          "owner_party": "OWNER Name: Park & Poplar Residential LLC Street: 525 North End Drive, Suite 100 Carmel, IN 46032. \u00a71.4 Owner Affiliation: Contractor and Owner may be affiliated entities ... Subcontractor waives any claim or defense based upon the relationship.",
+          "project_address": "Project Name: Park & Poplar Project Address: Westfield Blvd/Park Street, Westfield IN (page-1 block)",
+          "subcontract_value": "SUBCONTRACT SUM: $398,500.00 (page-1 block). 'The Subcontract Sum is a fixed, firm, and all-inclusive price ... includes all applicable federal, state, county, municipal and local taxes ... All price escalation is included.'",
+          "confirmed_scope": "complete professional execution of Agg and Helical Pier scopes ... 3. Provide VSC and Helical Pier Layout ... 4. Furnish and install Vibratory Stone Columns (VSC) at design locations. 5. Furnish and install Galvanized Helical Piers at design locations. 6. Spoils will be moved outside of building footprint by this subcontractor. 7. Provide verification testing as required (Exhibit B)",
+          "retainage_pct": "Take that portion of the Subcontract Sum properly allocable to completed Work ... less retainage of ten percent (10%); (b) ... materials and equipment delivered and suitably stored ... less retainage of ten percent (10%) (\u00a74.4)",
+          "retainage_release": "(d) Contractor receives final payment from Owner for Subcontractor's Work. (\u00a74.8 final payment conditions \u2014 preceded by close-out submissions: warranties, O&M manuals, As-Builts, keys and other close-out submissions)",
+          "payment_terms": "On or before the 15th day of each month ('Invoice Due Date'), the Subcontractor shall ... submit ... an Application for Payment (\u00a74.3). ... Contractor shall make progress payments to the Subcontractor within ten (10) days of Contractor's receipt of payment from the Owner. (\u00a74.4)",
+          "liquidated_damages": "If the Prime Contract provides for liquidated damages against Contractor, and such damages are assessed, Contractor may assess liquidated damages against the Subcontractor in proportion to the Subcontractor's share of responsibility for the delay, not to exceed the amount assessed against Contractor. ... Contractor may suffer its own damages ... including without limitation, extended general condi",
+          "bonds_required": "\u00a7 3.5 Bonds: Is Subcontractor required to provide payment and performance bonds? [Check One] Yes [____] No [__X__] (bonds not required)",
+          "insurance_requirements": "Comprehensive General Liability insurance written on an ISO occurrence form ... $2,000,000 Bodily Injury/Personal Injury per person and Property Damage per occurrence, and $5,000,000 general aggregate per project and $2,000,000 products and completed operations aggregate. ... Excess/umbrella liability ... at least $5,000,000. ... Contractors Pollution Liability ... $1,000,000 per occurrence and $2",
+          "certified_payroll": "Subcontractor shall verify the employment eligibility of all workers through proper completion and retention of Form I-9s and participation in the E-Verify program, and shall make such records available for inspection within 24 hours of request by Contractor.",
+          "working_hours": "\u00a7 3.7 Superintendent: The Subcontractor shall ... furnish in writing to Contractor the name and qualifications of a proposed English-speaking superintendent, foreman, or other site supervisor who shall be onsite whenever Subcontractor is performing Work.",
+          "surveying_staking": "3. Provide VSC and Helical Pier Layout for the Scope of Work. (Exhibit B, Scope of Work)",
+          "tax_note": "The Subcontract Sum is a fixed, firm, and all-inclusive price ... includes all applicable federal, state, county, municipal and local taxes including but not limited to all applicable sales, consumer, use and similar taxes, and all tariffs applicable to the Work. All price escalation is included in the Subcontract Sum."
+        },
+        "source_file": "Pier Foundations - Park and Poplar Subcontract (6-11-26) DRAFT.pdf",
+        "pages": 56,
+        "scanned_pages": [],
+        "item_id": "016ISVH63O4Z5QSFM4Z5C2SAT4ZMB6YGC5"
+      },
       "analysis": {
         "source": "Standalone Subcontracts review (subcontracts.html). Migrated into the project record.",
         "review_label": "Park & Poplar (Westfield, IN)",
@@ -3397,37 +3464,65 @@ window.PF_PROJECT_RECORDS = {
         "counterparty": "Old Town Construction, LLC (Contractor)",
         "amount": "$398,500.00",
         "doc_url": "https://pierfoundations.sharepoint.com/:b:/s/pf/IQBu5nsJFZzPRakCfMsD7BhdAamSC7PLK6cmLztyzDwwVVc",
-        "execution_status": "DRAFT — needs signature",
+        "execution_status": "DRAFT \u2014 needs signature",
         "verdict": "RED",
         "summary": "DRAFT lump-sum design-build subcontract with Old Town Construction for VSC + helical piers on a 6-story apartment + garage. Highest-dollar of the reviewed jobs ($398,500) and the highest-risk. Multiple RED items: contingent / pay-when-paid payment with an affiliate owner (Owner is Contractor's affiliate), subsurface risk shifted to PF, design-build professional-liability exposure, liquidated damages PLUS Contractor's own uncapped actual delay costs on a tight 23-day critical-path window, and flow-down of an un-attached Prime Contract. Insurance stack is heavier than PF baseline (CGL $2M/$5M, CPL $1M/$2M, PL $2M/$4M). Indiana construction-attorney review recommended before signing.",
         "key_terms": [
-          { "k": "Subcontract Amount", "v": "$398,500.00 — fixed, firm, all-inclusive lump sum (includes all taxes and all price escalation)." },
-          { "k": "Liquidated Damages", "v": "Proportional LD flow-down PLUS Contractor's own uncapped actual delay damages (extended GCs, acceleration, attorney fees) on a 23-day window. Ask for an aggregate cap." },
-          { "k": "Retainage", "v": "10% on work + stored materials; may be held until project final completion (~6/7/28) — roughly 20 months on a 23-day scope. Ask for early release or 5%." },
-          { "k": "Payment Terms", "v": "Pay-when-paid (contingent) — final payment expressly conditioned on Contractor receiving final Owner payment (§4.8(d)). Owner is Contractor's affiliate." },
-          { "k": "Pay App Due", "v": "By the 15th of each month." },
-          { "k": "Bonds", "v": "Not required (§3.5 'No' checked)." },
-          { "k": "E&O", "v": "Required — Professional Liability $2M/$4M (design-build scope, §14.9)." },
-          { "k": "Warranty", "v": "1-year call-back from Substantial Completion; broader defect warranty survives (§10.1, §10.2)." },
-          { "k": "Disputes", "v": "Indiana law; venue at project location. Stepped negotiation → AAA mediation (condition precedent) → binding AAA arbitration." }
+          {
+            "k": "Subcontract Amount",
+            "v": "$398,500.00 \u2014 fixed, firm, all-inclusive lump sum (includes all taxes and all price escalation)."
+          },
+          {
+            "k": "Liquidated Damages",
+            "v": "Proportional LD flow-down PLUS Contractor's own uncapped actual delay damages (extended GCs, acceleration, attorney fees) on a 23-day window. Ask for an aggregate cap."
+          },
+          {
+            "k": "Retainage",
+            "v": "10% on work + stored materials; may be held until project final completion (~6/7/28) \u2014 roughly 20 months on a 23-day scope. Ask for early release or 5%."
+          },
+          {
+            "k": "Payment Terms",
+            "v": "Pay-when-paid (contingent) \u2014 final payment expressly conditioned on Contractor receiving final Owner payment (\u00a74.8(d)). Owner is Contractor's affiliate."
+          },
+          {
+            "k": "Pay App Due",
+            "v": "By the 15th of each month."
+          },
+          {
+            "k": "Bonds",
+            "v": "Not required (\u00a73.5 'No' checked)."
+          },
+          {
+            "k": "E&O",
+            "v": "Required \u2014 Professional Liability $2M/$4M (design-build scope, \u00a714.9)."
+          },
+          {
+            "k": "Warranty",
+            "v": "1-year call-back from Substantial Completion; broader defect warranty survives (\u00a710.1, \u00a710.2)."
+          },
+          {
+            "k": "Disputes",
+            "v": "Indiana law; venue at project location. Stepped negotiation \u2192 AAA mediation (condition precedent) \u2192 binding AAA arbitration."
+          }
         ],
-        "insurance_summary": "CGL $2M/occ, $5M project aggregate, $2M products-completed (5-yr tail). Auto $1M. Umbrella/Excess $5M. Contractors Pollution Liability $1M/$2M (triggered by excavation/earthwork — PF qualifies, §9.1(g)). Professional Liability $2M/$4M (design-build, §14.9). Additional insureds: lender (Old Plank Trail Community Bank), Old Town Companies LLC, South Rangeline Partners LLC, plus Owner/Architect. Waiver of subrogation; primary & non-contributory. Deductibles capped $25k general / $50k PL. Gaps vs PF baseline: CGL $2M/occ + $5M project aggregate, owned-auto, and matching $2M/$4M PL for PF + sealing PE — all must be priced into the lump sum.",
-        "scope_summary": "Lump-sum DESIGN-BUILD: design the pier system, provide engineer signed & sealed PE submittals, lay out and furnish & install Vibratory Stone Columns (VSC) and galvanized Helical Piers, move spoils outside the building footprint, verification testing, and as-built drawings (Exhibit B items 1-8; §3.4).",
+        "insurance_summary": "CGL $2M/occ, $5M project aggregate, $2M products-completed (5-yr tail). Auto $1M. Umbrella/Excess $5M. Contractors Pollution Liability $1M/$2M (triggered by excavation/earthwork \u2014 PF qualifies, \u00a79.1(g)). Professional Liability $2M/$4M (design-build, \u00a714.9). Additional insureds: lender (Old Plank Trail Community Bank), Old Town Companies LLC, South Rangeline Partners LLC, plus Owner/Architect. Waiver of subrogation; primary & non-contributory. Deductibles capped $25k general / $50k PL. Gaps vs PF baseline: CGL $2M/occ + $5M project aggregate, owned-auto, and matching $2M/$4M PL for PF + sealing PE \u2014 all must be priced into the lump sum.",
+        "scope_summary": "Lump-sum DESIGN-BUILD: design the pier system, provide engineer signed & sealed PE submittals, lay out and furnish & install Vibratory Stone Columns (VSC) and galvanized Helical Piers, move spoils outside the building footprint, verification testing, and as-built drawings (Exhibit B items 1-8; \u00a73.4).",
         "risks": [
-          "RED — Contingent/pay-when-paid payment with affiliate owner: final payment conditioned on Contractor receiving final Owner payment (§4.8(d)); Owner is Contractor's affiliate, so the slow-pay squeeze PF has been burned on is concentrated.",
-          "RED — Subsurface / differing-site-condition risk shifted to PF: §2.4 relies only on PF's own evaluation; §7.7 DSC relief is narrow (3-day notice, money not clearly time); Exhibit B says meet the more-burdensome geotech requirement at no cost.",
-          "RED — Design-build professional-liability exposure: PF takes design responsibility; requires PL $2M/$4M through the statute of repose for PF and its sealing PE; must be priced into the lump sum.",
-          "RED — Liquidated damages PLUS Contractor's own actual delay costs with NO aggregate cap, on a tight 23-day critical-path window with 'time is of the essence.'",
-          "RED — Flow-down of an un-attached Prime Contract: PF agrees to be bound by all applicable Prime terms, but the Prime Contract was not provided for review (including LD rate and milestones).",
-          "YELLOW — 10% retainage held until project final completion (~6/7/26 to 6/7/28, roughly 20 months) on a 23-day scope.",
-          "YELLOW — Signed Change Order required before changed work; 7-day waiver deadlines to submit CO proposals/claims; OH&P on changes capped 10% labor / 5% materials.",
-          "YELLOW — No-damages-for-delay: for excusable delay PF's sole remedy is a time extension, even when caused by Contractor or other trades; PF absorbs its own standby/remob costs.",
-          "YELLOW — Insurance stack: CGL $2M/$5M, CPL $1M/$2M, PL $2M/$4M with 5-yr / statute-of-repose tails; confirm obtainable and already priced into $398,500.",
-          "YELLOW — Broad withholding incl. cross-default for matters on other contracts between the parties; §11.2 lien indemnity with 150% withholding.",
-          "NOTE — Prime Contract and Schedule of Values (Exhibit C) were not provided. Indiana construction attorney review recommended for payment, indemnity (IC 26-2-5), lien/retainage."
+          "RED \u2014 Contingent/pay-when-paid payment with affiliate owner: final payment conditioned on Contractor receiving final Owner payment (\u00a74.8(d)); Owner is Contractor's affiliate, so the slow-pay squeeze PF has been burned on is concentrated.",
+          "RED \u2014 Subsurface / differing-site-condition risk shifted to PF: \u00a72.4 relies only on PF's own evaluation; \u00a77.7 DSC relief is narrow (3-day notice, money not clearly time); Exhibit B says meet the more-burdensome geotech requirement at no cost.",
+          "RED \u2014 Design-build professional-liability exposure: PF takes design responsibility; requires PL $2M/$4M through the statute of repose for PF and its sealing PE; must be priced into the lump sum.",
+          "RED \u2014 Liquidated damages PLUS Contractor's own actual delay costs with NO aggregate cap, on a tight 23-day critical-path window with 'time is of the essence.'",
+          "RED \u2014 Flow-down of an un-attached Prime Contract: PF agrees to be bound by all applicable Prime terms, but the Prime Contract was not provided for review (including LD rate and milestones).",
+          "YELLOW \u2014 10% retainage held until project final completion (~6/7/26 to 6/7/28, roughly 20 months) on a 23-day scope.",
+          "YELLOW \u2014 Signed Change Order required before changed work; 7-day waiver deadlines to submit CO proposals/claims; OH&P on changes capped 10% labor / 5% materials.",
+          "YELLOW \u2014 No-damages-for-delay: for excusable delay PF's sole remedy is a time extension, even when caused by Contractor or other trades; PF absorbs its own standby/remob costs.",
+          "YELLOW \u2014 Insurance stack: CGL $2M/$5M, CPL $1M/$2M, PL $2M/$4M with 5-yr / statute-of-repose tails; confirm obtainable and already priced into $398,500.",
+          "YELLOW \u2014 Broad withholding incl. cross-default for matters on other contracts between the parties; \u00a711.2 lien indemnity with 150% withholding.",
+          "NOTE \u2014 Prime Contract and Schedule of Values (Exhibit C) were not provided. Indiana construction attorney review recommended for payment, indemnity (IC 26-2-5), lien/retainage."
         ]
       },
-      "discrepancies": []
+      "discrepancies": [],
+      "execution_status": "DRAFT \u2014 needs signature"
     },
     "26-014": {
       "project_number": "26-014",
@@ -4224,41 +4319,71 @@ window.PF_PROJECT_RECORDS = {
         "source": "Standalone Subcontracts review (subcontracts.html). Migrated into the project record; sits alongside the extracted contract fields + live embed already in this record.",
         "review_label": "Schaff CPA (Westfield, IN)",
         "subcontract_number": "26-015 / PH 22621SC03",
-        "review_date": "06/15/2026 (rev. 06/17/2026 — full 25-pg package)",
+        "review_date": "06/15/2026 (rev. 06/17/2026 \u2014 full 25-pg package)",
         "counterparty": "Patterson Horth, Inc. (Contractor)",
         "amount": "$68,200.00",
         "doc_url": "https://pierfoundations.sharepoint.com/:b:/s/pf/IQCJE8ZTSeHjQpS7LJbjmyn7AdqFwSFyOe8lfOEstyqrYsA",
-        "execution_status": "DRAFT — needs signature",
+        "execution_status": "DRAFT \u2014 needs signature",
         "verdict": "RED",
-        "summary": "Design-build Rammed Aggregate Pier subcontract with Patterson Horth for the Schaaf CPA HQ. The full 25-page package (Standard Terms + Exhibits A/B/C/D, Jobsite Policies, Safety) is now attached and reviewed — PF is no longer signing blind. Two RED items dominate: a PERSONAL GUARANTY embedded in the monthly lien-waiver form (Exhibit B, p.10) that, as written, makes Brad personally liable and defeats the LLC, and a PAY-IF-PAID clause (ST §3) that puts owner-credit risk on PF. Also RED: subsurface risk on PF (no DSC clause) and a broad indemnity. HOLD execution (DocuSign already lists Brad) until the guaranty paragraph is struck and decisions are made on pay-if-paid, subsurface, and indemnity. Indiana construction-attorney review recommended.",
+        "summary": "Design-build Rammed Aggregate Pier subcontract with Patterson Horth for the Schaaf CPA HQ. The full 25-page package (Standard Terms + Exhibits A/B/C/D, Jobsite Policies, Safety) is now attached and reviewed \u2014 PF is no longer signing blind. Two RED items dominate: a PERSONAL GUARANTY embedded in the monthly lien-waiver form (Exhibit B, p.10) that, as written, makes Brad personally liable and defeats the LLC, and a PAY-IF-PAID clause (ST \u00a73) that puts owner-credit risk on PF. Also RED: subsurface risk on PF (no DSC clause) and a broad indemnity. HOLD execution (DocuSign already lists Brad) until the guaranty paragraph is struck and decisions are made on pay-if-paid, subsurface, and indemnity. Indiana construction-attorney review recommended.",
         "key_terms": [
-          { "k": "Subcontract Amount", "v": "$68,200.00 — lump sum, all-inclusive (includes $11,500 in adds: VSC layout $5,500 + slab support $5,000 + slab-support layout $1,000)." },
-          { "k": "Liquidated Damages", "v": "'n/a' on the face, but Standard Terms §8 binds PF to the SAME LDs the Prime Contract imposes on PH 'if any'. Prime Contract not attached — request it." },
-          { "k": "Retainage", "v": "5% (lower than typical 10%). Final payment up to 100% after PF completes to PH/Owner/Architect satisfaction with final lien waivers. Ask for early release on this early trade." },
-          { "k": "Payment Terms", "v": "PAY-IF-PAID (ST §3) — owner payment to PH is a condition precedent; PF 'bears the risk of nonpayment by the Owner for any reason.' Paid 10 days after PH receives owner payment." },
-          { "k": "Pay App Due", "v": "Per accepted schedule of values; W-9 + SOV due within 10 days of execution (ST §3)." },
-          { "k": "Lien Waiver", "v": "Required with PERSONAL GUARANTY (Exhibit B, p.10) — STRIKE the guaranty / sign corporate-capacity only. Original signatures, notarized, with each billing." },
-          { "k": "Bonds", "v": "Not required (Payment & Performance Bonds — 'does not require')." },
-          { "k": "E&O", "v": "Required per face checkbox (design-build), but Exhibit C lists NO Professional Liability limit — face-vs-Exhibit-C inconsistency. Clarify the limit." },
-          { "k": "Warranty", "v": "ST §6–7: 48-hour cure on defective work within 1 year of Substantial Completion; PF defends/holds PH harmless for its defects." },
-          { "k": "Disputes", "v": "Indiana law; binding ARBITRATION (Midwest Dispute Resolution, LLC, Summary Rules); one-way attorney-fee shift (PF pays PH); 3-day claim-notice or waiver (ST §24, §30)." }
+          {
+            "k": "Subcontract Amount",
+            "v": "$68,200.00 \u2014 lump sum, all-inclusive (includes $11,500 in adds: VSC layout $5,500 + slab support $5,000 + slab-support layout $1,000)."
+          },
+          {
+            "k": "Liquidated Damages",
+            "v": "'n/a' on the face, but Standard Terms \u00a78 binds PF to the SAME LDs the Prime Contract imposes on PH 'if any'. Prime Contract not attached \u2014 request it."
+          },
+          {
+            "k": "Retainage",
+            "v": "5% (lower than typical 10%). Final payment up to 100% after PF completes to PH/Owner/Architect satisfaction with final lien waivers. Ask for early release on this early trade."
+          },
+          {
+            "k": "Payment Terms",
+            "v": "PAY-IF-PAID (ST \u00a73) \u2014 owner payment to PH is a condition precedent; PF 'bears the risk of nonpayment by the Owner for any reason.' Paid 10 days after PH receives owner payment."
+          },
+          {
+            "k": "Pay App Due",
+            "v": "Per accepted schedule of values; W-9 + SOV due within 10 days of execution (ST \u00a73)."
+          },
+          {
+            "k": "Lien Waiver",
+            "v": "Required with PERSONAL GUARANTY (Exhibit B, p.10) \u2014 STRIKE the guaranty / sign corporate-capacity only. Original signatures, notarized, with each billing."
+          },
+          {
+            "k": "Bonds",
+            "v": "Not required (Payment & Performance Bonds \u2014 'does not require')."
+          },
+          {
+            "k": "E&O",
+            "v": "Required per face checkbox (design-build), but Exhibit C lists NO Professional Liability limit \u2014 face-vs-Exhibit-C inconsistency. Clarify the limit."
+          },
+          {
+            "k": "Warranty",
+            "v": "ST \u00a76\u20137: 48-hour cure on defective work within 1 year of Substantial Completion; PF defends/holds PH harmless for its defects."
+          },
+          {
+            "k": "Disputes",
+            "v": "Indiana law; binding ARBITRATION (Midwest Dispute Resolution, LLC, Summary Rules); one-way attorney-fee shift (PF pays PH); 3-day claim-notice or waiver (ST \u00a724, \u00a730)."
+          }
         ],
-        "insurance_summary": "Exhibit C (now attached, p.25): CGL $1M each occurrence / $2M aggregate (per project), Auto $1M, Workers' Comp/EL $500K, Umbrella/Excess $1M. PH + Owner as primary additional insured maintained 2 years post-completion; primary & non-contributory; waiver of subrogation; products/completed-ops; XCU (explosion-collapse-underground) hazard coverage required. INCONSISTENCY: face checkbox marks E&O YES (design-build) but Exhibit C lists NO Professional Liability / E&O limit — clarify the required E&O limit and confirm PF + sealing PE carry it within the $68,200.",
+        "insurance_summary": "Exhibit C (now attached, p.25): CGL $1M each occurrence / $2M aggregate (per project), Auto $1M, Workers' Comp/EL $500K, Umbrella/Excess $1M. PH + Owner as primary additional insured maintained 2 years post-completion; primary & non-contributory; waiver of subrogation; products/completed-ops; XCU (explosion-collapse-underground) hazard coverage required. INCONSISTENCY: face checkbox marks E&O YES (design-build) but Exhibit C lists NO Professional Liability / E&O limit \u2014 clarify the required E&O limit and confirm PF + sealing PE carry it within the $68,200.",
         "scope_summary": "Design-build Rammed Aggregate Pier (RAP) / VSC scope per Spec Section 316000 and Contract Documents. Furnish all labor, material, taxes, insurance, supervision, and equipment; PF provides layout/engineering for its scope (control points set by CM) and final design of the system. Scope is expressly 'not limited by that scope.'",
         "risks": [
-          "RESOLVED — Prior #1 RED (signing blind): the Standard Terms & Conditions (full 10 pages, p.15–24) and Exhibits A/B/C/D, Jobsite Policies, and Safety Requirements are NOW ATTACHED in this revised 25-page package and have been reviewed. PF is no longer signing blind. (Residual: see Prime Contract item below.)",
-          "RED (NEW) — PERSONAL GUARANTY in the monthly lien-waiver form (Exhibit B, p.10): signer 'as Guarantor, in his/her individual capacity, personally guaranties any Obligation of the Subcontractor,' absolute/unconditional, enforceable without first pursuing PF. As written, each monthly waiver makes Brad personally liable and defeats the LLC. STRIKE this paragraph / sign corporate-capacity only before signing.",
-          "RED — PAY-IF-PAID (ST §3): owner payment to PH is a condition precedent; PF 'bears the risk of nonpayment by the Owner for any reason.' Owner-credit risk shifted to PF; relevant to PF's slow-pay history. Push for pay-when-paid with an outside date; confirm Schaaf CPA Group creditworthiness.",
-          "RED — Subsurface / differing-site-condition risk sits on PF: no DSC clause anywhere in the 25 pages; ST §1 has PF warrant it examined local conditions; scope 'not limited by that scope.' Name/incorporate the geotech report PF priced from and add a DSC clause for cost AND time (obstructions, refusal, unanticipated soils).",
-          "RED — Broad indemnity (ST §18): defend (PF expense, PH's counsel) / indemnify many parties for claims 'caused in whole or in part' by PF, 'regardless of whether caused in part by a party indemnified'; carve-out only the indemnitee's sole negligence/willful misconduct. Indiana anti-indemnity statute (IC 26-2-5) should read this down; Indiana counsel to confirm; confirm CGL covers it.",
-          "YELLOW — No damages for delay (ST §8): PF waives all delay/disruption/acceleration damages; time extensions only to the extent PH gets them from Owner; PF must accelerate at its own cost to hold schedule.",
-          "YELLOW — LD flow-down (ST §8): face says n/a, but PF is bound to the same LDs the Prime Contract imposes on PH 'if any' — Prime Contract not attached, confirm LDs and amount.",
-          "YELLOW — Termination (ST §21): owner-termination caps PH liability to PH's Prime recovery on PF's behalf; default termination back-charges completion costs + OH&P with no stated notice/cure; joint checks. Seek notice/cure and convenience-termination payment for work performed.",
-          "YELLOW — Back-charges net cost + 15% with no formal CO (ST §9); broad withholding (ST §20); $500 fine per missed coordination meeting (ST §5); 48-hour defect cure (ST §7); 2-business-day cure on damage to others' work (ST §16).",
-          "YELLOW — E&O limit gap: face checkbox marks E&O YES (design-build) but Exhibit C lists no Professional Liability limit. Clarify and price the coverage in.",
-          "YELLOW — Insurance Exhibit C particulars: PH/Owner additional insured for 2 years post-completion; primary & non-contributory; waiver of subrogation; XCU (explosion/collapse/underground) coverage required — confirm PF's CGL actually includes XCU and 2-year completed-ops.",
-          "YELLOW — Arbitration before a single named provider (Midwest Dispute Resolution, LLC) with a ONE-WAY attorney-fee shift (PF pays PH); 3-day claim-notice trap (ST §24).",
-          "NOTE — Prime Contract (PH-Owner) STILL not attached; it governs scope conflicts (ST §1) and flows down LDs (ST §8). Request it before signing. DocuSign already lists Brad as signer — HOLD execution until the personal-guaranty paragraph is struck and decisions are made on pay-if-paid, subsurface, and indemnity. Indiana construction attorney review recommended."
+          "RESOLVED \u2014 Prior #1 RED (signing blind): the Standard Terms & Conditions (full 10 pages, p.15\u201324) and Exhibits A/B/C/D, Jobsite Policies, and Safety Requirements are NOW ATTACHED in this revised 25-page package and have been reviewed. PF is no longer signing blind. (Residual: see Prime Contract item below.)",
+          "RED (NEW) \u2014 PERSONAL GUARANTY in the monthly lien-waiver form (Exhibit B, p.10): signer 'as Guarantor, in his/her individual capacity, personally guaranties any Obligation of the Subcontractor,' absolute/unconditional, enforceable without first pursuing PF. As written, each monthly waiver makes Brad personally liable and defeats the LLC. STRIKE this paragraph / sign corporate-capacity only before signing.",
+          "RED \u2014 PAY-IF-PAID (ST \u00a73): owner payment to PH is a condition precedent; PF 'bears the risk of nonpayment by the Owner for any reason.' Owner-credit risk shifted to PF; relevant to PF's slow-pay history. Push for pay-when-paid with an outside date; confirm Schaaf CPA Group creditworthiness.",
+          "RED \u2014 Subsurface / differing-site-condition risk sits on PF: no DSC clause anywhere in the 25 pages; ST \u00a71 has PF warrant it examined local conditions; scope 'not limited by that scope.' Name/incorporate the geotech report PF priced from and add a DSC clause for cost AND time (obstructions, refusal, unanticipated soils).",
+          "RED \u2014 Broad indemnity (ST \u00a718): defend (PF expense, PH's counsel) / indemnify many parties for claims 'caused in whole or in part' by PF, 'regardless of whether caused in part by a party indemnified'; carve-out only the indemnitee's sole negligence/willful misconduct. Indiana anti-indemnity statute (IC 26-2-5) should read this down; Indiana counsel to confirm; confirm CGL covers it.",
+          "YELLOW \u2014 No damages for delay (ST \u00a78): PF waives all delay/disruption/acceleration damages; time extensions only to the extent PH gets them from Owner; PF must accelerate at its own cost to hold schedule.",
+          "YELLOW \u2014 LD flow-down (ST \u00a78): face says n/a, but PF is bound to the same LDs the Prime Contract imposes on PH 'if any' \u2014 Prime Contract not attached, confirm LDs and amount.",
+          "YELLOW \u2014 Termination (ST \u00a721): owner-termination caps PH liability to PH's Prime recovery on PF's behalf; default termination back-charges completion costs + OH&P with no stated notice/cure; joint checks. Seek notice/cure and convenience-termination payment for work performed.",
+          "YELLOW \u2014 Back-charges net cost + 15% with no formal CO (ST \u00a79); broad withholding (ST \u00a720); $500 fine per missed coordination meeting (ST \u00a75); 48-hour defect cure (ST \u00a77); 2-business-day cure on damage to others' work (ST \u00a716).",
+          "YELLOW \u2014 E&O limit gap: face checkbox marks E&O YES (design-build) but Exhibit C lists no Professional Liability limit. Clarify and price the coverage in.",
+          "YELLOW \u2014 Insurance Exhibit C particulars: PH/Owner additional insured for 2 years post-completion; primary & non-contributory; waiver of subrogation; XCU (explosion/collapse/underground) coverage required \u2014 confirm PF's CGL actually includes XCU and 2-year completed-ops.",
+          "YELLOW \u2014 Arbitration before a single named provider (Midwest Dispute Resolution, LLC) with a ONE-WAY attorney-fee shift (PF pays PH); 3-day claim-notice trap (ST \u00a724).",
+          "NOTE \u2014 Prime Contract (PH-Owner) STILL not attached; it governs scope conflicts (ST \u00a71) and flows down LDs (ST \u00a78). Request it before signing. DocuSign already lists Brad as signer \u2014 HOLD execution until the personal-guaranty paragraph is struck and decisions are made on pay-if-paid, subsurface, and indemnity. Indiana construction attorney review recommended."
         ]
       },
       "discrepancies": [
