@@ -532,6 +532,22 @@ table tbody tr:hover {
   display: none;
 }
 
+/* ---- ROLE-AWARE UI (SEC-09): field_ops sees ONLY field-safe nav ---- */
+/* The server is the real boundary (it 403s sensitive /data/* + pages); this
+   only keeps the field crew's UI clean. When body.role-field-ops is set:
+   - hide every top-level nav-section that is NOT marked data-fo-safe / -mixed
+   - inside a data-fo-mixed section, hide items NOT marked data-fo-safe
+   - hide any item explicitly marked data-fo-hide (e.g. awarded schedule) */
+body.role-field-ops .sidebar-nav > .nav-section:not([data-fo-safe]):not([data-fo-mixed]) {
+  display: none !important;
+}
+body.role-field-ops .nav-section[data-fo-mixed] .nav-item:not([data-fo-safe]) {
+  display: none !important;
+}
+body.role-field-ops .nav-item[data-fo-hide] {
+  display: none !important;
+}
+
 /* ---- NESTED COLLAPSE (Level 2: subcategory, Level 3: sub-subcategory) ---- */
 /* A nav-sub groups a subcategory label + its items inside a top-level nav-section.
    A nav-subsub nests one level deeper (used by Preconstruction). Indentation per
@@ -1288,27 +1304,85 @@ table tbody tr:hover {
      middleware (functions/_middleware.js) — Basic Auth + httpOnly cookie,
      enforced at the edge before any content loads. No client-side gate needed. -->
 
-<!-- Live data loaded from separate file (blocks + executes before modules) -->
-<script src="/data/live-data.js"></script>
-<script src="/data/projects-data.js"></script>
-<!-- Auto %-complete from GUHMA column logs (sync/build-progress.py). LF % is the headline completion metric and drives the active->complete flip. -->
-<script src="/data/progress-data.js"></script>
-<!-- Per-project RECORD DETAIL data (sync/build-project-record.py). POET 26-002 = reference template (deepest record). READ-ONLY v1. -->
-<script src="/data/project-record-poet.js"></script>
-<!-- ALL OTHER awarded project records (sync/build-project-records.py): window.PF_PROJECT_RECORDS keyed by number. POET stays in the file above. -->
-<script src="/data/project-records.js"></script>
-<!-- Per-project Budget vs Actual job-cost tracker (sync/build-budget-actual.py). POET 26-002. INTERNAL financial data. -->
-<script src="/data/budget-actual-poet.js"></script>
-<!-- Awarded Projects index (sync/build-awarded-index.py): Awarded rows from the Project Bid Log (Agg Pier + Helical sheets). -->
-<script src="/data/awarded-projects.js"></script>
-<!-- Preconstruction pipeline (sync/build-precon-pipeline.py): every Project Bid Log row bucketed by Bid Status into stage panels. -->
-<script src="/data/precon-pipeline.js"></script>
-<!-- PF standard COI coverages (sync/build-pf-coi.py): our yardstick for checking new project COI requirements. -->
-<script src="/data/pf-coi.js"></script>
-<!-- Field Operations weekly timesheets (sync/build-timesheets.py): hours allocated by Cost Code + Job # per week. -->
-<script src="/data/timesheets.js"></script>
-<!-- Embedded crew-schedule seed: graceful fallback for the dashboard widgets if /api/schedule is unreachable. Live KV is the source of truth. -->
-<script src="/data/schedule-seed.js"></script>
+<!-- ============================================================
+     ROLE-AWARE DATA LOADING (SEC-09)
+     The SENSITIVE /data/* feeds (financials, contracts, pricing, precon,
+     bid/awarded values, COI) are NO LONGER static <script> tags. The server
+     now 403s those files for a field_ops session, so a static tag would just
+     produce a broken/blocked load. Instead we ask /api/me for the caller's
+     role and inject the sensitive feeds ONLY for admin/partner. The FIELD-SAFE
+     feeds (progress, timesheets, crew schedule — no $) always load.
+
+     IMPORTANT: the real security boundary is the SERVER (areaForPath gates
+     every /data/* file by role). This block only keeps the field_ops UI clean
+     and avoids 403 noise — a tampered role here grants access to nothing,
+     because the data files themselves are gated server-side.
+
+     A synchronous XHR is used deliberately: the existing modules below expect
+     window.PF_* globals to exist at parse time, so the feeds must finish
+     loading (in order) BEFORE the module scripts run. Fails CLOSED: if /api/me
+     is unreachable or returns an unexpected role, we do NOT load sensitive
+     feeds (treated as least-privilege). -->
+<script>
+(function () {
+  // FIELD-SAFE feeds — always loaded (no financials). Server allows these for
+  // field_ops too.
+  var FIELD_SAFE = [
+    '/data/progress-data.js',   // GUHMA %-complete (no $)
+    '/data/timesheets.js',      // hours/cost-codes (no $ wages)
+    '/data/schedule-seed.js'    // crew schedule seed (no $)
+  ];
+  // SENSITIVE feeds — admin/partner ONLY. Server 403s these for field_ops.
+  var SENSITIVE = [
+    '/data/live-data.js',
+    '/data/projects-data.js',
+    '/data/project-record-poet.js',
+    '/data/project-records.js',
+    '/data/budget-actual-poet.js',
+    '/data/awarded-projects.js',
+    '/data/precon-pipeline.js',
+    '/data/pf-coi.js'
+  ];
+
+  // Determine role (fail closed to a non-privileged role on any error).
+  var role = 'field_ops';
+  try {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/me', false); // sync: preserve load order before modules
+    xhr.send(null);
+    if (xhr.status === 200) {
+      var me = JSON.parse(xhr.responseText);
+      if (me && me.role) role = me.role;
+      window.PF_ME = { name: (me && me.name) || '', role: role };
+    }
+  } catch (e) { /* fail closed: role stays field_ops */ }
+  if (!window.PF_ME) window.PF_ME = { name: '', role: role };
+
+  var isPrivileged = (role === 'admin' || role === 'partner');
+
+  // Build the ordered feed list for this role.
+  var feeds = [];
+  // live-data first (matches original ordering; many modules depend on it)
+  if (isPrivileged) feeds.push('/data/live-data.js', '/data/projects-data.js');
+  feeds.push('/data/progress-data.js');
+  if (isPrivileged) {
+    feeds.push('/data/project-record-poet.js', '/data/project-records.js',
+               '/data/budget-actual-poet.js', '/data/awarded-projects.js',
+               '/data/precon-pipeline.js', '/data/pf-coi.js');
+  } else {
+    // field_ops: the project LIST comes from the field-safe derivative (no $),
+    // NOT the sensitive awarded-projects.js / project-record-poet.js feeds.
+    feeds.push('/data/fo-projects-field.js');
+  }
+  feeds.push('/data/timesheets.js', '/data/schedule-seed.js');
+
+  // Inject synchronously and IN ORDER via document.write so they execute before
+  // the inline module scripts that follow (same semantics as static tags).
+  for (var i = 0; i < feeds.length; i++) {
+    document.write('<script src="' + feeds[i] + '"><\/script>');
+  }
+})();
+</script>
 <script>
 // ---- CANONICAL HTML ESCAPE HELPER (global, SEC-004 stored-XSS fix) ----
 // Defined at global scope so every inlined module can call window.esc().
@@ -1566,18 +1640,18 @@ window.progress = (function () {
   <nav class="sidebar-nav">
 
     <!-- 1) PF ADMIN -->
-    <div class="nav-section collapsed">
+    <div class="nav-section collapsed" data-fo-mixed="1">
       <div class="nav-section-label" onclick="this.parentElement.classList.toggle('collapsed')">PF Admin</div>
       <a class="nav-item" data-module="pfadmin" onclick="showModule('pfadmin')">
         <span class="nav-icon">&#9881;</span> PF Admin Home
       </a>
-      <a class="nav-item" data-module="manual" onclick="showModule('manual')">
+      <a class="nav-item" data-fo-safe="1" data-module="manual" onclick="showModule('manual')">
         <span class="nav-icon">&#128214;</span> User Manual
       </a>
-      <a class="nav-item" data-module="training" onclick="showModule('training')">
+      <a class="nav-item" data-fo-safe="1" data-module="training" onclick="showModule('training')">
         <span class="nav-icon">&#127891;</span> Training Guides
       </a>
-      <a class="nav-item" data-module="onboarding" onclick="showModule('onboarding')">
+      <a class="nav-item" data-fo-safe="1" data-module="onboarding" onclick="showModule('onboarding')">
         <span class="nav-icon">&#127891;</span> Role Onboarding
       </a>
       <a class="nav-item" data-module="coochecklist" onclick="showModule('coochecklist')">
@@ -1721,7 +1795,7 @@ window.progress = (function () {
     </div>
 
     <!-- 5.5) FIELD OPERATIONS -->
-    <div class="nav-section collapsed">
+    <div class="nav-section collapsed" data-fo-safe="1">
       <div class="nav-section-label" onclick="this.parentElement.classList.toggle('collapsed')">Field Operations</div>
 
       <!-- Projects (FIELD view — operational only, NO financials) -->
@@ -1758,12 +1832,12 @@ window.progress = (function () {
     </div>
 
     <!-- 6) PROJECTS SCHEDULE -->
-    <div class="nav-section collapsed">
+    <div class="nav-section collapsed" data-fo-safe="1">
       <div class="nav-section-label" onclick="this.parentElement.classList.toggle('collapsed')">Projects Schedule</div>
       <a class="nav-item" data-module="schedule" onclick="showModule('schedule')">
         <span class="nav-icon">&#128197;</span> Crew Schedule
       </a>
-      <a class="nav-item" data-module="schedule-awarded" onclick="showModule('schedule-awarded')">
+      <a class="nav-item" data-fo-hide="1" data-module="schedule-awarded" onclick="showModule('schedule-awarded')">
         <span class="nav-icon">&#9707;</span> Awarded Projects Schedule
       </a>
     </div>
@@ -10957,7 +11031,9 @@ try {
     function renderList(){
       var root = document.getElementById('foProjRoot');
       if (!root) return;
-      var D = window.PF_AWARDED;
+      // SEC-09: prefer the FIELD-SAFE derivative (no $/GC). field_ops only ever
+      // has PF_FO_PROJECTS; admin/partner fall back to the full PF_AWARDED.
+      var D = window.PF_FO_PROJECTS || window.PF_AWARDED;
       if (!D || !D.projects) {
         root.innerHTML = '<div class="pf-placeholder"><div class="pf-placeholder-icon">&#9635;</div>'
           + '<h2>Projects &mdash; Field</h2><p>Project list data not loaded.</p></div>';
@@ -10981,22 +11057,29 @@ try {
 
       list.forEach(function(p){
         var pr = progressFor(p.number);
-        // Scope (piers / LF) — pulled from the per-project record where built, else discipline.
+        // Scope (piers / LF) — field-safe. Prefer the full POET bid_log when
+        // present (admin/partner); else use the stripped poet_scope from the
+        // field-safe derivative (field_ops). NEITHER carries any $.
+        var poetBL = (window.PF_PROJECT_POET && window.PF_PROJECT_POET.bid_log) || null;
+        var poetScope = (window.PF_FO_PROJECTS && window.PF_FO_PROJECTS.poet_scope) || null;
         var scope;
-        if (p.record === 'project-poet' && window.PF_PROJECT_POET && window.PF_PROJECT_POET.bid_log) {
-          var b = window.PF_PROJECT_POET.bid_log;
+        if (p.record === 'project-poet' && (poetBL || poetScope)) {
+          var b = poetBL || poetScope;
           scope = (b.total_columns ? b.total_columns + ' piers' : '')
                 + (b.total_lf ? ' / ' + b.total_lf + ' LF' : '');
           if (!scope.trim()) scope = p.discipline || '';
         } else {
           scope = p.discipline || '';
         }
-        var projStart = (p.record === 'project-poet' && window.PF_PROJECT_POET && window.PF_PROJECT_POET.bid_log)
-          ? dt(window.PF_PROJECT_POET.bid_log.projected_start) : '';
+        var projStart = (p.record === 'project-poet' && (poetBL || poetScope))
+          ? dt((poetBL || poetScope).projected_start) : '';
         var pct = pctLabel(pr);
 
         var openCell;
-        if (p.record === 'project-poet') {
+        // Field detail view needs the full per-project record (PF_PROJECT_POET).
+        // That feed is sensitive and not loaded for field_ops, so only offer the
+        // link when the record is actually available.
+        if (p.record === 'project-poet' && window.PF_PROJECT_POET) {
           openCell = '<a class="pf-record-link" onclick="window.foProjOpen(\'26-002\')">Open field detail</a>';
         } else {
           openCell = '<span class="pf-record-muted">details coming</span>';
@@ -11632,6 +11715,62 @@ try {
     if (document.readyState !== 'loading') render();
   } catch(e) {
     console.error("PF COI view failed to load:", e);
+  }
+})();
+</script>
+
+<!-- ============================================================
+     ROLE-AWARE UI INIT (SEC-09) — runs LAST so it can override the
+     default landing module and prune nav/mobile/FAB for field_ops.
+     window.PF_ME was populated by the role-aware data loader near the
+     top of <body>. The SERVER is the real boundary; this is cosmetic. -->
+<script>
+(function () {
+  var me = window.PF_ME || { role: 'field_ops', name: '' };
+  // Expose name in the topbar if a hook exists (non-fatal if absent).
+  try {
+    var who = document.getElementById('currentUser');
+    if (who && me.name) who.textContent = me.name;
+  } catch (e) {}
+
+  if (me.role !== 'field_ops') return; // admin/partner: full UI, no changes.
+
+  function applyFieldOpsUI() {
+    document.body.classList.add('role-field-ops');
+
+    // Mobile bottom tabs: hide tabs whose target module is NOT field-safe.
+    // Field-safe mobile targets for the crew: Projects(fo) / Logs / Safety / QA.
+    var SAFE_MOBILE = { 'fo-projects': 1, 'dailylogs': 1, 'dailyproduction': 1,
+                        'safety': 1, 'guhma': 1, 'modulus': 1, 'schedule': 1,
+                        'fo-timesheets': 1, 'ts-summary': 1 };
+    document.querySelectorAll('.mobile-tab').forEach(function (t) {
+      var oc = t.getAttribute('onclick') || '';
+      var m = oc.match(/showModule\('([^']+)'\)/);
+      if (m && !SAFE_MOBILE[m[1]]) t.style.display = 'none';
+    });
+    // FAB quick actions: keep only field-safe ones (logs/safety). Bid Score is
+    // a precon/financial tool -> hide for field_ops.
+    document.querySelectorAll('#fabMenu a').forEach(function (a) {
+      var oc = a.getAttribute('onclick') || '';
+      var m = oc.match(/showModule\('([^']+)'\)/);
+      if (m && !SAFE_MOBILE[m[1]]) a.style.display = 'none';
+    });
+
+    // Land on a field-safe module (NOT the financial dashboard).
+    try {
+      if (typeof showModule === 'function' && document.getElementById('mod-fo-projects')) {
+        showModule('fo-projects');
+        // open the Field Operations section so the crew sees their nav.
+        var foSec = document.querySelector('.nav-section[data-fo-safe]');
+        if (foSec) foSec.classList.remove('collapsed');
+      }
+    } catch (e) { /* leave default view if fo-projects missing */ }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applyFieldOpsUI);
+  } else {
+    applyFieldOpsUI();
   }
 })();
 </script>

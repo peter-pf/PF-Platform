@@ -260,16 +260,73 @@ export function requireArea(session, area) {
 // in the middleware and never reach a normal area check.
 
 // Static asset path prefixes that are safe for everyone (styling/scripts/media).
+//
+// NOTE (SEC-09 fix): '/data/' is deliberately NOT in this list. The sensitive
+// pages are client-side shells that pull their payload from /data/*.{js,json}
+// (bid log, project history, pricing, budgets, contracts, GC financial
+// contacts). Allow-listing the whole /data/ prefix here made the page-level
+// RBAC security theater: a field_ops user could just GET /data/bid-log.json
+// directly. /data/ files are now classified individually by DATA_FILE_AREAS
+// below, default-deny.
 const STATIC_ASSET_PREFIXES = [
   '/css/', '/js/', '/images/', '/img/', '/assets/', '/fonts/', '/icons/',
-  '/media/', '/vendor/', '/static/', '/design-studio/', '/data/',
+  '/media/', '/vendor/', '/static/', '/design-studio/',
 ];
 
 // Static asset file extensions safe for everyone (no data leakage by themselves;
-// the SENSITIVE data lives in the .html pages and the /api routes, which are
-// classified below). This lets shared CSS/JS/img load on field_ops pages.
+// the SENSITIVE data lives in the .html pages, the /api routes, and /data/*
+// files — all classified below). This lets shared CSS/JS/img load on field_ops
+// pages. NOTE: .js/.mjs/.json are EXCLUDED here so that /data/*.{js,json} cannot
+// fall through to 'general' by extension; they MUST be classified by
+// DATA_FILE_AREAS (default-deny). Real shared scripts live under /js/ /vendor/
+// /assets/ /design-studio/ which are prefix-allow-listed above.
 const STATIC_ASSET_EXT_RE =
-  /\.(css|js|mjs|map|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|eot|json|txt|webmanifest)$/i;
+  /\.(css|map|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|eot|txt|webmanifest)$/i;
+
+// ---------------------------------------------------------------------------
+// /data/ payload classification (SEC-09)
+// ---------------------------------------------------------------------------
+// The /data/ directory holds the ACTUAL sensitive payload that the client-side
+// page shells load. Every file is classified by CONTENT here. DEFAULT-DENY:
+// any /data/ file NOT explicitly listed as field-safe is treated as sensitive
+// (admin/partner only). This is the hard server-side boundary — gating the
+// .html shell does nothing because field_ops can fetch the data file directly.
+//
+// Field-safe files contain ONLY operational data with NO dollar amounts, bid /
+// contract values, margins, pricing, budgets, wages, or financial contacts:
+//   - production / progress (cols, LF, days, % complete — no $)
+//   - crew schedule (crews, equipment, job sequence — no $)
+//   - timesheets (employee hours, cost-CODE labels, per-diem night COUNTS — no
+//     wages/rates/dollar amounts)
+const DATA_FILE_AREAS = {
+  // ---- FIELD-SAFE (field_ops + partner + admin) ----
+  '/data/production-data.js':        'field_ops', // cols/LF/days — no $
+  '/data/progress-data.js':          'field_ops', // GUHMA % completion — no $
+  '/data/timesheets.js':             'field_ops', // hours/cost-codes/names — no $ wages
+  '/data/fo-projects-field.js':      'field_ops', // SEC-09 field-safe project list (no $/GC/contract)
+  '/data/schedule-seed.js':          'schedule',  // crew schedule seed — no $
+  '/data/schedule-seed-state.js':    'schedule',  // schedule state — no $
+  '/data/schedule-seed-state.json':  'schedule',  // schedule state — no $
+  '/data/schedule-data.js':          'schedule',  // crews/equipment/jobs — no $
+
+  // ---- SENSITIVE (admin/partner ONLY — field_ops BLOCKED) ----
+  '/data/bid-log.json':            'financials',      // bid_value, margin notes, GC contacts
+  '/data/live-data.js':            'financials',      // bid_value, contract_value, cost (live mirror)
+  '/data/pricing-data.js':         'financials',      // $ pricing
+  '/data/budget-actual-poet.js':   'financials',      // budget/cost/invoice/profit
+  '/data/project-records.js':      'financials',      // $ values, cost
+  '/data/project-record-poet.js':  'financials',      // contract_value
+  '/data/projects-data.js':        'financials',      // revenue, AR, paid/unpaid, contract
+  '/data/estimate-template.json':  'estimating',      // cost/amount estimating template
+  '/data/project-history.js':      'contracts',       // ContractValue / totalContractValue
+  '/data/awarded-projects.js':     'contracts',       // contract values, GC
+  '/data/project-master.json':     'contracts',       // contract_value, margin, profit
+  '/data/precon-pipeline.js':      'preconstruction', // $ pipeline values
+  '/data/bd-master.json':          'business_dev',    // EIN, tax id, credit-app, GC contacts
+  '/data/pf-coi.js':               'financials',      // private insurance policy/broker detail
+  '/data/insurance-baseline.js':   'financials',      // private policy limits/carriers
+  '/data/sync-meta.json':          'financials',      // bid/project counts + sensitive source URLs
+};
 
 // Sensitive HTML pages -> their area. field_ops is BLOCKED from all of these.
 // Anything that surfaces financials, contracts, pricing, or preconstruction.
@@ -315,6 +372,9 @@ export function areaForPath(pathname) {
     // /api/data proxies the live SharePoint data set (bid log = pricing/bid
     // financials, project master). Treat as FINANCIALS -> field_ops BLOCKED.
     if (pathname.startsWith('/api/data'))          return 'financials';
+    // /api/me returns ONLY the caller's own {name, role} (no business data).
+    // Reachable by any authenticated role so the SPA can tailor its UI.
+    if (pathname.startsWith('/api/me'))            return 'general';
     if (pathname.startsWith('/api/reset-password')) return 'reset'; // restricted-session only
     // Any other/new API route is admin-only until deliberately classified.
     return 'user_admin';
@@ -322,6 +382,21 @@ export function areaForPath(pathname) {
 
   // ---- Root / directory index -> portal home (general) ----
   if (pathname === '/' || pathname === '') return 'general';
+
+  // ---- /data/ payload files (SEC-09): classify by CONTENT, default-deny -----
+  // This MUST come BEFORE the static-asset checks so a /data/*.js or *.json
+  // file can never fall through to 'general'.
+  if (pathname.startsWith('/data/')) {
+    if (Object.prototype.hasOwnProperty.call(DATA_FILE_AREAS, pathname)) {
+      return DATA_FILE_AREAS[pathname];
+    }
+    // Heuristic backstop: a NEW /data/ file whose name screams "sensitive"
+    // (budget/financ/pricing/contract/bid/...) -> financials, field_ops blocked.
+    if (SENSITIVE_NAME_RE.test(pathname)) return 'financials';
+    // DEFAULT-DENY: any unclassified /data/ file is admin/partner only.
+    // (Field-safe data files must be added to DATA_FILE_AREAS explicitly.)
+    return 'user_admin';
+  }
 
   // ---- Static assets (styling/scripts/media) safe for everyone ----
   if (STATIC_ASSET_PREFIXES.some(p => pathname.startsWith(p))) return 'general';

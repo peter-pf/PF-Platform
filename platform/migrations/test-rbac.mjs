@@ -59,8 +59,41 @@ const FIELD_ALLOWED = [
   '/css/styles.css',
   '/js/main.js',
   '/images/logo.png',
-  '/data/schedule-seed.js',
   '/favicon.ico',          // resolves general by extension
+];
+
+// [SEC-09] /data/ payload files field_ops MUST NOT reach by direct URL. These
+// hold dollar values / bid+contract values / margins / pricing / GC financial
+// contacts. Before the fix areaForPath() blanket-allowed '/data/' as 'general'
+// (field_ops ALLOWED -> data-layer RBAC bypass). After the fix each resolves to
+// a sensitive area (field_ops DENIED).
+const DATA_SENSITIVE = [
+  '/data/bid-log.json',          // bid_value, margin notes, GC contacts
+  '/data/project-history.js',    // ContractValue / totalContractValue
+  '/data/pricing-data.js',       // $ pricing
+  '/data/budget-actual-poet.js', // budget/cost/invoice/profit
+  '/data/project-records.js',    // $ values / cost
+  '/data/pf-coi.js',             // private insurance policy detail
+  '/data/bd-master.json',        // EIN/tax id/credit-app, GC contacts
+  '/data/live-data.js',          // bid_value/contract_value/cost (live mirror)
+  '/data/projects-data.js',      // revenue/AR/paid/unpaid/contract
+  '/data/project-record-poet.js',// contract_value
+  '/data/project-master.json',   // contract_value/margin/profit
+  '/data/precon-pipeline.js',    // $ pipeline values
+  '/data/awarded-projects.js',   // contract values + GC
+  '/data/estimate-template.json',// cost/amount estimating template
+  '/data/insurance-baseline.js', // private policy limits/carriers
+  '/data/sync-meta.json',        // bid/project counts + sensitive source URLs
+];
+
+// [SEC-09] /data/ payload files field_ops SHOULD reach (operational, NO $).
+const DATA_FIELD_SAFE = [
+  '/data/progress-data.js',      // GUHMA %-complete (no $)
+  '/data/production-data.js',    // cols/LF/days (no $)
+  '/data/schedule-seed.js',      // crew schedule seed (no $)
+  '/data/schedule-data.js',      // crews/equipment/jobs (no $)
+  '/data/timesheets.js',         // hours/cost-codes/names (no $ wages)
+  '/data/fo-projects-field.js',  // field-safe project list (no $/GC/contract)
 ];
 
 // --- 1. areaForPath classification + default-deny ---------------------------
@@ -100,6 +133,39 @@ for (const p of FIELD_ALLOWED) {
   const area = areaForPath(p);
   ok(`${p} -> field_ops allowed (area=${area})`, roleCanAccess('field_ops', area) === true);
 }
+
+// --- SEC-09: /data/ payload classification (the data-layer boundary) --------
+section('SEC-09 sensitive /data/* files DENIED for field_ops');
+for (const p of DATA_SENSITIVE) {
+  const area = areaForPath(p);
+  ok(`${p} -> sensitive area (${area})`,
+     area !== 'general' && area !== 'schedule' && area !== 'field_ops');
+  ok(`${p} BLOCKED for field_ops`, roleCanAccess('field_ops', area) === false);
+  ok(`${p} ALLOWED for partner`, roleCanAccess('partner', area) === true);
+  ok(`${p} ALLOWED for admin`, roleCanAccess('admin', area) === true);
+}
+
+section('SEC-09 field-safe /data/* files ALLOWED for field_ops');
+for (const p of DATA_FIELD_SAFE) {
+  const area = areaForPath(p);
+  ok(`${p} -> field-safe area (${area})`,
+     area === 'field_ops' || area === 'schedule');
+  ok(`${p} ALLOWED for field_ops`, roleCanAccess('field_ops', area) === true);
+}
+
+section('SEC-09 default-DENY for an UNCLASSIFIED /data/* file');
+ok('/data/new-secret-feed.js -> admin-only (field_ops + partner blocked)',
+   areaForPath('/data/new-secret-feed.js') === 'user_admin' &&
+   roleCanAccess('field_ops', areaForPath('/data/new-secret-feed.js')) === false &&
+   roleCanAccess('partner', areaForPath('/data/new-secret-feed.js')) === false);
+ok('/data/2026-budget-draft.json -> financials by heuristic (field_ops blocked)',
+   areaForPath('/data/2026-budget-draft.json') === 'financials' &&
+   roleCanAccess('field_ops', areaForPath('/data/2026-budget-draft.json')) === false);
+
+section('SEC-09 /api/me reachable by any authenticated role');
+ok('/api/me -> general', areaForPath('/api/me') === 'general');
+ok('/api/me allowed field_ops', roleCanAccess('field_ops', areaForPath('/api/me')) === true);
+ok('/api/me allowed partner', roleCanAccess('partner', areaForPath('/api/me')) === true);
 
 // --- 2. roleCanAccess matrix ------------------------------------------------
 section('roleCanAccess matrix');
