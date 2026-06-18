@@ -690,6 +690,37 @@ table tbody tr:hover {
   font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em;
   text-transform: uppercase; vertical-align: middle;
 }
+/* Wide, horizontally-scrollable bid-log table for Preconstruction stage panels.
+   Mirrors the spreadsheet: every bid-log column in sheet order, with a sticky
+   first column (Project) so the row stays identifiable while scrolling right. */
+.pf-wide-wrap {
+  border: 1px solid var(--border); border-radius: 10px; overflow-x: auto;
+  background: var(--bg-0); margin-top: 14px; -webkit-overflow-scrolling: touch;
+}
+.pf-wide { border-collapse: collapse; font-size: 0.84rem; width: max-content; min-width: 100%; }
+.pf-wide th {
+  text-align: left; padding: 9px 12px; background: var(--bg-2);
+  color: var(--text-2); font-weight: 600; font-size: 0.72rem;
+  text-transform: uppercase; letter-spacing: 0.03em;
+  border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+.pf-wide td {
+  padding: 9px 12px; border-bottom: 1px solid var(--border-light);
+  color: var(--text-1); vertical-align: top;
+  max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pf-wide td.num, .pf-wide th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pf-wide tr:last-child td { border-bottom: none; }
+.pf-wide tr:hover td { background: var(--bg-1); }
+/* Sticky first column (Project) — stays pinned while scrolling horizontally. */
+.pf-wide th.pf-sticky-col, .pf-wide td.pf-sticky-col {
+  position: -webkit-sticky; position: sticky; left: 0; z-index: 2;
+  background: var(--bg-0); border-right: 1px solid var(--border);
+  max-width: 240px; white-space: normal;
+}
+.pf-wide th.pf-sticky-col { background: var(--bg-2); z-index: 3; }
+.pf-wide tr:hover td.pf-sticky-col { background: var(--bg-1); }
+.pf-wide td.pf-sticky-col .pf-record-link { display: inline-block; margin-top: 3px; font-size: 0.78rem; }
 
 /* ---- TIMESHEETS (Field Operations) ---- */
 .ts-root { max-width: 1180px; }
@@ -10562,10 +10593,12 @@ try {
 <!-- PRECONSTRUCTION STAGE PANELS — renders window.PF_PRECON into    -->
 <!-- the 12 stage mounts (.precon-mount[data-disc][data-bucket]).    -->
 <!-- One shared renderer parameterized by (discipline, bucket).      -->
-<!-- Clean table: Project #, Name, City/State, GC, Value, Due Date.  -->
-<!-- Count in the header; empty-state message for empty buckets.     -->
-<!-- Awarded bucket: built records link to showModule(); completed   -->
-<!-- jobs show a "Completed" tag. ALL strings via window.esc.        -->
+<!-- WIDE bid-log table: EVERY column from the Project Bid Log, in   -->
+<!-- sheet order (per-discipline via D.columns[disc]), horizontally  -->
+<!-- scrollable with a sticky first Project column. Reads each job's -->
+<!-- .fields map. Count in the header; empty-state for empty buckets.-->
+<!-- Awarded bucket: built records link to showModule()/openProject- -->
+<!-- Record(); completed jobs show a "Completed" tag. ALL via esc.   -->
 <!-- ============================================================ -->
 <script>
 (function(){
@@ -10627,24 +10660,43 @@ try {
         return;
       }
 
-      html += '<div class="pf-table-wrap"><table class="pf-table"><thead><tr>'
-        + '<th>#</th><th>Project</th><th>City / State</th><th>General Contractor</th>'
-        + '<th>Value</th><th>Due Date</th>'
-        + (bucket === 'awarded' ? '<th>Record</th>' : '')
-        + '</tr></thead><tbody>';
+      // FULL bid-log column set for this discipline, in sheet order (built by
+      // sync/build-precon-pipeline.py). The sticky first "Project" column replaces
+      // the raw "Project Name" header column, so we render every OTHER column as data.
+      var cols = (D.columns && D.columns[disc]) ? D.columns[disc] : [];
+      var dataCols = cols.filter(function(c){ return c.key !== 'Project Name'; });
+
+      // Header: sticky Project column, then every bid-log column in sheet order,
+      // then a Record column for the awarded bucket.
+      var thead = '<th class="pf-sticky-col">Project</th>';
+      dataCols.forEach(function(c){
+        var cls = (c.type === 'money') ? ' class="num"' : '';
+        thead += '<th' + cls + '>' + E(c.key) + '</th>';
+      });
+      if (bucket === 'awarded') thead += '<th>Record</th>';
+
+      html += '<div class="pf-wide-wrap"><table class="pf-wide"><thead><tr>'
+        + thead + '</tr></thead><tbody>';
 
       list.forEach(function(p){
-        var nameCell = E(p.name);
-        if (p.completed) {
-          nameCell += ' <span class="pf-tag-completed">Completed</span>';
-        }
-        var row = '<tr>'
-          + '<td class="num">' + E(p.number) + '</td>'
-          + '<td>' + nameCell + '</td>'
-          + '<td>' + E(p.city_state) + '</td>'
-          + '<td>' + E(p.gc) + '</td>'
-          + '<td class="num">' + E(money(p.value)) + '</td>'
-          + '<td>' + E(p.due_date) + '</td>';
+        var f = p.fields || {};
+        // Sticky Project cell: name (+ Completed tag) over the project number.
+        var nameTxt = E(p.name || f['Project Name'] || '');
+        if (p.completed) nameTxt += ' <span class="pf-tag-completed">Completed</span>';
+        var numTxt = E(p.number || f['Project Number'] || '');
+        var stickyInner = '<div>' + nameTxt + '</div>'
+          + (numTxt ? '<div class="pf-record-muted">' + numTxt + '</div>' : '');
+        var row = '<tr><td class="pf-sticky-col">' + stickyInner + '</td>';
+
+        dataCols.forEach(function(c){
+          var v = f[c.key];
+          var cell = (v === undefined || v === null) ? '' : E(v);
+          var cls = (c.type === 'money') ? ' class="num"' : '';
+          // title tooltip lets long/truncated cells be read on hover.
+          var ttl = cell ? ' title="' + cell + '"' : '';
+          row += '<td' + cls + ttl + '>' + cell + '</td>';
+        });
+
         if (bucket === 'awarded') {
           // Every awarded project opens its own record. POET keeps its deep module;
           // everything else opens the generic record view keyed by project number.

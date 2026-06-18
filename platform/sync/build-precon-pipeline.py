@@ -12,9 +12,22 @@ section. Writes data/precon-pipeline.js:
     ap: { actively_bidding:[], budget_pricing:[], feasibility_review:[],
           submitted_bids:[], awarded:[], not_awarded:[] },
     hp: { ...same six buckets... },
+    columns: { ap: [ {key, type} ... ], hp: [ ... ] },  # FULL bid-log column set, in sheet order
     generated, source, source_url,
     uncategorized: [ {discipline, status, number, name, section} ]
   }
+
+EVERY job object carries:
+  - convenience keys (number, name, value, completed, record, plus city_state/gc/
+    due_date kept for backward compatibility with any other consumer), AND
+  - a `fields` dict: { <exact bid-log header>: <formatted string value>, ... } holding
+    EVERY column from that sheet (blank cells stay blank). The wide stage table reads
+    `fields` in the order given by `columns[discipline]`.
+
+The per-discipline `columns` list captures each sheet's OWN column set and ORDER (the
+two sheets differ — AP carries a "Min Insurance Req" column HP lacks). The col-A
+sequence index ("Number" / "Column1") is layout scaffolding used only to detect
+section headers and is NOT emitted as a data column.
 
 Consumed by the 12 Preconstruction stage panels in index.html (precon-ap-*,
 precon-hp-*).
@@ -141,6 +154,60 @@ def header_map(ws, hr):
     return m
 
 
+def ordered_headers(ws, hr):
+    """[(header_text, 1-indexed col)] in sheet order. Skips the col-A sequence index
+    ('Number' / 'Column1') which is layout scaffolding, not project data."""
+    out = []
+    for c in range(1, 40):
+        v = ws.cell(row=hr, column=c).value
+        if v in (None, ""):
+            continue
+        name = str(v).strip()
+        if c == 1:           # per-row sequence index used only for section detection
+            continue
+        out.append((name, c))
+    return out
+
+
+# Header substrings -> formatting type. First match wins (case-insensitive).
+# 'money'  -> dollar-formatted; 'date' -> YYYY-MM-DD as the sheet shows; else 'text'.
+_MONEY_HEADERS = ("bid total value", "price per", "prelim design fee")
+_DATE_HEADERS = ("date", "due date")  # any header containing "date" is a date field
+
+
+def column_type(header):
+    low = (header or "").strip().lower()
+    for m in _MONEY_HEADERS:
+        if m in low:
+            return "money"
+    if "date" in low:
+        return "date"
+    return "text"
+
+
+def fmt_money(v):
+    n = num_or_none(v)
+    if n is None:
+        # Non-numeric content in a money column (rare) -> pass through trimmed.
+        return clean(v)
+    # Whole-dollar values (totals) read cleanest without cents; fractional values
+    # (per-SF / per-LF unit prices like $3.67) keep cents so they stay readable.
+    if float(n).is_integer():
+        return "$" + format(int(round(n)), ",")
+    return "$" + format(n, ",.2f")
+
+
+def fmt_cell(v, ctype):
+    """Format a raw cell value for display per its column type. Blank stays blank."""
+    if v is None or (isinstance(v, str) and not v.strip()):
+        return ""
+    if ctype == "money":
+        return fmt_money(v)
+    if ctype == "date":
+        return clean_date(v)
+    return clean(v)
+
+
 def clean(v):
     if v is None:
         return ""
@@ -222,15 +289,23 @@ def is_section_header(col_a, number, name):
 
 
 def extract(ws, disc_key):
-    """Return (buckets_dict, uncategorized_list) for one sheet."""
+    """Return (buckets_dict, uncategorized_list, columns_list) for one sheet.
+
+    columns_list is [{key, type}] in sheet order — the FULL bid-log column set for
+    this discipline, used to render the wide stage table."""
     buckets = {b: [] for b in BUCKETS}
     uncategorized = []
+    columns = []
 
     hr = find_header_row(ws)
     if not hr:
         print("  WARN: no header row found in '%s' — skipping" % ws.title)
-        return buckets, uncategorized
+        return buckets, uncategorized, columns
     h = header_map(ws, hr)
+
+    # FULL ordered column set for this sheet (drives the wide table + the `fields` dict).
+    ordered = ordered_headers(ws, hr)
+    columns = [{"key": name, "type": column_type(name)} for (name, _c) in ordered]
 
     c_num = h.get("Project Number")
     c_name = h.get("Project Name")
@@ -243,7 +318,7 @@ def extract(ws, disc_key):
 
     if not (c_num and c_name):
         print("  WARN: '%s' missing key columns (number/name) — skipping" % ws.title)
-        return buckets, uncategorized
+        return buckets, uncategorized, columns
 
     counted = 0
     data_rows = 0
@@ -292,7 +367,15 @@ def extract(ws, disc_key):
             })
             continue
 
+        # FULL field set for this row, keyed by exact bid-log header, in sheet order.
+        # Blank cells stay blank; money/date columns are formatted for display.
+        row_fields = {}
+        for (hname, hcol) in ordered:
+            row_fields[hname] = fmt_cell(ws.cell(row=r, column=hcol).value,
+                                         column_type(hname))
+
         job = {
+            # convenience keys (kept for backward compatibility with other consumers)
             "number": number,
             "name": name,
             "city_state": clean(ws.cell(row=r, column=c_city).value) if c_city else "",
@@ -302,6 +385,8 @@ def extract(ws, disc_key):
             "invite_date": clean_date(ws.cell(row=r, column=c_invite).value) if c_invite else "",
             "completed": completed,
             "record": RECORD_LINKS.get(number),  # showModule id or None
+            # full bid-log column set for the wide table
+            "fields": row_fields,
         }
         buckets[current_bucket].append(job)
         counted += 1
@@ -314,7 +399,9 @@ def extract(ws, disc_key):
     if unknown_sections:
         for lbl, _ in unknown_sections.items():
             print("      UNKNOWN SECTION (jobs -> uncategorized): %r" % lbl)
-    return buckets, uncategorized
+    print("      columns captured: %d -> %s" %
+          (len(columns), ", ".join(c["key"] for c in columns)))
+    return buckets, uncategorized, columns
 
 
 def main():
@@ -325,20 +412,23 @@ def main():
     wb = openpyxl.load_workbook(fp, read_only=True, data_only=True)
 
     out = {"ap": {b: [] for b in BUCKETS}, "hp": {b: [] for b in BUCKETS}}
+    cols = {"ap": [], "hp": []}
     uncategorized = []
 
     for sheet_name, disc_key in SHEETS:
         if sheet_name not in wb.sheetnames:
             print("  WARN: sheet '%s' not present — skipping" % sheet_name)
             continue
-        buckets, unc = extract(wb[sheet_name], disc_key)
+        buckets, unc, columns = extract(wb[sheet_name], disc_key)
         out[disc_key] = buckets
+        cols[disc_key] = columns
         uncategorized.extend(unc)
 
     payload = {
         "generated": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M") + " UTC",
         "source": "SharePoint/01 - Admin/13 - Master Spreadsheets/Project Bid Log.xlsx",
         "source_url": BID_LOG_WEBURL,
+        "columns": cols,        # per-discipline FULL bid-log column set, in sheet order
         "ap": out["ap"],
         "hp": out["hp"],
         "uncategorized": uncategorized,
