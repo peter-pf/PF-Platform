@@ -304,12 +304,17 @@ const DATA_FILE_AREAS = {
   '/data/progress-data.js':          'field_ops', // GUHMA % completion — no $
   '/data/timesheets.js':             'field_ops', // hours/cost-codes/names — no $ wages
   '/data/fo-projects-field.js':      'field_ops', // SEC-09 field-safe project list (no $/GC/contract)
-  '/data/schedule-seed.js':          'schedule',  // crew schedule seed — no $
-  '/data/schedule-seed-state.js':    'schedule',  // schedule state — no $
-  '/data/schedule-seed-state.json':  'schedule',  // schedule state — no $
-  '/data/schedule-data.js':          'schedule',  // crews/equipment/jobs — no $
+  '/data/schedule-field.js':         'schedule',  // SEC-12 field-safe schedule derivative (no value/gc_name)
 
   // ---- SENSITIVE (admin/partner ONLY — field_ops BLOCKED) ----
+  // SEC-12: the raw schedule seed/state/data files each carry per-job contract
+  // `value` ($) + `gc_name`. They are NOT field-safe and are reclassified
+  // financials -> field_ops DENIED. The crew gets schedule-field.js (above), a
+  // $/GC-stripped derivative. (SEC-13: the .js seed-state variant does not exist;
+  // only the .json is shipped, so no /data/schedule-seed-state.js entry.)
+  '/data/schedule-seed.js':          'financials',      // per-job value + gc_name
+  '/data/schedule-seed-state.json':  'financials',      // per-job value + gc_name
+  '/data/schedule-data.js':          'financials',      // per-job value + gc_name
   '/data/bid-log.json':            'financials',      // bid_value, margin notes, GC contacts
   '/data/live-data.js':            'financials',      // bid_value, contract_value, cost (live mirror)
   '/data/pricing-data.js':         'financials',      // $ pricing

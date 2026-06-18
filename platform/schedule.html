@@ -151,7 +151,7 @@ tr.is-completed td{color:var(--muted)}
 
 <h2>Status Buckets <span class="sub">— LF and column rollups (awarded + probable)</span></h2>
 <table id="bucketTable">
-  <thead><tr><th>Bucket</th><th class="num">Jobs</th><th class="num">Total LF</th><th class="num">Columns</th><th class="num">Value</th></tr></thead>
+  <thead id="bucketHead"></thead>
   <tbody id="bucketBody"></tbody>
 </table>
 
@@ -177,8 +177,34 @@ tr.is-completed td{color:var(--muted)}
   </div>
 </div>
 
-<!-- Fallback seed: used only if /api/schedule has no stored state and is unreachable. -->
-<script src="/data/schedule-seed.js"></script>
+<!-- ============================================================
+     ROLE-AWARE SEED LOADING (SEC-12)
+     The raw schedule seed (schedule-seed.js) carries per-job contract `value`
+     ($) + `gc_name` and is now admin/partner-only (the server 403s it for a
+     field_ops session). The field crew loads schedule-field.js — a $/GC-stripped
+     derivative (window.PF_SCHEDULE_FIELD). The REAL boundary is server-side:
+     /api/schedule redacts value/gc_name for field_ops and the data files are
+     gated by areaForPath. This block just loads the right seed and keeps the UI
+     clean. Fails CLOSED: any /api/me error -> field_ops (least privilege). -->
+<script>
+(function () {
+  var role = 'field_ops';
+  try {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/me', false); // sync: seed must exist before the inline module runs
+    xhr.send(null);
+    if (xhr.status === 200) {
+      var me = JSON.parse(xhr.responseText);
+      if (me && me.role) role = me.role;
+      window.PF_ME = { name: (me && me.name) || '', role: role };
+    }
+  } catch (e) { /* fail closed: role stays field_ops */ }
+  if (!window.PF_ME) window.PF_ME = { name: '', role: role };
+  var isPrivileged = (role === 'admin' || role === 'partner');
+  var seedSrc = isPrivileged ? '/data/schedule-seed.js' : '/data/schedule-field.js';
+  document.write('<script src="' + seedSrc + '"><\/script>');
+})();
+</script>
 <script>
 (function(){
   "use strict";
@@ -205,6 +231,28 @@ tr.is-completed td{color:var(--muted)}
     if(!startIso||!workDays||workDays<=0)return startIso;
     var cur=d(startIso),counted=0;
     while(true){ if(!isSunday(cur)){counted++; if(counted>=workDays)return iso(cur);} cur=addDays(cur,1); }
+  }
+
+  // ---------- role (SEC-12) ----------
+  // The server already redacts value/gc_name from /api/schedule (and the field
+  // seed has none), so even a tampered flag here leaks nothing. This only keeps
+  // the UI clean: hide the Value column + GC name and the editing controls for
+  // field_ops. Default-deny: anything not admin/partner is treated as field_ops.
+  var ME = window.PF_ME || { role: 'field_ops' };
+  var IS_PRIVILEGED = (ME.role === 'admin' || ME.role === 'partner');
+  // field_ops is READ-ONLY (the server 403s their writes). Hide the editing
+  // toolbar + retitle so the crew sees a clean read-only schedule. The Gantt
+  // drag handlers still set the in-memory STATE dirty, but there is no Save
+  // button to persist and the server rejects the PUT anyway.
+  if (!IS_PRIVILEGED) {
+    document.addEventListener('DOMContentLoaded', function () {
+      var sb = document.getElementById('saveBtn');      if (sb) sb.style.display = 'none';
+      var rb = document.getElementById('reloadBtn');    if (rb) rb.style.display = 'none';
+      var sBadge = document.getElementById('srcBadge'); if (sBadge) sBadge.style.display = 'none';
+      var tag = document.querySelector('h1 .tag');      if (tag) tag.textContent = 'Read-only';
+      var lead = document.querySelector('p.lead');
+      if (lead) lead.textContent = 'Crew schedule and assignments — dates, crews, and status. Read-only view for field operations.';
+    });
   }
 
   // ---------- state ----------
@@ -234,7 +282,10 @@ tr.is-completed td{color:var(--muted)}
   }
 
   function loadSeedFallback(){
-    var seed = window.SCHEDULE_SEED || null;
+    // SEC-12: privileged roles get window.SCHEDULE_SEED (raw, value/gc_name);
+    // field_ops gets window.PF_SCHEDULE_FIELD (no value/gc_name). Use whichever
+    // global the role-aware loader injected.
+    var seed = window.SCHEDULE_SEED || window.PF_SCHEDULE_FIELD || null;
     if(!seed){document.body.insertAdjacentHTML('beforeend','<p class="empty-note">Schedule data unavailable.</p>');return;}
     applyState(JSON.parse(JSON.stringify(seed)),'seed');
   }
@@ -522,24 +573,31 @@ tr.is-completed td{color:var(--muted)}
     var agg={};order.forEach(function(b){agg[b]={jobs:0,lf:0,cols:0,val:0};});
     STATE.jobs.forEach(function(j){var b=bucketOf(j);var a=agg[b];if(!a){a=agg[b]={jobs:0,lf:0,cols:0,val:0};order.push(b);}a.jobs++;a.lf+=(j.lf||0);a.cols+=(j.columns||0);a.val+=(j.value||0);});
     var colorOf={completed:'var(--bar-muted)',finalized:'var(--bar)',loi:'#5a6470',likely:'#7a828c',running:'#aab1ba'};
+    // SEC-12: the Value column is rendered ONLY for admin/partner. field_ops sees
+    // LF/columns/status — never job dollars.
+    var valHead = IS_PRIVILEGED ? '<th class="num">Value</th>' : '';
+    document.getElementById('bucketHead').innerHTML =
+      '<tr><th>Bucket</th><th class="num">Jobs</th><th class="num">Total LF</th><th class="num">Columns</th>'+valHead+'</tr>';
     var bb=document.getElementById('bucketBody');var tot={jobs:0,lf:0,cols:0,val:0};
     bb.innerHTML=order.map(function(b){
       var a=agg[b];tot.jobs+=a.jobs;tot.lf+=a.lf;tot.cols+=a.cols;tot.val+=a.val;
       var cls=b==='completed'?' class="is-completed"':'';
       var bm=bucketMeta[b]||(b==='completed'?{label:'Projects Completed',awarded:true}:{label:b,awarded:false});
       return '<tr'+cls+'><td><span class="dot" style="background:'+colorOf[b]+'"></span>'+esc(bm.label)+(bm.awarded?'':' <span class="muted" style="font-size:.72rem">(probable)</span>')+'</td>'
-        +'<td class="num">'+a.jobs+'</td><td class="num">'+n(a.lf)+'</td><td class="num">'+n(a.cols)+'</td><td class="num">'+money(a.val)+'</td></tr>';
+        +'<td class="num">'+a.jobs+'</td><td class="num">'+n(a.lf)+'</td><td class="num">'+n(a.cols)+'</td>'+(IS_PRIVILEGED?('<td class="num">'+money(a.val)+'</td>'):'')+'</tr>';
     }).join('')
-      +'<tr class="tot"><td>Overall</td><td class="num">'+tot.jobs+'</td><td class="num">'+n(tot.lf)+'</td><td class="num">'+n(tot.cols)+'</td><td class="num">'+money(tot.val)+'</td></tr>';
-    var awarded={lf:0,cols:0,val:0},probable={lf:0,cols:0,val:0};
-    STATE.jobs.forEach(function(j){var bid=bucketOf(j);
-      var m=bucketMeta[bid]||(bid==='completed'?{awarded:true}:null);
-      if(!m)return; // unknown probable-side bucket -> not counted (matches table)
-      var t=m.awarded?awarded:probable;t.lf+=(j.lf||0);t.cols+=(j.columns||0);t.val+=(j.value||0);});
+      +'<tr class="tot"><td>Overall</td><td class="num">'+tot.jobs+'</td><td class="num">'+n(tot.lf)+'</td><td class="num">'+n(tot.cols)+'</td>'+(IS_PRIVILEGED?('<td class="num">'+money(tot.val)+'</td>'):'')+'</tr>';
     var old=document.getElementById('awProbNote'); if(old)old.remove();
-    document.getElementById('bucketTable').insertAdjacentHTML('afterend',
-      '<div class="note" id="awProbNote"><b>Awarded</b> (completed + finalized + LOI): '+n(awarded.lf)+' LF &middot; '+money(awarded.val)
-      +' &nbsp;|&nbsp; <b>Probable</b> (likely + in the running): '+n(probable.lf)+' LF &middot; '+money(probable.val)+'.</div>');
+    if(IS_PRIVILEGED){
+      var awarded={lf:0,cols:0,val:0},probable={lf:0,cols:0,val:0};
+      STATE.jobs.forEach(function(j){var bid=bucketOf(j);
+        var m=bucketMeta[bid]||(bid==='completed'?{awarded:true}:null);
+        if(!m)return; // unknown probable-side bucket -> not counted (matches table)
+        var t=m.awarded?awarded:probable;t.lf+=(j.lf||0);t.cols+=(j.columns||0);t.val+=(j.value||0);});
+      document.getElementById('bucketTable').insertAdjacentHTML('afterend',
+        '<div class="note" id="awProbNote"><b>Awarded</b> (completed + finalized + LOI): '+n(awarded.lf)+' LF &middot; '+money(awarded.val)
+        +' &nbsp;|&nbsp; <b>Probable</b> (likely + in the running): '+n(probable.lf)+' LF &middot; '+money(probable.val)+'.</div>');
+    }
   }
 
   function renderUnscheduled(bucketMeta){
@@ -548,8 +606,9 @@ tr.is-completed td{color:var(--muted)}
     var html='';
     if(un.length===0){html+='<div class="note">All awarded/probable jobs have a dated mobilization.</div>';}
     else{
-      html+='<table><thead><tr><th>Project</th><th>Location</th><th>Bucket</th><th class="num">LF</th><th class="num">Columns</th><th class="num">Value</th></tr></thead><tbody>'
-        +un.map(function(j){var bm=bucketMeta[bucketOf(j)];return '<tr><td>'+esc(j.name)+'</td><td>'+esc(j.city_state||'—')+'</td><td>'+esc(bm?bm.label:bucketOf(j))+'</td><td class="num">'+n(j.lf)+'</td><td class="num">'+n(j.columns)+'</td><td class="num">'+money(j.value)+'</td></tr>';}).join('')
+      // SEC-12: Value column only for admin/partner.
+      html+='<table><thead><tr><th>Project</th><th>Location</th><th>Bucket</th><th class="num">LF</th><th class="num">Columns</th>'+(IS_PRIVILEGED?'<th class="num">Value</th>':'')+'</tr></thead><tbody>'
+        +un.map(function(j){var bm=bucketMeta[bucketOf(j)];return '<tr><td>'+esc(j.name)+'</td><td>'+esc(j.city_state||'—')+'</td><td>'+esc(bm?bm.label:bucketOf(j))+'</td><td class="num">'+n(j.lf)+'</td><td class="num">'+n(j.columns)+'</td>'+(IS_PRIVILEGED?('<td class="num">'+money(j.value)+'</td>'):'')+'</tr>';}).join('')
         +'</tbody></table>';
     }
     // C1: mobs without a valid date (including DONE ones) stay visible AND
@@ -598,14 +657,15 @@ tr.is-completed td{color:var(--muted)}
     el.addEventListener('mousemove',function(ev){
       if(el.classList.contains('dragging'))return;
       var bm=bucketMeta[bucketOf(j)];
+      // SEC-12: GC name + Value row only for admin/partner.
       tip.innerHTML='<b>'+esc(j.name)+'</b> <span style="color:#aab1ba">('+esc(j.number)+')</span><br>'
-        +'<span class="muted">'+esc(j.city_state||'')+(j.gc_name?' &middot; '+esc(j.gc_name):'')+'</span>'
+        +'<span class="muted">'+esc(j.city_state||'')+((IS_PRIVILEGED&&j.gc_name)?' &middot; '+esc(j.gc_name):'')+'</span>'
         +'<div class="row"><span class="k">Mobilization</span><span>'+esc(sg.mob.label)+(sg.done?' (done)':'')+'</span></div>'
         +'<div class="row"><span class="k">Dates</span><span>'+fmt(d(sg.start))+' – '+fmt(d(sg.end))+' ('+esc(sg.workDays)+' wd)</span></div>'
         +'<div class="row"><span class="k">Cols this mob</span><span>'+n(sg.mob.columns)+'</span></div>'
         +'<div class="row"><span class="k">LF / Cols total</span><span>'+n(j.lf)+' / '+n(j.columns)+'</span></div>'
         +'<div class="row"><span class="k">Crew / Men</span><span>'+(crew?esc(crew.lead)+' / '+esc(crew.men):'—')+'</span></div>'
-        +'<div class="row"><span class="k">Value</span><span>'+money(j.value)+'</span></div>'
+        +(IS_PRIVILEGED?('<div class="row"><span class="k">Value</span><span>'+money(j.value)+'</span></div>'):'')
         +'<div class="row"><span class="k">Status</span><span>'+esc(bm?bm.label:bucketOf(j))+'</span></div>'
         +(conflict?'<div style="color:#ff8a7a;margin-top:4px;font-weight:600">⚠ Crew conflict</div>':'')
         +'<div style="color:#aab1ba;margin-top:4px;font-size:.7rem">Drag to move &middot; hover for Done / Split</div>';

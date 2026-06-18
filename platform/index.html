@@ -1330,8 +1330,12 @@ body.role-field-ops .nav-item[data-fo-hide] {
   var FIELD_SAFE = [
     '/data/progress-data.js',   // GUHMA %-complete (no $)
     '/data/timesheets.js',      // hours/cost-codes (no $ wages)
-    '/data/schedule-seed.js'    // crew schedule seed (no $)
+    '/data/schedule-field.js'   // SEC-12 field-safe schedule derivative (no value/gc_name)
   ];
+  // SEC-12: the RAW schedule feed (schedule-seed.js) carries per-job value +
+  // gc_name and is now admin/partner-only (server 403s it for field_ops).
+  var SCHEDULE_PRIVILEGED = '/data/schedule-seed.js';
+  var SCHEDULE_FIELD = '/data/schedule-field.js';
   // SENSITIVE feeds — admin/partner ONLY. Server 403s these for field_ops.
   var SENSITIVE = [
     '/data/live-data.js',
@@ -1374,7 +1378,10 @@ body.role-field-ops .nav-item[data-fo-hide] {
     // NOT the sensitive awarded-projects.js / project-record-poet.js feeds.
     feeds.push('/data/fo-projects-field.js');
   }
-  feeds.push('/data/timesheets.js', '/data/schedule-seed.js');
+  // SEC-12: privileged roles get the raw schedule (value/gc_name); field_ops
+  // gets the $/GC-stripped derivative. The raw file is server-DENIED to field_ops.
+  feeds.push('/data/timesheets.js',
+             isPrivileged ? SCHEDULE_PRIVILEGED : SCHEDULE_FIELD);
 
   // Inject synchronously and IN ORDER via document.write so they execute before
   // the inline module scripts that follow (same semantics as static tags).
@@ -2691,8 +2698,13 @@ renderDashboard();
         throw new Error('no-kv-state');
       })
       .catch(function () {
-        // graceful fallback to embedded seed if present
-        var seed = (window.SCHEDULE_SEED && Array.isArray(window.SCHEDULE_SEED.jobs)) ? window.SCHEDULE_SEED : null;
+        // graceful fallback to embedded seed if present. SEC-12: privileged roles
+        // load window.SCHEDULE_SEED (raw, with value/gc_name); field_ops loads
+        // window.PF_SCHEDULE_FIELD ($/GC-stripped). Use whichever is present —
+        // the widget only needs job names/dates/crews, not dollars.
+        var seed = (window.SCHEDULE_SEED && Array.isArray(window.SCHEDULE_SEED.jobs)) ? window.SCHEDULE_SEED
+                 : (window.PF_SCHEDULE_FIELD && Array.isArray(window.PF_SCHEDULE_FIELD.jobs)) ? window.PF_SCHEDULE_FIELD
+                 : null;
         if (seed) return { state: JSON.parse(JSON.stringify(seed)), source: 'Embedded seed (scheduler not yet saved)' };
         return null; // signal: nothing to show
       });

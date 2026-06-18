@@ -177,8 +177,34 @@ function clientBaseVersion(input) {
 
 // ---- handlers ---------------------------------------------------------------
 
+// SEC-12: a stored schedule row persists per-job contract `value` ($) and
+// `gc_name`. The crew (field_ops) needs the schedule (their assignments) but
+// MUST NOT see job dollar values or GC names. This is the SERVER-SIDE boundary:
+// on READ, strip those two fields from every job when the caller is a field_ops
+// session. admin / partner (and the shared-auth admin fallback, whose role is
+// 'admin') get the full state unchanged. Writes still PERSIST value/gc_name
+// (sanitizeJob), so partner/admin edits round-trip — we only redact on read for
+// field_ops. Fails CLOSED: if the role is unknown/missing we DROP the sensitive
+// fields rather than leak them.
+function stripScheduleForFieldOps(state) {
+  if (!state || typeof state !== 'object' || !Array.isArray(state.jobs)) return state;
+  return {
+    ...state,
+    jobs: state.jobs.map((j) => {
+      if (!j || typeof j !== 'object') return j;
+      const { value, gc_name, ...safe } = j; // drop dollar value + GC name
+      return safe;
+    }),
+  };
+}
+
 export async function onRequestGet(context) {
   const { env } = context;
+  // Default-deny posture: anything that is NOT explicitly admin/partner is
+  // treated as field_ops and gets the redacted view.
+  const role = context.data && context.data.session ? context.data.session.role : null;
+  const isPrivileged = role === 'admin' || role === 'partner';
+  const view = (state) => (isPrivileged ? state : stripScheduleForFieldOps(state));
   try {
     if (!env.PF_SCHEDULE) {
       // Binding not present yet -> tell the client to use its embedded seed.
@@ -193,7 +219,7 @@ export async function onRequestGet(context) {
     try { state = JSON.parse(raw); }
     catch { return json({ seeded: false, fallback: false, state: null,
       note: 'Stored state was unreadable; front-end falls back to seed.' }); }
-    return json({ seeded: true, fallback: false, state });
+    return json({ seeded: true, fallback: false, state: view(state) });
   } catch (err) {
     console.error('api/schedule GET error:', err);
     return json({ status: 'error', message: 'An internal error occurred.' }, 500);
@@ -202,6 +228,23 @@ export async function onRequestGet(context) {
 
 async function handleWrite(context) {
   const { request, env } = context;
+  // SEC-12: same read-side redaction applies to anything we ECHO back from a
+  // write (the 409 conflict body and the normalized save echo both carry the
+  // full stored state, which includes value/gc_name). Privileged roles get the
+  // full echo; everyone else (default-deny) gets the redacted view. Persistence
+  // itself is unchanged — sanitizeJob still stores value/gc_name in KV.
+  const role = context.data && context.data.session ? context.data.session.role : null;
+  const isPrivileged = role === 'admin' || role === 'partner';
+  const echo = (state) => (isPrivileged ? state : stripScheduleForFieldOps(state));
+  // SEC-12 data-integrity: a field_ops session reads the schedule with value /
+  // gc_name STRIPPED. If it were allowed to write that redacted state back, the
+  // dollar values + GC names would be WIPED from KV (sanitizeJob would persist
+  // null). The scheduler is admin/partner-edited; field_ops is READ-ONLY. Reject
+  // writes from any non-privileged session, fail closed.
+  if (!isPrivileged) {
+    return json({ status: 'forbidden',
+      message: 'You do not have permission to edit the schedule.' }, 403);
+  }
   try {
     // Size cap: reject oversized bodies before parsing.
     const len = Number(request.headers.get('Content-Length') || '0');
@@ -235,7 +278,7 @@ async function handleWrite(context) {
       if (currentVersion && currentVersion !== clientVersion) {
         return json({ status: 'conflict',
           message: 'The schedule changed since you loaded it. Reload before saving.',
-          currentVersion, yourVersion: clientVersion, state: existing }, 409);
+          currentVersion, yourVersion: clientVersion, state: echo(existing) }, 409);
       }
     }
 
@@ -247,10 +290,11 @@ async function handleWrite(context) {
     }
 
     await env.PF_SCHEDULE.put(KV_KEY, JSON.stringify(result.state));
-    // H1/M1: return the full NORMALIZED state so the client re-applies exactly
-    // what was stored (no UI/KV drift). updated == the new version stamp.
+    // H1/M1: return the NORMALIZED state so the client re-applies exactly what
+    // was stored (no UI/KV drift). updated == the new version stamp. SEC-12: the
+    // echo is redacted for non-privileged callers (value/gc_name stripped).
     return json({ status: 'ok', saved: true, updated: stamp,
-      jobs: result.state.jobs.length, state: result.state });
+      jobs: result.state.jobs.length, state: echo(result.state) });
   } catch (err) {
     console.error('api/schedule write error:', err);
     return json({ status: 'error', message: 'An internal error occurred.' }, 500);

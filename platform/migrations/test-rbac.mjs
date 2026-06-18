@@ -12,6 +12,10 @@ import {
   mintSession, verifySession, isRestrictedSession,
   hashPassword, verifyPassword, RESET_SESSION_TTL_MS,
 } from '../functions/lib/auth.js';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+const __dir = dirname(fileURLToPath(import.meta.url));
 
 let pass = 0, fail = 0;
 const fails = [];
@@ -84,14 +88,18 @@ const DATA_SENSITIVE = [
   '/data/estimate-template.json',// cost/amount estimating template
   '/data/insurance-baseline.js', // private policy limits/carriers
   '/data/sync-meta.json',        // bid/project counts + sensitive source URLs
+  // [SEC-12] the raw schedule feeds embed per-job contract value ($) + gc_name.
+  // Reclassified financials -> field_ops DENIED. The crew uses schedule-field.js.
+  '/data/schedule-data.js',      // SEC-12: per-job value + gc_name
+  '/data/schedule-seed.js',      // SEC-12: per-job value + gc_name
+  '/data/schedule-seed-state.json', // SEC-12: per-job value + gc_name
 ];
 
 // [SEC-09] /data/ payload files field_ops SHOULD reach (operational, NO $).
 const DATA_FIELD_SAFE = [
   '/data/progress-data.js',      // GUHMA %-complete (no $)
   '/data/production-data.js',    // cols/LF/days (no $)
-  '/data/schedule-seed.js',      // crew schedule seed (no $)
-  '/data/schedule-data.js',      // crews/equipment/jobs (no $)
+  '/data/schedule-field.js',     // SEC-12 field-safe schedule derivative (no value/gc_name)
   '/data/timesheets.js',         // hours/cost-codes/names (no $ wages)
   '/data/fo-projects-field.js',  // field-safe project list (no $/GC/contract)
 ];
@@ -166,6 +174,52 @@ section('SEC-09 /api/me reachable by any authenticated role');
 ok('/api/me -> general', areaForPath('/api/me') === 'general');
 ok('/api/me allowed field_ops', roleCanAccess('field_ops', areaForPath('/api/me')) === true);
 ok('/api/me allowed partner', roleCanAccess('partner', areaForPath('/api/me')) === true);
+
+// --- SEC-12: schedule leak (per-job value $ + gc_name) ----------------------
+section('SEC-12 raw schedule feeds DENIED for field_ops (value $ + gc_name)');
+const SCHED_RAW = ['/data/schedule-data.js', '/data/schedule-seed.js', '/data/schedule-seed-state.json'];
+for (const p of SCHED_RAW) {
+  const area = areaForPath(p);
+  ok(`${p} -> sensitive area (${area})`,
+     area !== 'general' && area !== 'schedule' && area !== 'field_ops');
+  ok(`${p} BLOCKED for field_ops`, roleCanAccess('field_ops', area) === false);
+  ok(`${p} ALLOWED for partner`, roleCanAccess('partner', area) === true);
+  ok(`${p} ALLOWED for admin`, roleCanAccess('admin', area) === true);
+}
+ok('SEC-13: dead /data/schedule-seed-state.JS entry not field-safe (file does not exist; classified by default-deny)',
+   roleCanAccess('field_ops', areaForPath('/data/schedule-seed-state.js')) === false);
+
+section('SEC-12 field-safe schedule derivative ALLOWED for field_ops');
+ok('/data/schedule-field.js -> schedule', areaForPath('/data/schedule-field.js') === 'schedule');
+ok('/data/schedule-field.js ALLOWED for field_ops',
+   roleCanAccess('field_ops', areaForPath('/data/schedule-field.js')) === true);
+ok('/data/schedule-field.js ALLOWED for partner',
+   roleCanAccess('partner', areaForPath('/data/schedule-field.js')) === true);
+
+section('SEC-12 schedule-field.js content carries NO value/gc_name/$ (data-layer proof)');
+{
+  const fieldSrc = readFileSync(join(__dir, '../data/schedule-field.js'), 'utf8');
+  ok('schedule-field.js has NO "value" key', !/"value"\s*:/.test(fieldSrc));
+  ok('schedule-field.js has NO "gc_name" key', !/"gc_name"\s*:/.test(fieldSrc));
+  ok('schedule-field.js has NO literal "$"', !/\$/.test(fieldSrc));
+  ok('schedule-field.js exposes window.PF_SCHEDULE_FIELD', /window\.PF_SCHEDULE_FIELD\s*=/.test(fieldSrc));
+}
+
+section('SEC-12 /api/schedule redacts value/gc_name for field_ops + denies field_ops writes');
+{
+  const schedSrc = readFileSync(join(__dir, '../functions/api/schedule.js'), 'utf8');
+  ok('api/schedule strips value/gc_name on read (stripScheduleForFieldOps)',
+     /stripScheduleForFieldOps/.test(schedSrc) &&
+     /const\s*\{\s*value\s*,\s*gc_name\s*,\s*\.\.\.\s*safe\s*\}\s*=\s*j/.test(schedSrc));
+  ok('api/schedule GET returns redacted view for non-privileged role',
+     /return json\(\{\s*seeded:\s*true,\s*fallback:\s*false,\s*state:\s*view\(state\)/.test(schedSrc));
+  ok('api/schedule GET keys role off context.data.session.role',
+     /context\.data\s*&&\s*context\.data\.session\s*\?\s*context\.data\.session\.role/.test(schedSrc));
+  ok('api/schedule write DENIES non-privileged (field_ops) with 403',
+     /if \(!isPrivileged\) \{[\s\S]*?403/.test(schedSrc));
+  ok('api/schedule still PERSISTS value (sanitizeJob keeps value) — only redacts on read',
+     /value:\s*num\(j\.value/.test(schedSrc));
+}
 
 // --- 2. roleCanAccess matrix ------------------------------------------------
 section('roleCanAccess matrix');
@@ -242,10 +296,6 @@ ok('wrong secret rejected', await verifySession(normal, 'other-secret') === null
 
 // --- 6. endpoints actually CALL requireArea (static source check) -----------
 section('source-level: requireArea invoked in doc.js + data.js');
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-const __dir = dirname(fileURLToPath(import.meta.url));
 const docSrc = readFileSync(join(__dir, '../functions/api/doc.js'), 'utf8');
 const dataSrc = readFileSync(join(__dir, '../functions/api/data.js'), 'utf8');
 const mwSrc = readFileSync(join(__dir, '../functions/_middleware.js'), 'utf8');
