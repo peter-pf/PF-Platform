@@ -32,5 +32,8 @@ Goal: the whole team lives in the portal. Jonathan, Derek (primarily for NEW OPP
 
 Possibility confirmed: yes (Graph Excel write API + our ReadWrite permissions). Set-up: yes, as Phase 2, built incrementally on the proven schedule-style editable+persist pattern, with an audit log of every change.
 
+## Project document browser — mirror SharePoint subfolders + inline embed (Brad 2026-06-17)
+In each project's section, build a DOCUMENT browser that mirrors the project's SharePoint SUBFOLDER structure (same folders/subfolders as the project folder: 01 Preconstruction, 02 Project Management, 03 Engineering & Design, 04 GC Drawings & Specs, 05 Field, and their subfolders). Navigate the project's files inside the portal by those same subfolders, and view each file EMBEDDED inline (via the live `/api/doc` proxy, same approach confirmed for the contract) rather than bouncing to SharePoint. So the portal becomes the single place to read every project document, organized exactly like the SharePoint folder, always live. (Builds on the embed-file proxy; extends from a single contract embed to a full per-project file tree.)
+
 ## Status
 Framework agreed; Phase 1 (Excel→portal population) in progress now. Phase 2 (portal→Excel backfill) starts once Phase 1 is solid. Start the write-back with one section (e.g. New Opportunity intake) as the proof, then expand.
