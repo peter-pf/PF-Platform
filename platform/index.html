@@ -1220,8 +1220,10 @@ table tbody tr:hover {
 <script src="/data/projects-data.js"></script>
 <!-- Auto %-complete from GUHMA column logs (sync/build-progress.py). LF % is the headline completion metric and drives the active->complete flip. -->
 <script src="/data/progress-data.js"></script>
-<!-- Per-project RECORD DETAIL data (sync/build-project-record.py). POET 26-002 = reference template. READ-ONLY v1. -->
+<!-- Per-project RECORD DETAIL data (sync/build-project-record.py). POET 26-002 = reference template (deepest record). READ-ONLY v1. -->
 <script src="/data/project-record-poet.js"></script>
+<!-- ALL OTHER awarded project records (sync/build-project-records.py): window.PF_PROJECT_RECORDS keyed by number. POET stays in the file above. -->
+<script src="/data/project-records.js"></script>
 <!-- Per-project Budget vs Actual job-cost tracker (sync/build-budget-actual.py). POET 26-002. INTERNAL financial data. -->
 <script src="/data/budget-actual-poet.js"></script>
 <!-- Awarded Projects index (sync/build-awarded-index.py): Awarded rows from the Project Bid Log (Agg Pier + Helical sheets). -->
@@ -2067,6 +2069,12 @@ document.addEventListener('click', function(e) {
     <div id="prRoot" class="pr-root"></div>
   </div>
 
+  <!-- GENERIC PROJECT RECORD DETAIL VIEW — any awarded project opens here via openProjectRecord(num). -->
+  <!-- Same 11-section schema as POET; data from window.PF_PROJECT_RECORDS[num] (or PF_PROJECT_POET fallback). -->
+  <div class="module-view" id="mod-project-record">
+    <div id="prGenericRoot" class="pr-root"></div>
+  </div>
+
   <!-- BUDGET vs ACTUAL (Project Management -> Financials) — INTERNAL job-cost tracker. -->
   <!-- Populated client-side by initBudgetActual() from window.PF_BUDGET_ACTUAL_POET     -->
   <!-- (data/budget-actual-poet.js). FINANCIAL data — NOT reachable from fo-projects.     -->
@@ -2147,6 +2155,7 @@ const moduleTitles = {
   'precon-hp-awarded': 'Helical Pilings — Awarded',
   'precon-hp-not-awarded': 'Helical Pilings — Not Awarded',
   'awarded-projects': 'Awarded Projects',
+  'project-record': 'Project Record',
   'fo-timesheets': 'TimeSheets — Weekly',
   'ts-summary': 'TimeSheets — Summary',
   'fo-projects': 'Projects — Field',
@@ -10049,14 +10058,14 @@ try {
         + '</div>';
     }
 
-    function render(){
-      var root = document.getElementById('prRoot');
+    // Render a project record object D into the given root element. Reusable for
+    // POET (#prRoot) AND every other awarded project (#prGenericRoot via openProjectRecord).
+    function renderInto(D, root){
       if (!root) return;
-      var D = window.PF_PROJECT_POET;
       if (!D) {
         root.innerHTML = '<div class="pr-note">Project record data not loaded. '
-          + 'Run <code>sync/build-project-record.py</code> to generate '
-          + '<code>data/project-record-poet.js</code>.</div>';
+          + 'Run <code>sync/build-project-records.py</code> (or '
+          + '<code>build-project-record.py</code> for POET) to generate the record data.</div>';
         return;
       }
       var bid = D.bid_log || {};
@@ -10299,9 +10308,44 @@ try {
       }
     }
 
-    document.addEventListener('DOMContentLoaded', render);
-    // If DOM already parsed (script at end of body), render immediately too.
-    if (document.readyState !== 'loading') render();
+    // ---- expose a reusable renderer + project-aware opener ----
+    // renderProjectRecord(num, root): resolve a record by number and render it.
+    // Resolution: PF_PROJECT_RECORDS[num] (bulk file) first; POET falls back to its
+    // deeper PF_PROJECT_POET record so POET keeps subcontract fields + contract embed.
+    function resolveRecord(num){
+      num = String(num || '').trim();
+      var bulk = (window.PF_PROJECT_RECORDS && window.PF_PROJECT_RECORDS.records)
+        ? window.PF_PROJECT_RECORDS.records[num] : null;
+      if (bulk) return bulk;
+      // POET (or any number) falls back to the dedicated deep record if it matches.
+      if (window.PF_PROJECT_POET && String(window.PF_PROJECT_POET.project_number) === num) {
+        return window.PF_PROJECT_POET;
+      }
+      return null;
+    }
+    window.renderProjectRecord = function(num, root){
+      renderInto(resolveRecord(num), root || document.getElementById('prGenericRoot'));
+    };
+    // openProjectRecord(num): switch to the generic record module and render that project.
+    // POET still has its own module (project-poet) for legacy direct links; everything
+    // else (and POET too, if linked this way) opens through the generic view.
+    window.openProjectRecord = function(num){
+      var root = document.getElementById('prGenericRoot');
+      window.renderProjectRecord(num, root);
+      var rec = resolveRecord(num);
+      if (typeof showModule === 'function') showModule('project-record');
+      // Set the title AFTER showModule (which sets the generic moduleTitles entry).
+      try {
+        var t = document.getElementById('pageTitle');
+        if (t) t.textContent = (rec && rec.project_name)
+          ? (num + ' — ' + rec.project_name) : ('Project Record — ' + num);
+      } catch(e){}
+    };
+
+    // POET keeps auto-rendering into its dedicated #prRoot module (deep record, unchanged).
+    function renderPoet(){ renderInto(window.PF_PROJECT_POET, document.getElementById('prRoot')); }
+    document.addEventListener('DOMContentLoaded', renderPoet);
+    if (document.readyState !== 'loading') renderPoet();
   } catch(e) {
     console.error("Project record view failed to load:", e);
   }
@@ -10478,12 +10522,17 @@ try {
       list.forEach(function(p){
         var isHp = /helical/i.test(p.discipline || '');
         var pill = '<span class="pf-pill' + (isHp ? ' hp' : '') + '">' + E(p.discipline || '') + '</span>';
+        // Every awarded project now opens its own record. POET (p.record === 'project-poet')
+        // keeps its dedicated deep module; everything else opens the generic record view
+        // keyed by project number. num is escaped + only digits/hyphen by construction.
         var rec;
-        if (p.record) {
-          // Build a safe onclick: the record id comes from a server-side allow-list (RECORD_LINKS).
-          rec = '<a class="pf-record-link" onclick="showModule(\'' + E(p.record) + '\')">Open record</a>';
+        var num = String(p.number || '');
+        if (p.record === 'project-poet') {
+          rec = '<a class="pf-record-link" onclick="showModule(\'project-poet\')">Open record</a>';
+        } else if (num) {
+          rec = '<a class="pf-record-link" onclick="openProjectRecord(\'' + E(num) + '\')">Open record</a>';
         } else {
-          rec = '<span class="pf-record-muted">record being built</span>';
+          rec = '<span class="pf-record-muted">no project number</span>';
         }
         html += '<tr>'
           + '<td class="num">' + E(p.number) + '</td>'
@@ -10597,12 +10646,16 @@ try {
           + '<td class="num">' + E(money(p.value)) + '</td>'
           + '<td>' + E(p.due_date) + '</td>';
         if (bucket === 'awarded') {
+          // Every awarded project opens its own record. POET keeps its deep module;
+          // everything else opens the generic record view keyed by project number.
           var rec;
-          if (p.record) {
-            // record id comes from the server-side RECORD_LINKS allow-list.
-            rec = '<a class="pf-record-link" onclick="showModule(\'' + E(p.record) + '\')">Open record</a>';
+          var num = String(p.number || '');
+          if (p.record === 'project-poet') {
+            rec = '<a class="pf-record-link" onclick="showModule(\'project-poet\')">Open record</a>';
+          } else if (num) {
+            rec = '<a class="pf-record-link" onclick="openProjectRecord(\'' + E(num) + '\')">Open record</a>';
           } else {
-            rec = '<span class="pf-record-muted">record being built</span>';
+            rec = '<span class="pf-record-muted">no project number</span>';
           }
           row += '<td>' + rec + '</td>';
         }
