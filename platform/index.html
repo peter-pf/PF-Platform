@@ -1164,6 +1164,48 @@ table tbody tr:hover {
 .pr-field-value.empty { color: var(--text-3); }
 .pr-field-src { font-size: 0.66rem; color: var(--text-3); font-style: italic; }
 
+/* ---- SUBCONTRACT ANALYSIS card (migrated from standalone Subcontracts tool) ---- */
+.pr-verdict {
+  display: inline-block; font-size: 0.74rem; font-weight: 800;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 4px 12px; border-radius: 999px; vertical-align: middle;
+  border: 1px solid transparent;
+}
+.pr-verdict.green  { background: #e9f3ec; color: #2f7d4a; border-color: #bfe0c9; }
+.pr-verdict.yellow { background: #fef3e2; color: #9a6a06; border-color: #f6dca8; }
+.pr-verdict.red    { background: #fdecea; color: #b3261e; border-color: #f3c0bb; }
+.pr-exec {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 14px; margin-bottom: 14px;
+  border-radius: 8px; border: 1px solid transparent;
+  font-size: 0.82rem;
+}
+.pr-exec .pr-exec-dot { width: 10px; height: 10px; flex: 0 0 10px; border-radius: 50%; }
+.pr-exec .pr-exec-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.75; }
+.pr-exec .pr-exec-val { font-size: 0.95rem; font-weight: 800; letter-spacing: 0.01em; }
+.pr-exec.green  { background: #e9f3ec; color: #2f7d4a; border-color: #bfe0c9; }
+.pr-exec.green  .pr-exec-dot { background: #2f7d4a; }
+.pr-exec.amber  { background: #fef3e2; color: #9a6a06; border-color: #f6dca8; }
+.pr-exec.amber  .pr-exec-dot { background: #d98a00; }
+.pr-exec.grey   { background: #eef0f2; color: #4a5159; border-color: #d9dee3; }
+.pr-exec.grey   .pr-exec-dot { background: #8a929b; }
+.pr-an-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.pr-an-meta { font-size: 0.78rem; color: var(--text-3); }
+.pr-an-summary { font-size: 0.9rem; color: var(--text-1); line-height: 1.55; margin-bottom: 6px; }
+.pr-an-block { font-size: 0.86rem; color: var(--text-1); line-height: 1.5; }
+.pr-an-terms { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px 24px; }
+@media (max-width: 720px) { .pr-an-terms { grid-template-columns: 1fr; } }
+.pr-an-term { display: flex; flex-direction: column; gap: 2px; padding: 4px 0; border-bottom: 1px solid var(--border-light); }
+.pr-an-term .k { font-size: 0.7rem; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.03em; }
+.pr-an-term .v { font-size: 0.86rem; color: var(--text-1); }
+.pr-an-risks { list-style: none; padding: 0; margin: 0; }
+.pr-an-risk { display: flex; gap: 9px; padding: 7px 0; font-size: 0.86rem; color: var(--text-1); line-height: 1.5; border-bottom: 1px solid var(--border-light); }
+.pr-an-risk:last-child { border-bottom: none; }
+.pr-an-risk::before { content: "!"; flex: 0 0 18px; height: 18px; margin-top: 1px;
+  background: var(--amber, #d98a00); color: #fff; border-radius: 50%;
+  font-size: 0.72rem; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.pr-an-foot { font-size: 0.72rem; color: var(--text-3); margin-top: 10px; font-style: italic; }
+
 /* ---- BUDGET vs ACTUAL (job-cost tracker) ---- */
 .ba-wrap { max-width: 1100px; }
 .ba-note { font-size: 0.78rem; color: var(--text-3); margin: 0 0 14px; line-height: 1.5; }
@@ -10199,6 +10241,80 @@ try {
                    L.contract,
                    (D.subcontract && D.subcontract.source_file))
         + linkRow(L.contract));
+
+      // ----- 3b. Subcontract Analysis (migrated from the standalone Subcontracts tool) -----
+      // PM-view only. Renders when the record carries an analysis block. Same content the
+      // standalone subcontracts.html presents: colored verdict, summary, key terms, insurance
+      // + scope summaries, and the flagged risks list. The fo-projects field view uses a
+      // separate renderer and never reads D.analysis, so this stays out of the field view.
+      var A = D.analysis;
+      if (A) {
+        var vraw = String(A.verdict || '').toUpperCase();
+        var vcls = vraw === 'GREEN' ? 'green' : (vraw === 'RED' ? 'red' : 'yellow');
+        var redCount = (A.risks || []).filter(function(r){ return /^\s*RED\b/i.test(String(r)); }).length;
+        var riskMeta = (A.risks ? A.risks.length : 0) + ' flagged'
+          + (redCount ? ' · ' + redCount + ' RED' : '');
+
+        var ab = '';
+
+        // Prominent execution-status banner (top of card). Auto-determined from the
+        // contract's signature / DocuSign completion during extraction; set manually for now.
+        // green = fully executed, amber = draft/unsigned, grey = unknown/unverified.
+        if (A.execution_status) {
+          var esRaw = String(A.execution_status);
+          var esUp = esRaw.toUpperCase();
+          var esCls = /FULLY EXECUTED|EXECUTED/.test(esUp) ? 'green'
+                    : /DRAFT|NEEDS SIGNATURE|UNSIGNED|PENDING/.test(esUp) ? 'amber'
+                    : 'grey';
+          ab += '<div class="pr-exec '+esCls+'">'
+              +   '<span class="pr-exec-dot"></span>'
+              +   '<span class="pr-exec-label">Execution Status</span>'
+              +   '<span class="pr-exec-val">'+E(esRaw)+'</span>'
+              + '</div>';
+        }
+
+        ab += '<div class="pr-an-head">'
+            +   '<span class="pr-verdict '+vcls+'">'+E(vraw || 'REVIEW')+'</span>';
+        if (A.amount) ab += '<span class="pr-an-meta">'+E(A.amount)+'</span>';
+        if (A.counterparty) ab += '<span class="pr-an-meta">'+E(A.counterparty)+'</span>';
+        if (A.review_date) ab += '<span class="pr-an-meta">Reviewed '+E(A.review_date)+'</span>';
+        ab += '</div>';
+
+        if (A.summary) ab += '<div class="pr-an-summary">'+E(A.summary)+'</div>';
+
+        if (A.key_terms && A.key_terms.length) {
+          ab += subhead('Key Terms');
+          ab += '<div class="pr-an-terms">';
+          A.key_terms.forEach(function(t){
+            ab += '<div class="pr-an-term"><span class="k">'+E(t.k)+'</span>'
+                + '<span class="v">'+E(t.v)+'</span></div>';
+          });
+          ab += '</div>';
+        }
+
+        if (A.insurance_summary) {
+          ab += subhead('Insurance');
+          ab += '<div class="pr-an-block">'+E(A.insurance_summary)+'</div>';
+        }
+        if (A.scope_summary) {
+          ab += subhead('Scope of Work');
+          ab += '<div class="pr-an-block">'+E(A.scope_summary)+'</div>';
+        }
+
+        if (A.risks && A.risks.length) {
+          ab += subhead('Risk Exposure to PF');
+          ab += '<ul class="pr-an-risks">';
+          A.risks.forEach(function(r){ ab += '<li class="pr-an-risk">'+E(r)+'</li>'; });
+          ab += '</ul>';
+        }
+
+        ab += '<div class="pr-an-foot">'
+            + E((A.source || 'Migrated from the standalone Subcontracts review.')
+                + ' Business-level summary, not legal advice.')
+            + '</div>';
+
+        html += card('3b', 'Subcontract Analysis', riskMeta, ab, true);
+      }
 
       // ----- 4. Engineering & Design -----
       var engBody = subhead('Engineering & Design Contacts') + contactList(g.engineering)
