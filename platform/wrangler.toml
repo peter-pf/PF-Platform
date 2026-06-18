@@ -1,0 +1,30 @@
+# wrangler.toml — PF Platform (Cloudflare Pages project: pf-platform)
+#
+# Binding config for the D1 database that backs per-user auth + RBAC.
+#
+# IMPORTANT — how bindings actually reach this Pages project:
+#   This project's KV binding (PF_SCHEDULE) was applied HEADLESSLY via the
+#   Cloudflare REST API (PATCH .../pages/projects/pf-platform/deployment_configs)
+#   because the deploy flow does not consistently read wrangler.toml bindings for
+#   Pages. This file documents the binding for clarity + local dev; the
+#   AUTHORITATIVE binding is set on the Pages project (dashboard:
+#   Settings > Functions > D1 database bindings, or via REST). See
+#   platform/migrations/SETUP-D1.sh for the REST commands.
+#
+# The binding NAME the code expects is  DB  (env.DB in the Functions).
+
+name = "pf-platform"
+pages_build_output_dir = "."
+compatibility_date = "2026-06-01"
+
+# D1 binding — fill in database_id after `wrangler d1 create pf-platform-db`
+# (or after Brad creates it in the dashboard). The code references env.DB.
+[[d1_databases]]
+binding = "DB"
+database_name = "pf-platform-db"
+database_id = "REPLACE_WITH_DATABASE_ID_AFTER_CREATE"
+
+# Existing KV binding (already live on the project; listed for completeness).
+[[kv_namespaces]]
+binding = "PF_SCHEDULE"
+id = "6c8bd3b9bf3a464ca8d1a5d939231858"

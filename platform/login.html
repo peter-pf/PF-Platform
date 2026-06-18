@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Sign in — Pier Foundations Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --accent:#006DB0;
+    --accent-dark:#005A91;
+    --accent-light:#E0F0FF;
+    --text:#2B2F36;
+    --text-soft:#5A6472;
+    --border:#D9DEE6;
+    --bg:#F2F5F9;
+    --card:#FFFFFF;
+    --error:#B4232A;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+    color:var(--text);
+    background:linear-gradient(135deg,#E9F1F8 0%,#F2F5F9 60%,#FFFFFF 100%);
+    min-height:100vh;
+    display:flex;align-items:center;justify-content:center;
+    padding:24px;
+  }
+  .login-box{
+    width:100%;max-width:380px;
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    box-shadow:0 12px 40px rgba(0,40,80,0.10);
+    padding:36px 32px 30px;
+  }
+  .brand{
+    text-align:center;margin-bottom:22px;
+  }
+  .brand .mark{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:56px;height:56px;border-radius:14px;
+    background:var(--accent);color:#fff;
+    font-weight:700;font-size:1.4rem;letter-spacing:0.5px;
+    margin-bottom:12px;
+  }
+  .brand h1{
+    font-size:1.18rem;font-weight:700;margin:0;color:var(--text);
+  }
+  .brand p{
+    font-size:0.86rem;color:var(--text-soft);margin:4px 0 0;
+  }
+  label{
+    display:block;font-size:0.8rem;font-weight:600;color:var(--text-soft);
+    margin:14px 0 5px;
+  }
+  input[type=email],input[type=password]{
+    width:100%;padding:11px 13px;
+    border:1px solid var(--border);border-radius:8px;
+    font-size:0.95rem;font-family:inherit;color:var(--text);
+    background:#FBFCFE;transition:border-color .15s, box-shadow .15s;
+  }
+  input:focus{
+    outline:none;border-color:var(--accent);
+    box-shadow:0 0 0 3px var(--accent-light);
+  }
+  button{
+    width:100%;margin-top:22px;padding:12px;
+    background:var(--accent);color:#fff;border:none;border-radius:8px;
+    font-size:0.98rem;font-weight:600;font-family:inherit;cursor:pointer;
+    transition:background .15s;
+  }
+  button:hover{background:var(--accent-dark);}
+  button:disabled{opacity:0.6;cursor:default;}
+  .error{
+    display:none;margin-top:16px;padding:10px 12px;
+    background:#FCEBEC;border:1px solid #F2C4C7;border-radius:8px;
+    color:var(--error);font-size:0.86rem;
+  }
+  .error.show{display:block;}
+  .foot{
+    text-align:center;margin-top:20px;
+    font-size:0.76rem;color:var(--text-soft);line-height:1.5;
+  }
+</style>
+</head>
+<body>
+  <form class="login-box" id="loginForm" autocomplete="on">
+    <div class="brand">
+      <div class="mark">PF</div>
+      <h1>Pier Foundations Platform</h1>
+      <p>Sign in with your account</p>
+    </div>
+
+    <label for="email">Email</label>
+    <input type="email" id="email" name="email" autocomplete="username"
+           required autofocus placeholder="you@pierfoundations.com">
+
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password"
+           autocomplete="current-password" required placeholder="Your password">
+
+    <button type="submit" id="submitBtn">Sign in</button>
+
+    <div class="error" id="errorBox" role="alert"></div>
+
+    <div class="foot">
+      Internal operations tool. Authorized users only.<br>
+      Trouble signing in? Contact Brad.
+    </div>
+  </form>
+
+<script>
+(function () {
+  var form = document.getElementById('loginForm');
+  var btn = document.getElementById('submitBtn');
+  var errBox = document.getElementById('errorBox');
+
+  function showError(msg) {
+    errBox.textContent = msg;
+    errBox.classList.add('show');
+  }
+  function clearError() {
+    errBox.textContent = '';
+    errBox.classList.remove('show');
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    clearError();
+    btn.disabled = true;
+    btn.textContent = 'Signing in…';
+
+    var email = document.getElementById('email').value.trim();
+    var password = document.getElementById('password').value;
+
+    fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ email: email, password: password })
+    })
+    .then(function (res) {
+      return res.json().then(function (data) { return { ok: res.ok, data: data }; });
+    })
+    .then(function (r) {
+      if (r.ok && r.data.status === 'ok') {
+        // Honor a ?next= return path if present and same-origin, else go home.
+        var params = new URLSearchParams(window.location.search);
+        var next = params.get('next');
+        var dest = '/';
+        if (next && next.charAt(0) === '/' && next.indexOf('//') !== 0) dest = next;
+        if (r.data.must_reset) {
+          // Password-reset flow is a future build; for now proceed to portal
+          // and surface a notice. (must_reset enforced server-side later.)
+          window.location.href = dest;
+        } else {
+          window.location.href = dest;
+        }
+      } else {
+        showError((r.data && r.data.message) || 'Invalid email or password.');
+        btn.disabled = false;
+        btn.textContent = 'Sign in';
+      }
+    })
+    .catch(function () {
+      showError('Could not reach the server. Please try again.');
+      btn.disabled = false;
+      btn.textContent = 'Sign in';
+    });
+  });
+})();
+</script>
+</body>
+</html>
