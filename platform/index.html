@@ -944,6 +944,37 @@ table tbody tr:hover {
   .doc-frame { height: calc(100vh - var(--topbar-h) - 100px); }
 }
 
+/* ---- INLINE CONTRACT DOC EMBED (project record, via /api/doc proxy) ---- */
+.pr-doc-embed {
+  margin-top: 6px;
+  border: 1px solid var(--border, #e2e2e2);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+.pr-doc-frame {
+  width: 100%;
+  height: 620px;
+  border: 0;
+  display: block;
+  background: #fff;
+}
+.pr-doc-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border, #e2e2e2);
+  font-size: 0.85rem;
+}
+.pr-doc-name { color: var(--muted, #667); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pr-doc-fallback { white-space: nowrap; text-decoration: none; }
+.pr-doc-fallback:hover { text-decoration: underline; }
+@media (max-width: 768px) {
+  .pr-doc-frame { height: 70vh; }
+}
+
 /* ---- EMPTY STATE ---- */
 .empty-state {
   text-align: center;
@@ -9981,6 +10012,29 @@ try {
       return '<div class="pr-subhead">Documents</div><div class="pr-links">'+out+'</div>';
     }
 
+    // ---- inline document embed (LIVE SharePoint file via the /api/doc proxy) ----
+    // Renders the file INLINE (not just a link) so it feels attached AND is always
+    // current. The iframe src points at our authenticated, drive-restricted proxy
+    // (/api/doc?item=<drive-item id>), which streams the live bytes from SharePoint
+    // behind the same auth gate as the rest of the portal. itemId is baked into the
+    // record by sync/build-project-record.py. A SharePoint fallback link sits beneath.
+    function docEmbed(itemId, fallbackLinks, fileName){
+      if (!itemId) return ''; // no id resolved -> the linkRow fallback still shows
+      var src = '/api/doc?item=' + encodeURIComponent(itemId);
+      var fb = '';
+      var fl = (fallbackLinks || []).find(function(l){ return l.found && l.url; });
+      if (fl) {
+        fb = '<a class="pr-doc-fallback" href="'+E(fl.url)+'" target="_blank" rel="noopener noreferrer">'
+           + '&#128279; Open in SharePoint</a>';
+      }
+      var cap = fileName ? E(fileName) : 'Executed subcontract';
+      return '<div class="pr-subhead">Contract document (live)</div>'
+        + '<div class="pr-doc-embed">'
+        +   '<iframe class="pr-doc-frame" src="'+E(src)+'" title="'+cap+'" loading="lazy"></iframe>'
+        +   '<div class="pr-doc-foot"><span class="pr-doc-name">&#128196; '+cap+'</span>'+fb+'</div>'
+        + '</div>';
+    }
+
     // ---- collapsible card ----
     function card(num, title, meta, bodyHtml, open){
       var metaHtml = meta ? '<span class="pr-card-meta">'+E(meta)+'</span>' : '';
@@ -10098,7 +10152,11 @@ try {
           field('Project Working Hours', SF.working_hours, SS),
           field('Date COI Sent to GC', ''),
           field('Date W9 Sent to GC', '')
-        ]) + linkRow(L.contract));
+        ])
+        + docEmbed((D.subcontract && D.subcontract.item_id),
+                   L.contract,
+                   (D.subcontract && D.subcontract.source_file))
+        + linkRow(L.contract));
 
       // ----- 4. Engineering & Design -----
       var engBody = subhead('Engineering & Design Contacts') + contactList(g.engineering)

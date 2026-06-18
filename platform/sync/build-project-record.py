@@ -286,6 +286,62 @@ SUBCONTRACT_FILE = (f"{SP_PROJECT_FOLDER}/02 - Project Management/"
                     "Subcontract Agreement/26-0331 - POET Subcontract Agmt FE.pdf")
 
 
+# Crew One on POET (per the project timesheets / Crew 01 assignment). The POET
+# contact log only carries John Willis (the crew lead); his crew works the job
+# with him. Add the rest of Crew 1 as known PF Team members so the record
+# reflects who is actually on site. Name + crew role only — we do NOT fabricate
+# phone/email we don't have (left blank, rendered as em-dash by the view).
+# Source: POET timesheets (Crew 01). John Willis already comes from the contact log.
+POET_CREW_ONE = [
+    {
+        "scope": "Crew 1 — Operator",
+        "company": "Pier Foundations, LLC",
+        "name": "Seth Willis",
+        "address": "",
+        "phone": "",
+        "cell": "",
+        "email": "",
+        "website": "www.pierfoundations.com",
+        "notes": "Crew 1 (added from POET timesheets — Crew 01)",
+    },
+    {
+        "scope": "Crew 1 — Operator",
+        "company": "Pier Foundations, LLC",
+        "name": "Jordan Lemay",
+        "address": "",
+        "phone": "",
+        "cell": "",
+        "email": "",
+        "website": "www.pierfoundations.com",
+        "notes": "Crew 1 (added from POET timesheets — Crew 01)",
+    },
+]
+
+
+def add_crew_one(contacts):
+    """Ensure POET's PF Team includes Crew 1 (John Willis + Seth Willis + Jordan
+    Lemay). John Willis already comes from the contact log; append Seth and Jordan
+    only if a member of the same name is not already present (idempotent)."""
+    team = contacts.get("groups", {}).get("pf_team", [])
+    existing = {(c.get("name") or "").strip().lower() for c in team}
+    for crew in POET_CREW_ONE:
+        if crew["name"].strip().lower() not in existing:
+            team.append(dict(crew))
+            existing.add(crew["name"].strip().lower())
+    return contacts
+
+
+def resolve_subcontract_item_id(token):
+    """Resolve the Graph drive-item id for the POET fully-executed subcontract PDF.
+    This id is baked into the record so the portal can embed the LIVE file inline
+    via the /api/doc proxy (<iframe src="/api/doc?item=<id>">). Returns '' if not
+    resolvable (the view then falls back to the SharePoint link)."""
+    item = get_item_by_path(token, SUBCONTRACT_FILE)
+    if item and item.get("id"):
+        return item["id"]
+    return ""
+
+
 def parse_subcontract(token):
     """Download + parse the POET fully-executed subcontract PDF (AIA A142-2004
     Design-Builder/Contractor agreement) and return:
@@ -584,11 +640,17 @@ def detect_discrepancies(bid, sub):
 
 def assemble(token):
     contacts = parse_contacts(token)
+    contacts = add_crew_one(contacts)  # ensure Crew 1 (John + Seth + Jordan) on PF Team
     links = resolve_links(token)
     progress = load_progress()
     bid = parse_bid_log(token)
     sub = parse_subcontract(token)
     discrepancies = detect_discrepancies(bid, sub)
+
+    # Bake the live subcontract drive-item id into the record so the portal can
+    # embed the file inline via the /api/doc proxy (always current, not a copy).
+    if sub is not None:
+        sub["item_id"] = resolve_subcontract_item_id(token)
 
     record = {
         "project_number": PROJECT_NUMBER,

@@ -7,7 +7,7 @@ window.PF_PROJECT_POET = {
   "project_name": "POET Biosciences",
   "location": "Shelbyville, IN",
   "sp_folder": "04 - Project Management/02 - Projects/26-002 - POET Projects - POET",
-  "generated": "2026-06-17T19:52:47.892793+00:00Z",
+  "generated": "2026-06-18T00:05:35.224041+00:00Z",
   "data_note": "READ-ONLY v1. Populated from SharePoint: the POET Project Info contacts file (full contact directory), the Project Bid Log (General Info metrics, Contract Info dates, award value, GC/engineer), the fully-executed POET subcontract (executed date, contract no., retainage, payment terms, LDs, prevailing wage, working hours, surveying \u2014 fills Bid-Log gaps only), folder doc links, and the auto-progress engine (QA/QC installed qty). Editing/saving is v2. Bid Log wins on shared fields; subcontract only fills blanks or confirms. Fields with no confirmed source render blank \u2014 never fabricated.",
   "contacts": {
     "title": "Poet Biosciences Shelbyville, IN - Pier Foundations Contact Log",
@@ -161,6 +161,28 @@ window.PF_PROJECT_POET = {
           "email": "jwillis@pierfoundations.com",
           "website": "www.pierfoundations.com",
           "notes": ""
+        },
+        {
+          "scope": "Crew 1 \u2014 Operator",
+          "company": "Pier Foundations, LLC",
+          "name": "Seth Willis",
+          "address": "",
+          "phone": "",
+          "cell": "",
+          "email": "",
+          "website": "www.pierfoundations.com",
+          "notes": "Crew 1 (added from POET timesheets \u2014 Crew 01)"
+        },
+        {
+          "scope": "Crew 1 \u2014 Operator",
+          "company": "Pier Foundations, LLC",
+          "name": "Jordan Lemay",
+          "address": "",
+          "phone": "",
+          "cell": "",
+          "email": "",
+          "website": "www.pierfoundations.com",
+          "notes": "Crew 1 (added from POET timesheets \u2014 Crew 01)"
         }
       ],
       "vendors": [
@@ -444,7 +466,8 @@ window.PF_PROJECT_POET = {
     },
     "source_file": "26-0331 - POET Subcontract Agmt FE.pdf",
     "pages": 424,
-    "scanned_pages": []
+    "scanned_pages": [],
+    "item_id": "016ISVH64RZ6FBDCIAMNELEB5CKPHJ2UW3"
   },
   "discrepancies": []
 };
