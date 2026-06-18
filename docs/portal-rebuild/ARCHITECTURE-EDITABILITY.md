@@ -35,5 +35,20 @@ Possibility confirmed: yes (Graph Excel write API + our ReadWrite permissions). 
 ## Project document browser — mirror SharePoint subfolders + inline embed (Brad 2026-06-17)
 In each project's section, build a DOCUMENT browser that mirrors the project's SharePoint SUBFOLDER structure (same folders/subfolders as the project folder: 01 Preconstruction, 02 Project Management, 03 Engineering & Design, 04 GC Drawings & Specs, 05 Field, and their subfolders). Navigate the project's files inside the portal by those same subfolders, and view each file EMBEDDED inline (via the live `/api/doc` proxy, same approach confirmed for the contract) rather than bouncing to SharePoint. So the portal becomes the single place to read every project document, organized exactly like the SharePoint folder, always live. (Builds on the embed-file proxy; extends from a single contract embed to a full per-project file tree.)
 
+## Access control — per-user logins + role-based access (Brad 2026-06-18) — CORE D1 REQUIREMENT
+Today the portal is ONE shared Basic-Auth password (PF_AUTH_USER/PASS). Brad wants per-user logins with guardrails: different staff see different areas, each with their own password. E.g. a field-ops person logs in with their own password and sees only their section, not the whole portal.
+
+Design (build security-first, server-side enforced — not just hidden in the UI):
+- **Users table in D1**: id, name, email, password_hash (salted, e.g. PBKDF2/bcrypt — never plaintext), role, active flag. Per-user passwords; admin can add/disable users.
+- **Per-user login replaces the single shared password**: login form → validate against D1 (hashed) → issue a signed session token (reuse PF_TOKEN_SECRET + the existing middleware signed-token pattern). Each user their own session.
+- **Roles → allowed modules/sections** (proposed, confirm with Brad):
+  - Owner/Admin (Brad): full access + all edit + user management.
+  - Partner (Jonathan, Derek): full view; edit their domains (estimating/BD/PM).
+  - Field Ops (John Willis + crew, each own password): ONLY Field Operations — their projects field view, daily logs/timesheets entry, safety. NO financials, NO preconstruction, NO contracts.
+  - (future) Office/Accounting; limited external Agency role (the agency layer noted earlier).
+- **Enforcement is server-side**: the Functions check the user's role before serving data or accepting an edit (a field-ops user can't reach financial endpoints even by URL). Reuse the financials-stripped field-view pattern for what field-ops sees.
+- **Audit**: every edit logged with the user id (ties to the project-log requirement).
+NEEDS FROM BRAD before building: the staff list + which role each person gets, and confirmation of the role→access map above.
+
 ## Status
 Framework agreed; Phase 1 (Excel→portal population) in progress now. Phase 2 (portal→Excel backfill) starts once Phase 1 is solid. Start the write-back with one section (e.g. New Opportunity intake) as the proof, then expand.
