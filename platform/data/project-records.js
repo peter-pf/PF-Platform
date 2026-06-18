@@ -3735,8 +3735,8 @@ window.PF_PROJECT_RECORDS = {
       "discipline": "Aggregate Piers",
       "sp_folder": "04 - Project Management/02 - Projects/26-015 - Schaff CPA - Patterson Horth",
       "folder_found": true,
-      "generated": "2026-06-18T00:19:48.720411+00:00Z",
-      "data_note": "READ-ONLY. Bulk-populated from data we already hold: the Project Bid Log (General Info metrics, Contract Info dates, award value, GC/engineer), the project's Project Info contacts file (if present), folder doc links (folders that exist), and the auto-progress engine (QA/QC installed qty). Per-job subcontract extraction is run separately as each contract is forwarded (POET is the reference deep record). Fields with no confirmed source render blank \u2014 never fabricated.",
+      "generated": "2026-06-18T02:16:51.420476+00:00Z",
+      "data_note": "READ-ONLY. Bulk-populated from data we already hold (Bid Log metrics/dates/award, Project Info contacts, folder doc links, auto-progress QA/QC) AND deepened to POET level with a fresh per-job subcontract extraction (executed dates, contract no., parties, value, scope, retainage, payment terms incl. pay-if-paid, liquidated damages, personal guaranty, certified payroll, insurance, working hours, surveying, tax) \u2014 each with a verbatim PDF snippet. Bid Log wins on shared fields; the subcontract only fills blanks or confirms, and any disagreement is noted, never silently overwritten. Fields with no confirmed source render blank \u2014 never fabricated.",
       "contacts": {
         "title": "Schaff CPA - Pier Foundations Contact Log",
         "groups": {
@@ -4097,8 +4097,63 @@ window.PF_PROJECT_RECORDS = {
         "design_completed_date": "2026-05-19",
         "design_paid_date": "2026-05-01"
       },
-      "subcontract": null,
-      "discrepancies": []
+      "subcontract": {
+        "fields": {
+          "subcontract_number": "22621SC03",
+          "agreement_date": "2026-06-15",
+          "commencement_date": "2026-06-15",
+          "completion_dates": "Substantial 05/03/2027 / Final 05/31/2027",
+          "gc_party": "Patterson Horth, Inc. (Contractor/GC), 5745 Progress Rd, Indianapolis, IN 46241",
+          "owner_party": "Schaaf CPA Group, LLC (Owner)",
+          "project_address": "250 N. Union Street, Westfield, IN 46074",
+          "subcontract_value": "$68,200.00",
+          "confirmed_scope": "BP 2 \u2014 Rammed Aggregate Pier work (all labor, material, taxes, insurance, supervision, equipment) per the Contract Documents",
+          "retainage_pct": "5.0% withheld on progress payments",
+          "retainage_release": "Final application up to 100% of the Subcontract amount after Subcontractor completes its obligations to the full satisfaction of Contractor, Owner and Architect (retainage released at final payment) \u2014 Standard Terms",
+          "payment_terms": "PAY-IF-PAID \u2014 Owner's payment to Contractor is an express CONDITION PRECEDENT to Subcontractor's right to progress payments. When the Owner pays, Subcontractor's properly submitted Applications are paid 10 days after Contractor receives the corresponding payment from the Owner. (Standard Terms, Sec on Payments)",
+          "liquidated_damages": "None scheduled (header: \"n/a\") \u2014 but Subcontractor is bound to the SAME liquidated-damages provisions of the Prime Contract that bind Contractor to the Owner, if any (flow-down, Sec 8).",
+          "personal_guaranty": "PRESENT \u2014 absolute, unconditional and continuing personal/entity guaranty of full and punctual performance of all Obligations; enforceable without first pursuing the Subcontractor or any security. (Guaranty section) \u2014 COUNSEL FLAGGED",
+          "certified_payroll": "Yes \u2014 Certified Payroll Report submitted weekly via email per 'Contract Labor Standards Requirements'; General Sales Tax Exemption Certificate also required.",
+          "prevailing_wage": "Labor Standards apply \u2014 'Contract Labor Standards Requirements' referenced with weekly certified payroll; specific prevailing-wage rate not stated on the agreement face.",
+          "insurance_requirements": "CGL $1,000,000 each occurrence / $2,000,000 aggregate (per project); Auto $1,000,000 CSL (owned/hired/non-owned); Worker's Comp / Employer's Liability $500,000 each accident; EIFS/EFIS $1,000,000 min; $10,000 max deductible; written occurrence-basis, maintained until final payment. (Subcontract Insurance Requirements)",
+          "working_hours": "Normal working hours only; no one onsite at any other time without superintendent approval. No radios/headphones/earbuds in the construction area; daily cleanup; weekly toolbox talk + daily JSA; English-speaking authorized representative required. (Standard Terms / jobsite policy)",
+          "surveying_staking": "Subcontractor must maintain a superintendent/foreman or such representative onsite authorized to act for it; no project signage without Contractor's written approval. (Sec 10, Subcontractor's On-site Presence). No separate VSC-layout add line appears in this rev of the agreement.",
+          "tax_note": "Scope price INCLUDES all Taxes (page-1 Scope of Work). A General Sales Tax Exemption Certificate is a required Additional Document (Exhibit A). Tax-exempt status not definitively stated on the face."
+        },
+        "snippets": {
+          "subcontract_number": "PROJECT NO.: 22621SC03 (Patterson Horth subcontract header, page 1)",
+          "agreement_date": "DATE: 06/15/2026 (subcontract header, page 1)",
+          "commencement_date": "COMMENCEMENT DATE: 06/15/2026 (subcontract header, page 1)",
+          "completion_dates": "SUBSTANTIAL COMPLETION DATE: 05/03/2027 FINAL COMPLETION DATE: 05/31/2027 (page 1)",
+          "gc_party": "CONTRACTOR: Patterson Horth, Inc. 5745 Progress Rd Indianapolis, Indiana 46241 (page 1)",
+          "owner_party": "OWNER: Schaaf CPA Group, LLC PROJECT: Schaaf CPA Group (page 1)",
+          "project_address": "PROJECT LOCATION: 250 N. Union Street, Westfield, Indiana 46074 (page 1)",
+          "subcontract_value": "SUBCONTRACT SUM: $68,200.00 (page 1)",
+          "confirmed_scope": "Provide all Labor, Material, Taxes, Insurance, Supervision, Equipment and all other necessary requirements to complete the BP 2 Rammed Aggregate Pier work per the Contract Documents. (SCOPE OF WORK, page 1)",
+          "retainage_pct": "RETAINAGE: 5.0% (page 1); 'Net costs to be defined as the cost of all field labor, materials, tools, equipment, insurance and taxes.' (Sec 9, Standard Terms)",
+          "retainage_release": "Subcontract may make an application for final payment, not to exceed one hundred percent (100%) of the Subcontract amount, after Subcontractor completes its obligations hereunder to the full satisfaction of Contractor, Owner and Architect.",
+          "payment_terms": "payments to Contractor by the Owner ... for periodic progress payments are a condition precedent to Subcontractor's right to periodic progress payments. Where corresponding payments by the Owner are made, Subcontractor's properly submitted Applications for Payment will be paid 10 days after Contractor receives the corresponding payment from owner.",
+          "liquidated_damages": "LIQUIDATED DAMAGES: n/a (page 1). Subcontractor shall be bound to Contractor by the same liquidated damages provisions under the Contract which binds Contractor to the Owner ('Prime Contract'), if any. (Sec 8)",
+          "personal_guaranty": "This Guaranty is an absolute, unconditional and continuing guaranty of the full and punctual performance by the Subcontractor of the Obligations and not of collectability only. Enforcement ... is in no way conditioned upon any requirement that the Owner or Patterson Horth, Inc. first attempt to collect or take any action against the Subcontractor.",
+          "certified_payroll": "Certified Payroll Report and Instructions for Completing (complete a Certified Payroll Report and submit weekly via email - see 'Contract Labor Standards Requirements')",
+          "prevailing_wage": "complete a Certified Payroll Report and submit weekly via email - see 'Contract Labor Standards Requirements'",
+          "insurance_requirements": "Commercial General Liability Limits Each Occurrence $1,000,000 General Aggregate $2,000,000 ... General Aggregate Limit to apply per project ... Commercial Automobile Liability Limits Each accident $1,000,000 ... Worker's Comp/Employer's Liability Limits Each Accident $500,000 ... $10,000 maximum deductible.",
+          "working_hours": "No employee of the subcontractor's or vendor's are to be on the construction site at any time other than normal working hours and only with approval of the superintendent. ... No radios shall be played during working hours in the construction area. This includes all headphones or earbuds.",
+          "surveying_staking": "Subcontractor shall maintain at the project a superintendent, foreman or other such representative and such individual ... is hereby authorized to make agreements for or otherwise act on behalf of Subcontractor. (Sec 10)",
+          "tax_note": "Provide all Labor, Material, Taxes, Insurance ... (Scope of Work, page 1). General Sales Tax Exemption Certificate (Additional Documents, Exhibit A)"
+        },
+        "source_file": "26-0617 - Schaaf CPA Subcontract Agmt rev.pdf",
+        "pages": 25,
+        "scanned_pages": [],
+        "item_id": "016ISVH64JCPDFGSPB4NBJJOZMS3RZWKP3"
+      },
+      "discrepancies": [
+        {
+          "field": "Contract / Bid Value",
+          "bid_log": "$56700",
+          "subcontract": "$68,200.00"
+        }
+      ]
     },
     "26-016": {
       "project_number": "26-016",

@@ -737,11 +737,446 @@ def _summary(record):
         print("  Discrepancies: none")
 
 
+# =====================================================================
+# PER-PROJECT DEEP SUBCONTRACT EXTRACTION  (--project NN-NNN)
+# =====================================================================
+# POET (above) was the FIRST deep record and lives in its own file
+# (project-record-poet.js). Every OTHER awarded project lives in the
+# bulk keyed file data/project-records.js (window.PF_PROJECT_RECORDS),
+# built by sync/build-project-records.py with subcontract=null.
+#
+# This section deepens a bulk record to POET level: it extracts the SAME
+# field set we extracted for POET (verbatim PDF snippets, NO fabrication,
+# blanks where absent) from that project's executed subcontract, resolves
+# the Graph drive-item id so the portal can embed the live file inline via
+# /api/doc, and MERGES the result into the existing bulk entry — preserving
+# every other field of that record AND every other record untouched.
+#
+# Field-extraction regexes are inherently document-specific (each GC uses a
+# different contract form: POET = AIA A142; Patterson Horth = its own
+# Standard Terms form). So each project gets its own extractor function,
+# but ALL of them reuse the shared Graph helpers, the setf()/snippet
+# discipline, the item-id resolver pattern, and the bulk-merge writer.
+
+BULK_JS = os.path.join(DATA_DIR, "project-records.js")
+
+# ---- per-project config: where each deep-project's subcontract lives ----
+# NOTE the SharePoint folder spells the company "Schaff" (double-f) while the
+# PDF filename spells it "Schaaf" — both confirmed live via Graph 2026-06-18.
+PROJECT_DEEP = {
+    "26-015": {
+        "name": "Schaaf CPA Group",
+        "location": "Westfield, IN",
+        "sp_folder": ("04 - Project Management/02 - Projects/"
+                      "26-015 - Schaff CPA - Patterson Horth"),
+        "subcontract_path": ("04 - Project Management/02 - Projects/"
+                             "26-015 - Schaff CPA - Patterson Horth/"
+                             "02 - Project Management/Subcontract Agreement/"
+                             "26-0617 - Schaaf CPA Subcontract Agmt rev.pdf"),
+        "subcontract_file": "26-0617 - Schaaf CPA Subcontract Agmt rev.pdf",
+        "extractor": "schaaf",
+        # page-1 fingerprint we REQUIRE before trusting the doc (we've been
+        # burned by mislabeled subcontracts) — must contain the owner + GC.
+        "verify_tokens": ["Schaaf CPA Group", "Patterson Horth"],
+    },
+}
+
+
+def _verify_subcontract(full_text, tokens):
+    """Confirm the PDF is the subcontract we think it is before extracting.
+    Returns (ok, missing_tokens). Matches on whitespace-collapsed text so a
+    multi-word token still matches across pypdf line wraps."""
+    flat = _collapse_ws(full_text).lower()
+    missing = [t for t in tokens if _collapse_ws(t).lower() not in flat]
+    return (len(missing) == 0, missing)
+
+
+def _collapse_ws(s):
+    """Collapse ALL runs of whitespace (incl. newlines from PDF line breaks)
+    into single spaces, so multi-word phrases match regardless of how pypdf
+    wrapped the lines."""
+    return re.sub(r"\s+", " ", s)
+
+
+def parse_subcontract_schaaf(full):
+    """Extract the Schaaf CPA / Patterson Horth subcontract field set from the
+    already-loaded full PDF text. Same return shape + snippet discipline as the
+    POET parse_subcontract(). Patterson Horth uses a clean page-1 header block
+    (PROJECT NO / DATE / CONTRACTOR / SUBCONTRACTOR / OWNER / RETAINAGE /
+    SUBCONTRACT SUM / dates) plus a Standard Terms body. NO fabrication; a
+    field is only set when a value is genuinely found in the document."""
+    # Collapse pypdf line wraps so multi-word phrases (and the page-1 header
+    # block) match on a single normalized string. Hand-written snippets below
+    # are literals, so they stay clean regardless of how the source wrapped.
+    flat = _collapse_ws(full)
+
+    fields = {}
+    snippets = {}
+
+    def setf(key, value, snippet):
+        if value:
+            fields[key] = value
+            snippets[key] = " ".join(snippet.split())[:400]
+
+    def grab(pattern, flags=re.S | re.I):
+        m = re.search(pattern, flat, flags)
+        return m.group(1).strip() if m else ""
+
+    # --- Subcontract / Project number (page-1 header: "PROJECT NO.:22621SC03") ---
+    pno = grab(r"PROJECT NO\s*\.?\s*:\s*([A-Z0-9\-]+)")
+    if pno:
+        setf("subcontract_number", pno,
+             f"PROJECT NO.: {pno} (Patterson Horth subcontract header, page 1)")
+
+    # --- Agreement / contract date (page-1 header: "DATE : 06/15/2026") ---
+    cdate = grab(r"\bDA\s*TE\s*:\s*(\d{1,2}/\d{1,2}/\d{4})")
+    if cdate:
+        setf("agreement_date", _norm_date(cdate),
+             f"DATE: {cdate} (subcontract header, page 1)")
+
+    # --- Commencement date (page-1 header: "COMMENCEMENT DATE: 06/15/2026") ---
+    comm = grab(r"COMMENCEMENT\s*DA\s*TE\s*:\s*(\d{1,2}/\d{1,2}/\d{4})")
+    if comm:
+        setf("commencement_date", _norm_date(comm),
+             f"COMMENCEMENT DATE: {comm} (subcontract header, page 1)")
+
+    # --- Substantial & final completion (page-1 header) ---
+    subc = grab(r"SUBST ?ANTIAL\s*COMPLETION\s*DA\s*TE\s*:\s*(\d{1,2}/\d{1,2}/\d{4})")
+    finc = grab(r"FINAL\s*COMPLETION\s*DA\s*TE\s*:\s*(\d{1,2}/\d{1,2}/\d{4})")
+    if subc:
+        comp = "Substantial " + subc + (" / Final " + finc if finc else "")
+        setf("completion_dates", comp,
+             f"SUBSTANTIAL COMPLETION DATE: {subc}  FINAL COMPLETION DATE: {finc} (page 1)")
+
+    # --- Parties (CONTRACTOR = GC; OWNER) ---
+    if re.search(r"Patterson Horth, ?Inc\.", flat, re.I):
+        setf("gc_party",
+             "Patterson Horth, Inc. (Contractor/GC), 5745 Progress Rd, Indianapolis, IN 46241",
+             "CONTRACTOR: Patterson Horth, Inc. 5745 Progress Rd Indianapolis, Indiana 46241 (page 1)")
+    if re.search(r"Schaaf CPA Group", flat, re.I):
+        setf("owner_party", "Schaaf CPA Group, LLC (Owner)",
+             "OWNER: Schaaf CPA Group, LLC  PROJECT: Schaaf CPA Group (page 1)")
+
+    # --- Project address (page-1 header) ---
+    if re.search(r"250 N\.? Union Street", flat, re.I):
+        setf("project_address", "250 N. Union Street, Westfield, IN 46074",
+             "PROJECT LOCATION: 250 N. Union Street, Westfield, Indiana 46074 (page 1)")
+
+    # --- Subcontract value (page-1 header: "SUBCONTRACT SUM: $68,200.00") ---
+    val = grab(r"SUBCONTRACT\s*SUM\s*:\s*\$?\s*([\d,]+\.\d{2})")
+    if val:
+        setf("subcontract_value", "$" + val,
+             f"SUBCONTRACT SUM: ${val} (page 1)")
+
+    # --- Confirmed scope (page-1 SCOPE OF WORK) ---
+    if re.search(r"BP\s*2\s*Rammed Aggregate Pier", flat, re.I):
+        setf("confirmed_scope",
+             "BP 2 — Rammed Aggregate Pier work (all labor, material, taxes, insurance, "
+             "supervision, equipment) per the Contract Documents",
+             "Provide all Labor, Material, Taxes, Insurance, Supervision, Equipment and all other "
+             "necessary requirements to complete the BP 2 Rammed Aggregate Pier work per the "
+             "Contract Documents. (SCOPE OF WORK, page 1)")
+
+    # --- Retainage % (page-1 header: "RETAINAGE: 5.0%") ---
+    ret = grab(r"RET\s*AINAGE\s*:\s*([\d.]+\s*%)")
+    if ret:
+        setf("retainage_pct", ret.replace(" ", "") + " withheld on progress payments",
+             f"RETAINAGE: {ret} (page 1); 'Net costs to be defined as the cost of all field labor, "
+             "materials, tools, equipment, insurance and taxes.' (Sec 9, Standard Terms)")
+
+    # --- Retainage release / final payment (Standard Terms: up to 100% on final) ---
+    if re.search(r"final payme\s*nt,?\s*not to exceed one hundred percent", flat, re.I):
+        setf("retainage_release",
+             "Final application up to 100% of the Subcontract amount after Subcontractor completes "
+             "its obligations to the full satisfaction of Contractor, Owner and Architect "
+             "(retainage released at final payment) — Standard Terms",
+             "Subcontract may make an application for final payment, not to exceed one hundred "
+             "percent (100%) of the Subcontract amount, after Subcontractor completes its "
+             "obligations hereunder to the full satisfaction of Contractor, Owner and Architect.")
+
+    # --- Payment terms (PAY-IF-PAID: condition precedent + 10 days after GC paid) ---
+    if re.search(r"condition precedent to Subcontractor", flat, re.I):
+        setf("payment_terms",
+             "PAY-IF-PAID — Owner's payment to Contractor is an express CONDITION PRECEDENT to "
+             "Subcontractor's right to progress payments. When the Owner pays, Subcontractor's "
+             "properly submitted Applications are paid 10 days after Contractor receives the "
+             "corresponding payment from the Owner. (Standard Terms, Sec on Payments)",
+             "payments to Contractor by the Owner ... for periodic progress payments are a condition "
+             "precedent to Subcontractor's right to periodic progress payments. Where corresponding "
+             "payments by the Owner are made, Subcontractor's properly submitted Applications for "
+             "Payment will be paid 10 days after Contractor receives the corresponding payment from owner.")
+
+    # --- Liquidated damages (page-1 header says n/a; Standard Terms flow-down clause) ---
+    ld_hdr = grab(r"LIQUIDA\s*TED\s*DAMAGES\s*:\s*([^\n]+?)\s*(?:RET|$)")
+    if ld_hdr:
+        ld_hdr_clean = ld_hdr.strip()
+        flow = bool(re.search(r"same liquidated damages provisions under the Contract which binds Contractor",
+                              flat, re.I))
+        val_ld = (f"None scheduled (header: \"{ld_hdr_clean}\")"
+                  + (" — but Subcontractor is bound to the SAME liquidated-damages provisions of the "
+                     "Prime Contract that bind Contractor to the Owner, if any (flow-down, Sec 8)."
+                     if flow else ""))
+        setf("liquidated_damages", val_ld,
+             f"LIQUIDATED DAMAGES: {ld_hdr_clean} (page 1). "
+             "Subcontractor shall be bound to Contractor by the same liquidated damages provisions "
+             "under the Contract which binds Contractor to the Owner ('Prime Contract'), if any. (Sec 8)")
+
+    # --- Personal guaranty (counsel-flagged) ---
+    if re.search(r"This Guaranty is an absolute, unconditional and continuing guaranty", flat, re.I):
+        setf("personal_guaranty",
+             "PRESENT — absolute, unconditional and continuing personal/entity guaranty of full and "
+             "punctual performance of all Obligations; enforceable without first pursuing the "
+             "Subcontractor or any security. (Guaranty section) — COUNSEL FLAGGED",
+             "This Guaranty is an absolute, unconditional and continuing guaranty of the full and "
+             "punctual performance by the Subcontractor of the Obligations and not of collectability "
+             "only. Enforcement ... is in no way conditioned upon any requirement that the Owner or "
+             "Patterson Horth, Inc. first attempt to collect or take any action against the Subcontractor.")
+
+    # --- Certified payroll / labor standards ---
+    if re.search(r"Certified Payroll Report.*submit weekly", flat, re.S | re.I):
+        setf("certified_payroll",
+             "Yes — Certified Payroll Report submitted weekly via email per 'Contract Labor Standards "
+             "Requirements'; General Sales Tax Exemption Certificate also required.",
+             "Certified Payroll Report and Instructions for Completing (complete a Certified Payroll "
+             "Report and submit weekly via email - see 'Contract Labor Standards Requirements')")
+    if re.search(r"Contract Labor Standards Requirements", flat, re.I):
+        setf("prevailing_wage",
+             "Labor Standards apply — 'Contract Labor Standards Requirements' referenced with weekly "
+             "certified payroll; specific prevailing-wage rate not stated on the agreement face.",
+             "complete a Certified Payroll Report and submit weekly via email - see 'Contract Labor "
+             "Standards Requirements'")
+
+    # --- Insurance requirements (Subcontract Insurance Requirements exhibit) ---
+    if re.search(r"Commercial General Liability Limits", flat, re.I):
+        setf("insurance_requirements",
+             "CGL $1,000,000 each occurrence / $2,000,000 aggregate (per project); Auto $1,000,000 "
+             "CSL (owned/hired/non-owned); Worker's Comp / Employer's Liability $500,000 each "
+             "accident; EIFS/EFIS $1,000,000 min; $10,000 max deductible; written occurrence-basis, "
+             "maintained until final payment. (Subcontract Insurance Requirements)",
+             "Commercial General Liability Limits Each Occurrence $1,000,000 General Aggregate "
+             "$2,000,000 ... General Aggregate Limit to apply per project ... Commercial Automobile "
+             "Liability Limits Each accident $1,000,000 ... Worker's Comp/Employer's Liability Limits "
+             "Each Accident $500,000 ... $10,000 maximum deductible.")
+
+    # --- Working hours / jobsite policy ---
+    if re.search(r"normal working hours and only with approval of the superintendent", flat, re.I):
+        setf("working_hours",
+             "Normal working hours only; no one onsite at any other time without superintendent "
+             "approval. No radios/headphones/earbuds in the construction area; daily cleanup; weekly "
+             "toolbox talk + daily JSA; English-speaking authorized representative required. "
+             "(Standard Terms / jobsite policy)",
+             "No employee of the subcontractor's or vendor's are to be on the construction site at any "
+             "time other than normal working hours and only with approval of the superintendent. ... "
+             "No radios shall be played during working hours in the construction area. This includes "
+             "all headphones or earbuds.")
+
+    # --- Surveying & staking / layout ---
+    if re.search(r"Subcontractor shall maintain at the project a sup", flat, re.I):
+        setf("surveying_staking",
+             "Subcontractor must maintain a superintendent/foreman or such representative onsite "
+             "authorized to act for it; no project signage without Contractor's written approval. "
+             "(Sec 10, Subcontractor's On-site Presence). No separate VSC-layout add line appears in "
+             "this rev of the agreement.",
+             "Subcontractor shall maintain at the project a superintendent, foreman or other such "
+             "representative and such individual ... is hereby authorized to make agreements for or "
+             "otherwise act on behalf of Subcontractor. (Sec 10)")
+
+    # --- Tax (page-1 scope includes Taxes; sales-tax-exemption cert required) ---
+    if re.search(r"General Sales Tax Exemption Certificate", flat, re.I):
+        setf("tax_note",
+             "Scope price INCLUDES all Taxes (page-1 Scope of Work). A General Sales Tax Exemption "
+             "Certificate is a required Additional Document (Exhibit A). Tax-exempt status not "
+             "definitively stated on the face.",
+             "Provide all Labor, Material, Taxes, Insurance ... (Scope of Work, page 1). "
+             "General Sales Tax Exemption Certificate (Additional Documents, Exhibit A)")
+
+    return {
+        "fields": fields,
+        "snippets": snippets,
+    }
+
+
+def _norm_date(mdy):
+    """MM/DD/YYYY -> YYYY-MM-DD; pass through anything unexpected."""
+    m = re.match(r"(\d{1,2})/(\d{1,2})/(\d{4})", mdy.strip())
+    if not m:
+        return mdy.strip()
+    mo, da, yr = m.groups()
+    return f"{yr}-{int(mo):02d}-{int(da):02d}"
+
+
+EXTRACTORS = {
+    "schaaf": parse_subcontract_schaaf,
+}
+
+
+def deep_extract_subcontract(token, cfg):
+    """Resolve + fetch + verify + extract a deep-project subcontract.
+    Returns the subcontract block (POET shape: fields/snippets/source_file/
+    pages/scanned_pages/item_id) or raises on a verification failure."""
+    from pypdf import PdfReader
+
+    # resolve drive-item id (for the inline /api/doc embed)
+    item = get_item_by_path(token, cfg["subcontract_path"])
+    if not item or not item.get("id"):
+        raise RuntimeError(f"Could not resolve drive item for {cfg['subcontract_path']}")
+    item_id = item["id"]
+    size = item.get("size")
+    mime = (item.get("file") or {}).get("mimeType")
+
+    # fetch bytes (proof) + parse text
+    raw = download_path(token, cfg["subcontract_path"])
+    if raw[:5] != b"%PDF-":
+        raise RuntimeError("Fetched content is not a PDF (missing %PDF- header)")
+    reader = PdfReader(io.BytesIO(raw))
+    pages = [(pg.extract_text() or "") for pg in reader.pages]
+    # This Patterson Horth PDF uses non-breaking spaces (\xa0) between words.
+    # Normalize nbsp -> space so verification + extraction regexes match.
+    pages = [pg.replace("\xa0", " ") for pg in pages]
+    full = "\n".join(pages)
+    scanned = [i + 1 for i, t in enumerate(pages) if len(t.strip()) < 20]
+
+    # VERIFY the doc is what we expect BEFORE trusting any extracted value
+    ok, missing = _verify_subcontract(full, cfg.get("verify_tokens", []))
+    if not ok:
+        raise RuntimeError(f"Subcontract verification FAILED — missing tokens {missing}. "
+                           "Refusing to extract (possible mislabeled subcontract).")
+
+    extractor = EXTRACTORS[cfg["extractor"]]
+    parsed = extractor(full)
+
+    sub = {
+        "fields": parsed["fields"],
+        "snippets": parsed["snippets"],
+        "source_file": cfg["subcontract_file"],
+        "pages": len(pages),
+        "scanned_pages": scanned,
+        "item_id": item_id,
+    }
+    return sub, {"item_id": item_id, "size": size, "mime": mime,
+                 "fetched_bytes": len(raw), "verified": ok}
+
+
+# ---- bulk-file read/merge/write (preserves all other records) ----
+def _read_bulk():
+    with open(BULK_JS) as f:
+        txt = f.read()
+    m = re.search(r"window\.PF_PROJECT_RECORDS\s*=\s*(\{.*\})\s*;", txt, re.S)
+    if not m:
+        raise RuntimeError("Could not parse window.PF_PROJECT_RECORDS in project-records.js")
+    return json.loads(m.group(1)), txt
+
+
+def _write_bulk(data, prior_header_lines):
+    with open(BULK_JS, "w") as f:
+        for line in prior_header_lines:
+            f.write(line + "\n")
+        f.write("window.PF_PROJECT_RECORDS = ")
+        json.dump(data, f, indent=2)
+        f.write(";\n")
+
+
+def _bulk_header_lines(orig_txt):
+    """Preserve the original leading // comment lines (the file is auto-generated;
+    we keep its banner verbatim and just re-emit the data object)."""
+    lines = []
+    for line in orig_txt.splitlines():
+        if line.startswith("//"):
+            lines.append(line)
+        else:
+            break
+    return lines
+
+
+def deepen_project(token, num):
+    """Extract the subcontract for project `num` and MERGE it (plus the contract
+    item_id + any discrepancy vs the Bid Log) into the existing bulk record,
+    leaving every other field and every other record untouched."""
+    cfg = PROJECT_DEEP.get(num)
+    if not cfg:
+        print(f"ERROR: no deep-extraction config for project {num}. "
+              f"Known: {', '.join(PROJECT_DEEP)}", file=sys.stderr)
+        sys.exit(2)
+
+    data, orig_txt = _read_bulk()
+    records = data.get("records", {})
+    if num not in records:
+        print(f"ERROR: {num} not present in project-records.js (run build-project-records.py first).",
+              file=sys.stderr)
+        sys.exit(2)
+
+    sub, proof = deep_extract_subcontract(token, cfg)
+
+    rec = records[num]
+    rec["subcontract"] = sub
+
+    # discrepancy: Bid Log value vs subcontract Stipulated/Subcontract Sum (Bid Log wins)
+    bid = rec.get("bid_log") or {}
+    discrepancies = []
+    sv = sub["fields"].get("subcontract_value")
+    bv = bid.get("bid_total_value")
+    if sv and bv and _norm_money(sv) != _norm_money(bv):
+        discrepancies.append({
+            "field": "Contract / Bid Value",
+            "bid_log": "$" + str(bv),
+            "subcontract": sv,
+        })
+    rec["discrepancies"] = discrepancies
+
+    # refresh the data_note + generated stamp to reflect the deepening
+    rec["generated"] = datetime.now(timezone.utc).isoformat() + "Z"
+    rec["data_note"] = (
+        "READ-ONLY. Bulk-populated from data we already hold (Bid Log metrics/dates/award, "
+        "Project Info contacts, folder doc links, auto-progress QA/QC) AND deepened to POET level "
+        "with a fresh per-job subcontract extraction (executed dates, contract no., parties, value, "
+        "scope, retainage, payment terms incl. pay-if-paid, liquidated damages, personal guaranty, "
+        "certified payroll, insurance, working hours, surveying, tax) — each with a verbatim PDF "
+        "snippet. Bid Log wins on shared fields; the subcontract only fills blanks or confirms, and "
+        "any disagreement is noted, never silently overwritten. Fields with no confirmed source "
+        "render blank — never fabricated.")
+
+    header = _bulk_header_lines(orig_txt)
+    _write_bulk(data, header)
+
+    # ---- console summary + proof ----
+    print(f"\nDEEPENED {num} ({cfg['name']}):", file=sys.stderr)
+    print(f"  contract item_id : {proof['item_id']}", file=sys.stderr)
+    print(f"  fetched bytes    : {proof['fetched_bytes']} | mime: {proof['mime']} | "
+          f"verified: {proof['verified']}", file=sys.stderr)
+    print(f"  subcontract pages: {sub['pages']} | scanned/blank: {sub['scanned_pages'] or 'none'}",
+          file=sys.stderr)
+    print(f"  extracted fields : {len(sub['fields'])}", file=sys.stderr)
+    for k, v in sub["fields"].items():
+        print(f"      [SUB] {k}: {v}", file=sys.stderr)
+    if discrepancies:
+        print("  discrepancies (Bid Log kept):", file=sys.stderr)
+        for d in discrepancies:
+            print(f"      ! {d['field']}: bidlog={d['bid_log']} vs subcontract={d['subcontract']}",
+                  file=sys.stderr)
+    print(f"\nWrote (merged): {BULK_JS}", file=sys.stderr)
+
+
 def main():
-    dump = "--dump" in sys.argv[1:]
+    args = sys.argv[1:]
+    dump = "--dump" in args
     if not DRIVE_ID:
         print("ERROR: SP_DRIVE_ID not set in /home/aiciv/.env", file=sys.stderr)
         sys.exit(1)
+
+    # --project NN-NNN : deepen a bulk record (merge subcontract + embed id)
+    proj = None
+    if "--project" in args:
+        i = args.index("--project")
+        if i + 1 < len(args):
+            proj = args[i + 1]
+    if proj:
+        print(f"build-project-record (deepen {proj}) — "
+              f"{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC", file=sys.stderr)
+        token = _token()
+        deepen_project(token, proj)
+        return
+
+    # default: rebuild the POET deep record
     print(f"build-project-record (POET) — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC",
           file=sys.stderr)
     token = _token()
