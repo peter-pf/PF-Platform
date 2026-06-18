@@ -114,16 +114,31 @@ async function hmac(payloadB64, secret) {
   return b64urlEncode(new Uint8Array(sig));
 }
 
-// Mint a per-user session token: base64url(JSON{uid,role,name,exp}).signature
-export async function mintSession({ uid, role, name }, secret, ttlMs = SESSION_TTL_MS) {
-  const payload = b64urlEncode(new TextEncoder().encode(JSON.stringify({
+// Mint a per-user session token: base64url(JSON{uid,role,name,mr,exp}).signature
+// `mustReset` (mr) marks a RESTRICTED session: the user authenticated correctly
+// but must change a temporary password. A restricted session may ONLY reach the
+// password-reset endpoint/page (enforced in the middleware), never the portal.
+export async function mintSession(
+  { uid, role, name, mustReset }, secret, ttlMs = SESSION_TTL_MS
+) {
+  const claims = {
     uid,
     role,
     name: name || '',
     exp: Date.now() + ttlMs,
-  })));
+  };
+  if (mustReset) claims.mr = 1; // restricted: reset-only
+  const payload = b64urlEncode(new TextEncoder().encode(JSON.stringify(claims)));
   const sig = await hmac(payload, secret);
   return `${payload}.${sig}`;
+}
+
+// Restricted sessions get a SHORTER TTL (just long enough to change a password).
+export const RESET_SESSION_TTL_MS = 15 * 60 * 1000; // 15 minutes
+
+// Is this a restricted (must_reset) session?
+export function isRestrictedSession(session) {
+  return !!(session && (session.mr === 1 || session.mr === true));
 }
 
 // Verify a session token. Returns the decoded session object {uid,role,name,exp}
@@ -198,6 +213,11 @@ const AREA_ROLES = {
   general:          ['admin', 'partner', 'field_ops'], // non-sensitive shared data
   // Admin-only
   user_admin:       ['admin'],
+  // Password-reset endpoint: reachable by ANY authenticated role (incl. a
+  // restricted must_reset session). The restriction (ONLY this endpoint) is
+  // enforced separately via the `restricted` session flag in the middleware,
+  // not by role — a restricted session is blocked from every other area.
+  reset:            ['admin', 'partner', 'field_ops'],
 };
 
 // Does `role` have access to `area`? Unknown area => admin-only (fail closed).
@@ -225,17 +245,103 @@ export function requireArea(session, area) {
   return null;
 }
 
-// Map a request pathname to the area it touches, so the middleware can apply a
-// coarse server-side gate in ADDITION to per-endpoint requireArea() calls.
-// Default-deny for unknown /api paths is the caller's choice; this returns
-// 'general' for anything unmapped so the middleware doesn't over-block static
-// pages — sensitive ENDPOINTS still call requireArea() themselves.
+// Map a request pathname to the area it touches, so the middleware can gate
+// BOTH static pages (*.html) and API routes — in ADDITION to per-endpoint
+// requireArea() calls (defense-in-depth).
+//
+// POSTURE: DEFAULT-DENY. Anything not explicitly allow-listed below resolves to
+// the admin-only `user_admin` area, so an unmapped/new path is BLOCKED for
+// field_ops (and partner) until it is deliberately classified. This inverts the
+// old fail-OPEN 'general' default that made the static surface security theater.
+//
+// Static asset directories (css/js/images/fonts/etc.) are non-sensitive and are
+// allow-listed as 'general' so the field crew's pages can load their styling.
+// The login/reset/public pages are handled by PUBLIC_PATHS / restricted sessions
+// in the middleware and never reach a normal area check.
+
+// Static asset path prefixes that are safe for everyone (styling/scripts/media).
+const STATIC_ASSET_PREFIXES = [
+  '/css/', '/js/', '/images/', '/img/', '/assets/', '/fonts/', '/icons/',
+  '/media/', '/vendor/', '/static/', '/design-studio/', '/data/',
+];
+
+// Static asset file extensions safe for everyone (no data leakage by themselves;
+// the SENSITIVE data lives in the .html pages and the /api routes, which are
+// classified below). This lets shared CSS/JS/img load on field_ops pages.
+const STATIC_ASSET_EXT_RE =
+  /\.(css|js|mjs|map|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|eot|json|txt|webmanifest)$/i;
+
+// Sensitive HTML pages -> their area. field_ops is BLOCKED from all of these.
+// Anything that surfaces financials, contracts, pricing, or preconstruction.
+const PAGE_AREAS = {
+  '/project-history.html':   'contracts',       // contract values / awards
+  '/pricing.html':           'financials',
+  '/subcontracts.html':      'contracts',
+  '/quickbooks-guide.html':  'financials',
+  '/next-sprint.html':       'preconstruction',
+  '/3-day-sprint.html':      'preconstruction',
+  '/alpha-review.html':      'financials',       // internal financial/ops review
+  '/coo-checklist.html':     'financials',       // COO/business oversight
+  '/peter-cheatsheet.html':  'financials',       // internal business cheatsheet
+  '/sop-additions.html':            'preconstruction',
+  '/sop-additions-standalone.html': 'preconstruction',
+  '/manual.html':            'general',          // platform how-to (non-sensitive)
+  '/onboarding.html':        'general',          // onboarding (non-sensitive)
+  '/training.html':          'general',          // role training (non-sensitive)
+  '/index.html':             'general',          // portal home/landing
+  '/denied.html':            'general',          // access-denied notice (any auth user)
+  '/reset-password.html':    'general',          // reset UI (restricted-session gated separately)
+};
+
+// HTML pages the FIELD CREW is explicitly allowed to reach (their operational
+// surface). Everything here resolves to 'field_ops' or 'general'.
+const FIELD_PAGES = {
+  '/daily-production.html':  'field_ops',         // daily logs / production
+  '/schedule.html':          'schedule',          // crew schedule (operational)
+};
+
+// Filename keywords that mark a page as financial/contract/precon even if it is
+// added later without an explicit entry above. Belt-and-suspenders so a NEW
+// budget/financial page does not silently fall through to a permissive default.
+const SENSITIVE_NAME_RE =
+  /(budget|financ|pricing|cost|invoice|contract|subcontract|quickbook|estimat|precon|sprint|margin|profit|revenue|bid)/i;
+
 export function areaForPath(pathname) {
-  // Sensitive API endpoints get an explicit area here as defense-in-depth.
-  if (pathname.startsWith('/api/doc'))      return 'documents';
-  if (pathname.startsWith('/api/schedule')) return 'schedule';
-  if (pathname.startsWith('/api/users'))    return 'user_admin';
-  // Add future financial/contract endpoints here as they are built, e.g.:
-  //   if (pathname.startsWith('/api/budget')) return 'financials';
-  return 'general';
+  // ---- API routes (explicit classification) ----
+  if (pathname.startsWith('/api/')) {
+    if (pathname.startsWith('/api/doc'))           return 'documents';
+    if (pathname.startsWith('/api/schedule'))      return 'schedule';
+    if (pathname.startsWith('/api/users'))         return 'user_admin';
+    // /api/data proxies the live SharePoint data set (bid log = pricing/bid
+    // financials, project master). Treat as FINANCIALS -> field_ops BLOCKED.
+    if (pathname.startsWith('/api/data'))          return 'financials';
+    if (pathname.startsWith('/api/reset-password')) return 'reset'; // restricted-session only
+    // Any other/new API route is admin-only until deliberately classified.
+    return 'user_admin';
+  }
+
+  // ---- Root / directory index -> portal home (general) ----
+  if (pathname === '/' || pathname === '') return 'general';
+
+  // ---- Static assets (styling/scripts/media) safe for everyone ----
+  if (STATIC_ASSET_PREFIXES.some(p => pathname.startsWith(p))) return 'general';
+  if (STATIC_ASSET_EXT_RE.test(pathname) && !pathname.endsWith('.html')) return 'general';
+
+  // ---- Field crew operational pages ----
+  if (Object.prototype.hasOwnProperty.call(FIELD_PAGES, pathname)) {
+    return FIELD_PAGES[pathname];
+  }
+
+  // ---- Explicitly classified HTML pages ----
+  if (Object.prototype.hasOwnProperty.call(PAGE_AREAS, pathname)) {
+    return PAGE_AREAS[pathname];
+  }
+
+  // ---- Heuristic: any *.html whose name screams "sensitive" -> financials ----
+  if (pathname.endsWith('.html') && SENSITIVE_NAME_RE.test(pathname)) {
+    return 'financials';
+  }
+
+  // ---- DEFAULT-DENY: unmapped path => admin-only ----
+  return 'user_admin';
 }

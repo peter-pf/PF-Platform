@@ -23,13 +23,44 @@
 // every user has a per-user login and Brad confirms, the Basic-Auth block can
 // be deleted in a follow-up — but not here.
 
-import { verifySession, getCookie, areaForPath, roleCanAccess } from './lib/auth.js';
+import {
+  verifySession, getCookie, areaForPath, roleCanAccess, isRestrictedSession,
+} from './lib/auth.js';
 
 // Paths that don't require auth at all.
 const PUBLIC_PATHS = ['/favicon.ico', '/robots.txt', '/login.html'];
 
 // Paths that bypass the SESSION gate (they ARE the auth surface).
 const AUTH_ENDPOINTS = ['/api/login', '/api/logout'];
+
+// The reset page + endpoint a RESTRICTED (must_reset) session is allowed to use.
+const RESET_PAGE = '/reset-password.html';
+const RESET_ENDPOINT = '/api/reset-password';
+const DENIED_PAGE = '/denied.html';
+
+// Is this an HTML navigation request (vs. an asset/API fetch)?
+function isHtmlNav(request) {
+  const accept = request.headers.get('Accept') || '';
+  return request.method === 'GET' && accept.includes('text/html');
+}
+
+// Build a uniform 403 for either an API call (JSON) or an HTML nav (redirect to
+// the on-brand denied page).
+function deny(request) {
+  if (isHtmlNav(request)) {
+    return new Response(null, {
+      status: 302,
+      headers: { 'Location': DENIED_PAGE, 'Cache-Control': 'private, no-store' },
+    });
+  }
+  return new Response(JSON.stringify({
+    status: 'forbidden',
+    message: 'You do not have access to this area.',
+  }), {
+    status: 403,
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' },
+  });
+}
 
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // legacy shared-token TTL (24h)
 
@@ -62,20 +93,45 @@ export async function onRequest(context) {
       context.data.session = session;
       context.data.role = session.role;
 
-      // Defense-in-depth: coarse server-side area gate at the edge. Sensitive
-      // ENDPOINTS still call requireArea() themselves, but this blocks a
-      // field_ops user from even reaching an out-of-scope API by URL.
-      if (path.startsWith('/api/')) {
-        const area = areaForPath(path);
-        if (!roleCanAccess(session.role, area)) {
-          return new Response(JSON.stringify({
-            status: 'forbidden',
-            message: 'You do not have access to this area.',
-          }), {
-            status: 403,
-            headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' },
+      // ---- RESTRICTED (must_reset) session: reset surface ONLY ----
+      // A user with a temporary password authenticated correctly but may NOT
+      // use the portal. They can reach only the reset page + reset endpoint.
+      if (isRestrictedSession(session)) {
+        // Allow ONLY: the reset page, the reset endpoint, logout, and the
+        // static assets (css/js/img) the reset page needs to render.
+        const isAsset = path !== '/' && !path.endsWith('.html') &&
+                        !path.startsWith('/api/') && areaForPath(path) === 'general';
+        const allowedForReset =
+          path === RESET_PAGE ||
+          path === RESET_ENDPOINT ||
+          path === '/api/logout' ||
+          isAsset;
+        if (allowedForReset) {
+          return context.next();
+        }
+        // Anything else: send HTML navs to the reset page, APIs get 403.
+        if (isHtmlNav(request)) {
+          return new Response(null, {
+            status: 302,
+            headers: { 'Location': RESET_PAGE, 'Cache-Control': 'private, no-store' },
           });
         }
+        return new Response(JSON.stringify({
+          status: 'must_reset',
+          message: 'You must set a new password before continuing.',
+        }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' },
+        });
+      }
+
+      // ---- Normal session: server-side area gate for PAGES *and* APIs ----
+      // Default-deny lives in areaForPath(): an unmapped path resolves to an
+      // admin-only area, so sensitive *.html and /api routes are blocked for
+      // field_ops by direct URL. Sensitive ENDPOINTS ALSO call requireArea().
+      const area = areaForPath(path);
+      if (!roleCanAccess(session.role, area)) {
+        return deny(request);
       }
       return context.next();
     }
@@ -87,11 +143,19 @@ export async function onRequest(context) {
   const legacyToken = getCookie(cookie, 'pf_auth_token');
   if (legacyToken && await verifyLegacyToken(legacyToken, SECRET)) {
     context.data = context.data || {};
-    context.data.role = 'admin'; // shared whole-portal gate => admin continuity
+    // shared whole-portal gate => admin continuity. Provide a synthetic session
+    // so per-endpoint requireArea() backstops treat the shared gate as admin.
+    context.data.session = { uid: 'shared', role: 'admin', name: 'Shared Access' };
+    context.data.role = 'admin';
     return context.next();
   }
 
   // ---- (2b) EXISTING shared Basic Auth (legacy, initial login) ------------
+  // TODO REMOVE AFTER CUTOVER (SEC-04): the shared Basic-Auth credential grants
+  // role=admin to anyone who knows the whole-portal password. KEPT intentionally
+  // so no one is locked out during the per-user cutover. Peter will rotate the
+  // shared password and DELETE this block (and the legacy pf_auth_token block
+  // above) once every user has a per-user login. Do not extend this fallback.
   const USER = env.PF_AUTH_USER;
   const PASS = env.PF_AUTH_PASS;
   const auth = request.headers.get('Authorization');
@@ -105,6 +169,10 @@ export async function onRequest(context) {
     } catch { /* malformed -> fall through */ }
 
     if (timingSafeEqual(username, USER) && timingSafeEqual(password, PASS)) {
+      // Synthetic admin session for per-endpoint requireArea() backstops.
+      context.data = context.data || {};
+      context.data.session = { uid: 'shared', role: 'admin', name: 'Shared Access' };
+      context.data.role = 'admin';
       const response = await context.next();
       const newResponse = new Response(response.body, response);
       const token = await mintLegacyToken(username, SECRET);

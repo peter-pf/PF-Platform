@@ -1,11 +1,17 @@
 // Cloudflare Pages Function — /api/data
 // Serves live data from SharePoint via Microsoft Graph API
 // Data is NOT embedded in the HTML — fetched on demand
+//
+// SECURITY: this endpoint surfaces the bid log (pricing/bid financials) and the
+// project master. It is FINANCIALS-class data. In addition to the middleware
+// edge gate, it calls requireArea(session, 'financials') itself so field_ops is
+// blocked even if the middleware map ever changes (defense-in-depth).
 
-const TENANT_ID = ''; // Set via CF environment variable: AZURE_TENANT_ID
-const CLIENT_ID = ''; // Set via CF environment variable: AZURE_CLIENT_ID
-const CLIENT_SECRET = ''; // Set via CF environment variable: AZURE_CLIENT_SECRET
-const DRIVE_ID = ''; // Set via CF environment variable: SP_DRIVE_ID
+import { requireArea } from '../lib/auth.js';
+
+// Graph creds + drive id come from Cloudflare env vars (server-side only):
+//   AZURE_TENANT_ID / AZURE_CLIENT_ID / AZURE_CLIENT_SECRET / SP_DRIVE_ID
+// (No placeholder constants in source — secrets never live in the repo.)
 
 const FILE_IDS = {
   bid_log: '016ISVH6Y7M7KQIB5C5FDLNKI5H3IZFXRK',
@@ -14,6 +20,11 @@ const FILE_IDS = {
 
 export async function onRequestGet(context) {
   const { env } = context;
+
+  // [SEC-03] Per-endpoint RBAC backstop. /api/data is FINANCIALS — field_ops is
+  // denied here regardless of the middleware. Fails closed if no session.
+  const denied = requireArea(context.data && context.data.session, 'financials');
+  if (denied) return denied;
 
   // For now, serve the pre-synced JSON data files
   // In production, this would call Graph API directly

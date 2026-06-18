@@ -31,6 +31,8 @@
 //  - Fails CLOSED: if any Graph env var is missing, return 503 (never silently
 //    proxy on a misconfiguration).
 
+import { requireArea } from '../lib/auth.js';
+
 const GRAPH = 'https://graph.microsoft.com/v1.0';
 const TOKEN_URL_TMPL = 'https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token';
 
@@ -90,6 +92,12 @@ async function getGraphToken(env) {
 
 export async function onRequestGet(context) {
   const { request, env } = context;
+
+  // [SEC-03] Per-endpoint RBAC backstop. The doc proxy can surface contracts /
+  // financials, so it is 'documents' (partner+admin only). field_ops is denied
+  // here regardless of the middleware. Fails closed if no session.
+  const denied = requireArea(context.data && context.data.session, 'documents');
+  if (denied) return denied;
 
   try {
     // [fail closed] All Graph creds + the fixed drive id must be present.
