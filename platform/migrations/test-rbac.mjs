@@ -109,7 +109,7 @@ section('areaForPath classification');
 for (const p of SENSITIVE_PAGES) {
   const area = areaForPath(p);
   ok(`${p} -> sensitive area (${area})`,
-     ['financials', 'contracts', 'preconstruction'].includes(area));
+     ['financials', 'financials_global', 'contracts', 'preconstruction'].includes(area));
   ok(`${p} BLOCKED for field_ops`, roleCanAccess('field_ops', area) === false);
   ok(`${p} ALLOWED for partner`, roleCanAccess('partner', area) === true);
 }
@@ -119,7 +119,7 @@ for (const p of SENSITIVE_APIS) {
   ok(`${path} -> non-general sensitive area (${area})`,
      area !== 'general' && roleCanAccess('field_ops', area) === false);
 }
-ok('/api/data -> financials', areaForPath('/api/data') === 'financials');
+ok('/api/data -> financials (BD sees full bid log, Brad 2026-06-23)', areaForPath('/api/data') === 'financials');
 ok('/api/doc -> documents', areaForPath('/api/doc') === 'documents');
 ok('/api/users -> user_admin', areaForPath('/api/users') === 'user_admin');
 
@@ -130,9 +130,9 @@ ok('unmapped /api/secret-thing -> admin-only',
    roleCanAccess('partner', areaForPath('/api/secret-thing')) === false);
 ok('unmapped /random-page.html -> admin-only (field_ops blocked)',
    roleCanAccess('field_ops', areaForPath('/random-page.html')) === false);
-ok('heuristic /budget-2026.html -> financials (field_ops blocked)',
-   areaForPath('/budget-2026.html') === 'financials' &&
-   roleCanAccess('field_ops', 'financials') === false);
+ok('heuristic /budget-2026.html -> financials_global (field_ops + BD blocked, fail safe)',
+   areaForPath('/budget-2026.html') === 'financials_global' &&
+   roleCanAccess('field_ops', 'financials_global') === false);
 ok('heuristic /contract-summary.html -> financials (blocked)',
    roleCanAccess('field_ops', areaForPath('/contract-summary.html')) === false);
 
@@ -166,8 +166,8 @@ ok('/data/new-secret-feed.js -> admin-only (field_ops + partner blocked)',
    areaForPath('/data/new-secret-feed.js') === 'user_admin' &&
    roleCanAccess('field_ops', areaForPath('/data/new-secret-feed.js')) === false &&
    roleCanAccess('partner', areaForPath('/data/new-secret-feed.js')) === false);
-ok('/data/2026-budget-draft.json -> financials by heuristic (field_ops blocked)',
-   areaForPath('/data/2026-budget-draft.json') === 'financials' &&
+ok('/data/2026-budget-draft.json -> financials_global by heuristic (field_ops + BD blocked, fail safe)',
+   areaForPath('/data/2026-budget-draft.json') === 'financials_global' &&
    roleCanAccess('field_ops', areaForPath('/data/2026-budget-draft.json')) === false);
 
 section('SEC-09 /api/me reachable by any authenticated role');
@@ -307,6 +307,144 @@ ok('middleware gate is OUTSIDE the /api/ branch (gates pages)',
    /Normal session: server-side area gate for PAGES/.test(mwSrc) &&
    /const area = areaForPath\(path\);\s*\n\s*if \(!roleCanAccess/.test(mwSrc));
 ok('middleware handles restricted sessions', /isRestrictedSession\(session\)/.test(mwSrc));
+
+// --- 7. ITEM E: business_dev role — project vs company-wide financials -------
+section('ITEM E: business_dev role exists + area matrix');
+ok('business_dev is a known role', roleCanAccess('business_dev', 'general') === true);
+// PROJECT-level financials: BD ALLOWED.
+ok('BD -> financials (project-level) ALLOWED', roleCanAccess('business_dev', 'financials') === true);
+ok('BD -> preconstruction ALLOWED', roleCanAccess('business_dev', 'preconstruction') === true);
+ok('BD -> business_dev area ALLOWED', roleCanAccess('business_dev', 'business_dev') === true);
+ok('BD -> estimating ALLOWED', roleCanAccess('business_dev', 'estimating') === true);
+ok('BD -> field_ops area ALLOWED', roleCanAccess('business_dev', 'field_ops') === true);
+ok('BD -> schedule ALLOWED', roleCanAccess('business_dev', 'schedule') === true);
+ok('BD -> general ALLOWED', roleCanAccess('business_dev', 'general') === true);
+// COMPANY-WIDE / GLOBAL financials + admin-only + contracts + documents: BD BLOCKED.
+ok('BD -> financials_global BLOCKED', roleCanAccess('business_dev', 'financials_global') === false);
+ok('BD -> user_admin BLOCKED', roleCanAccess('business_dev', 'user_admin') === false);
+ok('BD -> contracts ALLOWED (Brad 2026-06-23)', roleCanAccess('business_dev', 'contracts') === true);
+ok('BD -> documents ALLOWED (Brad 2026-06-23)', roleCanAccess('business_dev', 'documents') === true);
+ok('BD -> unknown area BLOCKED (fail closed)', roleCanAccess('business_dev', 'nonexistent') === false);
+
+section('ITEM E: business_dev CAN reach PROJECT-level financial data files');
+const BD_PROJECT_DATA = [
+  '/data/project-records.js',
+  '/data/project-record-poet.js',
+  '/data/budget-actual-poet.js',
+  '/data/awarded-projects.js',
+  '/data/project-master.json',
+  '/data/project-history.js',
+  '/data/precon-pipeline.js',
+  '/data/bd-master.json',
+  '/data/bid-log.json',          // BD sees full bid log (Brad 2026-06-23)
+  '/data/schedule-data.js',
+  '/data/schedule-seed.js',
+  '/data/schedule-seed-state.json',
+];
+for (const p of BD_PROJECT_DATA) {
+  const area = areaForPath(p);
+  ok(`${p} -> project-level area (${area})`,
+     ['financials', 'preconstruction', 'business_dev', 'estimating', 'schedule', 'field_ops'].includes(area));
+  ok(`${p} ALLOWED for business_dev`, roleCanAccess('business_dev', area) === true);
+  ok(`${p} STILL BLOCKED for field_ops`,
+     ['financials', 'preconstruction', 'business_dev', 'estimating', 'contracts', 'financials_global'].includes(area)
+       ? roleCanAccess('field_ops', area) === false
+       : true);
+}
+
+section('ITEM E: business_dev CAN reach project pages + /api/me + field/general');
+const BD_ALLOWED_PATHS = [
+  '/api/me',
+  '/project-history.html',   // project-level
+  '/next-sprint.html',       // precon
+  '/3-day-sprint.html',      // precon
+  '/sop-additions.html',     // precon
+  '/daily-production.html',  // field op
+  '/schedule.html',          // schedule
+  '/manual.html', '/onboarding.html', '/training.html', '/index.html', '/',
+  '/css/styles.css',
+  '/subcontracts.html',      // contracts — BD allowed (Brad 2026-06-23)
+  '/api/doc?item=016ISVH64RZ6FBDCIAMNELEB5CKPHJ2UW3', // documents — BD allowed
+  '/api/data?type=all',      // bid log + project master — BD allowed
+];
+for (const p of BD_ALLOWED_PATHS) {
+  const area = areaForPath(p);
+  ok(`${p} ALLOWED for business_dev (area=${area})`, roleCanAccess('business_dev', area) === true);
+}
+
+section('ITEM E: business_dev CANNOT reach company-wide / global financials');
+const BD_BLOCKED_DATA = [
+  '/data/projects-data.js',     // cross-job revenue/AR rollup
+  '/data/live-data.js',         // global live mirror
+  '/data/pricing-data.js',      // global pricing master
+  '/data/sync-meta.json',       // cross-job sync meta
+  '/data/pf-coi.js',            // company insurance
+  '/data/insurance-baseline.js',// company insurance baseline
+  '/data/estimate-template.json',// company estimating template
+];
+for (const p of BD_BLOCKED_DATA) {
+  const area = areaForPath(p);
+  ok(`${p} -> financials_global (${area})`, area === 'financials_global');
+  ok(`${p} BLOCKED for business_dev`, roleCanAccess('business_dev', area) === false);
+  ok(`${p} ALLOWED for partner`, roleCanAccess('partner', area) === true);
+  ok(`${p} ALLOWED for admin`, roleCanAccess('admin', area) === true);
+}
+
+section('ITEM E: business_dev BLOCKED from global pages, /api/data, contracts, user_admin');
+const BD_BLOCKED_PATHS = [
+  '/api/users',              // user_admin
+  '/pricing.html',           // global pricing master
+  '/quickbooks-guide.html',  // global accounting
+  '/alpha-review.html',      // global financial review
+  '/coo-checklist.html',     // global COO oversight
+  '/peter-cheatsheet.html',  // global internal cheatsheet
+];
+for (const p of BD_BLOCKED_PATHS) {
+  const area = areaForPath(p);
+  ok(`${p} BLOCKED for business_dev (area=${area})`, roleCanAccess('business_dev', area) === false);
+}
+
+section('ITEM E: business_dev default-DENY for unmapped + unclassified sensitive');
+ok('unmapped /api/secret-thing BLOCKED for BD',
+   roleCanAccess('business_dev', areaForPath('/api/secret-thing')) === false);
+ok('unmapped /random-page.html BLOCKED for BD',
+   roleCanAccess('business_dev', areaForPath('/random-page.html')) === false);
+ok('NEW sensitive /data/2026-budget-draft.json -> financials_global (BD blocked, fail safe)',
+   areaForPath('/data/2026-budget-draft.json') === 'financials_global' &&
+   roleCanAccess('business_dev', '/data/2026-budget-draft.json'.length ? areaForPath('/data/2026-budget-draft.json') : '') === false);
+ok('NEW sensitive /financials-summary.html -> financials_global (BD blocked, fail safe)',
+   areaForPath('/financials-summary.html') === 'financials_global' &&
+   roleCanAccess('business_dev', areaForPath('/financials-summary.html')) === false);
+ok('unclassified /data/new-secret-feed.js -> user_admin (BD blocked)',
+   roleCanAccess('business_dev', areaForPath('/data/new-secret-feed.js')) === false);
+
+section('ITEM E: requireArea backstop for business_dev');
+const bdSession = { uid: 'u5', role: 'business_dev', name: 'BD Staff' };
+ok('requireArea(BD, financials) => null (allowed)',
+   requireArea(bdSession, 'financials') === null);
+ok('requireArea(BD, preconstruction) => null (allowed)',
+   requireArea(bdSession, 'preconstruction') === null);
+ok('requireArea(BD, financials_global) => 403',
+   requireArea(bdSession, 'financials_global')?.status === 403);
+ok('requireArea(BD, contracts) => null (allowed, Brad 2026-06-23)',
+   requireArea(bdSession, 'contracts') === null);
+ok('requireArea(BD, documents) => null (allowed, Brad 2026-06-23)',
+   requireArea(bdSession, 'documents') === null);
+ok('requireArea(BD, user_admin) => 403',
+   requireArea(bdSession, 'user_admin')?.status === 403);
+ok('requireArea(BD, financials_global) still => 403',
+   requireArea(bdSession, 'financials_global')?.status === 403);
+
+section('ITEM E: REGRESSION — field_ops/partner/admin unchanged on split areas');
+ok('field_ops -> financials STILL DENIED', roleCanAccess('field_ops', 'financials') === false);
+ok('field_ops -> financials_global STILL DENIED', roleCanAccess('field_ops', 'financials_global') === false);
+ok('partner -> financials ALLOWED', roleCanAccess('partner', 'financials') === true);
+ok('partner -> financials_global ALLOWED', roleCanAccess('partner', 'financials_global') === true);
+ok('admin -> financials_global ALLOWED', roleCanAccess('admin', 'financials_global') === true);
+ok('partner -> projects-data.js (global) ALLOWED',
+   roleCanAccess('partner', areaForPath('/data/projects-data.js')) === true);
+ok('field_ops -> projects-data.js (global) DENIED',
+   roleCanAccess('field_ops', areaForPath('/data/projects-data.js')) === false);
 
 // --- summary ----------------------------------------------------------------
 console.log(`\n${'='.repeat(48)}`);

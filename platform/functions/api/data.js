@@ -2,10 +2,12 @@
 // Serves live data from SharePoint via Microsoft Graph API
 // Data is NOT embedded in the HTML — fetched on demand
 //
-// SECURITY: this endpoint surfaces the bid log (pricing/bid financials) and the
-// project master. It is FINANCIALS-class data. In addition to the middleware
-// edge gate, it calls requireArea(session, 'financials') itself so field_ops is
-// blocked even if the middleware map ever changes (defense-in-depth).
+// SECURITY: this endpoint surfaces the bid log (pricing/bid financials ACROSS ALL
+// JOBS) and the project master. It is COMPANY-WIDE / GLOBAL financials-class data.
+// In addition to the middleware edge gate, it calls
+// requireArea(session, 'financials') itself so field_ops AND business_dev
+// are blocked even if the middleware map ever changes (defense-in-depth). BD reaches
+// per-job financials through the project-level /data/* files, not this global proxy.
 
 import { requireArea } from '../lib/auth.js';
 
@@ -21,8 +23,9 @@ const FILE_IDS = {
 export async function onRequestGet(context) {
   const { env } = context;
 
-  // [SEC-03] Per-endpoint RBAC backstop. /api/data is FINANCIALS — field_ops is
-  // denied here regardless of the middleware. Fails closed if no session.
+  // [SEC-03] Per-endpoint RBAC backstop. /api/data is COMPANY-WIDE financials
+  // (financials_global) — field_ops AND business_dev are denied here regardless
+  // of the middleware. Fails closed if no session.
   const denied = requireArea(context.data && context.data.session, 'financials');
   if (denied) return denied;
 

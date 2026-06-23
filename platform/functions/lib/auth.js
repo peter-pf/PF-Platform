@@ -187,37 +187,63 @@ export function clearSessionCookie() {
 // ---------------------------------------------------------------------------
 //
 // Roles (per docs/portal-rebuild/ARCHITECTURE-EDITABILITY.md, Access control):
-//   admin     — Brad. Full access + user management.
-//   partner   — Jonathan, Derek. Full view + edit their domains.
-//   field_ops — field crew. ONLY Field Operations. NO financials / contracts /
-//               preconstruction, even by direct URL.
+//   admin        — Brad. Full access + user management.
+//   partner      — Jonathan, Derek. Full view + edit their domains.
+//   business_dev — BD staff. Sees PROJECT-level financials (per-job records,
+//                  budget-vs-actual for a job, awarded-project contract values,
+//                  the precon pipeline, BD's own tools) but NOT company-wide /
+//                  global financials (cross-job revenue/AR rollups, company P&L,
+//                  the global pricing master, sync-meta, global financial
+//                  dashboards). Enforced SERVER-SIDE, even by direct URL.
+//   field_ops    — field crew. ONLY Field Operations. NO financials / contracts /
+//                  preconstruction, even by direct URL.
 //
 // We model access as a set of "areas" each role may touch, and tag sensitive
 // API endpoints with a required area. The default-deny posture: an endpoint
 // tagged with an area that the role does NOT hold returns 403.
 
-export const ROLES = ['admin', 'partner', 'field_ops'];
+export const ROLES = ['admin', 'partner', 'business_dev', 'field_ops'];
 
 // Area -> which roles may access it. Anything not listed defaults to admin-only.
+//
+// FINANCIAL VISIBILITY SPLIT (item E): the single old `financials` area is split
+// into TWO tiers so business_dev can see PROJECT-level financials but never
+// company-wide/global financials:
+//   financials        = PROJECT-level financials (per-job records,
+//                       budget-vs-actual for ONE job, awarded contract values).
+//                       Allowed: admin, partner, business_dev.
+//   financials_global = company-wide / global financials (cross-job revenue/AR
+//                       rollups, company P&L, the global pricing master,
+//                       sync-meta, company insurance, the estimating template).
+//                       Allowed: admin, partner ONLY (business_dev + field_ops
+//                       BLOCKED). This is the "fail-safe" bucket: when unsure,
+//                       classify here.
 const AREA_ROLES = {
-  // Field crew areas — field_ops + partner + admin
-  field_ops:        ['admin', 'partner', 'field_ops'],
-  schedule:         ['admin', 'partner', 'field_ops'], // crew schedule (operational)
-  // Sensitive business areas — partner + admin ONLY (field_ops BLOCKED)
-  financials:       ['admin', 'partner'],
-  contracts:        ['admin', 'partner'],
-  preconstruction:  ['admin', 'partner'],
-  estimating:       ['admin', 'partner'],
-  business_dev:     ['admin', 'partner'],
-  documents:        ['admin', 'partner'], // /api/doc proxy (may surface contracts/financials)
-  general:          ['admin', 'partner', 'field_ops'], // non-sensitive shared data
+  // Field crew areas — field_ops + partner + business_dev + admin
+  field_ops:        ['admin', 'partner', 'business_dev', 'field_ops'],
+  schedule:         ['admin', 'partner', 'business_dev', 'field_ops'], // crew schedule (operational)
+  // PROJECT-level financials — admin + partner + business_dev (field_ops BLOCKED)
+  financials:       ['admin', 'partner', 'business_dev'],
+  // Company-wide / GLOBAL financials — partner + admin ONLY (BD + field_ops BLOCKED)
+  financials_global:['admin', 'partner'],
+  // Contracts + subcontracts — BD sees these (Brad 2026-06-23). admin + partner + business_dev.
+  contracts:        ['admin', 'partner', 'business_dev'],
+  // Preconstruction = the bid/opportunity pipeline — BD domain. BD + partner + admin.
+  preconstruction:  ['admin', 'partner', 'business_dev'],
+  // Estimating: the COMPANY estimating TEMPLATE is global (financials_global).
+  // The estimating AREA (if any per-job estimating page is added) is BD-domain.
+  estimating:       ['admin', 'partner', 'business_dev'],
+  // BD's own tools/opportunity data — admin + partner + business_dev.
+  business_dev:     ['admin', 'partner', 'business_dev'],
+  documents:        ['admin', 'partner', 'business_dev'], // /api/doc proxy — BD needs it to view embedded contracts/subcontracts (Brad 2026-06-23)
+  general:          ['admin', 'partner', 'business_dev', 'field_ops'], // non-sensitive shared data
   // Admin-only
   user_admin:       ['admin'],
   // Password-reset endpoint: reachable by ANY authenticated role (incl. a
   // restricted must_reset session). The restriction (ONLY this endpoint) is
   // enforced separately via the `restricted` session flag in the middleware,
   // not by role — a restricted session is blocked from every other area.
-  reset:            ['admin', 'partner', 'field_ops'],
+  reset:            ['admin', 'partner', 'business_dev', 'field_ops'],
 };
 
 // Does `role` have access to `area`? Unknown area => admin-only (fail closed).
@@ -299,54 +325,65 @@ const STATIC_ASSET_EXT_RE =
 //   - timesheets (employee hours, cost-CODE labels, per-diem night COUNTS — no
 //     wages/rates/dollar amounts)
 const DATA_FILE_AREAS = {
-  // ---- FIELD-SAFE (field_ops + partner + admin) ----
+  // ---- FIELD-SAFE (field_ops + business_dev + partner + admin) ----
   '/data/production-data.js':        'field_ops', // cols/LF/days — no $
   '/data/progress-data.js':          'field_ops', // GUHMA % completion — no $
   '/data/timesheets.js':             'field_ops', // hours/cost-codes/names — no $ wages
   '/data/fo-projects-field.js':      'field_ops', // SEC-09 field-safe project list (no $/GC/contract)
   '/data/schedule-field.js':         'schedule',  // SEC-12 field-safe schedule derivative (no value/gc_name)
 
-  // ---- SENSITIVE (admin/partner ONLY — field_ops BLOCKED) ----
+  // ---- PROJECT-LEVEL financials (admin/partner/business_dev — field_ops BLOCKED) ----
+  // Item E: per-job financial records. BD needs these to work opportunities &
+  // awarded projects. NOT company-wide rollups.
+  '/data/project-records.js':      'financials',      // PROJECT: per-job $ values, cost
+  '/data/project-record-poet.js':  'financials',      // PROJECT: per-job contract_value (POET)
+  '/data/budget-actual-poet.js':   'financials',      // PROJECT: per-job budget/cost/invoice/profit
+  '/data/awarded-projects.js':     'financials',      // PROJECT: awarded-project contract values + GC
+  '/data/project-master.json':     'financials',      // PROJECT: per-job contract_value/margin/profit
+  '/data/project-history.js':      'financials',      // PROJECT: per-job ContractValue/totalContractValue
+  '/data/precon-pipeline.js':      'preconstruction', // PROJECT/BD: opportunity pipeline ($ per opp) — BD domain
+  '/data/bd-master.json':          'business_dev',    // BD: EIN/tax id/credit-app, GC contacts — BD's own tool
+
+  // ---- COMPANY-WIDE / GLOBAL financials (admin/partner ONLY — BD + field_ops BLOCKED) ----
+  // Item E: cross-job rollups, company P&L, the global pricing master, company
+  // insurance, sync-meta, the company estimating template. BD must NOT see these.
+  '/data/projects-data.js':        'financials_global', // GLOBAL: revenue/AR/paid-unpaid across ALL jobs
+  '/data/live-data.js':            'financials_global', // GLOBAL: live mirror — bid/contract/cost across jobs
+  '/data/pricing-data.js':         'financials_global', // GLOBAL: company pricing master
+  '/data/sync-meta.json':          'financials_global', // GLOBAL: cross-job counts + sensitive source URLs
+  '/data/pf-coi.js':               'financials_global', // GLOBAL: company insurance policy/broker detail
+  '/data/insurance-baseline.js':   'financials_global', // GLOBAL: company policy limits/carriers
+  '/data/estimate-template.json':  'financials_global', // GLOBAL: company estimating template (cost/amount basis)
+  // bid-log.json: BD domain (opportunities) BUT carries per-row margins + GC
+  // financial contacts across ALL bids (company-wide bid economics). Classified
+  // CONSERVATIVELY as financials_global (BD BLOCKED) per the spec — BD reaches
+  // opportunities through precon-pipeline.js, which is the bucketed pipeline view.
+  '/data/bid-log.json':            'financials', // BD sees the FULL bid log (Brad 2026-06-23); field_ops still BLOCKED
+
+  // ---- SCHEDULE raw feeds (admin/partner ONLY — field_ops BLOCKED) ----
   // SEC-12: the raw schedule seed/state/data files each carry per-job contract
-  // `value` ($) + `gc_name`. They are NOT field-safe and are reclassified
-  // financials -> field_ops DENIED. The crew gets schedule-field.js (above), a
-  // $/GC-stripped derivative. (SEC-13: the .js seed-state variant does not exist;
-  // only the .json is shipped, so no /data/schedule-seed-state.js entry.)
-  '/data/schedule-seed.js':          'financials',      // per-job value + gc_name
-  '/data/schedule-seed-state.json':  'financials',      // per-job value + gc_name
-  '/data/schedule-data.js':          'financials',      // per-job value + gc_name
-  '/data/bid-log.json':            'financials',      // bid_value, margin notes, GC contacts
-  '/data/live-data.js':            'financials',      // bid_value, contract_value, cost (live mirror)
-  '/data/pricing-data.js':         'financials',      // $ pricing
-  '/data/budget-actual-poet.js':   'financials',      // budget/cost/invoice/profit
-  '/data/project-records.js':      'financials',      // $ values, cost
-  '/data/project-record-poet.js':  'financials',      // contract_value
-  '/data/projects-data.js':        'financials',      // revenue, AR, paid/unpaid, contract
-  '/data/estimate-template.json':  'estimating',      // cost/amount estimating template
-  '/data/project-history.js':      'contracts',       // ContractValue / totalContractValue
-  '/data/awarded-projects.js':     'contracts',       // contract values, GC
-  '/data/project-master.json':     'contracts',       // contract_value, margin, profit
-  '/data/precon-pipeline.js':      'preconstruction', // $ pipeline values
-  '/data/bd-master.json':          'business_dev',    // EIN, tax id, credit-app, GC contacts
-  '/data/pf-coi.js':               'financials',      // private insurance policy/broker detail
-  '/data/insurance-baseline.js':   'financials',      // private policy limits/carriers
-  '/data/sync-meta.json':          'financials',      // bid/project counts + sensitive source URLs
+  // `value` ($) + `gc_name`. These are PROJECT-level financial data; BD legitimately
+  // works projects, so they stay 'financials' (BD allowed, field_ops blocked).
+  // The crew gets schedule-field.js (above), a $/GC-stripped derivative.
+  '/data/schedule-seed.js':          'financials',      // PROJECT: per-job value + gc_name
+  '/data/schedule-seed-state.json':  'financials',      // PROJECT: per-job value + gc_name
+  '/data/schedule-data.js':          'financials',      // PROJECT: per-job value + gc_name
 };
 
 // Sensitive HTML pages -> their area. field_ops is BLOCKED from all of these.
 // Anything that surfaces financials, contracts, pricing, or preconstruction.
 const PAGE_AREAS = {
-  '/project-history.html':   'contracts',       // contract values / awards
-  '/pricing.html':           'financials',
-  '/subcontracts.html':      'contracts',
-  '/quickbooks-guide.html':  'financials',
-  '/next-sprint.html':       'preconstruction',
-  '/3-day-sprint.html':      'preconstruction',
-  '/alpha-review.html':      'financials',       // internal financial/ops review
-  '/coo-checklist.html':     'financials',       // COO/business oversight
-  '/peter-cheatsheet.html':  'financials',       // internal business cheatsheet
-  '/sop-additions.html':            'preconstruction',
-  '/sop-additions-standalone.html': 'preconstruction',
+  '/project-history.html':   'financials',       // PROJECT: per-job contract values / awards — BD ok
+  '/pricing.html':           'financials_global',// GLOBAL: company pricing master — BD blocked
+  '/subcontracts.html':      'contracts',        // contracts — partner/admin only (BD blocked)
+  '/quickbooks-guide.html':  'financials_global',// GLOBAL: company QB/accounting — BD blocked
+  '/next-sprint.html':       'preconstruction',  // BD: precon/opportunity sprint planning — BD ok
+  '/3-day-sprint.html':      'preconstruction',  // BD: precon/opportunity sprint planning — BD ok
+  '/alpha-review.html':      'financials_global',// GLOBAL: internal company financial/ops review — BD blocked
+  '/coo-checklist.html':     'financials_global',// GLOBAL: COO/company oversight — BD blocked
+  '/peter-cheatsheet.html':  'financials_global',// GLOBAL: internal company cheatsheet — BD blocked
+  '/sop-additions.html':            'preconstruction', // BD: precon SOPs — BD ok
+  '/sop-additions-standalone.html': 'preconstruction', // BD: precon SOPs — BD ok
   '/manual.html':            'general',          // platform how-to (non-sensitive)
   '/onboarding.html':        'general',          // onboarding (non-sensitive)
   '/training.html':          'general',          // role training (non-sensitive)
@@ -374,8 +411,9 @@ export function areaForPath(pathname) {
     if (pathname.startsWith('/api/doc'))           return 'documents';
     if (pathname.startsWith('/api/schedule'))      return 'schedule';
     if (pathname.startsWith('/api/users'))         return 'user_admin';
-    // /api/data proxies the live SharePoint data set (bid log = pricing/bid
-    // financials, project master). Treat as FINANCIALS -> field_ops BLOCKED.
+    // /api/data proxies the live SharePoint data set (bid log + project master).
+    // BD sees the full bid log (Brad 2026-06-23) -> classify as financials
+    // (project/BD tier). field_ops still BLOCKED (not in the financials area).
     if (pathname.startsWith('/api/data'))          return 'financials';
     // /api/me returns ONLY the caller's own {name, role} (no business data).
     // Reachable by any authenticated role so the SPA can tailor its UI.
@@ -396,10 +434,13 @@ export function areaForPath(pathname) {
       return DATA_FILE_AREAS[pathname];
     }
     // Heuristic backstop: a NEW /data/ file whose name screams "sensitive"
-    // (budget/financ/pricing/contract/bid/...) -> financials, field_ops blocked.
-    if (SENSITIVE_NAME_RE.test(pathname)) return 'financials';
-    // DEFAULT-DENY: any unclassified /data/ file is admin/partner only.
-    // (Field-safe data files must be added to DATA_FILE_AREAS explicitly.)
+    // (budget/financ/pricing/contract/bid/...) -> financials_global. We FAIL SAFE
+    // to the partner/admin-only tier so an unclassified sensitive file is NEVER
+    // BD-visible (item E req #4). A deliberately project-level file must be added
+    // to DATA_FILE_AREAS explicitly to grant BD access.
+    if (SENSITIVE_NAME_RE.test(pathname)) return 'financials_global';
+    // DEFAULT-DENY: any unclassified /data/ file is admin only.
+    // (Field-safe / BD-safe data files must be added to DATA_FILE_AREAS explicitly.)
     return 'user_admin';
   }
 
@@ -417,9 +458,11 @@ export function areaForPath(pathname) {
     return PAGE_AREAS[pathname];
   }
 
-  // ---- Heuristic: any *.html whose name screams "sensitive" -> financials ----
+  // ---- Heuristic: any *.html whose name screams "sensitive" -> financials_global
+  // (fail safe to partner/admin-only so a NEW sensitive page is NEVER BD-visible
+  // until deliberately classified — item E req #4). ----
   if (pathname.endsWith('.html') && SENSITIVE_NAME_RE.test(pathname)) {
-    return 'financials';
+    return 'financials_global';
   }
 
   // ---- DEFAULT-DENY: unmapped path => admin-only ----
