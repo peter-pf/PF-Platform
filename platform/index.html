@@ -706,6 +706,31 @@ body.role-field-ops .nav-item[data-fo-hide] {
   font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em;
   text-transform: uppercase; vertical-align: middle;
 }
+/* Bid-resolution fork + Dead Set (item A): per-row resolution actions */
+.pf-resolve-cell { white-space: nowrap; }
+.pf-resolve-btn {
+  display: inline-block; margin: 1px 3px 1px 0; padding: 3px 9px;
+  border: 1px solid var(--border); border-radius: 7px; cursor: pointer;
+  font-size: 0.74rem; font-weight: 600; background: var(--bg-1);
+  color: var(--text-2); white-space: nowrap;
+}
+.pf-resolve-btn:hover { border-color: var(--accent); color: var(--accent); }
+.pf-resolve-btn[disabled] { opacity: 0.5; cursor: default; }
+.pf-resolve-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.pf-resolve-btn.primary:hover { background: var(--accent-dark); color: #fff; }
+.pf-tag-awarded {
+  display: inline-block; margin-left: 6px; padding: 1px 7px;
+  background: #E6F4EA; color: #1E7A38; border-radius: 9px;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em;
+  text-transform: uppercase; vertical-align: middle;
+}
+.pf-tag-dead {
+  display: inline-block; margin-left: 6px; padding: 1px 7px;
+  background: #FBEAEA; color: #A12626; border-radius: 9px;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em;
+  text-transform: uppercase; vertical-align: middle;
+}
+.pf-resolve-meta { color: var(--text-3); font-size: 0.72rem; font-style: italic; }
 /* Wide, horizontally-scrollable bid-log table for Preconstruction stage panels.
    Mirrors the spreadsheet: every bid-log column in sheet order, with a sticky
    first column (Project) so the row stays identifiable while scrolling right. */
@@ -1752,6 +1777,9 @@ window.progress = (function () {
         <a class="nav-item" data-module="pricing" onclick="showModule('pricing')">Stone &amp; Transport Pricing</a>
         <a class="nav-item" data-module="proposals" onclick="showModule('proposals')">Proposals</a>
       </div>
+
+      <!-- 4d) Dead Set — not-awarded / lost bids (item A). One-click Reactivate. -->
+      <a class="nav-item" data-module="dead-set" onclick="showModule('dead-set')">Dead Set</a>
     </div>
 
     <!-- 5) PROJECT MANAGEMENT -->
@@ -2194,6 +2222,12 @@ document.addEventListener('click', function(e) {
     <div class="pf-index-root precon-mount" data-disc="hp" data-bucket="not_awarded"></div>
   </div>
 
+  <!-- Dead Set (item A): every not-awarded / dead job across disciplines, each -->
+  <!-- with one-click Reactivate. Populated by renderDeadSet() from PF_PIPELINE.  -->
+  <div class="module-view" id="mod-dead-set">
+    <div id="deadSetRoot" class="pf-index-root"></div>
+  </div>
+
   <!-- Awarded Projects index — populated client-side by initAwardedProjects() from window.PF_AWARDED (data/awarded-projects.js). -->
   <div class="module-view" id="mod-awarded-projects">
     <div id="awardedRoot" class="pf-index-root"></div>
@@ -2308,6 +2342,7 @@ const moduleTitles = {
   'precon-hp-submitted-bids': 'Helical Pilings — Submitted Bids',
   'precon-hp-awarded': 'Helical Pilings — Awarded',
   'precon-hp-not-awarded': 'Helical Pilings — Not Awarded',
+  'dead-set': 'Dead Set — Not Awarded / Lost Bids',
   'awarded-projects': 'Awarded Projects',
   'project-record': 'Project Record',
   'fo-timesheets': 'TimeSheets — Weekly',
@@ -10822,6 +10857,192 @@ try {
       var n = +v; if (!isFinite(n)) return '';
       return '$' + Math.round(n).toLocaleString();
     }
+
+    // ----------------------------------------------------------------------
+    // BID-RESOLUTION FORK + DEAD SET (item A)
+    // ----------------------------------------------------------------------
+    // Resolution overrides come from /api/pipeline-state (KV-backed). They are
+    // overlaid on the auto-built pipeline at render time. A job is keyed by its
+    // stable project number. The auto pipeline (PF_PRECON) is never mutated.
+    //
+    //   override.status = 'awarded'     -> show in Awarded (PM picks it up)
+    //   override.status = 'not_awarded'  -> remove from auto bucket, show in Dead Set
+    //   override.status = 'active'       -> back to its auto bucket (Reactivate)
+    //
+    // Only privileged roles (admin/partner/business_dev) may act. field_ops is
+    // blocked client-side AND server-side (preconstruction area).
+    window.PF_PIPELINE = window.PF_PIPELINE || { overrides: {}, meta: { updated: null }, loaded: false };
+
+    function role(){ return (window.PF_ME && window.PF_ME.role) || 'field_ops'; }
+    function canResolve(){
+      var r = role();
+      return r === 'admin' || r === 'partner' || r === 'business_dev';
+    }
+    function jobKey(p){ return String((p && (p.number || (p.fields && p.fields['Project Number']))) || ''); }
+    function overrideFor(p){
+      var k = jobKey(p);
+      return (k && window.PF_PIPELINE.overrides && window.PF_PIPELINE.overrides[k]) || null;
+    }
+
+    // Load overrides once (synchronously, before first render, like /api/me).
+    function loadOverrides(){
+      try {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/pipeline-state', false);
+        xhr.withCredentials = true;
+        xhr.send(null);
+        if (xhr.status === 200) {
+          var d = JSON.parse(xhr.responseText);
+          window.PF_PIPELINE.overrides = (d && d.overrides) || {};
+          window.PF_PIPELINE.meta = (d && d.meta) || { updated: null };
+        } else {
+          // 403 (field_ops) or other: no overrides, render the plain auto pipeline.
+          window.PF_PIPELINE.overrides = {};
+          window.PF_PIPELINE.meta = { updated: null };
+        }
+      } catch (e) {
+        window.PF_PIPELINE.overrides = {};
+        window.PF_PIPELINE.meta = { updated: null };
+      }
+      window.PF_PIPELINE.loaded = true;
+    }
+
+    // POST a single job's resolution. On success, update local state + re-render
+    // everything (the moved job appears/disappears across buckets immediately).
+    window.pfResolveBid = function(jobId, status, btn){
+      if (!canResolve()) { alert('You do not have permission to change bid status.'); return; }
+      if (!jobId) { alert('This job has no project number, so it cannot be resolved.'); return; }
+      if (btn) { btn.disabled = true; }
+      try {
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/pipeline-state', false);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.withCredentials = true;
+        xhr.send(JSON.stringify({
+          jobId: jobId, status: status,
+          meta: { updated: window.PF_PIPELINE.meta && window.PF_PIPELINE.meta.updated }
+        }));
+        if (xhr.status === 200) {
+          var d = JSON.parse(xhr.responseText);
+          window.PF_PIPELINE.overrides = (d && d.overrides) || window.PF_PIPELINE.overrides;
+          window.PF_PIPELINE.meta = (d && d.meta) || window.PF_PIPELINE.meta;
+          renderAll();
+          renderDeadSet();
+        } else if (xhr.status === 409) {
+          alert('Another user changed the pipeline since you loaded it. Reloading the latest resolutions.');
+          loadOverrides(); renderAll(); renderDeadSet();
+        } else if (xhr.status === 403) {
+          alert('You do not have permission to change bid status.');
+          if (btn) btn.disabled = false;
+        } else {
+          alert('Could not save the change (HTTP ' + xhr.status + '). Please try again.');
+          if (btn) btn.disabled = false;
+        }
+      } catch (e) {
+        alert('Could not save the change. Please check your connection and try again.');
+        if (btn) btn.disabled = false;
+      }
+    };
+
+    // The per-row action cell for a given job + the bucket it is rendered in.
+    function actionCell(p, displayBucket){
+      if (!canResolve()) return '';
+      var k = jobKey(p);
+      if (!k) return '<span class="pf-resolve-meta">no project number</span>';
+      var kJs = "'" + k.replace(/'/g, "\\'") + "'";
+      var ov = overrideFor(p);
+      var btns = '';
+      if (displayBucket === 'dead') {
+        btns = '<button class="pf-resolve-btn primary" onclick="pfResolveBid(' + kJs + ",'active',this)\">Reactivate</button>";
+        if (ov && ov.resolvedBy) {
+          btns += '<div class="pf-resolve-meta">Lost by ' + E(ov.resolvedBy)
+            + (ov.resolvedAt ? ' &middot; ' + E(String(ov.resolvedAt).slice(0,10)) : '') + '</div>';
+        }
+      } else if (displayBucket === 'awarded') {
+        btns = (ov && ov.status === 'awarded' && ov.resolvedBy)
+          ? '<span class="pf-resolve-meta">Awarded by ' + E(ov.resolvedBy)
+            + (ov.resolvedAt ? ' &middot; ' + E(String(ov.resolvedAt).slice(0,10)) : '') + '</span>'
+          : '';
+      } else {
+        // Open buckets: offer Mark Awarded + Not Awarded.
+        btns = '<div class="pf-resolve-cell">'
+          + '<button class="pf-resolve-btn primary" onclick="pfResolveBid(' + kJs + ",'awarded',this)\">Mark Awarded</button>"
+          + '<button class="pf-resolve-btn" onclick="pfResolveBid(' + kJs + ",'not_awarded',this)\">Not Awarded</button>"
+          + '</div>';
+      }
+      return btns;
+    }
+
+    // Build the WIDE bid-log table HTML for a list of jobs.
+    // opts: { recordCol, actionCol, displayBucket, actionColLabel }.
+    function renderTable(disc, list, opts){
+      opts = opts || {};
+      var cols = (window.PF_PRECON.columns && window.PF_PRECON.columns[disc]) ? window.PF_PRECON.columns[disc] : [];
+      var dataCols = cols.filter(function(c){ return c.key !== 'Project Name'; });
+
+      var thead = '<th class="pf-sticky-col">Project</th>';
+      dataCols.forEach(function(c){
+        var cls = (c.type === 'money') ? ' class="num"' : '';
+        thead += '<th' + cls + '>' + E(c.key) + '</th>';
+      });
+      if (opts.recordCol) thead += '<th>Record</th>';
+      if (opts.actionCol) thead += '<th>' + E(opts.actionColLabel || 'Resolution') + '</th>';
+
+      var html = '<div class="pf-wide-wrap"><table class="pf-wide"><thead><tr>'
+        + thead + '</tr></thead><tbody>';
+
+      list.forEach(function(p){
+        var f = p.fields || {};
+        var ov = overrideFor(p);
+        var nameTxt = E(p.name || f['Project Name'] || '');
+        if (p.completed) nameTxt += ' <span class="pf-tag-completed">Completed</span>';
+        if (ov && ov.status === 'awarded') nameTxt += ' <span class="pf-tag-awarded">Awarded</span>';
+        if (ov && ov.status === 'not_awarded') nameTxt += ' <span class="pf-tag-dead">Dead</span>';
+        var numTxt = E(p.number || f['Project Number'] || '');
+        var stickyInner = '<div>' + nameTxt + '</div>'
+          + (numTxt ? '<div class="pf-record-muted">' + numTxt + '</div>' : '');
+        var row = '<tr><td class="pf-sticky-col">' + stickyInner + '</td>';
+
+        dataCols.forEach(function(c){
+          var v = f[c.key];
+          var cell = (v === undefined || v === null) ? '' : E(v);
+          var cls = (c.type === 'money') ? ' class="num"' : '';
+          var ttl = cell ? ' title="' + cell + '"' : '';
+          row += '<td' + cls + ttl + '>' + cell + '</td>';
+        });
+
+        if (opts.recordCol) {
+          var rec, num = String(p.number || '');
+          if (p.record === 'project-poet') {
+            rec = '<a class="pf-record-link" onclick="showModule(\'project-poet\')">Open record</a>';
+          } else if (num) {
+            rec = '<a class="pf-record-link" onclick="openProjectRecord(\'' + E(num) + '\')">Open record</a>';
+          } else {
+            rec = '<span class="pf-record-muted">no project number</span>';
+          }
+          row += '<td>' + rec + '</td>';
+        }
+        if (opts.actionCol) {
+          row += '<td>' + actionCell(p, opts.displayBucket) + '</td>';
+        }
+        row += '</tr>';
+        html += row;
+      });
+
+      html += '</tbody></table></div>';
+      return html;
+    }
+
+    function sortByNumber(list){
+      return list.slice().sort(function(a,b){
+        var an = String(a.number||''), bn = String(b.number||'');
+        if (!an && !bn) return 0;
+        if (!an) return 1;
+        if (!bn) return -1;
+        return an.localeCompare(bn);
+      });
+    }
+
     function renderMount(mount){
       var disc = mount.getAttribute('data-disc');
       var bucket = mount.getAttribute('data-bucket');
@@ -10836,15 +11057,37 @@ try {
         return;
       }
 
-      var list = D[disc][bucket].slice();
-      // Stable sort by project number ascending; blank numbers fall to the end.
-      list.sort(function(a,b){
-        var an = String(a.number||''), bn = String(b.number||'');
-        if (!an && !bn) return 0;
-        if (!an) return 1;
-        if (!bn) return -1;
-        return an.localeCompare(bn);
-      });
+      // ----- OVERLAY: build the EFFECTIVE list for this bucket -----
+      // A job with status=not_awarded leaves every stage bucket (it lives in Dead
+      // Set). A job with status=awarded is pulled INTO the awarded bucket from
+      // wherever it sat. status=active (or none) keeps its auto bucket.
+      var auto = D[disc][bucket] || [];
+      var list = [];
+      if (bucket === 'awarded') {
+        // Auto-awarded jobs that aren't overridden away, PLUS any job in THIS
+        // discipline overridden to 'awarded' from another bucket.
+        auto.forEach(function(p){
+          var ov = overrideFor(p);
+          if (!ov || ov.status === 'awarded') list.push(p);
+        });
+        // Pull in jobs from other buckets of this discipline marked awarded.
+        var seen = {}; list.forEach(function(p){ seen[jobKey(p)] = 1; });
+        Object.keys(D[disc]).forEach(function(b){
+          if (b === 'awarded') return;
+          (D[disc][b] || []).forEach(function(p){
+            var ov = overrideFor(p);
+            if (ov && ov.status === 'awarded' && !seen[jobKey(p)]) { list.push(p); seen[jobKey(p)] = 1; }
+          });
+        });
+      } else {
+        // A stage bucket: drop jobs overridden to awarded or not_awarded.
+        auto.forEach(function(p){
+          var ov = overrideFor(p);
+          if (ov && (ov.status === 'awarded' || ov.status === 'not_awarded')) return;
+          list.push(p);
+        });
+      }
+      list = sortByNumber(list);
 
       var srcLink = D.source_url
         ? '<a href="' + E(D.source_url) + '" target="_blank" rel="noopener noreferrer">Project Bid Log</a>'
@@ -10864,70 +11107,77 @@ try {
         return;
       }
 
-      // FULL bid-log column set for this discipline, in sheet order (built by
-      // sync/build-precon-pipeline.py). The sticky first "Project" column replaces
-      // the raw "Project Name" header column, so we render every OTHER column as data.
-      var cols = (D.columns && D.columns[disc]) ? D.columns[disc] : [];
-      var dataCols = cols.filter(function(c){ return c.key !== 'Project Name'; });
-
-      // Header: sticky Project column, then every bid-log column in sheet order,
-      // then a Record column for the awarded bucket.
-      var thead = '<th class="pf-sticky-col">Project</th>';
-      dataCols.forEach(function(c){
-        var cls = (c.type === 'money') ? ' class="num"' : '';
-        thead += '<th' + cls + '>' + E(c.key) + '</th>';
+      html += renderTable(disc, list, {
+        recordCol: (bucket === 'awarded'),
+        actionCol: canResolve(),
+        displayBucket: (bucket === 'awarded') ? 'awarded' : 'open',
+        actionColLabel: (bucket === 'awarded') ? 'Awarded' : 'Resolution'
       });
-      if (bucket === 'awarded') thead += '<th>Record</th>';
-
-      html += '<div class="pf-wide-wrap"><table class="pf-wide"><thead><tr>'
-        + thead + '</tr></thead><tbody>';
-
-      list.forEach(function(p){
-        var f = p.fields || {};
-        // Sticky Project cell: name (+ Completed tag) over the project number.
-        var nameTxt = E(p.name || f['Project Name'] || '');
-        if (p.completed) nameTxt += ' <span class="pf-tag-completed">Completed</span>';
-        var numTxt = E(p.number || f['Project Number'] || '');
-        var stickyInner = '<div>' + nameTxt + '</div>'
-          + (numTxt ? '<div class="pf-record-muted">' + numTxt + '</div>' : '');
-        var row = '<tr><td class="pf-sticky-col">' + stickyInner + '</td>';
-
-        dataCols.forEach(function(c){
-          var v = f[c.key];
-          var cell = (v === undefined || v === null) ? '' : E(v);
-          var cls = (c.type === 'money') ? ' class="num"' : '';
-          // title tooltip lets long/truncated cells be read on hover.
-          var ttl = cell ? ' title="' + cell + '"' : '';
-          row += '<td' + cls + ttl + '>' + cell + '</td>';
-        });
-
-        if (bucket === 'awarded') {
-          // Every awarded project opens its own record. POET keeps its deep module;
-          // everything else opens the generic record view keyed by project number.
-          var rec;
-          var num = String(p.number || '');
-          if (p.record === 'project-poet') {
-            rec = '<a class="pf-record-link" onclick="showModule(\'project-poet\')">Open record</a>';
-          } else if (num) {
-            rec = '<a class="pf-record-link" onclick="openProjectRecord(\'' + E(num) + '\')">Open record</a>';
-          } else {
-            rec = '<span class="pf-record-muted">no project number</span>';
-          }
-          row += '<td>' + rec + '</td>';
-        }
-        row += '</tr>';
-        html += row;
-      });
-
-      html += '</tbody></table></div>';
       mount.innerHTML = html;
     }
+
     function renderAll(){
       var mounts = document.querySelectorAll('.precon-mount');
       for (var i = 0; i < mounts.length; i++) renderMount(mounts[i]);
     }
-    document.addEventListener('DOMContentLoaded', renderAll);
-    if (document.readyState !== 'loading') renderAll();
+
+    // ----- DEAD SET view: all not-awarded jobs across both disciplines -----
+    function renderDeadSet(){
+      var root = document.getElementById('deadSetRoot');
+      if (!root) return;
+      var D = window.PF_PRECON;
+      var ov = window.PF_PIPELINE.overrides || {};
+
+      var html = '<div class="pf-index-head"><h2>Dead Set &mdash; Not Awarded / Lost Bids</h2>'
+        + '<div class="pf-index-meta">Bids marked Not Awarded land here. Use Reactivate to send one back to Actively Bidding.</div></div>';
+
+      if (!D) {
+        root.innerHTML = html + '<div class="pf-empty-state">Pipeline data not loaded.</div>';
+        return;
+      }
+      if (!canResolve()) {
+        root.innerHTML = html + '<div class="pf-empty-state">You do not have access to the Dead Set.</div>';
+        return;
+      }
+
+      // Find every job (across disc + buckets) whose override is not_awarded.
+      var deadKeys = {};
+      Object.keys(ov).forEach(function(k){ if (ov[k] && ov[k].status === 'not_awarded') deadKeys[k] = 1; });
+
+      var any = false;
+      ['ap','hp'].forEach(function(disc){
+        if (!D[disc]) return;
+        var dead = [], seen = {};
+        Object.keys(D[disc]).forEach(function(b){
+          (D[disc][b] || []).forEach(function(p){
+            var k = jobKey(p);
+            if (k && deadKeys[k] && !seen[k]) { dead.push(p); seen[k] = 1; }
+          });
+        });
+        dead = sortByNumber(dead);
+        if (!dead.length) return;
+        any = true;
+        html += '<h2 style="margin-top:18px">' + E(DISC_LABEL[disc] || disc)
+          + ' <span class="pf-count-badge">' + dead.length + '</span></h2>';
+        html += renderTable(disc, dead, {
+          recordCol: false, actionCol: true, displayBucket: 'dead', actionColLabel: 'Action'
+        });
+      });
+
+      if (!any) {
+        html += '<div class="pf-empty-state">No dead bids. Bids you mark Not Awarded in the pipeline appear here, each with a one-click Reactivate.</div>';
+      }
+      root.innerHTML = html;
+    }
+    window.renderDeadSet = renderDeadSet;
+
+    function boot(){
+      loadOverrides();
+      renderAll();
+      renderDeadSet();
+    }
+    document.addEventListener('DOMContentLoaded', boot);
+    if (document.readyState !== 'loading') boot();
   } catch(e) {
     console.error("Preconstruction pipeline panels failed to load:", e);
   }

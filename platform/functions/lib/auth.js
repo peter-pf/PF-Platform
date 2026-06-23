@@ -410,6 +410,9 @@ export function areaForPath(pathname) {
   if (pathname.startsWith('/api/')) {
     if (pathname.startsWith('/api/doc'))           return 'documents';
     if (pathname.startsWith('/api/schedule'))      return 'schedule';
+    // Bid-resolution fork + Dead Set (item A): preconstruction action.
+    // admin + partner + business_dev allowed; field_ops BLOCKED by direct URL.
+    if (pathname.startsWith('/api/pipeline-state')) return 'preconstruction';
     if (pathname.startsWith('/api/users'))         return 'user_admin';
     // /api/data proxies the live SharePoint data set (bid log + project master).
     // BD sees the full bid log (Brad 2026-06-23) -> classify as financials
