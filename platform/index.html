@@ -1453,6 +1453,10 @@ body.role-field-ops .nav-item[data-fo-hide] {
   if (!window.PF_ME) window.PF_ME = { name: '', role: role };
 
   var isPrivileged = (role === 'admin' || role === 'partner');
+  // BD tier: admin/partner/business_dev. These roles may see PROJECT-level /
+  // preconstruction / BD-domain feeds (field_ops is server-DENIED them). The
+  // server (auth.js) is the real boundary; this only keeps the UI honest.
+  var isBdOrAbove = isPrivileged || role === 'business_dev';
 
   // Build the ordered feed list for this role.
   var feeds = [];
@@ -1468,6 +1472,15 @@ body.role-field-ops .nav-item[data-fo-hide] {
     // field_ops: the project LIST comes from the field-safe derivative (no $),
     // NOT the sensitive awarded-projects.js / project-record-poet.js feeds.
     feeds.push('/data/fo-projects-field.js');
+  }
+  // Section dashboards (precon + BD): BD-tier visible (admin/partner/business_dev),
+  // field_ops BLOCKED. precon-dashboard.js -> preconstruction area;
+  // bd-dashboard.js -> business_dev area (both default-deny + server-enforced).
+  if (isBdOrAbove) {
+    feeds.push('/data/precon-dashboard.js', '/data/bd-dashboard.js');
+    // BD also needs the precon pipeline feed (preconstruction area) — previously
+    // only injected for admin/partner; BD is allowed it server-side.
+    if (!isPrivileged) feeds.push('/data/precon-pipeline.js');
   }
   // SEC-12: privileged roles get the raw schedule (value/gc_name); field_ops
   // gets the $/GC-stripped derivative. The raw file is server-DENIED to field_ops.
@@ -2351,6 +2364,61 @@ document.addEventListener('click', function(e) {
     <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9636;</div><h2>WIP, PF Cost Codes & Cashflow</h2><p>Coming in a later release.</p></div>
   </div>
 
+  <div class="module-view" id="mod-precon-dashboard">
+    <!-- Preconstruction KPI dashboard. Renders from window.PF_PRECON_DASH
+         (data/precon-dashboard.js, built by sync/build-precon-dashboard.py from
+         the bid log via data/precon-pipeline.js). Reuses window.PFDashboard.
+         preconstruction — admin/partner/business_dev; field_ops is server-DENIED
+         the feed. -->
+    <div class="pfdash-wrap">
+      <div class="pfdash-toolbar">
+        <div class="pfdash-period-toggle" id="precondashPeriodToggle" role="tablist" aria-label="Time period">
+          <button type="button" class="pfdash-pbtn" data-period="week">Week</button>
+          <button type="button" class="pfdash-pbtn" data-period="month">Month</button>
+          <button type="button" class="pfdash-pbtn active" data-period="quarter">Quarter</button>
+          <button type="button" class="pfdash-pbtn" data-period="annual">Annual</button>
+        </div>
+        <div class="pfdash-scope" id="precondashScope"></div>
+        <div class="pfdash-meta" id="precondashMeta"></div>
+      </div>
+      <div class="pfdash-banner" id="precondashBanner" style="display:none"></div>
+      <div class="pfdash-cards" id="precondashCards"></div>
+      <div class="pfdash-tablewrap">
+        <table class="pfdash-table" id="precondashTable">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="module-view" id="mod-bd-dashboard">
+    <!-- Business Development KPI dashboard. Renders from window.PF_BD_DASH
+         (data/bd-dashboard.js, built by sync/build-bd-dashboard.py from the PF
+         BD Master workbook). Reuses window.PFDashboard. business_dev —
+         admin/partner/business_dev; field_ops is server-DENIED the feed. -->
+    <div class="pfdash-wrap">
+      <div class="pfdash-toolbar">
+        <div class="pfdash-period-toggle" id="bddashPeriodToggle" role="tablist" aria-label="Time period">
+          <button type="button" class="pfdash-pbtn" data-period="week">Week</button>
+          <button type="button" class="pfdash-pbtn" data-period="month">Month</button>
+          <button type="button" class="pfdash-pbtn active" data-period="quarter">Quarter</button>
+          <button type="button" class="pfdash-pbtn" data-period="annual">Annual</button>
+        </div>
+        <div class="pfdash-scope" id="bddashScope"></div>
+        <div class="pfdash-meta" id="bddashMeta"></div>
+      </div>
+      <div class="pfdash-banner" id="bddashBanner" style="display:none"></div>
+      <div class="pfdash-cards" id="bddashCards"></div>
+      <div class="pfdash-tablewrap">
+        <table class="pfdash-table" id="bddashTable">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <div class="module-view" id="mod-pf-dashboard">
     <!-- Company-wide KPI dashboard. Renders from window.PF_DASHBOARD
          (data/pf-dashboard.js, built by sync/build-pf-dashboard.py from the
@@ -2442,7 +2510,9 @@ const moduleTitles = {
   'budget-actual-poet': 'Budget vs Actual — 26-002 POET',
   'schedule-awarded': 'Awarded Projects Schedule',
   'financials-wip': 'WIP & Cashflow',
-  'pf-dashboard': 'PF Dashboard'
+  'pf-dashboard': 'PF Dashboard',
+  'precon-dashboard': 'Preconstruction Dashboard',
+  'bd-dashboard': 'Business Development Dashboard'
 };
 
 function showModule(id) {
@@ -12277,14 +12347,27 @@ try {
   // KPI cards shown at top (the headline metrics).
   var CARD_METRICS = ['Bids Sent', 'Projects Awarded (LOI)', 'Net Monthly Income', 'Net Monthly Margin'];
 
+  // Default mount-node IDs (the company PF dashboard). Section dashboards pass
+  // their OWN id map via opts.ids so multiple dashboards can coexist in the DOM.
+  var DEFAULT_IDS = {
+    cards: 'pfdashCards', table: 'pfdashTable', banner: 'pfdashBanner',
+    meta: 'pfdashMeta', scope: 'pfdashScope', scopeSel: 'pfdashScopeSel',
+  };
+
   // ---- render one dataset into the mount nodes ----
-  function render(dataset, period, scopeKey) {
-    var cards = document.getElementById('pfdashCards');
-    var thead = document.querySelector('#pfdashTable thead');
-    var tbody = document.querySelector('#pfdashTable tbody');
-    var banner = document.getElementById('pfdashBanner');
-    var meta = document.getElementById('pfdashMeta');
-    var scopeBox = document.getElementById('pfdashScope');
+  // opts (optional): { ids:{...}, cardMetrics:[...], weekMsg:'...', scopeNoun:'...' }
+  function render(dataset, period, scopeKey, opts) {
+    opts = opts || {};
+    var ids = opts.ids || DEFAULT_IDS;
+    var cardMetrics = opts.cardMetrics || CARD_METRICS;
+    var scopeNoun = opts.scopeNoun || 'Month';
+    var scopeSelId = ids.scopeSel || (ids.scope + 'Sel');
+    var cards = document.getElementById(ids.cards);
+    var thead = document.querySelector('#' + ids.table + ' thead');
+    var tbody = document.querySelector('#' + ids.table + ' tbody');
+    var banner = document.getElementById(ids.banner);
+    var meta = document.getElementById(ids.meta);
+    var scopeBox = document.getElementById(ids.scope);
     if (!cards || !tbody) return;
 
     if (!dataset || !dataset.months) {
@@ -12304,8 +12387,8 @@ try {
     // ---- WEEK: the source sheet has no weekly granularity ----
     if (period === 'week') {
       banner.style.display = '';
-      banner.textContent = 'The PF Dashboard tab tracks data MONTHLY. No weekly breakdown exists '
-        + 'in the source sheet, so the weekly view has no data. Add a weekly feed to enable this period.';
+      banner.textContent = opts.weekMsg || ('This dashboard tracks data MONTHLY. No weekly breakdown exists '
+        + 'in the source sheet, so the weekly view has no data. Add a weekly feed to enable this period.');
       scopeBox.innerHTML = '';
       cards.innerHTML = '';
       thead.innerHTML = '';
@@ -12347,7 +12430,7 @@ try {
       });
       var qMonths = dataset.quarters[scopeKey].filter(function (m) { return dataset.monthHasData[m]; });
       rows = rollup(dataset, qMonths);
-      scopeBox.innerHTML = '<label>Quarter <select id="pfdashScopeSel">' + scopeOptions + '</select></label>';
+      scopeBox.innerHTML = '<label>Quarter <select id="' + scopeSelId + '">' + scopeOptions + '</select></label>';
     } else { // month
       if (!scopeKey || monthsAvail.indexOf(scopeKey) < 0) scopeKey = monthsAvail[0] || dataset.monthOrder[0];
       dataset.monthOrder.forEach(function (m) {
@@ -12356,16 +12439,16 @@ try {
           + (has ? '' : ' disabled') + '>' + m + ' ' + dataset.year + (has ? '' : ' (no data)') + '</option>';
       });
       rows = (dataset.months[scopeKey] || { rows: [] }).rows;
-      scopeBox.innerHTML = '<label>Month <select id="pfdashScopeSel">' + scopeOptions + '</select></label>';
+      scopeBox.innerHTML = '<label>' + E(scopeNoun) + ' <select id="' + scopeSelId + '">' + scopeOptions + '</select></label>';
     }
 
     // wire scope selector
-    var sel = document.getElementById('pfdashScopeSel');
-    if (sel) sel.addEventListener('change', function () { render(dataset, period, this.value); });
+    var sel = document.getElementById(scopeSelId);
+    if (sel) sel.addEventListener('change', function () { render(dataset, period, this.value, opts); });
 
     // ---- KPI cards ----
     var byName = {}; rows.forEach(function (r) { byName[r.metric] = r; });
-    var cardHtml = CARD_METRICS.map(function (name) {
+    var cardHtml = cardMetrics.map(function (name) {
       var r = byName[name]; if (!r) return '';
       var val = fmtPrimary(r); if (val == null) val = '—';
       var dCls = deltaClass(r), dTxt = deltaText(r);
@@ -12383,10 +12466,10 @@ try {
       + '<th class="metric-col">Metric</th>'
       + '<th>Actual</th><th>Goal / Budget</th><th>Delta</th>'
       + '</tr>';
-    var FIN_START = 'Monthly Income'; // visually group the financial block
+    var FIN_START = ('finStart' in opts) ? opts.finStart : 'Monthly Income'; // visually group the financial block (PF dashboard only)
     var inFin = false;
     tbody.innerHTML = rows.map(function (r) {
-      if (r.metric === FIN_START) inFin = true;
+      if (FIN_START && r.metric === FIN_START) inFin = true;
       var actual = fmtPrimaryFull(r);
       var goalBud;
       if (r.type === 'count') goalBud = count(r.qtyGoal);
@@ -12405,10 +12488,66 @@ try {
   }
 
   // ---- public component API (reusable for section dashboards) ----
+  // mount(opts): wire a self-contained section dashboard. opts:
+  //   { toggleId, ids:{cards,table,banner,meta,scope,scopeSel}, dataset|getData,
+  //     cardMetrics, scopeNoun, weekMsg, finStart, moduleId }
+  // Returns a draw() fn. Used by mod-precon-dashboard + mod-bd-dashboard so they
+  // reuse THIS engine instead of each shipping their own.
+  function mount(cfg) {
+    var st = { period: 'quarter', scope: null };
+    function getDS() { return typeof cfg.getData === 'function' ? cfg.getData() : cfg.dataset; }
+    function drawIt() {
+      render(getDS(), st.period, st.scope, {
+        ids: cfg.ids, cardMetrics: cfg.cardMetrics, scopeNoun: cfg.scopeNoun,
+        weekMsg: cfg.weekMsg, finStart: cfg.finStart,
+      });
+    }
+    function wire() {
+      var tg = document.getElementById(cfg.toggleId);
+      if (!tg || tg.dataset.wired) return;
+      tg.dataset.wired = '1';
+      tg.querySelectorAll('.pfdash-pbtn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          tg.querySelectorAll('.pfdash-pbtn').forEach(function (b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          st.period = btn.dataset.period;
+          st.scope = null;
+          drawIt();
+        });
+      });
+    }
+    return function activate() { wire(); drawIt(); };
+  }
+
   window.PFDashboard = {
-    render: function (dataset, period, scopeKey) { render(dataset, period || 'quarter', scopeKey); },
-    rollup: rollup
+    render: function (dataset, period, scopeKey, opts) { render(dataset, period || 'quarter', scopeKey, opts); },
+    rollup: rollup,
+    mount: mount
   };
+
+  // ---- section dashboards: Precon + BD (reuse the engine via mount) ----
+  var preconActivate = mount({
+    toggleId: 'precondashPeriodToggle',
+    ids: { cards: 'precondashCards', table: 'precondashTable', banner: 'precondashBanner',
+           meta: 'precondashMeta', scope: 'precondashScope', scopeSel: 'precondashScopeSel' },
+    getData: function () { return window.PF_PRECON_DASH; },
+    cardMetrics: ['Bid Invites', 'Bids Sent', 'Awarded', 'Win Rate'],
+    scopeNoun: 'Month',
+    finStart: null,
+    weekMsg: 'The bid log tracks dates per bid but this view rolls up MONTHLY. '
+      + 'A weekly breakdown is not built yet, so the weekly view has no data.',
+  });
+  var bdActivate = mount({
+    toggleId: 'bddashPeriodToggle',
+    ids: { cards: 'bddashCards', table: 'bddashTable', banner: 'bddashBanner',
+           meta: 'bddashMeta', scope: 'bddashScope', scopeSel: 'bddashScopeSel' },
+    getData: function () { return window.PF_BD_DASH; },
+    cardMetrics: ['Interactions Logged', 'Companies Contacted', 'Total Companies', 'Total Opportunities'],
+    scopeNoun: 'Month',
+    finStart: null,
+    weekMsg: 'BD interactions are dated, but this view rolls up MONTHLY. '
+      + 'A weekly breakdown is not built yet, so the weekly view has no data.',
+  });
 
   // ---- internal state + wiring for the PF (company) dashboard ----
   var state = { period: 'quarter', scope: null };
@@ -12435,6 +12574,8 @@ try {
   window.showModule = function (id) {
     if (typeof prev === 'function') prev(id);
     if (id === 'pf-dashboard') { wireToggle(); draw(); }
+    if (id === 'precon-dashboard') { preconActivate(); }
+    if (id === 'bd-dashboard') { bdActivate(); }
   };
 })();
 } catch (e) {

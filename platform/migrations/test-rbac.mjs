@@ -464,6 +464,64 @@ ok('requireArea(business_dev, pf-dashboard area) => 403',
 ok('requireArea(field_ops, pf-dashboard area) => 403',
    requireArea({ uid: 'fo', role: 'field_ops', name: 'Crew' }, areaForPath('/data/pf-dashboard.js'))?.status === 403);
 
+// --- PRECON + BD DASHBOARDS: new section-dashboard feeds --------------------
+// precon-dashboard.js -> preconstruction (admin/partner/business_dev; field_ops BLOCKED)
+// bd-dashboard.js      -> business_dev   (admin/partner/business_dev; field_ops BLOCKED)
+section('Precon Dashboard feed: /data/precon-dashboard.js -> preconstruction');
+ok('/data/precon-dashboard.js -> preconstruction',
+   areaForPath('/data/precon-dashboard.js') === 'preconstruction');
+ok('precon-dashboard.js ALLOWED for admin',
+   roleCanAccess('admin', areaForPath('/data/precon-dashboard.js')) === true);
+ok('precon-dashboard.js ALLOWED for partner',
+   roleCanAccess('partner', areaForPath('/data/precon-dashboard.js')) === true);
+ok('precon-dashboard.js ALLOWED for business_dev',
+   roleCanAccess('business_dev', areaForPath('/data/precon-dashboard.js')) === true);
+ok('precon-dashboard.js BLOCKED for field_ops',
+   roleCanAccess('field_ops', areaForPath('/data/precon-dashboard.js')) === false);
+ok('requireArea(field_ops, precon-dashboard area) => 403',
+   requireArea({ uid: 'fo', role: 'field_ops', name: 'Crew' }, areaForPath('/data/precon-dashboard.js'))?.status === 403);
+ok('requireArea(business_dev, precon-dashboard area) => null (allowed)',
+   requireArea({ uid: 'bd', role: 'business_dev', name: 'BD' }, areaForPath('/data/precon-dashboard.js')) === null);
+
+section('BD Dashboard feed: /data/bd-dashboard.js -> business_dev');
+ok('/data/bd-dashboard.js -> business_dev',
+   areaForPath('/data/bd-dashboard.js') === 'business_dev');
+ok('bd-dashboard.js ALLOWED for admin',
+   roleCanAccess('admin', areaForPath('/data/bd-dashboard.js')) === true);
+ok('bd-dashboard.js ALLOWED for partner',
+   roleCanAccess('partner', areaForPath('/data/bd-dashboard.js')) === true);
+ok('bd-dashboard.js ALLOWED for business_dev',
+   roleCanAccess('business_dev', areaForPath('/data/bd-dashboard.js')) === true);
+ok('bd-dashboard.js BLOCKED for field_ops',
+   roleCanAccess('field_ops', areaForPath('/data/bd-dashboard.js')) === false);
+ok('requireArea(field_ops, bd-dashboard area) => 403',
+   requireArea({ uid: 'fo', role: 'field_ops', name: 'Crew' }, areaForPath('/data/bd-dashboard.js'))?.status === 403);
+ok('requireArea(business_dev, bd-dashboard area) => null (allowed)',
+   requireArea({ uid: 'bd', role: 'business_dev', name: 'BD' }, areaForPath('/data/bd-dashboard.js')) === null);
+
+// Data-layer proof: the feed files must not leak company-wide $ that BD/field
+// shouldn't compute. (precon = project/BD bid economics by design; assert the
+// generated feeds carry the expected window globals + no surprise globals.)
+section('Precon + BD dashboard feeds: generated shape sanity');
+{
+  const preconSrc = readFileSync(join(__dir, '../data/precon-dashboard.js'), 'utf8');
+  const bdSrc = readFileSync(join(__dir, '../data/bd-dashboard.js'), 'utf8');
+  ok('precon-dashboard.js exposes window.PF_PRECON_DASH', /window\.PF_PRECON_DASH\s*=/.test(preconSrc));
+  ok('bd-dashboard.js exposes window.PF_BD_DASH', /window\.PF_BD_DASH\s*=/.test(bdSrc));
+  ok('precon feed has metricsMeta', /"metricsMeta"/.test(preconSrc));
+  ok('bd feed has metricsMeta', /"metricsMeta"/.test(bdSrc));
+  ok('bd feed documents OMITTED metrics (no fabrication)', /"_omitted"/.test(bdSrc));
+}
+
+// Both new feeds DENIED to field_ops (consolidated, mirrors the spec ask).
+section('Precon + BD dashboards: field_ops sees ZERO of either');
+for (const p of ['/data/precon-dashboard.js', '/data/bd-dashboard.js']) {
+  ok(`${p} BLOCKED for field_ops`, roleCanAccess('field_ops', areaForPath(p)) === false);
+  ok(`${p} ALLOWED for admin`, roleCanAccess('admin', areaForPath(p)) === true);
+  ok(`${p} ALLOWED for partner`, roleCanAccess('partner', areaForPath(p)) === true);
+  ok(`${p} ALLOWED for business_dev`, roleCanAccess('business_dev', areaForPath(p)) === true);
+}
+
 // --- summary ----------------------------------------------------------------
 console.log(`\n${'='.repeat(48)}`);
 console.log(`RESULT: ${pass} passed, ${fail} failed`);

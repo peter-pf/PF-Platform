@@ -342,7 +342,9 @@ const DATA_FILE_AREAS = {
   '/data/project-master.json':     'financials',      // PROJECT: per-job contract_value/margin/profit
   '/data/project-history.js':      'financials',      // PROJECT: per-job ContractValue/totalContractValue
   '/data/precon-pipeline.js':      'preconstruction', // PROJECT/BD: opportunity pipeline ($ per opp) — BD domain
+  '/data/precon-dashboard.js':     'preconstruction', // PROJECT/BD: precon PERIOD KPIs (invites/bids/awarded/win rate) — BD domain, field_ops BLOCKED
   '/data/bd-master.json':          'business_dev',    // BD: EIN/tax id/credit-app, GC contacts — BD's own tool
+  '/data/bd-dashboard.js':         'business_dev',    // BD: BD PERIOD KPIs (interactions/companies contacted/totals) — BD's own tool, field_ops BLOCKED
 
   // ---- COMPANY-WIDE / GLOBAL financials (admin/partner ONLY — BD + field_ops BLOCKED) ----
   // Item E: cross-job rollups, company P&L, the global pricing master, company
