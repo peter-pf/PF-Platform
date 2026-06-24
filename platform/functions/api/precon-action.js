@@ -67,7 +67,12 @@ function derivePriority(dueDate, nowMs) {
   if (!dueDate) return 'none';
   const due = new Date(dueDate + 'T00:00:00Z');
   if (Number.isNaN(due.getTime())) return 'none';
-  const days = Math.round((due.getTime() - nowMs) / (24 * 60 * 60 * 1000));
+  // Anchor BOTH ends to UTC midnight so this matches the client rule exactly.
+  // Measuring from the raw instant would flip a due-today item to overdue after
+  // midday UTC, disagreeing with the on-screen badge.
+  const n = new Date(nowMs);
+  const todayMs = Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate());
+  const days = Math.round((due.getTime() - todayMs) / (24 * 60 * 60 * 1000));
   if (days < 0) return 'overdue';
   if (days <= DUE_SOON_DAYS) return 'due-soon';
   return 'upcoming';
