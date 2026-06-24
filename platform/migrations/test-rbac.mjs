@@ -546,6 +546,73 @@ for (const p of ['/data/precon-dashboard.js', '/data/bd-dashboard.js']) {
   ok(`${p} ALLOWED for business_dev`, roleCanAccess('business_dev', areaForPath(p)) === true);
 }
 
+// --- BD CRM backbone: companies + contacts + interactions -------------------
+// bd-records.js -> business_dev (base feed). /api/bd-record + /api/bd-interaction
+// -> business_dev (write-back). admin/partner/business_dev allowed; field_ops
+// BLOCKED everywhere (feed + both endpoints), by direct URL too.
+section('BD CRM: /data/bd-records.js -> business_dev');
+ok('/data/bd-records.js -> business_dev', areaForPath('/data/bd-records.js') === 'business_dev');
+ok('bd-records.js ALLOWED for admin', roleCanAccess('admin', areaForPath('/data/bd-records.js')) === true);
+ok('bd-records.js ALLOWED for partner', roleCanAccess('partner', areaForPath('/data/bd-records.js')) === true);
+ok('bd-records.js ALLOWED for business_dev', roleCanAccess('business_dev', areaForPath('/data/bd-records.js')) === true);
+ok('bd-records.js BLOCKED for field_ops', roleCanAccess('field_ops', areaForPath('/data/bd-records.js')) === false);
+ok('requireArea(field_ops, bd-records area) => 403',
+   requireArea({ uid: 'fo', role: 'field_ops', name: 'Crew' }, areaForPath('/data/bd-records.js'))?.status === 403);
+
+section('BD CRM: write-back endpoints -> business_dev (field_ops denied)');
+const BD_API = ['/api/bd-record', '/api/bd-interaction',
+                '/api/bd-interaction?entityType=company&entityId=co_x',
+                '/api/bd-record?foo=bar'];
+for (const p of BD_API) {
+  const path = p.split('?')[0];
+  const area = areaForPath(path);
+  ok(`${path} -> business_dev (${area})`, area === 'business_dev');
+  ok(`${path} ALLOWED for admin`, roleCanAccess('admin', area) === true);
+  ok(`${path} ALLOWED for partner`, roleCanAccess('partner', area) === true);
+  ok(`${path} ALLOWED for business_dev`, roleCanAccess('business_dev', area) === true);
+  ok(`${path} BLOCKED for field_ops`, roleCanAccess('field_ops', area) === false);
+}
+ok('requireArea(field_ops, /api/bd-record area) => 403',
+   requireArea({ uid: 'fo', role: 'field_ops', name: 'Crew' }, areaForPath('/api/bd-record'))?.status === 403);
+ok('requireArea(field_ops, /api/bd-interaction area) => 403',
+   requireArea({ uid: 'fo', role: 'field_ops', name: 'Crew' }, areaForPath('/api/bd-interaction'))?.status === 403);
+ok('requireArea(business_dev, /api/bd-record area) => null (allowed)',
+   requireArea({ uid: 'bd', role: 'business_dev', name: 'BD' }, areaForPath('/api/bd-record')) === null);
+ok('requireArea(null session, /api/bd-interaction) => 403 (fail closed)',
+   requireArea(null, areaForPath('/api/bd-interaction'))?.status === 403);
+
+section('BD CRM: endpoints actually CALL require(business_dev) (source check)');
+{
+  const ixSrc = readFileSync(join(__dir, '../functions/api/bd-interaction.js'), 'utf8');
+  const recSrc = readFileSync(join(__dir, '../functions/api/bd-record.js'), 'utf8');
+  ok('bd-interaction imports requireArea', /import\s*\{[^}]*requireArea[^}]*\}\s*from/.test(ixSrc));
+  ok('bd-interaction calls requireArea(...business_dev)', /requireArea\([^)]*['"]business_dev['"]\)/.test(ixSrc));
+  ok('bd-record imports requireArea', /import\s*\{[^}]*requireArea[^}]*\}\s*from/.test(recSrc));
+  ok('bd-record calls requireArea(...business_dev)', /requireArea\([^)]*['"]business_dev['"]\)/.test(recSrc));
+  // both GET and POST guard (two requireArea calls each).
+  ok('bd-interaction guards GET and POST', (ixSrc.match(/requireArea\(/g) || []).length >= 2);
+  ok('bd-record guards GET and POST', (recSrc.match(/requireArea\(/g) || []).length >= 2);
+  // KV binding used + write-cap present.
+  ok('bd-interaction uses env.PF_SCHEDULE', /env\.PF_SCHEDULE/.test(ixSrc));
+  ok('bd-record uses env.PF_SCHEDULE', /env\.PF_SCHEDULE/.test(recSrc));
+  ok('bd-record enforces a field allow-list', /allow/.test(recSrc) && /cleanFields/.test(recSrc));
+}
+
+section('BD CRM: bd-records.js feed shape (generated)');
+{
+  const recFeed = readFileSync(join(__dir, '../data/bd-records.js'), 'utf8');
+  ok('bd-records.js exposes window.PF_BD_RECORDS', /window\.PF_BD_RECORDS\s*=/.test(recFeed));
+  const recJson = JSON.parse(recFeed.replace(/^[\s\S]*?window\.PF_BD_RECORDS\s*=/, '').replace(/;\s*$/, ''));
+  ok('feed has companies array', Array.isArray(recJson.companies) && recJson.companies.length > 0);
+  ok('companies carry stable ids + fields + contacts',
+     recJson.companies.every(c => c.id && c.fields && Array.isArray(c.contacts)));
+  ok('company ids are unique',
+     new Set(recJson.companies.map(c => c.id)).size === recJson.companies.length);
+  ok('companyFields + contactFields are present (row-4 field lists)',
+     Array.isArray(recJson.companyFields) && recJson.companyFields.includes('Name') &&
+     Array.isArray(recJson.contactFields) && recJson.contactFields.includes('Name'));
+}
+
 // --- summary ----------------------------------------------------------------
 console.log(`\n${'='.repeat(48)}`);
 console.log(`RESULT: ${pass} passed, ${fail} failed`);

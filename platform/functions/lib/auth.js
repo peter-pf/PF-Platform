@@ -345,6 +345,7 @@ const DATA_FILE_AREAS = {
   '/data/precon-dashboard.js':     'preconstruction', // PROJECT/BD: precon PERIOD KPIs (invites/bids/awarded/win rate) — BD domain, field_ops BLOCKED
   '/data/bd-master.json':          'business_dev',    // BD: EIN/tax id/credit-app, GC contacts — BD's own tool
   '/data/bd-dashboard.js':         'business_dev',    // BD: BD PERIOD KPIs (interactions/companies contacted/totals) — BD's own tool, field_ops BLOCKED
+  '/data/bd-records.js':           'business_dev',    // BD CRM base: companies + linked contacts (read-only base) — BD's own tool, field_ops BLOCKED
 
   // ---- COMPANY-WIDE / GLOBAL financials (admin/partner ONLY — BD + field_ops BLOCKED) ----
   // Item E: cross-job rollups, company P&L, the global pricing master, company
@@ -416,6 +417,11 @@ export function areaForPath(pathname) {
     // Bid-resolution fork + Dead Set (item A): preconstruction action.
     // admin + partner + business_dev allowed; field_ops BLOCKED by direct URL.
     if (pathname.startsWith('/api/pipeline-state')) return 'preconstruction';
+    // BD CRM write-back (companies/contacts overlay + interactions log). BD's
+    // own tool: admin + partner + business_dev allowed; field_ops BLOCKED by
+    // direct URL too. Each endpoint ALSO calls requireArea('business_dev').
+    if (pathname.startsWith('/api/bd-interaction')) return 'business_dev';
+    if (pathname.startsWith('/api/bd-record'))      return 'business_dev';
     if (pathname.startsWith('/api/users'))         return 'user_admin';
     // /api/data proxies the live SharePoint data set (bid log + project master).
     // BD sees the full bid log (Brad 2026-06-23) -> classify as financials

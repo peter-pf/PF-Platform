@@ -1477,7 +1477,7 @@ body.role-field-ops .nav-item[data-fo-hide] {
   // field_ops BLOCKED. precon-dashboard.js -> preconstruction area;
   // bd-dashboard.js -> business_dev area (both default-deny + server-enforced).
   if (isBdOrAbove) {
-    feeds.push('/data/precon-dashboard.js', '/data/bd-dashboard.js');
+    feeds.push('/data/precon-dashboard.js', '/data/bd-dashboard.js', '/data/bd-records.js');
     // BD also needs the precon pipeline feed (preconstruction area) — previously
     // only injected for admin/partner; BD is allowed it server-side.
     if (!isPrivileged) feeds.push('/data/precon-pipeline.js');
@@ -1817,6 +1817,9 @@ window.progress = (function () {
       </a>
       <a class="nav-item" data-module="bd-outreach" onclick="showModule('bd-outreach')">
         <span class="nav-icon">&#9993;</span> Outreach
+      </a>
+      <a class="nav-item" data-module="bd-companies" onclick="showModule('bd-companies')">
+        <span class="nav-icon">&#9784;</span> Companies &amp; Contacts
       </a>
     </div>
 
@@ -2419,6 +2422,57 @@ document.addEventListener('click', function(e) {
     </div>
   </div>
 
+  <div class="module-view" id="mod-bd-companies">
+    <!-- BD CRM: Companies + Contacts with an interactions log. Reads the
+         read-only base window.PF_BD_RECORDS (data/bd-records.js) and merges KV
+         overlay additions (/api/bd-record) + interactions (/api/bd-interaction).
+         business_dev area — admin/partner/business_dev; field_ops server-DENIED
+         the feed AND the endpoints. All rendered data goes through window.esc. -->
+    <style>
+      #mod-bd-companies .bdc-wrap { display:flex; gap:16px; align-items:flex-start; }
+      #mod-bd-companies .bdc-list { flex:0 0 320px; max-width:320px; }
+      #mod-bd-companies .bdc-detail { flex:1 1 auto; min-width:0; }
+      #mod-bd-companies .bdc-toolbar { display:flex; gap:8px; margin-bottom:10px; }
+      #mod-bd-companies .bdc-search { flex:1 1 auto; padding:7px 10px; }
+      #mod-bd-companies .bdc-colist { max-height:62vh; overflow:auto; border:1px solid var(--border, #2a2f3a); border-radius:8px; }
+      #mod-bd-companies .bdc-co { padding:9px 12px; cursor:pointer; border-bottom:1px solid var(--border, #2a2f3a); }
+      #mod-bd-companies .bdc-co:hover { background:var(--surface-2, #1b212c); }
+      #mod-bd-companies .bdc-co.active { background:var(--surface-2, #1b212c); border-left:3px solid var(--accent, #2f6df6); }
+      #mod-bd-companies .bdc-co .nm { font-weight:600; }
+      #mod-bd-companies .bdc-co .sub { font-size:12px; color:var(--text-3, #8a93a6); }
+      #mod-bd-companies .bdc-card { border:1px solid var(--border, #2a2f3a); border-radius:8px; padding:14px 16px; margin-bottom:14px; }
+      #mod-bd-companies .bdc-fields { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:6px 18px; }
+      #mod-bd-companies .bdc-f .lbl { font-size:11px; color:var(--text-3, #8a93a6); text-transform:uppercase; letter-spacing:.03em; }
+      #mod-bd-companies .bdc-f .val { font-size:14px; }
+      #mod-bd-companies .bdc-h { display:flex; justify-content:space-between; align-items:center; margin:0 0 8px; }
+      #mod-bd-companies .bdc-contact { border-top:1px solid var(--border, #2a2f3a); padding:8px 0; }
+      #mod-bd-companies .bdc-ix { border-top:1px dashed var(--border, #2a2f3a); padding:7px 0; font-size:13px; }
+      #mod-bd-companies .bdc-ix .meta { font-size:11px; color:var(--text-3, #8a93a6); }
+      #mod-bd-companies .bdc-form { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+      #mod-bd-companies .bdc-form input, #mod-bd-companies .bdc-form select, #mod-bd-companies .bdc-form textarea { padding:6px 9px; }
+      #mod-bd-companies .bdc-form textarea { flex:1 1 100%; min-height:48px; }
+      #mod-bd-companies .bdc-badge { display:inline-block; font-size:11px; padding:1px 7px; border-radius:10px; background:var(--surface-2,#1b212c); color:var(--text-3,#8a93a6); margin-left:6px; }
+      #mod-bd-companies .bdc-muted { color:var(--text-3, #8a93a6); }
+      #mod-bd-companies .bdc-err { color:#e5534b; font-size:13px; margin-top:6px; }
+      #mod-bd-companies .bdc-ok { color:#3fb950; font-size:13px; margin-top:6px; }
+    </style>
+    <div id="bdcNoData" class="bdc-muted" style="display:none">No Business Development records available for your role.</div>
+    <div class="bdc-wrap" id="bdcWrap">
+      <div class="bdc-list">
+        <div class="bdc-toolbar">
+          <input type="text" class="bdc-search" id="bdcSearch" placeholder="Search companies or contacts" autocomplete="off">
+        </div>
+        <button type="button" class="btn" id="bdcAddCoBtn">+ Add company</button>
+        <div id="bdcAddCoForm" class="bdc-form" style="display:none"></div>
+        <div class="bdc-colist" id="bdcCoList"></div>
+        <div class="bdc-muted" id="bdcCount" style="margin-top:8px;font-size:12px"></div>
+      </div>
+      <div class="bdc-detail" id="bdcDetail">
+        <div class="bdc-muted">Select a company to see its details, contacts, and interactions.</div>
+      </div>
+    </div>
+  </div>
+
   <div class="module-view" id="mod-pf-dashboard">
     <!-- Company-wide KPI dashboard. Renders from window.PF_DASHBOARD
          (data/pf-dashboard.js, built by sync/build-pf-dashboard.py from the
@@ -2512,7 +2566,8 @@ const moduleTitles = {
   'financials-wip': 'WIP & Cashflow',
   'pf-dashboard': 'PF Dashboard',
   'precon-dashboard': 'Preconstruction Dashboard',
-  'bd-dashboard': 'Business Development Dashboard'
+  'bd-dashboard': 'Business Development Dashboard',
+  'bd-companies': 'Companies & Contacts'
 };
 
 function showModule(id) {
@@ -12621,6 +12676,380 @@ try {
 })();
 } catch (e) {
   console.error('Module pf-dashboard failed to load:', e);
+}
+</script>
+
+<script>
+// ============================================================
+// MODULE: bd-companies — BD CRM (Companies + Contacts + Interactions)
+// Reads the read-only base window.PF_BD_RECORDS (data/bd-records.js) and merges
+// the KV overlay: manual additions via /api/bd-record and interaction logs via
+// /api/bd-interaction. business_dev area — field_ops is server-DENIED both the
+// feed and the endpoints. ALL rendered data passes through window.esc (XSS-safe).
+// ============================================================
+try {
+(function () {
+  'use strict';
+  var E = window.esc || function (s) { return s == null ? '' : String(s); };
+
+  var CHANNELS = ['call', 'email', 'meeting', 'text', 'site visit', 'linkedin', 'event', 'voicemail', 'other'];
+
+  var state = {
+    loaded: false,
+    companies: [],        // merged base + overlay companies
+    selectedId: null,
+    filter: '',
+    ixCache: {},          // entityKey -> items[]
+  };
+
+  function base() { return window.PF_BD_RECORDS || null; }
+
+  // ---- merge base records + KV overlay additions ----
+  function buildMerged(overlay) {
+    var b = base();
+    if (!b) return [];
+    // deep-ish copy of base companies (we only append, never mutate base meaning)
+    var companies = b.companies.map(function (c) {
+      return { id: c.id, fields: c.fields, contacts: c.contacts.slice(), _added: false };
+    });
+    var byId = {};
+    companies.forEach(function (c) { byId[c.id] = c; });
+
+    var ov = overlay || { companies: [], contacts: [] };
+    (ov.companies || []).forEach(function (oc) {
+      if (byId[oc.id]) return;
+      var c = { id: oc.id, fields: oc.fields || {}, contacts: [], _added: true };
+      companies.push(c); byId[oc.id] = c;
+    });
+    (ov.contacts || []).forEach(function (oct) {
+      var c = byId[oct.companyId];
+      if (!c) return;
+      c.contacts.push({ id: oct.id, fields: oct.fields || {}, _added: true });
+    });
+    return companies;
+  }
+
+  function api(path, opts) {
+    return fetch(path, Object.assign({ credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' } }, opts || {}))
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); });
+  }
+
+  function load() {
+    var b = base();
+    var noData = document.getElementById('bdcNoData');
+    var wrap = document.getElementById('bdcWrap');
+    if (!b) {
+      if (noData) noData.style.display = '';
+      if (wrap) wrap.style.display = 'none';
+      return;
+    }
+    if (noData) noData.style.display = 'none';
+    if (wrap) wrap.style.display = '';
+    if (state.loaded) { renderList(); return; }
+    // pull overlay additions (best-effort; base still renders if this fails)
+    api('/api/bd-record').then(function (res) {
+      var ov = (res.ok && res.body) ? res.body : { companies: [], contacts: [] };
+      state.companies = buildMerged(ov);
+      state.loaded = true;
+      wireControls();
+      renderList();
+    }).catch(function () {
+      state.companies = buildMerged(null);
+      state.loaded = true;
+      wireControls();
+      renderList();
+    });
+  }
+
+  function matchCompany(c, f) {
+    if (!f) return true;
+    if (String(c.fields.Name || '').toLowerCase().indexOf(f) >= 0) return true;
+    return c.contacts.some(function (ct) {
+      return String(ct.fields.Name || '').toLowerCase().indexOf(f) >= 0;
+    });
+  }
+
+  function renderList() {
+    var listEl = document.getElementById('bdcCoList');
+    var countEl = document.getElementById('bdcCount');
+    if (!listEl) return;
+    var f = state.filter.toLowerCase();
+    var shown = state.companies.filter(function (c) { return matchCompany(c, f); });
+    shown.sort(function (a, b) {
+      return String(a.fields.Name || '').localeCompare(String(b.fields.Name || ''));
+    });
+    listEl.innerHTML = shown.map(function (c) {
+      var sub = [c.fields.Type, c.fields.City, c.fields.State].filter(Boolean).join(' • ');
+      return '<div class="bdc-co' + (c.id === state.selectedId ? ' active' : '')
+        + '" data-id="' + E(c.id) + '">'
+        + '<div class="nm">' + E(c.fields.Name || '(no name)')
+        + (c._added ? '<span class="bdc-badge">added</span>' : '') + '</div>'
+        + '<div class="sub">' + E(sub) + ' &middot; ' + c.contacts.length + ' contact'
+        + (c.contacts.length === 1 ? '' : 's') + '</div>'
+        + '</div>';
+    }).join('') || '<div class="bdc-co bdc-muted">No matches.</div>';
+    if (countEl) countEl.textContent = shown.length + ' of ' + state.companies.length + ' companies';
+    listEl.querySelectorAll('.bdc-co[data-id]').forEach(function (el) {
+      el.addEventListener('click', function () { selectCompany(this.getAttribute('data-id')); });
+    });
+  }
+
+  function findCompany(id) {
+    for (var i = 0; i < state.companies.length; i++) if (state.companies[i].id === id) return state.companies[i];
+    return null;
+  }
+
+  function selectCompany(id) {
+    state.selectedId = id;
+    renderList();
+    renderDetail();
+  }
+
+  function fieldGrid(fields, order) {
+    var keys = order && order.length ? order : Object.keys(fields);
+    var cells = keys.map(function (k) {
+      var v = fields[k];
+      if (v == null || v === '') return '';
+      if (k === 'Name') return '';
+      return '<div class="bdc-f"><div class="lbl">' + E(k) + '</div><div class="val">' + E(v) + '</div></div>';
+    }).filter(Boolean).join('');
+    return '<div class="bdc-fields">' + cells + '</div>';
+  }
+
+  function renderDetail() {
+    var d = document.getElementById('bdcDetail');
+    if (!d) return;
+    var c = findCompany(state.selectedId);
+    var b = base();
+    if (!c) { d.innerHTML = '<div class="bdc-muted">Select a company to see its details, contacts, and interactions.</div>'; return; }
+    var coFields = (b && b.companyFields) || [];
+    var html = '';
+    html += '<div class="bdc-card">'
+      + '<div class="bdc-h"><h2 style="margin:0">' + E(c.fields.Name || '(no name)')
+      + (c._added ? '<span class="bdc-badge">added</span>' : '') + '</h2></div>'
+      + fieldGrid(c.fields, coFields)
+      + '</div>';
+
+    // Company interactions
+    html += '<div class="bdc-card">'
+      + '<div class="bdc-h"><h3 style="margin:0">Company interactions</h3></div>'
+      + '<div id="bdcCoIx" data-etype="company" data-eid="' + E(c.id) + '"><div class="bdc-muted">Loading…</div></div>'
+      + interactionForm('company', c.id)
+      + '</div>';
+
+    // Contacts
+    var contactsHtml = c.contacts.map(function (ct) {
+      var ctFields = (b && b.contactFields) || [];
+      return '<div class="bdc-contact">'
+        + '<div class="bdc-h"><strong>' + E(ct.fields.Name || '(no name)')
+        + (ct._added ? '<span class="bdc-badge">added</span>' : '') + '</strong>'
+        + '<span class="bdc-muted" style="font-size:12px">' + E([ct.fields.Position, ct.fields.Email].filter(Boolean).join(' • ')) + '</span></div>'
+        + fieldGrid(ct.fields, ctFields)
+        + '<div id="bdcCtIx_' + E(ct.id) + '" data-etype="contact" data-eid="' + E(ct.id) + '"><div class="bdc-muted" style="font-size:12px">Loading interactions…</div></div>'
+        + interactionForm('contact', ct.id)
+        + '</div>';
+    }).join('');
+    html += '<div class="bdc-card">'
+      + '<div class="bdc-h"><h3 style="margin:0">Contacts (' + c.contacts.length + ')</h3>'
+      + '<button type="button" class="btn" id="bdcAddCtBtn">+ Add contact</button></div>'
+      + '<div id="bdcAddCtForm" class="bdc-form" style="display:none"></div>'
+      + (contactsHtml || '<div class="bdc-muted">No contacts yet.</div>')
+      + '</div>';
+
+    d.innerHTML = html;
+
+    // load interaction logs
+    loadInteractions('company', c.id, document.getElementById('bdcCoIx'));
+    c.contacts.forEach(function (ct) {
+      loadInteractions('contact', ct.id, document.getElementById('bdcCtIx_' + ct.id));
+    });
+    wireDetailForms(c);
+  }
+
+  function interactionForm(etype, eid) {
+    var opts = CHANNELS.map(function (ch) { return '<option value="' + E(ch) + '">' + E(ch) + '</option>'; }).join('');
+    var p = 'bdcix_' + etype + '_' + eid;
+    return '<form class="bdc-form" data-ixform="' + E(etype) + '" data-eid="' + E(eid) + '">'
+      + '<input type="date" name="date" aria-label="Date">'
+      + '<input type="text" name="who" placeholder="Who" maxlength="200" aria-label="Who">'
+      + '<select name="channel" aria-label="Channel">' + opts + '</select>'
+      + '<textarea name="note" placeholder="What was discussed" maxlength="2000" aria-label="Note"></textarea>'
+      + '<button type="submit" class="btn">Add interaction</button>'
+      + '<div class="bdc-msg" data-msg></div>'
+      + '</form>';
+  }
+
+  function loadInteractions(etype, eid, mountEl) {
+    if (!mountEl) return;
+    api('/api/bd-interaction?entityType=' + encodeURIComponent(etype) + '&entityId=' + encodeURIComponent(eid))
+      .then(function (res) {
+        var items = (res.ok && res.body && Array.isArray(res.body.items)) ? res.body.items : [];
+        renderInteractions(mountEl, items, etype === 'contact');
+      })
+      .catch(function () { mountEl.innerHTML = '<div class="bdc-muted" style="font-size:12px">Could not load interactions.</div>'; });
+  }
+
+  function renderInteractions(mountEl, items, small) {
+    if (!items.length) {
+      mountEl.innerHTML = '<div class="bdc-muted" style="font-size:' + (small ? '12px' : '13px') + '">No interactions logged yet.</div>';
+      return;
+    }
+    items.sort(function (a, b) { return String(b.date || '').localeCompare(String(a.date || '')); });
+    mountEl.innerHTML = items.map(function (it) {
+      return '<div class="bdc-ix">'
+        + '<div>' + E(it.note) + '</div>'
+        + '<div class="meta">' + E(it.date) + ' &middot; ' + E(it.channel || 'other')
+        + (it.who ? ' &middot; ' + E(it.who) : '')
+        + (it.addedBy ? ' &middot; logged by ' + E(it.addedBy) : '') + '</div>'
+        + '</div>';
+    }).join('');
+  }
+
+  function wireControls() {
+    var search = document.getElementById('bdcSearch');
+    if (search && !search.dataset.wired) {
+      search.dataset.wired = '1';
+      search.addEventListener('input', function () { state.filter = this.value || ''; renderList(); });
+    }
+    var addCoBtn = document.getElementById('bdcAddCoBtn');
+    if (addCoBtn && !addCoBtn.dataset.wired) {
+      addCoBtn.dataset.wired = '1';
+      addCoBtn.addEventListener('click', function () { toggleAddCompanyForm(); });
+    }
+  }
+
+  function companyFieldInputs() {
+    var b = base();
+    var fields = (b && b.companyFields) || ['Name'];
+    return fields.map(function (k) {
+      return '<input type="text" name="' + E(k) + '" placeholder="' + E(k) + '" maxlength="500"'
+        + (k === 'Name' ? ' required' : '') + ' aria-label="' + E(k) + '">';
+    }).join('');
+  }
+
+  function contactFieldInputs() {
+    var b = base();
+    var fields = (b && b.contactFields) || ['Name'];
+    return fields.map(function (k) {
+      return '<input type="text" name="' + E(k) + '" placeholder="' + E(k) + '" maxlength="500"'
+        + (k === 'Name' ? ' required' : '') + ' aria-label="' + E(k) + '">';
+    }).join('');
+  }
+
+  function toggleAddCompanyForm() {
+    var f = document.getElementById('bdcAddCoForm');
+    if (!f) return;
+    if (f.style.display === 'none' || !f.innerHTML) {
+      f.innerHTML = companyFieldInputs()
+        + '<button type="button" class="btn" id="bdcSaveCo">Save company</button>'
+        + '<div class="bdc-msg" data-msg></div>';
+      f.style.display = '';
+      var save = document.getElementById('bdcSaveCo');
+      save.addEventListener('click', function () { saveCompany(f); });
+    } else {
+      f.style.display = 'none';
+    }
+  }
+
+  function collectFields(formEl) {
+    var out = {};
+    formEl.querySelectorAll('input[name], select[name], textarea[name]').forEach(function (el) {
+      if (el.name) out[el.name] = el.value;
+    });
+    return out;
+  }
+
+  function msg(formEl, text, ok) {
+    var m = formEl.querySelector('[data-msg]');
+    if (m) { m.textContent = text; m.className = 'bdc-msg ' + (ok ? 'bdc-ok' : 'bdc-err'); }
+  }
+
+  function saveCompany(formEl) {
+    var b = base();
+    var fields = collectFields(formEl);
+    if (!fields.Name || !fields.Name.trim()) { msg(formEl, 'A company name is required.', false); return; }
+    api('/api/bd-record', { method: 'POST', body: JSON.stringify({
+      kind: 'company', fields: fields, allow: (b && b.companyFields) || ['Name'] }) })
+      .then(function (res) {
+        if (!res.ok || !res.body || !res.body.saved) { msg(formEl, (res.body && res.body.message) || 'Save failed.', false); return; }
+        var rec = res.body.record;
+        var c = { id: rec.id, fields: rec.fields, contacts: [], _added: true };
+        state.companies.push(c);
+        formEl.style.display = 'none';
+        renderList();
+        selectCompany(c.id);
+      })
+      .catch(function () { msg(formEl, 'Network error saving company.', false); });
+  }
+
+  function wireDetailForms(company) {
+    var addCtBtn = document.getElementById('bdcAddCtBtn');
+    if (addCtBtn) {
+      addCtBtn.addEventListener('click', function () {
+        var f = document.getElementById('bdcAddCtForm');
+        if (!f) return;
+        if (f.style.display === 'none' || !f.innerHTML) {
+          f.innerHTML = contactFieldInputs()
+            + '<button type="button" class="btn" id="bdcSaveCt">Save contact</button>'
+            + '<div class="bdc-msg" data-msg></div>';
+          f.style.display = '';
+          document.getElementById('bdcSaveCt').addEventListener('click', function () { saveContact(f, company); });
+        } else { f.style.display = 'none'; }
+      });
+    }
+    // interaction forms (company + each contact)
+    document.querySelectorAll('form[data-ixform]').forEach(function (form) {
+      form.addEventListener('submit', function (ev) {
+        ev.preventDefault();
+        submitInteraction(form);
+      });
+    });
+  }
+
+  function saveContact(formEl, company) {
+    var b = base();
+    var fields = collectFields(formEl);
+    if (!fields.Name || !fields.Name.trim()) { msg(formEl, 'A contact name is required.', false); return; }
+    api('/api/bd-record', { method: 'POST', body: JSON.stringify({
+      kind: 'contact', companyId: company.id, fields: fields, allow: (b && b.contactFields) || ['Name'] }) })
+      .then(function (res) {
+        if (!res.ok || !res.body || !res.body.saved) { msg(formEl, (res.body && res.body.message) || 'Save failed.', false); return; }
+        var rec = res.body.record;
+        company.contacts.push({ id: rec.id, fields: rec.fields, _added: true });
+        renderList();
+        renderDetail();
+      })
+      .catch(function () { msg(formEl, 'Network error saving contact.', false); });
+  }
+
+  function submitInteraction(formEl) {
+    var etype = formEl.getAttribute('data-ixform');
+    var eid = formEl.getAttribute('data-eid');
+    var fields = collectFields(formEl);
+    if (!fields.note || !fields.note.trim()) { msg(formEl, 'A note is required.', false); return; }
+    api('/api/bd-interaction', { method: 'POST', body: JSON.stringify({
+      entityType: etype, entityId: eid, date: fields.date, who: fields.who,
+      channel: fields.channel, note: fields.note }) })
+      .then(function (res) {
+        if (!res.ok || !res.body || !res.body.saved) { msg(formEl, (res.body && res.body.message) || 'Save failed.', false); return; }
+        msg(formEl, 'Interaction added.', true);
+        formEl.reset();
+        var mountId = etype === 'company' ? 'bdcCoIx' : ('bdcCtIx_' + eid);
+        renderInteractions(document.getElementById(mountId), res.body.items || [], etype === 'contact');
+      })
+      .catch(function () { msg(formEl, 'Network error saving interaction.', false); });
+  }
+
+  // Activate on module entry (chain the existing showModule).
+  var prev = window.showModule;
+  window.showModule = function (id) {
+    if (typeof prev === 'function') prev(id);
+    if (id === 'bd-companies') { load(); }
+  };
+})();
+} catch (e) {
+  console.error('Module bd-companies failed to load:', e);
 }
 </script>
 </body>
