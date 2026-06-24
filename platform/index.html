@@ -1321,6 +1321,70 @@ body.role-field-ops .nav-item[data-fo-hide] {
 .pr-link:hover { background: var(--accent); color: #fff; }
 .pr-link.missing { background: var(--bg-2); color: var(--text-3); border: 1px dashed var(--border); cursor: not-allowed; }
 .pr-empty-note { font-size: 0.84rem; color: var(--text-3); font-style: italic; }
+
+/* ---- PF DASHBOARD (company-wide KPI view) ---- */
+.pfdash-wrap { padding: 4px 2px 32px; }
+.pfdash-toolbar {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 14px;
+  margin-bottom: 18px;
+}
+.pfdash-period-toggle {
+  display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius);
+  overflow: hidden; background: var(--bg-0);
+}
+.pfdash-pbtn {
+  appearance: none; border: 0; background: transparent; cursor: pointer;
+  padding: 8px 16px; font-size: 0.86rem; font-weight: 600; color: var(--text-2);
+  border-right: 1px solid var(--border-light);
+}
+.pfdash-pbtn:last-child { border-right: 0; }
+.pfdash-pbtn:hover { background: var(--bg-2); color: var(--text-1); }
+.pfdash-pbtn.active { background: var(--accent); color: #fff; }
+.pfdash-pbtn:disabled { color: var(--text-3); cursor: not-allowed; background: var(--bg-1); }
+.pfdash-scope {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 0.86rem; color: var(--text-2);
+}
+.pfdash-scope select {
+  padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 0.86rem; background: var(--bg-0); color: var(--text-1);
+}
+.pfdash-meta { margin-left: auto; font-size: 0.78rem; color: var(--text-3); text-align: right; }
+.pfdash-banner {
+  background: var(--amber-light); color: #92580a; border: 1px solid #f1d18a;
+  border-left: 3px solid var(--amber); border-radius: 6px;
+  padding: 10px 14px; font-size: 0.84rem; margin-bottom: 16px;
+}
+.pfdash-cards {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 14px; margin-bottom: 22px;
+}
+.pfdash-card {
+  background: var(--bg-0); border: 1px solid var(--border-light);
+  border-top: 3px solid var(--accent); border-radius: var(--radius);
+  padding: 14px 16px; box-shadow: var(--shadow-sm);
+}
+.pfdash-card .k-label { font-size: 0.74rem; color: var(--text-2); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+.pfdash-card .k-value { font-size: 1.5rem; font-weight: 700; color: var(--text-0); margin: 6px 0 2px; }
+.pfdash-card .k-sub { font-size: 0.78rem; color: var(--text-3); }
+.pfdash-card .k-delta { font-size: 0.8rem; font-weight: 600; margin-top: 4px; }
+.pfdash-card .k-delta.pos { color: var(--green); }
+.pfdash-card .k-delta.neg { color: var(--red); }
+.pfdash-card .k-delta.flat { color: var(--text-3); }
+.pfdash-tablewrap { overflow-x: auto; border: 1px solid var(--border-light); border-radius: var(--radius); }
+.pfdash-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; background: var(--bg-0); }
+.pfdash-table th, .pfdash-table td { padding: 9px 14px; text-align: right; white-space: nowrap; }
+.pfdash-table thead th {
+  background: var(--bg-2); color: var(--text-2); font-weight: 600;
+  border-bottom: 2px solid var(--accent); position: sticky; top: 0;
+}
+.pfdash-table th.metric-col, .pfdash-table td.metric-col { text-align: left; font-weight: 600; color: var(--text-1); }
+.pfdash-table tbody tr { border-bottom: 1px solid var(--border-light); }
+.pfdash-table tbody tr:hover { background: var(--bg-1); }
+.pfdash-table tbody tr.section-fin td { background: var(--bg-1); }
+.pfdash-table td.num-pos { color: var(--green); font-weight: 600; }
+.pfdash-table td.num-neg { color: var(--red); font-weight: 600; }
+.pfdash-table td.num-na { color: var(--text-3); }
 </style>
 </head>
 <body>
@@ -1370,7 +1434,8 @@ body.role-field-ops .nav-item[data-fo-hide] {
     '/data/budget-actual-poet.js',
     '/data/awarded-projects.js',
     '/data/precon-pipeline.js',
-    '/data/pf-coi.js'
+    '/data/pf-coi.js',
+    '/data/pf-dashboard.js'      // company-wide monthly KPI dashboard (financials_global)
   ];
 
   // Determine role (fail closed to a non-privileged role on any error).
@@ -1397,7 +1462,8 @@ body.role-field-ops .nav-item[data-fo-hide] {
   if (isPrivileged) {
     feeds.push('/data/project-record-poet.js', '/data/project-records.js',
                '/data/budget-actual-poet.js', '/data/awarded-projects.js',
-               '/data/precon-pipeline.js', '/data/pf-coi.js');
+               '/data/precon-pipeline.js', '/data/pf-coi.js',
+               '/data/pf-dashboard.js');
   } else {
     // field_ops: the project LIST comes from the field-safe derivative (no $),
     // NOT the sensitive awarded-projects.js / project-record-poet.js feeds.
@@ -2286,7 +2352,30 @@ document.addEventListener('click', function(e) {
   </div>
 
   <div class="module-view" id="mod-pf-dashboard">
-    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9707;</div><h2>PF Dashboard</h2><p>Coming in a later release.</p></div>
+    <!-- Company-wide KPI dashboard. Renders from window.PF_DASHBOARD
+         (data/pf-dashboard.js, built by sync/build-pf-dashboard.py from the
+         "PF Dashboard" tab of the PF Project Master). financials_global —
+         OWNERS ONLY (admin/partner); the feed is server-DENIED to BD + field. -->
+    <div class="pfdash-wrap">
+      <div class="pfdash-toolbar">
+        <div class="pfdash-period-toggle" id="pfdashPeriodToggle" role="tablist" aria-label="Time period">
+          <button type="button" class="pfdash-pbtn" data-period="week">Week</button>
+          <button type="button" class="pfdash-pbtn" data-period="month">Month</button>
+          <button type="button" class="pfdash-pbtn active" data-period="quarter">Quarter</button>
+          <button type="button" class="pfdash-pbtn" data-period="annual">Annual</button>
+        </div>
+        <div class="pfdash-scope" id="pfdashScope"></div>
+        <div class="pfdash-meta" id="pfdashMeta"></div>
+      </div>
+      <div class="pfdash-banner" id="pfdashBanner" style="display:none"></div>
+      <div class="pfdash-cards" id="pfdashCards"></div>
+      <div class="pfdash-tablewrap">
+        <table class="pfdash-table" id="pfdashTable">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
 </main>
@@ -12050,6 +12139,307 @@ try {
     applyFieldOpsUI();
   }
 })();
+</script>
+
+<script>
+// ============================================================
+// MODULE: pf-dashboard — company-wide KPI dashboard
+// Renders #mod-pf-dashboard from window.PF_DASHBOARD
+// (data/pf-dashboard.js). financials_global: the feed is server-DENIED to
+// business_dev + field_ops, so PF_DASHBOARD is simply undefined for them and we
+// render a "no access / no data" state (the server is the real boundary).
+//
+// REUSABLE COMPONENT: window.PFDashboard.render(mountIds, dataset, opts) draws
+// the period toggle + KPI cards + KPI table from ANY dataset shaped like
+// PF_DASHBOARD (monthOrder/quarters/months/metricsMeta). Section dashboards
+// (BD / Precon / PM / Financials) can mount their own feed the same way.
+// ============================================================
+try {
+(function () {
+  'use strict';
+  var E = window.esc || function (s) { return s == null ? '' : String(s); };
+
+  // ---- formatters ----
+  function money(v) {
+    if (v == null) return null;
+    v = +v || 0;
+    var neg = v < 0; v = Math.abs(v);
+    var s;
+    if (v >= 1000000) s = '$' + (v / 1000000).toFixed(2) + 'M';
+    else if (v >= 1000) s = '$' + (v / 1000).toFixed(0) + 'K';
+    else s = '$' + Math.round(v).toLocaleString();
+    return neg ? '-' + s : s;
+  }
+  function moneyFull(v) {
+    if (v == null) return null;
+    var neg = (+v) < 0;
+    var s = '$' + Math.round(Math.abs(+v || 0)).toLocaleString();
+    return neg ? '-' + s : s;
+  }
+  function pct(v) { return v == null ? null : (v * 100).toFixed(1) + '%'; }
+  function count(v) { return v == null ? null : String(Math.round(v)); }
+
+  // Format a metric's primary "value" by its type.
+  function fmtPrimary(row) {
+    if (row.type === 'pct') return pct(row.amtActual);
+    if (row.type === 'money_only') return money(row.amtActual);
+    // count / count_money -> headline is the quantity
+    return count(row.qtyActual);
+  }
+  function fmtPrimaryFull(row) {
+    if (row.type === 'pct') return pct(row.amtActual);
+    if (row.type === 'money_only') return moneyFull(row.amtActual);
+    return count(row.qtyActual);
+  }
+  // Secondary line (goal/budget context).
+  function fmtSecondary(row) {
+    if (row.type === 'count') {
+      return row.qtyGoal == null ? '' : 'Goal ' + count(row.qtyGoal);
+    }
+    if (row.type === 'count_money') {
+      var parts = [];
+      if (row.qtyGoal != null) parts.push('Goal ' + count(row.qtyGoal));
+      if (row.amtActual != null) parts.push(money(row.amtActual) + ' vs ' + money(row.amtBudget) + ' bud');
+      return parts.join(' • ');
+    }
+    if (row.type === 'pct') {
+      return row.amtBudget == null ? '' : 'Target ' + pct(row.amtBudget);
+    }
+    // money_only
+    return row.amtBudget == null ? '' : 'Budget ' + money(row.amtBudget);
+  }
+
+  // ---- rollup: sum a set of months into one synthetic "row set" ----
+  // counts/$ are summed; percentages are recomputed where derivable, else averaged.
+  function rollup(ds, monthNames) {
+    var meta = ds.metricsMeta;
+    var acc = {};
+    meta.forEach(function (m) {
+      acc[m.metric] = {
+        metric: m.metric, type: m.type,
+        qtyActual: null, qtyGoal: null, amtActual: null, amtBudget: null, delta: null,
+        _pctA: [], _pctB: []
+      };
+    });
+    monthNames.forEach(function (mn) {
+      var mo = ds.months[mn];
+      if (!mo) return;
+      mo.rows.forEach(function (r) {
+        var a = acc[r.metric];
+        if (!a) return;
+        if (r.type === 'pct') {
+          if (r.amtActual != null) a._pctA.push(r.amtActual);
+          if (r.amtBudget != null) a._pctB.push(r.amtBudget);
+          // qty side of a pct metric (if any) still sums
+          a.qtyActual = addN(a.qtyActual, r.qtyActual);
+          a.qtyGoal = addN(a.qtyGoal, r.qtyGoal);
+        } else {
+          a.qtyActual = addN(a.qtyActual, r.qtyActual);
+          a.qtyGoal = addN(a.qtyGoal, r.qtyGoal);
+          a.amtActual = addN(a.amtActual, r.amtActual);
+          a.amtBudget = addN(a.amtBudget, r.amtBudget);
+        }
+      });
+    });
+    // finalize pct + delta
+    return meta.map(function (m) {
+      var a = acc[m.metric];
+      if (a.type === 'pct') {
+        a.amtActual = avg(a._pctA);
+        a.amtBudget = avg(a._pctB);
+        a.delta = (a.amtActual != null && a.amtBudget != null) ? (a.amtActual - a.amtBudget) : null;
+      } else {
+        a.delta = (a.amtActual != null && a.amtBudget != null) ? (a.amtActual - a.amtBudget)
+                : (a.qtyActual != null && a.qtyGoal != null) ? (a.qtyActual - a.qtyGoal) : null;
+      }
+      delete a._pctA; delete a._pctB;
+      return a;
+    });
+  }
+  function addN(acc, v) { if (v == null) return acc; return (acc == null ? 0 : acc) + v; }
+  function avg(arr) { if (!arr.length) return null; return arr.reduce(function (s, x) { return s + x; }, 0) / arr.length; }
+
+  // ---- delta classification for color ----
+  function deltaClass(row) {
+    var d = row.delta;
+    if (d == null || d === 0) return 'flat';
+    return d > 0 ? 'pos' : 'neg';
+  }
+  function deltaText(row) {
+    var d = row.delta;
+    if (d == null) return '';
+    var sign = d > 0 ? '+' : '';
+    if (row.type === 'pct') return sign + (d * 100).toFixed(1) + ' pts';
+    if (row.type === 'count') return sign + Math.round(d);
+    return sign + money(d);
+  }
+
+  // KPI cards shown at top (the headline metrics).
+  var CARD_METRICS = ['Bids Sent', 'Projects Awarded (LOI)', 'Net Monthly Income', 'Net Monthly Margin'];
+
+  // ---- render one dataset into the mount nodes ----
+  function render(dataset, period, scopeKey) {
+    var cards = document.getElementById('pfdashCards');
+    var thead = document.querySelector('#pfdashTable thead');
+    var tbody = document.querySelector('#pfdashTable tbody');
+    var banner = document.getElementById('pfdashBanner');
+    var meta = document.getElementById('pfdashMeta');
+    var scopeBox = document.getElementById('pfdashScope');
+    if (!cards || !tbody) return;
+
+    if (!dataset || !dataset.months) {
+      cards.innerHTML = '';
+      thead.innerHTML = '';
+      tbody.innerHTML = '<tr><td class="metric-col">No dashboard data available for your role.</td></tr>';
+      banner.style.display = 'none';
+      meta.textContent = '';
+      scopeBox.innerHTML = '';
+      return;
+    }
+
+    // sync note
+    meta.innerHTML = 'Source: ' + E(dataset.sourceFile) + ' • ' + E(dataset.sourceTab)
+      + '<br>Synced ' + E((dataset.syncedAt || '').replace('T', ' ').replace('Z', ' UTC'));
+
+    // ---- WEEK: the source sheet has no weekly granularity ----
+    if (period === 'week') {
+      banner.style.display = '';
+      banner.textContent = 'The PF Dashboard tab tracks data MONTHLY. No weekly breakdown exists '
+        + 'in the source sheet, so the weekly view has no data. Add a weekly feed to enable this period.';
+      scopeBox.innerHTML = '';
+      cards.innerHTML = '';
+      thead.innerHTML = '';
+      tbody.innerHTML = '<tr><td class="metric-col">No weekly data in source.</td></tr>';
+      return;
+    }
+
+    // template-data warning (months are identical seed values)
+    if (dataset.isTemplateData) {
+      banner.style.display = '';
+      banner.textContent = 'Heads up: the PF Dashboard tab currently holds identical placeholder values '
+        + 'across all months (template not yet filled with real monthly actuals). Numbers below reflect '
+        + 'the sheet as-is.';
+    } else {
+      banner.style.display = 'none';
+    }
+
+    // ---- build scope selector + the row set for this period ----
+    var rows, scopeLabel, scopeOptions = '';
+    var monthsAvail = dataset.monthOrder.filter(function (m) { return dataset.monthHasData[m]; });
+
+    if (period === 'annual') {
+      rows = rollup(dataset, monthsAvail);
+      scopeLabel = dataset.year + ' — Full Year';
+      scopeBox.innerHTML = '<strong>' + E(scopeLabel) + '</strong> '
+        + '<span style="color:var(--text-3)">(' + monthsAvail.length + ' months)</span>';
+    } else if (period === 'quarter') {
+      var qKeys = Object.keys(dataset.quarters);
+      // default to a quarter that has data
+      if (!scopeKey || qKeys.indexOf(scopeKey) < 0) {
+        scopeKey = qKeys.filter(function (q) {
+          return dataset.quarters[q].some(function (m) { return dataset.monthHasData[m]; });
+        })[0] || qKeys[0];
+      }
+      qKeys.forEach(function (q) {
+        var has = dataset.quarters[q].some(function (m) { return dataset.monthHasData[m]; });
+        scopeOptions += '<option value="' + q + '"' + (q === scopeKey ? ' selected' : '')
+          + (has ? '' : ' disabled') + '>' + q + ' ' + dataset.year + (has ? '' : ' (no data)') + '</option>';
+      });
+      var qMonths = dataset.quarters[scopeKey].filter(function (m) { return dataset.monthHasData[m]; });
+      rows = rollup(dataset, qMonths);
+      scopeBox.innerHTML = '<label>Quarter <select id="pfdashScopeSel">' + scopeOptions + '</select></label>';
+    } else { // month
+      if (!scopeKey || monthsAvail.indexOf(scopeKey) < 0) scopeKey = monthsAvail[0] || dataset.monthOrder[0];
+      dataset.monthOrder.forEach(function (m) {
+        var has = dataset.monthHasData[m];
+        scopeOptions += '<option value="' + m + '"' + (m === scopeKey ? ' selected' : '')
+          + (has ? '' : ' disabled') + '>' + m + ' ' + dataset.year + (has ? '' : ' (no data)') + '</option>';
+      });
+      rows = (dataset.months[scopeKey] || { rows: [] }).rows;
+      scopeBox.innerHTML = '<label>Month <select id="pfdashScopeSel">' + scopeOptions + '</select></label>';
+    }
+
+    // wire scope selector
+    var sel = document.getElementById('pfdashScopeSel');
+    if (sel) sel.addEventListener('change', function () { render(dataset, period, this.value); });
+
+    // ---- KPI cards ----
+    var byName = {}; rows.forEach(function (r) { byName[r.metric] = r; });
+    var cardHtml = CARD_METRICS.map(function (name) {
+      var r = byName[name]; if (!r) return '';
+      var val = fmtPrimary(r); if (val == null) val = '—';
+      var dCls = deltaClass(r), dTxt = deltaText(r);
+      return '<div class="pfdash-card">'
+        + '<div class="k-label">' + E(name) + '</div>'
+        + '<div class="k-value">' + E(val) + '</div>'
+        + '<div class="k-sub">' + E(fmtSecondary(r) || '') + '</div>'
+        + (dTxt ? '<div class="k-delta ' + dCls + '">' + E(dTxt) + ' vs ' + (r.type === 'count' ? 'goal' : 'budget') + '</div>' : '')
+        + '</div>';
+    }).join('');
+    cards.innerHTML = cardHtml;
+
+    // ---- full KPI table ----
+    thead.innerHTML = '<tr>'
+      + '<th class="metric-col">Metric</th>'
+      + '<th>Actual</th><th>Goal / Budget</th><th>Delta</th>'
+      + '</tr>';
+    var FIN_START = 'Monthly Income'; // visually group the financial block
+    var inFin = false;
+    tbody.innerHTML = rows.map(function (r) {
+      if (r.metric === FIN_START) inFin = true;
+      var actual = fmtPrimaryFull(r);
+      var goalBud;
+      if (r.type === 'count') goalBud = count(r.qtyGoal);
+      else if (r.type === 'count_money') goalBud = (count(r.qtyGoal) || '—') + ' / ' + (money(r.amtBudget) || '—');
+      else if (r.type === 'pct') goalBud = pct(r.amtBudget);
+      else goalBud = moneyFull(r.amtBudget);
+      var dTxt = deltaText(r);
+      var dCls = r.delta == null ? '' : (r.delta > 0 ? 'num-pos' : r.delta < 0 ? 'num-neg' : '');
+      return '<tr' + (inFin ? ' class="section-fin"' : '') + '>'
+        + '<td class="metric-col">' + E(r.metric) + '</td>'
+        + '<td' + (actual == null ? ' class="num-na"' : '') + '>' + E(actual == null ? 'N/A' : actual) + '</td>'
+        + '<td' + (goalBud == null ? ' class="num-na"' : '') + '>' + E(goalBud == null ? '—' : goalBud) + '</td>'
+        + '<td class="' + dCls + '">' + E(dTxt || '—') + '</td>'
+        + '</tr>';
+    }).join('');
+  }
+
+  // ---- public component API (reusable for section dashboards) ----
+  window.PFDashboard = {
+    render: function (dataset, period, scopeKey) { render(dataset, period || 'quarter', scopeKey); },
+    rollup: rollup
+  };
+
+  // ---- internal state + wiring for the PF (company) dashboard ----
+  var state = { period: 'quarter', scope: null };
+  function draw() {
+    render(window.PF_DASHBOARD, state.period, state.scope);
+  }
+  function wireToggle() {
+    var tg = document.getElementById('pfdashPeriodToggle');
+    if (!tg || tg.dataset.wired) return;
+    tg.dataset.wired = '1';
+    tg.querySelectorAll('.pfdash-pbtn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        tg.querySelectorAll('.pfdash-pbtn').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        state.period = btn.dataset.period;
+        state.scope = null; // reset scope when period changes
+        draw();
+      });
+    });
+  }
+
+  // Render on first activation of the module (and keep it fresh on re-entry).
+  var prev = window.showModule;
+  window.showModule = function (id) {
+    if (typeof prev === 'function') prev(id);
+    if (id === 'pf-dashboard') { wireToggle(); draw(); }
+  };
+})();
+} catch (e) {
+  console.error('Module pf-dashboard failed to load:', e);
+}
 </script>
 </body>
 </html>

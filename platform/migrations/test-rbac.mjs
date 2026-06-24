@@ -381,6 +381,7 @@ const BD_BLOCKED_DATA = [
   '/data/pf-coi.js',            // company insurance
   '/data/insurance-baseline.js',// company insurance baseline
   '/data/estimate-template.json',// company estimating template
+  '/data/pf-dashboard.js',      // company-wide monthly KPI/financial dashboard
 ];
 for (const p of BD_BLOCKED_DATA) {
   const area = areaForPath(p);
@@ -445,6 +446,23 @@ ok('partner -> projects-data.js (global) ALLOWED',
    roleCanAccess('partner', areaForPath('/data/projects-data.js')) === true);
 ok('field_ops -> projects-data.js (global) DENIED',
    roleCanAccess('field_ops', areaForPath('/data/projects-data.js')) === false);
+
+// --- PF DASHBOARD: company-wide KPI feed is financials_global (owners only) ---
+section('PF Dashboard feed: /data/pf-dashboard.js -> financials_global (OWNERS ONLY)');
+ok('/data/pf-dashboard.js -> financials_global',
+   areaForPath('/data/pf-dashboard.js') === 'financials_global');
+ok('pf-dashboard.js ALLOWED for admin',
+   roleCanAccess('admin', areaForPath('/data/pf-dashboard.js')) === true);
+ok('pf-dashboard.js ALLOWED for partner',
+   roleCanAccess('partner', areaForPath('/data/pf-dashboard.js')) === true);
+ok('pf-dashboard.js BLOCKED for business_dev',
+   roleCanAccess('business_dev', areaForPath('/data/pf-dashboard.js')) === false);
+ok('pf-dashboard.js BLOCKED for field_ops',
+   roleCanAccess('field_ops', areaForPath('/data/pf-dashboard.js')) === false);
+ok('requireArea(business_dev, pf-dashboard area) => 403',
+   requireArea({ uid: 'bd', role: 'business_dev', name: 'BD' }, areaForPath('/data/pf-dashboard.js'))?.status === 403);
+ok('requireArea(field_ops, pf-dashboard area) => 403',
+   requireArea({ uid: 'fo', role: 'field_ops', name: 'Crew' }, areaForPath('/data/pf-dashboard.js'))?.status === 403);
 
 // --- summary ----------------------------------------------------------------
 console.log(`\n${'='.repeat(48)}`);

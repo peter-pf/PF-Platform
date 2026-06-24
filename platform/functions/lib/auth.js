@@ -354,6 +354,7 @@ const DATA_FILE_AREAS = {
   '/data/pf-coi.js':               'financials_global', // GLOBAL: company insurance policy/broker detail
   '/data/insurance-baseline.js':   'financials_global', // GLOBAL: company policy limits/carriers
   '/data/estimate-template.json':  'financials_global', // GLOBAL: company estimating template (cost/amount basis)
+  '/data/pf-dashboard.js':         'financials_global', // GLOBAL: company-wide monthly KPI/financial dashboard (income/expenses/margins/cash) — OWNERS ONLY
   // bid-log.json: BD domain (opportunities) BUT carries per-row margins + GC
   // financial contacts across ALL bids (company-wide bid economics). Classified
   // CONSERVATIVELY as financials_global (BD BLOCKED) per the spec — BD reaches
