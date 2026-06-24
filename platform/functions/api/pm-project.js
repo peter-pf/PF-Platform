@@ -80,9 +80,19 @@ function nextNumber(yy, takenNs) {
   return yy + '-' + String(next).padStart(3, '0');
 }
 
-// Current 2-digit year (UTC).
+// Current 2-digit year in PF's local time (Eastern / Indiana). A project number
+// is a human-meaningful job number, so it must follow Brad's calendar, not UTC.
+// (A UTC clock would mint next year's number on the evening of Dec 31 Eastern.)
 function currentYY() {
-  return String(new Date().getUTCFullYear()).slice(-2);
+  let y;
+  try {
+    y = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York', year: 'numeric',
+    }).format(new Date());
+  } catch (e) {
+    y = String(new Date().getUTCFullYear());
+  }
+  return String(y).slice(-2);
 }
 
 // KNOWN LIMITATION: KV read-modify-write (load -> assign number -> put), no
