@@ -164,17 +164,61 @@ def build(xlsx_bytes):
     populated = [m for m in MONTH_ORDER if month_has_data[m]]
     is_template = len(populated) > 1 and len({sig(m) for m in populated}) == 1
 
-    out = {
+    metrics_meta = [{'metric': n, 'type': t} for (_, n, t) in METRICS]
+
+    # The populated year (the tab we just parsed).
+    populated_year = {
         'year': year,
-        'sourceFile': SOURCE_FILE,
-        'sourceTab': SOURCE_TAB,
-        'syncedAt': datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'),
         'isTemplateData': is_template,   # true => months are identical seed values
         'monthOrder': MONTH_ORDER,
         'quarters': QUARTERS,
         'monthHasData': month_has_data,
-        'metricsMeta': [{'metric': n, 'type': t} for (_, n, t) in METRICS],
+        'metricsMeta': metrics_meta,
         'months': months,
+    }
+
+    # MULTI-YEAR MAP (PF started 2024). Cross-year compare needs a years map; the
+    # ONLY monthly-KPI source today is the single "PF Dashboard" tab (its year).
+    # Prior years with no source are EMPTY placeholders (monthHasData all False);
+    # they light up automatically once a prior-year KPI source is added. We do NOT
+    # fabricate prior-year numbers.
+    def empty_year(yy):
+        emonths = {m: {'rows': [{'metric': n, 'type': t, 'qtyActual': None,
+                                 'qtyGoal': None, 'amtActual': None, 'amtBudget': None,
+                                 'delta': None} for (_, n, t) in METRICS]}
+                   for m in MONTH_ORDER}
+        return {
+            'year': yy,
+            'isTemplateData': False,
+            'monthOrder': MONTH_ORDER,
+            'quarters': QUARTERS,
+            'monthHasData': {m: False for m in MONTH_ORDER},
+            'metricsMeta': metrics_meta,
+            'months': emonths,
+        }
+
+    years = {}
+    for yy in ('2024', '2025', '2026'):
+        years[yy] = populated_year if str(yy) == str(year) else empty_year(int(yy))
+    # If the parsed year is outside 2024-2026 (future), still include it.
+    if str(year) not in years:
+        years[str(year)] = populated_year
+
+    out = {
+        'year': year,
+        'sourceFile': SOURCE_FILE,
+        'sourceTab': SOURCE_TAB,
+        'syncedAt': datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+        'isTemplateData': is_template,   # true => months are identical seed values
+        # Top-level fields point at the CURRENT (parsed) year so the existing
+        # Week/Month/Quarter/YTD/Annual views work unchanged.
+        'monthOrder': MONTH_ORDER,
+        'quarters': QUARTERS,
+        'monthHasData': month_has_data,
+        'metricsMeta': metrics_meta,
+        'months': months,
+        # Multi-year map for the cross-year compare view.
+        'years': years,
     }
     return out
 

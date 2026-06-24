@@ -1342,9 +1342,10 @@ body.role-field-ops .nav-item[data-fo-hide] {
 .pfdash-pbtn.active { background: var(--accent); color: #fff; }
 .pfdash-pbtn:disabled { color: var(--text-3); cursor: not-allowed; background: var(--bg-1); }
 .pfdash-cmpmonths { margin: 8px 0 4px; }
-.pfdash-cmpbar { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+.pfdash-cmpbar { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin-bottom: 4px; }
 .pfdash-cmpbox { font-size: 0.82rem; color: var(--text-2); display: inline-flex; align-items: center; gap: 4px; }
 .pfdash-cmpbox.nodata { color: var(--text-3); }
+.pfdash-cmplabel { font-size: 0.78rem; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.03em; }
 .pfdash-scope {
   display: inline-flex; align-items: center; gap: 8px;
   font-size: 0.86rem; color: var(--text-2);
@@ -12965,73 +12966,127 @@ try {
     if (opts.cmpMode && period === 'compare') {
       banner.style.display = 'none';
       scopeBox.innerHTML = '';
-      var withData = dataset.monthOrder.filter(function (m) { return dataset.monthHasData[m]; });
-      // selected months: scopeKey is a comma-joined list; default to months with data.
-      var selected;
-      if (typeof scopeKey === 'string' && scopeKey.length) {
-        selected = scopeKey.split(',').filter(function (m) { return dataset.monthOrder.indexOf(m) >= 0; });
-      } else {
-        selected = withData.slice();
+      // Multi-year map (build-pf-dashboard emits dataset.years). Fall back to a
+      // single-year map built from the top-level fields if an older feed is live.
+      var YEARS = (opts.cmpYears || ['2024', '2025', '2026']);
+      var yearsMap = dataset.years || {};
+      if (!dataset.years) {
+        yearsMap = {}; yearsMap[String(dataset.year)] = dataset;
       }
-      // month multi-select control
+      function yObj(y) { return yearsMap[String(y)] || null; }
+      function yHasData(y) {
+        var yd = yObj(y);
+        return !!(yd && yd.monthOrder.some(function (m) { return yd.monthHasData[m]; }));
+      }
+      var MORDER = dataset.monthOrder;
+
+      // ---- parse scopeKey: "years=2026,2025;periods=June,Annual" ----
+      // periods are month names and/or the literal "Annual". Defaults: the current
+      // year + all of its months (the original within-year behavior).
+      var selYears = [], selPeriods = [];
+      if (typeof scopeKey === 'string' && scopeKey.indexOf('years=') >= 0) {
+        scopeKey.split(';').forEach(function (part) {
+          var kv = part.split('=');
+          if (kv[0] === 'years') selYears = kv[1] ? kv[1].split(',').filter(Boolean) : [];
+          if (kv[0] === 'periods') selPeriods = kv[1] ? kv[1].split(',').filter(Boolean) : [];
+        });
+      }
+      if (!selYears.length) selYears = [String(dataset.year)];
+      if (!selPeriods.length) {
+        var cy = yObj(dataset.year);
+        selPeriods = cy ? cy.monthOrder.filter(function (m) { return cy.monthHasData[m]; }) : [];
+      }
+      function buildScope(yrs, pds) { return 'years=' + yrs.join(',') + ';periods=' + pds.join(','); }
+
+      // ---- controls: year multi-select + month checkboxes + Annual + Select all ----
       if (cmpMonthsEl) {
         cmpMonthsEl.style.display = '';
-        var allOn = withData.length > 0 && withData.every(function (m) { return selected.indexOf(m) >= 0; });
-        var boxes = dataset.monthOrder.map(function (m) {
-          var has = dataset.monthHasData[m];
-          var on = selected.indexOf(m) >= 0;
+        var yearBoxes = YEARS.map(function (y) {
+          var has = yHasData(y);
+          var on = selYears.indexOf(y) >= 0;
           return '<label class="pfdash-cmpbox' + (has ? '' : ' nodata') + '">'
-            + '<input type="checkbox" data-cmpm="' + E(m) + '"' + (on ? ' checked' : '') + (has ? '' : ' disabled') + '> '
-            + E(m.slice(0, 3)) + (has ? '' : ' (no data)') + '</label>';
+            + '<input type="checkbox" data-cmpy="' + E(y) + '"' + (on ? ' checked' : '') + (has ? '' : ' disabled') + '> '
+            + E(y) + (has ? '' : ' (no data)') + '</label>';
         }).join('');
-        cmpMonthsEl.innerHTML = '<div class="pfdash-cmpbar">'
-          + '<label class="pfdash-cmpbox"><input type="checkbox" id="pfdashCmpAll"' + (allOn ? ' checked' : '') + '> '
-          + '<strong>Select all / Annual</strong></label> ' + boxes + '</div>';
-        var allCb = document.getElementById('pfdashCmpAll');
-        if (allCb) allCb.addEventListener('change', function () {
-          render(dataset, period, this.checked ? withData.join(',') : '', opts);
-        });
-        cmpMonthsEl.querySelectorAll('input[data-cmpm]').forEach(function (cb) {
-          cb.addEventListener('change', function () {
-            var next = dataset.monthOrder.filter(function (m) {
-              var el = cmpMonthsEl.querySelector('input[data-cmpm="' + m + '"]');
-              return el && el.checked;
-            });
-            render(dataset, period, next.join(','), opts);
+        var annualOn = selPeriods.indexOf('Annual') >= 0;
+        var monthBoxes = MORDER.map(function (m) {
+          var on = selPeriods.indexOf(m) >= 0;
+          return '<label class="pfdash-cmpbox">'
+            + '<input type="checkbox" data-cmpm="' + E(m) + '"' + (on ? ' checked' : '') + '> '
+            + E(m.slice(0, 3)) + '</label>';
+        }).join('');
+        cmpMonthsEl.innerHTML =
+          '<div class="pfdash-cmpbar"><span class="pfdash-cmplabel">Years:</span> ' + yearBoxes + '</div>'
+          + '<div class="pfdash-cmpbar"><span class="pfdash-cmplabel">Periods:</span> '
+          + '<label class="pfdash-cmpbox"><input type="checkbox" data-cmpp="Annual"' + (annualOn ? ' checked' : '') + '> '
+          + '<strong>Annual (full year)</strong></label> ' + monthBoxes + '</div>';
+
+        function reread() {
+          var yrs = YEARS.filter(function (y) {
+            var el = cmpMonthsEl.querySelector('input[data-cmpy="' + y + '"]');
+            return el && el.checked;
           });
+          var pds = [];
+          var ann = cmpMonthsEl.querySelector('input[data-cmpp="Annual"]');
+          MORDER.forEach(function (m) {
+            var el = cmpMonthsEl.querySelector('input[data-cmpm="' + m + '"]');
+            if (el && el.checked) pds.push(m);
+          });
+          if (ann && ann.checked) pds.push('Annual');
+          render(dataset, period, buildScope(yrs, pds), opts);
+        }
+        cmpMonthsEl.querySelectorAll('input[data-cmpy],input[data-cmpm],input[data-cmpp]').forEach(function (cb) {
+          cb.addEventListener('change', reread);
         });
       }
-      // PER-MONTH SIDE-BY-SIDE: each selected month with data is its OWN column
-      // group (Actual + Budget), in CALENDAR order. Values come straight from
-      // dataset.months[Month].rows - NO summing/rollup across months. No delta.
-      var cmpMonths = dataset.monthOrder.filter(function (m) {
-        return selected.indexOf(m) >= 0 && dataset.monthHasData[m];
+
+      // ---- build columns = (selected years) x (selected periods) ----
+      // Month period -> that year's own month (no sum). Annual period -> the SUM
+      // of that year's 12 months via rollup() (the only allowed sum: a single
+      // year's full-year total). Empty (year,period) combos are OMITTED.
+      // Order: year ascending, then months in calendar order, Annual last.
+      var orderedYears = YEARS.filter(function (y) { return selYears.indexOf(y) >= 0; });
+      var orderedPeriods = MORDER.filter(function (m) { return selPeriods.indexOf(m) >= 0; });
+      if (selPeriods.indexOf('Annual') >= 0) orderedPeriods.push('Annual');
+
+      var columns = []; // { label, rowsByMetric }
+      orderedYears.forEach(function (y) {
+        var yd = yObj(y);
+        if (!yd) return;
+        orderedPeriods.forEach(function (p) {
+          var idx = {};
+          if (p === 'Annual') {
+            var ydMonths = yd.monthOrder.filter(function (m) { return yd.monthHasData[m]; });
+            if (!ydMonths.length) return; // empty year/Annual -> omit
+            rollup(yd, ydMonths).forEach(function (r) { idx[r.metric] = r; });
+            columns.push({ label: y + ' Annual', rowsByMetric: idx });
+          } else {
+            if (!yd.monthHasData[p]) return; // empty (year,month) -> omit
+            ((yd.months[p] || {}).rows || []).forEach(function (r) { idx[r.metric] = r; });
+            columns.push({ label: p + ' ' + y, rowsByMetric: idx });
+          }
+        });
       });
+
       cards.innerHTML = '';
-      if (!cmpMonths.length) {
+      if (!columns.length) {
         thead.innerHTML = '<tr><th class="metric-col">Metric</th></tr>';
-        tbody.innerHTML = '<tr><td class="metric-col">'
-          + (selected.length ? 'No data for the selected months.' : 'Select one or more months to compare.')
-          + '</td></tr>';
+        var msg = (!selYears.length || !selPeriods.length)
+          ? 'Select one or more years and one or more periods to compare.'
+          : 'No data for the selected years and periods.';
+        tbody.innerHTML = '<tr><td class="metric-col">' + msg + '</td></tr>';
         return;
       }
-      // two-row header: month name (colspan 2) over Actual | Budget
+
+      // two-row header: column label (colspan 2) over Actual | Budget
       var topRow = '<tr><th class="metric-col" rowspan="2">Metric</th>'
-        + cmpMonths.map(function (m) {
-            return '<th colspan="2" class="mstart" style="text-align:center">' + E(m) + ' ' + E(dataset.year) + '</th>';
+        + columns.map(function (c) {
+            return '<th colspan="2" class="mstart" style="text-align:center">' + E(c.label) + '</th>';
           }).join('') + '</tr>';
       var subRow = '<tr>'
-        + cmpMonths.map(function () { return '<th class="mstart">Actual</th><th class="budget">Budget</th>'; }).join('') + '</tr>';
+        + columns.map(function () { return '<th class="mstart">Actual</th><th class="budget">Budget</th>'; }).join('') + '</tr>';
       thead.innerHTML = topRow + subRow;
 
-      // index each month's rows by metric name for direct lookup (no sum)
-      var byMonth = {};
-      cmpMonths.forEach(function (m) {
-        var idx = {};
-        ((dataset.months[m] || {}).rows || []).forEach(function (r) { idx[r.metric] = r; });
-        byMonth[m] = idx;
-      });
-      // format one month's Actual / Budget pair for a metric row (its OWN values).
       function cellPair(r) {
         if (!r) return ['', ''];
         if (r.type === 'count') return [count(r.qtyActual), count(r.qtyGoal)];
@@ -13044,8 +13099,8 @@ try {
       }
       tbody.innerHTML = dataset.metricsMeta.map(function (mm) {
         var row = '<td class="metric-col">' + E(mm.metric) + '</td>';
-        cmpMonths.forEach(function (m) {
-          var pair = cellPair(byMonth[m][mm.metric]);
+        columns.forEach(function (c) {
+          var pair = cellPair(c.rowsByMetric[mm.metric]);
           var a = pair[0], b = pair[1];
           row += '<td class="mstart' + (a == null ? ' num-na' : '') + '">' + E(a == null ? 'N/A' : a) + '</td>'
               + '<td class="budget' + (b == null ? ' num-na' : '') + '">' + E(b == null ? '-' : b) + '</td>';

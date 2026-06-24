@@ -248,3 +248,62 @@ group laid side by side, NOT summed into one pair. The month multi-select +
   each month's own 40% actual vs 50% budget; 7 columns (1 + 2*3), NO delta.
 - No regression: Month/Quarter/YTD/Annual unchanged; Precon/BD byte-identical.
 - Deploy OK; gate 401 on / and /data/pf-dashboard.js.
+
+## Actual vs Budget: cross-year comparison (2026-06-24)
+
+Brad extended the Actual vs Budget view to compare across years: total annual
+performance side by side (2024 vs 2025 vs 2026 Annual) and the same month across
+years (June 2024 vs June 2025 vs June 2026). Same compare view, per-month
+side-by-side layout, month dividers, shaded Budget column, NO delta.
+
+### Audit: prior-year data
+The ONLY monthly-KPI source is the "PF Dashboard" tab of PF Project Master, whose
+C3 year = 2026. The "2025/2026 WIP & Completed Projects" tabs are PROJECT LISTS
+(project #, contract status, invoice details), NOT monthly KPI dashboards (no
+Jan..Dec actual/budget rows). So 2024 and 2025 have NO source today: they stay
+EMPTY and light up automatically once a prior-year KPI source is added. We do not
+fabricate prior-year numbers.
+
+### Multi-year feed
+build-pf-dashboard.py now emits a `years` map: `years: {'2024':{...},'2025':{...},
+'2026':{...}}`. The parsed tab populates its year (2026); 2024/2025 are empty
+placeholders (monthHasData all false, metric rows all null). The top-level fields
+(year/monthOrder/monthHasData/months/quarters/metricsMeta) still point at the
+current year so Week/Month/Quarter/YTD/Annual work unchanged.
+
+### Compare = year x period cross-product
+The compare controls now have a YEAR multi-select (2024/2025/2026, empty years
+disabled) + the month checkboxes + an "Annual (full year)" period option. Columns
+= (selected years) x (selected periods) where a period is a month OR "Annual":
+- {2024,2025,2026} x {June}  -> June 2024 | June 2025 | June 2026
+- {2024,2025,2026} x {Annual} -> 2024 Annual | 2025 Annual | 2026 Annual
+- {2026} x {Jan,Feb,Mar} -> the within-one-year per-month behavior (unchanged)
+A MONTH column reads dataset.years[year].months[month] directly (no sum). An
+ANNUAL column = the SUM of that year's 12 months (rollup(): counts/$ summed, pct
+averaged or pooled if basis) - the only allowed sum, a single year's full-year
+total. scopeKey encodes selection as "years=2026,2025;periods=June,Annual".
+- Column order: year ascending, then months in calendar order, Annual last.
+- Empty (year,period) combos are OMITTED (so empty 2024/2025 do not show blank
+  columns). If everything selected is empty -> clean "No data" message; if a
+  whole year is empty its checkbox is disabled.
+- KEEP: month dividers (mstart), shaded Budget column (budget), NO delta.
+
+### Guardrails
+- OPT-IN via opts.cmpMode (PF draw only). Precon + BD untouched (one
+  data-period=compare, one cmpMode passer). pf-dashboard.js stays
+  financials_global (owners only). No mail. The non-compare views unchanged.
+
+### Verification (2026-06-24)
+- Builder: years {2024 empty, 2025 empty, 2026 12 months}; top-level unchanged.
+- test-rbac.mjs 661 pass / 0 fail (no RBAC change).
+- {2024,2025,2026} x {June} -> only "June 2026" (empty years omitted);
+  {...} x {Annual} -> only "2026 Annual"; {2026} x {Annual} = 12-month sum (Bids
+  Sent 144 / $12M = manual sum, match); {2026} x {Jan,Feb,Mar} = 3 per-month
+  columns each = month's own value (12, not summed). Order year asc / Annual last.
+  No delta; dividers + budget shading applied.
+- No regression: Month/Quarter/YTD/Annual unchanged; Precon/BD byte-identical.
+- Deploy OK; gate 401 on / and /data/pf-dashboard.js.
+
+NOTE FOR BRAD: 2024 and 2025 Annual/month columns will be EMPTY (omitted) until
+prior-year monthly KPI data is entered - there is no source for them today. 2026
+populates fully.
