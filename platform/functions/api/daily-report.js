@@ -69,7 +69,9 @@ function s(v, cap = MAX_SHORT) {
 // Hours: a non-negative number, capped. Returns a number or null. NEVER money.
 function hours(v) {
   if (v == null || String(v).trim() === '') return null;
-  let n = parseFloat(String(v).replace(/[^0-9.]/g, ''));
+  // Parse BEFORE stripping so a negative value is actually rejected (stripping
+  // the minus first would silently turn "-5" into 5).
+  let n = parseFloat(String(v).replace(/[^0-9.-]/g, ''));
   if (!isFinite(n) || n < 0) return null;
   if (n > 24) n = 24;        // a single-day timesheet line cannot exceed 24h
   return Math.round(n * 100) / 100;
