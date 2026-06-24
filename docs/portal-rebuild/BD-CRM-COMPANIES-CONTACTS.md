@@ -25,12 +25,28 @@ both shipped in one slice: Phase A read views, Phase B KV write-back.
   }
   ```
 - Linking: a contact's "Organization" field is matched (normalized) to a
-  company's "Name". Unmatched contacts are reported in `unlinkedContacts`, never
-  dropped.
-- Stable ids: companies `co_<sha1(name)>`, contacts `ct_<sha1(name||org)>`. The
-  ingest base ids never collide with overlay ids (below).
-- Current ingest: 263 companies, 399 contacts (375 linked, 24 unlinked). All
-  spec'd tabs + fields present (no omissions).
+  company's "Name". Contacts that still do not match are reported in
+  `unlinkedContacts`, never dropped, and ARE rendered in the UI.
+- Matching (deterministic, in order): (1) exact normalized Name; (2) suffix
+  stripped exact (drops ", Inc.", " LLC", " Group", " Construction" etc. on both
+  sides); (3) company normalized name STARTS WITH the contact org at a word
+  boundary (catches regional suffixes like "Alston Construction" ->
+  "Alston Construction - IL"). A fuzzy match links ONLY when exactly one company
+  matches and is recorded in `fuzzyLinks` for audit. If several companies match
+  (ARCO/Alston regional variants) the contact stays unlinked and is tagged
+  `ambiguousCandidates:[...]` so it can be picked manually. Blank-Organization
+  contacts stay genuine orphans.
+- Stable ids: companies `co_<sha1(name)>`, contacts `ct_<sha1(name||org)>`.
+  COLLISION-ONLY disambiguation: the first occurrence of a seed keeps the plain
+  hash (so ~all ids stay stable across re-syncs), and the Nth duplicate of the
+  same seed hashes `seed#N` instead. The workbook has 4 duplicate (Name,Org)
+  contact rows that previously shared an id (interaction logs would have bled
+  together); they now get distinct ids. Company ids get the same guard (0 dups
+  today, a warning prints if any appear). The builder hard-verifies global id
+  uniqueness and exits non-zero if any collision remains.
+- Current ingest: 263 companies, 399 contacts (378 linked, 21 unlinked), 3
+  audited fuzzy links (Panzica, Lauth, Kasco), 4 ambiguous contacts tagged. All
+  spec'd tabs + fields present (no omissions). 662 ids, all unique.
 
 ### Write-back overlay (KV)
 Manual additions and interactions live ONLY in KV, merged on top of the base in
@@ -113,3 +129,32 @@ chars per field.
   gate). The handler logic, area enforcement, KV persistence, validation, and
   the field_ops/unauth 403 path are all proven headlessly against the REAL
   Function code; the deployed gate is proven to 401 unauth.
+
+## Review fixes (2026-06-24, post triple-review of 12b844d)
+- FIX 1 — Unlinked contacts are now rendered. The UI builds a synthetic
+  "Unlinked contacts" group (id `__unlinked__`, always sorted last) from
+  `unlinkedContacts`. Each unlinked contact shows its full fields, an org hint
+  (no match / ambiguous candidates / no Organization), its own interaction log
+  and an add-interaction form. They are fully usable, never hidden.
+- FIX 2 — The contact-to-company matcher gained a deterministic second pass
+  (suffix-stripped exact, then company-startswith-org at a word boundary). It
+  links only on a single match and records every fuzzy link in `fuzzyLinks`.
+  Multiple matches stay unlinked with `ambiguousCandidates`. Linked rose 375 ->
+  378, unlinked fell 24 -> 21 (Panzica, Lauth, Kasco linked; ARCO + Alston
+  variants left ambiguous on purpose).
+- FIX 3 — Collision-only unique ids (see Data model). 4 duplicate contact rows
+  now get distinct ids so interaction logs cannot bleed; non-colliding ids stay
+  stable across re-syncs. Builder hard-verifies uniqueness.
+- KV race: both write-back handlers carry a comment noting the
+  read-modify-write last-writer-wins limitation and that the durable fix is a D1
+  migration (no behavior change now).
+
+## Verification (review fixes)
+- Builder STDOUT: 263 companies, 378 linked / 21 unlinked, 3 fuzzy links listed,
+  4 ambiguous tagged, ID UNIQUENESS OK (662 ids).
+- `node migrations/test-rbac.mjs`: 431 pass / 0 fail (added id-uniqueness,
+  unlinkedContacts-consumed, fuzzyLinks + ambiguous assertions).
+- Headless write-back re-verified 6/6 (incl. an interaction on an unlinked
+  contact id).
+- Deploy OK; gate 401 with no creds on /, /data/bd-records.js, /api/bd-record,
+  /api/bd-interaction (GET + POST).

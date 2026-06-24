@@ -2455,6 +2455,8 @@ document.addEventListener('click', function(e) {
       #mod-bd-companies .bdc-muted { color:var(--text-3, #8a93a6); }
       #mod-bd-companies .bdc-err { color:#e5534b; font-size:13px; margin-top:6px; }
       #mod-bd-companies .bdc-ok { color:#3fb950; font-size:13px; margin-top:6px; }
+      #mod-bd-companies .bdc-co.bdc-unlinked { border-top:2px solid var(--border, #2a2f3a); }
+      #mod-bd-companies .bdc-co.bdc-unlinked .nm { color:var(--text-2, #c2c9d6); font-style:italic; }
     </style>
     <div id="bdcNoData" class="bdc-muted" style="display:none">No Business Development records available for your role.</div>
     <div class="bdc-wrap" id="bdcWrap">
@@ -12726,6 +12728,25 @@ try {
       if (!c) return;
       c.contacts.push({ id: oct.id, fields: oct.fields || {}, _added: true });
     });
+
+    // Unlinked contacts (Organization matched no company, was blank, or was
+    // ambiguous): surface them as a synthetic group so they are NEVER hidden.
+    // Each still gets its full fields + its own interaction log + add-interaction
+    // form (it is a real contact id). The synthetic group has no "add contact".
+    var unl = (b.unlinkedContacts || []).map(function (u) {
+      return { id: u.id, fields: u.fields || {},
+               orgName: u.orgName || '', ambiguousCandidates: u.ambiguousCandidates || null,
+               _added: false };
+    });
+    if (unl.length) {
+      companies.push({
+        id: '__unlinked__',
+        fields: { Name: 'Unlinked contacts', Type: 'Contacts with no matched company' },
+        contacts: unl,
+        _added: false,
+        _unlinked: true,
+      });
+    }
     return companies;
   }
 
@@ -12777,19 +12798,29 @@ try {
     var f = state.filter.toLowerCase();
     var shown = state.companies.filter(function (c) { return matchCompany(c, f); });
     shown.sort(function (a, b) {
+      // synthetic "Unlinked contacts" group always sorts last
+      if (a._unlinked !== b._unlinked) return a._unlinked ? 1 : -1;
       return String(a.fields.Name || '').localeCompare(String(b.fields.Name || ''));
     });
     listEl.innerHTML = shown.map(function (c) {
-      var sub = [c.fields.Type, c.fields.City, c.fields.State].filter(Boolean).join(' • ');
+      var sub = c._unlinked
+        ? (c.contacts.length + ' contact' + (c.contacts.length === 1 ? '' : 's') + ' with no matched company')
+        : ([c.fields.Type, c.fields.City, c.fields.State].filter(Boolean).join(' • ')
+           + ' &middot; ' + c.contacts.length + ' contact' + (c.contacts.length === 1 ? '' : 's'));
       return '<div class="bdc-co' + (c.id === state.selectedId ? ' active' : '')
-        + '" data-id="' + E(c.id) + '">'
+        + (c._unlinked ? ' bdc-unlinked' : '') + '" data-id="' + E(c.id) + '">'
         + '<div class="nm">' + E(c.fields.Name || '(no name)')
-        + (c._added ? '<span class="bdc-badge">added</span>' : '') + '</div>'
-        + '<div class="sub">' + E(sub) + ' &middot; ' + c.contacts.length + ' contact'
-        + (c.contacts.length === 1 ? '' : 's') + '</div>'
+        + (c._added ? '<span class="bdc-badge">added</span>' : '')
+        + (c._unlinked ? '<span class="bdc-badge">' + c.contacts.length + '</span>' : '') + '</div>'
+        + '<div class="sub">' + sub + '</div>'
         + '</div>';
     }).join('') || '<div class="bdc-co bdc-muted">No matches.</div>';
-    if (countEl) countEl.textContent = shown.length + ' of ' + state.companies.length + ' companies';
+    var coCount = state.companies.filter(function (c) { return !c._unlinked; }).length;
+    if (countEl) {
+      var u = state.companies.filter(function (c) { return c._unlinked; })[0];
+      countEl.textContent = coCount + ' companies'
+        + (u ? ' + ' + u.contacts.length + ' unlinked contacts' : '');
+    }
     listEl.querySelectorAll('.bdc-co[data-id]').forEach(function (el) {
       el.addEventListener('click', function () { selectCompany(this.getAttribute('data-id')); });
     });
@@ -12822,45 +12853,71 @@ try {
     if (!d) return;
     var c = findCompany(state.selectedId);
     var b = base();
-    if (!c) { d.innerHTML = '<div class="bdc-muted">Select a company to see its details, contacts, and interactions.</div>'; return; }
+    if (!c) { d.innerHTML = '<div class="bdc-muted">Select a company to see its details, contacts and interactions.</div>'; return; }
     var coFields = (b && b.companyFields) || [];
+    var ctFields = (b && b.contactFields) || [];
     var html = '';
-    html += '<div class="bdc-card">'
-      + '<div class="bdc-h"><h2 style="margin:0">' + E(c.fields.Name || '(no name)')
-      + (c._added ? '<span class="bdc-badge">added</span>' : '') + '</h2></div>'
-      + fieldGrid(c.fields, coFields)
-      + '</div>';
 
-    // Company interactions
-    html += '<div class="bdc-card">'
-      + '<div class="bdc-h"><h3 style="margin:0">Company interactions</h3></div>'
-      + '<div id="bdcCoIx" data-etype="company" data-eid="' + E(c.id) + '"><div class="bdc-muted">Loading…</div></div>'
-      + interactionForm('company', c.id)
-      + '</div>';
+    if (c._unlinked) {
+      // Synthetic group: contacts whose Organization matched no company.
+      html += '<div class="bdc-card">'
+        + '<div class="bdc-h"><h2 style="margin:0">Unlinked contacts</h2></div>'
+        + '<div class="bdc-muted">These contacts could not be matched to a company '
+        + '(their Organization was blank, ambiguous, or had no matching record). '
+        + 'They are fully usable here. Add an interaction or fix the link in the source workbook.</div>'
+        + '</div>';
+    } else {
+      html += '<div class="bdc-card">'
+        + '<div class="bdc-h"><h2 style="margin:0">' + E(c.fields.Name || '(no name)')
+        + (c._added ? '<span class="bdc-badge">added</span>' : '') + '</h2></div>'
+        + fieldGrid(c.fields, coFields)
+        + '</div>';
 
-    // Contacts
+      // Company interactions (real companies only)
+      html += '<div class="bdc-card">'
+        + '<div class="bdc-h"><h3 style="margin:0">Company interactions</h3></div>'
+        + '<div id="bdcCoIx" data-etype="company" data-eid="' + E(c.id) + '"><div class="bdc-muted">Loading…</div></div>'
+        + interactionForm('company', c.id)
+        + '</div>';
+    }
+
+    // Contacts (linked OR unlinked — both get fields + interaction log + form)
     var contactsHtml = c.contacts.map(function (ct) {
-      var ctFields = (b && b.contactFields) || [];
+      var orgHint = '';
+      if (c._unlinked) {
+        if (ct.ambiguousCandidates && ct.ambiguousCandidates.length) {
+          orgHint = '<div class="bdc-muted" style="font-size:12px">Org "' + E(ct.orgName || '')
+            + '" matches several companies: ' + E(ct.ambiguousCandidates.join(', ')) + '. Pick one in the source.</div>';
+        } else if (ct.orgName) {
+          orgHint = '<div class="bdc-muted" style="font-size:12px">Org "' + E(ct.orgName) + '" has no matching company record.</div>';
+        } else {
+          orgHint = '<div class="bdc-muted" style="font-size:12px">No Organization listed.</div>';
+        }
+      }
       return '<div class="bdc-contact">'
         + '<div class="bdc-h"><strong>' + E(ct.fields.Name || '(no name)')
         + (ct._added ? '<span class="bdc-badge">added</span>' : '') + '</strong>'
         + '<span class="bdc-muted" style="font-size:12px">' + E([ct.fields.Position, ct.fields.Email].filter(Boolean).join(' • ')) + '</span></div>'
+        + orgHint
         + fieldGrid(ct.fields, ctFields)
         + '<div id="bdcCtIx_' + E(ct.id) + '" data-etype="contact" data-eid="' + E(ct.id) + '"><div class="bdc-muted" style="font-size:12px">Loading interactions…</div></div>'
         + interactionForm('contact', ct.id)
         + '</div>';
     }).join('');
+
+    var addCtBtn = c._unlinked ? '' : '<button type="button" class="btn" id="bdcAddCtBtn">+ Add contact</button>';
+    var addCtForm = c._unlinked ? '' : '<div id="bdcAddCtForm" class="bdc-form" style="display:none"></div>';
     html += '<div class="bdc-card">'
       + '<div class="bdc-h"><h3 style="margin:0">Contacts (' + c.contacts.length + ')</h3>'
-      + '<button type="button" class="btn" id="bdcAddCtBtn">+ Add contact</button></div>'
-      + '<div id="bdcAddCtForm" class="bdc-form" style="display:none"></div>'
+      + addCtBtn + '</div>'
+      + addCtForm
       + (contactsHtml || '<div class="bdc-muted">No contacts yet.</div>')
       + '</div>';
 
     d.innerHTML = html;
 
     // load interaction logs
-    loadInteractions('company', c.id, document.getElementById('bdcCoIx'));
+    if (!c._unlinked) loadInteractions('company', c.id, document.getElementById('bdcCoIx'));
     c.contacts.forEach(function (ct) {
       loadInteractions('contact', ct.id, document.getElementById('bdcCtIx_' + ct.id));
     });

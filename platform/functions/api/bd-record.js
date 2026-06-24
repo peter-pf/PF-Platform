@@ -71,6 +71,10 @@ function cleanFields(input, allow) {
   return out;
 }
 
+// KNOWN LIMITATION: this is a KV read-modify-write (load overlay -> push record
+// -> put). KV has no transaction, so two simultaneous adds can last-writer-wins
+// and drop one. Acceptable for BD's low-concurrency add flow; the durable fix is
+// a D1 migration with an INSERT per record. No behavior change now.
 async function loadOverlay(env) {
   const raw = await env.PF_SCHEDULE.get(KV_KEY);
   if (!raw) return { companies: [], contacts: [], meta: { updated: null } };

@@ -611,6 +611,28 @@ section('BD CRM: bd-records.js feed shape (generated)');
   ok('companyFields + contactFields are present (row-4 field lists)',
      Array.isArray(recJson.companyFields) && recJson.companyFields.includes('Name') &&
      Array.isArray(recJson.contactFields) && recJson.contactFields.includes('Name'));
+
+  // FIX 3: EVERY id (companies + all contacts + unlinked) must be unique so
+  // interaction logs (keyed by id) never bleed between records.
+  const allIds = [];
+  recJson.companies.forEach(c => { allIds.push(c.id); c.contacts.forEach(ct => allIds.push(ct.id)); });
+  (recJson.unlinkedContacts || []).forEach(u => allIds.push(u.id));
+  ok('ALL ids (companies + contacts + unlinked) are globally unique',
+     new Set(allIds).size === allIds.length);
+  ok('there is a healthy number of ids (regression guard)', allIds.length > 600);
+
+  // FIX 1 source-check: index.html actually CONSUMES unlinkedContacts (so the 24
+  // named contacts are not invisible). Before the fix the feed had them but the
+  // UI never referenced the key.
+  const idxSrc = readFileSync(join(__dir, '../index.html'), 'utf8');
+  ok('index.html references unlinkedContacts (renders them)', /unlinkedContacts/.test(idxSrc));
+  ok('index.html has the synthetic Unlinked group id __unlinked__', /__unlinked__/.test(idxSrc));
+
+  // FIX 2: feed exposes fuzzyLinks for audit + tags ambiguous unlinked contacts.
+  ok('feed exposes fuzzyLinks array (auditable second-pass links)', Array.isArray(recJson.fuzzyLinks));
+  ok('unlinkedContacts is present + consumed', Array.isArray(recJson.unlinkedContacts));
+  const ambig = (recJson.unlinkedContacts || []).filter(u => Array.isArray(u.ambiguousCandidates) && u.ambiguousCandidates.length);
+  ok('ambiguous unlinked contacts carry candidate lists (no guessing)', ambig.length >= 1);
 }
 
 // --- summary ----------------------------------------------------------------

@@ -104,11 +104,6 @@ def headers_for(ws):
     return out
 
 
-def stable_id(prefix, name, extra=""):
-    h = hashlib.sha1((name + "||" + extra).encode("utf-8")).hexdigest()[:10]
-    return prefix + "_" + h
-
-
 def read_records(ws, fields):
     """Each data row (from HEADER_ROW+1) with a non-empty Name -> {fields:{...}}."""
     out = []
@@ -127,6 +122,40 @@ def read_records(ws, fields):
 
 def norm_key(s):
     return re.sub(r"\s+", " ", (s or "").strip()).lower()
+
+
+# Strip common legal/suffix noise so "Lauth" can match "Lauth Group, Inc." etc.
+# Used ONLY as a deterministic second pass AFTER an exact normalized match misses.
+_SUFFIX_RE = re.compile(
+    r"(,?\s+(inc|incorporated|llc|l\.l\.c|ltd|co|corp|corporation|company|"
+    r"group|construction|builders|building|contractors|contracting|"
+    r"development|developers|enterprises|services|holdings)\.?)+\s*$",
+    re.IGNORECASE,
+)
+
+
+def strip_suffix(s):
+    """Normalized name with trailing legal/industry suffixes + punctuation removed."""
+    n = norm_key(s)
+    prev = None
+    # strip repeatedly so "Acme Construction Group Inc" collapses fully
+    while prev != n:
+        prev = n
+        n = _SUFFIX_RE.sub("", n)
+        n = n.strip().rstrip(",.-").strip()
+    return n
+
+
+def collision_id(prefix, seed, seen):
+    """Stable, collision-ONLY id. First occurrence of a seed keeps the plain
+    hash (so 99% of ids never move across re-syncs). The Nth duplicate of the
+    SAME seed gets a deterministic '#N' suffix BEFORE hashing, so only the
+    genuinely colliding records shift -- everything else stays stable."""
+    n = seen.get(seed, 0) + 1
+    seen[seed] = n
+    eff = seed if n == 1 else (seed + "#" + str(n))
+    h = hashlib.sha1(eff.encode("utf-8")).hexdigest()[:10]
+    return prefix + "_" + h, (n > 1)
 
 
 def build(xlsm_bytes):
@@ -158,31 +187,95 @@ def build(xlsm_bytes):
     cons = read_records(con_ws, con_fields)
     wb.close()
 
-    # Build companies keyed by normalized Name for linking.
+    # ---- companies (collision-only unique ids) + match indexes -------------
     companies = []
-    by_name = {}
+    by_name = {}        # exact normalized Name -> company
+    by_stripped = {}    # suffix-stripped Name -> [companies]  (for fuzzy pass)
+    co_seen = {}        # seed -> count, for collision-only disambiguation
+    co_id_warnings = []
     for of in orgs:
-        cid = stable_id("co", of.get("Name", ""))
+        seed = norm_key(of.get("Name", ""))
+        cid, collided = collision_id("co", seed, co_seen)
+        if collided:
+            co_id_warnings.append("Duplicate company Name (collision-suffixed id): %r" % of.get("Name", ""))
         comp = {"id": cid, "fields": of, "contacts": []}
         companies.append(comp)
-        by_name[norm_key(of.get("Name", ""))] = comp
+        by_name[seed] = comp
+        st = strip_suffix(of.get("Name", ""))
+        if st:
+            by_stripped.setdefault(st, []).append(comp)
 
+    # ---- contacts: exact -> fuzzy -> unlinked ------------------------------
+    ct_seen = {}        # seed -> count, for collision-only disambiguation
     unlinked = []
+    fuzzy_links = []    # [{contact, matchedCompany, rule}] for Jonathan to audit
     for cf in cons:
-        cid = stable_id("ct", cf.get("Name", ""), cf.get("Organization", ""))
+        name = cf.get("Name", "")
         org_name = cf.get("Organization", "")
-        comp = by_name.get(norm_key(org_name))
+        seed = name + "||" + org_name
+        cid, collided = collision_id("ct", seed, ct_seen)
         rec = {"id": cid, "fields": cf}
+
+        comp = None
+        rule = None
+        org_norm = norm_key(org_name)
+
+        if org_norm and org_norm in by_name:
+            comp = by_name[org_norm]   # exact normalized match (primary)
+        elif org_norm:
+            # Deterministic second pass (only if Organization is non-blank).
+            org_stripped = strip_suffix(org_name)
+            cands = []
+            seen_ids = set()
+
+            # rule 1: exact match on suffix-stripped forms
+            if org_stripped and org_stripped in by_stripped:
+                for c in by_stripped[org_stripped]:
+                    if c["id"] not in seen_ids:
+                        cands.append((c, "stripped-exact")); seen_ids.add(c["id"])
+
+            # rule 2: company normalized name STARTS WITH the contact org
+            #         (catches regional suffixes: "Alston Construction" ->
+            #          "Alston Construction - IL"). Require a word boundary so
+            #          "Smith" does not match "Smithfield".
+            if not cands and org_norm:
+                for c in companies:
+                    cn = norm_key(c["fields"].get("Name", ""))
+                    if cn == org_norm:
+                        continue
+                    if cn.startswith(org_norm) and (
+                        len(cn) == len(org_norm) or not cn[len(org_norm)].isalnum()
+                    ):
+                        if c["id"] not in seen_ids:
+                            cands.append((c, "company-startswith-org")); seen_ids.add(c["id"])
+
+            if len(cands) == 1:
+                comp, rule = cands[0][0], cands[0][1]
+                fuzzy_links.append({
+                    "contact": name,
+                    "contactOrg": org_name,
+                    "matchedCompany": comp["fields"].get("Name", ""),
+                    "rule": rule,
+                })
+            elif len(cands) > 1:
+                # Ambiguous: do NOT guess. Leave unlinked, tag the candidates.
+                rec2 = dict(rec)
+                rec2["orgName"] = org_name
+                rec2["ambiguousCandidates"] = [c["fields"].get("Name", "") for (c, _r) in cands]
+                unlinked.append(rec2)
+                continue
+
         if comp:
             comp["contacts"].append(rec)
         else:
             rec2 = dict(rec)
-            rec2["orgName"] = org_name
+            rec2["orgName"] = org_name   # blank => genuine orphan
             unlinked.append(rec2)
 
     out = {
         "companies": companies,
         "unlinkedContacts": unlinked,
+        "fuzzyLinks": fuzzy_links,
         "companyFields": org_field_names,
         "contactFields": con_field_names,
         "generated": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -191,7 +284,7 @@ def build(xlsm_bytes):
     }
     if omitted:
         out["_omitted"] = omitted
-    return out, omitted
+    return out, omitted, co_id_warnings
 
 
 def write_js(data):
@@ -206,13 +299,23 @@ def write_js(data):
     body = "window.PF_BD_RECORDS = " + json.dumps(data, indent=2, ensure_ascii=False) + ";\n"
     with open(OUT_JS, "w") as f:
         f.write(note + body)
-    ncon = sum(len(c["contacts"]) for c in data["companies"]) + len(data["unlinkedContacts"])
+    linked = sum(len(c["contacts"]) for c in data["companies"])
+    nunlinked = len(data["unlinkedContacts"])
+    ncon = linked + nunlinked
     print("wrote", OUT_JS)
     print("  companies: %d" % len(data["companies"]))
-    print("  contacts: %d (linked %d, unlinked %d)"
-          % (ncon, ncon - len(data["unlinkedContacts"]), len(data["unlinkedContacts"])))
-    print("  companyFields (%d): %s" % (len(data["companyFields"]), ", ".join(data["companyFields"])))
-    print("  contactFields (%d): %s" % (len(data["contactFields"]), ", ".join(data["contactFields"])))
+    print("  contacts: %d (linked %d, unlinked %d)" % (ncon, linked, nunlinked))
+    print("  fuzzy links (auditable): %d" % len(data.get("fuzzyLinks", [])))
+    for fl in data.get("fuzzyLinks", []):
+        print("    [%s] %r (org %r) -> %r"
+              % (fl["rule"], fl["contact"], fl["contactOrg"], fl["matchedCompany"]))
+    nambig = sum(1 for u in data["unlinkedContacts"] if u.get("ambiguousCandidates"))
+    if nambig:
+        print("  ambiguous (left unlinked, candidates tagged): %d" % nambig)
+        for u in data["unlinkedContacts"]:
+            if u.get("ambiguousCandidates"):
+                print("    %r (org %r) -> candidates %s"
+                      % (u["fields"].get("Name", ""), u.get("orgName", ""), u["ambiguousCandidates"]))
 
 
 def main():
@@ -230,13 +333,31 @@ def main():
         xlsm = download_workbook()
         print("source: SharePoint download")
 
-    data, omitted = build(xlsm)
+    data, omitted, co_id_warnings = build(xlsm)
     write_js(data)
     if omitted:
         for o in omitted:
             print("  OMITTED:", o)
     else:
         print("  OMITTED: none (all spec'd tabs + fields present)")
+
+    # ID-collision report (companies + contacts).
+    if co_id_warnings:
+        for w in co_id_warnings:
+            print("  ID WARNING:", w)
+    else:
+        print("  ID WARNING: none (no duplicate company Name)")
+
+    # Hard verify: every emitted id (companies + all contacts) is UNIQUE.
+    all_ids = [c["id"] for c in data["companies"]]
+    for c in data["companies"]:
+        all_ids += [ct["id"] for ct in c["contacts"]]
+    all_ids += [u["id"] for u in data["unlinkedContacts"]]
+    dupes = set(x for x in all_ids if all_ids.count(x) > 1)
+    if dupes:
+        print("  ID UNIQUENESS: FAIL — %d colliding ids: %s" % (len(dupes), list(dupes)))
+        sys.exit(1)
+    print("  ID UNIQUENESS: OK — %d ids all unique" % len(all_ids))
 
 
 if __name__ == "__main__":

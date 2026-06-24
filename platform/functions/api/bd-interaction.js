@@ -72,6 +72,11 @@ function rid() {
   return 'ix_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
+// KNOWN LIMITATION: this is a KV read-modify-write (load log -> push item ->
+// put). KV has no transaction, so two simultaneous appends to the SAME entity
+// can last-writer-wins and drop one. Acceptable for BD's low-concurrency log
+// (one BD user per record at a time); the durable fix is a D1 migration with an
+// INSERT per interaction. No behavior change now.
 async function loadLog(env, key) {
   const raw = await env.PF_SCHEDULE.get(key);
   if (!raw) return { items: [], meta: { updated: null } };
