@@ -780,6 +780,58 @@ section('GC targets + templates feed shape (generated)');
      Array.isArray(tplJson.docs) && tplJson.docs.length > 0 && tplJson.docs.every(d => d.status === 'pending'));
 }
 
+// --- PRECON: Historical Bid Log feed + per-bid activity log -----------------
+section('Precon Historical: /data/precon-historical.js -> preconstruction');
+ok('/data/precon-historical.js -> preconstruction', areaForPath('/data/precon-historical.js') === 'preconstruction');
+ok('precon-historical.js ALLOWED for admin', roleCanAccess('admin', areaForPath('/data/precon-historical.js')) === true);
+ok('precon-historical.js ALLOWED for partner', roleCanAccess('partner', areaForPath('/data/precon-historical.js')) === true);
+ok('precon-historical.js ALLOWED for business_dev', roleCanAccess('business_dev', areaForPath('/data/precon-historical.js')) === true);
+ok('precon-historical.js BLOCKED for field_ops', roleCanAccess('field_ops', areaForPath('/data/precon-historical.js')) === false);
+
+section('Precon activity log: /api/precon-log -> preconstruction');
+for (const p of ['/api/precon-log', '/api/precon-log?bidId=hbid_x']) {
+  const area = areaForPath(p.split('?')[0]);
+  ok(`${p} -> preconstruction (${area})`, area === 'preconstruction');
+  ok(`${p} ALLOWED for admin`, roleCanAccess('admin', area) === true);
+  ok(`${p} ALLOWED for partner`, roleCanAccess('partner', area) === true);
+  ok(`${p} ALLOWED for business_dev`, roleCanAccess('business_dev', area) === true);
+  ok(`${p} BLOCKED for field_ops`, roleCanAccess('field_ops', area) === false);
+}
+ok('requireArea(field_ops, precon-log area) => 403',
+   requireArea({ uid: 'fo', role: 'field_ops', name: 'Crew' }, areaForPath('/api/precon-log'))?.status === 403);
+ok('requireArea(business_dev, precon-log area) => null (allowed)',
+   requireArea({ uid: 'bd', role: 'business_dev', name: 'BD' }, areaForPath('/api/precon-log')) === null);
+ok('requireArea(partner, precon-log area) => null (allowed)',
+   requireArea({ uid: 'p', role: 'partner', name: 'JR' }, areaForPath('/api/precon-log')) === null);
+ok('requireArea(null, precon-log area) => 403 (fail closed)',
+   requireArea(null, areaForPath('/api/precon-log'))?.status === 403);
+
+section('Precon activity log: source-level guards + NO mail');
+{
+  const src = readFileSync(join(__dir, '../functions/api/precon-log.js'), 'utf8');
+  ok('precon-log imports requireArea', /import\s*\{[^}]*requireArea[^}]*\}\s*from/.test(src));
+  ok('precon-log GET+POST both guard preconstruction', (src.match(/requireArea\([^)]*['"]preconstruction['"]\)/g) || []).length >= 2);
+  ok('precon-log uses env.PF_SCHEDULE', /env\.PF_SCHEDULE/.test(src));
+  ok('precon-log documents the KV read-modify-write race', /read-modify-write/.test(src));
+  const noComments = src.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
+  ok('precon-log makes NO fetch / outbound call', !/\bfetch\s*\(/.test(noComments) && !/https?:\/\//.test(noComments));
+  ok('precon-log calls NO mail API', !/sendMail|\/messages|smtp|nodemailer|mailgun|sendgrid/i.test(noComments));
+}
+
+section('Precon Historical feed shape (generated)');
+{
+  const hFeed = readFileSync(join(__dir, '../data/precon-historical.js'), 'utf8');
+  ok('precon-historical.js exposes window.PF_PRECON_HISTORICAL', /window\.PF_PRECON_HISTORICAL\s*=/.test(hFeed));
+  const hJson = JSON.parse(hFeed.replace(/^[\s\S]*?window\.PF_PRECON_HISTORICAL\s*=/, '').replace(/;\s*$/, ''));
+  ok('feed has years array', Array.isArray(hJson.years) && hJson.years.length > 0);
+  ok('each year has columns + rows + summary', hJson.years.every(y => Array.isArray(y.columns) && Array.isArray(y.rows) && Array.isArray(y.summary)));
+  ok('rows carry id + outcome + fields', hJson.years[0].rows.every(r => r.id && r.outcome && r.fields));
+  const ids = hJson.years[0].rows.map(r => r.id);
+  ok('historical row ids unique within a year', new Set(ids).size === ids.length);
+  ok('outcome is win/loss/other only', hJson.years[0].rows.every(r => ['win', 'loss', 'other'].includes(r.outcome)));
+  ok('feed carries source_url (SharePoint link)', /sharepoint/i.test(hJson.source_url || ''));
+}
+
 // --- summary ----------------------------------------------------------------
 console.log(`\n${'='.repeat(48)}`);
 console.log(`RESULT: ${pass} passed, ${fail} failed`);

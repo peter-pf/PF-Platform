@@ -352,6 +352,7 @@ const DATA_FILE_AREAS = {
   '/data/project-history.js':      'financials',      // PROJECT: per-job ContractValue/totalContractValue
   '/data/precon-pipeline.js':      'preconstruction', // PROJECT/BD: opportunity pipeline ($ per opp) — BD domain
   '/data/precon-dashboard.js':     'preconstruction', // PROJECT/BD: precon PERIOD KPIs (invites/bids/awarded/win rate) — BD domain, field_ops BLOCKED
+  '/data/precon-historical.js':    'preconstruction', // PROJECT/BD: historical win/loss bid log by year (read-only) — BD domain, field_ops BLOCKED
   '/data/bd-master.json':          'business_dev',    // BD: EIN/tax id/credit-app, GC contacts — BD's own tool
   '/data/bd-dashboard.js':         'business_dev',    // BD: BD PERIOD KPIs (interactions/companies contacted/totals) — BD's own tool, field_ops BLOCKED
   '/data/bd-records.js':           'business_dev',    // BD CRM base: companies + linked contacts (read-only base) — BD's own tool, field_ops BLOCKED
@@ -429,6 +430,10 @@ export function areaForPath(pathname) {
     // Bid-resolution fork + Dead Set (item A): preconstruction action.
     // admin + partner + business_dev allowed; field_ops BLOCKED by direct URL.
     if (pathname.startsWith('/api/pipeline-state')) return 'preconstruction';
+    // Per-bid precon activity log (notes/changes/comms/file refs). BD domain:
+    // admin + partner + business_dev; field_ops BLOCKED by direct URL too. The
+    // handler also calls requireArea(session, 'preconstruction').
+    if (pathname.startsWith('/api/precon-log'))     return 'preconstruction';
     // BD CRM write-back (companies/contacts overlay + interactions log). BD's
     // own tool: admin + partner + business_dev allowed; field_ops BLOCKED by
     // direct URL too. Each endpoint ALSO calls requireArea('business_dev').

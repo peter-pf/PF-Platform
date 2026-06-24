@@ -1478,7 +1478,7 @@ body.role-field-ops .nav-item[data-fo-hide] {
   // bd-dashboard.js -> business_dev area (both default-deny + server-enforced).
   if (isBdOrAbove) {
     feeds.push('/data/precon-dashboard.js', '/data/bd-dashboard.js', '/data/bd-records.js', '/data/opportunities.js',
-               '/data/gc-targets.js', '/data/bd-templates.js');
+               '/data/gc-targets.js', '/data/bd-templates.js', '/data/precon-historical.js');
     // BD also needs the precon pipeline feed (preconstruction area) — previously
     // only injected for admin/partner; BD is allowed it server-side.
     if (!isPrivileged) feeds.push('/data/precon-pipeline.js');
@@ -1869,6 +1869,8 @@ window.progress = (function () {
 
       <!-- 4d) Dead Set — not-awarded / lost bids (item A). One-click Reactivate. -->
       <a class="nav-item" data-module="dead-set" onclick="showModule('dead-set')">Dead Set</a>
+      <!-- 4e) Historical Bid Log — per-year win/loss archive (read-only). -->
+      <a class="nav-item" data-module="precon-historical" onclick="showModule('precon-historical')">Historical Bid Log</a>
     </div>
 
     <!-- 5) PROJECT MANAGEMENT -->
@@ -2387,6 +2389,42 @@ document.addEventListener('click', function(e) {
     <div id="deadSetRoot" class="pf-index-root"></div>
   </div>
 
+  <div class="module-view" id="mod-precon-historical">
+    <!-- Historical Bid Log: per-year win/loss archive from the Project Bid Log
+         "<year> Win Loss Log" tab(s). Read-only. window.PF_PRECON_HISTORICAL
+         (data/precon-historical.js). preconstruction area; field_ops DENIED the
+         feed. All data via window.esc. -->
+    <style>
+      #mod-precon-historical .ph-toolbar { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; align-items:center; }
+      #mod-precon-historical .ph-search { flex:1 1 240px; padding:7px 10px; }
+      #mod-precon-historical .ph-year-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+      #mod-precon-historical .ph-year { padding:6px 14px; border:1px solid var(--border,#2a2f3a); border-radius:8px; cursor:pointer; }
+      #mod-precon-historical .ph-year.active { background:var(--surface-2,#1b212c); border-color:var(--accent,#2f6df6); }
+      #mod-precon-historical .ph-summary { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:6px 16px; margin:8px 0 14px; }
+      #mod-precon-historical .ph-sline { font-size:13px; }
+      #mod-precon-historical .ph-sline .lbl { color:var(--text-3,#8a93a6); }
+      #mod-precon-historical .ph-muted { color:var(--text-3,#8a93a6); }
+      #mod-precon-historical tr.ph-win td:first-child { border-left:3px solid #3fb950; }
+      #mod-precon-historical tr.ph-loss td:first-child { border-left:3px solid #e5534b; }
+      #mod-precon-historical tr.ph-other td:first-child { border-left:3px solid var(--border,#2a2f3a); }
+      #mod-precon-historical .ph-tag { font-size:11px; padding:1px 7px; border-radius:10px; }
+      #mod-precon-historical .ph-tag.win { background:rgba(63,185,80,.15); color:#3fb950; }
+      #mod-precon-historical .ph-tag.loss { background:rgba(229,83,75,.15); color:#e5534b; }
+      #mod-precon-historical .ph-tag.other { background:var(--surface-2,#1b212c); color:var(--text-3,#8a93a6); }
+    </style>
+    <div id="phNoData" class="ph-muted" style="display:none">No historical bid log available for your role.</div>
+    <div id="phWrap">
+      <div class="ph-year-tabs" id="phYearTabs"></div>
+      <div id="phSummary"></div>
+      <div class="ph-toolbar">
+        <input type="text" class="ph-search" id="phSearch" placeholder="Search this year (project, GC, status)" autocomplete="off">
+        <span class="ph-muted" id="phCount" style="font-size:12px"></span>
+        <span class="ph-muted" id="phSource" style="font-size:12px"></span>
+      </div>
+      <div id="phTable"></div>
+    </div>
+  </div>
+
   <!-- Awarded Projects index — populated client-side by initAwardedProjects() from window.PF_AWARDED (data/awarded-projects.js). -->
   <div class="module-view" id="mod-awarded-projects">
     <div id="awardedRoot" class="pf-index-root"></div>
@@ -2689,6 +2727,7 @@ const moduleTitles = {
   'precon-hp-awarded': 'Helical Pilings — Awarded',
   'precon-hp-not-awarded': 'Helical Pilings — Not Awarded',
   'dead-set': 'Dead Set — Not Awarded / Lost Bids',
+  'precon-historical': 'Historical Bid Log',
   'awarded-projects': 'Awarded Projects',
   'project-record': 'Project Record',
   'fo-timesheets': 'TimeSheets — Weekly',
@@ -11230,6 +11269,33 @@ try {
       return r === 'admin' || r === 'partner' || r === 'business_dev';
     }
     function jobKey(p){ return String((p && (p.number || (p.fields && p.fields['Project Number']))) || ''); }
+    // STABLE per-bid id for the activity log (/api/precon-log). Project Number
+    // when it is a real value, else a hash of (Project Name + GC). Mirrors the
+    // scheme in build-precon-historical.py + documented in BD-PRECON docs.
+    function bidLogId(p){
+      var f = (p && p.fields) || {};
+      var num = String((p && p.number) || f['Project Number'] || '').trim();
+      if (num && num.toLowerCase() !== 'x') return 'num_' + num.toLowerCase();
+      var name = String((p && p.name) || f['Project Name'] || '').trim().toLowerCase();
+      var gc = String((p && p.gc) || f['General Contractor'] || '').trim().toLowerCase();
+      var seed = name + '|' + gc;
+      // small deterministic hash (djb2) -> hex; matches "name+gc" intent, no crypto needed client-side
+      var h = 5381; for (var i = 0; i < seed.length; i++) h = ((h << 5) + h + seed.charCodeAt(i)) >>> 0;
+      return 'ng_' + h.toString(16);
+    }
+    // Sum a numeric field across a list, skipping blanks/non-numbers (no NaN).
+    function sumField(list, key){
+      var t = 0, any = false;
+      list.forEach(function(p){
+        var raw = (p.fields && p.fields[key]);
+        if (raw == null || String(raw).trim() === '') return;
+        var n = parseFloat(String(raw).replace(/[^0-9.\-]/g, ''));
+        if (isFinite(n)) { t += n; any = true; }
+      });
+      return any ? t : null;
+    }
+    function fmtMoney0(n){ return n == null ? null : '$' + Math.round(n).toLocaleString(); }
+    function fmtNum0(n){ return n == null ? null : Math.round(n).toLocaleString(); }
     function overrideFor(p){
       var k = jobKey(p);
       return (k && window.PF_PIPELINE.overrides && window.PF_PIPELINE.overrides[k]) || null;
@@ -11338,6 +11404,7 @@ try {
       });
       if (opts.recordCol) thead += '<th>Record</th>';
       if (opts.actionCol) thead += '<th>' + E(opts.actionColLabel || 'Resolution') + '</th>';
+      thead += '<th>Activity</th>';
 
       var html = '<div class="pf-wide-wrap"><table class="pf-wide"><thead><tr>'
         + thead + '</tr></thead><tbody>';
@@ -11376,6 +11443,10 @@ try {
         if (opts.actionCol) {
           row += '<td>' + actionCell(p, opts.displayBucket) + '</td>';
         }
+        // Activity-log opener (per bid). data-bid is the stable bid id.
+        var bidName = E((p.name || f['Project Name'] || '').toString());
+        row += '<td><a class="pf-record-link precon-actlink" data-bid="' + E(bidLogId(p))
+          + '" data-bidname="' + bidName + '">Activity</a></td>';
         row += '</tr>';
         html += row;
       });
@@ -11458,13 +11529,95 @@ try {
         return;
       }
 
+      // ----- SUMMARY line (count + total Bid Total Value + total Total LF) -----
+      var sVal = sumField(list, 'Bid Total Value');
+      var sLf = sumField(list, 'Total LF');
+      var parts = [list.length + ' bid' + (list.length === 1 ? '' : 's')];
+      if (sVal != null) parts.push('Total value ' + fmtMoney0(sVal));
+      if (sLf != null) parts.push('Total LF ' + fmtNum0(sLf));
+      html += '<div class="pf-index-meta" style="margin:4px 0 10px">' + E(parts.join('  •  ')) + '</div>';
+
       html += renderTable(disc, list, {
         recordCol: (bucket === 'awarded'),
         actionCol: canResolve(),
         displayBucket: (bucket === 'awarded') ? 'awarded' : 'open',
         actionColLabel: (bucket === 'awarded') ? 'Awarded' : 'Resolution'
       });
+      // a per-mount activity-log panel host (one open at a time within the mount)
+      html += '<div class="precon-actlog" style="margin-top:12px"></div>';
       mount.innerHTML = html;
+
+      // wire the per-bid Activity openers
+      var panel = mount.querySelector('.precon-actlog');
+      mount.querySelectorAll('.precon-actlink').forEach(function(a){
+        a.addEventListener('click', function(){
+          openActivity(panel, this.getAttribute('data-bid'), this.getAttribute('data-bidname'));
+        });
+      });
+    }
+
+    // ----- per-bid ACTIVITY LOG panel (reads + appends /api/precon-log) -----
+    function plog(path, opts){
+      return fetch(path, Object.assign({ credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' } }, opts || {}))
+        .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, status: r.status, body: j }; }); });
+    }
+    var ACT_KINDS = ['note', 'change', 'comm', 'file'];
+    var ACT_CHANNELS = ['call', 'email', 'meeting', 'text', 'site visit', 'portal', 'voicemail', 'other'];
+    function openActivity(panel, bidId, bidName){
+      if (!panel) return;
+      panel.innerHTML = '<div class="pf-index-meta">Loading activity for ' + E(bidName || bidId) + '…</div>';
+      plog('/api/precon-log?bidId=' + encodeURIComponent(bidId)).then(function(res){
+        var items = (res.ok && res.body && Array.isArray(res.body.items)) ? res.body.items : [];
+        renderActivity(panel, bidId, bidName, items, res.ok ? '' : ((res.body && res.body.message) || 'Could not load activity.'));
+      }).catch(function(){ renderActivity(panel, bidId, bidName, [], 'Could not load activity.'); });
+    }
+    function renderActivity(panel, bidId, bidName, items, err){
+      var kOpts = ACT_KINDS.map(function(k){ return '<option value="' + k + '">' + k + '</option>'; }).join('');
+      var cOpts = ACT_CHANNELS.map(function(c){ return '<option value="' + c + '">' + c + '</option>'; }).join('');
+      items = items.slice().sort(function(a, b){ return String(b.addedAt || '').localeCompare(String(a.addedAt || '')); });
+      var list = items.length ? items.map(function(it){
+        return '<div style="border-top:1px dashed var(--border,#2a2f3a);padding:6px 0;font-size:13px">'
+          + '<div><strong>' + E(it.kind) + '</strong> ' + E(it.note) + '</div>'
+          + '<div class="pf-record-muted" style="font-size:11px">' + E(it.date)
+          + (it.channel ? ' • ' + E(it.channel) : '')
+          + (it.who ? ' • ' + E(it.who) : '')
+          + (it.fileRef ? ' • ref ' + E(it.fileRef) : '')
+          + (it.addedBy ? ' • logged by ' + E(it.addedBy) : '') + '</div></div>';
+      }).join('') : '<div class="pf-record-muted" style="font-size:12px">No activity logged yet.</div>';
+      panel.innerHTML = '<div class="pf-card" style="border:1px solid var(--border,#2a2f3a);border-radius:8px;padding:12px 14px">'
+        + '<div class="pf-index-head"><h3 style="margin:0">Activity — ' + E(bidName || bidId) + '</h3></div>'
+        + (err ? '<div style="color:#e5534b;font-size:13px">' + E(err) + '</div>' : '')
+        + '<div style="margin:8px 0">' + list + '</div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;border-top:1px solid var(--border,#2a2f3a);padding-top:8px">'
+        + '<label style="font-size:11px">Type<br><select class="al-kind">' + kOpts + '</select></label>'
+        + '<label style="font-size:11px">Date<br><input type="date" class="al-date"></label>'
+        + '<label style="font-size:11px">Who<br><input type="text" class="al-who" maxlength="300"></label>'
+        + '<label style="font-size:11px">Channel<br><select class="al-channel">' + cOpts + '</select></label>'
+        + '<label style="font-size:11px">File ref<br><input type="text" class="al-fileref" maxlength="300" placeholder="link/path"></label>'
+        + '<label style="flex:1 1 100%;font-size:11px">Note<br><textarea class="al-note" maxlength="4000" style="width:100%;min-height:44px"></textarea></label>'
+        + '<button type="button" class="btn al-add">Add entry</button>'
+        + '<span class="al-msg" style="font-size:12px"></span>'
+        + '</div></div>';
+      var addBtn = panel.querySelector('.al-add');
+      addBtn.addEventListener('click', function(){
+        var note = panel.querySelector('.al-note').value;
+        var msg = panel.querySelector('.al-msg');
+        if (!note || !note.trim()) { msg.textContent = 'A note is required.'; msg.style.color = '#e5534b'; return; }
+        var payload = {
+          bidId: bidId,
+          kind: panel.querySelector('.al-kind').value,
+          date: panel.querySelector('.al-date').value,
+          who: panel.querySelector('.al-who').value,
+          channel: panel.querySelector('.al-channel').value,
+          note: note,
+          fileRef: panel.querySelector('.al-fileref').value,
+        };
+        plog('/api/precon-log', { method: 'POST', body: JSON.stringify(payload) }).then(function(res){
+          if (!res.ok || !res.body || !res.body.saved) { msg.textContent = (res.body && res.body.message) || 'Save failed.'; msg.style.color = '#e5534b'; return; }
+          renderActivity(panel, bidId, bidName, res.body.items || [], '');
+        }).catch(function(){ msg.textContent = 'Network error.'; msg.style.color = '#e5534b'; });
+      });
     }
 
     function renderAll(){
@@ -13917,6 +14070,114 @@ try {
 })();
 } catch (e) {
   console.error('Module bd-templates failed to load:', e);
+}
+</script>
+
+<script>
+// ============================================================
+// MODULE: precon-historical — per-year win/loss bid log archive (read-only)
+// Reads window.PF_PRECON_HISTORICAL (data/precon-historical.js). preconstruction
+// area; field_ops server-DENIED the feed. All data via window.esc.
+// ============================================================
+try {
+(function () {
+  'use strict';
+  var E = window.esc || function (s) { return s == null ? '' : String(s); };
+  var state = { year: null, filter: '' };
+
+  function base() { return window.PF_PRECON_HISTORICAL || null; }
+  function yearObj(y) { var b = base(); return b && (b.years || []).find(function (x) { return x.year === y; }); }
+
+  function load() {
+    var b = base();
+    var noData = document.getElementById('phNoData');
+    var wrap = document.getElementById('phWrap');
+    if (!b || !(b.years || []).length) { if (noData) noData.style.display = ''; if (wrap) wrap.style.display = 'none'; return; }
+    if (noData) noData.style.display = 'none';
+    if (wrap) wrap.style.display = '';
+    if (state.year == null) state.year = b.years[0].year; // newest first
+    renderTabs(); renderYear();
+  }
+
+  function renderTabs() {
+    var host = document.getElementById('phYearTabs');
+    var b = base();
+    host.innerHTML = (b.years || []).map(function (y) {
+      return '<div class="ph-year' + (y.year === state.year ? ' active' : '') + '" data-year="' + y.year + '">'
+        + E(y.year) + ' Historical Bid Log</div>';
+    }).join('');
+    host.querySelectorAll('.ph-year[data-year]').forEach(function (t) {
+      t.addEventListener('click', function () { state.year = +this.getAttribute('data-year'); state.filter = ''; var s = document.getElementById('phSearch'); if (s) s.value = ''; renderTabs(); renderYear(); });
+    });
+  }
+
+  function renderYear() {
+    var y = yearObj(state.year);
+    var sumEl = document.getElementById('phSummary');
+    var tableEl = document.getElementById('phTable');
+    var countEl = document.getElementById('phCount');
+    var srcEl = document.getElementById('phSource');
+    var b = base();
+    if (!y) { if (tableEl) tableEl.innerHTML = ''; return; }
+
+    // summary stats block
+    if (sumEl) {
+      sumEl.innerHTML = (y.summary && y.summary.length)
+        ? '<div class="ph-summary">' + y.summary.map(function (s) {
+            var extra = [];
+            if (s.totalCount != null) extra.push('count ' + E(s.totalCount));
+            if (s.prelimUsed != null) extra.push('prelim ' + E(s.prelimUsed));
+            if (s.prelimPct != null) { var p = parseFloat(s.prelimPct); extra.push(isFinite(p) ? (p * 100).toFixed(0) + '%' : E(s.prelimPct)); }
+            return '<div class="ph-sline"><span class="lbl">' + E(s.label) + ':</span> ' + E(extra.join(' • ')) + '</div>';
+          }).join('') + '</div>'
+        : '';
+    }
+
+    // wire search once
+    var search = document.getElementById('phSearch');
+    if (search && !search.dataset.wired) {
+      search.dataset.wired = '1';
+      search.addEventListener('input', function () { state.filter = (this.value || '').toLowerCase(); renderTable(); });
+    }
+    if (srcEl) {
+      var link = b.source_url ? '<a href="' + E(b.source_url) + '" target="_blank" rel="noopener noreferrer">Project Bid Log</a>' : E(b.source || '');
+      srcEl.innerHTML = 'Source: ' + link + ' • ' + E(b.generated || '');
+    }
+    renderTable();
+
+    function renderTable() {
+      var f = state.filter;
+      var rows = y.rows.filter(function (r) {
+        if (!f) return true;
+        var fld = r.fields || {};
+        return ['Project Name', 'General Contractor', 'Bid Status', 'City / State'].some(function (k) {
+          return String(fld[k] || '').toLowerCase().indexOf(f) >= 0;
+        });
+      });
+      var wins = rows.filter(function (r) { return r.outcome === 'win'; }).length;
+      var losses = rows.filter(function (r) { return r.outcome === 'loss'; }).length;
+      if (countEl) countEl.textContent = rows.length + ' rows (win ' + wins + ' / loss ' + losses + ')';
+      // columns: show Project Name first then the rest
+      var cols = (y.columns || []).filter(function (c) { return c !== 'Project Name'; });
+      var thead = '<th class="pf-sticky-col">Project</th><th>Outcome</th>'
+        + cols.map(function (c) { return '<th>' + E(c) + '</th>'; }).join('');
+      var body = rows.map(function (r) {
+        var fld = r.fields || {};
+        var tag = '<span class="ph-tag ' + E(r.outcome) + '">' + E(r.outcome) + '</span>';
+        var tds = '<td class="pf-sticky-col">' + E(fld['Project Name'] || '') + '</td><td>' + tag + '</td>'
+          + cols.map(function (c) { var v = fld[c]; var cell = (v == null) ? '' : E(v); return '<td title="' + cell + '">' + cell + '</td>'; }).join('');
+        return '<tr class="ph-' + E(r.outcome) + '">' + tds + '</tr>';
+      }).join('');
+      tableEl.innerHTML = '<div class="pf-wide-wrap"><table class="pf-wide"><thead><tr>' + thead + '</tr></thead><tbody>'
+        + (body || '<tr><td class="pf-sticky-col ph-muted">No rows match.</td></tr>') + '</tbody></table></div>';
+    }
+  }
+
+  var prev = window.showModule;
+  window.showModule = function (id) { if (typeof prev === 'function') prev(id); if (id === 'precon-historical') { load(); } };
+})();
+} catch (e) {
+  console.error('Module precon-historical failed to load:', e);
 }
 </script>
 </body>
