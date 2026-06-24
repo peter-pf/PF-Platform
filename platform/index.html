@@ -1384,6 +1384,9 @@ body.role-field-ops .nav-item[data-fo-hide] {
 }
 .pfdash-table th.metric-col, .pfdash-table td.metric-col { text-align: left; font-weight: 600; color: var(--text-1); }
 .pfdash-table tbody tr { border-bottom: 1px solid var(--border-light); }
+/* Actual vs Budget compare view: thick divider at each month group start + shaded budget column */
+.pfdash-table th.mstart, .pfdash-table td.mstart { border-left: 3px solid var(--text-3); }
+.pfdash-table th.budget, .pfdash-table td.budget { background: var(--bg-1); }
 .pfdash-table tbody tr:hover { background: var(--bg-1); }
 .pfdash-table tbody tr.section-fin td { background: var(--bg-1); }
 .pfdash-table td.num-pos { color: var(--green); font-weight: 600; }
@@ -12955,9 +12958,10 @@ try {
 
     // ---- ACTUAL vs BUDGET (PF dashboard only, opt-in via opts.cmpMode) ----
     // A month MULTI-SELECT (Jan..Dec checkboxes + Select all) drives a side-by-side
-    // Actual vs Budget table. Counts and dollars are summed over the SELECTED
-    // months via the existing rollup(); pct is averaged (or pooled if a metric
-    // declares basisNum/basisDen). NO delta column in this view.
+    // Actual vs Budget table. Each selected month is its OWN column group (Actual +
+    // Budget), values read straight from dataset.months[Month].rows - NO summing
+    // across months. A thick divider (mstart) starts each month group and the
+    // Budget column is shaded (budget). NO delta column in this view.
     if (opts.cmpMode && period === 'compare') {
       banner.style.display = 'none';
       scopeBox.innerHTML = '';
@@ -13014,10 +13018,10 @@ try {
       // two-row header: month name (colspan 2) over Actual | Budget
       var topRow = '<tr><th class="metric-col" rowspan="2">Metric</th>'
         + cmpMonths.map(function (m) {
-            return '<th colspan="2" style="text-align:center">' + E(m) + ' ' + E(dataset.year) + '</th>';
+            return '<th colspan="2" class="mstart" style="text-align:center">' + E(m) + ' ' + E(dataset.year) + '</th>';
           }).join('') + '</tr>';
       var subRow = '<tr>'
-        + cmpMonths.map(function () { return '<th>Actual</th><th>Budget</th>'; }).join('') + '</tr>';
+        + cmpMonths.map(function () { return '<th class="mstart">Actual</th><th class="budget">Budget</th>'; }).join('') + '</tr>';
       thead.innerHTML = topRow + subRow;
 
       // index each month's rows by metric name for direct lookup (no sum)
@@ -13043,8 +13047,8 @@ try {
         cmpMonths.forEach(function (m) {
           var pair = cellPair(byMonth[m][mm.metric]);
           var a = pair[0], b = pair[1];
-          row += '<td' + (a == null ? ' class="num-na"' : '') + '>' + E(a == null ? 'N/A' : a) + '</td>'
-              + '<td' + (b == null ? ' class="num-na"' : '') + '>' + E(b == null ? '-' : b) + '</td>';
+          row += '<td class="mstart' + (a == null ? ' num-na' : '') + '">' + E(a == null ? 'N/A' : a) + '</td>'
+              + '<td class="budget' + (b == null ? ' num-na' : '') + '">' + E(b == null ? '-' : b) + '</td>';
         });
         return '<tr>' + row + '</tr>';
       }).join('');
