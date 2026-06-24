@@ -12997,30 +12997,56 @@ try {
           });
         });
       }
-      // only sum months that actually have data
-      var cmpMonths = selected.filter(function (m) { return dataset.monthHasData[m]; });
+      // PER-MONTH SIDE-BY-SIDE: each selected month with data is its OWN column
+      // group (Actual + Budget), in CALENDAR order. Values come straight from
+      // dataset.months[Month].rows - NO summing/rollup across months. No delta.
+      var cmpMonths = dataset.monthOrder.filter(function (m) {
+        return selected.indexOf(m) >= 0 && dataset.monthHasData[m];
+      });
       cards.innerHTML = '';
-      thead.innerHTML = '<tr><th class="metric-col">Metric</th><th>Actual</th><th>Budget</th></tr>';
       if (!cmpMonths.length) {
+        thead.innerHTML = '<tr><th class="metric-col">Metric</th></tr>';
         tbody.innerHTML = '<tr><td class="metric-col">'
           + (selected.length ? 'No data for the selected months.' : 'Select one or more months to compare.')
           + '</td></tr>';
         return;
       }
-      var crows = rollup(dataset, cmpMonths);
-      tbody.innerHTML = crows.map(function (r) {
-        var actual, budget;
-        if (r.type === 'count') { actual = count(r.qtyActual); budget = count(r.qtyGoal); }
-        else if (r.type === 'count_money') {
-          actual = (count(r.qtyActual) || '-') + ' / ' + (moneyFull(r.amtActual) || '-');
-          budget = (count(r.qtyGoal) || '-') + ' / ' + (moneyFull(r.amtBudget) || '-');
-        } else if (r.type === 'pct') { actual = pct(r.amtActual); budget = pct(r.amtBudget); }
-        else { actual = moneyFull(r.amtActual); budget = moneyFull(r.amtBudget); }
-        return '<tr>'
-          + '<td class="metric-col">' + E(r.metric) + '</td>'
-          + '<td' + (actual == null ? ' class="num-na"' : '') + '>' + E(actual == null ? 'N/A' : actual) + '</td>'
-          + '<td' + (budget == null ? ' class="num-na"' : '') + '>' + E(budget == null ? '-' : budget) + '</td>'
-          + '</tr>';
+      // two-row header: month name (colspan 2) over Actual | Budget
+      var topRow = '<tr><th class="metric-col" rowspan="2">Metric</th>'
+        + cmpMonths.map(function (m) {
+            return '<th colspan="2" style="text-align:center">' + E(m) + ' ' + E(dataset.year) + '</th>';
+          }).join('') + '</tr>';
+      var subRow = '<tr>'
+        + cmpMonths.map(function () { return '<th>Actual</th><th>Budget</th>'; }).join('') + '</tr>';
+      thead.innerHTML = topRow + subRow;
+
+      // index each month's rows by metric name for direct lookup (no sum)
+      var byMonth = {};
+      cmpMonths.forEach(function (m) {
+        var idx = {};
+        ((dataset.months[m] || {}).rows || []).forEach(function (r) { idx[r.metric] = r; });
+        byMonth[m] = idx;
+      });
+      // format one month's Actual / Budget pair for a metric row (its OWN values).
+      function cellPair(r) {
+        if (!r) return ['', ''];
+        if (r.type === 'count') return [count(r.qtyActual), count(r.qtyGoal)];
+        if (r.type === 'count_money') return [
+          (count(r.qtyActual) || '-') + ' / ' + (moneyFull(r.amtActual) || '-'),
+          (count(r.qtyGoal) || '-') + ' / ' + (moneyFull(r.amtBudget) || '-'),
+        ];
+        if (r.type === 'pct') return [pct(r.amtActual), pct(r.amtBudget)];
+        return [moneyFull(r.amtActual), moneyFull(r.amtBudget)];
+      }
+      tbody.innerHTML = dataset.metricsMeta.map(function (mm) {
+        var row = '<td class="metric-col">' + E(mm.metric) + '</td>';
+        cmpMonths.forEach(function (m) {
+          var pair = cellPair(byMonth[m][mm.metric]);
+          var a = pair[0], b = pair[1];
+          row += '<td' + (a == null ? ' class="num-na"' : '') + '>' + E(a == null ? 'N/A' : a) + '</td>'
+              + '<td' + (b == null ? ' class="num-na"' : '') + '>' + E(b == null ? '-' : b) + '</td>';
+        });
+        return '<tr>' + row + '</tr>';
       }).join('');
       return;
     }

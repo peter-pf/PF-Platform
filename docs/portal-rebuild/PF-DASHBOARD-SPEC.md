@@ -210,3 +210,41 @@ months" message renders (no NaN, no crash).
   vs 120; Jan+Mar(24) < Annual(144). No Delta column (head = Metric|Actual|Budget).
 - No regression: PF Month (June 12), Quarter (Q2 36), YTD (Jan-Jun 72) unchanged;
   Precon + BD untouched. Deploy OK; gate 401 on / and /data/pf-dashboard.js.
+
+## Actual vs Budget: per-month side-by-side (revised 2026-06-24)
+
+Brad clarified the Actual vs Budget view: each checked month is its OWN column
+group laid side by side, NOT summed into one pair. The month multi-select +
+"Actual vs Budget" mode button are unchanged; only the TABLE render changed.
+
+### Layout
+- Column 1: Metric.
+- Then, for EACH selected month with data (in CALENDAR order Jan..Dec regardless
+  of click order), a month COLUMN GROUP: a two-row header with the month name
+  ("January 2026") spanning two sub-columns "Actual" and "Budget".
+- So Jan+Feb+Mar yields: Metric | Jan Actual | Jan Budget | Feb Actual | Feb
+  Budget | Mar Actual | Mar Budget (1 + 2*N columns).
+- Each cell is that SINGLE month's value, read straight from
+  dataset.months[Month].rows (NO rollup/sum for this view). Per metric type:
+  money -> $actual vs $budget; count -> qtyActual vs qtyGoal (goal=budget);
+  count_money -> "qty / $" in both Actual and Budget; pct -> that month's actual %
+  vs budget % (each month standalone, not averaged).
+- NO delta column anywhere.
+- No-data months stay DISABLED in the checklist, so only real months become
+  columns. "Select all / Annual" -> all 12 data-months as side-by-side columns
+  (the table wrap scrolls horizontally). None selected / none with data -> clean
+  "Select one or more months" message.
+
+### Guardrails (unchanged)
+- OPT-IN via opts.cmpMode (PF draw only). Precon + BD untouched (no cmpMode, no
+  compare button: one data-period=compare, one cmpMode passer). pf-dashboard.js
+  stays financials_global (owners only). No mail, no new data surface. Other
+  views (Week/Month/Quarter/YTD/Annual) unchanged.
+
+### Verification (2026-06-24)
+- test-rbac.mjs 661 pass / 0 fail (no RBAC change).
+- Jan+Feb+Mar: 3 month groups, each Actual+Budget; each cell = that month's own
+  feed value (Jan Bids Sent 12/$1M from the Jan row, NOT 36/$3M summed); pct shows
+  each month's own 40% actual vs 50% budget; 7 columns (1 + 2*3), NO delta.
+- No regression: Month/Quarter/YTD/Annual unchanged; Precon/BD byte-identical.
+- Deploy OK; gate 401 on / and /data/pf-dashboard.js.
