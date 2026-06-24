@@ -1871,6 +1871,8 @@ window.progress = (function () {
       <a class="nav-item" data-module="dead-set" onclick="showModule('dead-set')">Dead Set</a>
       <!-- 4e) Historical Bid Log - per-year win/loss archive (read-only). -->
       <a class="nav-item" data-module="precon-historical" onclick="showModule('precon-historical')">Historical Bid Log</a>
+      <!-- 4f) Action Items + auto bid calendar (write-back via /api/precon-action). -->
+      <a class="nav-item" data-module="precon-actions" onclick="showModule('precon-actions')">Action Items &amp; Calendar</a>
     </div>
 
     <!-- 5) PROJECT MANAGEMENT -->
@@ -2425,6 +2427,53 @@ document.addEventListener('click', function(e) {
     </div>
   </div>
 
+  <div class="module-view" id="mod-precon-actions">
+    <!-- Action items (date-based to-dos with a completion log) + an auto bid
+         calendar (upcoming bid due dates from precon-pipeline.js merged with open
+         action items). Write-back via /api/precon-action. preconstruction area;
+         field_ops server-DENIED. All data via window.esc. Priority is derived
+         from due dates (overdue / due soon / upcoming), never hardcoded. -->
+    <style>
+      #mod-precon-actions .pa-tabs { display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; }
+      #mod-precon-actions .pa-tab { padding:7px 14px; border:1px solid var(--border,#2a2f3a); border-radius:8px; cursor:pointer; }
+      #mod-precon-actions .pa-tab.active { background:var(--surface-2,#1b212c); border-color:var(--accent,#2f6df6); }
+      #mod-precon-actions .pa-pane { display:none; }
+      #mod-precon-actions .pa-pane.active { display:block; }
+      #mod-precon-actions .pa-card { border:1px solid var(--border,#2a2f3a); border-radius:8px; padding:12px 14px; margin-bottom:10px; }
+      #mod-precon-actions .pa-form { display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; }
+      #mod-precon-actions .pa-form label { font-size:11px; color:var(--text-3,#8a93a6); }
+      #mod-precon-actions .pa-form input, #mod-precon-actions .pa-form select, #mod-precon-actions .pa-form textarea { display:block; padding:6px 9px; }
+      #mod-precon-actions .pa-form textarea { flex:1 1 100%; min-height:42px; }
+      #mod-precon-actions .pa-group-label { font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-3,#8a93a6); margin:14px 0 4px; }
+      #mod-precon-actions .pa-item { display:flex; gap:10px; align-items:flex-start; border-top:1px solid var(--border,#2a2f3a); padding:8px 0; }
+      #mod-precon-actions .pa-item .body { flex:1 1 auto; min-width:0; }
+      #mod-precon-actions .pa-item .title { font-weight:600; }
+      #mod-precon-actions .pa-item .meta { font-size:12px; color:var(--text-3,#8a93a6); }
+      #mod-precon-actions .pa-done .title { color:var(--text-3,#8a93a6); text-decoration:line-through; }
+      #mod-precon-actions .pa-done { opacity:.7; }
+      #mod-precon-actions .pa-prio { font-size:11px; padding:1px 8px; border-radius:10px; }
+      #mod-precon-actions .pa-prio.overdue { background:rgba(229,83,75,.16); color:#e5534b; }
+      #mod-precon-actions .pa-prio.due-soon { background:rgba(210,153,34,.18); color:#d29922; }
+      #mod-precon-actions .pa-prio.upcoming { background:rgba(63,185,80,.14); color:#3fb950; }
+      #mod-precon-actions .pa-prio.none { background:var(--surface-2,#1b212c); color:var(--text-3,#8a93a6); }
+      #mod-precon-actions .pa-muted { color:var(--text-3,#8a93a6); }
+      #mod-precon-actions .pa-err { color:#e5534b; font-size:13px; }
+      #mod-precon-actions .pa-cal-row { display:flex; gap:10px; border-top:1px solid var(--border,#2a2f3a); padding:7px 0; font-size:13px; }
+      #mod-precon-actions .pa-cal-row .date { flex:0 0 110px; color:var(--text-3,#8a93a6); }
+      #mod-precon-actions .pa-cal-row .kind { flex:0 0 70px; font-size:11px; }
+      #mod-precon-actions .pa-btn-sm { font-size:12px; padding:3px 9px; }
+    </style>
+    <div id="paNoData" class="pa-muted" style="display:none">Action items not available for your role.</div>
+    <div id="paWrap">
+      <div class="pa-tabs">
+        <div class="pa-tab active" data-pane="actions">Action items</div>
+        <div class="pa-tab" data-pane="calendar">Bid calendar</div>
+      </div>
+      <div class="pa-pane active" id="paPaneActions"></div>
+      <div class="pa-pane" id="paPaneCalendar"></div>
+    </div>
+  </div>
+
   <!-- Awarded Projects index - populated client-side by initAwardedProjects() from window.PF_AWARDED (data/awarded-projects.js). -->
   <div class="module-view" id="mod-awarded-projects">
     <div id="awardedRoot" class="pf-index-root"></div>
@@ -2728,6 +2777,7 @@ const moduleTitles = {
   'precon-hp-not-awarded': 'Helical Pilings - Not Awarded',
   'dead-set': 'Dead Set - Not Awarded / Lost Bids',
   'precon-historical': 'Historical Bid Log',
+  'precon-actions': 'Action Items & Calendar',
   'awarded-projects': 'Awarded Projects',
   'project-record': 'Project Record',
   'fo-timesheets': 'TimeSheets - Weekly',
@@ -14186,6 +14236,248 @@ try {
 })();
 } catch (e) {
   console.error('Module precon-historical failed to load:', e);
+}
+</script>
+
+<script>
+// ============================================================
+// MODULE: precon-actions — Action items + auto bid calendar
+// Action items via /api/precon-action (preconstruction, write-back). Calendar
+// merges open bid Due Dates (window.PF_PRECON, open buckets, future-or-overdue)
+// with open action items, grouped Overdue / This week / Later. field_ops is
+// server-DENIED the endpoint + the precon feed. All data via window.esc.
+// Priority is DERIVED from due dates (server + client agree), never hardcoded.
+// ============================================================
+try {
+(function () {
+  'use strict';
+  var E = window.esc || function (s) { return s == null ? '' : String(s); };
+  var DAY = 24 * 60 * 60 * 1000;
+  var state = { loaded: false, actions: [], pane: 'actions' };
+
+  function api(path, opts) {
+    return fetch(path, Object.assign({ credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' } }, opts || {}))
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); });
+  }
+
+  // Days from today (UTC midnight) to an ISO date string, or null if unparseable.
+  function daysUntil(dateStr) {
+    if (!dateStr) return null;
+    var d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00Z');
+    if (isNaN(d.getTime())) return null;
+    var now = new Date();
+    var today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    return Math.round((d.getTime() - today) / DAY);
+  }
+  function priorityOf(dateStr) {
+    var dd = daysUntil(dateStr);
+    if (dd == null) return 'none';
+    if (dd < 0) return 'overdue';
+    if (dd <= 7) return 'due-soon';
+    return 'upcoming';
+  }
+
+  function load() {
+    var noData = document.getElementById('paNoData');
+    var wrap = document.getElementById('paWrap');
+    api('/api/precon-action').then(function (res) {
+      if (res.status === 403) { if (noData) noData.style.display = ''; if (wrap) wrap.style.display = 'none'; return; }
+      if (noData) noData.style.display = 'none';
+      if (wrap) wrap.style.display = '';
+      state.actions = (res.ok && res.body && Array.isArray(res.body.actions)) ? res.body.actions : [];
+      state.loaded = true;
+      wireTabs();
+      renderPane();
+    }).catch(function () {
+      if (wrap) wrap.style.display = '';
+      state.actions = [];
+      wireTabs();
+      renderPane();
+    });
+  }
+
+  function wireTabs() {
+    document.querySelectorAll('#mod-precon-actions .pa-tab').forEach(function (t) {
+      if (t.dataset.wired) return; t.dataset.wired = '1';
+      t.addEventListener('click', function () {
+        state.pane = this.getAttribute('data-pane');
+        document.querySelectorAll('#mod-precon-actions .pa-tab').forEach(function (x) { x.classList.remove('active'); });
+        this.classList.add('active');
+        document.querySelectorAll('#mod-precon-actions .pa-pane').forEach(function (p) { p.classList.remove('active'); });
+        var pane = document.getElementById('paPane' + (state.pane === 'actions' ? 'Actions' : 'Calendar'));
+        if (pane) pane.classList.add('active');
+        renderPane();
+      });
+    });
+  }
+
+  function renderPane() {
+    if (state.pane === 'actions') return renderActions();
+    return renderCalendar();
+  }
+
+  // ---- ACTION ITEMS ----
+  function renderActions() {
+    var host = document.getElementById('paPaneActions');
+    if (!host) return;
+    var open = state.actions.filter(function (a) { return a.status !== 'done'; });
+    var done = state.actions.filter(function (a) { return a.status === 'done'; });
+    // sort open by due date ascending (no date last); overdue first naturally
+    open.sort(function (a, b) {
+      var da = daysUntil(a.dueDate), db = daysUntil(b.dueDate);
+      if (da == null && db == null) return 0;
+      if (da == null) return 1;
+      if (db == null) return -1;
+      return da - db;
+    });
+    done.sort(function (a, b) { return String(b.completedAt || '').localeCompare(String(a.completedAt || '')); });
+
+    var form = '<div class="pa-card"><div class="pa-form">'
+      + '<div><label>Title</label><input type="text" id="paTitle" maxlength="300" placeholder="What needs doing"></div>'
+      + '<div><label>Due date</label><input type="date" id="paDue"></div>'
+      + '<div><label>Assignee</label><input type="text" id="paAssignee" maxlength="300" placeholder="Who"></div>'
+      + '<div><label>Linked bid id</label><input type="text" id="paBid" maxlength="300" placeholder="optional"></div>'
+      + '<div><label>&nbsp;</label><button type="button" class="btn" id="paAdd">Add action</button></div>'
+      + '<textarea id="paNote" maxlength="4000" placeholder="Note (optional)"></textarea>'
+      + '<div class="pa-err" id="paMsg"></div>'
+      + '</div></div>';
+
+    var openHtml = open.length ? open.map(actionRow).join('') : '<div class="pa-muted">No open action items.</div>';
+    var doneHtml = done.length ? done.map(actionRow).join('') : '<div class="pa-muted">Nothing completed yet.</div>';
+
+    host.innerHTML = form
+      + '<div class="pa-group-label">Open (' + open.length + ')</div>' + openHtml
+      + '<div class="pa-group-label">Completed (' + done.length + ')</div>' + doneHtml;
+
+    var addBtn = document.getElementById('paAdd');
+    if (addBtn) addBtn.addEventListener('click', addAction);
+    host.querySelectorAll('[data-complete]').forEach(function (b) {
+      b.addEventListener('click', function () { act('complete', this.getAttribute('data-complete')); });
+    });
+    host.querySelectorAll('[data-reopen]').forEach(function (b) {
+      b.addEventListener('click', function () { act('reopen', this.getAttribute('data-reopen')); });
+    });
+    host.querySelectorAll('[data-delete]').forEach(function (b) {
+      b.addEventListener('click', function () { act('delete', this.getAttribute('data-delete')); });
+    });
+  }
+
+  function actionRow(a) {
+    var prio = priorityOf(a.dueDate);
+    var done = a.status === 'done';
+    var meta = [];
+    if (a.dueDate) meta.push('due ' + E(a.dueDate));
+    if (a.assignee) meta.push(E(a.assignee));
+    if (a.linkedBidId) meta.push('bid ' + E(a.linkedBidId));
+    if (done && a.completedBy) meta.push('done by ' + E(a.completedBy) + ' ' + E((a.completedAt || '').slice(0, 10)));
+    var buttons = done
+      ? '<button type="button" class="btn pa-btn-sm" data-reopen="' + E(a.id) + '">Reopen</button>'
+      : '<button type="button" class="btn pa-btn-sm" data-complete="' + E(a.id) + '">Complete</button>';
+    buttons += ' <button type="button" class="btn pa-btn-sm" data-delete="' + E(a.id) + '">Delete</button>';
+    return '<div class="pa-item' + (done ? ' pa-done' : '') + '">'
+      + (done ? '' : '<span class="pa-prio ' + prio + '">' + E(prio) + '</span>')
+      + '<div class="body"><div class="title">' + E(a.title) + '</div>'
+      + '<div class="meta">' + meta.join('  •  ') + '</div>'
+      + (a.note ? '<div class="meta">' + E(a.note) + '</div>' : '') + '</div>'
+      + '<div>' + buttons + '</div></div>';
+  }
+
+  function addAction() {
+    var msg = document.getElementById('paMsg');
+    var title = (document.getElementById('paTitle').value || '').trim();
+    if (!title) { msg.textContent = 'A title is required.'; return; }
+    var payload = {
+      action: 'create',
+      title: title,
+      dueDate: document.getElementById('paDue').value,
+      assignee: document.getElementById('paAssignee').value,
+      linkedBidId: document.getElementById('paBid').value,
+      note: document.getElementById('paNote').value,
+    };
+    api('/api/precon-action', { method: 'POST', body: JSON.stringify(payload) }).then(function (res) {
+      if (!res.ok || !res.body || !res.body.saved) { msg.textContent = (res.body && res.body.message) || 'Save failed.'; return; }
+      state.actions.push(res.body.record);
+      renderActions();
+    }).catch(function () { msg.textContent = 'Network error.'; });
+  }
+
+  function act(action, id) {
+    api('/api/precon-action', { method: 'POST', body: JSON.stringify({ action: action, id: id }) }).then(function (res) {
+      if (!res.ok || !res.body || !res.body.saved) return;
+      if (action === 'delete') {
+        state.actions = state.actions.filter(function (a) { return a.id !== id; });
+      } else {
+        var i = state.actions.findIndex(function (a) { return a.id === id; });
+        if (i >= 0) state.actions[i] = res.body.record;
+      }
+      renderActions();
+    }).catch(function () {});
+  }
+
+  // ---- BID CALENDAR (agenda) ----
+  function calendarEntries() {
+    var entries = [];
+    // open action items with a due date
+    state.actions.forEach(function (a) {
+      if (a.status === 'done' || !a.dueDate) return;
+      entries.push({ date: a.dueDate, kind: 'action', label: a.title, sub: a.assignee || '' });
+    });
+    // upcoming bid due dates from open precon buckets (not awarded/not_awarded)
+    var D = window.PF_PRECON;
+    if (D) {
+      ['ap', 'hp'].forEach(function (disc) {
+        if (!D[disc]) return;
+        Object.keys(D[disc]).forEach(function (bucket) {
+          if (bucket === 'awarded' || bucket === 'not_awarded') return;
+          (D[disc][bucket] || []).forEach(function (p) {
+            var due = p.due_date || (p.fields && p.fields['Due Date']) || '';
+            if (!due) return;
+            var dd = daysUntil(due);
+            if (dd == null) return;
+            entries.push({ date: String(due).slice(0, 10), kind: 'bid',
+              label: (p.name || (p.fields && p.fields['Project Name']) || ''),
+              sub: (p.gc || (p.fields && p.fields['General Contractor']) || '') });
+          });
+        });
+      });
+    }
+    return entries;
+  }
+
+  function renderCalendar() {
+    var host = document.getElementById('paPaneCalendar');
+    if (!host) return;
+    var entries = calendarEntries();
+    entries.sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); });
+    var groups = { Overdue: [], 'This week': [], Later: [] };
+    entries.forEach(function (e) {
+      var dd = daysUntil(e.date);
+      if (dd == null) return;
+      if (dd < 0) groups.Overdue.push(e);
+      else if (dd <= 7) groups['This week'].push(e);
+      else groups.Later.push(e);
+    });
+    function rowsFor(list) {
+      return list.length ? list.map(function (e) {
+        return '<div class="pa-cal-row"><span class="date">' + E(e.date) + '</span>'
+          + '<span class="kind pa-prio ' + (e.kind === 'bid' ? 'upcoming' : 'none') + '">' + E(e.kind) + '</span>'
+          + '<span>' + E(e.label) + (e.sub ? ' <span class="pa-muted">' + E(e.sub) + '</span>' : '') + '</span></div>';
+      }).join('') : '<div class="pa-muted" style="font-size:13px">Nothing here.</div>';
+    }
+    host.innerHTML = '<div class="pa-card"><div class="pa-muted" style="font-size:12px;margin-bottom:6px">'
+      + 'Upcoming bid due dates (open buckets) merged with open action items. Read-only agenda.</div>'
+      + '<div class="pa-group-label">Overdue (' + groups.Overdue.length + ')</div>' + rowsFor(groups.Overdue)
+      + '<div class="pa-group-label">This week (' + groups['This week'].length + ')</div>' + rowsFor(groups['This week'])
+      + '<div class="pa-group-label">Later (' + groups.Later.length + ')</div>' + rowsFor(groups.Later)
+      + '</div>';
+  }
+
+  var prev = window.showModule;
+  window.showModule = function (id) { if (typeof prev === 'function') prev(id); if (id === 'precon-actions') { load(); } };
+})();
+} catch (e) {
+  console.error('Module precon-actions failed to load:', e);
 }
 </script>
 </body>

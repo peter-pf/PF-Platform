@@ -434,6 +434,10 @@ export function areaForPath(pathname) {
     // admin + partner + business_dev; field_ops BLOCKED by direct URL too. The
     // handler also calls requireArea(session, 'preconstruction').
     if (pathname.startsWith('/api/precon-log'))     return 'preconstruction';
+    // Precon action items (date-based to-dos feeding the bid calendar). BD
+    // domain: admin + partner + business_dev; field_ops BLOCKED by direct URL.
+    // The handler also calls requireArea(session, 'preconstruction').
+    if (pathname.startsWith('/api/precon-action'))  return 'preconstruction';
     // BD CRM write-back (companies/contacts overlay + interactions log). BD's
     // own tool: admin + partner + business_dev allowed; field_ops BLOCKED by
     // direct URL too. Each endpoint ALSO calls requireArea('business_dev').

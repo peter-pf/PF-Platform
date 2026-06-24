@@ -832,6 +832,40 @@ section('Precon Historical feed shape (generated)');
   ok('feed carries source_url (SharePoint link)', /sharepoint/i.test(hJson.source_url || ''));
 }
 
+// --- PRECON ACTION ITEMS + bid calendar ------------------------------------
+section('Precon action items: /api/precon-action -> preconstruction');
+for (const p of ['/api/precon-action', '/api/precon-action?x=1']) {
+  const area = areaForPath(p.split('?')[0]);
+  ok(`${p} -> preconstruction (${area})`, area === 'preconstruction');
+  ok(`${p} ALLOWED for admin`, roleCanAccess('admin', area) === true);
+  ok(`${p} ALLOWED for partner`, roleCanAccess('partner', area) === true);
+  ok(`${p} ALLOWED for business_dev`, roleCanAccess('business_dev', area) === true);
+  ok(`${p} BLOCKED for field_ops`, roleCanAccess('field_ops', area) === false);
+}
+ok('requireArea(field_ops, precon-action area) => 403',
+   requireArea({ uid: 'fo', role: 'field_ops', name: 'Crew' }, areaForPath('/api/precon-action'))?.status === 403);
+ok('requireArea(business_dev, precon-action area) => null (allowed)',
+   requireArea({ uid: 'bd', role: 'business_dev', name: 'BD' }, areaForPath('/api/precon-action')) === null);
+ok('requireArea(partner, precon-action area) => null (allowed)',
+   requireArea({ uid: 'p', role: 'partner', name: 'JR' }, areaForPath('/api/precon-action')) === null);
+ok('requireArea(admin, precon-action area) => null (allowed)',
+   requireArea({ uid: 'a', role: 'admin', name: 'Brad' }, areaForPath('/api/precon-action')) === null);
+ok('requireArea(null, precon-action area) => 403 (fail closed)',
+   requireArea(null, areaForPath('/api/precon-action'))?.status === 403);
+
+section('Precon action items: source-level guards + NO mail');
+{
+  const src = readFileSync(join(__dir, '../functions/api/precon-action.js'), 'utf8');
+  ok('precon-action imports requireArea', /import\s*\{[^}]*requireArea[^}]*\}\s*from/.test(src));
+  ok('precon-action GET+POST both guard preconstruction', (src.match(/requireArea\([^)]*['"]preconstruction['"]\)/g) || []).length >= 2);
+  ok('precon-action uses env.PF_SCHEDULE', /env\.PF_SCHEDULE/.test(src));
+  ok('precon-action derives priority from dueDate', /function derivePriority/.test(src));
+  ok('precon-action documents the KV read-modify-write race', /read-modify-write/.test(src));
+  const noComments = src.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
+  ok('precon-action makes NO fetch / outbound call', !/\bfetch\s*\(/.test(noComments) && !/https?:\/\//.test(noComments));
+  ok('precon-action calls NO mail API', !/sendMail|\/messages|smtp|nodemailer|mailgun|sendgrid/i.test(noComments));
+}
+
 // --- summary ----------------------------------------------------------------
 console.log(`\n${'='.repeat(48)}`);
 console.log(`RESULT: ${pass} passed, ${fail} failed`);
