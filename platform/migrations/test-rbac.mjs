@@ -866,6 +866,56 @@ section('Precon action items: source-level guards + NO mail');
   ok('precon-action calls NO mail API', !/sendMail|\/messages|smtp|nodemailer|mailgun|sendgrid/i.test(noComments));
 }
 
+// --- PM: award->PM handoff endpoint + Project Dashboard tracked items --------
+section('PM handoff: /api/pm-project -> preconstruction');
+for (const p of ['/api/pm-project', '/api/pm-project?x=1']) {
+  const area = areaForPath(p.split('?')[0]);
+  ok(`${p} -> preconstruction (${area})`, area === 'preconstruction');
+  ok(`${p} ALLOWED for admin`, roleCanAccess('admin', area) === true);
+  ok(`${p} ALLOWED for partner`, roleCanAccess('partner', area) === true);
+  ok(`${p} ALLOWED for business_dev`, roleCanAccess('business_dev', area) === true);
+  ok(`${p} BLOCKED for field_ops`, roleCanAccess('field_ops', area) === false);
+}
+ok('requireArea(field_ops, pm-project area) => 403',
+   requireArea({ uid: 'fo', role: 'field_ops', name: 'Crew' }, areaForPath('/api/pm-project'))?.status === 403);
+ok('requireArea(business_dev, pm-project area) => null (allowed)',
+   requireArea({ uid: 'bd', role: 'business_dev', name: 'BD' }, areaForPath('/api/pm-project')) === null);
+ok('requireArea(null, pm-project area) => 403 (fail closed)',
+   requireArea(null, areaForPath('/api/pm-project'))?.status === 403);
+
+section('PM handoff: source-level guards + NO mail');
+{
+  const src = readFileSync(join(__dir, '../functions/api/pm-project.js'), 'utf8');
+  ok('pm-project imports requireArea', /import\s*\{[^}]*requireArea[^}]*\}\s*from/.test(src));
+  ok('pm-project GET+POST both guard preconstruction', (src.match(/requireArea\([^)]*['"]preconstruction['"]\)/g) || []).length >= 2);
+  ok('pm-project uses env.PF_SCHEDULE', /env\.PF_SCHEDULE/.test(src));
+  ok('pm-project derives next project number (YY-NNN)', /function nextNumber/.test(src) && /padStart\(3/.test(src));
+  ok('pm-project is idempotent by sourceBidId', /alreadyLinked/.test(src));
+  ok('pm-project documents the KV read-modify-write race', /read-modify-write/.test(src));
+  const noComments = src.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
+  ok('pm-project makes NO fetch / outbound call', !/\bfetch\s*\(/.test(noComments) && !/https?:\/\//.test(noComments));
+  ok('pm-project calls NO mail API', !/sendMail|\/messages|smtp|nodemailer|mailgun|sendgrid/i.test(noComments));
+}
+
+section('PM: Project Dashboard tracked items feed -> financials (field_ops blocked)');
+ok('/data/project-dashboard.js -> financials', areaForPath('/data/project-dashboard.js') === 'financials');
+ok('project-dashboard.js ALLOWED for admin', roleCanAccess('admin', areaForPath('/data/project-dashboard.js')) === true);
+ok('project-dashboard.js ALLOWED for partner', roleCanAccess('partner', areaForPath('/data/project-dashboard.js')) === true);
+ok('project-dashboard.js ALLOWED for business_dev', roleCanAccess('business_dev', areaForPath('/data/project-dashboard.js')) === true);
+ok('project-dashboard.js BLOCKED for field_ops', roleCanAccess('field_ops', areaForPath('/data/project-dashboard.js')) === false);
+
+section('PM: Project Dashboard feed shape + Financials section OMITTED');
+{
+  const pdFeed = readFileSync(join(__dir, '../data/project-dashboard.js'), 'utf8');
+  ok('project-dashboard.js exposes window.PF_PROJECT_DASHBOARD', /window\.PF_PROJECT_DASHBOARD\s*=/.test(pdFeed));
+  const pdJson = JSON.parse(pdFeed.replace(/^[\s\S]*?window\.PF_PROJECT_DASHBOARD\s*=/, '').replace(/;\s*$/, ''));
+  ok('feed has projects array', Array.isArray(pdJson.projects) && pdJson.projects.length > 0);
+  ok('each project has projectNumber + sections', pdJson.projects.every(p => p.projectNumber && Array.isArray(p.sections)));
+  ok('Financials section NOT ingested (sections list)', !pdJson.sections.some(s => /financ/i.test(s)));
+  ok('no G702/G703/retainage-billing item leaked', !/g702|g703|retainage billing|invoice due by/i.test(pdFeed));
+  ok('_omitted records the Financials section', Array.isArray(pdJson._omitted) && pdJson._omitted.some(o => /financ/i.test(o)));
+}
+
 // --- summary ----------------------------------------------------------------
 console.log(`\n${'='.repeat(48)}`);
 console.log(`RESULT: ${pass} passed, ${fail} failed`);

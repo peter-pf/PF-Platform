@@ -349,6 +349,8 @@ const DATA_FILE_AREAS = {
   '/data/budget-actual-poet.js':   'financials',      // PROJECT: per-job budget/cost/invoice/profit
   '/data/awarded-projects.js':     'financials',      // PROJECT: awarded-project contract values + GC
   '/data/project-master.json':     'financials',      // PROJECT: per-job contract_value/margin/profit
+  '/data/project-dashboard.js':    'financials',      // PROJECT: per-project tracked items (Financials section OMITTED) - admin/partner/business_dev, field_ops BLOCKED
+  '/data/pm-overlay.js':           'financials',      // PROJECT: KV-mirror placeholder (PM overlay read via /api/pm-project) - reserved
   '/data/project-history.js':      'financials',      // PROJECT: per-job ContractValue/totalContractValue
   '/data/precon-pipeline.js':      'preconstruction', // PROJECT/BD: opportunity pipeline ($ per opp) — BD domain
   '/data/precon-dashboard.js':     'preconstruction', // PROJECT/BD: precon PERIOD KPIs (invites/bids/awarded/win rate) — BD domain, field_ops BLOCKED
@@ -438,6 +440,10 @@ export function areaForPath(pathname) {
     // domain: admin + partner + business_dev; field_ops BLOCKED by direct URL.
     // The handler also calls requireArea(session, 'preconstruction').
     if (pathname.startsWith('/api/precon-action'))  return 'preconstruction';
+    // Award -> PM handoff (assign next project number, create PM project carrying
+    // BD/precon history). A precon action: admin + partner + business_dev;
+    // field_ops BLOCKED by direct URL. Handler also calls requireArea.
+    if (pathname.startsWith('/api/pm-project'))     return 'preconstruction';
     // BD CRM write-back (companies/contacts overlay + interactions log). BD's
     // own tool: admin + partner + business_dev allowed; field_ops BLOCKED by
     // direct URL too. Each endpoint ALSO calls requireArea('business_dev').
