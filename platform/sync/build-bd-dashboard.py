@@ -215,12 +215,19 @@ def build(xlsm_bytes, forced_year):
         months[mname] = {'rows': rows_out}
         month_has_data[mname] = any_data
 
+    # Detect template/identical-month data (parity with build-pf-dashboard.py):
+    # if every populated month is byte-identical, the feed is placeholder data.
+    def sig(m):
+        return json.dumps(months[m]['rows'], sort_keys=True)
+    populated = [m for m in MONTH_ORDER if month_has_data[m]]
+    is_template = len(populated) > 1 and len({sig(m) for m in populated}) == 1
+
     out = {
         'year': year,
         'sourceFile': SOURCE_FILE,
         'sourceTab': SOURCE_TAB,
         'syncedAt': datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
-        'isTemplateData': False,
+        'isTemplateData': is_template,
         'monthOrder': MONTH_ORDER,
         'quarters': QUARTERS,
         'monthHasData': month_has_data,

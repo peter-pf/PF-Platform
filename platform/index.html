@@ -12291,6 +12291,11 @@ try {
         _pctA: [], _pctB: []
       };
     });
+    // metricsMeta lookup so a pct metric can find its basis (numerator /
+    // denominator) count metrics for POOLED-ratio rollup (opt-in).
+    var metaByName = {};
+    meta.forEach(function (m) { metaByName[m.metric] = m; });
+
     monthNames.forEach(function (mn) {
       var mo = ds.months[mn];
       if (!mo) return;
@@ -12311,13 +12316,41 @@ try {
         }
       });
     });
+    // The summed count value of a metric over the period (qty for count /
+    // count_money; falls back to amt for an amount-only basis). Used by the
+    // pooled-ratio path below.
+    function basisSum(name) {
+      var b = acc[name];
+      if (!b) return null;
+      return (b.qtyActual != null) ? b.qtyActual : b.amtActual;
+    }
+
     // finalize pct + delta
     return meta.map(function (m) {
       var a = acc[m.metric];
       if (a.type === 'pct') {
-        a.amtActual = avg(a._pctA);
-        a.amtBudget = avg(a._pctB);
-        a.delta = (a.amtActual != null && a.amtBudget != null) ? (a.amtActual - a.amtBudget) : null;
+        var meta_m = metaByName[m.metric] || {};
+        // OPT-IN POOLED RATIO: a pct metric that declares basisNum + basisDen
+        // is rolled up as sum(numerator) / sum(denominator) over the period
+        // (the true pooled rate), NOT the mean of the monthly rates. pct
+        // metrics WITHOUT a basis (e.g. every company-dashboard margin) keep
+        // the existing averaging path untouched.
+        if (meta_m.basisNum && meta_m.basisDen) {
+          var dens = [].concat(meta_m.basisDen);
+          var num = basisSum(meta_m.basisNum);
+          var den = 0, denSeen = false;
+          dens.forEach(function (dn) {
+            var v = basisSum(dn);
+            if (v != null) { den += v; denSeen = true; }
+          });
+          a.amtActual = (denSeen && den > 0 && num != null) ? (num / den) : null;
+          a.amtBudget = avg(a._pctB); // target/budget pct still averages if present
+          a.delta = (a.amtActual != null && a.amtBudget != null) ? (a.amtActual - a.amtBudget) : null;
+        } else {
+          a.amtActual = avg(a._pctA);
+          a.amtBudget = avg(a._pctB);
+          a.delta = (a.amtActual != null && a.amtBudget != null) ? (a.amtActual - a.amtBudget) : null;
+        }
       } else {
         a.delta = (a.amtActual != null && a.amtBudget != null) ? (a.amtActual - a.amtBudget)
                 : (a.qtyActual != null && a.qtyGoal != null) ? (a.qtyActual - a.qtyGoal) : null;
@@ -12402,6 +12435,12 @@ try {
       banner.textContent = 'Heads up: the PF Dashboard tab currently holds identical placeholder values '
         + 'across all months (template not yet filled with real monthly actuals). Numbers below reflect '
         + 'the sheet as-is.';
+    } else if (opts.note) {
+      // Disclosed-proxy / omission note for real-data feeds (precon + BD). The
+      // template banner takes precedence; this only shows when it is not already
+      // showing, so the user always sees how the numbers were derived.
+      banner.style.display = '';
+      banner.textContent = opts.note;
     } else {
       banner.style.display = 'none';
     }
@@ -12490,7 +12529,7 @@ try {
   // ---- public component API (reusable for section dashboards) ----
   // mount(opts): wire a self-contained section dashboard. opts:
   //   { toggleId, ids:{cards,table,banner,meta,scope,scopeSel}, dataset|getData,
-  //     cardMetrics, scopeNoun, weekMsg, finStart, moduleId }
+  //     cardMetrics, scopeNoun, weekMsg, finStart, note, moduleId }
   // Returns a draw() fn. Used by mod-precon-dashboard + mod-bd-dashboard so they
   // reuse THIS engine instead of each shipping their own.
   function mount(cfg) {
@@ -12499,7 +12538,7 @@ try {
     function drawIt() {
       render(getDS(), st.period, st.scope, {
         ids: cfg.ids, cardMetrics: cfg.cardMetrics, scopeNoun: cfg.scopeNoun,
-        weekMsg: cfg.weekMsg, finStart: cfg.finStart,
+        weekMsg: cfg.weekMsg, finStart: cfg.finStart, note: cfg.note,
       });
     }
     function wire() {
@@ -12534,6 +12573,7 @@ try {
     cardMetrics: ['Bid Invites', 'Bids Sent', 'Awarded', 'Win Rate'],
     scopeNoun: 'Month',
     finStart: null,
+    note: 'Awarded and Not Awarded are dated by Date Submitted. The bid log has no separate award date column.',
     weekMsg: 'The bid log tracks dates per bid but this view rolls up MONTHLY. '
       + 'A weekly breakdown is not built yet, so the weekly view has no data.',
   });
@@ -12545,6 +12585,7 @@ try {
     cardMetrics: ['Interactions Logged', 'Companies Contacted', 'Total Companies', 'Total Opportunities'],
     scopeNoun: 'Month',
     finStart: null,
+    note: 'Opportunity status and new companies or contacts added are not shown. The source columns are blank. Companies Contacted is counted per month.',
     weekMsg: 'BD interactions are dated, but this view rolls up MONTHLY. '
       + 'A weekly breakdown is not built yet, so the weekly view has no data.',
   });

@@ -47,7 +47,7 @@ Metrics 7–16 (the financial side): Projects Billed, Monthly Income, Project/No
 
 Two NEW section dashboards now reuse the SAME `window.PFDashboard` engine that
 powers the company PF Dashboard. The engine's `render()` gained an optional
-4th `opts` arg (`{ids, cardMetrics, scopeNoun, weekMsg, finStart}`) plus a
+4th `opts` arg (`{ids, cardMetrics, scopeNoun, weekMsg, finStart, note}`) plus a
 `window.PFDashboard.mount(cfg)` helper, so each dashboard mounts its own DOM
 nodes (no duplicate IDs) and shares ONE codebase. Backward-compatible: the PF
 dashboard call is unchanged.
@@ -95,3 +95,25 @@ dashboard call is unchanged.
 - Both builders wired into `tools/platform_sync_boop.sh` (non-fatal) after the
   pf-dashboard step.
 - Both views show the same Week banner as the PF dashboard ("no weekly feed yet").
+
+### Review fixes (2026-06-24, post triple-review)
+- **User-visible disclosure note.** `render()` now takes an optional `opts.note`.
+  When present and the template/week banner is not already showing, the note is
+  rendered into the banner so the user always sees how the numbers were derived.
+  Precon note: "Awarded and Not Awarded are dated by Date Submitted. The bid log
+  has no separate award date column." BD note: "Opportunity status and new
+  companies or contacts added are not shown. The source columns are blank.
+  Companies Contacted is counted per month." The company PF Dashboard passes no
+  note, so its behavior is unchanged.
+- **Pooled Win Rate on quarter/annual.** A pct metric may declare
+  `basisNum` + `basisDen` in `metricsMeta`. `rollup()` then computes the rolled
+  value as sum(numerator) / sum(denominator) over the period (the true pooled
+  rate) instead of averaging the monthly rates. Win Rate declares
+  `basisNum: 'Awarded'`, `basisDen: ['Awarded', 'Not Awarded']`. Annual Win Rate
+  is now 46.67% (14 / 30 decided), not the 45.68% mean-of-months. pct metrics
+  WITHOUT a basis (every company-dashboard margin) keep the averaging path, proven
+  byte-identical across all periods.
+- **Real `isTemplateData`.** Both builders now compute the identical-month
+  signature check (parity with `build-pf-dashboard.py`) instead of hardcoding
+  False, so the template banner can fire if a feed ever fills with identical
+  months. Currently False (data is genuinely distinct).

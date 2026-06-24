@@ -511,6 +511,30 @@ section('Precon + BD dashboard feeds: generated shape sanity');
   ok('precon feed has metricsMeta', /"metricsMeta"/.test(preconSrc));
   ok('bd feed has metricsMeta', /"metricsMeta"/.test(bdSrc));
   ok('bd feed documents OMITTED metrics (no fabrication)', /"_omitted"/.test(bdSrc));
+
+  // FIX 2: Win Rate declares a pooled-ratio basis so quarter/annual rollups use
+  // sum(Awarded)/sum(Awarded+Not Awarded), not the mean of monthly rates.
+  const preconJson = JSON.parse(preconSrc.replace(/^[\s\S]*?window\.PF_PRECON_DASH\s*=/, '').replace(/;\s*$/, ''));
+  const winRate = preconJson.metricsMeta.find(m => m.metric === 'Win Rate');
+  ok('precon Win Rate metricsMeta exists', !!winRate);
+  ok('Win Rate declares basisNum = Awarded', winRate && winRate.basisNum === 'Awarded');
+  ok('Win Rate declares basisDen = [Awarded, Not Awarded]',
+     winRate && Array.isArray(winRate.basisDen) &&
+     winRate.basisDen.join(',') === 'Awarded,Not Awarded');
+  const names = preconJson.metricsMeta.map(m => m.metric);
+  ok('basisNum metric exists in feed', names.includes(winRate.basisNum));
+  ok('all basisDen metrics exist in feed', winRate.basisDen.every(n => names.includes(n)));
+  // No OTHER pct metric carries a basis (so company-dashboard margins, which
+  // live in a different feed, keep the averaging path; here we just assert the
+  // precon feed only attaches a basis to a ratio-of-counts metric).
+  preconJson.metricsMeta.forEach(function (m) {
+    if (m.metric !== 'Win Rate') {
+      ok(m.metric + ' carries NO basis (only ratio-of-counts gets pooled)', !m.basisNum && !m.basisDen);
+    }
+  });
+  ok('precon isTemplateData is a real computed boolean', typeof preconJson.isTemplateData === 'boolean');
+  const bdJson = JSON.parse(bdSrc.replace(/^[\s\S]*?window\.PF_BD_DASH\s*=/, '').replace(/;\s*$/, ''));
+  ok('bd isTemplateData is a real computed boolean', typeof bdJson.isTemplateData === 'boolean');
 }
 
 // Both new feeds DENIED to field_ops (consolidated, mirrors the spec ask).
