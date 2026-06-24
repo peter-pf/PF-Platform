@@ -38,9 +38,25 @@ export const VERSION = 'v1';
 
 function low(v) { return String(v == null ? '' : v).toLowerCase(); }
 
+const STATE_NAMES = {
+  ALABAMA: 'AL', ALASKA: 'AK', ARIZONA: 'AZ', ARKANSAS: 'AR', CALIFORNIA: 'CA',
+  COLORADO: 'CO', CONNECTICUT: 'CT', DELAWARE: 'DE', FLORIDA: 'FL', GEORGIA: 'GA',
+  HAWAII: 'HI', IDAHO: 'ID', ILLINOIS: 'IL', INDIANA: 'IN', IOWA: 'IA',
+  KANSAS: 'KS', KENTUCKY: 'KY', LOUISIANA: 'LA', MAINE: 'ME', MARYLAND: 'MD',
+  MASSACHUSETTS: 'MA', MICHIGAN: 'MI', MINNESOTA: 'MN', MISSISSIPPI: 'MS',
+  MISSOURI: 'MO', MONTANA: 'MT', NEBRASKA: 'NE', NEVADA: 'NV',
+  'NEW HAMPSHIRE': 'NH', 'NEW JERSEY': 'NJ', 'NEW MEXICO': 'NM', 'NEW YORK': 'NY',
+  'NORTH CAROLINA': 'NC', 'NORTH DAKOTA': 'ND', OHIO: 'OH', OKLAHOMA: 'OK',
+  OREGON: 'OR', PENNSYLVANIA: 'PA', 'RHODE ISLAND': 'RI', 'SOUTH CAROLINA': 'SC',
+  'SOUTH DAKOTA': 'SD', TENNESSEE: 'TN', TEXAS: 'TX', UTAH: 'UT', VERMONT: 'VT',
+  VIRGINIA: 'VA', WASHINGTON: 'WA', 'WEST VIRGINIA': 'WV', WISCONSIN: 'WI',
+  WYOMING: 'WY',
+};
+
 function stateCode(v) {
   const s = String(v == null ? '' : v).trim().toUpperCase();
   if (/^[A-Z]{2}$/.test(s)) return s;            // bare 2-letter code
+  if (STATE_NAMES[s]) return STATE_NAMES[s];     // full state name
   const m = s.match(/\b([A-Z]{2})\b\s*$/);        // trailing ", XX"
   return m ? m[1] : '';
 }
@@ -80,6 +96,13 @@ export function score(opp, now) {
   const sector = low(v.sector);
   const st = stateCode(v.state);
   const lead = daysUntil(v.dueDate, now);
+
+  // RULE 0: too little to judge -> REVIEW (do not read as a green light).
+  // If Sector, State, and Bid Due Date are all blank there is nothing to score.
+  if (!sector && !st && lead == null) {
+    reasons.push('Insufficient data to recommend. Add Sector, State, and Bid Due Date.');
+    return { recommendation: 'Review', reasons, rule: 'insufficient-data' };
+  }
 
   // RULE 1: out of scope (DOT / highway / heavy civil) -> PASS
   const oos = CONFIG.outOfScopeSectors.filter((w) => sector.indexOf(w) >= 0);
