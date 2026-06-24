@@ -117,3 +117,53 @@ dashboard call is unchanged.
   signature check (parity with `build-pf-dashboard.py`) instead of hardcoding
   False, so the template banner can fire if a feed ever fills with identical
   months. Currently False (data is genuinely distinct).
+
+## Period control: Year to Date + Annual year dropdown (2026-06-24)
+
+Brad reworked the "Annual" end of the PF Dashboard period toggle. The control is
+now: Week | Month | Quarter | Year to Date | Annual [year v]. This is the COMPANY
+PF Dashboard ONLY - it is OPT-IN via `opts.yearMode` so the shared engine's
+Precon + BD dashboards are unchanged (they pass no yearMode, have no YTD button).
+
+- **Year to Date (YTD):** sums the current year's months from January through the
+  CURRENT month, using the EASTERN clock (Intl timeZone America/New_York, the same
+  basis pm-project uses). Counts and dollars are summed and percentages averaged
+  by the existing `rollup()` (basis-pct like Win Rate uses its pooled basis).
+  Labeled "{year} Year to Date (through {Month})". If the feed year is not the
+  current Eastern year, a clean "No data entered for {year} year to date" banner
+  shows (no zeros, no crash). Verified: 2026 YTD (Jan-Jun, 6 months) = the sum of
+  those months, and is less than the 12-month Annual.
+
+- **Annual with a YEAR DROPDOWN:** options 2024 / 2025 / 2026 (PF started in 2024;
+  nothing earlier). Defaults to the current Eastern year. When the selected year
+  has no data in the feed (today: 2024 and 2025), a clean "No data entered for
+  {year}" banner shows with empty cards + table (no zeros, no NaN, no crash).
+
+- **Week | Month | Quarter unchanged.** Month/Quarter still operate on the current
+  year's months; Week keeps the existing "no weekly data" banner.
+
+### Data decision (years map)
+The feed (`build-pf-dashboard.py` -> `data/pf-dashboard.js`) stays a SINGLE-YEAR
+feed (the current year, 2026, from the "PF Dashboard" tab). The Annual year
+dropdown lists 2024/2025/2026 and the UI treats any year not equal to the feed's
+`year` as empty ("No data entered"). This was the cleaner option: no builder
+change, no new data surface, no RBAC change. When a prior year's data is added
+later, the simplest path is a follow-up that emits a years map
+(`years:{'2025':{...},'2026':{...}}`) and points the dropdown at it; the UI empty
+path already handles the gap until then.
+
+### Scope guardrails honored
+- OPT-IN: only the PF `draw()` passes `{ yearMode: true }`. Precon + BD mounts
+  (`window.PFDashboard.mount`) pass no yearMode -> their Week/Month/Quarter/Annual
+  behavior is byte-identical, and their toggles have no YTD button.
+- No RBAC/gating change: `/data/pf-dashboard.js` stays `financials_global`
+  (admin/partner only; business_dev + field_ops blocked). No new data surface.
+- No mail.
+
+### Verification (2026-06-24)
+- `node migrations/test-rbac.mjs`: 661 pass / 0 fail (RBAC unchanged - UI-only).
+- YTD 2026 = Jan-Jun rollup (Bids Sent qty 72 = manual sum; Annual 12mo = 144).
+  Annual 2025/2024 -> "No data entered" path (no NaN/crash).
+- PF Month (June=12) + Quarter (Q2=36) rollups reconcile (no regression). Precon +
+  BD render unchanged (no yearMode, single ytd button = the PF toggle).
+- Deploy OK; gate 401 with no creds on / and /data/pf-dashboard.js.

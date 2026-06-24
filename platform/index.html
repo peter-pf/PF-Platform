@@ -2793,6 +2793,7 @@ document.addEventListener('click', function(e) {
           <button type="button" class="pfdash-pbtn" data-period="week">Week</button>
           <button type="button" class="pfdash-pbtn" data-period="month">Month</button>
           <button type="button" class="pfdash-pbtn active" data-period="quarter">Quarter</button>
+          <button type="button" class="pfdash-pbtn" data-period="ytd">Year to Date</button>
           <button type="button" class="pfdash-pbtn" data-period="annual">Annual</button>
         </div>
         <div class="pfdash-scope" id="pfdashScope"></div>
@@ -12886,6 +12887,25 @@ try {
   // KPI cards shown at top (the headline metrics).
   var CARD_METRICS = ['Bids Sent', 'Projects Awarded (LOI)', 'Net Monthly Income', 'Net Monthly Margin'];
 
+  // ---- Eastern-clock year/month (consistent with pm-project) ----
+  // PF Dashboard YTD + the Annual year dropdown key off the Eastern (New York)
+  // clock. Returns { year:'2026', monthIndex:0..11 }.
+  function easternNow() {
+    try {
+      var parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York', year: 'numeric', month: 'numeric',
+      }).formatToParts(new Date());
+      var y = '', m = '1';
+      parts.forEach(function (p) { if (p.type === 'year') y = p.value; if (p.type === 'month') m = p.value; });
+      return { year: y || String(new Date().getFullYear()), monthIndex: Math.max(0, (parseInt(m, 10) || 1) - 1) };
+    } catch (e) {
+      var d = new Date();
+      return { year: String(d.getFullYear()), monthIndex: d.getMonth() };
+    }
+  }
+  // Annual year-dropdown options (PF started in 2024).
+  var PF_ANNUAL_YEARS = ['2024', '2025', '2026'];
+
   // Default mount-node IDs (the company PF dashboard). Section dashboards pass
   // their OWN id map via opts.ids so multiple dashboards can coexist in the DOM.
   var DEFAULT_IDS = {
@@ -12955,7 +12975,49 @@ try {
     var rows, scopeLabel, scopeOptions = '';
     var monthsAvail = dataset.monthOrder.filter(function (m) { return dataset.monthHasData[m]; });
 
-    if (period === 'annual') {
+    // YEAR TO DATE (PF dashboard only, opt-in via opts.yearMode). Sum Jan..the
+    // CURRENT Eastern month of the current year. The single-year feed holds the
+    // current year, so YTD = those months that have data up to the current month.
+    if (opts.yearMode && period === 'ytd') {
+      var en = easternNow();
+      var monthsThruNow = dataset.monthOrder.slice(0, en.monthIndex + 1)
+        .filter(function (m) { return dataset.monthHasData[m]; });
+      // If the feed year is not the current Eastern year, there is no YTD data.
+      if (String(dataset.year) !== String(en.year) || !monthsThruNow.length) {
+        scopeBox.innerHTML = '<strong>' + E(en.year) + ' Year to Date</strong>';
+        banner.style.display = '';
+        banner.textContent = 'No data entered for ' + en.year + ' year to date.';
+        cards.innerHTML = '';
+        thead.innerHTML = '';
+        tbody.innerHTML = '<tr><td class="metric-col">No data for the current year to date.</td></tr>';
+        return;
+      }
+      rows = rollup(dataset, monthsThruNow);
+      var thruLabel = dataset.monthOrder[en.monthIndex] || '';
+      scopeBox.innerHTML = '<strong>' + E(en.year) + ' Year to Date (through ' + E(thruLabel) + ')</strong> '
+        + '<span style="color:var(--text-3)">(' + monthsThruNow.length + ' months)</span>';
+    } else if (opts.yearMode && period === 'annual') {
+      // ANNUAL with a YEAR DROPDOWN (2024/2025/2026, default current Eastern year).
+      var enA = easternNow();
+      var selYear = (PF_ANNUAL_YEARS.indexOf(String(scopeKey)) >= 0) ? String(scopeKey) : enA.year;
+      if (PF_ANNUAL_YEARS.indexOf(selYear) < 0) selYear = PF_ANNUAL_YEARS[PF_ANNUAL_YEARS.length - 1];
+      scopeOptions = PF_ANNUAL_YEARS.map(function (y) {
+        return '<option value="' + y + '"' + (y === selYear ? ' selected' : '') + '>' + y + '</option>';
+      }).join('');
+      scopeBox.innerHTML = '<label>Year <select id="' + scopeSelId + '">' + scopeOptions + '</select></label>';
+      // The single-year feed only holds dataset.year. Any other year is empty.
+      if (String(selYear) !== String(dataset.year) || !monthsAvail.length) {
+        banner.style.display = '';
+        banner.textContent = 'No data entered for ' + selYear + '.';
+        cards.innerHTML = '';
+        thead.innerHTML = '';
+        tbody.innerHTML = '<tr><td class="metric-col">No data entered for ' + E(selYear) + '.</td></tr>';
+        var selE = document.getElementById(scopeSelId);
+        if (selE) selE.addEventListener('change', function () { render(dataset, period, this.value, opts); });
+        return;
+      }
+      rows = rollup(dataset, monthsAvail);
+    } else if (period === 'annual') {
       rows = rollup(dataset, monthsAvail);
       scopeLabel = dataset.year + ' - Full Year';
       scopeBox.innerHTML = '<strong>' + E(scopeLabel) + '</strong> '
@@ -13099,7 +13161,10 @@ try {
   // ---- internal state + wiring for the PF (company) dashboard ----
   var state = { period: 'quarter', scope: null };
   function draw() {
-    render(window.PF_DASHBOARD, state.period, state.scope);
+    // yearMode:true is OPT-IN and enables Year-to-Date + the Annual year
+    // dropdown for the COMPANY PF dashboard ONLY. Precon + BD mounts do NOT pass
+    // this flag, so their Week/Month/Quarter/Annual behavior is unchanged.
+    render(window.PF_DASHBOARD, state.period, state.scope, { yearMode: true });
   }
   function wireToggle() {
     var tg = document.getElementById('pfdashPeriodToggle');
