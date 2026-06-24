@@ -143,19 +143,19 @@ tr.is-completed td{color:var(--muted)}
 </div>
 <div class="legend" id="legend"></div>
 
-<h2>Conflicts <span class="sub">— same crew, overlapping dates (done mobilizations excluded)</span></h2>
+<h2>Conflicts <span class="sub">- same crew, overlapping dates (done mobilizations excluded)</span></h2>
 <div id="conflictArea"></div>
 
-<h2>Capacity <span class="sub">— scheduled demand vs available crew-days in the window</span></h2>
+<h2>Capacity <span class="sub">- scheduled demand vs available crew-days in the window</span></h2>
 <div id="capacityArea"></div>
 
-<h2>Status Buckets <span class="sub">— LF and column rollups (awarded + probable)</span></h2>
+<h2>Status Buckets <span class="sub">- LF and column rollups (awarded + probable)</span></h2>
 <table id="bucketTable">
   <thead id="bucketHead"></thead>
   <tbody id="bucketBody"></tbody>
 </table>
 
-<h2>Unscheduled <span class="sub">— awarded/probable, no active mobilization with a date</span></h2>
+<h2>Unscheduled <span class="sub">- awarded/probable, no active mobilization with a date</span></h2>
 <div id="unschedArea"></div>
 
 <div class="foot" id="foot"></div>
@@ -181,7 +181,7 @@ tr.is-completed td{color:var(--muted)}
      ROLE-AWARE SEED LOADING (SEC-12)
      The raw schedule seed (schedule-seed.js) carries per-job contract `value`
      ($) + `gc_name` and is now admin/partner-only (the server 403s it for a
-     field_ops session). The field crew loads schedule-field.js — a $/GC-stripped
+     field_ops session). The field crew loads schedule-field.js - a $/GC-stripped
      derivative (window.PF_SCHEDULE_FIELD). The REAL boundary is server-side:
      /api/schedule redacts value/gc_name for field_ops and the data files are
      gated by areaForPath. This block just loads the right seed and keeps the UI
@@ -251,7 +251,7 @@ tr.is-completed td{color:var(--muted)}
       var sBadge = document.getElementById('srcBadge'); if (sBadge) sBadge.style.display = 'none';
       var tag = document.querySelector('h1 .tag');      if (tag) tag.textContent = 'Read-only';
       var lead = document.querySelector('p.lead');
-      if (lead) lead.textContent = 'Crew schedule and assignments — dates, crews, and status. Read-only view for field operations.';
+      if (lead) lead.textContent = 'Crew schedule and assignments - dates, crews, and status. Read-only view for field operations.';
     });
   }
 
@@ -317,7 +317,7 @@ tr.is-completed td{color:var(--muted)}
     .then(function(res){
       // LOW-1: another editor saved since we loaded -> do NOT clobber.
       if(res.status===409){
-        ss.textContent='Schedule changed since you loaded it — reload before saving';ss.className='save-state error';
+        ss.textContent='Schedule changed since you loaded it - reload before saving';ss.className='save-state error';
         sb.disabled=false; return;
       }
       if(res.ok && res.b && res.b.saved){
@@ -392,7 +392,7 @@ tr.is-completed td{color:var(--muted)}
     var nWeeks=Math.ceil(totalDays/7);
     function pct(dt){return ((dt-minD)/DAY)/totalDays*100;}
     GEO={minD:minD,maxD:maxD,totalDays:totalDays,nWeeks:nWeeks,pct:pct};
-    document.getElementById('windowLabel').textContent='— '+fmt(minD)+' to '+fmt(maxD)+' ('+totalDays+' days)';
+    document.getElementById('windowLabel').textContent='- '+fmt(minD)+' to '+fmt(maxD)+' ('+totalDays+' days)';
 
     // conflicts: exclude done segments
     function overlap(a,b){return d(a.start)<=d(b.end)&&d(b.start)<=d(a.end);}
@@ -456,7 +456,7 @@ tr.is-completed td{color:var(--muted)}
         var bar=document.createElement('div');
         bar.className='bar b-'+bucketOf(sg.job)+(sg.done?' is-done':'')+(inConflict(sg)?' conflict':'');
         bar.style.left=left+'%';bar.style.width=width+'%';bar.style.top=top+'px';
-        var label=sg.job.name+( (sg.job.mobilizations.length>1)?(' — '+sg.mob.label):'' );
+        var label=sg.job.name+( (sg.job.mobilizations.length>1)?(' - '+sg.mob.label):'' );
         bar.innerHTML='<span class="lbl">'+esc(label)+'</span>'
           +'<span class="acts">'
             +'<button class="chip" data-act="done">'+(sg.done?'Undone':'Done')+'</button>'
@@ -479,7 +479,7 @@ tr.is-completed td{color:var(--muted)}
 
       if(laneSegs.length===0){
         var en=document.createElement('div');en.className='empty-note';en.style.position='relative';en.style.zIndex='2';
-        en.textContent=crew.active?'No mobilizations assigned.':'Crew not active yet — add jobs once online.';
+        en.textContent=crew.active?'No mobilizations assigned.':'Crew not active yet - add jobs once online.';
         track.appendChild(en);
       }
       row.appendChild(track);g.appendChild(row);
@@ -556,8 +556,8 @@ tr.is-completed td{color:var(--muted)}
       var util=avail>0?Math.round(demand/avail*100):(demand>0?999:0);
       var over=crew.active&&demand>avail; if(over)anyOver=true;
       return '<tr'+(over?' class="row-alert"':'')+'><td>'+esc(crew.lead)+(crew.active?'':' <span class="muted">(inactive)</span>')+'</td>'
-        +'<td class="num">'+demand+'</td><td class="num">'+(crew.active?avail:'—')+'</td>'
-        +'<td class="num">'+(crew.active?util+'%':'—')+'</td>'
+        +'<td class="num">'+demand+'</td><td class="num">'+(crew.active?avail:'-')+'</td>'
+        +'<td class="num">'+(crew.active?util+'%':'-')+'</td>'
         +'<td>'+(over?'<b style="color:var(--alert)">OVER-BOOKED</b>':(crew.active?'OK':'Not online'))+'</td></tr>';
     }).join('');
     cap.innerHTML='<table><thead><tr><th>Crew</th><th class="num">Demand (job-days)</th><th class="num">Available (work-days)</th><th class="num">Utilization</th><th>Status</th></tr></thead><tbody>'+capRows+'</tbody></table>';
@@ -574,7 +574,7 @@ tr.is-completed td{color:var(--muted)}
     STATE.jobs.forEach(function(j){var b=bucketOf(j);var a=agg[b];if(!a){a=agg[b]={jobs:0,lf:0,cols:0,val:0};order.push(b);}a.jobs++;a.lf+=(j.lf||0);a.cols+=(j.columns||0);a.val+=(j.value||0);});
     var colorOf={completed:'var(--bar-muted)',finalized:'var(--bar)',loi:'#5a6470',likely:'#7a828c',running:'#aab1ba'};
     // SEC-12: the Value column is rendered ONLY for admin/partner. field_ops sees
-    // LF/columns/status — never job dollars.
+    // LF/columns/status - never job dollars.
     var valHead = IS_PRIVILEGED ? '<th class="num">Value</th>' : '';
     document.getElementById('bucketHead').innerHTML =
       '<tr><th>Bucket</th><th class="num">Jobs</th><th class="num">Total LF</th><th class="num">Columns</th>'+valHead+'</tr>';
@@ -608,7 +608,7 @@ tr.is-completed td{color:var(--muted)}
     else{
       // SEC-12: Value column only for admin/partner.
       html+='<table><thead><tr><th>Project</th><th>Location</th><th>Bucket</th><th class="num">LF</th><th class="num">Columns</th>'+(IS_PRIVILEGED?'<th class="num">Value</th>':'')+'</tr></thead><tbody>'
-        +un.map(function(j){var bm=bucketMeta[bucketOf(j)];return '<tr><td>'+esc(j.name)+'</td><td>'+esc(j.city_state||'—')+'</td><td>'+esc(bm?bm.label:bucketOf(j))+'</td><td class="num">'+n(j.lf)+'</td><td class="num">'+n(j.columns)+'</td>'+(IS_PRIVILEGED?('<td class="num">'+money(j.value)+'</td>'):'')+'</tr>';}).join('')
+        +un.map(function(j){var bm=bucketMeta[bucketOf(j)];return '<tr><td>'+esc(j.name)+'</td><td>'+esc(j.city_state||'-')+'</td><td>'+esc(bm?bm.label:bucketOf(j))+'</td><td class="num">'+n(j.lf)+'</td><td class="num">'+n(j.columns)+'</td>'+(IS_PRIVILEGED?('<td class="num">'+money(j.value)+'</td>'):'')+'</tr>';}).join('')
         +'</tbody></table>';
     }
     // C1: mobs without a valid date (including DONE ones) stay visible AND
@@ -621,7 +621,7 @@ tr.is-completed td{color:var(--muted)}
         +'<table><thead><tr><th>Project</th><th>Mobilization</th><th class="num">Columns</th><th>State</th><th>Actions</th></tr></thead><tbody>'
         +um.map(function(u,ix){
           var doneTxt=u.mob.done?'<span style="color:var(--ok);font-weight:600">Done</span>':'<span class="muted">Open</span>';
-          return '<tr><td>'+esc(u.job.name)+'</td><td>'+esc(u.mob.label||'—')+'</td><td class="num">'+n(u.mob.columns)+'</td><td>'+doneTxt+'</td>'
+          return '<tr><td>'+esc(u.job.name)+'</td><td>'+esc(u.mob.label||'-')+'</td><td class="num">'+n(u.mob.columns)+'</td><td>'+doneTxt+'</td>'
             +'<td><button class="btn umtoggle" data-um="'+ix+'" style="padding:3px 10px;font-size:.74rem">'+(u.mob.done?'Mark open':'Mark done')+'</button> '
             +'<button class="btn umdate" data-um="'+ix+'" style="padding:3px 10px;font-size:.74rem">Set date</button></td></tr>';
         }).join('')
@@ -664,7 +664,7 @@ tr.is-completed td{color:var(--muted)}
         +'<div class="row"><span class="k">Dates</span><span>'+fmt(d(sg.start))+' – '+fmt(d(sg.end))+' ('+esc(sg.workDays)+' wd)</span></div>'
         +'<div class="row"><span class="k">Cols this mob</span><span>'+n(sg.mob.columns)+'</span></div>'
         +'<div class="row"><span class="k">LF / Cols total</span><span>'+n(j.lf)+' / '+n(j.columns)+'</span></div>'
-        +'<div class="row"><span class="k">Crew / Men</span><span>'+(crew?esc(crew.lead)+' / '+esc(crew.men):'—')+'</span></div>'
+        +'<div class="row"><span class="k">Crew / Men</span><span>'+(crew?esc(crew.lead)+' / '+esc(crew.men):'-')+'</span></div>'
         +(IS_PRIVILEGED?('<div class="row"><span class="k">Value</span><span>'+money(j.value)+'</span></div>'):'')
         +'<div class="row"><span class="k">Status</span><span>'+esc(bm?bm.label:bucketOf(j))+'</span></div>'
         +(conflict?'<div style="color:#ff8a7a;margin-top:4px;font-weight:600">⚠ Crew conflict</div>':'')
