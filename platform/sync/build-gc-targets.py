@@ -106,10 +106,15 @@ def collision_id(prefix, seed, seen):
 
 
 def split_name_note(text):
-    """A GC cell may embed a ' - location' note. Keep the full Name, split a Note."""
+    """A GC cell may embed a ' - location' note. Keep the full Name, split a Note.
+    Do NOT split on a dash that sits inside a parenthetical, e.g.
+    'Performance Contracting Group (PCG - Indiana)' must stay whole."""
     parts = NOTE_SPLIT_RE.split(text, 1)
     if len(parts) == 2 and parts[1].strip():
-        return parts[0].strip(), parts[1].strip()
+        left = parts[0].strip()
+        # unbalanced '(' means the dash was inside parens -> do not split
+        if left.count("(") <= left.count(")"):
+            return left, parts[1].strip()
     return text, ""
 
 
