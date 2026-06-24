@@ -712,6 +712,74 @@ section('Opportunities: feasibility scorer (transparent v1 rules)');
      F.score({ fields: { 'Project Name': 'X' } }, at).reasons.length > 0);
 }
 
+// --- GC TARGETS + TEMPLATES/QUICK-SEND -------------------------------------
+section('GC targets + templates feeds -> business_dev (field_ops denied)');
+for (const p of ['/data/gc-targets.js', '/data/bd-templates.js']) {
+  const area = areaForPath(p);
+  ok(`${p} -> business_dev (${area})`, area === 'business_dev');
+  ok(`${p} ALLOWED for admin`, roleCanAccess('admin', area) === true);
+  ok(`${p} ALLOWED for partner`, roleCanAccess('partner', area) === true);
+  ok(`${p} ALLOWED for business_dev`, roleCanAccess('business_dev', area) === true);
+  ok(`${p} BLOCKED for field_ops`, roleCanAccess('field_ops', area) === false);
+}
+
+section('BD quick-send: /api/bd-send path gate (business_dev; field_ops blocked)');
+for (const p of ['/api/bd-send', '/api/bd-send?pending=1']) {
+  const area = areaForPath(p.split('?')[0]);
+  ok(`${p} -> business_dev (${area})`, area === 'business_dev');
+  ok(`${p} middleware allows admin`, roleCanAccess('admin', area) === true);
+  ok(`${p} middleware allows business_dev`, roleCanAccess('business_dev', area) === true);
+  ok(`${p} middleware BLOCKS field_ops`, roleCanAccess('field_ops', area) === false);
+}
+
+section('BD quick-send: ADMIN-only send bridge (bd_send_bridge area)');
+ok('bd_send_bridge ALLOWED for admin', roleCanAccess('admin', 'bd_send_bridge') === true);
+ok('bd_send_bridge BLOCKED for business_dev', roleCanAccess('business_dev', 'bd_send_bridge') === false);
+ok('bd_send_bridge BLOCKED for partner', roleCanAccess('partner', 'bd_send_bridge') === false);
+ok('bd_send_bridge BLOCKED for field_ops', roleCanAccess('field_ops', 'bd_send_bridge') === false);
+ok('requireArea(business_dev, bd_send_bridge) => 403 (pending GET + mark-sent denied to BD)',
+   requireArea({ uid: 'bd', role: 'business_dev', name: 'BD' }, 'bd_send_bridge')?.status === 403);
+ok('requireArea(admin, bd_send_bridge) => null (send daemon allowed)',
+   requireArea({ uid: 'a', role: 'admin', name: 'Daemon' }, 'bd_send_bridge') === null);
+ok('requireArea(null, bd_send_bridge) => 403 (fail closed)',
+   requireArea(null, 'bd_send_bridge')?.status === 403);
+
+section('BD quick-send: source-level guards + NO mail API');
+{
+  const sendSrc = readFileSync(join(__dir, '../functions/api/bd-send.js'), 'utf8');
+  ok('bd-send imports requireArea', /import\s*\{[^}]*requireArea[^}]*\}\s*from/.test(sendSrc));
+  ok('bd-send calls requireArea(business_dev)', /requireArea\([^)]*['"]business_dev['"]\)/.test(sendSrc));
+  ok('bd-send calls requireArea(bd_send_bridge) for admin tier', /requireArea\([^)]*['"]bd_send_bridge['"]\)/.test(sendSrc));
+  ok('bd-send uses env.PF_SCHEDULE', /env\.PF_SCHEDULE/.test(sendSrc));
+  ok('bd-send documents the KV read-modify-write race', /read-modify-write/.test(sendSrc));
+  ok('mark-sent is in the ADMIN_ACTIONS set', /ADMIN_ACTIONS\s*=\s*\{\s*'mark-sent'/.test(sendSrc));
+  // SENDING IS OFF: NO mail-send call / NO outbound fetch in the handler.
+  const noComments = sendSrc.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
+  ok('bd-send makes NO fetch / outbound call (queue only)', !/\bfetch\s*\(/.test(noComments) && !/https?:\/\//.test(noComments));
+  ok('bd-send calls NO mail API (sendMail/messages/smtp/nodemailer)',
+     !/sendMail|\/messages|smtp|nodemailer|mailgun|sendgrid/i.test(noComments));
+  ok('queue action sets status queued (not sent)', /status:\s*'queued'/.test(sendSrc));
+}
+
+section('GC targets + templates feed shape (generated)');
+{
+  const gcFeed = readFileSync(join(__dir, '../data/gc-targets.js'), 'utf8');
+  ok('gc-targets.js exposes window.PF_GC_TARGETS', /window\.PF_GC_TARGETS\s*=/.test(gcFeed));
+  const gcJson = JSON.parse(gcFeed.replace(/^[\s\S]*?window\.PF_GC_TARGETS\s*=/, '').replace(/;\s*$/, ''));
+  ok('gc feed has sectors array', Array.isArray(gcJson.sectors) && gcJson.sectors.length > 0);
+  ok('each sector has name + gcs', gcJson.sectors.every(sx => sx.name && Array.isArray(sx.gcs)));
+  const gids = [];
+  gcJson.sectors.forEach(sx => sx.gcs.forEach(g => gids.push(g.id)));
+  ok('all GC ids unique', new Set(gids).size === gids.length);
+
+  const tplFeed = readFileSync(join(__dir, '../data/bd-templates.js'), 'utf8');
+  ok('bd-templates.js exposes window.PF_BD_TEMPLATES', /window\.PF_BD_TEMPLATES\s*=/.test(tplFeed));
+  const tplJson = JSON.parse(tplFeed.replace(/^[\s\S]*?window\.PF_BD_TEMPLATES\s*=/, '').replace(/;\s*$/, ''));
+  ok('templates seed present with {{placeholders}}', Array.isArray(tplJson.templates) && /\{\{contactName\}\}/.test(JSON.stringify(tplJson.templates)));
+  ok('doc registry present, all status pending (files not supplied)',
+     Array.isArray(tplJson.docs) && tplJson.docs.length > 0 && tplJson.docs.every(d => d.status === 'pending'));
+}
+
 // --- summary ----------------------------------------------------------------
 console.log(`\n${'='.repeat(48)}`);
 console.log(`RESULT: ${pass} passed, ${fail} failed`);

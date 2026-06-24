@@ -1,0 +1,123 @@
+#!/usr/bin/env python3
+"""
+BD Templates base seed (build-bd-templates.py)
+==============================================
+Emits the read-only SEED for the BD document-templates module: a couple of
+sensible default intro email templates (Brad style: no em dashes, no oxford
+commas, no cursing) and the attachment-doc REGISTRY (named docs with a reference
+field). The ACTUAL document files (2-Pager Intro, PF Resume, PF Project List) are
+NOT in scope and are NOT fabricated; each registry entry's reference is marked
+"not yet provided" until Brad/Derek supply a URL or SharePoint link.
+
+This is the READ-ONLY BASE. Edits to templates + edits to the doc references live
+in KV (bd_templates_v1, written by /api/bd-send) and merge on top in the UI.
+
+Output: platform/data/bd-templates.js
+  window.PF_BD_TEMPLATES = {
+    templates: [ {id, name, subject, body} ],   // {{placeholder}} tokens
+    docs:      [ {id, name, reference, status} ],// status: 'pending' until supplied
+    placeholders: ['contactName','companyName','senderName','senderTitle'],
+    generated, source
+  }
+
+There is NO workbook source for these; they are authored defaults. (Building them
+in a sync script keeps the same build+deploy pipeline as the other feeds.)
+
+GATING: /data/bd-templates.js -> business_dev. field_ops BLOCKED.
+
+Usage: python3 build-bd-templates.py
+"""
+
+import os
+for _v in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS"):
+    os.environ.setdefault(_v, "1")
+
+import json
+import datetime
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+PLATFORM = os.path.dirname(HERE)
+DATA_DIR = os.path.join(PLATFORM, "data")
+OUT_JS = os.path.join(DATA_DIR, "bd-templates.js")
+
+PLACEHOLDERS = ["contactName", "companyName", "senderName", "senderTitle", "projectName"]
+
+# Brad style: no em dashes, no oxford commas, no cursing, polished. Placeholders
+# are {{token}}. These are SEED defaults; BD can edit + add more (stored in KV).
+TEMPLATES = [
+    {
+        "id": "tpl_intro_general",
+        "name": "Intro - General GC",
+        "subject": "Pier Foundations - ground improvement for {{companyName}}",
+        "body": (
+            "Hi {{contactName}},\n\n"
+            "I'm {{senderName}}, {{senderTitle}} at Pier Foundations. We install "
+            "vibratory stone columns to strengthen weak soils before commercial "
+            "construction, so your sites bear load without deep foundations or "
+            "long over-excavation.\n\n"
+            "We work commercial buildings and data centers across Indiana, Ohio, "
+            "Michigan, Illinois plus Wisconsin, and we'd like to be on your bid "
+            "list for ground improvement scopes. I've attached a quick overview "
+            "of who we are and what we've built.\n\n"
+            "Could we set up a short call to introduce the team and talk through "
+            "your upcoming work?\n\n"
+            "Thanks,\n{{senderName}}\n{{senderTitle}}, Pier Foundations"
+        ),
+    },
+    {
+        "id": "tpl_intro_datacenter",
+        "name": "Intro - Data Center GC",
+        "subject": "Ground improvement for {{companyName}} data center work",
+        "body": (
+            "Hi {{contactName}},\n\n"
+            "I'm {{senderName}} with Pier Foundations. With the data center "
+            "buildout across the Midwest, ground improvement is often the path to "
+            "hitting bearing and settlement targets on schedule. We install "
+            "vibratory stone columns that let large pad and equipment loads bear "
+            "on improved soil, which keeps your foundation design simpler and your "
+            "timeline tighter.\n\n"
+            "We'd like to be considered for {{companyName}}'s data center "
+            "projects. I've attached our overview plus a recent project list.\n\n"
+            "Open to a brief call to walk through how we'd fit your program?\n\n"
+            "Best,\n{{senderName}}\n{{senderTitle}}, Pier Foundations"
+        ),
+    },
+]
+
+# The ACTUAL files are pending from Brad/Derek. We store the reference only.
+DOCS = [
+    {"id": "doc_2pager", "name": "2-Pager Intro Doc", "reference": "", "status": "pending"},
+    {"id": "doc_resume", "name": "PF Resume", "reference": "", "status": "pending"},
+    {"id": "doc_projectlist", "name": "PF Project List", "reference": "", "status": "pending"},
+]
+
+
+def main():
+    data = {
+        "templates": TEMPLATES,
+        "docs": DOCS,
+        "placeholders": PLACEHOLDERS,
+        "generated": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "source": "authored defaults (no workbook source)",
+        "_note": ("Actual document files (2-pager, resume, project list) are PENDING "
+                  "from Brad/Derek; references are empty until supplied. Email sending "
+                  "is intentionally OFF: quick-send only QUEUES a record."),
+    }
+    note = (
+        "// AUTO-GENERATED by sync/build-bd-templates.py — DO NOT EDIT BY HAND.\n"
+        "// Seed templates + attachment-doc registry for the BD quick-send module.\n"
+        "// Edits live in KV (bd_templates_v1) and merge on top. The actual doc\n"
+        "// FILES are pending from Brad/Derek (reference only). SENDING IS OFF:\n"
+        "// quick-send only QUEUES (status 'queued'); no mail API is called.\n"
+        "// ACCESS: business_dev — admin/partner/business_dev (field_ops BLOCKED).\n"
+    )
+    with open(OUT_JS, "w") as f:
+        f.write(note + "window.PF_BD_TEMPLATES = " + json.dumps(data, indent=2, ensure_ascii=False) + ";\n")
+    print("wrote", OUT_JS)
+    print("  templates: %d, docs: %d (all status=pending), placeholders: %s"
+          % (len(TEMPLATES), len(DOCS), ", ".join(PLACEHOLDERS)))
+    print("  NOTE: actual doc files pending from Brad/Derek; sending intentionally OFF (queue only)")
+
+
+if __name__ == "__main__":
+    main()

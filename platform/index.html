@@ -1477,7 +1477,8 @@ body.role-field-ops .nav-item[data-fo-hide] {
   // field_ops BLOCKED. precon-dashboard.js -> preconstruction area;
   // bd-dashboard.js -> business_dev area (both default-deny + server-enforced).
   if (isBdOrAbove) {
-    feeds.push('/data/precon-dashboard.js', '/data/bd-dashboard.js', '/data/bd-records.js', '/data/opportunities.js');
+    feeds.push('/data/precon-dashboard.js', '/data/bd-dashboard.js', '/data/bd-records.js', '/data/opportunities.js',
+               '/data/gc-targets.js', '/data/bd-templates.js');
     // BD also needs the precon pipeline feed (preconstruction area) — previously
     // only injected for admin/partner; BD is allowed it server-side.
     if (!isPrivileged) feeds.push('/data/precon-pipeline.js');
@@ -1823,6 +1824,9 @@ window.progress = (function () {
       </a>
       <a class="nav-item" data-module="bd-opportunities" onclick="showModule('bd-opportunities')">
         <span class="nav-icon">&#9733;</span> Opportunities
+      </a>
+      <a class="nav-item" data-module="bd-templates" onclick="showModule('bd-templates')">
+        <span class="nav-icon">&#9993;</span> Templates &amp; Quick-Send
       </a>
     </div>
 
@@ -2260,10 +2264,80 @@ document.addEventListener('click', function(e) {
     <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9679;</div><h2>Leads</h2><p>Coming in a later release.</p></div>
   </div>
   <div class="module-view" id="mod-bd-targets">
-    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9678;</div><h2>Target Accounts</h2><p>Coming in a later release.</p></div>
+    <!-- GC target accounts by sector. Reads read-only window.PF_GC_TARGETS
+         (data/gc-targets.js, the GCs-to-Contact tab as a matrix: row 2 = sector
+         headers, columns = GC lists). business_dev area; field_ops server-DENIED.
+         All data via window.esc. -->
+    <style>
+      #mod-bd-targets .gct-toolbar { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+      #mod-bd-targets .gct-search { flex:1 1 240px; padding:7px 10px; }
+      #mod-bd-targets .gct-sector { border:1px solid var(--border,#2a2f3a); border-radius:8px; margin-bottom:12px; }
+      #mod-bd-targets .gct-sector-h { padding:9px 12px; font-weight:700; cursor:pointer; display:flex; justify-content:space-between; }
+      #mod-bd-targets .gct-sector-h:hover { background:var(--surface-2,#1b212c); }
+      #mod-bd-targets .gct-gcs { padding:4px 0; }
+      #mod-bd-targets .gct-gc { padding:6px 14px; border-top:1px solid var(--border,#2a2f3a); display:flex; justify-content:space-between; gap:10px; }
+      #mod-bd-targets .gct-gc .note { font-size:12px; color:var(--text-3,#8a93a6); }
+      #mod-bd-targets .gct-gc a { color:var(--accent,#2f6df6); font-size:12px; }
+      #mod-bd-targets .gct-muted { color:var(--text-3,#8a93a6); }
+      #mod-bd-targets .gct-badge { font-size:11px; padding:1px 7px; border-radius:10px; background:var(--surface-2,#1b212c); color:var(--text-3,#8a93a6); }
+      #mod-bd-targets .gct-collapsed .gct-gcs { display:none; }
+    </style>
+    <div id="gctNoData" class="gct-muted" style="display:none">No target accounts available for your role.</div>
+    <div id="gctWrap">
+      <div class="gct-toolbar">
+        <input type="text" class="gct-search" id="gctSearch" placeholder="Search GCs across sectors" autocomplete="off">
+        <span class="gct-muted" id="gctCount" style="align-self:center;font-size:12px"></span>
+      </div>
+      <div id="gctSectors"></div>
+    </div>
   </div>
+
   <div class="module-view" id="mod-bd-outreach">
     <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9993;</div><h2>Outreach</h2><p>Coming in a later release.</p></div>
+  </div>
+
+  <div class="module-view" id="mod-bd-templates">
+    <!-- Document templates + quick-send. EMAIL SENDING IS OFF: quick-send only
+         QUEUES a record (status 'queued'). Reads read-only seed
+         window.PF_BD_TEMPLATES (data/bd-templates.js) + merges the KV overlay
+         (/api/bd-send). business_dev area; field_ops server-DENIED. Actual doc
+         files (2-pager, resume, project list) are pending from Brad/Derek. All
+         data via window.esc. -->
+    <style>
+      #mod-bd-templates .tpl-tabs { display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; }
+      #mod-bd-templates .tpl-tab { padding:7px 14px; border:1px solid var(--border,#2a2f3a); border-radius:8px; cursor:pointer; }
+      #mod-bd-templates .tpl-tab.active { background:var(--surface-2,#1b212c); border-color:var(--accent,#2f6df6); }
+      #mod-bd-templates .tpl-pane { display:none; }
+      #mod-bd-templates .tpl-pane.active { display:block; }
+      #mod-bd-templates .tpl-card { border:1px solid var(--border,#2a2f3a); border-radius:8px; padding:14px 16px; margin-bottom:12px; }
+      #mod-bd-templates .tpl-banner { border:1px solid var(--border,#2a2f3a); border-left:3px solid var(--accent,#2f6df6); border-radius:6px; padding:9px 12px; margin-bottom:12px; font-size:13px; }
+      #mod-bd-templates label { display:block; font-size:12px; color:var(--text-3,#8a93a6); margin:8px 0 3px; }
+      #mod-bd-templates input, #mod-bd-templates select, #mod-bd-templates textarea { width:100%; padding:7px 10px; box-sizing:border-box; }
+      #mod-bd-templates textarea { min-height:160px; font-family:inherit; }
+      #mod-bd-templates .tpl-preview { white-space:pre-wrap; background:var(--surface-2,#1b212c); border-radius:6px; padding:12px; font-size:13px; }
+      #mod-bd-templates .tpl-row { display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; }
+      #mod-bd-templates .tpl-col { flex:1 1 220px; min-width:0; }
+      #mod-bd-templates .tpl-muted { color:var(--text-3,#8a93a6); }
+      #mod-bd-templates .tpl-ok { color:#3fb950; font-size:13px; }
+      #mod-bd-templates .tpl-err { color:#e5534b; font-size:13px; }
+      #mod-bd-templates .tpl-chip { display:inline-block; font-size:12px; padding:3px 9px; border:1px solid var(--border,#2a2f3a); border-radius:14px; margin:3px 4px 0 0; cursor:pointer; }
+      #mod-bd-templates .tpl-chip.on { background:var(--accent,#2f6df6); color:#fff; border-color:var(--accent,#2f6df6); }
+      #mod-bd-templates .tpl-send { border-top:1px dashed var(--border,#2a2f3a); padding:8px 0; }
+    </style>
+    <div id="tplNoData" class="tpl-muted" style="display:none">Templates not available for your role.</div>
+    <div id="tplWrap">
+      <div class="tpl-banner">Email sending is OFF for now. Quick-send builds the email and QUEUES it for a later automated send. Nothing is emailed yet.</div>
+      <div class="tpl-tabs">
+        <div class="tpl-tab active" data-pane="compose">Quick-send</div>
+        <div class="tpl-tab" data-pane="templates">Email templates</div>
+        <div class="tpl-tab" data-pane="docs">Attachment docs</div>
+        <div class="tpl-tab" data-pane="queue">Queued sends</div>
+      </div>
+      <div class="tpl-pane active" id="tplPaneCompose"></div>
+      <div class="tpl-pane" id="tplPaneTemplates"></div>
+      <div class="tpl-pane" id="tplPaneDocs"></div>
+      <div class="tpl-pane" id="tplPaneQueue"></div>
+    </div>
   </div>
 
   <!-- Preconstruction stage panels — populated client-side by initPrecon() from -->
@@ -2629,7 +2703,8 @@ const moduleTitles = {
   'precon-dashboard': 'Preconstruction Dashboard',
   'bd-dashboard': 'Business Development Dashboard',
   'bd-companies': 'Companies & Contacts',
-  'bd-opportunities': 'Opportunities'
+  'bd-opportunities': 'Opportunities',
+  'bd-templates': 'Templates & Quick-Send'
 };
 
 function showModule(id) {
@@ -13468,6 +13543,380 @@ try {
 })();
 } catch (e) {
   console.error('Module bd-opportunities failed to load:', e);
+}
+</script>
+
+<script>
+// ============================================================
+// MODULE: bd-targets — GC target accounts by sector
+// Reads read-only window.PF_GC_TARGETS (data/gc-targets.js). business_dev area;
+// field_ops server-DENIED. All data via window.esc. Links a GC to a company in
+// window.PF_BD_RECORDS only on a clean exact name match (nice-to-have).
+// ============================================================
+try {
+(function () {
+  'use strict';
+  var E = window.esc || function (s) { return s == null ? '' : String(s); };
+  var state = { filter: '', collapsed: {} };
+
+  function base() { return window.PF_GC_TARGETS || null; }
+
+  // exact-normalized company lookup (nice-to-have link), only if bd-records loaded
+  function companyLink(name) {
+    var recs = window.PF_BD_RECORDS;
+    if (!recs || !recs.companies) return null;
+    var n = String(name || '').trim().toLowerCase();
+    for (var i = 0; i < recs.companies.length; i++) {
+      if (String(recs.companies[i].fields.Name || '').trim().toLowerCase() === n) return recs.companies[i].id;
+    }
+    return null;
+  }
+
+  function load() {
+    var b = base();
+    var noData = document.getElementById('gctNoData');
+    var wrap = document.getElementById('gctWrap');
+    if (!b) { if (noData) noData.style.display = ''; if (wrap) wrap.style.display = 'none'; return; }
+    if (noData) noData.style.display = 'none';
+    if (wrap) wrap.style.display = '';
+    wireControls();
+    render();
+  }
+
+  function wireControls() {
+    var search = document.getElementById('gctSearch');
+    if (search && !search.dataset.wired) {
+      search.dataset.wired = '1';
+      search.addEventListener('input', function () { state.filter = (this.value || '').toLowerCase(); render(); });
+    }
+  }
+
+  function render() {
+    var host = document.getElementById('gctSectors');
+    var countEl = document.getElementById('gctCount');
+    if (!host) return;
+    var b = base();
+    var f = state.filter;
+    var totalShown = 0;
+    var html = (b.sectors || []).map(function (sx) {
+      var gcs = sx.gcs.filter(function (g) {
+        return !f || String(g.fields.Name || '').toLowerCase().indexOf(f) >= 0
+          || String(g.fields.Note || '').toLowerCase().indexOf(f) >= 0;
+      });
+      if (!gcs.length) return '';
+      totalShown += gcs.length;
+      var collapsed = state.collapsed[sx.name];
+      var rows = gcs.map(function (g) {
+        var cid = companyLink(g.fields.Name);
+        var link = cid ? '<a href="#" data-co="' + E(cid) + '">in CRM</a>' : '';
+        var note = g.fields.Note ? '<span class="note">' + E(g.fields.Note) + '</span>' : '';
+        return '<div class="gct-gc"><span>' + E(g.fields.Name) + ' ' + note + '</span>' + link + '</div>';
+      }).join('');
+      return '<div class="gct-sector' + (collapsed ? ' gct-collapsed' : '') + '" data-sector="' + E(sx.name) + '">'
+        + '<div class="gct-sector-h"><span>' + E(sx.name) + '</span>'
+        + '<span class="gct-badge">' + gcs.length + '</span></div>'
+        + '<div class="gct-gcs">' + rows + '</div></div>';
+    }).join('');
+    host.innerHTML = html || '<div class="gct-muted">No GCs match.</div>';
+    if (countEl) countEl.textContent = totalShown + ' GCs across ' + (b.sectors || []).length + ' sectors';
+
+    host.querySelectorAll('.gct-sector-h').forEach(function (h) {
+      h.addEventListener('click', function () {
+        var sec = this.parentElement.getAttribute('data-sector');
+        state.collapsed[sec] = !state.collapsed[sec]; render();
+      });
+    });
+    host.querySelectorAll('a[data-co]').forEach(function (a) {
+      a.addEventListener('click', function (ev) { ev.preventDefault(); if (window.showModule) window.showModule('bd-companies'); });
+    });
+  }
+
+  var prev = window.showModule;
+  window.showModule = function (id) { if (typeof prev === 'function') prev(id); if (id === 'bd-targets') { load(); } };
+})();
+} catch (e) {
+  console.error('Module bd-targets failed to load:', e);
+}
+</script>
+
+<script>
+// ============================================================
+// MODULE: bd-templates — document templates + quick-send (QUEUE ONLY)
+// Reads read-only seed window.PF_BD_TEMPLATES + merges KV overlay (/api/bd-send,
+// business_dev). EMAIL SENDING IS OFF: "Queue send" writes status 'queued'; the
+// UI never sends and never calls a mail API. business_dev area; field_ops
+// server-DENIED. All data via window.esc.
+// ============================================================
+try {
+(function () {
+  'use strict';
+  var E = window.esc || function (s) { return s == null ? '' : String(s); };
+  var state = { loaded: false, templates: [], docs: [], sends: [], pane: 'compose' };
+
+  function base() { return window.PF_BD_TEMPLATES || null; }
+
+  function api(path, opts) {
+    return fetch(path, Object.assign({ credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' } }, opts || {}))
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); });
+  }
+
+  // merge seed templates/docs with KV overlay (overlay id wins)
+  function merge(seed, ov) {
+    var byId = {};
+    var out = (seed || []).map(function (x) { byId[x.id] = true; return Object.assign({}, x); });
+    (ov || []).forEach(function (x) {
+      var i = out.findIndex(function (y) { return y.id === x.id; });
+      if (i >= 0) out[i] = Object.assign({}, out[i], x); else out.push(Object.assign({}, x));
+    });
+    return out;
+  }
+
+  function load() {
+    var b = base();
+    var noData = document.getElementById('tplNoData');
+    var wrap = document.getElementById('tplWrap');
+    if (!b) { if (noData) noData.style.display = ''; if (wrap) wrap.style.display = 'none'; return; }
+    if (noData) noData.style.display = 'none';
+    if (wrap) wrap.style.display = '';
+    api('/api/bd-send').then(function (res) {
+      var ov = (res.ok && res.body) ? res.body : {};
+      state.templates = merge(b.templates, ov.templates);
+      state.docs = merge(b.docs, ov.docs);
+      state.sends = ov.sends || [];
+      state.loaded = true; wireTabs(); renderPane();
+    }).catch(function () {
+      state.templates = (b.templates || []).slice();
+      state.docs = (b.docs || []).slice();
+      state.sends = [];
+      state.loaded = true; wireTabs(); renderPane();
+    });
+  }
+
+  function wireTabs() {
+    document.querySelectorAll('#mod-bd-templates .tpl-tab').forEach(function (t) {
+      if (t.dataset.wired) return; t.dataset.wired = '1';
+      t.addEventListener('click', function () {
+        state.pane = this.getAttribute('data-pane');
+        document.querySelectorAll('#mod-bd-templates .tpl-tab').forEach(function (x) { x.classList.remove('active'); });
+        this.classList.add('active');
+        document.querySelectorAll('#mod-bd-templates .tpl-pane').forEach(function (p) { p.classList.remove('active'); });
+        var pane = document.getElementById('tplPane' + cap(state.pane));
+        if (pane) pane.classList.add('active');
+        renderPane();
+      });
+    });
+  }
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  function renderPane() {
+    if (state.pane === 'compose') return renderCompose();
+    if (state.pane === 'templates') return renderTemplates();
+    if (state.pane === 'docs') return renderDocs();
+    if (state.pane === 'queue') return renderQueue();
+  }
+
+  // {{token}} resolution
+  function resolve(text, vars) {
+    return String(text || '').replace(/\{\{(\w+)\}\}/g, function (m, k) { return vars[k] != null && vars[k] !== '' ? vars[k] : m; });
+  }
+
+  function contactsList() {
+    var recs = window.PF_BD_RECORDS;
+    var out = [];
+    if (recs && recs.companies) {
+      recs.companies.forEach(function (c) {
+        (c.contacts || []).forEach(function (ct) {
+          out.push({ id: ct.id, name: ct.fields.Name, email: ct.fields.Email || '', company: c.fields.Name });
+        });
+      });
+    }
+    return out;
+  }
+
+  function renderCompose() {
+    var host = document.getElementById('tplPaneCompose');
+    if (!host) return;
+    var contacts = contactsList();
+    var cOpts = '<option value="">Select a contact</option>' + contacts.map(function (c, i) {
+      return '<option value="' + i + '">' + E(c.name) + (c.company ? ' (' + E(c.company) + ')' : '') + '</option>';
+    }).join('');
+    var tOpts = '<option value="">Select a template</option>' + state.templates.map(function (t) {
+      return '<option value="' + E(t.id) + '">' + E(t.name) + '</option>';
+    }).join('');
+    var docChips = state.docs.map(function (d) {
+      return '<span class="tpl-chip" data-doc="' + E(d.id) + '">' + E(d.name)
+        + (d.status === 'pending' ? ' (file pending)' : '') + '</span>';
+    }).join('');
+    host.innerHTML = '<div class="tpl-card">'
+      + '<div class="tpl-row">'
+      + '<div class="tpl-col"><label>Contact</label><select id="tplC">' + cOpts + '</select></div>'
+      + '<div class="tpl-col"><label>Template</label><select id="tplT">' + tOpts + '</select></div>'
+      + '</div>'
+      + '<label>Your name</label><input id="tplSender" placeholder="Sender name" value="">'
+      + '<label>Your title</label><input id="tplTitle" placeholder="Sender title" value="">'
+      + '<label>Attachments</label><div id="tplDocs">' + (docChips || '<span class="tpl-muted">No docs registered.</span>') + '</div>'
+      + '<label>Preview (placeholders filled)</label>'
+      + '<div class="tpl-muted" id="tplPrevSubj" style="font-size:13px;margin-bottom:4px"></div>'
+      + '<div class="tpl-preview" id="tplPrev">Pick a contact and a template to preview.</div>'
+      + '<div style="margin-top:10px"><button type="button" class="btn" id="tplQueue">Queue send</button>'
+      + '<span class="tpl-muted" style="margin-left:8px;font-size:12px">Queues only. No email is sent.</span></div>'
+      + '<div class="tpl-msg" data-msg style="margin-top:6px"></div>'
+      + '</div>';
+
+    var chosenDocs = {};
+    host.querySelectorAll('.tpl-chip[data-doc]').forEach(function (ch) {
+      ch.addEventListener('click', function () {
+        var id = this.getAttribute('data-doc');
+        chosenDocs[id] = !chosenDocs[id]; this.classList.toggle('on', chosenDocs[id]); doPreview();
+      });
+    });
+    ['tplC', 'tplT', 'tplSender', 'tplTitle'].forEach(function (id) {
+      var el = document.getElementById(id); if (el) el.addEventListener('input', doPreview);
+    });
+
+    function currentVars() {
+      var ci = document.getElementById('tplC').value;
+      var c = ci !== '' ? contacts[+ci] : null;
+      return {
+        contact: c,
+        vars: {
+          contactName: c ? c.name : '',
+          companyName: c ? c.company : '',
+          senderName: document.getElementById('tplSender').value || '',
+          senderTitle: document.getElementById('tplTitle').value || '',
+          projectName: '',
+        },
+      };
+    }
+    function currentTemplate() {
+      var tid = document.getElementById('tplT').value;
+      return state.templates.find(function (t) { return t.id === tid; }) || null;
+    }
+    function doPreview() {
+      var t = currentTemplate(); var cv = currentVars();
+      var prev = document.getElementById('tplPrev'); var subj = document.getElementById('tplPrevSubj');
+      if (!t) { prev.textContent = 'Pick a contact and a template to preview.'; subj.textContent = ''; return; }
+      subj.textContent = 'Subject: ' + resolve(t.subject, cv.vars);
+      prev.textContent = resolve(t.body, cv.vars);
+    }
+    doPreview();
+
+    document.getElementById('tplQueue').addEventListener('click', function () {
+      var t = currentTemplate(); var cv = currentVars();
+      var msgEl = host.querySelector('[data-msg]');
+      if (!t) { setMsg(msgEl, 'Pick a template first.', false); return; }
+      if (!cv.contact) { setMsg(msgEl, 'Pick a contact first.', false); return; }
+      var atts = Object.keys(chosenDocs).filter(function (k) { return chosenDocs[k]; });
+      var payload = {
+        action: 'queue',
+        to: cv.contact.email || '',
+        contactId: cv.contact.id,
+        templateId: t.id,
+        attachments: atts,
+        renderedSubject: resolve(t.subject, cv.vars),
+        renderedBody: resolve(t.body, cv.vars),
+      };
+      api('/api/bd-send', { method: 'POST', body: JSON.stringify(payload) }).then(function (res) {
+        if (!res.ok || !res.body || !res.body.queued) { setMsg(msgEl, (res.body && res.body.message) || 'Queue failed.', false); return; }
+        state.sends.push(res.body.record);
+        setMsg(msgEl, 'Queued (not sent). See the Queued sends tab.', true);
+      }).catch(function () { setMsg(msgEl, 'Network error queueing send.', false); });
+    });
+  }
+  function setMsg(el, text, ok) { if (el) { el.textContent = text; el.className = 'tpl-msg ' + (ok ? 'tpl-ok' : 'tpl-err'); } }
+
+  function renderTemplates() {
+    var host = document.getElementById('tplPaneTemplates');
+    if (!host) return;
+    var ph = (base() && base().placeholders) || [];
+    host.innerHTML = state.templates.map(function (t) {
+      return '<div class="tpl-card" data-tpl="' + E(t.id) + '">'
+        + '<label>Name</label><input class="t-name" value="' + E(t.name) + '">'
+        + '<label>Subject</label><input class="t-subject" value="' + E(t.subject) + '">'
+        + '<label>Body</label><textarea class="t-body">' + E(t.body) + '</textarea>'
+        + '<div style="margin-top:8px"><button type="button" class="btn t-save">Save template</button>'
+        + '<span class="tpl-muted" style="margin-left:8px;font-size:12px">Placeholders: ' + E(ph.map(function (p) { return '{{' + p + '}}'; }).join(' ')) + '</span></div>'
+        + '<div class="tpl-msg" data-msg style="margin-top:6px"></div></div>';
+    }).join('')
+      + '<div class="tpl-card"><button type="button" class="btn" id="tplNew">+ New template</button></div>';
+
+    host.querySelectorAll('.tpl-card[data-tpl]').forEach(function (card) {
+      var id = card.getAttribute('data-tpl');
+      card.querySelector('.t-save').addEventListener('click', function () {
+        saveTemplate(card, id);
+      });
+    });
+    var nb = document.getElementById('tplNew');
+    if (nb) nb.addEventListener('click', function () {
+      state.templates.push({ id: '', name: 'New template', subject: '', body: '' }); renderTemplates();
+    });
+  }
+  function saveTemplate(card, id) {
+    var payload = {
+      action: 'save-template',
+      id: id || undefined,
+      name: card.querySelector('.t-name').value,
+      subject: card.querySelector('.t-subject').value,
+      body: card.querySelector('.t-body').value,
+    };
+    var msgEl = card.querySelector('[data-msg]');
+    api('/api/bd-send', { method: 'POST', body: JSON.stringify(payload) }).then(function (res) {
+      if (!res.ok || !res.body || !res.body.saved) { setMsg(msgEl, (res.body && res.body.message) || 'Save failed.', false); return; }
+      var rec = res.body.record;
+      var i = state.templates.findIndex(function (t) { return t.id === rec.id || t.id === ''; });
+      if (i >= 0) state.templates[i] = rec; else state.templates.push(rec);
+      setMsg(msgEl, 'Saved.', true);
+    }).catch(function () { setMsg(msgEl, 'Network error.', false); });
+  }
+
+  function renderDocs() {
+    var host = document.getElementById('tplPaneDocs');
+    if (!host) return;
+    host.innerHTML = '<div class="tpl-banner">The actual files (2-pager, resume, project list) are pending from Brad and Derek. Store a link or SharePoint reference here when available.</div>'
+      + state.docs.map(function (d) {
+        return '<div class="tpl-card" data-doc="' + E(d.id) + '">'
+          + '<strong>' + E(d.name) + '</strong> <span class="tpl-muted" style="font-size:12px">(' + E(d.status || 'pending') + ')</span>'
+          + '<label>Reference (URL or SharePoint link)</label>'
+          + '<input class="d-ref" value="' + E(d.reference || '') + '" placeholder="not yet provided">'
+          + '<div style="margin-top:8px"><button type="button" class="btn d-save">Save reference</button></div>'
+          + '<div class="tpl-msg" data-msg style="margin-top:6px"></div></div>';
+      }).join('');
+    host.querySelectorAll('.tpl-card[data-doc]').forEach(function (card) {
+      var id = card.getAttribute('data-doc');
+      card.querySelector('.d-save').addEventListener('click', function () {
+        var payload = { action: 'save-doc', id: id, reference: card.querySelector('.d-ref').value };
+        var msgEl = card.querySelector('[data-msg]');
+        api('/api/bd-send', { method: 'POST', body: JSON.stringify(payload) }).then(function (res) {
+          if (!res.ok || !res.body || !res.body.saved) { setMsg(msgEl, (res.body && res.body.message) || 'Save failed.', false); return; }
+          var rec = res.body.record;
+          var i = state.docs.findIndex(function (x) { return x.id === rec.id; });
+          if (i >= 0) state.docs[i] = Object.assign({}, state.docs[i], rec);
+          setMsg(msgEl, 'Saved.', true); renderDocs();
+        }).catch(function () { setMsg(msgEl, 'Network error.', false); });
+      });
+    });
+  }
+
+  function renderQueue() {
+    var host = document.getElementById('tplPaneQueue');
+    if (!host) return;
+    if (!state.sends.length) { host.innerHTML = '<div class="tpl-muted">No queued sends yet.</div>'; return; }
+    host.innerHTML = state.sends.slice().reverse().map(function (sd) {
+      return '<div class="tpl-card tpl-send">'
+        + '<div><strong>' + E(sd.renderedSubject || '(no subject)') + '</strong> '
+        + '<span class="tpl-muted" style="font-size:12px">status: ' + E(sd.status) + (sd.to ? ' • to ' + E(sd.to) : '') + '</span></div>'
+        + '<div class="tpl-muted" style="font-size:12px">attachments: ' + E((sd.attachments || []).join(', ') || 'none')
+        + ' • queued by ' + E(sd.queuedBy || '') + ' ' + E(sd.queuedAt || '') + '</div>'
+        + '<div class="tpl-preview" style="margin-top:6px">' + E(sd.renderedBody || '') + '</div></div>';
+    }).join('');
+  }
+
+  var prev = window.showModule;
+  window.showModule = function (id) { if (typeof prev === 'function') prev(id); if (id === 'bd-templates') { load(); } };
+})();
+} catch (e) {
+  console.error('Module bd-templates failed to load:', e);
 }
 </script>
 </body>
