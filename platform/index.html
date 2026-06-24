@@ -14125,9 +14125,17 @@ try {
       sumEl.innerHTML = (y.summary && y.summary.length)
         ? '<div class="ph-summary">' + y.summary.map(function (s) {
             var extra = [];
-            if (s.totalCount != null) extra.push('count ' + E(s.totalCount));
-            if (s.prelimUsed != null) extra.push('prelim ' + E(s.prelimUsed));
-            if (s.prelimPct != null) { var p = parseFloat(s.prelimPct); extra.push(isFinite(p) ? (p * 100).toFixed(0) + '%' : E(s.prelimPct)); }
+            // Rate rows (e.g. "Win Rate ...") store a 0..1 ratio in totalCount and
+            // a formula caption in prelimUsed. Show them as a percent, not "count".
+            var rate = parseFloat(s.totalCount);
+            var isRate = /win rate/i.test(s.label || '') && isFinite(rate) && rate >= 0 && rate <= 1;
+            if (isRate) {
+              extra.push((rate * 100).toFixed(1) + '%');
+            } else {
+              if (s.totalCount != null) extra.push('count ' + E(s.totalCount));
+              if (s.prelimUsed != null) extra.push('prelim ' + E(s.prelimUsed));
+              if (s.prelimPct != null) { var p = parseFloat(s.prelimPct); extra.push(isFinite(p) ? (p * 100).toFixed(0) + '%' : E(s.prelimPct)); }
+            }
             return '<div class="ph-sline"><span class="lbl">' + E(s.label) + ':</span> ' + E(extra.join(' • ')) + '</div>';
           }).join('') + '</div>'
         : '';
