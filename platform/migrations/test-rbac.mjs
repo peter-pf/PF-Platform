@@ -635,6 +635,83 @@ section('BD CRM: bd-records.js feed shape (generated)');
   ok('ambiguous unlinked contacts carry candidate lists (no guessing)', ambig.length >= 1);
 }
 
+// --- OPPORTUNITIES: base feed + two-tier endpoint -------------------------
+// opportunities.js -> business_dev (field_ops denied). /api/opportunity path is
+// gated business_dev at the middleware; the ADMIN-only email-bridge actions are
+// enforced in-handler via the opp_email_bridge area (admin only; BD + partner +
+// field_ops denied those, BD still allowed create/update/decide).
+section('Opportunities: /data/opportunities.js -> business_dev');
+ok('/data/opportunities.js -> business_dev', areaForPath('/data/opportunities.js') === 'business_dev');
+ok('opportunities.js ALLOWED for admin', roleCanAccess('admin', areaForPath('/data/opportunities.js')) === true);
+ok('opportunities.js ALLOWED for partner', roleCanAccess('partner', areaForPath('/data/opportunities.js')) === true);
+ok('opportunities.js ALLOWED for business_dev', roleCanAccess('business_dev', areaForPath('/data/opportunities.js')) === true);
+ok('opportunities.js BLOCKED for field_ops', roleCanAccess('field_ops', areaForPath('/data/opportunities.js')) === false);
+
+section('Opportunities: /api/opportunity path gate (business_dev; field_ops blocked)');
+for (const p of ['/api/opportunity', '/api/opportunity?pending=1']) {
+  const area = areaForPath(p.split('?')[0]);
+  ok(`${p} -> business_dev (${area})`, area === 'business_dev');
+  ok(`${p} middleware allows admin`, roleCanAccess('admin', area) === true);
+  ok(`${p} middleware allows business_dev`, roleCanAccess('business_dev', area) === true);
+  ok(`${p} middleware BLOCKS field_ops`, roleCanAccess('field_ops', area) === false);
+}
+
+section('Opportunities: business_dev actions (create/update/decide) area');
+ok('business_dev area allows create/update/decide tier', roleCanAccess('business_dev', 'business_dev') === true);
+ok('requireArea(business_dev, business_dev) => null', requireArea({ uid: 'bd', role: 'business_dev', name: 'BD' }, 'business_dev') === null);
+ok('requireArea(field_ops, business_dev) => 403', requireArea({ uid: 'fo', role: 'field_ops', name: 'C' }, 'business_dev')?.status === 403);
+
+section('Opportunities: ADMIN-only email bridge (opp_email_bridge area)');
+ok('opp_email_bridge ALLOWED for admin', roleCanAccess('admin', 'opp_email_bridge') === true);
+ok('opp_email_bridge BLOCKED for business_dev', roleCanAccess('business_dev', 'opp_email_bridge') === false);
+ok('opp_email_bridge BLOCKED for partner', roleCanAccess('partner', 'opp_email_bridge') === false);
+ok('opp_email_bridge BLOCKED for field_ops', roleCanAccess('field_ops', 'opp_email_bridge') === false);
+ok('requireArea(business_dev, opp_email_bridge) => 403 (pending GET + mark-emailed denied to BD)',
+   requireArea({ uid: 'bd', role: 'business_dev', name: 'BD' }, 'opp_email_bridge')?.status === 403);
+ok('requireArea(admin, opp_email_bridge) => null (email daemon allowed)',
+   requireArea({ uid: 'a', role: 'admin', name: 'Daemon' }, 'opp_email_bridge') === null);
+ok('requireArea(null, opp_email_bridge) => 403 (fail closed)',
+   requireArea(null, 'opp_email_bridge')?.status === 403);
+
+section('Opportunities: source-level guards (handler calls requireArea per tier)');
+{
+  const oppSrc = readFileSync(join(__dir, '../functions/api/opportunity.js'), 'utf8');
+  ok('opportunity imports requireArea', /import\s*\{[^}]*requireArea[^}]*\}\s*from/.test(oppSrc));
+  ok('opportunity imports the feasibility scorer', /from '\.\.\/lib\/feasibility\.js'/.test(oppSrc));
+  ok('opportunity calls requireArea(business_dev)', /requireArea\([^)]*['"]business_dev['"]\)/.test(oppSrc));
+  ok('opportunity calls requireArea(opp_email_bridge) for admin tier', /requireArea\([^)]*['"]opp_email_bridge['"]\)/.test(oppSrc));
+  ok('opportunity uses env.PF_SCHEDULE', /env\.PF_SCHEDULE/.test(oppSrc));
+  ok('opportunity documents the KV read-modify-write race', /read-modify-write/.test(oppSrc));
+  ok('mark-emailed is in the ADMIN_ACTIONS set', /ADMIN_ACTIONS\s*=\s*\{\s*'mark-emailed'/.test(oppSrc));
+}
+
+section('Opportunities: base feed shape (generated)');
+{
+  const oppFeed = readFileSync(join(__dir, '../data/opportunities.js'), 'utf8');
+  ok('opportunities.js exposes window.PF_OPPORTUNITIES', /window\.PF_OPPORTUNITIES\s*=/.test(oppFeed));
+  const oppJson = JSON.parse(oppFeed.replace(/^[\s\S]*?window\.PF_OPPORTUNITIES\s*=/, '').replace(/;\s*$/, ''));
+  ok('feed has opportunities array', Array.isArray(oppJson.opportunities));
+  ok('feed has fields list', Array.isArray(oppJson.fields) && oppJson.fields.includes('Project Name'));
+  const oids = oppJson.opportunities.map(o => o.id);
+  ok('opportunity ids are unique', new Set(oids).size === oids.length);
+}
+
+section('Opportunities: feasibility scorer (transparent v1 rules)');
+{
+  const F = await import('../functions/lib/feasibility.js');
+  const at = new Date('2026-06-24').getTime();
+  ok('DOT/highway -> Pass',
+     F.score({ fields: { 'Project Name': 'I-69', 'Type': 'DOT highway', 'State': 'IN', 'Bid Due Date': '2026-08-01' } }, at).recommendation === 'Pass');
+  ok('out-of-region -> Review',
+     F.score({ fields: { 'Project Name': 'AZ WH', 'Type': 'warehouse', 'State': 'AZ', 'Bid Due Date': '2026-09-01' } }, at).recommendation === 'Review');
+  ok('tight in-region building -> Review',
+     F.score({ fields: { 'Project Name': 'FW Office', 'Type': 'commercial building', 'State': 'IN', 'Bid Due Date': '2026-06-30' } }, at).recommendation === 'Review');
+  ok('clean in-region data center -> Prelim',
+     F.score({ fields: { 'Project Name': 'DC', 'Type': 'data center', 'State': 'IN', 'Bid Due Date': '2026-09-15' } }, at).recommendation === 'Prelim');
+  ok('scorer always returns reasons (basis shown)',
+     F.score({ fields: { 'Project Name': 'X' } }, at).reasons.length > 0);
+}
+
 // --- summary ----------------------------------------------------------------
 console.log(`\n${'='.repeat(48)}`);
 console.log(`RESULT: ${pass} passed, ${fail} failed`);

@@ -239,6 +239,10 @@ const AREA_ROLES = {
   general:          ['admin', 'partner', 'business_dev', 'field_ops'], // non-sensitive shared data
   // Admin-only
   user_admin:       ['admin'],
+  // Opportunity email-bridge (the external email daemon authenticates as admin):
+  // GET ?pending=1 + POST {action:'mark-emailed'} are ADMIN ONLY. business_dev
+  // is DENIED these (its create/update/decide actions use the business_dev area).
+  opp_email_bridge: ['admin'],
   // Password-reset endpoint: reachable by ANY authenticated role (incl. a
   // restricted must_reset session). The restriction (ONLY this endpoint) is
   // enforced separately via the `restricted` session flag in the middleware,
@@ -346,6 +350,7 @@ const DATA_FILE_AREAS = {
   '/data/bd-master.json':          'business_dev',    // BD: EIN/tax id/credit-app, GC contacts — BD's own tool
   '/data/bd-dashboard.js':         'business_dev',    // BD: BD PERIOD KPIs (interactions/companies contacted/totals) — BD's own tool, field_ops BLOCKED
   '/data/bd-records.js':           'business_dev',    // BD CRM base: companies + linked contacts (read-only base) — BD's own tool, field_ops BLOCKED
+  '/data/opportunities.js':        'business_dev',    // BD CRM: opportunities base (read-only) — BD's own tool, field_ops BLOCKED
 
   // ---- COMPANY-WIDE / GLOBAL financials (admin/partner ONLY — BD + field_ops BLOCKED) ----
   // Item E: cross-job rollups, company P&L, the global pricing master, company
@@ -422,6 +427,12 @@ export function areaForPath(pathname) {
     // direct URL too. Each endpoint ALSO calls requireArea('business_dev').
     if (pathname.startsWith('/api/bd-interaction')) return 'business_dev';
     if (pathname.startsWith('/api/bd-record'))      return 'business_dev';
+    // Opportunities: the MIDDLEWARE gates the path at business_dev (admin +
+    // partner + business_dev pass; field_ops BLOCKED). The admin-only email
+    // bridge actions (GET ?pending=1, POST mark-emailed) are enforced IN the
+    // handler via requireArea('opp_email_bridge'); the normal UI actions
+    // (create/update/decide) via requireArea('business_dev').
+    if (pathname.startsWith('/api/opportunity'))    return 'business_dev';
     if (pathname.startsWith('/api/users'))         return 'user_admin';
     // /api/data proxies the live SharePoint data set (bid log + project master).
     // BD sees the full bid log (Brad 2026-06-23) -> classify as financials

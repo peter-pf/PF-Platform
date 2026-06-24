@@ -1477,7 +1477,7 @@ body.role-field-ops .nav-item[data-fo-hide] {
   // field_ops BLOCKED. precon-dashboard.js -> preconstruction area;
   // bd-dashboard.js -> business_dev area (both default-deny + server-enforced).
   if (isBdOrAbove) {
-    feeds.push('/data/precon-dashboard.js', '/data/bd-dashboard.js', '/data/bd-records.js');
+    feeds.push('/data/precon-dashboard.js', '/data/bd-dashboard.js', '/data/bd-records.js', '/data/opportunities.js');
     // BD also needs the precon pipeline feed (preconstruction area) — previously
     // only injected for admin/partner; BD is allowed it server-side.
     if (!isPrivileged) feeds.push('/data/precon-pipeline.js');
@@ -1820,6 +1820,9 @@ window.progress = (function () {
       </a>
       <a class="nav-item" data-module="bd-companies" onclick="showModule('bd-companies')">
         <span class="nav-icon">&#9784;</span> Companies &amp; Contacts
+      </a>
+      <a class="nav-item" data-module="bd-opportunities" onclick="showModule('bd-opportunities')">
+        <span class="nav-icon">&#9733;</span> Opportunities
       </a>
     </div>
 
@@ -2470,7 +2473,63 @@ document.addEventListener('click', function(e) {
         <div class="bdc-muted" id="bdcCount" style="margin-top:8px;font-size:12px"></div>
       </div>
       <div class="bdc-detail" id="bdcDetail">
-        <div class="bdc-muted">Select a company to see its details, contacts, and interactions.</div>
+        <div class="bdc-muted">Select a company to see its details, contacts and interactions.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="module-view" id="mod-bd-opportunities">
+    <!-- BD CRM Opportunities: capture + feasibility recommendation + go/pass
+         decision. Reads read-only base window.PF_OPPORTUNITIES (data/opportunities.js)
+         + merges the KV overlay (/api/opportunity). business_dev area —
+         field_ops server-DENIED the feed and the endpoint. All data via window.esc.
+         The email send is handled by an external daemon; this only sets flags. -->
+    <style>
+      #mod-bd-opportunities .opp-wrap { display:flex; gap:16px; align-items:flex-start; }
+      #mod-bd-opportunities .opp-list { flex:0 0 340px; max-width:340px; }
+      #mod-bd-opportunities .opp-detail { flex:1 1 auto; min-width:0; }
+      #mod-bd-opportunities .opp-toolbar { display:flex; gap:8px; margin-bottom:10px; }
+      #mod-bd-opportunities .opp-search { flex:1 1 auto; padding:7px 10px; }
+      #mod-bd-opportunities .opp-group-label { font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-3,#8a93a6); margin:12px 0 4px; }
+      #mod-bd-opportunities .opp-colist { max-height:60vh; overflow:auto; border:1px solid var(--border,#2a2f3a); border-radius:8px; }
+      #mod-bd-opportunities .opp-row { padding:9px 12px; cursor:pointer; border-bottom:1px solid var(--border,#2a2f3a); }
+      #mod-bd-opportunities .opp-row:hover { background:var(--surface-2,#1b212c); }
+      #mod-bd-opportunities .opp-row.active { background:var(--surface-2,#1b212c); border-left:3px solid var(--accent,#2f6df6); }
+      #mod-bd-opportunities .opp-row .nm { font-weight:600; }
+      #mod-bd-opportunities .opp-row .sub { font-size:12px; color:var(--text-3,#8a93a6); }
+      #mod-bd-opportunities .opp-card { border:1px solid var(--border,#2a2f3a); border-radius:8px; padding:14px 16px; margin-bottom:14px; }
+      #mod-bd-opportunities .opp-fields { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:6px 18px; }
+      #mod-bd-opportunities .opp-f .lbl { font-size:11px; color:var(--text-3,#8a93a6); text-transform:uppercase; letter-spacing:.03em; }
+      #mod-bd-opportunities .opp-f .val { font-size:14px; }
+      #mod-bd-opportunities .opp-h { display:flex; justify-content:space-between; align-items:center; margin:0 0 8px; gap:10px; }
+      #mod-bd-opportunities .opp-rec { font-weight:700; padding:2px 10px; border-radius:12px; font-size:13px; }
+      #mod-bd-opportunities .opp-rec.Prelim { background:rgba(63,185,80,.15); color:#3fb950; }
+      #mod-bd-opportunities .opp-rec.Pass { background:rgba(229,83,75,.15); color:#e5534b; }
+      #mod-bd-opportunities .opp-rec.Review { background:rgba(210,153,34,.18); color:#d29922; }
+      #mod-bd-opportunities .opp-reasons { margin:6px 0 0 18px; font-size:13px; }
+      #mod-bd-opportunities .opp-badge { display:inline-block; font-size:11px; padding:1px 7px; border-radius:10px; background:var(--surface-2,#1b212c); color:var(--text-3,#8a93a6); margin-left:6px; }
+      #mod-bd-opportunities .opp-form { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+      #mod-bd-opportunities .opp-form input, #mod-bd-opportunities .opp-form select, #mod-bd-opportunities .opp-form textarea { padding:6px 9px; }
+      #mod-bd-opportunities .opp-form textarea { flex:1 1 100%; min-height:46px; }
+      #mod-bd-opportunities .opp-muted { color:var(--text-3,#8a93a6); }
+      #mod-bd-opportunities .opp-err { color:#e5534b; font-size:13px; }
+      #mod-bd-opportunities .opp-ok { color:#3fb950; font-size:13px; }
+      #mod-bd-opportunities .opp-actions { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+      #mod-bd-opportunities .opp-row.passed .nm { color:var(--text-3,#8a93a6); text-decoration:line-through; }
+    </style>
+    <div id="oppNoData" class="opp-muted" style="display:none">No Opportunities available for your role.</div>
+    <div class="opp-wrap" id="oppWrap">
+      <div class="opp-list">
+        <div class="opp-toolbar">
+          <input type="text" class="opp-search" id="oppSearch" placeholder="Search opportunities" autocomplete="off">
+        </div>
+        <button type="button" class="btn" id="oppAddBtn">+ New opportunity</button>
+        <div id="oppAddForm" class="opp-form" style="display:none"></div>
+        <div id="oppListGroups"></div>
+        <div class="opp-muted" id="oppCount" style="margin-top:8px;font-size:12px"></div>
+      </div>
+      <div class="opp-detail" id="oppDetail">
+        <div class="opp-muted">Select an opportunity, or add a new one. The system reads the project data and recommends Prelim, Pass or Review with its reasoning.</div>
       </div>
     </div>
   </div>
@@ -2569,7 +2628,8 @@ const moduleTitles = {
   'pf-dashboard': 'PF Dashboard',
   'precon-dashboard': 'Preconstruction Dashboard',
   'bd-dashboard': 'Business Development Dashboard',
-  'bd-companies': 'Companies & Contacts'
+  'bd-companies': 'Companies & Contacts',
+  'bd-opportunities': 'Opportunities'
 };
 
 function showModule(id) {
@@ -13107,6 +13167,307 @@ try {
 })();
 } catch (e) {
   console.error('Module bd-companies failed to load:', e);
+}
+</script>
+
+<script>
+// ============================================================
+// MODULE: bd-opportunities — capture + feasibility recommendation + decision
+// Reads read-only base window.PF_OPPORTUNITIES (data/opportunities.js) and
+// merges the KV overlay (/api/opportunity, business_dev). The feasibility
+// recommendation is computed + stored SERVER-SIDE on create/edit (one source of
+// truth in functions/lib/feasibility.js); the UI shows recommendation + reasons.
+// The email send is handled by an external admin daemon; the UI never sends.
+// field_ops is server-DENIED the feed and the endpoint. All data via window.esc.
+// ============================================================
+try {
+(function () {
+  'use strict';
+  var E = window.esc || function (s) { return s == null ? '' : String(s); };
+
+  // The capture fields a feasibility read needs (spec). Stored under these keys
+  // so functions/lib/feasibility.js can read them.
+  var CAPTURE_FIELDS = [
+    { key: 'Project Name', ph: 'Project name', req: true },
+    { key: 'Organization', ph: 'GC / company' },
+    { key: 'Type', ph: 'Sector / type (e.g. data center, warehouse, DOT)' },
+    { key: 'State', ph: 'State (e.g. IN)' },
+    { key: 'City', ph: 'City' },
+    { key: 'Value', ph: 'Estimated size / value' },
+    { key: 'Bid Due Date', ph: 'Bid due date', type: 'date' },
+    { key: 'Source', ph: 'Source (who/where it came from)' },
+    { key: 'Notes', ph: 'Soil / geotech notes', ta: true },
+  ];
+
+  var state = { loaded: false, opps: [], selectedId: null, filter: '' };
+
+  function base() { return window.PF_OPPORTUNITIES || null; }
+
+  function api(path, opts) {
+    return fetch(path, Object.assign({ credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' } }, opts || {}))
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); });
+  }
+
+  // Merge read-only base + KV overlay. Overlay records (ov_op_*) are the live
+  // working set (they carry recommendation/decision/email flags); base records
+  // (op_*) are legacy rows shown read-only until promoted by an edit.
+  function buildMerged(overlay) {
+    var b = base();
+    if (!b) return [];
+    var out = [];
+    var ovById = {};
+    (overlay && overlay.opportunities ? overlay.opportunities : []).forEach(function (o) {
+      ovById[o.id] = o; out.push(Object.assign({ _overlay: true }, o));
+    });
+    (b.opportunities || []).forEach(function (o) {
+      if (ovById[o.id]) return;
+      out.push({ id: o.id, fields: o.fields, _overlay: false, _legacy: true,
+        recommendation: null, recommendationReasons: null, decision: null, emailStatus: null });
+    });
+    return out;
+  }
+
+  function load() {
+    var b = base();
+    var noData = document.getElementById('oppNoData');
+    var wrap = document.getElementById('oppWrap');
+    if (!b) { if (noData) noData.style.display = ''; if (wrap) wrap.style.display = 'none'; return; }
+    if (noData) noData.style.display = 'none';
+    if (wrap) wrap.style.display = '';
+    api('/api/opportunity').then(function (res) {
+      var ov = (res.ok && res.body) ? res.body : { opportunities: [] };
+      state.opps = buildMerged(ov);
+      state.loaded = true; wireControls(); renderList();
+    }).catch(function () {
+      state.opps = buildMerged(null);
+      state.loaded = true; wireControls(); renderList();
+    });
+  }
+
+  function nm(o) { return (o.fields && (o.fields['Project Name'] || o.fields.projectName)) || '(unnamed)'; }
+
+  function matchOpp(o, f) {
+    if (!f) return true;
+    return String(nm(o)).toLowerCase().indexOf(f) >= 0
+      || String((o.fields && o.fields.Organization) || '').toLowerCase().indexOf(f) >= 0;
+  }
+
+  function renderList() {
+    var groupsEl = document.getElementById('oppListGroups');
+    var countEl = document.getElementById('oppCount');
+    if (!groupsEl) return;
+    var f = state.filter.toLowerCase();
+    var shown = state.opps.filter(function (o) { return matchOpp(o, f); });
+    var passed = shown.filter(function (o) { return o.decision === 'passed'; });
+    var open = shown.filter(function (o) { return o.decision !== 'passed'; });
+    open.sort(byName); passed.sort(byName);
+
+    function rowHtml(o) {
+      var rec = o.recommendation ? '<span class="opp-badge">' + E(o.recommendation) + '</span>' : '';
+      var dec = o.decision === 'prelim' ? '<span class="opp-badge">to precon</span>' : '';
+      var em = (o.emailStatus === 'pending') ? '<span class="opp-badge">email pending</span>' : '';
+      var sub = [(o.fields && o.fields.Organization), (o.fields && o.fields.State)].filter(Boolean).join(' • ');
+      return '<div class="opp-row' + (o.id === state.selectedId ? ' active' : '')
+        + (o.decision === 'passed' ? ' passed' : '') + '" data-id="' + E(o.id) + '">'
+        + '<div class="nm">' + E(nm(o)) + rec + dec + em + '</div>'
+        + '<div class="sub">' + E(sub) + '</div></div>';
+    }
+    var html = '<div class="opp-group-label">Open (' + open.length + ')</div>'
+      + '<div class="opp-colist">' + (open.map(rowHtml).join('') || '<div class="opp-row opp-muted">None.</div>') + '</div>';
+    html += '<div class="opp-group-label">Opportunities passed on (' + passed.length + ')</div>'
+      + '<div class="opp-colist">' + (passed.map(rowHtml).join('') || '<div class="opp-row opp-muted">None.</div>') + '</div>';
+    groupsEl.innerHTML = html;
+
+    var undecided = state.opps.filter(function (o) { return o._overlay && !o.decision; }).length;
+    if (countEl) countEl.textContent = open.length + ' open, ' + passed.length + ' passed'
+      + (undecided ? ' — ' + undecided + ' awaiting a decision' : '');
+
+    groupsEl.querySelectorAll('.opp-row[data-id]').forEach(function (el) {
+      el.addEventListener('click', function () { state.selectedId = this.getAttribute('data-id'); renderList(); renderDetail(); });
+    });
+  }
+  function byName(a, b) { return String(nm(a)).localeCompare(String(nm(b))); }
+
+  function findOpp(id) { for (var i = 0; i < state.opps.length; i++) if (state.opps[i].id === id) return state.opps[i]; return null; }
+
+  function fieldGrid(fields) {
+    var keys = (base() && base().fields) || Object.keys(fields || {});
+    var cells = keys.map(function (k) {
+      var v = fields[k];
+      if (v == null || v === '' || k === 'Project Name') return '';
+      return '<div class="opp-f"><div class="lbl">' + E(k) + '</div><div class="val">' + E(v) + '</div></div>';
+    }).filter(Boolean).join('');
+    // also show capture-only keys not in the base field list
+    CAPTURE_FIELDS.forEach(function (cf) {
+      if (keys.indexOf(cf.key) >= 0) return;
+      var v = fields[cf.key];
+      if (v == null || v === '' || cf.key === 'Project Name') return;
+      cells += '<div class="opp-f"><div class="lbl">' + E(cf.key) + '</div><div class="val">' + E(v) + '</div></div>';
+    });
+    return '<div class="opp-fields">' + cells + '</div>';
+  }
+
+  function renderDetail() {
+    var d = document.getElementById('oppDetail');
+    if (!d) return;
+    var o = findOpp(state.selectedId);
+    if (!o) { d.innerHTML = '<div class="opp-muted">Select an opportunity, or add a new one.</div>'; return; }
+    var html = '';
+    html += '<div class="opp-card">'
+      + '<div class="opp-h"><h2 style="margin:0">' + E(nm(o))
+      + (o._legacy ? '<span class="opp-badge">legacy (edit to activate)</span>' : '') + '</h2>'
+      + (o.recommendation ? '<span class="opp-rec ' + E(o.recommendation) + '">' + E(o.recommendation) + '</span>' : '')
+      + '</div>'
+      + fieldGrid(o.fields || {})
+      + '</div>';
+
+    // Feasibility recommendation + reasons (always show the basis)
+    if (o.recommendation) {
+      html += '<div class="opp-card">'
+        + '<div class="opp-h"><h3 style="margin:0">Feasibility: ' + E(o.recommendation) + '</h3>'
+        + '<span class="opp-muted" style="font-size:12px">rule: ' + E(o.recRule || '') + ' • ' + E(o.recVersion || 'v1') + '</span></div>'
+        + '<ul class="opp-reasons">'
+        + (o.recommendationReasons || []).map(function (r) { return '<li>' + E(r) + '</li>'; }).join('')
+        + '</ul></div>';
+    }
+
+    // Status + decision
+    var emailLine = o.emailStatus
+      ? ('Email to Ray, Jonathan and Derek: ' + E(o.emailStatus) + (o.emailedAt ? ' (' + E(o.emailedAt) + ')' : ''))
+      : 'Email status: not set (legacy record).';
+    var decLine = o.decision === 'prelim' ? 'Decision: sent to precon for prelim'
+      : o.decision === 'passed' ? ('Decision: passed' + (o.passReason ? ' — ' + E(o.passReason) : ''))
+      : 'Decision: undecided';
+    html += '<div class="opp-card">'
+      + '<div class="opp-h"><h3 style="margin:0">Status</h3></div>'
+      + '<div class="opp-muted" style="font-size:13px">' + emailLine + '<br>' + decLine
+      + (o.decidedBy ? ' (' + E(o.decidedBy) + ', ' + E(o.decidedAt || '') + ')' : '') + '</div>';
+    if (o._overlay && !o.decision) {
+      html += '<div class="opp-actions">'
+        + '<button type="button" class="btn" id="oppPrelimBtn">Send to precon for prelim</button>'
+        + '<button type="button" class="btn" id="oppPassBtn">Pass</button>'
+        + '</div>'
+        + '<div id="oppPassForm" class="opp-form" style="display:none">'
+        + '<input type="text" name="passReason" placeholder="Reason for passing (optional)" maxlength="1000">'
+        + '<button type="button" class="btn" id="oppPassConfirm">Confirm pass</button></div>'
+        + '<div class="opp-msg" data-msg></div>';
+    } else if (o._legacy) {
+      html += '<div class="opp-actions"><button type="button" class="btn" id="oppActivateBtn">Edit / activate this opportunity</button></div>'
+        + '<div id="oppEditForm" class="opp-form" style="display:none"></div>'
+        + '<div class="opp-msg" data-msg></div>';
+    }
+    html += '</div>';
+
+    d.innerHTML = html;
+    wireDetail(o);
+  }
+
+  function captureInputs(prefill) {
+    return CAPTURE_FIELDS.map(function (cf) {
+      var v = (prefill && prefill[cf.key]) ? E(prefill[cf.key]) : '';
+      if (cf.ta) return '<textarea name="' + E(cf.key) + '" placeholder="' + E(cf.ph) + '" maxlength="1000">' + v + '</textarea>';
+      var type = cf.type === 'date' ? 'date' : 'text';
+      return '<input type="' + type + '" name="' + E(cf.key) + '" placeholder="' + E(cf.ph) + '" maxlength="1000"'
+        + (cf.req ? ' required' : '') + ' value="' + v + '">';
+    }).join('');
+  }
+
+  function collect(formEl) {
+    var out = {};
+    formEl.querySelectorAll('input[name],select[name],textarea[name]').forEach(function (el) { if (el.name) out[el.name] = el.value; });
+    return out;
+  }
+  function msg(el, text, ok) { var m = el.querySelector('[data-msg]') || document.querySelector('#oppAddForm [data-msg]'); if (m) { m.textContent = text; m.className = 'opp-msg ' + (ok ? 'opp-ok' : 'opp-err'); } }
+
+  function wireControls() {
+    var search = document.getElementById('oppSearch');
+    if (search && !search.dataset.wired) {
+      search.dataset.wired = '1';
+      search.addEventListener('input', function () { state.filter = this.value || ''; renderList(); });
+    }
+    var addBtn = document.getElementById('oppAddBtn');
+    if (addBtn && !addBtn.dataset.wired) {
+      addBtn.dataset.wired = '1';
+      addBtn.addEventListener('click', function () {
+        var f = document.getElementById('oppAddForm');
+        if (!f) return;
+        if (f.style.display === 'none' || !f.innerHTML) {
+          f.innerHTML = captureInputs(null)
+            + '<button type="button" class="btn" id="oppSaveNew">Save + get recommendation</button>'
+            + '<div class="opp-msg" data-msg></div>';
+          f.style.display = '';
+          document.getElementById('oppSaveNew').addEventListener('click', function () { createOpp(f); });
+        } else { f.style.display = 'none'; }
+      });
+    }
+  }
+
+  function createOpp(formEl) {
+    var fields = collect(formEl);
+    if (!fields['Project Name'] || !fields['Project Name'].trim()) { msg(formEl, 'A project name is required.', false); return; }
+    api('/api/opportunity', { method: 'POST', body: JSON.stringify({ action: 'create', fields: fields }) })
+      .then(function (res) {
+        if (!res.ok || !res.body || !res.body.saved) { msg(formEl, (res.body && res.body.message) || 'Save failed.', false); return; }
+        state.opps.push(Object.assign({ _overlay: true }, res.body.record));
+        formEl.style.display = ''; formEl.innerHTML = '';
+        state.selectedId = res.body.record.id;
+        renderList(); renderDetail();
+      })
+      .catch(function () { msg(formEl, 'Network error saving opportunity.', false); });
+  }
+
+  function wireDetail(o) {
+    var prelimBtn = document.getElementById('oppPrelimBtn');
+    if (prelimBtn) prelimBtn.addEventListener('click', function () { decide(o, 'prelim', null); });
+    var passBtn = document.getElementById('oppPassBtn');
+    if (passBtn) passBtn.addEventListener('click', function () {
+      var pf = document.getElementById('oppPassForm'); if (pf) pf.style.display = (pf.style.display === 'none' ? '' : 'none');
+    });
+    var passConfirm = document.getElementById('oppPassConfirm');
+    if (passConfirm) passConfirm.addEventListener('click', function () {
+      var reason = (document.querySelector('#oppPassForm input[name=passReason]') || {}).value || '';
+      decide(o, 'passed', reason);
+    });
+    var actBtn = document.getElementById('oppActivateBtn');
+    if (actBtn) actBtn.addEventListener('click', function () {
+      var f = document.getElementById('oppEditForm');
+      if (!f) return;
+      if (f.style.display === 'none' || !f.innerHTML) {
+        f.innerHTML = captureInputs(o.fields)
+          + '<button type="button" class="btn" id="oppSaveEdit">Save + recommend</button>'
+          + '<div class="opp-msg" data-msg></div>';
+        f.style.display = '';
+        // a legacy base record has no overlay id yet -> CREATE a fresh overlay
+        // record from the edited fields (keeps base read-only, all history kept).
+        document.getElementById('oppSaveEdit').addEventListener('click', function () { createOpp(f); });
+      } else { f.style.display = 'none'; }
+    });
+  }
+
+  function decide(o, decision, passReason) {
+    var payload = { action: 'decide', id: o.id, decision: decision };
+    if (decision === 'passed') payload.passReason = passReason || '';
+    api('/api/opportunity', { method: 'POST', body: JSON.stringify(payload) })
+      .then(function (res) {
+        if (!res.ok || !res.body || !res.body.saved) {
+          var d = document.getElementById('oppDetail'); if (d) { var m = d.querySelector('[data-msg]'); if (m) { m.textContent = (res.body && res.body.message) || 'Decision failed.'; m.className = 'opp-msg opp-err'; } }
+          return;
+        }
+        Object.assign(o, res.body.record);
+        renderList(); renderDetail();
+      })
+      .catch(function () {});
+  }
+
+  var prev = window.showModule;
+  window.showModule = function (id) {
+    if (typeof prev === 'function') prev(id);
+    if (id === 'bd-opportunities') { load(); }
+  };
+})();
+} catch (e) {
+  console.error('Module bd-opportunities failed to load:', e);
 }
 </script>
 </body>
