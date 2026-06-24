@@ -1936,6 +1936,7 @@ window.progress = (function () {
       <!-- Daily Reports -->
       <div class="nav-sub collapsed">
         <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Daily Reports</div>
+        <a class="nav-item" data-module="daily-reports" onclick="showModule('daily-reports')">Submit Daily Report</a>
         <a class="nav-item" data-module="dailyproduction" onclick="showModule('dailyproduction')">Daily Production</a>
         <a class="nav-item" data-module="dailylogs" onclick="showModule('dailylogs')">Daily Logs</a>
       </div>
@@ -2549,6 +2550,66 @@ document.addEventListener('click', function(e) {
     <div id="foProjRoot" class="pr-root"></div>
   </div>
 
+  <div class="module-view" id="mod-daily-reports">
+    <!-- FIELD daily reports. field_ops CAN read + write here (first field_ops
+         write surface). ZERO financials: hours, narrative, production counts,
+         safety only - no dollars/rates/costs. Approval is an in-platform STATUS
+         flow (submitted -> approved -> sent-to-HR); NO email. Reads/writes
+         /api/daily-report. All data via window.esc. -->
+    <style>
+      #mod-daily-reports .dr-card { border:1px solid var(--border,#2a2f3a); border-radius:8px; padding:14px 16px; margin-bottom:12px; }
+      #mod-daily-reports label { display:block; font-size:12px; color:var(--text-3,#8a93a6); margin:8px 0 3px; }
+      #mod-daily-reports input, #mod-daily-reports select, #mod-daily-reports textarea { width:100%; padding:7px 10px; box-sizing:border-box; }
+      #mod-daily-reports textarea { min-height:54px; font-family:inherit; }
+      #mod-daily-reports .dr-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:4px 16px; }
+      #mod-daily-reports .dr-crew-row { display:flex; gap:8px; margin-bottom:6px; }
+      #mod-daily-reports .dr-crew-row input.nm { flex:2 1 auto; }
+      #mod-daily-reports .dr-crew-row input.hr { flex:0 0 90px; }
+      #mod-daily-reports .dr-crew-row input.cc { flex:1 1 auto; }
+      #mod-daily-reports .dr-muted { color:var(--text-3,#8a93a6); }
+      #mod-daily-reports .dr-err { color:#e5534b; font-size:13px; }
+      #mod-daily-reports .dr-ok { color:#3fb950; font-size:13px; }
+      #mod-daily-reports .dr-flag { font-size:11px; color:var(--text-3,#8a93a6); }
+      #mod-daily-reports .dr-item { border-top:1px solid var(--border,#2a2f3a); padding:8px 0; }
+      #mod-daily-reports .dr-status { font-size:11px; padding:1px 8px; border-radius:10px; }
+      #mod-daily-reports .dr-status.draft { background:var(--surface-2,#1b212c); color:var(--text-3,#8a93a6); }
+      #mod-daily-reports .dr-status.submitted { background:rgba(210,153,34,.18); color:#d29922; }
+      #mod-daily-reports .dr-status.approved { background:rgba(63,185,80,.15); color:#3fb950; }
+      #mod-daily-reports .dr-status.sentToHR { background:rgba(47,109,246,.15); color:#5b8cff; }
+      #mod-daily-reports .btn-sm { font-size:12px; padding:3px 10px; }
+    </style>
+    <div id="drNoData" class="dr-muted" style="display:none">Daily reports not available for your role.</div>
+    <div id="drWrap">
+      <div class="dr-card dr-muted" style="font-size:13px">Daily reports capture field work for the day. Hours entered here feed the timesheets. The crew hours, production, weather, equipment, delays and safety are recorded - no financial data. Approval is in-platform status only, no email is sent. All fields are a v1 draft, confirm with Brad.</div>
+      <div class="dr-card">
+        <h3 style="margin:0 0 8px">New daily report <span class="dr-flag">(v1 fields, confirm with Brad)</span></h3>
+        <div class="dr-grid">
+          <div><label>Date</label><input type="date" id="drDate"></div>
+          <div><label>Project (# - Name)</label><input type="text" id="drProject" placeholder="26-002 - POET Biosciences"></div>
+          <div><label>Foreman / leader</label><input type="text" id="drForeman" placeholder="Name"></div>
+          <div><label>Weather</label><input type="text" id="drWeather" placeholder="Clear, 78F"></div>
+          <div><label>Columns installed today</label><input type="text" id="drCols" placeholder="0" inputmode="numeric"></div>
+          <div><label>LF installed today</label><input type="text" id="drLf" placeholder="0" inputmode="numeric"></div>
+        </div>
+        <label>Crew + hours <span class="dr-flag">(hours only, no pay)</span></label>
+        <div id="drCrew"></div>
+        <button type="button" class="btn btn-sm" id="drAddCrew">+ Add crew member</button>
+        <label>Work completed (narrative)</label><textarea id="drWork"></textarea>
+        <label>Equipment on site</label><textarea id="drEquip"></textarea>
+        <label>Delays / issues</label><textarea id="drDelays"></textarea>
+        <label>Safety observations / incidents</label><textarea id="drSafety"></textarea>
+        <div style="margin-top:10px">
+          <button type="button" class="btn" id="drSaveDraft">Save draft</button>
+          <button type="button" class="btn" id="drSubmit">Submit for approval</button>
+          <span class="dr-muted" style="font-size:12px;margin-left:8px">No email is sent. Submit is an in-platform status.</span>
+        </div>
+        <div class="dr-msg" data-msg style="margin-top:6px"></div>
+      </div>
+      <h3 style="margin:14px 0 6px">Recent daily reports</h3>
+      <div id="drList"></div>
+    </div>
+  </div>
+
   <div class="module-view" id="mod-schedule-awarded">
     <div class="pf-placeholder"><div class="pf-placeholder-icon">&#128197;</div><h2>Awarded Projects Schedule</h2><p>Coming in a later release.</p></div>
   </div>
@@ -2810,6 +2871,7 @@ const moduleTitles = {
   'fo-timesheets': 'TimeSheets - Weekly',
   'ts-summary': 'TimeSheets - Summary',
   'fo-projects': 'Projects - Field',
+  'daily-reports': 'Daily Reports',
   'pf-coi': 'PF COI - Standard Coverages',
   'project-poet': '26-002 POET Biosciences',
   'budget-actual-poet': 'Budget vs Actual - 26-002 POET',
@@ -11886,12 +11948,24 @@ try {
       var list = D.projects.slice();
       list.sort(function(a,b){ return String(a.number).localeCompare(String(b.number)); });
 
+      // ---- crew SEARCH (project number / name / city / scope) - no $ shown ----
+      var q = (window.__foProjFilter || '').toLowerCase();
+      var shown = !q ? list : list.filter(function(p){
+        return [p.number, p.name, p.city_state, p.discipline].some(function(v){
+          return String(v == null ? '' : v).toLowerCase().indexOf(q) >= 0;
+        });
+      });
+
       var html = '<div class="pf-index-head">'
         + '<h2>Projects - Field</h2>'
         + '<p class="pf-index-sub">Operational view for the field team. Scope, schedule, safety, '
         + 'site readiness, equipment, material and QA/QC - <strong>no financials</strong>.</p>'
-        + '<div class="pf-index-meta">' + list.length + ' active / awarded projects</div>'
+        + '<input type="text" id="foProjSearch" placeholder="Search projects you can access" '
+        + 'autocomplete="off" value="' + E(window.__foProjFilter || '') + '" '
+        + 'style="width:100%;max-width:360px;padding:7px 10px;margin:6px 0">'
+        + '<div class="pf-index-meta">' + shown.length + ' of ' + list.length + ' active / awarded projects</div>'
         + '</div>';
+      list = shown;
 
       html += '<div class="pf-table-wrap"><table class="pf-table"><thead><tr>'
         + '<th>#</th><th>Project</th><th>City / State</th><th>Scope</th>'
@@ -11941,6 +12015,16 @@ try {
       html += '<div class="pf-index-foot">Field view - financial data is intentionally omitted. '
         + 'For commercial/financial details see Project Management.</div>';
       root.innerHTML = html;
+      // wire the crew search (re-render on input, keep focus + caret at end)
+      var sb = document.getElementById('foProjSearch');
+      if (sb) {
+        sb.addEventListener('input', function(){
+          window.__foProjFilter = this.value;
+          renderList();
+          var nb = document.getElementById('foProjSearch');
+          if (nb) { nb.focus(); nb.setSelectionRange(nb.value.length, nb.value.length); }
+        });
+      }
     }
 
     // ===================== DETAIL VIEW (POET, FINANCIALS STRIPPED) =====================
@@ -14732,6 +14816,168 @@ try {
 })();
 } catch (e) {
   console.error('Project Dashboard checklist failed to load:', e);
+}
+</script>
+
+<script>
+// ============================================================
+// MODULE: daily-reports - field daily report write-back (FIRST field_ops WRITE)
+// field_ops creates/submits; admin/partner approve + send-to-HR (status only, NO
+// email). Reads/writes /api/daily-report (field_ops area, ZERO financials). All
+// data via window.esc. Approval is in-platform status (submitted/approved/
+// sent-to-HR), never mail.
+// ============================================================
+try {
+(function () {
+  'use strict';
+  var E = window.esc || function (s) { return s == null ? '' : String(s); };
+  var state = { reports: [], crew: [{ name: '', hours: '', costCode: '' }], priv: false };
+
+  function api(path, opts) {
+    return fetch(path, Object.assign({ credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' } }, opts || {}))
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); });
+  }
+
+  function load() {
+    var noData = document.getElementById('drNoData');
+    var wrap = document.getElementById('drWrap');
+    var me = window.PF_ME || {};
+    state.priv = (me.role === 'admin' || me.role === 'partner');
+    api('/api/daily-report').then(function (res) {
+      if (res.status === 403) { if (noData) noData.style.display = ''; if (wrap) wrap.style.display = 'none'; return; }
+      if (noData) noData.style.display = 'none';
+      if (wrap) wrap.style.display = '';
+      state.reports = (res.ok && res.body && Array.isArray(res.body.reports)) ? res.body.reports : [];
+      wireForm();
+      renderCrew();
+      renderList();
+    }).catch(function () { if (wrap) wrap.style.display = ''; state.reports = []; wireForm(); renderCrew(); renderList(); });
+  }
+
+  function renderCrew() {
+    var host = document.getElementById('drCrew');
+    if (!host) return;
+    host.innerHTML = state.crew.map(function (m, i) {
+      return '<div class="dr-crew-row">'
+        + '<input class="nm" data-i="' + i + '" data-f="name" placeholder="Crew member" value="' + E(m.name) + '">'
+        + '<input class="hr" data-i="' + i + '" data-f="hours" placeholder="Hrs" inputmode="decimal" value="' + E(m.hours) + '">'
+        + '<input class="cc" data-i="' + i + '" data-f="costCode" placeholder="Cost code (optional)" value="' + E(m.costCode) + '">'
+        + '</div>';
+    }).join('');
+    host.querySelectorAll('input[data-i]').forEach(function (el) {
+      el.addEventListener('input', function () {
+        var i = +this.getAttribute('data-i'), f = this.getAttribute('data-f');
+        state.crew[i][f] = this.value;
+      });
+    });
+  }
+
+  function wireForm() {
+    var add = document.getElementById('drAddCrew');
+    if (add && !add.dataset.wired) { add.dataset.wired = '1'; add.addEventListener('click', function () { state.crew.push({ name: '', hours: '', costCode: '' }); renderCrew(); }); }
+    var sd = document.getElementById('drSaveDraft');
+    if (sd && !sd.dataset.wired) { sd.dataset.wired = '1'; sd.addEventListener('click', function () { save(false); }); }
+    var sub = document.getElementById('drSubmit');
+    if (sub && !sub.dataset.wired) { sub.dataset.wired = '1'; sub.addEventListener('click', function () { save(true); }); }
+  }
+
+  function collectBody() {
+    return {
+      date: document.getElementById('drDate').value,
+      projectName: document.getElementById('drProject').value,
+      projectId: (document.getElementById('drProject').value || '').split(' ')[0],
+      foreman: document.getElementById('drForeman').value,
+      weather: document.getElementById('drWeather').value,
+      columnsInstalled: document.getElementById('drCols').value,
+      lfInstalled: document.getElementById('drLf').value,
+      crew: state.crew.filter(function (m) { return (m.name || '').trim(); }),
+      workCompleted: document.getElementById('drWork').value,
+      equipment: document.getElementById('drEquip').value,
+      delays: document.getElementById('drDelays').value,
+      safety: document.getElementById('drSafety').value,
+    };
+  }
+
+  function msg(t, ok) { var m = document.querySelector('#mod-daily-reports [data-msg]'); if (m) { m.textContent = t; m.className = 'dr-msg ' + (ok ? 'dr-ok' : 'dr-err'); } }
+
+  function save(submit) {
+    var body = collectBody();
+    if (!body.projectName || !body.projectName.trim()) { msg('A project is required.', false); return; }
+    var payload = Object.assign({ action: 'create' }, body);
+    api('/api/daily-report', { method: 'POST', body: JSON.stringify(payload) }).then(function (res) {
+      if (!res.ok || !res.body || !res.body.saved) { msg((res.body && res.body.message) || 'Save failed.', false); return; }
+      var rec = res.body.record;
+      if (submit) {
+        api('/api/daily-report', { method: 'POST', body: JSON.stringify({ action: 'submit', id: rec.id }) }).then(function (r2) {
+          if (r2.ok && r2.body && r2.body.saved) { state.reports.push(r2.body.record); msg('Submitted for approval (no email sent).', true); resetForm(); renderList(); }
+          else { state.reports.push(rec); msg((r2.body && r2.body.message) || 'Saved draft but submit failed.', false); renderList(); }
+        });
+      } else {
+        state.reports.push(rec); msg('Draft saved.', true); resetForm(); renderList();
+      }
+    }).catch(function () { msg('Network error.', false); });
+  }
+
+  function resetForm() {
+    ['drDate', 'drProject', 'drForeman', 'drWeather', 'drCols', 'drLf', 'drWork', 'drEquip', 'drDelays', 'drSafety'].forEach(function (id) {
+      var el = document.getElementById(id); if (el) el.value = '';
+    });
+    state.crew = [{ name: '', hours: '', costCode: '' }];
+    renderCrew();
+  }
+
+  function statusChip(st) {
+    var cls = st === 'sent-to-HR' ? 'sentToHR' : st;
+    return '<span class="dr-status ' + cls + '">' + E(st) + '</span>';
+  }
+
+  function renderList() {
+    var host = document.getElementById('drList');
+    if (!host) return;
+    var rs = state.reports.slice().sort(function (a, b) { return String(b.createdAt || '').localeCompare(String(a.createdAt || '')); });
+    if (!rs.length) { host.innerHTML = '<div class="dr-muted">No daily reports yet.</div>'; return; }
+    host.innerHTML = rs.map(function (r) {
+      var crewH = (r.crew || []).map(function (c) { return E(c.name) + (c.hours != null ? ' (' + E(c.hours) + 'h)' : ''); }).join(', ');
+      var prod = [];
+      if (r.columnsInstalled != null) prod.push(r.columnsInstalled + ' cols');
+      if (r.lfInstalled != null) prod.push(r.lfInstalled + ' LF');
+      var actions = '';
+      if (state.priv) {
+        if (r.status === 'submitted') actions += '<button type="button" class="btn btn-sm" data-approve="' + E(r.id) + '">Approve</button> ';
+        if (r.status === 'approved') actions += '<button type="button" class="btn btn-sm" data-hr="' + E(r.id) + '">Send to HR</button> ';
+      }
+      return '<div class="dr-item">'
+        + '<div><strong>' + E(r.date) + ' - ' + E(r.projectName || r.projectId || '') + '</strong> ' + statusChip(r.status) + '</div>'
+        + '<div class="dr-muted" style="font-size:12px">Foreman ' + E(r.foreman || '-') + (crewH ? ' - crew ' + crewH : '') + (prod.length ? ' - ' + prod.join(', ') : '') + '</div>'
+        + (r.workCompleted ? '<div style="font-size:13px">' + E(r.workCompleted) + '</div>' : '')
+        + (r.safety ? '<div class="dr-muted" style="font-size:12px">Safety: ' + E(r.safety) + '</div>' : '')
+        + '<div class="dr-muted" style="font-size:11px">'
+        + (r.submittedBy ? 'submitted by ' + E(r.submittedBy) + ' ' + E((r.submittedAt || '').slice(0, 10)) : '')
+        + (r.approvedBy ? ' - approved by ' + E(r.approvedBy) + ' ' + E((r.approvedAt || '').slice(0, 10)) : '')
+        + (r.sentToHrBy ? ' - sent to HR by ' + E(r.sentToHrBy) + ' ' + E((r.sentToHrAt || '').slice(0, 10)) : '')
+        + '</div>'
+        + (actions ? '<div style="margin-top:6px">' + actions + '</div>' : '')
+        + '</div>';
+    }).join('');
+    host.querySelectorAll('button[data-approve]').forEach(function (b) { b.addEventListener('click', function () { transition('approve', this.getAttribute('data-approve')); }); });
+    host.querySelectorAll('button[data-hr]').forEach(function (b) { b.addEventListener('click', function () { transition('send-to-hr', this.getAttribute('data-hr')); }); });
+  }
+
+  function transition(action, id) {
+    api('/api/daily-report', { method: 'POST', body: JSON.stringify({ action: action, id: id }) }).then(function (res) {
+      if (!res.ok || !res.body || !res.body.saved) return;
+      var i = state.reports.findIndex(function (r) { return r.id === id; });
+      if (i >= 0) state.reports[i] = res.body.record;
+      renderList();
+    }).catch(function () {});
+  }
+
+  var prev = window.showModule;
+  window.showModule = function (id) { if (typeof prev === 'function') prev(id); if (id === 'daily-reports') { load(); } };
+})();
+} catch (e) {
+  console.error('Module daily-reports failed to load:', e);
 }
 </script>
 </body>

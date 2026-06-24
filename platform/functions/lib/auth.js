@@ -429,6 +429,11 @@ export function areaForPath(pathname) {
   if (pathname.startsWith('/api/')) {
     if (pathname.startsWith('/api/doc'))           return 'documents';
     if (pathname.startsWith('/api/schedule'))      return 'schedule';
+    // Field daily reports: the FIRST field_ops WRITE surface. field_ops area =
+    // admin/partner/business_dev/field_ops, so the crew can read+write their
+    // daily reports. This area exposes ZERO financials. The approve / send-to-hr
+    // transitions are further restricted to admin/partner IN the handler.
+    if (pathname.startsWith('/api/daily-report'))  return 'field_ops';
     // Bid-resolution fork + Dead Set (item A): preconstruction action.
     // admin + partner + business_dev allowed; field_ops BLOCKED by direct URL.
     if (pathname.startsWith('/api/pipeline-state')) return 'preconstruction';

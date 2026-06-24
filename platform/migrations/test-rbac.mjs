@@ -916,6 +916,70 @@ section('PM: Project Dashboard feed shape + Financials section OMITTED');
   ok('_omitted records the Financials section', Array.isArray(pdJson._omitted) && pdJson._omitted.some(o => /financ/i.test(o)));
 }
 
+// --- FIELD OPS: daily reports (first field_ops WRITE) + ZERO financials -----
+section('Field daily reports: /api/daily-report -> field_ops (crew can read+write)');
+for (const p of ['/api/daily-report', '/api/daily-report?projectId=26-002']) {
+  const area = areaForPath(p.split('?')[0]);
+  ok(`${p} -> field_ops (${area})`, area === 'field_ops');
+  ok(`${p} ALLOWED for field_ops (CREW WRITE)`, roleCanAccess('field_ops', area) === true);
+  ok(`${p} ALLOWED for admin`, roleCanAccess('admin', area) === true);
+  ok(`${p} ALLOWED for partner`, roleCanAccess('partner', area) === true);
+  ok(`${p} ALLOWED for business_dev`, roleCanAccess('business_dev', area) === true);
+}
+ok('requireArea(field_ops, daily-report area) => null (CREW READ+WRITE allowed)',
+   requireArea({ uid: 'fo', role: 'field_ops', name: 'Crew' }, areaForPath('/api/daily-report')) === null);
+ok('requireArea(null, daily-report area) => 403 (fail closed)',
+   requireArea(null, areaForPath('/api/daily-report'))?.status === 403);
+
+section('Field daily reports: source-level guards + approval tier + NO mail/money');
+{
+  const src = readFileSync(join(__dir, '../functions/api/daily-report.js'), 'utf8');
+  ok('daily-report imports requireArea', /import\s*\{[^}]*requireArea[^}]*\}\s*from/.test(src));
+  ok('daily-report GET+POST guard field_ops', (src.match(/requireArea\([^)]*['"]field_ops['"]\)/g) || []).length >= 2);
+  ok('daily-report restricts approve/send-to-hr to privileged', /PRIVILEGED_ACTIONS\s*=\s*\{\s*approve/.test(src) && /isPrivileged\(session\)/.test(src));
+  ok('daily-report uses env.PF_SCHEDULE', /env\.PF_SCHEDULE/.test(src));
+  ok('daily-report sets submittedBy from session', /submittedBy\s*=\s*who/.test(src));
+  ok('daily-report documents the KV read-modify-write race', /read-modify-write/.test(src));
+  ok('daily-report send-to-hr is status only (no email noted)', /STATUS ONLY|no email/i.test(src));
+  const noComments = src.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
+  ok('daily-report makes NO fetch / outbound call', !/\bfetch\s*\(/.test(noComments) && !/https?:\/\//.test(noComments));
+  ok('daily-report calls NO mail API', !/sendMail|\/messages|smtp|nodemailer|mailgun|sendgrid/i.test(noComments));
+  // money guard: the handler must not accept/return dollar fields (costCode is a label, not $).
+  ok('daily-report has NO money handler (rate/wage/salary/price as a field)',
+     !/['"](rate|wage|salary|payRate|amount|price|cost)['"]\s*:/.test(noComments));
+}
+
+// THE BIG ONE: field_ops sees ZERO financials. Assert blocked from EVERY known
+// financial / BD / precon / PM feed AND endpoint, while allowed the field surface.
+section('Field ops ZERO-financials guarantee (blocked from all $ feeds + endpoints)');
+const FIN_FEEDS = [
+  '/data/pf-dashboard.js', '/data/projects-data.js', '/data/live-data.js',
+  '/data/pricing-data.js', '/data/project-dashboard.js', '/data/project-records.js',
+  '/data/project-record-poet.js', '/data/budget-actual-poet.js', '/data/awarded-projects.js',
+  '/data/project-master.json', '/data/project-history.js', '/data/bid-log.json',
+  '/data/precon-pipeline.js', '/data/precon-dashboard.js', '/data/precon-historical.js',
+  '/data/bd-records.js', '/data/bd-dashboard.js', '/data/opportunities.js',
+  '/data/gc-targets.js', '/data/bd-templates.js', '/data/pf-coi.js',
+  '/data/schedule-data.js', '/data/schedule-seed.js', '/data/estimate-template.json',
+];
+for (const p of FIN_FEEDS) {
+  ok(`field_ops BLOCKED from ${p}`, roleCanAccess('field_ops', areaForPath(p)) === false);
+}
+const FIN_APIS = [
+  '/api/pm-project', '/api/opportunity', '/api/bd-record', '/api/bd-interaction',
+  '/api/bd-send', '/api/precon-log', '/api/precon-action', '/api/pipeline-state',
+  '/api/data', '/api/users',
+];
+for (const p of FIN_APIS) {
+  ok(`field_ops BLOCKED from ${p}`, roleCanAccess('field_ops', areaForPath(p)) === false);
+}
+// ...and field_ops IS allowed only its operational surface (no $).
+const FIELD_OK = ['/data/fo-projects-field.js', '/data/production-data.js', '/data/progress-data.js',
+  '/data/timesheets.js', '/data/schedule-field.js', '/api/daily-report', '/api/schedule', '/api/me'];
+for (const p of FIELD_OK) {
+  ok(`field_ops ALLOWED ${p} (operational, no $)`, roleCanAccess('field_ops', areaForPath(p)) === true);
+}
+
 // --- summary ----------------------------------------------------------------
 console.log(`\n${'='.repeat(48)}`);
 console.log(`RESULT: ${pass} passed, ${fail} failed`);
