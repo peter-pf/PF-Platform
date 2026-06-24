@@ -167,3 +167,46 @@ path already handles the gap until then.
 - PF Month (June=12) + Quarter (Q2=36) rollups reconcile (no regression). Precon +
   BD render unchanged (no yearMode, single ytd button = the PF toggle).
 - Deploy OK; gate 401 with no creds on / and /data/pf-dashboard.js.
+
+## Actual vs Budget comparison view (2026-06-24)
+
+Brad added a side-by-side Actual vs Budget comparison to the PF Dashboard. The
+toggle now reads: Week | Month | Quarter | Year to Date | Annual | Actual vs
+Budget. PF Dashboard ONLY - OPT-IN via `opts.cmpMode` so Precon + BD dashboards
+are unchanged (no cmpMode, no compare button).
+
+### Month multi-select
+Selecting "Actual vs Budget" reveals a month multi-select (Jan..Dec checkboxes +
+a "Select all / Annual" checkbox) above the table. Months with no data are shown
+disabled. Default scope = all months with data. The selection is carried as a
+comma-joined month list in the engine scopeKey; toggling any box re-renders.
+You can pick MULTIPLE months, CERTAIN months (any subset), or all (Annual).
+
+### Comparison table (no delta)
+Each metric row shows ACTUAL and BUDGET side by side - NO delta column (Brad does
+not want delta in this view). Sums over the SELECTED months use the existing
+`rollup()`:
+- money metrics: amtActual vs amtBudget
+- count metrics: qtyActual vs qtyGoal (qtyGoal is the count budget/goal)
+- count_money metrics: qty Actual/Budget AND $ Actual/Budget (both shown)
+- pct metrics: actual pct vs budget pct, AVERAGED across selected months (or
+  pooled if the metric declares basisNum/basisDen, consistent with rollup)
+Months with no data are excluded from the sums. If no months are selected or none
+have data, a clean "Select one or more months" / "No data for the selected
+months" message renders (no NaN, no crash).
+
+### Guardrails honored
+- OPT-IN: only the PF `draw()` passes `{ yearMode: true, cmpMode: true }`. The
+  Precon + BD mounts pass neither, so their toggles + rollups are byte-identical
+  and have no compare button (one `data-period=compare` button in the file).
+- No RBAC change: `/data/pf-dashboard.js` stays `financials_global` (owners only).
+- No mail, no new data surface (reads the existing single-year feed).
+
+### Verification (2026-06-24)
+- `node migrations/test-rbac.mjs`: 661 pass / 0 fail (RBAC unchanged).
+- Jan+Mar compare: Bids Sent Actual 24 / $2M vs Budget 20 / $2M (qty + $ reconcile
+  to the manual month sums); Net Income Actual $160K = manual; Avg Profit Margin
+  pct 0.4 actual vs 0.5 budget AVERAGED not summed. Annual (12mo) Bids Sent 144
+  vs 120; Jan+Mar(24) < Annual(144). No Delta column (head = Metric|Actual|Budget).
+- No regression: PF Month (June 12), Quarter (Q2 36), YTD (Jan-Jun 72) unchanged;
+  Precon + BD untouched. Deploy OK; gate 401 on / and /data/pf-dashboard.js.
