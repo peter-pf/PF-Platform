@@ -884,6 +884,17 @@ body.role-field-ops .nav-item[data-fo-hide] {
 .pf-hl-field .pf-hl-value.num { font-variant-numeric: tabular-nums; }
 .pf-hl-detail-actions { grid-column: 1 / -1; margin-top: 4px; }
 .pf-hl-detail-actions .pf-record-link { font-size: 0.82rem; }
+/* Compact variant for buckets with many highlight columns (Submitted Bids). */
+.pf-hl-table.pf-hl-compact { font-size: 0.8rem; }
+.pf-hl-table.pf-hl-compact th { font-size: 0.66rem; padding: 8px 9px; }
+.pf-hl-table.pf-hl-compact td { padding: 8px 9px; }
+/* Follow-up date flags (overdue / due soon). Mirrors the precon action-item
+   calendar palette so the cue reads the same across the app. */
+.pf-hl-flag { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 10px;
+  font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+  vertical-align: middle; white-space: nowrap; }
+.pf-hl-flag.overdue { background: rgba(229,83,75,.16); color: #e5534b; }
+.pf-hl-flag.due-soon { background: rgba(210,153,34,.18); color: #d29922; }
 
 /* ---- TIMESHEETS (Field Operations) ---- */
 .ts-root { max-width: 1180px; }
@@ -11739,6 +11750,18 @@ try {
       return m;
     }
 
+    // Days from today (UTC midnight) to a date string, or null if unparseable.
+    // Matches the precon action-item calendar's daysUntil so follow-up flags read
+    // identically across the app (negative = overdue, <= 7 = due soon).
+    function hlDaysUntil(dateStr){
+      if (!dateStr) return null;
+      var d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00Z');
+      if (isNaN(d.getTime())) return null;
+      var now = new Date();
+      var today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+      return Math.round((d.getTime() - today) / 86400000);
+    }
+
     // HIGHLIGHTS-ROW + CLICK-TO-EXPAND renderer (Actively Bidding + Budget
     // Pricing). A compact full-width table shows only the headline columns; every
     // remaining bid-log field drops into a per-project labeled detail panel that
@@ -11762,19 +11785,25 @@ try {
       var thead = '<th class="pf-hl-disc" aria-label="expand"></th>'
         + '<th>Project</th>';
       highlights.forEach(function(h){
-        var cls = (h.type === 'money') ? ' class="num"' : '';
+        var cls = (h.type === 'money' || h.type === 'num') ? ' class="num"' : '';
         thead += '<th' + cls + '>' + E(h.label || h.key) + '</th>';
       });
       if (opts.actionCol) thead += '<th class="pf-hl-action">Resolution</th>';
 
-      // table-layout:fixed needs a colgroup so columns size sensibly.
+      // table-layout:fixed needs a colgroup so columns size sensibly. A highlight
+      // column may declare an explicit width (h.w) to keep wide rows from
+      // overflowing; otherwise money columns default to 140px and the rest flex.
       var colgroup = '<col style="width:34px"><col>';
       highlights.forEach(function(h){
-        colgroup += (h.type === 'money') ? '<col style="width:140px">' : '<col>';
+        var w = h.w ? h.w : (h.type === 'money' ? '140px' : '');
+        colgroup += w ? ('<col style="width:' + w + '">') : '<col>';
       });
       if (opts.actionCol) colgroup += '<col style="width:188px">';
 
-      var html = '<div class="pf-hl-wrap"><table class="pf-hl-table"><colgroup>'
+      // Compact mode (smaller font + tighter padding) for buckets with many
+      // highlight columns so they fit without horizontal scroll (Submitted Bids).
+      var tableCls = 'pf-hl-table' + (opts.compact ? ' pf-hl-compact' : '');
+      var html = '<div class="pf-hl-wrap"><table class="' + tableCls + '"><colgroup>'
         + colgroup + '</colgroup><thead><tr>' + thead + '</tr></thead><tbody>';
 
       list.forEach(function(p, idx){
@@ -11809,7 +11838,16 @@ try {
         highlights.forEach(function(h){
           var v = f[h.key];
           var cell = (v === undefined || v === null) ? '' : E(v);
-          var cls = (h.type === 'money') ? ' class="num"' : '';
+          var cls = (h.type === 'money' || h.type === 'num') ? ' class="num"' : '';
+          // Follow-up date gets an overdue / due-soon flag, matching the precon
+          // action-item calendar palette. Same thresholds: past = overdue,
+          // within 7 days = due soon. The flag text is static (safe); the date
+          // value itself is still escaped above.
+          if (opts.followUpKey && h.key === opts.followUpKey && (v !== undefined && v !== null && String(v) !== '')) {
+            var dd = hlDaysUntil(v);
+            if (dd !== null && dd < 0) cell += ' <span class="pf-hl-flag overdue">Overdue</span>';
+            else if (dd !== null && dd <= 7) cell += ' <span class="pf-hl-flag due-soon">Due soon</span>';
+          }
           row += '<td' + cls + '>' + cell + '</td>';
         });
         if (opts.actionCol) {
@@ -12054,34 +12092,61 @@ try {
         html += '<div class="precon-dnd-err" style="display:none"></div>';
       }
 
-      // Actively Bidding + Budget Pricing use the HIGHLIGHTS-ROW + click-to-expand
-      // layout (no horizontal scroll). All other buckets keep the WIDE table.
-      var useHighlights = (bucket === 'actively_bidding' || bucket === 'budget_pricing');
+      // Actively Bidding + Budget Pricing + Submitted Bids use the HIGHLIGHTS-ROW
+      // + click-to-expand layout (no horizontal scroll). All other buckets keep
+      // the WIDE table.
+      var useHighlights = (bucket === 'actively_bidding' || bucket === 'budget_pricing' || bucket === 'submitted_bids');
       if (useHighlights) {
         // Actively Bidding highlight columns are FIXED by Jonathan's spec:
         // Project Name (name cell), Design Completed Date, Due Date, City/State, GC.
         // Budget Pricing mirrors the look with a sensible set: project identity,
         // Due Date, City/State, GC, plus the headline number (Bid Total Value).
-        var highlights = (bucket === 'actively_bidding')
-          ? [
-              { key: 'Design Completed Date', label: 'Prelim Design Completed', type: 'date' },
-              { key: 'Due Date',              label: 'Bid Due Date',           type: 'date' },
-              { key: 'City / State',          label: 'City / State',           type: 'text' },
-              { key: 'General Contractor',    label: 'GC',                     type: 'text' }
-            ]
-          : [
-              { key: 'Due Date',           label: 'Bid Due Date',     type: 'date' },
-              { key: 'City / State',       label: 'City / State',     type: 'text' },
-              { key: 'General Contractor', label: 'GC',               type: 'text' },
-              { key: 'Bid Total Value',    label: 'Bid Total Value',  type: 'money' }
-            ];
-        html += renderHighlightTable(disc, list, {
-          highlights: highlights,
+        // Submitted Bids carries MORE columns (Jonathan's spec) because once a bid
+        // is submitted the known fields shift to quantities + pricing + schedule.
+        var highlights, hlOpts = {
           recordCol: (bucket === 'awarded'),
           actionCol: canResolve(),
           displayBucket: displayBucket,
           idBucket: bucket
-        });
+        };
+        if (bucket === 'actively_bidding') {
+          highlights = [
+            { key: 'Design Completed Date', label: 'Prelim Design Completed', type: 'date' },
+            { key: 'Due Date',              label: 'Bid Due Date',           type: 'date' },
+            { key: 'City / State',          label: 'City / State',           type: 'text' },
+            { key: 'General Contractor',    label: 'GC',                     type: 'text' }
+          ];
+        } else if (bucket === 'budget_pricing') {
+          highlights = [
+            { key: 'Due Date',           label: 'Bid Due Date',     type: 'date' },
+            { key: 'City / State',       label: 'City / State',     type: 'text' },
+            { key: 'General Contractor', label: 'GC',               type: 'text' },
+            { key: 'Bid Total Value',    label: 'Bid Total Value',  type: 'money' }
+          ];
+        } else {
+          // SUBMITTED BIDS - Jonathan's exact order. Project Name lives in the
+          // name cell; the rest are highlight columns; GC is last before the
+          // action buttons. Explicit widths keep 9 data columns from overflowing;
+          // text columns (City/State, GC) flex + ellipsis-truncate. Compact mode
+          // (smaller font) plus narrow date/number columns make it fit a normal
+          // screen without horizontal scroll. Follow Up Date carries the
+          // overdue / due-soon flag.
+          highlights = [
+            { key: 'City / State',           label: 'City / State',     type: 'text' },
+            { key: 'Bid Total Value',        label: 'Bid Total',        type: 'money', w: '110px' },
+            { key: 'Total LF',               label: 'Total LF',         type: 'num',   w: '84px' },
+            { key: 'Total Columns',          label: 'Columns',          type: 'num',   w: '80px' },
+            { key: 'Date Submitted',         label: 'Submitted',        type: 'date',  w: '100px' },
+            { key: 'Follow Up Date',         label: 'Follow-up',        type: 'date',  w: '120px' },
+            { key: 'Projected Start Date',   label: 'Proj. Start',      type: 'date',  w: '100px' },
+            { key: 'Project Duration (Days)',label: 'Duration',         type: 'num',   w: '82px' },
+            { key: 'General Contractor',     label: 'GC',               type: 'text' }
+          ];
+          hlOpts.compact = true;
+          hlOpts.followUpKey = 'Follow Up Date';
+        }
+        hlOpts.highlights = highlights;
+        html += renderHighlightTable(disc, list, hlOpts);
       } else {
         html += renderTable(disc, list, {
           recordCol: (bucket === 'awarded'),
