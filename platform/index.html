@@ -11576,6 +11576,23 @@ try {
       var k = jobKey(p);
       return (k && window.PF_PIPELINE.overrides && window.PF_PIPELINE.overrides[k]) || null;
     }
+    // TWO-WAY (high-level) SYNC: the Awarded row reads the LIVE linked PM overlay
+    // record (single source: the bid + pm_projects_v1, keyed by sourceBidId) and
+    // renders its assigned project number plus a "Completed" marker when PM marks
+    // the project complete. Because this reads window.PF_PM (refreshed from
+    // /api/pm-project) at render time, any PM-side status/number change shows here
+    // on the next render without a copy that can drift. Returns '' if no link yet.
+    function pmNumTag(p){
+      try {
+        if (typeof window.pfPmRecordFor !== 'function') return '';
+        var pm = window.pfPmRecordFor(p);
+        if (!pm || !pm.projectNumber) return '';
+        var done = (pm.status === 'completed')
+          ? ' <span class="pf-tag-completed">PM complete</span>' : '';
+        return ' <span class="pf-tag-awarded" title="Assigned project number">'
+          + E(pm.projectNumber) + '</span>' + done;
+      } catch (e) { return ''; }
+    }
 
     // Load overrides once (synchronously, before first render, like /api/me).
     function loadOverrides(){
@@ -11621,6 +11638,16 @@ try {
           window.PF_PIPELINE.meta = (d && d.meta) || window.PF_PIPELINE.meta;
           renderAll();
           renderDeadSet();
+          // AUTO-HANDOFF: a successful 'awarded' resolution ALSO creates the PM
+          // project (assigns the next YY-NNN, carries the bid info forward). The
+          // pm-handoff module owns the create + numbering; it is idempotent on
+          // sourceBidId so a re-clicked award never mints a second number. Best
+          // effort: the award is already saved, so a handoff hiccup must not
+          // block the UI. The hook refreshes the overlay + re-renders this view
+          // so the assigned number appears on the Awarded row.
+          if (status === 'awarded' && typeof window.pfAutoCreatePmOnAward === 'function') {
+            window.pfAutoCreatePmOnAward(jobId);
+          }
         } else if (xhr.status === 409) {
           alert('Another user changed the pipeline since you loaded it. Reloading the latest resolutions.');
           loadOverrides(); renderAll(); renderDeadSet();
@@ -11690,7 +11717,7 @@ try {
         var ov = overrideFor(p);
         var nameTxt = E(p.name || f['Project Name'] || '');
         if (p.completed) nameTxt += ' <span class="pf-tag-completed">Completed</span>';
-        if (ov && ov.status === 'awarded') nameTxt += ' <span class="pf-tag-awarded">Awarded</span>';
+        if (ov && ov.status === 'awarded') nameTxt += ' <span class="pf-tag-awarded">Awarded</span>' + pmNumTag(p);
         if (ov && ov.status === 'not_awarded') nameTxt += ' <span class="pf-tag-dead">Dead</span>';
         var numTxt = E(p.number || f['Project Number'] || '');
         var stickyInner = '<div>' + nameTxt + '</div>'
@@ -11820,7 +11847,7 @@ try {
         // ---- main highlights row ----
         var nameTxt = E(p.name || f['Project Name'] || '');
         if (p.completed) nameTxt += ' <span class="pf-tag-completed">Completed</span>';
-        if (ov && ov.status === 'awarded') nameTxt += ' <span class="pf-tag-awarded">Awarded</span>';
+        if (ov && ov.status === 'awarded') nameTxt += ' <span class="pf-tag-awarded">Awarded</span>' + pmNumTag(p);
         if (ov && ov.status === 'not_awarded') nameTxt += ' <span class="pf-tag-dead">Dead</span>';
         var numTxt = E(p.number || f['Project Number'] || '');
         var nameCell = '<div class="pf-hl-name">' + nameTxt + '</div>'
@@ -12241,6 +12268,9 @@ try {
       var mounts = document.querySelectorAll('.precon-mount');
       for (var i = 0; i < mounts.length; i++) renderMount(mounts[i]);
     }
+    // Exposed so the pm-handoff auto-award hook can refresh the Awarded view once
+    // the (async) PM create resolves and the assigned number is known.
+    window.pfRerenderPrecon = function(){ renderAll(); renderDeadSet(); };
 
     // ----- DEAD SET view: all not-awarded jobs across both disciplines -----
     function renderDeadSet(){
@@ -15372,6 +15402,7 @@ try {
       if (wrap) wrap.style.display = '';
       state.pm = (res.ok && res.body && Array.isArray(res.body.projects)) ? res.body.projects : [];
       state.loaded = true;
+      if (typeof rebuildPmIndex === 'function') rebuildPmIndex();
       render();
     }).catch(function () { state.pm = []; render(); });
   }
@@ -15422,8 +15453,16 @@ try {
     });
   }
 
-  function createPM(b) {
+  // createPM(bid, onDone?). Carries the bid info forward (name, GC, value, LF,
+  // columns, and a history blob of the key bid fields) so the PM project is
+  // populated, not empty. onDone(record) fires after the overlay is updated; the
+  // manual button passes none (so it just re-renders the handoff list), the
+  // auto-award hook passes a callback to refresh the precon Awarded view.
+  function createPM(b, onDone) {
     var f = b.fields || {};
+    var num = b.number || f['Project Number'] || 'n/a';
+    var lf = f['Total LF'] || '';
+    var cols = f['Total Columns'] || '';
     var payload = {
       action: 'create',
       name: b.name || f['Project Name'] || '',
@@ -15431,7 +15470,9 @@ try {
       value: (b.value != null ? String(b.value) : (f['Bid Total Value'] || '')),
       sourceBidId: bidId(b),
       history: 'Awarded from precon. GC ' + (b.gc || f['General Contractor'] || '')
-        + '. Bid #' + (b.number || f['Project Number'] || 'n/a')
+        + '. Bid #' + num
+        + (lf ? '. LF ' + lf : '')
+        + (cols ? '. Columns ' + cols : '')
         + '. Invite ' + (f['Invite Date'] || 'n/a') + ', submitted ' + (f['Date Submitted'] || 'n/a') + '.',
       existingNumbers: existingNumbers(),
     };
@@ -15444,12 +15485,86 @@ try {
       // refresh overlay then re-render
       state.pm = state.pm.filter(function (p) { return p.id !== res.body.record.id; });
       state.pm.push(res.body.record);
-      render();
+      if (typeof rebuildPmIndex === 'function') rebuildPmIndex();
+      if (document.getElementById('pmhContent')) render();
+      if (typeof onDone === 'function') onDone(res.body.record);
     }).catch(function () { var msg = document.getElementById('pmhMsg'); if (msg) msg.textContent = 'Network error.'; });
   }
 
+  // ---- App-wide overlay cache + auto-create hook -------------------------
+  // The precon Awarded view (a SEPARATE IIFE) needs two things from here:
+  //   1. read the assigned PM number for a bid so it can surface it on the row;
+  //   2. auto-create the PM project the instant a bid is Marked Awarded.
+  // We expose both as globals keyed by the SAME sourceBidId scheme (bidId()), so
+  // there is ONE source: the bid plus its linked pm_projects_v1 overlay record.
+  // window.PF_PM mirrors state.pm into a byBidId map for O(1) lookup.
+  window.PF_PM = window.PF_PM || { byBidId: {}, loaded: false };
+
+  function rebuildPmIndex() {
+    var map = {};
+    state.pm.forEach(function (p) { if (p && p.sourceBidId) map[p.sourceBidId] = p; });
+    window.PF_PM.byBidId = map;
+    window.PF_PM.loaded = state.loaded;
+  }
+
+  // Load the PM overlay once for the whole app (not just the handoff module), so
+  // the Awarded view can show live numbers + status without opening the module.
+  window.pfPmLoad = function (cb) {
+    api('/api/pm-project').then(function (res) {
+      state.pm = (res.ok && res.body && Array.isArray(res.body.projects)) ? res.body.projects : [];
+      state.loaded = true;
+      rebuildPmIndex();
+      if (typeof cb === 'function') cb();
+    }).catch(function () { rebuildPmIndex(); if (typeof cb === 'function') cb(); });
+  };
+
+  // Return the linked PM overlay record for a bid object (or null). The Awarded
+  // view reads .projectNumber + .status off this to stay in sync with PM.
+  window.pfPmRecordFor = function (p) {
+    if (!p) return null;
+    return window.PF_PM.byBidId[bidId(p)] || null;
+  };
+
+  // AUTO-CREATE on award. Called by pfResolveBid() right after a successful
+  // 'awarded' POST. jobId is the bid's Project Number (jobKey). We find the
+  // matching awarded bid object, build the SAME payload createPM() uses, and POST
+  // create. The server is IDEMPOTENT on sourceBidId, so a re-click (or a bid that
+  // was already handed off) never mints a second number. Best effort + silent:
+  // the award itself already succeeded; a handoff hiccup must not block the UI.
+  // Returns nothing; refreshes window.PF_PM so the Awarded row shows the number.
+  window.pfAutoCreatePmOnAward = function (jobId) {
+    try {
+      var jk = String(jobId || '').trim();
+      if (!jk) return;
+      // Find the awarded bid whose jobKey (Project Number) matches.
+      var match = null;
+      awardedBids().some(function (b) {
+        var f = b.fields || {};
+        var n = String((b.number || f['Project Number']) || '').trim();
+        if (n && n === jk) { match = b; return true; }
+        return false;
+      });
+      if (!match) return; // no project number to hand off (cannot key a PM record)
+      // Skip the network call if we already hold a linked record for this bid.
+      if (window.pfPmRecordFor(match)) return;
+      createPM(match, function () {
+        rebuildPmIndex();
+        // Refresh the precon Awarded view so the new number appears on the row.
+        if (typeof window.pfRerenderPrecon === 'function') window.pfRerenderPrecon();
+      });
+    } catch (e) { /* award already saved; never throw from the hook */ }
+  };
+
   var prev = window.showModule;
   window.showModule = function (id) { if (typeof prev === 'function') prev(id); if (id === 'pm-handoff') { load(); } };
+
+  // Warm the overlay cache once at startup so the Awarded view has numbers
+  // without the user opening the handoff module first. 403 (field_ops) -> empty.
+  // On completion, re-render the precon view so already-handed-off bids show
+  // their assigned number on first paint (the precon IIFE booted before this).
+  window.pfPmLoad(function () {
+    if (typeof window.pfRerenderPrecon === 'function') window.pfRerenderPrecon();
+  });
 })();
 } catch (e) {
   console.error('Module pm-handoff failed to load:', e);
