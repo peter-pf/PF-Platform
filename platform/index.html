@@ -763,6 +763,71 @@ body.role-field-ops .nav-item[data-fo-hide] {
 .pf-wide tr:hover td.pf-sticky-col { background: var(--bg-1); }
 .pf-wide td.pf-sticky-col .pf-record-link { display: inline-block; margin-top: 3px; font-size: 0.78rem; }
 
+/* ---- PF DASHBOARD owner-wide SEARCH ---- */
+.pfdash-search { margin: 0 0 14px; }
+.pfdash-search-box {
+  display: flex; align-items: center; gap: 8px;
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--bg-0); padding: 8px 12px; max-width: 560px;
+}
+.pfdash-search-box input {
+  flex: 1 1 auto; border: none; outline: none; background: transparent;
+  font-size: 0.92rem; color: var(--text-1); min-width: 0;
+}
+.pfdash-search-box input::placeholder { color: var(--text-3); }
+.pfdash-search-clear {
+  border: none; background: transparent; cursor: pointer;
+  color: var(--text-3); font-size: 1.1rem; line-height: 1; padding: 0 2px;
+}
+.pfdash-search-clear:hover { color: var(--text-1); }
+.pfdash-results { margin-top: 10px; max-width: 720px; }
+.pfdash-results-empty { color: var(--text-3); font-size: 0.86rem; padding: 8px 2px; }
+.pfdash-rgroup { margin-bottom: 12px; }
+.pfdash-rgroup-h {
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--text-2);
+  padding: 4px 2px; border-bottom: 1px solid var(--border-light); margin-bottom: 4px;
+}
+.pfdash-rgroup-h .pfdash-rcount { color: var(--text-3); font-weight: 600; margin-left: 6px; }
+.pfdash-ritem {
+  display: block; width: 100%; text-align: left; cursor: pointer;
+  border: 1px solid transparent; border-radius: 8px;
+  background: transparent; padding: 7px 10px; margin: 1px 0;
+  color: var(--text-1); font-size: 0.88rem;
+}
+.pfdash-ritem:hover, .pfdash-ritem:focus {
+  background: var(--bg-1); border-color: var(--border); outline: none;
+}
+.pfdash-ritem .pfdash-rsub { display: block; color: var(--text-3); font-size: 0.76rem; margin-top: 2px; }
+.pfdash-rmore { color: var(--text-3); font-size: 0.78rem; font-style: italic; padding: 2px 10px; }
+
+/* ---- Preconstruction drag-and-drop (item: kanban-style move) ---- */
+.precon-dnd-bar {
+  display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 4px;
+  align-items: stretch;
+}
+.precon-dropzone {
+  flex: 1 1 150px; min-height: 52px;
+  border: 1px dashed var(--border); border-radius: 10px;
+  background: var(--bg-1); color: var(--text-2);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-size: 0.78rem; font-weight: 600; text-align: center; padding: 8px;
+  transition: background 0.12s, border-color 0.12s;
+}
+.precon-dropzone .precon-dz-sub { color: var(--text-3); font-weight: 500; font-size: 0.7rem; margin-top: 2px; }
+.precon-dropzone.dz-over { border-color: var(--accent); background: var(--accent-light); color: var(--accent-dark); border-style: solid; }
+.pf-wide tr[draggable="true"] { cursor: grab; }
+.pf-wide tr.pf-dragging td { opacity: 0.45; }
+.precon-dnd-hint { color: var(--text-3); font-size: 0.76rem; font-style: italic; margin: 6px 0 0; }
+.precon-dnd-err { color: #A12626; font-size: 0.78rem; margin: 6px 0 0; }
+/* Touch-only devices: HTML5 drag is impractical, so hide the drop bar/hint and
+   keep the per-row Resolution buttons (the existing way) as the path to change
+   state. Pointer-capable devices keep drag-and-drop. */
+@media (hover: none) and (pointer: coarse) {
+  .precon-dnd-bar, .precon-dnd-hint { display: none !important; }
+  .pf-wide tr[draggable="true"] { cursor: default; }
+}
+
 /* ---- TIMESHEETS (Field Operations) ---- */
 .ts-root { max-width: 1180px; }
 .ts-toolbar {
@@ -2778,6 +2843,19 @@ document.addEventListener('click', function(e) {
          "PF Dashboard" tab of the PF Project Master). financials_global -
          OWNERS ONLY (admin/partner); the feed is server-DENIED to BD + field. -->
     <div class="pfdash-wrap">
+      <!-- Owner-wide SEARCH: searches across the records the current user can
+           access (already-loaded window.PF_* feeds, which are role-gated). -->
+      <div class="pfdash-search">
+        <div class="pfdash-search-box">
+          <span aria-hidden="true" style="color:var(--text-3)">&#128269;</span>
+          <input type="text" id="pfdashSearch" autocomplete="off" spellcheck="false"
+                 placeholder="Search projects, bids, opportunities, companies, contacts"
+                 aria-label="Search across your records">
+          <button type="button" class="pfdash-search-clear" id="pfdashSearchClear"
+                  title="Clear search" aria-label="Clear search" style="display:none">&times;</button>
+        </div>
+        <div class="pfdash-results" id="pfdashResults" role="listbox" aria-label="Search results"></div>
+      </div>
       <div class="pfdash-toolbar">
         <div class="pfdash-period-toggle" id="pfdashPeriodToggle" role="tablist" aria-label="Time period">
           <button type="button" class="pfdash-pbtn" data-period="week">Week</button>
@@ -11549,7 +11627,17 @@ try {
         var numTxt = E(p.number || f['Project Number'] || '');
         var stickyInner = '<div>' + nameTxt + '</div>'
           + (numTxt ? '<div class="pf-record-muted">' + numTxt + '</div>' : '');
-        var row = '<tr><td class="pf-sticky-col">' + stickyInner + '</td>';
+        // DRAG-AND-DROP: privileged roles may drag a row onto a resolution
+        // drop-zone (Awarded / Not Awarded / Back to Active). The row carries its
+        // stable jobKey + current display bucket so the drop handler can call the
+        // SAME pfResolveBid() path the buttons use. Rows without a project number
+        // (no jobKey) are NOT draggable (they cannot be persisted). field_ops never
+        // reaches this code (canResolve() false + server-gated feed).
+        var jk = jobKey(p);
+        var dragAttrs = (canResolve() && jk)
+          ? ' draggable="true" data-jobkey="' + E(jk) + '" data-curbucket="' + E(opts.displayBucket || 'open') + '"'
+          : '';
+        var row = '<tr' + dragAttrs + '><td class="pf-sticky-col">' + stickyInner + '</td>';
 
         dataCols.forEach(function(c){
           var v = f[c.key];
@@ -11592,6 +11680,69 @@ try {
         if (!an) return 1;
         if (!bn) return -1;
         return an.localeCompare(bn);
+      });
+    }
+
+    // ----- DRAG-AND-DROP wiring for one mount -----
+    // Reuses pfResolveBid() (a blocking synchronous POST to /api/pipeline-state):
+    // on success it re-renders, on 409/403/error it alerts. There is no optimistic
+    // UI move and nothing to revert - the row only changes bucket after the POST
+    // returns and the re-render runs. Here we add the drag source (rows) + drop
+    // targets (the resolution zones) and a small inline error line for clarity.
+    function wireDnd(mount){
+      var rows = mount.querySelectorAll('tr[draggable="true"]');
+      var zones = mount.querySelectorAll('.precon-dropzone');
+      var errEl = mount.querySelector('.precon-dnd-err');
+      if (!rows.length || !zones.length) return;
+      var dragKey = null;
+
+      function showErr(msg){
+        if (!errEl) return;
+        errEl.textContent = msg || '';
+        errEl.style.display = msg ? '' : 'none';
+      }
+
+      rows.forEach(function(tr){
+        tr.addEventListener('dragstart', function(ev){
+          dragKey = tr.getAttribute('data-jobkey') || null;
+          tr.classList.add('pf-dragging');
+          showErr('');
+          if (ev.dataTransfer) {
+            ev.dataTransfer.effectAllowed = 'move';
+            // some browsers require data to be set for the drag to start
+            try { ev.dataTransfer.setData('text/plain', dragKey || ''); } catch (e) {}
+          }
+        });
+        tr.addEventListener('dragend', function(){
+          tr.classList.remove('pf-dragging');
+          dragKey = null;
+          zones.forEach(function(z){ z.classList.remove('dz-over'); });
+        });
+      });
+
+      zones.forEach(function(zone){
+        zone.addEventListener('dragover', function(ev){
+          ev.preventDefault(); // allow drop
+          if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
+          zone.classList.add('dz-over');
+        });
+        zone.addEventListener('dragleave', function(){ zone.classList.remove('dz-over'); });
+        zone.addEventListener('drop', function(ev){
+          ev.preventDefault();
+          zone.classList.remove('dz-over');
+          var key = dragKey;
+          if (!key && ev.dataTransfer) { try { key = ev.dataTransfer.getData('text/plain'); } catch (e) {} }
+          if (!key) { showErr('Could not identify the bid that was dragged. Please try again.'); return; }
+          var action = zone.getAttribute('data-act');
+          if (action !== 'awarded' && action !== 'not_awarded' && action !== 'active') {
+            showErr('Unknown drop target.'); return;
+          }
+          showErr('');
+          // pfResolveBid handles permission, the blocking POST, re-render on
+          // success, and alert on conflict/permission/error (409 reloads). We
+          // pass null for the button arg (no per-row button to disable here).
+          window.pfResolveBid(key, action, null);
+        });
       });
     }
 
@@ -11667,15 +11818,47 @@ try {
       if (sLf != null) parts.push('Total LF ' + fmtNum0(sLf));
       html += '<div class="pf-index-meta" style="margin:4px 0 10px">' + E(parts.join('  •  ')) + '</div>';
 
+      var displayBucket = (bucket === 'awarded') ? 'awarded' : 'open';
+
+      // DRAG-AND-DROP bar: privileged roles can drag a bid row onto a resolution
+      // drop-zone. The zones map to the THREE states the /api/pipeline-state
+      // endpoint supports (awarded / not_awarded / active). The per-row buttons
+      // still work; this is an additive affordance, NOT a replacement. Hidden on
+      // touch-only devices (drag is impractical there) via the (hover: none) media
+      // rule below; the buttons remain the way to change state on touch.
+      if (canResolve()) {
+        if (displayBucket === 'awarded') {
+          html += '<div class="precon-dnd-bar">'
+            + '<div class="precon-dropzone" data-act="not_awarded">Not Awarded'
+            + '<span class="precon-dz-sub">drag here to send to the Dead Set</span></div>'
+            + '<div class="precon-dropzone" data-act="active">Back to Active'
+            + '<span class="precon-dz-sub">drag here to return to bidding</span></div>'
+            + '</div>'
+            + '<div class="precon-dnd-hint">Drag an awarded bid onto a zone to change its status. The buttons in each row do the same.</div>';
+        } else {
+          html += '<div class="precon-dnd-bar">'
+            + '<div class="precon-dropzone" data-act="awarded">Awarded'
+            + '<span class="precon-dz-sub">drag a bid here to mark it Awarded</span></div>'
+            + '<div class="precon-dropzone" data-act="not_awarded">Not Awarded'
+            + '<span class="precon-dz-sub">drag a bid here to send to the Dead Set</span></div>'
+            + '</div>'
+            + '<div class="precon-dnd-hint">Drag a bid row onto a zone to change its status. The buttons in each row do the same.</div>';
+        }
+        html += '<div class="precon-dnd-err" style="display:none"></div>';
+      }
+
       html += renderTable(disc, list, {
         recordCol: (bucket === 'awarded'),
         actionCol: canResolve(),
-        displayBucket: (bucket === 'awarded') ? 'awarded' : 'open',
+        displayBucket: displayBucket,
         actionColLabel: (bucket === 'awarded') ? 'Awarded' : 'Resolution'
       });
       // a per-mount activity-log panel host (one open at a time within the mount)
       html += '<div class="precon-actlog" style="margin-top:12px"></div>';
       mount.innerHTML = html;
+
+      // ----- wire DRAG-AND-DROP (privileged only) -----
+      if (canResolve()) wireDnd(mount);
 
       // wire the per-bid Activity openers
       var panel = mount.querySelector('.precon-actlog');
@@ -15191,6 +15374,281 @@ try {
 } catch (e) {
   console.error('Module daily-reports failed to load:', e);
 }
+</script>
+
+<!-- ============================================================ -->
+<!-- PF DASHBOARD owner-wide SEARCH                                -->
+<!-- Searches across the records the current user can access. It   -->
+<!-- runs CLIENT-SIDE over the already-loaded window.PF_* feeds.   -->
+<!-- Those feeds are injected ONLY when the caller's role is        -->
+<!-- allowed (see the role-aware loader + server-side auth.js),     -->
+<!-- so the search can NEVER surface a record the user could not   -->
+<!-- already load. field_ops loads none of these feeds, so it      -->
+<!-- gets zero financial/contract/bid/BD hits. Every rendered      -->
+<!-- value is escaped via window.esc. Navigation reuses            -->
+<!-- showModule()/openProjectRecord().                              -->
+<!-- ============================================================ -->
+<script>
+(function () {
+  try {
+    var E = window.esc;
+    var input = document.getElementById('pfdashSearch');
+    var resultsEl = document.getElementById('pfdashResults');
+    var clearBtn = document.getElementById('pfdashSearchClear');
+    if (!input || !resultsEl) return;
+
+    var MIN_CHARS = 2;       // ignore 1-char noise
+    var MAX_PER_GROUP = 8;   // cap each group
+    var DEBOUNCE_MS = 160;
+
+    // ---- helpers ----
+    function txt(v) { return (v == null) ? '' : String(v); }
+    function lc(v) { return txt(v).toLowerCase(); }
+    // Does the haystack (array of strings) contain ALL query tokens?
+    function matchAll(tokens, hayLc) {
+      for (var i = 0; i < tokens.length; i++) {
+        if (hayLc.indexOf(tokens[i]) === -1) return false;
+      }
+      return true;
+    }
+    function nav(id) {
+      if (typeof window.showModule === 'function') {
+        try { window.showModule(id); } catch (e) {}
+      }
+      collapse();
+    }
+    function navRecord(num) {
+      // Project records have a dedicated opener; fall back to a module if absent.
+      if (num && typeof window.openProjectRecord === 'function') {
+        try { window.openProjectRecord(String(num)); collapse(); return; } catch (e) {}
+      }
+      nav('projects');
+    }
+    function collapse() { resultsEl.innerHTML = ''; }
+
+    // ---- index builders (read whatever feeds are present; missing = skipped) ----
+    // Each entry: { label, sub, hayLc, onClick }
+    function buildIndex() {
+      var items = [];
+
+      // Awarded projects (financials feed) - clickable to its record.
+      var AW = window.PF_AWARDED;
+      if (AW && Array.isArray(AW.projects)) {
+        AW.projects.forEach(function (p) {
+          var name = txt(p.name), num = txt(p.number), gc = txt(p.gc), cs = txt(p.city_state);
+          var sub = [num, gc, cs].filter(Boolean).join('  -  ');
+          items.push({
+            type: 'Projects',
+            label: name || num || 'Awarded project',
+            sub: sub,
+            hayLc: lc(name + ' ' + num + ' ' + gc + ' ' + cs + ' ' + txt(p.discipline)),
+            onClick: (function (n) { return function () { navRecord(n); }; })(num)
+          });
+        });
+      }
+
+      // Preconstruction bid pipeline (preconstruction feed) - both disciplines, all buckets.
+      var PC = window.PF_PRECON;
+      if (PC && (PC.ap || PC.hp)) {
+        var bucketModule = {
+          ap: { actively_bidding: 'precon-ap-actively-bidding', budget_pricing: 'precon-ap-budget-pricing',
+                feasibility_review: 'precon-ap-feasibility-review', submitted_bids: 'precon-ap-submitted-bids',
+                awarded: 'precon-ap-awarded', not_awarded: 'precon-ap-not-awarded' },
+          hp: { actively_bidding: 'precon-hp-actively-bidding', budget_pricing: 'precon-hp-budget-pricing',
+                feasibility_review: 'precon-hp-feasibility-review', submitted_bids: 'precon-hp-submitted-bids',
+                awarded: 'precon-hp-awarded', not_awarded: 'precon-hp-not-awarded' }
+        };
+        var discLabel = { ap: 'Aggregate Piers', hp: 'Helical Pilings' };
+        var seenBid = {};
+        ['ap', 'hp'].forEach(function (disc) {
+          var d = PC[disc]; if (!d) return;
+          Object.keys(d).forEach(function (bucket) {
+            (d[bucket] || []).forEach(function (job) {
+              var f = job.fields || {};
+              var name = txt(job.name || f['Project Name']);
+              var num = txt(job.number || f['Project Number']);
+              var gc = txt(job.gc || f['General Contractor']);
+              // de-dup a job that appears in multiple references
+              var dedup = (disc + '|' + (num || name + '|' + gc)).toLowerCase();
+              if (seenBid[dedup]) return; seenBid[dedup] = 1;
+              var modId = (bucketModule[disc] && bucketModule[disc][bucket]) || 'precon-' + disc + '-actively-bidding';
+              items.push({
+                type: 'Preconstruction bids',
+                label: name || num || 'Bid',
+                sub: [num, gc, discLabel[disc]].filter(Boolean).join('  -  '),
+                hayLc: lc(name + ' ' + num + ' ' + gc + ' ' + discLabel[disc] + ' ' + txt(f['City, State'] || f['City/State'])),
+                onClick: (function (m) { return function () { nav(m); }; })(modId)
+              });
+            });
+          });
+        });
+      }
+
+      // BD opportunities (business_dev feed).
+      var OP = window.PF_OPPORTUNITIES;
+      if (OP && Array.isArray(OP.opportunities)) {
+        OP.opportunities.forEach(function (o) {
+          var f = o.fields || {};
+          var name = txt(f['Project Name']);
+          var org = txt(f['Organization']);
+          var sub = [org, txt(f['Stage']), txt(f['Status'])].filter(Boolean).join('  -  ');
+          items.push({
+            type: 'Opportunities',
+            label: name || org || 'Opportunity',
+            sub: sub,
+            hayLc: lc(name + ' ' + org + ' ' + txt(f['Deal Owner']) + ' ' + txt(f['Source']) + ' ' + txt(f['Notes'])),
+            onClick: function () { nav('bd-opportunities'); }
+          });
+        });
+      }
+
+      // BD companies + contacts (business_dev feed).
+      var BD = window.PF_BD_RECORDS;
+      if (BD && Array.isArray(BD.companies)) {
+        BD.companies.forEach(function (co) {
+          var cf = co.fields || {};
+          var cname = txt(cf['Name']);
+          items.push({
+            type: 'Companies',
+            label: cname || 'Company',
+            sub: [txt(cf['Type']), txt(cf['City']), txt(cf['State'])].filter(Boolean).join('  -  '),
+            hayLc: lc(cname + ' ' + txt(cf['Primary Estimator']) + ' ' + txt(cf['Primary PM']) + ' ' + txt(cf['City']) + ' ' + txt(cf['Website'])),
+            onClick: function () { nav('bd-companies'); }
+          });
+          (co.contacts || []).forEach(function (ct) {
+            var tf = ct.fields || {};
+            var ctname = txt(tf['Name']);
+            if (!ctname) return;
+            items.push({
+              type: 'Contacts',
+              label: ctname,
+              sub: [cname, txt(tf['Type']), txt(tf['Title'])].filter(Boolean).join('  -  '),
+              hayLc: lc(ctname + ' ' + cname + ' ' + txt(tf['Type']) + ' ' + txt(tf['Title']) + ' ' + txt(tf['Email']) + ' ' + txt(tf['Phone'])),
+              onClick: function () { nav('bd-companies'); }
+            });
+          });
+        });
+      }
+
+      // BD GC target accounts (business_dev feed).
+      var GT = window.PF_GC_TARGETS;
+      if (GT && Array.isArray(GT.sectors)) {
+        var seenGc = {};
+        GT.sectors.forEach(function (sx) {
+          (sx.gcs || []).forEach(function (gc) {
+            var gf = gc.fields || {};
+            var gname = txt(gf['Name']);
+            if (!gname) return;
+            var key = gname.toLowerCase();
+            if (seenGc[key]) return; seenGc[key] = 1;
+            items.push({
+              type: 'Target accounts',
+              label: gname,
+              sub: txt(sx.name),
+              hayLc: lc(gname + ' ' + txt(sx.name) + ' ' + txt(gf['Note'])),
+              onClick: function () { nav('bd-targets'); }
+            });
+          });
+        });
+      }
+
+      // PM project records (financials feed) - per-project tracked items.
+      var PD = window.PF_PROJECT_DASHBOARD;
+      var pdList = PD && (Array.isArray(PD.projects) ? PD.projects : (Array.isArray(PD) ? PD : null));
+      if (pdList) {
+        pdList.forEach(function (p) {
+          var name = txt(p.name || p.projectName);
+          // The project-dashboard feed keys the number as `projectNumber` (read it
+          // FIRST). GC is NOT a top-level field here (it lives nested under
+          // sections[].items[]), so we deliberately do NOT index a GC token.
+          var num = txt(p.projectNumber || p.number || p.projectNo || p.project_number);
+          if (!name && !num) return;
+          items.push({
+            type: 'Project management',
+            label: name || num,
+            sub: num,
+            hayLc: lc(name + ' ' + num),
+            onClick: (function (n) { return function () { navRecord(n); }; })(num)
+          });
+        });
+      }
+
+      return items;
+    }
+
+    // ---- search + render ----
+    function run(q) {
+      var query = txt(q).trim();
+      if (query.length < MIN_CHARS) { collapse(); return; }
+      var tokens = query.toLowerCase().split(/\s+/).filter(Boolean);
+      var index = buildIndex();
+
+      // group -> matched items
+      var groups = {}; var order = [];
+      var totalMatches = 0;
+      for (var i = 0; i < index.length; i++) {
+        var it = index[i];
+        if (!matchAll(tokens, it.hayLc)) continue;
+        if (!groups[it.type]) { groups[it.type] = []; order.push(it.type); }
+        groups[it.type].push(it);
+        totalMatches++;
+      }
+
+      if (!totalMatches) {
+        resultsEl.innerHTML = '<div class="pfdash-results-empty">No matches for &ldquo;'
+          + E(query) + '&rdquo;.</div>';
+        return;
+      }
+
+      var html = '';
+      order.forEach(function (type) {
+        var list = groups[type];
+        var shown = list.slice(0, MAX_PER_GROUP);
+        html += '<div class="pfdash-rgroup">'
+          + '<div class="pfdash-rgroup-h">' + E(type)
+          + '<span class="pfdash-rcount">' + list.length + '</span></div>';
+        shown.forEach(function (it, idx) {
+          html += '<button type="button" class="pfdash-ritem" role="option"'
+            + ' data-type="' + E(type) + '" data-idx="' + idx + '">'
+            + E(it.label)
+            + (it.sub ? '<span class="pfdash-rsub">' + E(it.sub) + '</span>' : '')
+            + '</button>';
+        });
+        if (list.length > shown.length) {
+          html += '<div class="pfdash-rmore">+ ' + (list.length - shown.length) + ' more. Refine your search.</div>';
+        }
+        html += '</div>';
+      });
+      resultsEl.innerHTML = html;
+
+      // wire clicks (closures captured by group+idx so onClick is exact)
+      resultsEl.querySelectorAll('.pfdash-ritem').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var type = this.getAttribute('data-type');
+          var idx = parseInt(this.getAttribute('data-idx'), 10);
+          var it = groups[type] && groups[type][idx];
+          if (it && typeof it.onClick === 'function') it.onClick();
+        });
+      });
+    }
+
+    var t = null;
+    input.addEventListener('input', function () {
+      clearBtn.style.display = input.value ? '' : 'none';
+      if (t) clearTimeout(t);
+      var v = input.value;
+      t = setTimeout(function () { run(v); }, DEBOUNCE_MS);
+    });
+    input.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape') { if (t) clearTimeout(t); input.value = ''; clearBtn.style.display = 'none'; collapse(); }
+    });
+    clearBtn.addEventListener('click', function () {
+      if (t) clearTimeout(t); input.value = ''; clearBtn.style.display = 'none'; collapse(); input.focus();
+    });
+  } catch (e) {
+    console.error('PF Dashboard search failed to load:', e);
+  }
+})();
 </script>
 </body>
 </html>
