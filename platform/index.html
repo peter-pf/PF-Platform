@@ -826,7 +826,64 @@ body.role-field-ops .nav-item[data-fo-hide] {
 @media (hover: none) and (pointer: coarse) {
   .precon-dnd-bar, .precon-dnd-hint { display: none !important; }
   .pf-wide tr[draggable="true"] { cursor: default; }
+  .pf-hl-table tr.pf-hl-row[draggable="true"] { cursor: default; }
 }
+
+/* ---- HIGHLIGHTS ROW + CLICK-TO-EXPAND (Actively Bidding / Budget Pricing) ---- */
+/* A compact, full-width table: a few headline columns per project plus a
+   disclosure chevron. Clicking the row drops down a labeled detail panel with
+   every remaining field. No horizontal scroll: the table fits the page width. */
+.pf-hl-wrap {
+  border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+  background: var(--bg-0); margin-top: 14px;
+}
+.pf-hl-table { border-collapse: collapse; width: 100%; table-layout: fixed; font-size: 0.84rem; }
+.pf-hl-table th {
+  text-align: left; padding: 9px 12px; background: var(--bg-2);
+  color: var(--text-2); font-weight: 600; font-size: 0.72rem;
+  text-transform: uppercase; letter-spacing: 0.03em;
+  border-bottom: 1px solid var(--border);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pf-hl-table th.num, .pf-hl-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.pf-hl-table th.pf-hl-disc, .pf-hl-table td.pf-hl-disc { width: 34px; text-align: center; padding-left: 6px; padding-right: 6px; }
+.pf-hl-table th.pf-hl-action, .pf-hl-table td.pf-hl-action { width: 188px; white-space: normal; }
+.pf-hl-table td {
+  padding: 9px 12px; border-bottom: 1px solid var(--border-light);
+  color: var(--text-1); vertical-align: top;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pf-hl-table tr.pf-hl-row { cursor: pointer; }
+.pf-hl-table tr.pf-hl-row[draggable="true"] { cursor: grab; }
+.pf-hl-table tr.pf-hl-row.pf-dragging td { opacity: 0.45; }
+.pf-hl-table tr.pf-hl-row:hover td { background: var(--bg-1); }
+.pf-hl-table tr.pf-hl-row.pf-hl-open td { background: var(--accent-light); }
+.pf-hl-name { font-weight: 600; color: var(--text-0); white-space: normal; }
+.pf-hl-name .pf-record-muted { font-weight: 400; }
+.pf-hl-chevron {
+  display: inline-block; width: 14px; height: 14px; line-height: 14px;
+  color: var(--text-2); transition: transform 0.12s; font-size: 0.8rem; user-select: none;
+}
+.pf-hl-row.pf-hl-open .pf-hl-chevron { transform: rotate(90deg); color: var(--accent); }
+/* The action cell sits inside the row but must NOT toggle the expand panel. */
+.pf-hl-table td.pf-hl-action .pf-resolve-btn,
+.pf-hl-table td.pf-hl-action .pf-resolve-cell { cursor: pointer; }
+.pf-hl-detail-row > td { padding: 0; border-bottom: 1px solid var(--border-light); background: var(--bg-1); }
+.pf-hl-detail-row.pf-hidden { display: none; }
+.pf-hl-detail {
+  padding: 12px 16px 14px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px 22px;
+}
+.pf-hl-field { min-width: 0; }
+.pf-hl-field .pf-hl-label {
+  display: block; font-size: 0.68rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.03em; color: var(--text-3); margin-bottom: 1px;
+}
+.pf-hl-field .pf-hl-value { display: block; font-size: 0.86rem; color: var(--text-1); word-break: break-word; }
+.pf-hl-field .pf-hl-value.num { font-variant-numeric: tabular-nums; }
+.pf-hl-detail-actions { grid-column: 1 / -1; margin-top: 4px; }
+.pf-hl-detail-actions .pf-record-link { font-size: 0.82rem; }
 
 /* ---- TIMESHEETS (Field Operations) ---- */
 .ts-root { max-width: 1180px; }
@@ -11673,6 +11730,156 @@ try {
       return html;
     }
 
+    // Per-discipline {header -> type} lookup so the detail panel can right-align
+    // money fields without re-deriving the type.
+    function colTypeMap(disc){
+      var cols = (window.PF_PRECON.columns && window.PF_PRECON.columns[disc]) ? window.PF_PRECON.columns[disc] : [];
+      var m = {};
+      cols.forEach(function(c){ m[c.key] = c.type; });
+      return m;
+    }
+
+    // HIGHLIGHTS-ROW + CLICK-TO-EXPAND renderer (Actively Bidding + Budget
+    // Pricing). A compact full-width table shows only the headline columns; every
+    // remaining bid-log field drops into a per-project labeled detail panel that
+    // is collapsed by default. NO horizontal scroll - the table is table-fixed and
+    // fits the page width. Drag-and-drop, the per-row resolve buttons, and the
+    // Activity opener are all preserved (same hooks as renderTable). opts:
+    // { highlights:[{key,label,type}], actionCol, displayBucket }.
+    function renderHighlightTable(disc, list, opts){
+      opts = opts || {};
+      var highlights = opts.highlights || [];
+      var typeMap = colTypeMap(disc);
+      // Fields shown in a highlight column are NOT repeated in the detail panel
+      // (Project Name lives in the sticky/name cell; the rest of the highlights
+      // are already visible on the row).
+      var hlKeys = { 'Project Name': 1 };
+      highlights.forEach(function(h){ hlKeys[h.key] = 1; });
+      var allCols = (window.PF_PRECON.columns && window.PF_PRECON.columns[disc]) ? window.PF_PRECON.columns[disc] : [];
+      var detailCols = allCols.filter(function(c){ return !hlKeys[c.key]; });
+
+      // ---- header ----
+      var thead = '<th class="pf-hl-disc" aria-label="expand"></th>'
+        + '<th>Project</th>';
+      highlights.forEach(function(h){
+        var cls = (h.type === 'money') ? ' class="num"' : '';
+        thead += '<th' + cls + '>' + E(h.label || h.key) + '</th>';
+      });
+      if (opts.actionCol) thead += '<th class="pf-hl-action">Resolution</th>';
+
+      // table-layout:fixed needs a colgroup so columns size sensibly.
+      var colgroup = '<col style="width:34px"><col>';
+      highlights.forEach(function(h){
+        colgroup += (h.type === 'money') ? '<col style="width:140px">' : '<col>';
+      });
+      if (opts.actionCol) colgroup += '<col style="width:188px">';
+
+      var html = '<div class="pf-hl-wrap"><table class="pf-hl-table"><colgroup>'
+        + colgroup + '</colgroup><thead><tr>' + thead + '</tr></thead><tbody>';
+
+      list.forEach(function(p, idx){
+        var f = p.fields || {};
+        var ov = overrideFor(p);
+        // Build the detail-panel id from the GENUINELY UNIQUE bucket name (e.g.
+        // actively_bidding / budget_pricing), NOT displayBucket - displayBucket
+        // collapses every non-awarded bucket to 'open', which would make
+        // actively_bidding and budget_pricing emit identical ids in the same
+        // document (duplicate DOM ids = invalid HTML + latent break). idBucket is
+        // the real data-bucket; displayBucket still drives resolve/DnD semantics.
+        var rid = 'hlr_' + disc + '_' + (opts.idBucket || opts.displayBucket || 'open') + '_' + idx;
+
+        // ---- main highlights row ----
+        var nameTxt = E(p.name || f['Project Name'] || '');
+        if (p.completed) nameTxt += ' <span class="pf-tag-completed">Completed</span>';
+        if (ov && ov.status === 'awarded') nameTxt += ' <span class="pf-tag-awarded">Awarded</span>';
+        if (ov && ov.status === 'not_awarded') nameTxt += ' <span class="pf-tag-dead">Dead</span>';
+        var numTxt = E(p.number || f['Project Number'] || '');
+        var nameCell = '<div class="pf-hl-name">' + nameTxt + '</div>'
+          + (numTxt ? '<div class="pf-record-muted">' + numTxt + '</div>' : '');
+
+        var jk = jobKey(p);
+        var dragAttrs = (canResolve() && jk)
+          ? ' draggable="true" data-jobkey="' + E(jk) + '" data-curbucket="' + E(opts.displayBucket || 'open') + '"'
+          : '';
+
+        var row = '<tr class="pf-hl-row"' + dragAttrs
+          + ' data-detail="' + rid + '" tabindex="0" role="button" aria-expanded="false">';
+        row += '<td class="pf-hl-disc"><span class="pf-hl-chevron">&#9656;</span></td>';
+        row += '<td>' + nameCell + '</td>';
+        highlights.forEach(function(h){
+          var v = f[h.key];
+          var cell = (v === undefined || v === null) ? '' : E(v);
+          var cls = (h.type === 'money') ? ' class="num"' : '';
+          row += '<td' + cls + '>' + cell + '</td>';
+        });
+        if (opts.actionCol) {
+          // The action cell must NOT toggle the panel; stop click propagation.
+          row += '<td class="pf-hl-action" onclick="event.stopPropagation()">'
+            + actionCell(p, opts.displayBucket) + '</td>';
+        }
+        row += '</tr>';
+
+        // ---- detail panel row (collapsed by default) ----
+        var span = 2 + highlights.length + (opts.actionCol ? 1 : 0);
+        var detail = '';
+        detailCols.forEach(function(c){
+          var v = f[c.key];
+          if (v === undefined || v === null || String(v) === '') return; // skip blanks
+          var cls = (typeMap[c.key] === 'money') ? ' num' : '';
+          detail += '<div class="pf-hl-field">'
+            + '<span class="pf-hl-label">' + E(c.key) + '</span>'
+            + '<span class="pf-hl-value' + cls + '">' + E(v) + '</span></div>';
+        });
+        if (!detail) detail = '<div class="pf-hl-field"><span class="pf-hl-value pf-record-muted">No additional fields recorded.</span></div>';
+
+        // Record link + Activity opener live in the detail panel (they were
+        // columns in the wide table). Activity keeps the .precon-actlink hook.
+        var bidName = E((p.name || f['Project Name'] || '').toString());
+        var extras = '<div class="pf-hl-detail-actions">';
+        if (opts.recordCol) {
+          var num = String(p.number || '');
+          if (p.record === 'project-poet') {
+            extras += '<a class="pf-record-link" onclick="event.stopPropagation();showModule(\'project-poet\')">Open record</a> &middot; ';
+          } else if (num) {
+            extras += '<a class="pf-record-link" onclick="event.stopPropagation();openProjectRecord(\'' + E(num) + '\')">Open record</a> &middot; ';
+          }
+        }
+        extras += '<a class="pf-record-link precon-actlink" data-bid="' + E(bidLogId(p))
+          + '" data-bidname="' + bidName + '">Activity</a></div>';
+
+        row += '<tr class="pf-hl-detail-row pf-hidden" id="' + rid + '"><td colspan="' + span + '">'
+          + '<div class="pf-hl-detail">' + detail + extras + '</div></td></tr>';
+        html += row;
+      });
+
+      html += '</tbody></table></div>';
+      return html;
+    }
+
+    // Wire expand/collapse for one mount's highlight rows. Clicking the row (or
+    // pressing Enter/Space on it) toggles its detail panel. The action cell and
+    // detail links stopPropagation so they do not toggle. Re-run after each
+    // render (renderMount calls this).
+    function wireHighlightExpand(mount){
+      var rows = mount.querySelectorAll('tr.pf-hl-row');
+      rows.forEach(function(tr){
+        function toggle(){
+          var id = tr.getAttribute('data-detail');
+          var panel = mount.querySelector('#' + (window.CSS && CSS.escape ? CSS.escape(id) : id));
+          if (!panel) return;
+          var open = panel.classList.toggle('pf-hidden') === false;
+          tr.classList.toggle('pf-hl-open', open);
+          tr.setAttribute('aria-expanded', open ? 'true' : 'false');
+        }
+        tr.addEventListener('click', toggle);
+        tr.addEventListener('keydown', function(ev){
+          if (ev.key === 'Enter' || ev.key === ' ' || ev.key === 'Spacebar') {
+            ev.preventDefault(); toggle();
+          }
+        });
+      });
+    }
+
     function sortByNumber(list){
       return list.slice().sort(function(a,b){
         var an = String(a.number||''), bn = String(b.number||'');
@@ -11847,18 +12054,50 @@ try {
         html += '<div class="precon-dnd-err" style="display:none"></div>';
       }
 
-      html += renderTable(disc, list, {
-        recordCol: (bucket === 'awarded'),
-        actionCol: canResolve(),
-        displayBucket: displayBucket,
-        actionColLabel: (bucket === 'awarded') ? 'Awarded' : 'Resolution'
-      });
+      // Actively Bidding + Budget Pricing use the HIGHLIGHTS-ROW + click-to-expand
+      // layout (no horizontal scroll). All other buckets keep the WIDE table.
+      var useHighlights = (bucket === 'actively_bidding' || bucket === 'budget_pricing');
+      if (useHighlights) {
+        // Actively Bidding highlight columns are FIXED by Jonathan's spec:
+        // Project Name (name cell), Design Completed Date, Due Date, City/State, GC.
+        // Budget Pricing mirrors the look with a sensible set: project identity,
+        // Due Date, City/State, GC, plus the headline number (Bid Total Value).
+        var highlights = (bucket === 'actively_bidding')
+          ? [
+              { key: 'Design Completed Date', label: 'Prelim Design Completed', type: 'date' },
+              { key: 'Due Date',              label: 'Bid Due Date',           type: 'date' },
+              { key: 'City / State',          label: 'City / State',           type: 'text' },
+              { key: 'General Contractor',    label: 'GC',                     type: 'text' }
+            ]
+          : [
+              { key: 'Due Date',           label: 'Bid Due Date',     type: 'date' },
+              { key: 'City / State',       label: 'City / State',     type: 'text' },
+              { key: 'General Contractor', label: 'GC',               type: 'text' },
+              { key: 'Bid Total Value',    label: 'Bid Total Value',  type: 'money' }
+            ];
+        html += renderHighlightTable(disc, list, {
+          highlights: highlights,
+          recordCol: (bucket === 'awarded'),
+          actionCol: canResolve(),
+          displayBucket: displayBucket,
+          idBucket: bucket
+        });
+      } else {
+        html += renderTable(disc, list, {
+          recordCol: (bucket === 'awarded'),
+          actionCol: canResolve(),
+          displayBucket: displayBucket,
+          actionColLabel: (bucket === 'awarded') ? 'Awarded' : 'Resolution'
+        });
+      }
       // a per-mount activity-log panel host (one open at a time within the mount)
       html += '<div class="precon-actlog" style="margin-top:12px"></div>';
       mount.innerHTML = html;
 
       // ----- wire DRAG-AND-DROP (privileged only) -----
       if (canResolve()) wireDnd(mount);
+      // ----- wire highlight-row expand/collapse -----
+      if (useHighlights) wireHighlightExpand(mount);
 
       // wire the per-bid Activity openers
       var panel = mount.querySelector('.precon-actlog');
