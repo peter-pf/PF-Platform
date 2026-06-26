@@ -13,6 +13,10 @@
 //     crew:[{name, hours, costCode}],        // HOURS only, NO pay rate / $
 //     weather, workCompleted, columnsInstalled, lfInstalled, equipment,
 //     delays, safety,
+//     equipmentOwned:[{machine, hours}],      // OWNED machines on site + OPERATING hours (for maintenance) -- NO $
+//     equipmentRental:[{category, hours}],    // RENTAL by category + OPERATING hours -- NO $
+//     maintenance:[{category, item, hourAtFailure}], // 5 fixed rows (Excavator/Mast/Vibro/Drill/Rental Equipment) -- NO $
+//     futureIssues:[{equipment, description}],// maintenance to identify later (feeds a Phase 2 compiled view) -- NO $
 //     status,                                // 'draft'|'submitted'|'approved'|'sent-to-HR'
 //     createdBy, createdAt, updatedAt,
 //     submittedBy, submittedAt,              // set from session on submit
@@ -45,6 +49,9 @@ const MAX_REPORTS = 20000;
 const MAX_CREW = 60;
 const MAX_STR = 4000;        // narrative cap
 const MAX_SHORT = 300;       // name/project/date/etc cap
+const MAX_EQUIP_ROWS = 50;   // owned / rental equipment rows cap
+const MAX_MAINT_ROWS = 20;   // maintenance rows cap (UI sends the 5 fixed categories)
+const MAX_FUTURE_ROWS = 50;  // future-issue rows cap
 
 const VALID_ACTIONS = { create: 1, update: 1, submit: 1, approve: 1, 'send-to-hr': 1 };
 const VALID_STATUS = { draft: 1, submitted: 1, approved: 1, 'sent-to-HR': 1 };
@@ -66,7 +73,9 @@ function s(v, cap = MAX_SHORT) {
   return str.replace(/[<>]/g, ''); // strip angle brackets (UI also escapes)
 }
 
-// Hours: a non-negative number, capped. Returns a number or null. NEVER money.
+// Crew worked-hours for ONE day: a non-negative number capped at 24. Returns a
+// number or null. NEVER money. Use ONLY for crew.hours (a single-day timesheet
+// line cannot exceed 24h). Do NOT use for equipment hour-meter readings.
 function hours(v) {
   if (v == null || String(v).trim() === '') return null;
   // Parse BEFORE stripping so a negative value is actually rejected (stripping
@@ -75,6 +84,18 @@ function hours(v) {
   if (!isFinite(n) || n < 0) return null;
   if (n > 24) n = 24;        // a single-day timesheet line cannot exceed 24h
   return Math.round(n * 100) / 100;
+}
+
+// Equipment OPERATING hours / hour-meter reading: a non-negative number with NO
+// 24h cap (machine meters routinely read in the hundreds or thousands, e.g.
+// 1450). Returns a number or null. NEVER money. A safety cap of 1,000,000 bounds
+// abuse. Same parse-before-strip negative rejection as hours().
+function meterHours(v) {
+  if (v == null || String(v).trim() === '') return null;
+  let n = parseFloat(String(v).replace(/[^0-9.-]/g, ''));
+  if (!isFinite(n) || n < 0) return null;
+  if (n > 1000000) n = 1000000; // bound abuse; real meters never approach this
+  return Math.round(n * 10) / 10; // one decimal is plenty for a meter reading
 }
 
 // A whole-number production count (columns / LF), or null.
@@ -104,6 +125,69 @@ function cleanCrew(input) {
     const name = s(m.name, MAX_SHORT);
     if (!name) continue;
     out.push({ name, hours: hours(m.hours), costCode: s(m.costCode, MAX_SHORT) });
+  }
+  return out;
+}
+
+// Rebuild a clean OWNED-equipment array: [{machine, hours}]. `hours` here is the
+// machine's OPERATING hours (hour-meter reading, NOT capped at 24), NOT money.
+function cleanEquipmentOwned(input) {
+  if (!Array.isArray(input)) return [];
+  const out = [];
+  for (const r of input.slice(0, MAX_EQUIP_ROWS)) {
+    if (!r || typeof r !== 'object') continue;
+    const machine = s(r.machine, MAX_SHORT);
+    const h = meterHours(r.hours);
+    if (!machine && h == null) continue; // skip wholly empty rows
+    out.push({ machine, hours: h });
+  }
+  return out;
+}
+
+// Rebuild a clean RENTAL-equipment array: [{category, hours}]. `hours` = machine
+// OPERATING hours (hour-meter reading, NOT capped at 24), NOT money. category is
+// one of the rental categories (a label).
+function cleanEquipmentRental(input) {
+  if (!Array.isArray(input)) return [];
+  const out = [];
+  for (const r of input.slice(0, MAX_EQUIP_ROWS)) {
+    if (!r || typeof r !== 'object') continue;
+    const category = s(r.category, MAX_SHORT);
+    const h = meterHours(r.hours);
+    if (!category && h == null) continue;
+    out.push({ category, hours: h });
+  }
+  return out;
+}
+
+// Rebuild a clean MAINTENANCE array: [{category, item, hourAtFailure}]. The UI
+// sends one row per FIXED maintenance category. `hourAtFailure` = the machine
+// hour-meter reading at the failure (NOT capped at 24), NOT money.
+function cleanMaintenance(input) {
+  if (!Array.isArray(input)) return [];
+  const out = [];
+  for (const r of input.slice(0, MAX_MAINT_ROWS)) {
+    if (!r || typeof r !== 'object') continue;
+    const category = s(r.category, MAX_SHORT);
+    const it = s(r.item, MAX_STR);
+    const h = meterHours(r.hourAtFailure);
+    if (!category && !it && h == null) continue;
+    out.push({ category, item: it, hourAtFailure: h });
+  }
+  return out;
+}
+
+// Rebuild a clean FUTURE-ISSUES array: [{equipment, description}]. Names + free
+// text only -- NO $. These persist so a Phase 2 view can compile them.
+function cleanFutureIssues(input) {
+  if (!Array.isArray(input)) return [];
+  const out = [];
+  for (const r of input.slice(0, MAX_FUTURE_ROWS)) {
+    if (!r || typeof r !== 'object') continue;
+    const equipment = s(r.equipment, MAX_SHORT);
+    const description = s(r.description, MAX_STR);
+    if (!equipment && !description) continue;
+    out.push({ equipment, description });
   }
   return out;
 }
@@ -212,6 +296,11 @@ export async function onRequestPost(context) {
         equipment: s(src.equipment != null ? src.equipment : base.equipment, MAX_STR),
         delays: s(src.delays != null ? src.delays : base.delays, MAX_STR),
         safety: s(src.safety != null ? src.safety : base.safety, MAX_STR),
+        // ---- structured fleet/maintenance fields (HOURS = operating hours, NO $) ----
+        equipmentOwned: (src.equipmentOwned != null) ? cleanEquipmentOwned(src.equipmentOwned) : (base.equipmentOwned || []),
+        equipmentRental: (src.equipmentRental != null) ? cleanEquipmentRental(src.equipmentRental) : (base.equipmentRental || []),
+        maintenance: (src.maintenance != null) ? cleanMaintenance(src.maintenance) : (base.maintenance || []),
+        futureIssues: (src.futureIssues != null) ? cleanFutureIssues(src.futureIssues) : (base.futureIssues || []),
       };
     }
 

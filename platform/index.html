@@ -2126,6 +2126,9 @@ window.progress = (function () {
       <a class="nav-item" data-module="pfadmin" onclick="showModule('pfadmin')">
         <span class="nav-icon">&#9881;</span> PF Admin Home
       </a>
+      <a class="nav-item" data-fo-hide="1" data-module="field-lists" onclick="showModule('field-lists')">
+        <span class="nav-icon">&#9874;</span> Field Lists (Fleet & Crew)
+      </a>
       <a class="nav-item" data-fo-safe="1" data-module="manual" onclick="showModule('manual')">
         <span class="nav-icon">&#128214;</span> User Manual
       </a>
@@ -2725,10 +2728,18 @@ document.addEventListener('click', function(e) {
       #mod-daily-reports input, #mod-daily-reports select, #mod-daily-reports textarea { width:100%; padding:7px 10px; box-sizing:border-box; }
       #mod-daily-reports textarea { min-height:54px; font-family:inherit; }
       #mod-daily-reports .dr-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:4px 16px; }
-      #mod-daily-reports .dr-crew-row { display:flex; gap:8px; margin-bottom:6px; }
-      #mod-daily-reports .dr-crew-row input.nm { flex:2 1 auto; }
-      #mod-daily-reports .dr-crew-row input.hr { flex:0 0 90px; }
-      #mod-daily-reports .dr-crew-row input.cc { flex:1 1 auto; }
+      #mod-daily-reports .dr-row { display:flex; gap:8px; margin-bottom:6px; align-items:center; }
+      #mod-daily-reports .dr-row select.nm, #mod-daily-reports .dr-row select.eq { flex:2 1 auto; }
+      #mod-daily-reports .dr-row input.hr { flex:0 0 110px; }
+      #mod-daily-reports .dr-row input.cc { flex:1 1 auto; }
+      #mod-daily-reports .dr-row input.item { flex:2 1 auto; }
+      #mod-daily-reports .dr-row input.desc { flex:2 1 auto; }
+      #mod-daily-reports .dr-row .dr-cat { flex:0 0 150px; font-size:12px; color:var(--text-2,#aab1c0); }
+      #mod-daily-reports .dr-section-h { font-size:13px; font-weight:600; margin:12px 0 4px; }
+      #mod-daily-reports .dr-proj-wrap { position:relative; }
+      #mod-daily-reports .dr-proj-list { position:absolute; z-index:20; left:0; right:0; max-height:220px; overflow:auto; background:var(--surface-2,#1b212c); border:1px solid var(--border,#2a2f3a); border-radius:6px; display:none; }
+      #mod-daily-reports .dr-proj-opt { padding:6px 10px; cursor:pointer; font-size:13px; }
+      #mod-daily-reports .dr-proj-opt:hover, #mod-daily-reports .dr-proj-opt.active { background:rgba(47,109,246,.18); }
       #mod-daily-reports .dr-muted { color:var(--text-3,#8a93a6); }
       #mod-daily-reports .dr-err { color:#e5534b; font-size:13px; }
       #mod-daily-reports .dr-ok { color:#3fb950; font-size:13px; }
@@ -2745,23 +2756,48 @@ document.addEventListener('click', function(e) {
     <div id="drWrap">
       <div class="dr-card dr-muted" style="font-size:13px">Daily reports capture field work for the day. Hours entered here feed the timesheets. The crew hours, production, weather, equipment, delays and safety are recorded - no financial data. Approval is in-platform status only, no email is sent. All fields are a v1 draft, confirm with Brad.</div>
       <div class="dr-card">
-        <h3 style="margin:0 0 8px">New daily report <span class="dr-flag">(v1 fields, confirm with Brad)</span></h3>
+        <h3 style="margin:0 0 8px">New daily report <span class="dr-flag">(first draft, Derek to iterate)</span></h3>
         <div class="dr-grid">
           <div><label>Date</label><input type="date" id="drDate"></div>
-          <div><label>Project (# - Name)</label><input type="text" id="drProject" placeholder="26-002 - POET Biosciences"></div>
-          <div><label>Foreman / leader</label><input type="text" id="drForeman" placeholder="Name"></div>
+          <div class="dr-proj-wrap">
+            <label>1. Project</label>
+            <input type="text" id="drProject" placeholder="Type to filter projects" autocomplete="off">
+            <input type="hidden" id="drProjectId">
+            <div class="dr-proj-list" id="drProjList"></div>
+          </div>
+          <div><label>2. Foreman</label><select id="drForeman"><option value="">Select foreman</option></select></div>
           <div><label>Weather</label><input type="text" id="drWeather" placeholder="Clear, 78F"></div>
           <div><label>Columns installed today</label><input type="text" id="drCols" placeholder="0" inputmode="numeric"></div>
           <div><label>LF installed today</label><input type="text" id="drLf" placeholder="0" inputmode="numeric"></div>
         </div>
-        <label>Crew + hours <span class="dr-flag">(hours only, no pay)</span></label>
+
+        <div class="dr-section-h">3. Crew <span class="dr-flag">(hours worked, no pay)</span></div>
         <div id="drCrew"></div>
-        <button type="button" class="btn btn-sm" id="drAddCrew">+ Add crew member</button>
-        <label>Work completed (narrative)</label><textarea id="drWork"></textarea>
-        <label>Equipment on site</label><textarea id="drEquip"></textarea>
-        <label>Delays / issues</label><textarea id="drDelays"></textarea>
-        <label>Safety observations / incidents</label><textarea id="drSafety"></textarea>
-        <div style="margin-top:10px">
+
+        <div class="dr-section-h">4. Work completed</div>
+        <textarea id="drWork" placeholder="Narrative of the day's work"></textarea>
+
+        <div class="dr-section-h">5. Equipment on site - owned <span class="dr-flag">(operating hours for maintenance)</span></div>
+        <div id="drOwned"></div>
+        <button type="button" class="btn btn-sm" id="drAddOwned">+ Add machine</button>
+
+        <div class="dr-section-h">6. Equipment on site - rental <span class="dr-flag">(operating hours)</span></div>
+        <div id="drRental"></div>
+        <button type="button" class="btn btn-sm" id="drAddRental">+ Add rental</button>
+
+        <div class="dr-section-h">7. Equipment failures & maintenance</div>
+        <div id="drMaint"></div>
+
+        <div class="dr-section-h">8. Future issues <span class="dr-flag">(maintenance to identify)</span></div>
+        <div id="drFuture"></div>
+        <button type="button" class="btn btn-sm" id="drAddFuture">+ Add issue</button>
+
+        <div class="dr-section-h">Delays / issues</div>
+        <textarea id="drDelays"></textarea>
+        <div class="dr-section-h">Safety observations / incidents</div>
+        <textarea id="drSafety"></textarea>
+
+        <div style="margin-top:12px">
           <button type="button" class="btn" id="drSaveDraft">Save draft</button>
           <button type="button" class="btn" id="drSubmit">Submit for approval</button>
           <span class="dr-muted" style="font-size:12px;margin-left:8px">No email is sent. Submit is an in-platform status.</span>
@@ -2770,6 +2806,41 @@ document.addEventListener('click', function(e) {
       </div>
       <h3 style="margin:14px 0 6px">Recent daily reports</h3>
       <div id="drList"></div>
+    </div>
+  </div>
+
+  <div class="module-view" id="mod-field-lists">
+    <!-- FIELD LISTS management (the Fleet/Lists data the daily report form pulls
+         from). Owners (admin/partner) curate owned equipment, personnel and
+         foremen; the crew READS these to fill the daily report. Rental + maint
+         categories are FIXED (shown read-only). field_ops is nav-hidden AND the
+         editor is only rendered for admin/partner; business_dev sees read-only.
+         Reads/writes /api/field-lists (field_ops area GET; owner-only POST).
+         ZERO financials: names + categories only. All data via window.esc. -->
+    <style>
+      #mod-field-lists .fl-card { border:1px solid var(--border,#2a2f3a); border-radius:8px; padding:14px 16px; margin-bottom:12px; }
+      #mod-field-lists h3 { margin:0 0 8px; }
+      #mod-field-lists .fl-row { display:flex; gap:8px; margin-bottom:6px; align-items:center; }
+      #mod-field-lists .fl-row input { flex:1 1 auto; padding:7px 10px; box-sizing:border-box; }
+      #mod-field-lists .fl-muted { color:var(--text-3,#8a93a6); font-size:12px; }
+      #mod-field-lists .fl-flag { font-size:11px; color:var(--text-3,#8a93a6); }
+      #mod-field-lists .fl-err { color:#e5534b; font-size:13px; }
+      #mod-field-lists .fl-ok { color:#3fb950; font-size:13px; }
+      #mod-field-lists .fl-tag { display:inline-block; background:var(--surface-2,#1b212c); border:1px solid var(--border,#2a2f3a); border-radius:12px; padding:2px 10px; margin:2px 4px 2px 0; font-size:12px; }
+      #mod-field-lists .btn-sm { font-size:12px; padding:3px 10px; }
+    </style>
+    <div id="flNoData" class="fl-muted" style="display:none">Field lists are not available for your role.</div>
+    <div id="flWrap">
+      <div class="fl-card fl-muted">These lists power the daily report form. Owners edit owned equipment, personnel and foremen. Rental and maintenance categories are fixed for now. <span class="fl-flag">Seed values are provisional, Derek to correct.</span></div>
+      <div id="flEditable"></div>
+      <div class="fl-card">
+        <h3>Fixed categories <span class="fl-flag">(not editable in v1)</span></h3>
+        <div class="fl-muted">Rental categories</div>
+        <div id="flRental"></div>
+        <div class="fl-muted" style="margin-top:8px">Maintenance categories</div>
+        <div id="flMaint"></div>
+      </div>
+      <div class="fl-msg" data-flmsg></div>
     </div>
   </div>
 
@@ -3049,6 +3120,7 @@ const moduleTitles = {
   'ts-summary': 'TimeSheets - Summary',
   'fo-projects': 'Projects - Field',
   'daily-reports': 'Daily Reports',
+  'field-lists': 'Field Lists (Fleet & Crew)',
   'pf-coi': 'PF COI - Standard Coverages',
   'project-poet': '26-002 POET Biosciences',
   'budget-actual-poet': 'Budget vs Actual - 26-002 POET',
@@ -15967,7 +16039,18 @@ try {
 (function () {
   'use strict';
   var E = window.esc || function (s) { return s == null ? '' : String(s); };
-  var state = { reports: [], crew: [{ name: '', hours: '', costCode: '' }], priv: false };
+  // state.crew rows carry an `auto` flag so we only auto-replace crew row 1 with
+  // the selected foreman when the user has not picked someone there manually.
+  var state = {
+    reports: [], priv: false,
+    lists: { ownedEquipment: [], personnel: [], foremen: [], rentalCategories: [], maintenanceCategories: [] },
+    projects: [],
+    crew: [{ name: '', hours: '', costCode: '', auto: true }, { name: '', hours: '', costCode: '', auto: false }, { name: '', hours: '', costCode: '', auto: false }],
+    owned: [{ machine: '', hours: '' }, { machine: '', hours: '' }],
+    rental: [{ category: '', hours: '' }, { category: '', hours: '' }],
+    maintenance: [],
+    future: [{ equipment: '', description: '' }],
+  };
 
   function api(path, opts) {
     return fetch(path, Object.assign({ credentials: 'same-origin',
@@ -15975,43 +16058,242 @@ try {
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); });
   }
 
+  // Pull the project list from the EXISTING feed already loaded in the SPA. The
+  // field crew gets the field-safe derivative (PF_FO_PROJECTS, no $/GC);
+  // admin/partner fall back to PF_AWARDED. We only read name/number (no $).
+  function loadProjects() {
+    var D = window.PF_FO_PROJECTS || window.PF_AWARDED;
+    var out = [];
+    if (D && Array.isArray(D.projects)) {
+      D.projects.forEach(function (p) {
+        var number = p.number != null ? String(p.number) : '';
+        var name = p.name != null ? String(p.name) : '';
+        if (!number && !name) return;
+        out.push({ id: number || name, label: (number ? number + ' - ' : '') + name });
+      });
+    }
+    out.sort(function (a, b) { return a.label.localeCompare(b.label); });
+    state.projects = out;
+  }
+
+  function buildMaintenanceRows() {
+    // 5 FIXED rows, one per maintenance category (from field-lists).
+    var cats = state.lists.maintenanceCategories || [];
+    state.maintenance = cats.map(function (c) { return { category: c, item: '', hourAtFailure: '' }; });
+  }
+
   function load() {
     var noData = document.getElementById('drNoData');
     var wrap = document.getElementById('drWrap');
     var me = window.PF_ME || {};
     state.priv = (me.role === 'admin' || me.role === 'partner');
-    api('/api/daily-report').then(function (res) {
-      if (res.status === 403) { if (noData) noData.style.display = ''; if (wrap) wrap.style.display = 'none'; return; }
+    loadProjects();
+    // Load the field lists (owned equipment / personnel / foremen + categories)
+    // and the daily reports in parallel.
+    Promise.all([api('/api/field-lists'), api('/api/daily-report')]).then(function (rs) {
+      var lr = rs[0], dr = rs[1];
+      if (dr.status === 403) { if (noData) noData.style.display = ''; if (wrap) wrap.style.display = 'none'; return; }
       if (noData) noData.style.display = 'none';
       if (wrap) wrap.style.display = '';
-      state.reports = (res.ok && res.body && Array.isArray(res.body.reports)) ? res.body.reports : [];
+      if (lr.ok && lr.body) {
+        state.lists = {
+          ownedEquipment: lr.body.ownedEquipment || [],
+          personnel: lr.body.personnel || [],
+          foremen: lr.body.foremen || [],
+          rentalCategories: lr.body.rentalCategories || [],
+          maintenanceCategories: lr.body.maintenanceCategories || [],
+        };
+      }
+      buildMaintenanceRows();
+      state.reports = (dr.ok && dr.body && Array.isArray(dr.body.reports)) ? dr.body.reports : [];
       wireForm();
+      renderForeman();
       renderCrew();
+      renderOwned();
+      renderRental();
+      renderMaint();
+      renderFuture();
       renderList();
-    }).catch(function () { if (wrap) wrap.style.display = ''; state.reports = []; wireForm(); renderCrew(); renderList(); });
+    }).catch(function () {
+      if (wrap) wrap.style.display = '';
+      state.reports = []; buildMaintenanceRows();
+      wireForm(); renderForeman(); renderCrew(); renderOwned(); renderRental(); renderMaint(); renderFuture(); renderList();
+    });
   }
 
+  // ---- option helpers --------------------------------------------------------
+  // If `selected` is a non-empty value NOT present in listVals, inject it as an
+  // option so a prefilled value (e.g. a foreman prefilled into crew row 1, or any
+  // value set before the lists drift) always renders and is never silently
+  // dropped on re-render. (DEF-3)
+  function opts(listVals, selected, placeholder) {
+    var html = '<option value="">' + E(placeholder || 'Select') + '</option>';
+    var vals = (listVals || []).slice();
+    var sel = (selected == null) ? '' : String(selected);
+    if (sel.trim() && vals.map(String).indexOf(sel) < 0) vals.unshift(sel);
+    vals.forEach(function (v) {
+      var s = (String(v) === sel) ? ' selected' : '';
+      html += '<option value="' + E(v) + '"' + s + '>' + E(v) + '</option>';
+    });
+    return html;
+  }
+
+  // ---- 2. Foreman dropdown ---------------------------------------------------
+  function renderForeman() {
+    var el = document.getElementById('drForeman');
+    if (!el) return;
+    var cur = el.value;
+    el.innerHTML = opts(state.lists.foremen, cur, 'Select foreman');
+  }
+
+  // ---- 3. Crew (3 rows, each a personnel dropdown) ---------------------------
   function renderCrew() {
     var host = document.getElementById('drCrew');
     if (!host) return;
     host.innerHTML = state.crew.map(function (m, i) {
-      return '<div class="dr-crew-row">'
-        + '<input class="nm" data-i="' + i + '" data-f="name" placeholder="Crew member" value="' + E(m.name) + '">'
-        + '<input class="hr" data-i="' + i + '" data-f="hours" placeholder="Hrs" inputmode="decimal" value="' + E(m.hours) + '">'
+      return '<div class="dr-row">'
+        + '<select class="nm" data-i="' + i + '" data-f="name">' + opts(state.lists.personnel, m.name, 'Crew member') + '</select>'
+        + '<input class="hr" data-i="' + i + '" data-f="hours" placeholder="Hrs worked" inputmode="decimal" value="' + E(m.hours) + '">'
         + '<input class="cc" data-i="' + i + '" data-f="costCode" placeholder="Cost code (optional)" value="' + E(m.costCode) + '">'
         + '</div>';
     }).join('');
-    host.querySelectorAll('input[data-i]').forEach(function (el) {
+    host.querySelectorAll('[data-i]').forEach(function (el) {
       el.addEventListener('input', function () {
         var i = +this.getAttribute('data-i'), f = this.getAttribute('data-f');
         state.crew[i][f] = this.value;
+        if (f === 'name') state.crew[i].auto = false; // user picked manually
+      });
+    });
+  }
+
+  // When the foreman changes, prefill crew row 1 if it is empty or still auto.
+  function applyForemanToCrew(name) {
+    var r0 = state.crew[0];
+    if (!r0) return;
+    if (r0.auto || !(r0.name || '').trim()) {
+      r0.name = name || '';
+      r0.auto = true;
+      renderCrew();
+    }
+  }
+
+  // ---- 5. Owned equipment (machine dropdown + hours) -------------------------
+  function renderOwned() {
+    var host = document.getElementById('drOwned');
+    if (!host) return;
+    host.innerHTML = state.owned.map(function (r, i) {
+      return '<div class="dr-row">'
+        + '<select class="eq" data-i="' + i + '" data-f="machine">' + opts(state.lists.ownedEquipment, r.machine, 'Machine') + '</select>'
+        + '<input class="hr" data-i="' + i + '" data-f="hours" placeholder="Op hours" inputmode="decimal" value="' + E(r.hours) + '">'
+        + '</div>';
+    }).join('');
+    host.querySelectorAll('[data-i]').forEach(function (el) {
+      el.addEventListener('input', function () {
+        state.owned[+this.getAttribute('data-i')][this.getAttribute('data-f')] = this.value;
+      });
+    });
+  }
+
+  // ---- 6. Rental equipment (category dropdown + hours) -----------------------
+  function renderRental() {
+    var host = document.getElementById('drRental');
+    if (!host) return;
+    host.innerHTML = state.rental.map(function (r, i) {
+      return '<div class="dr-row">'
+        + '<select class="eq" data-i="' + i + '" data-f="category">' + opts(state.lists.rentalCategories, r.category, 'Rental category') + '</select>'
+        + '<input class="hr" data-i="' + i + '" data-f="hours" placeholder="Op hours" inputmode="decimal" value="' + E(r.hours) + '">'
+        + '</div>';
+    }).join('');
+    host.querySelectorAll('[data-i]').forEach(function (el) {
+      el.addEventListener('input', function () {
+        state.rental[+this.getAttribute('data-i')][this.getAttribute('data-f')] = this.value;
+      });
+    });
+  }
+
+  // ---- 7. Maintenance (5 FIXED rows: item text + machine hour at failure) ----
+  function renderMaint() {
+    var host = document.getElementById('drMaint');
+    if (!host) return;
+    host.innerHTML = state.maintenance.map(function (r, i) {
+      return '<div class="dr-row">'
+        + '<span class="dr-cat">' + E(r.category) + '</span>'
+        + '<input class="item" data-i="' + i + '" data-f="item" placeholder="Failure or maintenance item" value="' + E(r.item) + '">'
+        + '<input class="hr" data-i="' + i + '" data-f="hourAtFailure" placeholder="Machine hour at failure" inputmode="decimal" value="' + E(r.hourAtFailure) + '">'
+        + '</div>';
+    }).join('');
+    host.querySelectorAll('[data-i]').forEach(function (el) {
+      el.addEventListener('input', function () {
+        state.maintenance[+this.getAttribute('data-i')][this.getAttribute('data-f')] = this.value;
+      });
+    });
+  }
+
+  // ---- 8. Future issues (fleet dropdown + description) -----------------------
+  function fleetOptions() {
+    // equipment dropdown = owned machines + maintenance categories (the fleet).
+    var out = [];
+    (state.lists.ownedEquipment || []).forEach(function (v) { out.push(v); });
+    (state.lists.maintenanceCategories || []).forEach(function (v) { if (out.indexOf(v) < 0) out.push(v); });
+    return out;
+  }
+  function renderFuture() {
+    var host = document.getElementById('drFuture');
+    if (!host) return;
+    var fleet = fleetOptions();
+    host.innerHTML = state.future.map(function (r, i) {
+      return '<div class="dr-row">'
+        + '<select class="eq" data-i="' + i + '" data-f="equipment">' + opts(fleet, r.equipment, 'Equipment') + '</select>'
+        + '<input class="desc" data-i="' + i + '" data-f="description" placeholder="Maintenance to identify" value="' + E(r.description) + '">'
+        + '</div>';
+    }).join('');
+    host.querySelectorAll('[data-i]').forEach(function (el) {
+      el.addEventListener('input', function () {
+        state.future[+this.getAttribute('data-i')][this.getAttribute('data-f')] = this.value;
+      });
+    });
+  }
+
+  // ---- 1. Project type-to-filter dropdown ------------------------------------
+  function renderProjList(filter) {
+    var box = document.getElementById('drProjList');
+    if (!box) return;
+    var q = (filter || '').toLowerCase();
+    var shown = !q ? state.projects.slice(0, 30)
+      : state.projects.filter(function (p) { return p.label.toLowerCase().indexOf(q) >= 0; }).slice(0, 30);
+    if (!shown.length) { box.style.display = 'none'; return; }
+    box.innerHTML = shown.map(function (p) {
+      return '<div class="dr-proj-opt" data-id="' + E(p.id) + '" data-label="' + E(p.label) + '">' + E(p.label) + '</div>';
+    }).join('');
+    box.style.display = '';
+    box.querySelectorAll('.dr-proj-opt').forEach(function (el) {
+      el.addEventListener('mousedown', function (ev) {
+        ev.preventDefault();
+        var pi = document.getElementById('drProject');
+        var hid = document.getElementById('drProjectId');
+        if (pi) pi.value = this.getAttribute('data-label');
+        if (hid) hid.value = this.getAttribute('data-id');
+        box.style.display = 'none';
       });
     });
   }
 
   function wireForm() {
-    var add = document.getElementById('drAddCrew');
-    if (add && !add.dataset.wired) { add.dataset.wired = '1'; add.addEventListener('click', function () { state.crew.push({ name: '', hours: '', costCode: '' }); renderCrew(); }); }
+    var pi = document.getElementById('drProject');
+    if (pi && !pi.dataset.wired) {
+      pi.dataset.wired = '1';
+      pi.addEventListener('input', function () { document.getElementById('drProjectId').value = ''; renderProjList(this.value); });
+      pi.addEventListener('focus', function () { renderProjList(this.value); });
+      pi.addEventListener('blur', function () { var b = document.getElementById('drProjList'); setTimeout(function () { if (b) b.style.display = 'none'; }, 150); });
+    }
+    var fm = document.getElementById('drForeman');
+    if (fm && !fm.dataset.wired) { fm.dataset.wired = '1'; fm.addEventListener('change', function () { applyForemanToCrew(this.value); }); }
+    var ao = document.getElementById('drAddOwned');
+    if (ao && !ao.dataset.wired) { ao.dataset.wired = '1'; ao.addEventListener('click', function () { state.owned.push({ machine: '', hours: '' }); renderOwned(); }); }
+    var ar = document.getElementById('drAddRental');
+    if (ar && !ar.dataset.wired) { ar.dataset.wired = '1'; ar.addEventListener('click', function () { state.rental.push({ category: '', hours: '' }); renderRental(); }); }
+    var af = document.getElementById('drAddFuture');
+    if (af && !af.dataset.wired) { af.dataset.wired = '1'; af.addEventListener('click', function () { state.future.push({ equipment: '', description: '' }); renderFuture(); }); }
     var sd = document.getElementById('drSaveDraft');
     if (sd && !sd.dataset.wired) { sd.dataset.wired = '1'; sd.addEventListener('click', function () { save(false); }); }
     var sub = document.getElementById('drSubmit');
@@ -16019,17 +16301,26 @@ try {
   }
 
   function collectBody() {
+    // DEF-5: only use the projectId chosen from the dropdown. If the user
+    // free-typed a project (no dropdown pick), leave projectId EMPTY and rely on
+    // projectName - the server create accepts projectId OR projectName. Do NOT
+    // fabricate an id from the typed text.
+    var pid = document.getElementById('drProjectId').value;
+    var pname = document.getElementById('drProject').value;
     return {
       date: document.getElementById('drDate').value,
-      projectName: document.getElementById('drProject').value,
-      projectId: (document.getElementById('drProject').value || '').split(' ')[0],
+      projectName: pname,
+      projectId: pid,
       foreman: document.getElementById('drForeman').value,
       weather: document.getElementById('drWeather').value,
       columnsInstalled: document.getElementById('drCols').value,
       lfInstalled: document.getElementById('drLf').value,
-      crew: state.crew.filter(function (m) { return (m.name || '').trim(); }),
+      crew: state.crew.filter(function (m) { return (m.name || '').trim(); }).map(function (m) { return { name: m.name, hours: m.hours, costCode: m.costCode }; }),
       workCompleted: document.getElementById('drWork').value,
-      equipment: document.getElementById('drEquip').value,
+      equipmentOwned: state.owned.filter(function (r) { return (r.machine || '').trim() || (r.hours || '').toString().trim(); }),
+      equipmentRental: state.rental.filter(function (r) { return (r.category || '').trim() || (r.hours || '').toString().trim(); }),
+      maintenance: state.maintenance.filter(function (r) { return (r.item || '').trim() || (r.hourAtFailure || '').toString().trim(); }),
+      futureIssues: state.future.filter(function (r) { return (r.equipment || '').trim() || (r.description || '').trim(); }),
       delays: document.getElementById('drDelays').value,
       safety: document.getElementById('drSafety').value,
     };
@@ -16056,11 +16347,15 @@ try {
   }
 
   function resetForm() {
-    ['drDate', 'drProject', 'drForeman', 'drWeather', 'drCols', 'drLf', 'drWork', 'drEquip', 'drDelays', 'drSafety'].forEach(function (id) {
+    ['drDate', 'drProject', 'drProjectId', 'drForeman', 'drWeather', 'drCols', 'drLf', 'drWork', 'drDelays', 'drSafety'].forEach(function (id) {
       var el = document.getElementById(id); if (el) el.value = '';
     });
-    state.crew = [{ name: '', hours: '', costCode: '' }];
-    renderCrew();
+    state.crew = [{ name: '', hours: '', costCode: '', auto: true }, { name: '', hours: '', costCode: '', auto: false }, { name: '', hours: '', costCode: '', auto: false }];
+    state.owned = [{ machine: '', hours: '' }, { machine: '', hours: '' }];
+    state.rental = [{ category: '', hours: '' }, { category: '', hours: '' }];
+    state.future = [{ equipment: '', description: '' }];
+    buildMaintenanceRows();
+    renderForeman(); renderCrew(); renderOwned(); renderRental(); renderMaint(); renderFuture();
   }
 
   function statusChip(st) {
@@ -16083,10 +16378,18 @@ try {
         if (r.status === 'submitted') actions += '<button type="button" class="btn btn-sm" data-approve="' + E(r.id) + '">Approve</button> ';
         if (r.status === 'approved') actions += '<button type="button" class="btn btn-sm" data-hr="' + E(r.id) + '">Send to HR</button> ';
       }
+      var ownedH = (r.equipmentOwned || []).map(function (e) { return E(e.machine) + (e.hours != null ? ' (' + E(e.hours) + 'h)' : ''); }).join(', ');
+      var rentalH = (r.equipmentRental || []).map(function (e) { return E(e.category) + (e.hours != null ? ' (' + E(e.hours) + 'h)' : ''); }).join(', ');
+      var maintH = (r.maintenance || []).filter(function (m) { return (m.item || '').trim(); }).map(function (m) { return E(m.category) + ': ' + E(m.item) + (m.hourAtFailure != null ? ' @' + E(m.hourAtFailure) + 'h' : ''); }).join('; ');
+      var futureH = (r.futureIssues || []).map(function (f) { return E(f.equipment) + (f.description ? ' - ' + E(f.description) : ''); }).join('; ');
       return '<div class="dr-item">'
         + '<div><strong>' + E(r.date) + ' - ' + E(r.projectName || r.projectId || '') + '</strong> ' + statusChip(r.status) + '</div>'
         + '<div class="dr-muted" style="font-size:12px">Foreman ' + E(r.foreman || '-') + (crewH ? ' - crew ' + crewH : '') + (prod.length ? ' - ' + prod.join(', ') : '') + '</div>'
         + (r.workCompleted ? '<div style="font-size:13px">' + E(r.workCompleted) + '</div>' : '')
+        + (ownedH ? '<div class="dr-muted" style="font-size:12px">Owned: ' + ownedH + '</div>' : '')
+        + (rentalH ? '<div class="dr-muted" style="font-size:12px">Rental: ' + rentalH + '</div>' : '')
+        + (maintH ? '<div class="dr-muted" style="font-size:12px">Maintenance: ' + maintH + '</div>' : '')
+        + (futureH ? '<div class="dr-muted" style="font-size:12px">Future issues: ' + futureH + '</div>' : '')
         + (r.safety ? '<div class="dr-muted" style="font-size:12px">Safety: ' + E(r.safety) + '</div>' : '')
         + '<div class="dr-muted" style="font-size:11px">'
         + (r.submittedBy ? 'submitted by ' + E(r.submittedBy) + ' ' + E((r.submittedAt || '').slice(0, 10)) : '')
@@ -16114,6 +16417,123 @@ try {
 })();
 } catch (e) {
   console.error('Module daily-reports failed to load:', e);
+}
+</script>
+
+<script>
+// ============================================================
+// MODULE: field-lists - Fleet/Lists management (owner-curated). admin/partner
+// EDIT ownedEquipment / personnel / foremen; business_dev sees read-only; the
+// crew never reaches this module (nav-hidden + server owner-only POST). The
+// daily-report FORM reads these via /api/field-lists. ZERO financials (names +
+// categories only). All data via window.esc.
+// ============================================================
+try {
+(function () {
+  'use strict';
+  var E = window.esc || function (s) { return s == null ? '' : String(s); };
+  var st = { lists: null, canEdit: false };
+
+  function api(path, opts) {
+    return fetch(path, Object.assign({ credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' } }, opts || {}))
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); });
+  }
+
+  function flmsg(t, ok) { var m = document.querySelector('#mod-field-lists [data-flmsg]'); if (m) { m.textContent = t; m.className = 'fl-msg ' + (ok ? 'fl-ok' : 'fl-err'); } }
+
+  function load() {
+    var noData = document.getElementById('flNoData');
+    var wrap = document.getElementById('flWrap');
+    var me = window.PF_ME || {};
+    st.canEdit = (me.role === 'admin' || me.role === 'partner');
+    api('/api/field-lists').then(function (res) {
+      if (res.status === 403) { if (noData) noData.style.display = ''; if (wrap) wrap.style.display = 'none'; return; }
+      if (noData) noData.style.display = 'none';
+      if (wrap) wrap.style.display = '';
+      st.lists = res.ok && res.body ? res.body : null;
+      render();
+    }).catch(function () { if (wrap) wrap.style.display = ''; render(); });
+  }
+
+  var EDITABLE = [
+    { key: 'ownedEquipment', title: 'Owned equipment' },
+    { key: 'personnel', title: 'Personnel' },
+    { key: 'foremen', title: 'Foremen (must be in Personnel)' },
+  ];
+
+  function render() {
+    var host = document.getElementById('flEditable');
+    var L = st.lists || {};
+    if (host) {
+      host.innerHTML = EDITABLE.map(function (d) {
+        var items = L[d.key] || [];
+        var rows = items.map(function (v, i) {
+          if (st.canEdit) {
+            return '<div class="fl-row" data-key="' + E(d.key) + '">'
+              + '<input data-i="' + i + '" value="' + E(v) + '">'
+              + '<button type="button" class="btn btn-sm" data-remove="' + i + '">Remove</button>'
+              + '</div>';
+          }
+          return '<span class="fl-tag">' + E(v) + '</span>';
+        }).join('');
+        var editor = st.canEdit
+          ? '<div data-rows="' + E(d.key) + '">' + rows + '</div>'
+            + '<button type="button" class="btn btn-sm" data-add="' + E(d.key) + '">+ Add</button> '
+            + '<button type="button" class="btn btn-sm" data-save="' + E(d.key) + '">Save ' + E(d.title) + '</button>'
+          : '<div>' + (rows || '<span class="fl-muted">None</span>') + '</div>';
+        return '<div class="fl-card"><h3>' + E(d.title) + '</h3>' + editor + '</div>';
+      }).join('');
+      wireEditable();
+    }
+    var rentalHost = document.getElementById('flRental');
+    if (rentalHost) rentalHost.innerHTML = (L.rentalCategories || []).map(function (v) { return '<span class="fl-tag">' + E(v) + '</span>'; }).join('') || '<span class="fl-muted">None</span>';
+    var maintHost = document.getElementById('flMaint');
+    if (maintHost) maintHost.innerHTML = (L.maintenanceCategories || []).map(function (v) { return '<span class="fl-tag">' + E(v) + '</span>'; }).join('') || '<span class="fl-muted">None</span>';
+  }
+
+  function wireEditable() {
+    if (!st.canEdit) return;
+    var host = document.getElementById('flEditable');
+    if (!host) return;
+    host.querySelectorAll('button[data-add]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var key = this.getAttribute('data-add');
+        (st.lists[key] = st.lists[key] || []).push('');
+        render();
+      });
+    });
+    host.querySelectorAll('button[data-remove]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var row = this.closest('.fl-row'); if (!row) return;
+        var key = row.getAttribute('data-key'); var i = +this.getAttribute('data-remove');
+        if (st.lists[key]) { st.lists[key].splice(i, 1); render(); }
+      });
+    });
+    host.querySelectorAll('div[data-rows] input[data-i]').forEach(function (el) {
+      el.addEventListener('input', function () {
+        var key = this.closest('[data-rows]').getAttribute('data-rows');
+        var i = +this.getAttribute('data-i');
+        if (st.lists[key]) st.lists[key][i] = this.value;
+      });
+    });
+    host.querySelectorAll('button[data-save]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var key = this.getAttribute('data-save');
+        var items = (st.lists[key] || []).filter(function (v) { return (v || '').trim(); });
+        api('/api/field-lists', { method: 'POST', body: JSON.stringify({ list: key, items: items }) }).then(function (res) {
+          if (!res.ok || !res.body || !res.body.saved) { flmsg((res.body && res.body.message) || 'Save failed.', false); return; }
+          st.lists = res.body; flmsg('Saved.', true); render();
+        }).catch(function () { flmsg('Network error.', false); });
+      });
+    });
+  }
+
+  var prev = window.showModule;
+  window.showModule = function (id) { if (typeof prev === 'function') prev(id); if (id === 'field-lists') { load(); } };
+})();
+} catch (e) {
+  console.error('Module field-lists failed to load:', e);
 }
 </script>
 

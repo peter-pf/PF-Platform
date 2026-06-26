@@ -949,6 +949,56 @@ section('Field daily reports: source-level guards + approval tier + NO mail/mone
      !/['"](rate|wage|salary|payRate|amount|price|cost)['"]\s*:/.test(noComments));
 }
 
+section('Field lists: /api/field-lists -> field_ops (crew READS; owners EDIT)');
+for (const p of ['/api/field-lists', '/api/field-lists?x=1']) {
+  const area = areaForPath(p.split('?')[0]);
+  ok(`${p} -> field_ops (${area})`, area === 'field_ops');
+  ok(`${p} READ allowed for field_ops (CREW)`, roleCanAccess('field_ops', area) === true);
+  ok(`${p} READ allowed for admin`, roleCanAccess('admin', area) === true);
+  ok(`${p} READ allowed for partner`, roleCanAccess('partner', area) === true);
+  ok(`${p} READ allowed for business_dev`, roleCanAccess('business_dev', area) === true);
+}
+ok('requireArea(field_ops, field-lists area) => null (CREW READ allowed)',
+   requireArea({ uid: 'fo', role: 'field_ops', name: 'Crew' }, areaForPath('/api/field-lists')) === null);
+ok('requireArea(null, field-lists area) => 403 (fail closed)',
+   requireArea(null, areaForPath('/api/field-lists'))?.status === 403);
+
+section('Field lists: source-level guards (owner-only WRITE, NO mail/money)');
+{
+  const src = readFileSync(join(__dir, '../functions/api/field-lists.js'), 'utf8');
+  ok('field-lists imports requireArea', /import\s*\{[^}]*requireArea[^}]*\}\s*from/.test(src));
+  ok('field-lists GET guards field_ops', /requireArea\([^)]*['"]field_ops['"]\)/.test(src));
+  ok('field-lists POST restricts edits to privileged (admin/partner)',
+     /isPrivileged\(session\)/.test(src) && /Only an owner can edit the field lists/.test(src));
+  ok('field-lists uses env.PF_SCHEDULE', /env\.PF_SCHEDULE/.test(src));
+  ok('field-lists keeps foremen a subset of personnel', /foremen\s*=\s*current\.foremen\.filter/.test(src));
+  const noComments = src.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
+  ok('field-lists makes NO fetch / outbound call', !/\bfetch\s*\(/.test(noComments) && !/https?:\/\//.test(noComments));
+  ok('field-lists calls NO mail API', !/sendMail|\/messages|smtp|nodemailer|mailgun|sendgrid/i.test(noComments));
+  ok('field-lists has NO money handler (rate/wage/salary/price as a field)',
+     !/['"](rate|wage|salary|payRate|amount|price|cost)['"]\s*:/.test(noComments));
+}
+
+section('Field daily reports: new structured fields are operational, NO money');
+{
+  const src = readFileSync(join(__dir, '../functions/api/daily-report.js'), 'utf8');
+  ok('daily-report stores equipmentOwned', /cleanEquipmentOwned/.test(src) && /equipmentOwned:/.test(src));
+  ok('daily-report stores equipmentRental', /cleanEquipmentRental/.test(src) && /equipmentRental:/.test(src));
+  ok('daily-report stores maintenance', /cleanMaintenance/.test(src) && /maintenance:/.test(src));
+  ok('daily-report stores futureIssues', /cleanFutureIssues/.test(src) && /futureIssues:/.test(src));
+  // DEF-2: equipment/maintenance hour-meter readings must use meterHours (NO 24
+  // cap), not the 24-capped hours(). crew.hours stays on the 24-capped hours().
+  ok('daily-report defines meterHours (no 24 cap, large meter readings)',
+     /function meterHours\s*\(/.test(src) && /n\s*>\s*1000000/.test(src) && !/if\s*\(\s*n\s*>\s*24\s*\)/.test(src.slice(src.indexOf('function meterHours'))));
+  ok('daily-report cleanEquipmentOwned uses meterHours', /cleanEquipmentOwned[\s\S]*?meterHours\(r\.hours\)/.test(src));
+  ok('daily-report cleanEquipmentRental uses meterHours', /cleanEquipmentRental[\s\S]*?meterHours\(r\.hours\)/.test(src));
+  ok('daily-report cleanMaintenance hourAtFailure uses meterHours', /cleanMaintenance[\s\S]*?meterHours\(r\.hourAtFailure\)/.test(src));
+  ok('daily-report crew.hours still uses 24-capped hours()', /cleanCrew[\s\S]*?hours:\s*hours\(m\.hours\)/.test(src));
+  const noComments = src.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
+  ok('daily-report new fields have NO money handler',
+     !/['"](rate|wage|salary|payRate|amount|price|cost)['"]\s*:/.test(noComments));
+}
+
 // THE BIG ONE: field_ops sees ZERO financials. Assert blocked from EVERY known
 // financial / BD / precon / PM feed AND endpoint, while allowed the field surface.
 section('Field ops ZERO-financials guarantee (blocked from all $ feeds + endpoints)');
@@ -975,7 +1025,7 @@ for (const p of FIN_APIS) {
 }
 // ...and field_ops IS allowed only its operational surface (no $).
 const FIELD_OK = ['/data/fo-projects-field.js', '/data/production-data.js', '/data/progress-data.js',
-  '/data/timesheets.js', '/data/schedule-field.js', '/api/daily-report', '/api/schedule', '/api/me'];
+  '/data/timesheets.js', '/data/schedule-field.js', '/api/daily-report', '/api/field-lists', '/api/schedule', '/api/me'];
 for (const p of FIELD_OK) {
   ok(`field_ops ALLOWED ${p} (operational, no $)`, roleCanAccess('field_ops', areaForPath(p)) === true);
 }

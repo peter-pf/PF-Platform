@@ -434,6 +434,12 @@ export function areaForPath(pathname) {
     // daily reports. This area exposes ZERO financials. The approve / send-to-hr
     // transitions are further restricted to admin/partner IN the handler.
     if (pathname.startsWith('/api/daily-report'))  return 'field_ops';
+    // Field reference lists (owned equipment / personnel / foremen + the FIXED
+    // rental + maintenance categories) that the daily-report FORM pulls from.
+    // field_ops area so the crew can READ the lists to fill the form; EDITING a
+    // list (POST) is restricted to admin/partner IN the handler. ZERO financials
+    // (names + categories only).
+    if (pathname.startsWith('/api/field-lists'))   return 'field_ops';
     // Bid-resolution fork + Dead Set (item A): preconstruction action.
     // admin + partner + business_dev allowed; field_ops BLOCKED by direct URL.
     if (pathname.startsWith('/api/pipeline-state')) return 'preconstruction';
