@@ -707,7 +707,7 @@ body.role-field-ops .nav-item[data-fo-hide] {
   text-transform: uppercase; vertical-align: middle;
 }
 /* Bid-resolution fork + Dead Set (item A): per-row resolution actions */
-.pf-resolve-cell { white-space: nowrap; }
+.pf-resolve-cell { display: flex; flex-wrap: wrap; gap: 3px; }
 .pf-resolve-btn {
   display: inline-block; margin: 1px 3px 1px 0; padding: 3px 9px;
   border: 1px solid var(--border); border-radius: 7px; cursor: pointer;
@@ -727,6 +727,14 @@ body.role-field-ops .nav-item[data-fo-hide] {
 .pf-tag-dead {
   display: inline-block; margin-left: 6px; padding: 1px 7px;
   background: #FBEAEA; color: #A12626; border-radius: 9px;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em;
+  text-transform: uppercase; vertical-align: middle;
+}
+/* Declined-to-bid tag (Dead Set): distinct from the lost (not_awarded) red tag.
+   Amber/neutral so "we chose not to bid" reads differently from "we bid and lost". */
+.pf-tag-declined {
+  display: inline-block; margin-left: 6px; padding: 1px 7px;
+  background: #FFF4E0; color: #9A6700; border-radius: 9px;
   font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em;
   text-transform: uppercase; vertical-align: middle;
 }
@@ -806,6 +814,24 @@ body.role-field-ops .nav-item[data-fo-hide] {
   display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 4px;
   align-items: stretch;
 }
+/* Submitted Bids aging filter bar */
+.pf-age-bar {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin: 6px 0 12px;
+}
+.pf-age-bar-label { color: var(--text-3); font-size: 0.78rem; margin-right: 4px; }
+.pf-age-btn {
+  display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px;
+  border: 1px solid var(--border); border-radius: 16px; cursor: pointer;
+  font-size: 0.76rem; font-weight: 600; background: var(--bg-1); color: var(--text-2);
+}
+.pf-age-btn:hover { border-color: var(--accent); color: var(--accent); }
+.pf-age-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.pf-age-n {
+  font-size: 0.68rem; font-weight: 700; opacity: 0.8;
+  background: rgba(0,0,0,0.08); border-radius: 8px; padding: 0 5px;
+}
+.pf-age-btn.active .pf-age-n { background: rgba(255,255,255,0.22); }
 .precon-dropzone {
   flex: 1 1 150px; min-height: 52px;
   border: 1px dashed var(--border); border-radius: 10px;
@@ -1945,7 +1971,7 @@ window.progress = (function () {
       <!-- 4a) Aggregate Piers -->
       <div class="nav-sub collapsed">
         <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Aggregate Piers</div>
-        <a class="nav-item" data-module="precon-ap-actively-bidding" onclick="showModule('precon-ap-actively-bidding')">Actively Bidding</a>
+        <a class="nav-item" data-module="precon-ap-actively-bidding" onclick="showModule('precon-ap-actively-bidding')">Actively Pricing</a>
         <a class="nav-item" data-module="precon-ap-budget-pricing" onclick="showModule('precon-ap-budget-pricing')">Budget Pricing</a>
         <a class="nav-item" data-module="precon-ap-feasibility-review" onclick="showModule('precon-ap-feasibility-review')">Feasibility Review</a>
         <a class="nav-item" data-module="precon-ap-submitted-bids" onclick="showModule('precon-ap-submitted-bids')">Submitted Bids</a>
@@ -1956,7 +1982,7 @@ window.progress = (function () {
       <!-- 4b) Helical Pilings -->
       <div class="nav-sub collapsed">
         <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Helical Pilings</div>
-        <a class="nav-item" data-module="precon-hp-actively-bidding" onclick="showModule('precon-hp-actively-bidding')">Actively Bidding</a>
+        <a class="nav-item" data-module="precon-hp-actively-bidding" onclick="showModule('precon-hp-actively-bidding')">Actively Pricing</a>
         <a class="nav-item" data-module="precon-hp-budget-pricing" onclick="showModule('precon-hp-budget-pricing')">Budget Pricing</a>
         <a class="nav-item" data-module="precon-hp-feasibility-review" onclick="showModule('precon-hp-feasibility-review')">Feasibility Review</a>
         <a class="nav-item" data-module="precon-hp-submitted-bids" onclick="showModule('precon-hp-submitted-bids')">Submitted Bids</a>
@@ -3001,13 +3027,13 @@ const moduleTitles = {
   // ---- Phase 1 placeholders ----
   pfadmin: 'PF Admin',
   'bd-targets': 'Business Development - Target Accounts',
-  'precon-ap-actively-bidding': 'Aggregate Piers - Actively Bidding',
+  'precon-ap-actively-bidding': 'Aggregate Piers - Actively Pricing',
   'precon-ap-budget-pricing': 'Aggregate Piers - Budget Pricing',
   'precon-ap-feasibility-review': 'Aggregate Piers - Feasibility Review',
   'precon-ap-submitted-bids': 'Aggregate Piers - Submitted Bids',
   'precon-ap-awarded': 'Aggregate Piers - Awarded',
   'precon-ap-not-awarded': 'Aggregate Piers - Not Awarded',
-  'precon-hp-actively-bidding': 'Helical Pilings - Actively Bidding',
+  'precon-hp-actively-bidding': 'Helical Pilings - Actively Pricing',
   'precon-hp-budget-pricing': 'Helical Pilings - Budget Pricing',
   'precon-hp-feasibility-review': 'Helical Pilings - Feasibility Review',
   'precon-hp-submitted-bids': 'Helical Pilings - Submitted Bids',
@@ -5139,7 +5165,7 @@ try {
 
     html += '<div class="tabs">';
     html += tabBtn('all', 'All (' + BIDS.length + ')');
-    html += tabBtn('active', 'Actively Bidding (' + countByGroup('active') + ')');
+    html += tabBtn('active', 'Actively Pricing (' + countByGroup('active') + ')');
     html += tabBtn('submitted', 'Submitted (' + countByGroup('submitted') + ')');
     html += tabBtn('awarded', 'Awarded (' + countByGroup('awarded') + ')');
     html += tabBtn('not-awarded', 'Not Awarded (' + countByGroup('not-awarded') + ')');
@@ -11525,7 +11551,7 @@ try {
     var E = window.esc;
     var DISC_LABEL = { ap: 'Aggregate Piers', hp: 'Helical Pilings' };
     var BUCKET_LABEL = {
-      actively_bidding: 'Actively Bidding',
+      actively_bidding: 'Actively Pricing',
       budget_pricing: 'Budget Pricing',
       feasibility_review: 'Feasibility Review',
       submitted_bids: 'Submitted Bids',
@@ -11716,7 +11742,9 @@ try {
       if (displayBucket === 'dead') {
         btns = '<button class="pf-resolve-btn primary" onclick="pfResolveBid(' + kJs + ",'active',this)\">Reactivate</button>";
         if (ov && ov.resolvedBy) {
-          btns += '<div class="pf-resolve-meta">Lost by ' + E(ov.resolvedBy)
+          // Verb matches the dead reason: declined-to-bid vs bid-and-lost.
+          var deadVerb = (ov.status === 'not_bidding') ? 'Declined by' : 'Lost by';
+          btns += '<div class="pf-resolve-meta">' + deadVerb + ' ' + E(ov.resolvedBy)
             + (ov.resolvedAt ? ' &middot; ' + E(String(ov.resolvedAt).slice(0,10)) : '') + '</div>';
         }
       } else if (displayBucket === 'awarded') {
@@ -11725,10 +11753,18 @@ try {
             + (ov.resolvedAt ? ' &middot; ' + E(String(ov.resolvedAt).slice(0,10)) : '') + '</span>'
           : '';
       } else if (realBucket === 'actively_bidding') {
-        // Actively Bidding: ONE button. Clicking it submits the bid, which
-        // relocates it into the Submitted Bids module (status 'submitted').
+        // Actively Pricing: THREE resolution buttons (Jonathan's spec). Each
+        // relocates the bid to a different bucket via a distinct override status:
+        //   Bid Sent    -> status 'submitted'   -> Submitted Bids (live bid)
+        //   Budget Sent -> status 'budget'      -> Budget Pricing (live item)
+        //   Not Bidding -> status 'not_bidding' -> Dead Set (declined to bid)
+        // .pf-resolve-cell wraps + flex-wraps them: side by side when they fit,
+        // else they stack. Shown for EVERY actively_pricing bid (numbered or not),
+        // keyed by resolveKey() so numberless bids are actionable too.
         btns = '<div class="pf-resolve-cell">'
-          + '<button class="pf-resolve-btn primary" onclick="pfResolveBid(' + kJs + ",'submitted',this)\">Bid Submitted</button>"
+          + '<button class="pf-resolve-btn primary" onclick="pfResolveBid(' + kJs + ",'submitted',this)\">Bid Sent</button>"
+          + '<button class="pf-resolve-btn" onclick="pfResolveBid(' + kJs + ",'budget',this)\">Budget Sent</button>"
+          + '<button class="pf-resolve-btn" onclick="pfResolveBid(' + kJs + ",'not_bidding',this)\">Not Bidding</button>"
           + '</div>';
       } else {
         // Other open buckets (Submitted Bids, Budget Pricing): Mark Awarded +
@@ -11766,7 +11802,15 @@ try {
         var nameTxt = E(p.name || f['Project Name'] || '');
         if (p.completed) nameTxt += ' <span class="pf-tag-completed">Completed</span>';
         if (ov && ov.status === 'awarded') nameTxt += ' <span class="pf-tag-awarded">Awarded</span>' + pmNumTag(p);
-        if (ov && ov.status === 'not_awarded') nameTxt += ' <span class="pf-tag-dead">Dead</span>';
+        // Dead-status reason tag: distinguish bid-and-lost from declined-to-bid.
+        // In the Dead Set view (displayBucket 'dead') we use the explicit reason
+        // tags; elsewhere a relocated dead bid just shows a generic Dead tag.
+        if (opts.displayBucket === 'dead') {
+          if (ov && ov.status === 'not_awarded') nameTxt += ' <span class="pf-tag-dead">Not Awarded (lost)</span>';
+          else if (ov && ov.status === 'not_bidding') nameTxt += ' <span class="pf-tag-declined">Not Bidding (declined)</span>';
+        } else {
+          if (ov && (ov.status === 'not_awarded' || ov.status === 'not_bidding')) nameTxt += ' <span class="pf-tag-dead">Dead</span>';
+        }
         var numTxt = E(p.number || f['Project Number'] || '');
         var stickyInner = '<div>' + nameTxt + '</div>'
           + (numTxt ? '<div class="pf-record-muted">' + numTxt + '</div>' : '');
@@ -11838,6 +11882,18 @@ try {
       return Math.round((d.getTime() - today) / 86400000);
     }
 
+    // Whole days SINCE a date string (today minus date), or null if unparseable.
+    // Positive = in the past (an aged bid). Used by the Submitted Bids aging
+    // filter: a bid is "30+ days" old when daysSince(Date Submitted) >= 30.
+    function daysSince(dateStr){
+      if (!dateStr) return null;
+      var d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00Z');
+      if (isNaN(d.getTime())) return null;
+      var now = new Date();
+      var today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+      return Math.round((today - d.getTime()) / 86400000);
+    }
+
     // HIGHLIGHTS-ROW + CLICK-TO-EXPAND renderer (Actively Bidding + Budget
     // Pricing). A compact full-width table shows only the headline columns; every
     // remaining bid-log field drops into a per-project labeled detail panel that
@@ -11874,7 +11930,7 @@ try {
         var w = h.w ? h.w : (h.type === 'money' ? '140px' : '');
         colgroup += w ? ('<col style="width:' + w + '">') : '<col>';
       });
-      if (opts.actionCol) colgroup += '<col style="width:188px">';
+      if (opts.actionCol) colgroup += '<col style="width:' + (opts.actionWidth || '188px') + '">';
 
       // Compact mode (smaller font + tighter padding) for buckets with many
       // highlight columns so they fit without horizontal scroll (Submitted Bids).
@@ -11898,6 +11954,7 @@ try {
         if (p.completed) nameTxt += ' <span class="pf-tag-completed">Completed</span>';
         if (ov && ov.status === 'awarded') nameTxt += ' <span class="pf-tag-awarded">Awarded</span>' + pmNumTag(p);
         if (ov && ov.status === 'not_awarded') nameTxt += ' <span class="pf-tag-dead">Dead</span>';
+        if (ov && ov.status === 'not_bidding') nameTxt += ' <span class="pf-tag-dead">Dead</span>';
         var numTxt = E(p.number || f['Project Number'] || '');
         var nameCell = '<div class="pf-hl-name">' + nameTxt + '</div>'
           + (numTxt ? '<div class="pf-record-muted">' + numTxt + '</div>' : '');
@@ -12079,7 +12136,8 @@ try {
           if (!key && ev.dataTransfer) { try { key = ev.dataTransfer.getData('text/plain'); } catch (e) {} }
           if (!key) { showErr('Could not identify the bid that was dragged. Please try again.'); return; }
           var action = zone.getAttribute('data-act');
-          if (action !== 'awarded' && action !== 'not_awarded' && action !== 'active' && action !== 'submitted') {
+          if (action !== 'awarded' && action !== 'not_awarded' && action !== 'active'
+              && action !== 'submitted' && action !== 'budget' && action !== 'not_bidding') {
             showErr('Unknown drop target.'); return;
           }
           showErr('');
@@ -12087,6 +12145,21 @@ try {
           // success, and alert on conflict/permission/error (409 reloads). We
           // pass null for the button arg (no per-row button to disable here).
           window.pfResolveBid(key, action, null);
+        });
+      });
+    }
+
+    // Wire the Submitted Bids aging-filter buttons. Clicking one stores the
+    // selection on the mount (data-age-filter) and re-renders just this mount, so
+    // the filter persists and is recomputed from the current list. No-op for mounts
+    // without an age bar.
+    function wireAgeFilter(mount){
+      var btns = mount.querySelectorAll('.pf-age-btn');
+      if (!btns.length) return;
+      btns.forEach(function(b){
+        b.addEventListener('click', function(){
+          mount.setAttribute('data-age-filter', b.getAttribute('data-age') || 'all');
+          renderMount(mount);
         });
       });
     }
@@ -12106,12 +12179,14 @@ try {
       }
 
       // ----- OVERLAY: build the EFFECTIVE list for this bucket -----
-      // A job with status=not_awarded leaves every stage bucket (it lives in Dead
-      // Set). status=awarded is pulled INTO the awarded bucket from wherever it
-      // sat. status=submitted is pulled INTO submitted_bids from wherever it sat
-      // (Jonathan's "Bid Submitted" action; it leaves actively_bidding). status=
-      // active (or none) keeps its auto bucket. RELOCATION dedupes on resolveKey()
-      // so numberless bids are handled too.
+      // A job with status=not_awarded OR not_bidding leaves every stage bucket (it
+      // lives in Dead Set). status=awarded is pulled INTO the awarded bucket from
+      // wherever it sat. status=submitted is pulled INTO submitted_bids; status=
+      // budget is pulled INTO budget_pricing (Jonathan's "Bid Sent" / "Budget Sent"
+      // actions; both leave actively_pricing). status=active (or none) keeps its
+      // auto bucket. RELOCATION dedupes on resolveKey() so numberless bids work too.
+      // RELOCATED is the set of override statuses that move a job OUT of its auto
+      // stage bucket (used by the stage else-branch drop test).
       var auto = D[disc][bucket] || [];
       var list = [];
       // Relocation helper: gather bids from OTHER buckets of this discipline whose
@@ -12137,23 +12212,64 @@ try {
         pullRelocated('awarded');
       } else if (bucket === 'submitted_bids') {
         // Auto-submitted jobs that aren't overridden away (awarded/not_awarded/
-        // active relocate them out), PLUS any job overridden to 'submitted' from
-        // another bucket (the "Bid Submitted" action moves it here).
+        // not_bidding/active/budget relocate them out), PLUS any job overridden to
+        // 'submitted' from another bucket (the "Bid Sent" action moves it here).
         auto.forEach(function(p){
           var ov = overrideFor(p);
           if (!ov || ov.status === 'submitted') list.push(p);
         });
         pullRelocated('submitted');
-      } else {
-        // A stage bucket (incl. actively_bidding): drop jobs overridden to
-        // awarded, not_awarded, or submitted (they have relocated elsewhere).
+      } else if (bucket === 'budget_pricing') {
+        // Auto budget-pricing jobs that aren't overridden away, PLUS any job
+        // overridden to 'budget' from another bucket (the "Budget Sent" action
+        // moves it here). Mirrors the submitted_bids relocation.
         auto.forEach(function(p){
           var ov = overrideFor(p);
-          if (ov && (ov.status === 'awarded' || ov.status === 'not_awarded' || ov.status === 'submitted')) return;
+          if (!ov || ov.status === 'budget') list.push(p);
+        });
+        pullRelocated('budget');
+      } else {
+        // A stage bucket (incl. actively_bidding): drop jobs overridden to a status
+        // that relocates them elsewhere (awarded, not_awarded, not_bidding,
+        // submitted, budget). Everything else (active / none) stays.
+        auto.forEach(function(p){
+          var ov = overrideFor(p);
+          if (ov && (ov.status === 'awarded' || ov.status === 'not_awarded'
+                  || ov.status === 'not_bidding' || ov.status === 'submitted'
+                  || ov.status === 'budget')) return;
           list.push(p);
         });
       }
       list = sortByNumber(list);
+
+      // ----- SUBMITTED BIDS AGING FILTER -----
+      // Show only submitted bids whose "Date Submitted" is at least N days ago
+      // (relative to today). The selection persists on the mount (data-age-filter)
+      // across re-renders. Default 'all'. Bids with a blank/unparseable submitted
+      // date are kept ONLY under 'all' (they have no measurable age). Age is the
+      // pre-filter count we display next to each option so the bar is informative.
+      var ageFilter = 'all';
+      var ageCounts = null;
+      if (bucket === 'submitted_bids') {
+        ageFilter = mount.getAttribute('data-age-filter') || 'all';
+        // Count how many fall in each threshold (computed from the FULL list).
+        ageCounts = { all: list.length, d30: 0, d60: 0, d90: 0, d180: 0 };
+        list.forEach(function(p){
+          var ds = daysSince((p.fields || {})['Date Submitted']);
+          if (ds == null) return;
+          if (ds >= 30)  ageCounts.d30++;
+          if (ds >= 60)  ageCounts.d60++;
+          if (ds >= 90)  ageCounts.d90++;
+          if (ds >= 180) ageCounts.d180++;
+        });
+        var minDays = { all: null, d30: 30, d60: 60, d90: 90, d180: 180 }[ageFilter];
+        if (minDays != null) {
+          list = list.filter(function(p){
+            var ds = daysSince((p.fields || {})['Date Submitted']);
+            return ds != null && ds >= minDays; // blank submitted date drops out of aged views
+          });
+        }
+      }
 
       var srcLink = D.source_url
         ? '<a href="' + E(D.source_url) + '" target="_blank" rel="noopener noreferrer">Project Bid Log</a>'
@@ -12165,11 +12281,40 @@ try {
         + ' &middot; ' + E(D.generated || '') + '</div>'
         + '</div>';
 
+      // ----- aging filter bar (Submitted Bids only) -----
+      // Built BEFORE the empty-state check so the user can switch back to All even
+      // when the current aged view is empty. Buttons are static (safe); counts are
+      // numeric. The active button carries .active; clicks set data-age-filter and
+      // re-render just this mount.
+      if (bucket === 'submitted_bids' && ageCounts) {
+        var ageOpts = [
+          { v: 'all',  label: 'All',    n: ageCounts.all },
+          { v: 'd30',  label: '30+',    n: ageCounts.d30 },
+          { v: 'd60',  label: '60+',    n: ageCounts.d60 },
+          { v: 'd90',  label: '90+',    n: ageCounts.d90 },
+          { v: 'd180', label: '180+',   n: ageCounts.d180 }
+        ];
+        var ageBtns = ageOpts.map(function(o){
+          return '<button type="button" class="pf-age-btn' + (ageFilter === o.v ? ' active' : '')
+            + '" data-age="' + E(o.v) + '">' + E(o.label)
+            + ' <span class="pf-age-n">' + o.n + '</span></button>';
+        }).join('');
+        html += '<div class="pf-age-bar"><span class="pf-age-bar-label">Age since submitted:</span>'
+          + ageBtns + '</div>';
+      }
+
       if (!list.length) {
-        html += '<div class="pf-empty-state">No jobs currently in '
-          + E(BUCKET_LABEL[bucket] || bucket) + ' for ' + E(DISC_LABEL[disc] || disc)
-          + '. Jobs appear here automatically as their Bid Status updates in the Project Bid Log.</div>';
+        if (bucket === 'submitted_bids' && ageFilter !== 'all') {
+          html += '<div class="pf-empty-state">No submitted bids are '
+            + E(({ d30: '30+', d60: '60+', d90: '90+', d180: '180+' }[ageFilter] || ''))
+            + ' days old. Choose All to see every submitted bid.</div>';
+        } else {
+          html += '<div class="pf-empty-state">No jobs currently in '
+            + E(BUCKET_LABEL[bucket] || bucket) + ' for ' + E(DISC_LABEL[disc] || disc)
+            + '. Jobs appear here automatically as their Bid Status updates in the Project Bid Log.</div>';
+        }
         mount.innerHTML = html;
+        wireAgeFilter(mount);
         return;
       }
 
@@ -12186,8 +12331,8 @@ try {
       // DRAG-AND-DROP bar: privileged roles can drag a bid row onto a resolution
       // drop-zone. The zones map to the states /api/pipeline-state supports. The
       // bar is BUCKET-AWARE so drag-to-act matches the per-row buttons exactly and
-      // users cannot bypass the submit-first flow:
-      //   actively_bidding -> single "Bid Submitted" zone (status 'submitted')
+      // users cannot bypass the resolution flow:
+      //   actively_pricing -> Bid Sent + Budget Sent + Not Bidding (3 zones)
       //   submitted_bids / budget_pricing -> Awarded + Not Awarded
       //   awarded -> Not Awarded + Back to Active
       // The per-row buttons still work; this is an additive affordance, NOT a
@@ -12203,11 +12348,16 @@ try {
             + '</div>'
             + '<div class="precon-dnd-hint">Drag an awarded bid onto a zone to change its status. The buttons in each row do the same.</div>';
         } else if (bucket === 'actively_bidding') {
+          // THREE zones, consistent with the three per-row buttons.
           html += '<div class="precon-dnd-bar">'
-            + '<div class="precon-dropzone" data-act="submitted">Bid Submitted'
+            + '<div class="precon-dropzone" data-act="submitted">Bid Sent'
             + '<span class="precon-dz-sub">drag a bid here to move it to Submitted Bids</span></div>'
+            + '<div class="precon-dropzone" data-act="budget">Budget Sent'
+            + '<span class="precon-dz-sub">drag a bid here to move it to Budget Pricing</span></div>'
+            + '<div class="precon-dropzone" data-act="not_bidding">Not Bidding'
+            + '<span class="precon-dz-sub">drag a bid here to send to the Dead Set (declined)</span></div>'
             + '</div>'
-            + '<div class="precon-dnd-hint">Drag a bid row here to mark it submitted. The Bid Submitted button in each row does the same.</div>';
+            + '<div class="precon-dnd-hint">Drag a bid row onto a zone to change its status. The buttons in each row do the same.</div>';
         } else {
           html += '<div class="precon-dnd-bar">'
             + '<div class="precon-dropzone" data-act="awarded">Awarded'
@@ -12238,6 +12388,10 @@ try {
           idBucket: bucket
         };
         if (bucket === 'actively_bidding') {
+          // Three resolution buttons (Bid Sent / Budget Sent / Not Bidding) need a
+          // wider action column so they fit side by side; they flex-wrap to stack
+          // on narrow screens.
+          hlOpts.actionWidth = '232px';
           highlights = [
             { key: 'Design Completed Date', label: 'Prelim Design Completed', type: 'date' },
             { key: 'Due Date',              label: 'Bid Due Date',           type: 'date' },
@@ -12330,6 +12484,8 @@ try {
       if (canResolve()) wireDnd(mount);
       // ----- wire highlight-row expand/collapse -----
       if (useHighlights) wireHighlightExpand(mount);
+      // ----- wire the Submitted Bids aging filter -----
+      wireAgeFilter(mount);
 
       // wire the per-bid Activity openers
       var panel = mount.querySelector('.precon-actlog');
@@ -12419,8 +12575,8 @@ try {
       var D = window.PF_PRECON;
       var ov = window.PF_PIPELINE.overrides || {};
 
-      var html = '<div class="pf-index-head"><h2>Dead Set - Not Awarded / Lost Bids</h2>'
-        + '<div class="pf-index-meta">Bids marked Not Awarded land here. Use Reactivate to send one back to Actively Bidding.</div></div>';
+      var html = '<div class="pf-index-head"><h2>Dead Set - Lost &amp; Declined Bids</h2>'
+        + '<div class="pf-index-meta">Bids we lost (Not Awarded) and projects we declined to bid (Not Bidding) land here. Use Reactivate to send one back to Actively Pricing.</div></div>';
 
       if (!D) {
         root.innerHTML = html + '<div class="pf-empty-state">Pipeline data not loaded.</div>';
@@ -12431,9 +12587,13 @@ try {
         return;
       }
 
-      // Find every job (across disc + buckets) whose override is not_awarded.
+      // Find every job (across disc + buckets) whose override is dead: bid-and-lost
+      // (not_awarded) OR declined-to-bid (not_bidding). Both live in the Dead Set
+      // but are tagged with a distinguishing reason on each row below.
       var deadKeys = {};
-      Object.keys(ov).forEach(function(k){ if (ov[k] && ov[k].status === 'not_awarded') deadKeys[k] = 1; });
+      Object.keys(ov).forEach(function(k){
+        if (ov[k] && (ov[k].status === 'not_awarded' || ov[k].status === 'not_bidding')) deadKeys[k] = 1;
+      });
 
       var any = false;
       ['ap','hp'].forEach(function(disc){
@@ -12455,7 +12615,9 @@ try {
             var hit = (rk && deadKeys[rk]) || (jk && deadKeys[jk]);
             if (!hit || seen[rk]) return;
             var eff = overrideFor(p);
-            if (!eff || eff.status !== 'not_awarded') return; // skip stale legacy membership
+            // Effective status must be a DEAD status (lost or declined); a stale
+            // legacy key that was later re-resolved is skipped.
+            if (!eff || (eff.status !== 'not_awarded' && eff.status !== 'not_bidding')) return;
             dead.push(p); seen[rk] = 1;
           });
         });

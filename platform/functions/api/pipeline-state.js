@@ -17,12 +17,19 @@
 //     - status=awarded     -> job shown as Awarded (visible to Project Mgmt)
 //     - status=not_awarded  -> job moves to the persistent Dead Set view
 //     - status=active       -> job returns to Actively Bidding
-//     - status=submitted    -> bid relocates from Actively Bidding to Submitted
-//                              Bids (Jonathan's "Bid Submitted" action). It is
+//     - status=submitted    -> bid relocates from Actively Pricing to Submitted
+//                              Bids (Jonathan's "Bid Sent" action). It is
 //                              still a live, un-resolved bid (NOT dead, NOT
 //                              awarded). deadSet stays false. From Submitted Bids
 //                              the existing Mark Awarded / Not Awarded buttons
 //                              then take it the rest of the way.
+//     - status=budget       -> bid relocates from Actively Pricing to Budget
+//                              Pricing (Jonathan's "Budget Sent" action). Still a
+//                              live, un-resolved item (NOT dead, NOT awarded).
+//                              deadSet stays false.
+//     - status=not_bidding  -> we DECLINED to bid. Moves to the Dead Set, but is
+//                              DISTINCT from not_awarded (which is bid-and-lost).
+//                              deadSet=true, reason='declined'.
 //
 // SECURITY MODEL (for the COO security review):
 //   - This endpoint is ALREADY behind the server-side auth gate in
@@ -53,7 +60,12 @@ const MAX_BODY_BYTES = 64 * 1024;   // resolution records are tiny; generous cap
 const MAX_OVERRIDES = 2000;         // bounds storage / blast radius
 const MAX_STR = 200;
 
-const VALID_STATUS = { awarded: 1, not_awarded: 1, active: 1, submitted: 1 };
+const VALID_STATUS = { awarded: 1, not_awarded: 1, active: 1, submitted: 1, budget: 1, not_bidding: 1 };
+
+// Statuses that land a job in the Dead Set, each with its distinguishing reason.
+//   not_awarded -> we bid and LOST   (reason: 'lost')
+//   not_bidding -> we DECLINED to bid (reason: 'declined')
+const DEAD_STATUS_REASON = { not_awarded: 'lost', not_bidding: 'declined' };
 
 const JSON_HEADERS = {
   'Content-Type': 'application/json',
@@ -91,14 +103,16 @@ function sanitizeResolution(r) {
   const status = String(r.status || '');
   if (!VALID_STATUS[status]) return null;
   // deadSet is implied by status but we persist it explicitly for the Dead Set
-  // view; coerce it to be consistent with status (not_awarded => dead).
-  const deadSet = status === 'not_awarded' ? true : false;
+  // view; coerce it to be consistent with status (not_awarded/not_bidding => dead).
+  const deadSet = DEAD_STATUS_REASON[status] ? true : false;
   const out = {
     status,
     deadSet,
     resolvedAt: isoOrNull(r.resolvedAt) || new Date().toISOString(),
     resolvedBy: s(r.resolvedBy),
   };
+  // Persist the dead reason so the Dead Set can distinguish declined vs lost.
+  if (DEAD_STATUS_REASON[status]) out.reason = DEAD_STATUS_REASON[status];
   const react = isoOrNull(r.reactivatedAt);
   if (react) out.reactivatedAt = react;
   return out;
@@ -166,13 +180,17 @@ export async function onRequestGet(context) {
 }
 
 // ---- POST: set ONE job's resolution -----------------------------------------
-// Body: { jobId, status: 'awarded'|'not_awarded'|'active'|'submitted', meta:{updated} }
+// Body: { jobId, status: 'awarded'|'not_awarded'|'active'|'submitted'|'budget'|'not_bidding', meta:{updated} }
 // Transition semantics:
-//   active      -> clears deadSet, stamps reactivatedAt (return to bidding)
+//   active      -> clears deadSet, stamps reactivatedAt (return to pricing)
 //   awarded     -> deadSet=false (moves into PM/awarded flow)
-//   not_awarded -> deadSet=true  (moves to Dead Set)
-//   submitted   -> deadSet=false (relocates Actively Bidding -> Submitted Bids;
+//   not_awarded -> deadSet=true, reason='lost' (bid and lost -> Dead Set)
+//   submitted   -> deadSet=false (relocates Actively Pricing -> Submitted Bids;
 //                  still a live bid, just past the submission line)
+//   budget      -> deadSet=false (relocates Actively Pricing -> Budget Pricing;
+//                  still a live item, a budget was sent)
+//   not_bidding -> deadSet=true, reason='declined' (declined to bid -> Dead Set,
+//                  distinct from not_awarded)
 async function handleWrite(context) {
   const { request, env } = context;
   const session = context.data && context.data.session;
@@ -197,7 +215,7 @@ async function handleWrite(context) {
     if (!jobId) return json({ status: 'error', message: 'jobId is required.' }, 400);
     if (!VALID_STATUS[status]) {
       return json({ status: 'error',
-        message: "status must be 'awarded', 'not_awarded', 'active', or 'submitted'." }, 400);
+        message: "status must be 'awarded', 'not_awarded', 'active', 'submitted', 'budget', or 'not_bidding'." }, 400);
     }
 
     if (!env.PF_SCHEDULE) {
@@ -233,10 +251,16 @@ async function handleWrite(context) {
     } else if (status === 'awarded') {
       record = { status: 'awarded', deadSet: false, resolvedAt: stamp, resolvedBy: who };
     } else if (status === 'submitted') {
-      // Relocate Actively Bidding -> Submitted Bids. Still live (not dead).
+      // Relocate Actively Pricing -> Submitted Bids. Still live (not dead).
       record = { status: 'submitted', deadSet: false, resolvedAt: stamp, resolvedBy: who };
+    } else if (status === 'budget') {
+      // Relocate Actively Pricing -> Budget Pricing. Still live (not dead).
+      record = { status: 'budget', deadSet: false, resolvedAt: stamp, resolvedBy: who };
+    } else if (status === 'not_bidding') {
+      // Declined to bid -> Dead Set, but DISTINCT from not_awarded (bid-and-lost).
+      record = { status: 'not_bidding', deadSet: true, reason: 'declined', resolvedAt: stamp, resolvedBy: who };
     } else { // not_awarded
-      record = { status: 'not_awarded', deadSet: true, resolvedAt: stamp, resolvedBy: who };
+      record = { status: 'not_awarded', deadSet: true, reason: 'lost', resolvedAt: stamp, resolvedBy: who };
     }
     overrides[jobId] = record;
 
