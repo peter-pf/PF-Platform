@@ -836,6 +836,37 @@ section('Precon flags: source-level guards + NO mail');
   ok('precon-flag calls NO mail API', !/sendMail|\/messages|smtp|nodemailer|mailgun|sendgrid/i.test(noComments));
 }
 
+section('Precon bid meta: /api/precon-bid-meta -> preconstruction');
+for (const p of ['/api/precon-bid-meta']) {
+  const area = areaForPath(p.split('?')[0]);
+  ok(`${p} -> preconstruction (${area})`, area === 'preconstruction');
+  ok(`${p} ALLOWED for admin`, roleCanAccess('admin', area) === true);
+  ok(`${p} ALLOWED for partner`, roleCanAccess('partner', area) === true);
+  ok(`${p} ALLOWED for business_dev`, roleCanAccess('business_dev', area) === true);
+  ok(`${p} BLOCKED for field_ops`, roleCanAccess('field_ops', area) === false);
+}
+ok('requireArea(field_ops, precon-bid-meta area) => 403',
+   requireArea({ uid: 'fo', role: 'field_ops', name: 'Crew' }, areaForPath('/api/precon-bid-meta'))?.status === 403);
+ok('requireArea(business_dev, precon-bid-meta area) => null (allowed)',
+   requireArea({ uid: 'bd', role: 'business_dev', name: 'BD' }, areaForPath('/api/precon-bid-meta')) === null);
+ok('requireArea(partner, precon-bid-meta area) => null (allowed)',
+   requireArea({ uid: 'p', role: 'partner', name: 'JR' }, areaForPath('/api/precon-bid-meta')) === null);
+ok('requireArea(null, precon-bid-meta area) => 403 (fail closed)',
+   requireArea(null, areaForPath('/api/precon-bid-meta'))?.status === 403);
+
+section('Precon bid meta: source-level guards + NO mail');
+{
+  const src = readFileSync(join(__dir, '../functions/api/precon-bid-meta.js'), 'utf8');
+  ok('precon-bid-meta imports requireArea', /import\s*\{[^}]*requireArea[^}]*\}\s*from/.test(src));
+  ok('precon-bid-meta GET+POST both guard preconstruction', (src.match(/requireArea\([^)]*['"]preconstruction['"]\)/g) || []).length >= 2);
+  ok('precon-bid-meta uses env.PF_SCHEDULE', /env\.PF_SCHEDULE/.test(src));
+  ok('precon-bid-meta documents the KV read-modify-write race', /read-modify-write/.test(src));
+  ok('precon-bid-meta guards prototype-pollution bidId', /__proto__/.test(src) && /constructor/.test(src) && /prototype/.test(src));
+  const noComments = src.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
+  ok('precon-bid-meta makes NO fetch / outbound call', !/\bfetch\s*\(/.test(noComments) && !/https?:\/\//.test(noComments));
+  ok('precon-bid-meta calls NO mail API', !/sendMail|\/messages|smtp|nodemailer|mailgun|sendgrid/i.test(noComments));
+}
+
 section('Precon activity log: source-level guards + NO mail');
 {
   const src = readFileSync(join(__dir, '../functions/api/precon-log.js'), 'utf8');
@@ -1070,8 +1101,8 @@ for (const p of FIN_FEEDS) {
 }
 const FIN_APIS = [
   '/api/pm-project', '/api/opportunity', '/api/bd-record', '/api/bd-interaction',
-  '/api/bd-send', '/api/precon-log', '/api/precon-action', '/api/pipeline-state',
-  '/api/data', '/api/users',
+  '/api/bd-send', '/api/precon-log', '/api/precon-action', '/api/precon-bid-meta',
+  '/api/pipeline-state', '/api/data', '/api/users',
 ];
 for (const p of FIN_APIS) {
   ok(`field_ops BLOCKED from ${p}`, roleCanAccess('field_ops', areaForPath(p)) === false);

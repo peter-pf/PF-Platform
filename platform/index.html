@@ -970,6 +970,34 @@ body.role-field-ops .nav-item[data-fo-hide] {
 .pf-garbin-chk { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent); }
 .pf-garbin-chk:disabled { cursor: default; opacity: 0.6; }
 .pf-garbin-err { display: block; font-size: 0.7rem; color: #b00020; margin-top: 2px; min-height: 0; }
+/* Editable effective-date cell (Prelim / Bid due). */
+.pf-hl-table td.pf-hl-effdate { white-space: normal; overflow: visible; position: relative; }
+.pf-date-val { font-size: 0.82rem; }
+.pf-date-edited { font-size: 0.62rem; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; margin-left: 4px; }
+.pf-date-btn { background: none; border: none; cursor: pointer; font-size: 0.9rem; padding: 0 2px; line-height: 1; vertical-align: middle; }
+.pf-date-pop { display: inline-flex; gap: 4px; align-items: center; margin-top: 4px; }
+.pf-date-pop input[type=date] { font-size: 0.78rem; padding: 2px 4px; border: 1px solid var(--border-light); border-radius: 4px; }
+.pf-date-save { font-size: 0.72rem; padding: 2px 8px; border: 1px solid var(--accent); background: var(--accent); color: #fff; border-radius: 4px; cursor: pointer; }
+.pf-date-err { display: block; font-size: 0.7rem; color: #b00020; margin-top: 2px; }
+/* Compact bidding-GCs cell on the row. */
+.pf-hl-table td.pf-hl-gclist { white-space: normal; overflow: visible; word-break: break-word; font-size: 0.8rem; line-height: 1.25; }
+.pf-gc-count { display: block; font-weight: 600; }
+.pf-gc-lead { display: block; font-size: 0.72rem; color: var(--text-2); }
+.pf-gc-awtag, .pf-gc-aw-lbl { font-size: 0.62rem; }
+.pf-gc-awtag { color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; }
+/* Bidding GCs editor in the expand detail. */
+.pf-gc-group { grid-column: 1 / -1; }
+.pf-gc-rows { display: flex; flex-direction: column; gap: 6px; }
+.pf-gc-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 6px; border: 1px solid var(--border-light); border-radius: 6px; }
+.pf-gc-aw { display: inline-flex; align-items: center; gap: 3px; cursor: pointer; }
+.pf-gc-awradio { accent-color: var(--accent); }
+.pf-gc-field { font-size: 0.78rem; padding: 4px 6px; border: 1px solid var(--border-light); border-radius: 4px; flex: 1 1 120px; min-width: 90px; }
+.pf-gc-rm { background: none; border: 1px solid var(--border-light); border-radius: 4px; cursor: pointer; font-size: 0.95rem; line-height: 1; padding: 2px 8px; color: var(--text-2); }
+.pf-gc-ctrls { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.pf-gc-btn { font-size: 0.74rem; padding: 4px 12px; border: 1px solid var(--border-light); background: var(--surface, #fff); border-radius: 4px; cursor: pointer; }
+.pf-gc-btn.primary { border-color: var(--accent); background: var(--accent); color: #fff; }
+.pf-gc-err { font-size: 0.72rem; color: #b00020; }
+.pf-gc-empty { font-size: 0.8rem; }
 .pf-hl-table td {
   padding: 9px 12px; border-bottom: 1px solid var(--border-light);
   color: var(--text-1); vertical-align: top;
@@ -11984,6 +12012,293 @@ try {
       }
     };
 
+    // ====================================================================
+    // PER-BID METADATA overlay (/api/precon-bid-meta, KV-backed). Actively
+    // Pricing only. Holds, per bid (keyed by resolveKey()=bidLogId so numberless
+    // bids persist):
+    //   - dates: ISO overrides for the Prelim (designCompletedDate) + Bid (dueDate)
+    //     dates, so an addendum-shifted date is corrected without touching the
+    //     read-only feed. effDate() returns the override if present, else the feed.
+    //   - gcs: the list of bidding GCs (a job often has more than one GC bidding).
+    //   - awardedGc: index into gcs of the GC of record (or -1).
+    // Loaded once alongside the overrides (same synchronous, fail-soft pattern).
+    // preconstruction-area read; field_ops -> 403 -> empty (no edit affordances).
+    window.PF_BIDMETA = window.PF_BIDMETA || { bids: {}, meta: { updated: null }, loaded: false };
+    function loadBidMeta(){
+      try {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/precon-bid-meta', false);
+        xhr.withCredentials = true;
+        xhr.send(null);
+        if (xhr.status === 200) {
+          var d = JSON.parse(xhr.responseText);
+          window.PF_BIDMETA.bids = (d && d.bids) || {};
+          window.PF_BIDMETA.meta = (d && d.meta) || { updated: null };
+        } else {
+          window.PF_BIDMETA.bids = {};
+          window.PF_BIDMETA.meta = { updated: null };
+        }
+      } catch (e) {
+        window.PF_BIDMETA.bids = {};
+        window.PF_BIDMETA.meta = { updated: null };
+      }
+      window.PF_BIDMETA.loaded = true;
+    }
+    function bidMetaFor(p){
+      var k = resolveKey(p);
+      var rec = k && window.PF_BIDMETA.bids ? window.PF_BIDMETA.bids[k] : null;
+      return rec || null;
+    }
+    // EFFECTIVE date: the saved override if present, else the feed value. field is
+    // 'designCompletedDate' (Prelim) or 'dueDate' (Bid due). Returns a string (the
+    // raw display value); '' when neither is set. Used by the row, the detail
+    // panel, AND the calendar so an addendum-shifted date moves everywhere.
+    var BIDMETA_FEED_KEY = { designCompletedDate: 'Design Completed Date', dueDate: 'Due Date' };
+    function effDate(p, field){
+      var rec = bidMetaFor(p);
+      if (rec && rec.dates && rec.dates[field] != null && rec.dates[field] !== '') return rec.dates[field];
+      var f = (p && p.fields) || {};
+      var v = f[BIDMETA_FEED_KEY[field]];
+      return (v == null) ? '' : String(v);
+    }
+    function effDateIsOverride(p, field){
+      var rec = bidMetaFor(p);
+      return !!(rec && rec.dates && rec.dates[field] != null && rec.dates[field] !== '');
+    }
+    // BIDDING GCS list for a bid. If the overlay has an explicit list, that is
+    // authoritative. Otherwise SEED a single-entry list from the feed's single GC
+    // (so a never-edited bid still shows its GC and can be expanded/edited).
+    function bidGcs(p){
+      var rec = bidMetaFor(p);
+      if (rec && Array.isArray(rec.gcs)) return rec.gcs;
+      var f = (p && p.fields) || {};
+      var company = (p && p.gc) || f['General Contractor'] || '';
+      var contact = f['Contact Name2'] || '';
+      var email = f['GC Email'] || '';
+      var phone = f['GC Phone'] || '';
+      if (!company && !contact && !email && !phone) return [];
+      return [{ company: String(company), contact: String(contact), email: String(email), phone: String(phone) }];
+    }
+    function bidAwardedGcIndex(p){
+      var rec = bidMetaFor(p);
+      return (rec && Number.isInteger(rec.awardedGc)) ? rec.awardedGc : -1;
+    }
+    // The GC OF RECORD for a bid: the chosen awarded GC if one is set, else the
+    // lead (first) bidding GC, else the feed GC. Exposed globally so the award ->
+    // PM handoff flow (a separate IIFE) carries the chosen GC into the PM record.
+    window.pfAwardedGcFor = function(p){
+      try {
+        var gcs = bidGcs(p);
+        var idx = bidAwardedGcIndex(p);
+        if (idx >= 0 && idx < gcs.length && gcs[idx] && gcs[idx].company) return gcs[idx].company;
+        if (gcs.length && gcs[0] && gcs[0].company) return gcs[0].company;
+      } catch (e) {}
+      var f = (p && p.fields) || {};
+      return (p && p.gc) || f['General Contractor'] || '';
+    };
+
+    // ISO date for the <input type="date"> prefill (from the effective value).
+    // Accepts ISO + US formats; returns '' when it cannot parse (input stays blank).
+    function effDateInputValue(p, field){
+      var raw = effDate(p, field);
+      var ymd = calParseYMD(raw);
+      if (!ymd) return '';
+      // ymd.m is 0-indexed (so < 9 zero-pads months Jan-Sep correctly); ymd.d is
+      // 1-indexed, so the day guard must be < 10 (day 9 needs a leading zero ->
+      // '09'). The old < 9 emitted '2026-06-9' for the 9th -> invalid ISO -> a
+      // BLANK <input type=date>.
+      return ymd.y + '-' + (ymd.m < 9 ? '0' : '') + (ymd.m + 1) + '-' + (ymd.d < 10 ? '0' : '') + ymd.d;
+    }
+    // Human-readable display of the effective date (the raw stored/feed string), or
+    // a dash when blank. The override gets a small "edited" marker.
+    function effDateDisplay(p, field){
+      var raw = effDate(p, field);
+      if (!raw) return '<span class="pf-record-muted">-</span>';
+      var mark = effDateIsOverride(p, field) ? ' <span class="pf-date-edited" title="Date edited">edited</span>' : '';
+      return E(raw) + mark;
+    }
+
+    // Generic POST helper for the bid-meta endpoint: optimistic-friendly blocking
+    // POST, returns true on success (and refreshes the local cache), false else.
+    function postBidMeta(payload){
+      try {
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/precon-bid-meta', false);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.withCredentials = true;
+        xhr.send(JSON.stringify(payload));
+        if (xhr.status === 200) {
+          var d = JSON.parse(xhr.responseText);
+          window.PF_BIDMETA.bids = (d && d.bids) || window.PF_BIDMETA.bids;
+          window.PF_BIDMETA.meta = (d && d.meta) || window.PF_BIDMETA.meta;
+          return true;
+        }
+      } catch (e) {}
+      return false;
+    }
+
+    // ---- FEATURE 1: edit a date via the calendar/date popup -----------------
+    // Toggle a small inline <input type="date"> next to a date cell. The wrapper
+    // carries data-bid + data-field; opening prefills from the effective date.
+    window.pfDateEditOpen = function(btn){
+      if (!btn) return;
+      var wrap = btn.closest ? btn.closest('.pf-date-edit') : null;
+      if (!wrap) return;
+      if (!canResolve()) return;
+      var pop = wrap.querySelector('.pf-date-pop');
+      if (!pop) return;
+      var open = pop.classList.toggle('pf-hidden') === false;
+      if (open) { var inp = pop.querySelector('input[type=date]'); if (inp) inp.focus(); }
+    };
+    // Save the chosen date (POST setDate with ISO value, '' clears the override).
+    window.pfDateEditSave = function(btn){
+      if (!btn) return;
+      var wrap = btn.closest ? btn.closest('.pf-date-edit') : null;
+      if (!wrap) return;
+      var errEl = wrap.querySelector('.pf-date-err');
+      if (errEl) errEl.textContent = '';
+      if (!canResolve()) { if (errEl) errEl.textContent = 'No permission.'; return; }
+      var bid = wrap.getAttribute('data-bid');
+      var field = wrap.getAttribute('data-field');
+      var inp = wrap.querySelector('input[type=date]');
+      if (!bid || !field || !inp) { if (errEl) errEl.textContent = 'Could not save.'; return; }
+      var ok = postBidMeta({ action: 'setDate', bidId: bid, field: field, value: inp.value || '' });
+      if (ok) { renderAll(); }
+      else if (errEl) { errEl.textContent = 'Save failed.'; }
+    };
+
+    // ---- FEATURE 2/3: bidding GCs editor (in the expand detail) -------------
+    // The editor renders GC rows into a container; Save serializes them and POSTs
+    // setGcs. Add / remove operate on the in-DOM rows then Save persists. "Set as
+    // awarded" POSTs setAwardedGc for the chosen index.
+    window.pfGcAddRow = function(btn){
+      if (!canResolve()) return;
+      var editor = btn && btn.closest ? btn.closest('.pf-gc-editor') : null;
+      if (!editor) return;
+      var list = editor.querySelector('.pf-gc-rows');
+      if (!list) return;
+      var idx = list.querySelectorAll('.pf-gc-row').length;
+      if (idx >= 12) { var e0 = editor.querySelector('.pf-gc-err'); if (e0) e0.textContent = 'Max 12 GCs.'; return; }
+      // Reuse the editor's per-bid radio group so a freshly added row stays mutually
+      // exclusive with the others for THIS bid.
+      var grp = editor.getAttribute('data-grp') || 'pfgcaw';
+      list.insertAdjacentHTML('beforeend', pfGcRowHtml({ company: '', contact: '', email: '', phone: '' }, idx, false, grp));
+    };
+    window.pfGcRemoveRow = function(btn){
+      if (!canResolve()) return;
+      var row = btn && btn.closest ? btn.closest('.pf-gc-row') : null;
+      if (row && row.parentNode) row.parentNode.removeChild(row);
+    };
+    window.pfGcSave = function(btn){
+      if (!canResolve()) return;
+      var editor = btn && btn.closest ? btn.closest('.pf-gc-editor') : null;
+      if (!editor) return;
+      var errEl = editor.querySelector('.pf-gc-err');
+      if (errEl) errEl.textContent = '';
+      var bid = editor.getAttribute('data-bid');
+      if (!bid) { if (errEl) errEl.textContent = 'Could not save.'; return; }
+      var gcs = [];
+      editor.querySelectorAll('.pf-gc-row').forEach(function(row){
+        gcs.push({
+          company: (row.querySelector('.pf-gc-company') || {}).value || '',
+          contact: (row.querySelector('.pf-gc-contact') || {}).value || '',
+          email:   (row.querySelector('.pf-gc-email') || {}).value || '',
+          phone:   (row.querySelector('.pf-gc-phone') || {}).value || ''
+        });
+      });
+      if (gcs.length > 12) { if (errEl) errEl.textContent = 'Max 12 GCs.'; return; }
+      var ok = postBidMeta({ action: 'setGcs', bidId: bid, gcs: gcs });
+      if (ok) { renderAll(); }
+      else if (errEl) { errEl.textContent = 'Save failed.'; }
+    };
+    window.pfGcSetAwarded = function(radio){
+      if (!canResolve()) { if (radio) radio.checked = !radio.checked; return; }
+      var editor = radio && radio.closest ? radio.closest('.pf-gc-editor') : null;
+      if (!editor) return;
+      var errEl = editor.querySelector('.pf-gc-err');
+      if (errEl) errEl.textContent = '';
+      var bid = editor.getAttribute('data-bid');
+      var idx = parseInt(radio.value, 10);
+      if (!bid || !(idx >= 0)) { if (errEl) errEl.textContent = 'Could not save.'; return; }
+      // DEF-C: a never-saved bid has only a SEEDED (from-feed) GC list, so the
+      // server record's gcs is [] and setAwardedGc(idx) would 400 (out of range).
+      // Auto-persist the currently-shown rows FIRST via setGcs, then setAwardedGc,
+      // so awarding works on a freshly seeded bid without a manual Save.
+      var serverRec = (window.PF_BIDMETA && window.PF_BIDMETA.bids) ? window.PF_BIDMETA.bids[bid] : null;
+      var hasSavedList = !!(serverRec && Array.isArray(serverRec.gcs) && serverRec.gcs.length);
+      if (!hasSavedList) {
+        var gcs = [];
+        editor.querySelectorAll('.pf-gc-row').forEach(function(row){
+          gcs.push({
+            company: (row.querySelector('.pf-gc-company') || {}).value || '',
+            contact: (row.querySelector('.pf-gc-contact') || {}).value || '',
+            email:   (row.querySelector('.pf-gc-email') || {}).value || '',
+            phone:   (row.querySelector('.pf-gc-phone') || {}).value || ''
+          });
+        });
+        var savedOk = postBidMeta({ action: 'setGcs', bidId: bid, gcs: gcs });
+        if (!savedOk) {
+          // DEF-B: revert the radio to server truth on failure.
+          if (errEl) errEl.textContent = 'Save failed.';
+          renderAll();
+          return;
+        }
+      }
+      var ok = postBidMeta({ action: 'setAwardedGc', bidId: bid, index: idx });
+      if (ok) { renderAll(); }
+      else {
+        // DEF-B: the POST failed, so the radio's checked state is stale. Re-render
+        // from server truth (which reverts the radio) and show the inline error.
+        if (errEl) errEl.textContent = 'Save failed.';
+        renderAll();
+      }
+    };
+    // One editable GC row. idx is its position; awarded marks the radio checked.
+    // groupName ties all rows for ONE bid into a single radio group (keyed by the
+    // bid id) so only one GC can be checked per bid, while different bids' editors
+    // stay isolated. groupName must be pre-escaped by the caller.
+    function pfGcRowHtml(gc, idx, awarded, groupName){
+      gc = gc || {};
+      var dis = canResolve() ? '' : ' disabled';
+      var awChecked = awarded ? ' checked' : '';
+      var grp = groupName || 'pfgcaw';
+      return '<div class="pf-gc-row" data-idx="' + idx + '">'
+        + '<label class="pf-gc-aw" title="Set as awarded GC">'
+        + '<input type="radio" name="' + grp + '" class="pf-gc-awradio" value="' + idx + '"' + awChecked + dis
+        + ' onchange="pfGcSetAwarded(this)"><span class="pf-gc-aw-lbl">Awarded</span></label>'
+        + '<input type="text" class="pf-gc-field pf-gc-company" placeholder="Company" value="' + E(gc.company || '') + '"' + dis + '>'
+        + '<input type="text" class="pf-gc-field pf-gc-contact" placeholder="Contact" value="' + E(gc.contact || '') + '"' + dis + '>'
+        + '<input type="text" class="pf-gc-field pf-gc-email" placeholder="Email" value="' + E(gc.email || '') + '"' + dis + '>'
+        + '<input type="text" class="pf-gc-field pf-gc-phone" placeholder="Phone" value="' + E(gc.phone || '') + '"' + dis + '>'
+        + (canResolve() ? '<button type="button" class="pf-gc-rm" onclick="pfGcRemoveRow(this)" title="Remove GC">&times;</button>' : '')
+        + '</div>';
+    }
+    // The whole "Bidding GCs" editor block for one bid (used in the expand detail).
+    function pfGcEditorHtml(p){
+      var bid = E(bidLogId(p));
+      var grp = 'pfgcaw_' + bid; // one radio group per bid (bid is already escaped)
+      var gcs = bidGcs(p);
+      var awIdx = bidAwardedGcIndex(p);
+      var rows = '';
+      if (gcs.length) {
+        gcs.forEach(function(g, i){ rows += pfGcRowHtml(g, i, i === awIdx, grp); });
+      } else {
+        rows = '<div class="pf-gc-empty pf-record-muted">No GCs recorded yet.</div>';
+      }
+      var ctrls = '';
+      if (canResolve()) {
+        ctrls = '<div class="pf-gc-ctrls">'
+          + '<button type="button" class="pf-gc-btn" onclick="pfGcAddRow(this)">Add GC</button>'
+          + '<button type="button" class="pf-gc-btn primary" onclick="pfGcSave(this)">Save GCs</button>'
+          + '<span class="pf-gc-err"></span></div>';
+      }
+      // All radios in one editor share name="pfgcaw_<bid>" so only ONE GC can be
+      // checked per bid; different bids' editors use different names so they do not
+      // collide. The awarded choice is also enforced server-side by index.
+      return '<div class="pf-gc-editor" data-bid="' + bid + '" data-grp="' + grp + '">'
+        + '<div class="pf-gc-rows">' + rows + '</div>' + ctrls + '</div>';
+    }
+
     // POST a single job's resolution. On success, update local state + re-render
     // everything (the moved job appears/disappears across buckets immediately).
     window.pfResolveBid = function(jobId, status, btn){
@@ -12297,6 +12612,50 @@ try {
               + '<span class="pf-garbin-err" data-bid="' + bid + '"></span></td>';
             return;
           }
+          // EFFECTIVE-DATE cell: shows the override-or-feed date plus (for
+          // privileged roles) an edit button that reveals a date picker. The
+          // wrapper carries the bid + field; saving POSTs setDate. The whole cell
+          // stops row-expand propagation so editing never toggles the panel.
+          if (h.type === 'effdate') {
+            var ebid = E(bidLogId(p));
+            var disp = effDateDisplay(p, h.field);
+            var inner = '<span class="pf-date-val">' + disp + '</span>';
+            if (canResolve()) {
+              var iv = effDateInputValue(p, h.field);
+              inner += ' <button type="button" class="pf-date-btn" title="Edit date"'
+                + ' onclick="pfDateEditOpen(this)">&#128197;</button>'
+                + '<span class="pf-date-pop pf-hidden">'
+                + '<input type="date" value="' + E(iv) + '">'
+                + '<button type="button" class="pf-date-save" onclick="pfDateEditSave(this)">Save</button>'
+                + '</span><span class="pf-date-err"></span>';
+            }
+            row += '<td class="pf-hl-effdate pf-date-edit" data-bid="' + ebid + '"'
+              + ' data-field="' + E(h.field) + '" onclick="event.stopPropagation()">'
+              + inner + '</td>';
+            return;
+          }
+          // GC LIST (compact) cell: shows the lead GC name + a "+N" when more than
+          // one GC is bidding (full editing lives in the expand detail). Replaces
+          // the single messy GC cell for Actively Pricing.
+          if (h.type === 'gclist') {
+            var gcs = bidGcs(p);
+            var awIdx = bidAwardedGcIndex(p);
+            var leadIdx = (awIdx >= 0 && awIdx < gcs.length) ? awIdx : 0;
+            var compact;
+            if (!gcs.length) {
+              compact = '<span class="pf-record-muted">No GC</span>';
+            } else if (gcs.length === 1) {
+              compact = E(gcs[0].company || '(unnamed GC)');
+            } else {
+              var lead = gcs[leadIdx] && gcs[leadIdx].company ? gcs[leadIdx].company : (gcs[0].company || '(unnamed GC)');
+              compact = '<span class="pf-gc-count">' + gcs.length + ' GCs bidding</span>'
+                + '<span class="pf-gc-lead">' + E(lead) + ' +' + (gcs.length - 1) + '</span>';
+            }
+            var awTag = (awIdx >= 0 && gcs[awIdx] && gcs[awIdx].company)
+              ? ' <span class="pf-gc-awtag" title="Awarded GC of record">awarded</span>' : '';
+            row += '<td class="pf-hl-gclist">' + compact + awTag + '</td>';
+            return;
+          }
           var v = f[h.key];
           var cell = (v === undefined || v === null) ? '' : E(v);
           // GC cell wraps (no ellipsis truncation) so the full GC name is always
@@ -12334,17 +12693,32 @@ try {
           opts.detailGroups.forEach(function(g){
             var fields = '';
             (g.fields || []).forEach(function(fd){
-              var raw = f[fd.key];
-              var v = (raw === undefined || raw === null) ? '' : raw;
               var cls = (typeMap[fd.key] === 'money') ? ' num' : '';
+              var valHtml;
+              if (fd.eff) {
+                // Effective date (override-or-feed) so the detail matches the row +
+                // calendar; an override carries the small "edited" marker.
+                valHtml = effDateDisplay(p, fd.eff);
+              } else {
+                var raw = f[fd.key];
+                var v = (raw === undefined || raw === null) ? '' : raw;
+                valHtml = E(v);
+              }
               fields += '<div class="pf-hl-field">'
                 + '<span class="pf-hl-label">' + E(fd.label) + '</span>'
-                + '<span class="pf-hl-value' + cls + '">' + E(v) + '</span></div>';
+                + '<span class="pf-hl-value' + cls + '">' + valHtml + '</span></div>';
             });
             detail += '<div class="pf-hl-group">'
               + '<div class="pf-hl-grouphead">' + E(g.title) + '</div>'
               + '<div class="pf-hl-groupgrid">' + fields + '</div></div>';
           });
+          // BIDDING GCS editor (Actively Pricing only): one tidy editable block per
+          // GC + add/remove + set-as-awarded. Replaces the old read-only GC group.
+          if (opts.gcEditor) {
+            detail += '<div class="pf-hl-group pf-gc-group">'
+              + '<div class="pf-hl-grouphead">Bidding GCs</div>'
+              + pfGcEditorHtml(p) + '</div>';
+          }
         } else {
           // FLAT layout (Budget Pricing, Submitted Bids): every remaining non-blank
           // field as a labeled value card.
@@ -12538,7 +12912,10 @@ try {
       return null;
     }
     function calYmdKey(y, m, d){
-      return y + '-' + (m < 9 ? '0' : '') + (m + 1) + '-' + (d < 9 ? '0' : '') + d;
+      // m is 0-indexed (< 9 pads correctly); d is 1-indexed so the day guard is
+      // < 10. Day-keys are only ever compared key-to-key here so the old < 9
+      // self-cancelled, but keep it correct for consistency with effDateInputValue.
+      return y + '-' + (m < 9 ? '0' : '') + (m + 1) + '-' + (d < 10 ? '0' : '') + d;
     }
     function calTodayKey(){
       var n = new Date();
@@ -12576,13 +12953,18 @@ try {
           if (seen[rk]) return; seen[rk] = 1;
           var f = p.fields || {};
           var name = (p.name || f['Project Name'] || 'Unnamed').toString();
-          var gc = (p.gc || f['General Contractor'] || '').toString();
-          // PRELIM: Design Completed Date (prelim design target) for any in-play bid.
-          var prelim = calParseYMD(f['Design Completed Date']);
+          // GC of record = chosen awarded GC, else lead bidding GC, else feed GC.
+          var gc = (typeof window.pfAwardedGcFor === 'function')
+            ? String(window.pfAwardedGcFor(p) || '')
+            : (p.gc || f['General Contractor'] || '').toString();
+          // PRELIM: Design Completed Date (prelim design target) for any in-play
+          // bid, using the EFFECTIVE date (override if set, else the feed) so an
+          // addendum-shifted prelim date moves on the calendar too.
+          var prelim = calParseYMD(effDate(p, 'designCompletedDate'));
           if (prelim) events.push({ ymd: prelim, type: 'prelim', name: name, gc: gc,
             dateLabel: 'Prelim design due' });
-          // BID vs BUDGET on the Due Date, by effective bucket.
-          var due = calParseYMD(f['Due Date']);
+          // BID vs BUDGET on the EFFECTIVE Due Date, by effective bucket.
+          var due = calParseYMD(effDate(p, 'dueDate'));
           if (due) {
             if (eff === 'budget_pricing') {
               events.push({ ymd: due, type: 'budget', name: name, gc: gc, dateLabel: 'Budget due' });
@@ -13021,11 +13403,12 @@ try {
           // bucket only. City / State is therefore dropped as its own column and
           // the freed slot becomes the persistent "Sent to Garbin?" checkbox.
           hlOpts.subLineKey = 'City / State';
+          hlOpts.gcEditor = true; // append the editable Bidding GCs block in the expand detail
           highlights = [
-            { key: 'Design Completed Date', label: 'Prelim Design Completed', type: 'date' },
-            { key: 'Due Date',              label: 'Bid Due Date',           type: 'date' },
-            { key: '__sentToGarbin',        label: 'Sent to Garbin?',        type: 'garbin', w: '130px' },
-            { key: 'General Contractor',    label: 'GC',                     type: 'gc' }
+            { key: 'Design Completed Date', label: 'Prelim Design Completed', type: 'effdate', field: 'designCompletedDate', w: '170px' },
+            { key: 'Due Date',              label: 'Bid Due Date',           type: 'effdate', field: 'dueDate',             w: '170px' },
+            { key: '__sentToGarbin',        label: 'Sent to Garbin?',        type: 'garbin',  w: '130px' },
+            { key: '__biddingGcs',          label: 'Bidding GCs',            type: 'gclist',  w: '160px' }
           ];
           // GROUPED expand detail (Jonathan's spec). Labels map to real feed keys
           // in data/precon-pipeline.js. 'Mirror main row' fields reuse the same
@@ -13041,17 +13424,14 @@ try {
             ]},
             { title: 'Project Schedule', fields: [
               { label: 'Invite Date',           key: 'Invite Date' },
-              { label: 'Prelim Due Date',       key: 'Design Completed Date' },
-              { label: 'Bid Due Date',          key: 'Due Date' },
+              { label: 'Prelim Due Date',       key: 'Design Completed Date', eff: 'designCompletedDate' },
+              { label: 'Bid Due Date',          key: 'Due Date',              eff: 'dueDate' },
               { label: 'Projected Start Date',  key: 'Projected Start Date' },
               { label: 'Bid Follow up date',    key: 'Follow Up Date' }
             ]},
-            { title: 'GC Information', fields: [
-              { label: 'GC',              key: 'General Contractor' },
-              { label: 'GC Contact name', key: 'Contact Name2' },
-              { label: 'GC Email',        key: 'GC Email' },
-              { label: 'GC Phone',        key: 'GC Phone' }
-            ]},
+            // GC Information is rendered as the editable "Bidding GCs" section
+            // (a clean block per GC + add/remove + set-as-awarded) appended after
+            // the groups, so it is omitted from the flat group list here.
             { title: 'Agg Pier Info', fields: [
               { label: 'Total LF',          key: 'Total LF' },
               { label: 'Total Columns',     key: 'Total Columns' },
@@ -13272,6 +13652,7 @@ try {
     function boot(){
       loadOverrides();
       loadGarbinFlags();
+      loadBidMeta();
       renderAll();
       renderDeadSet();
     }
@@ -16414,17 +16795,35 @@ try {
     var num = b.number || f['Project Number'] || 'n/a';
     var lf = f['Total LF'] || '';
     var cols = f['Total Columns'] || '';
+    // GC OF RECORD: prefer the chosen awarded GC from the bid-meta overlay (the
+    // Bidding GCs list + set-as-awarded selection); fall back to the feed GC. The
+    // OTHER bidding GCs stay attached as history so the bid context is not lost.
+    var feedGc = b.gc || f['General Contractor'] || '';
+    var gcOfRecord = (typeof window.pfAwardedGcFor === 'function')
+      ? (window.pfAwardedGcFor(b) || feedGc) : feedGc;
+    var otherGcs = '';
+    try {
+      if (window.PF_BIDMETA && window.PF_BIDMETA.bids) {
+        var meta = window.PF_BIDMETA.bids[bidId(b)];
+        if (meta && Array.isArray(meta.gcs) && meta.gcs.length > 1) {
+          var names = meta.gcs.map(function (g) { return (g && g.company) || ''; })
+            .filter(function (n) { return n && n !== gcOfRecord; });
+          if (names.length) otherGcs = ' Other bidding GCs: ' + names.join(', ') + '.';
+        }
+      }
+    } catch (e) {}
     var payload = {
       action: 'create',
       name: b.name || f['Project Name'] || '',
-      gc: b.gc || f['General Contractor'] || '',
+      gc: gcOfRecord,
       value: (b.value != null ? String(b.value) : (f['Bid Total Value'] || '')),
       sourceBidId: bidId(b),
-      history: 'Awarded from precon. GC ' + (b.gc || f['General Contractor'] || '')
+      history: 'Awarded from precon. GC ' + gcOfRecord
         + '. Bid #' + num
         + (lf ? '. LF ' + lf : '')
         + (cols ? '. Columns ' + cols : '')
-        + '. Invite ' + (f['Invite Date'] || 'n/a') + ', submitted ' + (f['Date Submitted'] || 'n/a') + '.',
+        + '. Invite ' + (f['Invite Date'] || 'n/a') + ', submitted ' + (f['Date Submitted'] || 'n/a') + '.'
+        + otherGcs,
       existingNumbers: existingNumbers(),
     };
     api('/api/pm-project', { method: 'POST', body: JSON.stringify(payload) }).then(function (res) {
