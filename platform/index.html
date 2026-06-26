@@ -2070,6 +2070,7 @@ window.progress = (function () {
       <div class="nav-sub collapsed">
         <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Daily Reports</div>
         <a class="nav-item" data-module="daily-reports" onclick="showModule('daily-reports')">Submit Daily Report</a>
+        <a class="nav-item" data-module="maintenance" onclick="showModule('maintenance')">Maintenance</a>
         <a class="nav-item" data-module="dailyproduction" onclick="showModule('dailyproduction')">Daily Production</a>
         <a class="nav-item" data-module="dailylogs" onclick="showModule('dailylogs')">Daily Logs</a>
       </div>
@@ -2809,6 +2810,43 @@ document.addEventListener('click', function(e) {
     </div>
   </div>
 
+  <div class="module-view" id="mod-maintenance">
+    <!-- COMPILED MAINTENANCE view (Phase 2 of Derek's daily-report). READ-ONLY:
+         it aggregates the maintenance[] and futureIssues[] rows from EVERY daily
+         report (the existing /api/daily-report GET, field_ops area) into one place
+         so owners can see all open maintenance, failures and future issues to
+         schedule against. ZERO financials: equipment names, item text, machine
+         operating hours, project + date + foreman only - no dollars/rates/costs.
+         No write surface in v1. All data via window.esc. -->
+    <style>
+      #mod-maintenance .mt-sum { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
+      #mod-maintenance .mt-stat { border:1px solid var(--border,#2a2f3a); border-radius:8px; padding:10px 16px; min-width:120px; }
+      #mod-maintenance .mt-stat .n { font-size:22px; font-weight:600; }
+      #mod-maintenance .mt-stat .l { font-size:11px; color:var(--text-3,#8a93a6); text-transform:uppercase; letter-spacing:.04em; }
+      #mod-maintenance .mt-stat.amber .n { color:#d29922; }
+      #mod-maintenance .mt-group { border:1px solid var(--border,#2a2f3a); border-radius:8px; margin-bottom:12px; overflow:hidden; }
+      #mod-maintenance .mt-group-h { display:flex; justify-content:space-between; align-items:center; padding:9px 14px; background:var(--surface-2,#1b212c); font-size:13px; font-weight:600; }
+      #mod-maintenance .mt-group-h .ct { font-size:11px; color:var(--text-3,#8a93a6); font-weight:400; }
+      #mod-maintenance .mt-row { border-top:1px solid var(--border,#2a2f3a); padding:9px 14px; }
+      #mod-maintenance .mt-row:first-child { border-top:none; }
+      #mod-maintenance .mt-item { font-size:13px; color:var(--text,#e6e9ef); }
+      #mod-maintenance .mt-hr { display:inline-block; font-size:11px; color:#d29922; background:rgba(210,153,34,.15); border-radius:10px; padding:1px 8px; margin-left:6px; }
+      #mod-maintenance .mt-meta { font-size:11px; color:var(--text-3,#8a93a6); margin-top:3px; }
+      #mod-maintenance .mt-section-h { font-size:14px; font-weight:600; margin:18px 0 8px; }
+      #mod-maintenance .mt-muted { color:var(--text-3,#8a93a6); }
+      #mod-maintenance .mt-empty { border:1px dashed var(--border,#2a2f3a); border-radius:8px; padding:22px 16px; text-align:center; color:var(--text-3,#8a93a6); font-size:13px; }
+    </style>
+    <div id="mtNoData" class="mt-muted" style="display:none">Maintenance data is not available for your role.</div>
+    <div id="mtWrap">
+      <div class="mt-muted" style="font-size:13px;margin-bottom:12px">A compiled, read-only view of every equipment failure, maintenance item and future issue logged on the daily reports, grouped so you can schedule against them. Source is the daily reports. No financial data. This view is read-only in v1.</div>
+      <div class="mt-sum" id="mtSummary"></div>
+      <div class="mt-section-h">Failures &amp; maintenance logged</div>
+      <div id="mtMaint"></div>
+      <div class="mt-section-h">Future issues to watch</div>
+      <div id="mtFuture"></div>
+    </div>
+  </div>
+
   <div class="module-view" id="mod-field-lists">
     <!-- FIELD LISTS management (the Fleet/Lists data the daily report form pulls
          from). Owners (admin/partner) curate owned equipment, personnel and
@@ -3120,6 +3158,7 @@ const moduleTitles = {
   'ts-summary': 'TimeSheets - Summary',
   'fo-projects': 'Projects - Field',
   'daily-reports': 'Daily Reports',
+  'maintenance': 'Maintenance',
   'field-lists': 'Field Lists (Fleet & Crew)',
   'pf-coi': 'PF COI - Standard Coverages',
   'project-poet': '26-002 POET Biosciences',
@@ -16417,6 +16456,204 @@ try {
 })();
 } catch (e) {
   console.error('Module daily-reports failed to load:', e);
+}
+</script>
+
+<script>
+// ============================================================
+// MODULE: maintenance - COMPILED maintenance view (Phase 2 of the daily report).
+// READ-ONLY. Aggregates the maintenance[] and futureIssues[] rows from EVERY
+// daily report (the existing /api/daily-report GET, field_ops area) so owners see
+// all open maintenance, failures and future issues in one place to schedule
+// against. NO write surface, NO new endpoint. ZERO financials (equipment, item
+// text, machine operating hours, project, date, foreman only). All data via
+// window.esc.
+// ============================================================
+try {
+(function () {
+  'use strict';
+  var E = window.esc || function (s) { return s == null ? '' : String(s); };
+
+  // The fixed maintenance categories (display + grouping order). Any other
+  // category found in the data is appended after these under its own group.
+  var CATEGORY_ORDER = ['Excavator', 'Mast', 'Vibro', 'Drill', 'Rental Equipment'];
+
+  function api(path, opts) {
+    return fetch(path, Object.assign({ credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' } }, opts || {}))
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); });
+  }
+
+  // Flatten every maintenance[] row WITH content (item text or a machine hour at
+  // failure present) across all reports, attaching the report's project, date and
+  // foreman so the row is self-describing.
+  function collectMaintenance(reports) {
+    var rows = [];
+    reports.forEach(function (r) {
+      var maint = Array.isArray(r.maintenance) ? r.maintenance : [];
+      maint.forEach(function (m) {
+        if (!m || typeof m !== 'object') return;
+        var item = (m.item == null) ? '' : String(m.item).trim();
+        var hasHour = m.hourAtFailure != null && String(m.hourAtFailure) !== '';
+        if (!item && !hasHour) return; // skip empty fixed-category rows
+        rows.push({
+          category: (m.category == null || String(m.category).trim() === '') ? 'Other' : String(m.category),
+          item: item,
+          hourAtFailure: hasHour ? m.hourAtFailure : null,
+          projectName: r.projectName || r.projectId || '',
+          date: r.date || '',
+          foreman: r.foreman || '',
+          createdAt: r.createdAt || '',
+        });
+      });
+    });
+    return rows;
+  }
+
+  // Flatten every futureIssues[] row across all reports.
+  function collectFuture(reports) {
+    var rows = [];
+    reports.forEach(function (r) {
+      var fut = Array.isArray(r.futureIssues) ? r.futureIssues : [];
+      fut.forEach(function (f) {
+        if (!f || typeof f !== 'object') return;
+        var equipment = (f.equipment == null) ? '' : String(f.equipment).trim();
+        var description = (f.description == null) ? '' : String(f.description).trim();
+        if (!equipment && !description) return;
+        rows.push({
+          equipment: equipment || 'Unspecified',
+          description: description,
+          projectName: r.projectName || r.projectId || '',
+          date: r.date || '',
+          foreman: r.foreman || '',
+          createdAt: r.createdAt || '',
+        });
+      });
+    });
+    return rows;
+  }
+
+  // Group rows by a key, preserving a preferred order then any extras (sorted),
+  // with each group's rows sorted newest first (by date then createdAt).
+  function groupBy(rows, keyFn, preferred) {
+    var map = {};
+    rows.forEach(function (row) {
+      var k = keyFn(row);
+      if (!map[k]) map[k] = [];
+      map[k].push(row);
+    });
+    var keys = Object.keys(map);
+    var pref = (preferred || []).filter(function (k) { return map[k]; });
+    var extra = keys.filter(function (k) { return pref.indexOf(k) < 0; })
+      .sort(function (a, b) { return a.localeCompare(b); });
+    var ordered = pref.concat(extra);
+    return ordered.map(function (k) {
+      var list = map[k].slice().sort(function (a, b) {
+        var d = String(b.date || '').localeCompare(String(a.date || ''));
+        if (d !== 0) return d;
+        return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+      });
+      return { key: k, rows: list };
+    });
+  }
+
+  function metaLine(row) {
+    var bits = [];
+    if (row.projectName) bits.push(E(row.projectName));
+    if (row.date) bits.push(E(row.date));
+    if (row.foreman) bits.push('Foreman ' + E(row.foreman));
+    return bits.join(' - ');
+  }
+
+  function renderSummary(maintRows, futureRows) {
+    var host = document.getElementById('mtSummary');
+    if (!host) return;
+    var byCat = {};
+    maintRows.forEach(function (r) { byCat[r.category] = (byCat[r.category] || 0) + 1; });
+    var html = ''
+      + '<div class="mt-stat amber"><div class="n">' + maintRows.length + '</div><div class="l">Open maintenance items</div></div>'
+      + '<div class="mt-stat"><div class="n">' + futureRows.length + '</div><div class="l">Future issues</div></div>';
+    var catKeys = CATEGORY_ORDER.filter(function (c) { return byCat[c]; })
+      .concat(Object.keys(byCat).filter(function (c) { return CATEGORY_ORDER.indexOf(c) < 0; }).sort());
+    catKeys.forEach(function (c) {
+      html += '<div class="mt-stat"><div class="n">' + byCat[c] + '</div><div class="l">' + E(c) + '</div></div>';
+    });
+    host.innerHTML = html;
+  }
+
+  function renderMaint(maintRows) {
+    var host = document.getElementById('mtMaint');
+    if (!host) return;
+    if (!maintRows.length) {
+      host.innerHTML = '<div class="mt-empty">No maintenance items logged yet. They will appear here as foremen record equipment failures on their daily reports.</div>';
+      return;
+    }
+    var groups = groupBy(maintRows, function (r) { return r.category; }, CATEGORY_ORDER);
+    host.innerHTML = groups.map(function (g) {
+      var rowsHtml = g.rows.map(function (r) {
+        var hr = (r.hourAtFailure != null) ? '<span class="mt-hr">@ ' + E(r.hourAtFailure) + ' h</span>' : '';
+        var itemTxt = r.item ? E(r.item) : '<span class="mt-muted">(failure logged, no detail)</span>';
+        return '<div class="mt-row">'
+          + '<div class="mt-item">' + itemTxt + hr + '</div>'
+          + '<div class="mt-meta">' + metaLine(r) + '</div>'
+          + '</div>';
+      }).join('');
+      return '<div class="mt-group">'
+        + '<div class="mt-group-h"><span>' + E(g.key) + '</span><span class="ct">' + g.rows.length + ' item' + (g.rows.length === 1 ? '' : 's') + '</span></div>'
+        + rowsHtml
+        + '</div>';
+    }).join('');
+  }
+
+  function renderFuture(futureRows) {
+    var host = document.getElementById('mtFuture');
+    if (!host) return;
+    if (!futureRows.length) {
+      host.innerHTML = '<div class="mt-empty">No future issues logged yet.</div>';
+      return;
+    }
+    var groups = groupBy(futureRows, function (r) { return r.equipment; }, []);
+    host.innerHTML = groups.map(function (g) {
+      var rowsHtml = g.rows.map(function (r) {
+        var desc = r.description ? E(r.description) : '<span class="mt-muted">(no description)</span>';
+        return '<div class="mt-row">'
+          + '<div class="mt-item">' + desc + '</div>'
+          + '<div class="mt-meta">' + metaLine(r) + '</div>'
+          + '</div>';
+      }).join('');
+      return '<div class="mt-group">'
+        + '<div class="mt-group-h"><span>' + E(g.key) + '</span><span class="ct">' + g.rows.length + ' item' + (g.rows.length === 1 ? '' : 's') + '</span></div>'
+        + rowsHtml
+        + '</div>';
+    }).join('');
+  }
+
+  function load() {
+    var noData = document.getElementById('mtNoData');
+    var wrap = document.getElementById('mtWrap');
+    api('/api/daily-report').then(function (dr) {
+      if (dr.status === 403) { if (noData) noData.style.display = ''; if (wrap) wrap.style.display = 'none'; return; }
+      if (noData) noData.style.display = 'none';
+      if (wrap) wrap.style.display = '';
+      var reports = (dr.ok && dr.body && Array.isArray(dr.body.reports)) ? dr.body.reports : [];
+      var maintRows = collectMaintenance(reports);
+      var futureRows = collectFuture(reports);
+      renderSummary(maintRows, futureRows);
+      renderMaint(maintRows);
+      renderFuture(futureRows);
+    }).catch(function () {
+      if (wrap) wrap.style.display = '';
+      renderSummary([], []);
+      renderMaint([]);
+      renderFuture([]);
+    });
+  }
+
+  var prev = window.showModule;
+  window.showModule = function (id) { if (typeof prev === 'function') prev(id); if (id === 'maintenance') { load(); } };
+})();
+} catch (e) {
+  console.error('Module maintenance failed to load:', e);
 }
 </script>
 
