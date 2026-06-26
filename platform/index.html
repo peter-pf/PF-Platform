@@ -998,6 +998,13 @@ body.role-field-ops .nav-item[data-fo-hide] {
 .pf-gc-btn.primary { border-color: var(--accent); background: var(--accent); color: #fff; }
 .pf-gc-err { font-size: 0.72rem; color: #b00020; }
 .pf-gc-empty { font-size: 0.8rem; }
+/* Editable Bid Price cell (Actively Pricing). */
+.pf-hl-table td.pf-hl-bidprice { white-space: normal; overflow: visible; }
+.pf-bidprice-wrap { display: inline-flex; align-items: center; gap: 2px; }
+.pf-bidprice-sym { color: var(--text-2); font-size: 0.82rem; }
+.pf-bidprice-input { width: 92px; font-size: 0.82rem; padding: 3px 6px; border: 1px solid var(--border-light); border-radius: 4px; text-align: right; }
+.pf-bidprice-input:focus { border-color: var(--accent); outline: none; }
+.pf-bidprice-err { display: block; font-size: 0.7rem; color: #b00020; margin-top: 2px; }
 .pf-hl-table td {
   padding: 9px 12px; border-bottom: 1px solid var(--border-light);
   color: var(--text-1); vertical-align: top;
@@ -11884,6 +11891,23 @@ try {
     }
     function fmtMoney0(n){ return n == null ? null : '$' + Math.round(n).toLocaleString(); }
     function fmtNum0(n){ return n == null ? null : Math.round(n).toLocaleString(); }
+    // CANONICAL money DISPLAY formatter for any value that may ALREADY carry a '$'
+    // and/or commas (feed strings like "$460,000") OR be a bare number string (an
+    // override like "460000" / "12500.5"). Parses out everything but digits/dot/-,
+    // then formats ONCE with thousands separators: whole dollars show no decimals
+    // ($460,000), values with cents show two decimals ($12,500.50). Blank / NaN ->
+    // '-' (never "$NaN", never "$$..."). Use this for DISPLAY only; keep the
+    // editable <input value> RAW so save/no-op compare + re-edit still work.
+    function fmtMoneyDisplay(v){
+      if (v == null || String(v).trim() === '') return '-';
+      var n = parseFloat(String(v).replace(/[^0-9.\-]/g, ''));
+      if (!isFinite(n)) return '-';
+      var hasCents = Math.round(n * 100) % 100 !== 0;
+      return '$' + n.toLocaleString('en-US', {
+        minimumFractionDigits: hasCents ? 2 : 0,
+        maximumFractionDigits: 2
+      });
+    }
     // RESOLUTION KEY (override map key). Every bid is keyed by bidLogId(p) =
     // 'num_<project number>' when it has a real number, else 'ng_<hash of
     // name+gc>'. This is the SAME scheme the PM handoff uses (bidId() over there),
@@ -12097,6 +12121,30 @@ try {
       return (p && p.gc) || f['General Contractor'] || '';
     };
 
+    // ---- BID PRICE (per-bid override in precon-bid-meta) --------------------
+    // The entered Bid Price (Actively Pricing). Stored as a numeric string in the
+    // overlay. Returns '' when not set. Because the overlay is keyed by bidId and
+    // the bid keeps its bidId when "Bid Sent" moves it to submitted_bids, the price
+    // persists across buckets.
+    function bidPriceRaw(p){
+      var rec = bidMetaFor(p);
+      var v = rec && rec.bidPrice != null ? rec.bidPrice : '';
+      return (v === '' || v == null) ? '' : String(v);
+    }
+    function bidPriceIsSet(p){ return bidPriceRaw(p) !== ''; }
+    // Value for the editable money <input> (raw number string, attribute-safe).
+    function bidPriceInputValue(p){ return bidPriceRaw(p); }
+    // EFFECTIVE Bid Total Value for a bid = the entered bidPrice override if set,
+    // else the feed 'Bid Total Value'. Used by submitted_bids so a price entered
+    // during pricing shows as the job's Bid value after it is submitted.
+    function effBidValue(p){
+      var ov = bidPriceRaw(p);
+      if (ov !== '') return ov;
+      var f = (p && p.fields) || {};
+      var v = f['Bid Total Value'];
+      return (v == null) ? '' : String(v);
+    }
+
     // ISO date for the <input type="date"> prefill (from the effective value).
     // Accepts ISO + US formats; returns '' when it cannot parse (input stays blank).
     function effDateInputValue(p, field){
@@ -12136,6 +12184,32 @@ try {
       } catch (e) {}
       return false;
     }
+
+    // ---- BID PRICE edit: save the entered money value (setBidPrice) ----------
+    // Optimistic: on success re-render (the value also flows to submitted_bids);
+    // on failure revert the input to the stored value + show an inline error. The
+    // input stops row-expand propagation. Gated to privileged roles + precon area.
+    window.pfBidPriceSave = function(inp){
+      if (!inp) return;
+      var wrap = inp.closest ? inp.closest('.pf-bidprice') : null;
+      if (!wrap) return;
+      var errEl = wrap.querySelector('.pf-bidprice-err');
+      if (errEl) errEl.textContent = '';
+      if (!canResolve()) { if (errEl) errEl.textContent = 'No permission.'; return; }
+      var bid = wrap.getAttribute('data-bid');
+      var prev = wrap.getAttribute('data-prev') || '';
+      if (!bid) { if (errEl) errEl.textContent = 'Could not save.'; return; }
+      var val = (inp.value == null) ? '' : String(inp.value).trim();
+      // No-op if unchanged (compare against the last-saved raw value).
+      if (val === prev) return;
+      var ok = postBidMeta({ action: 'setBidPrice', bidId: bid, value: val });
+      if (ok) { renderAll(); }
+      else {
+        // Revert the input to the stored value and surface the error.
+        inp.value = prev;
+        if (errEl) errEl.textContent = 'Save failed.';
+      }
+    };
 
     // ---- FEATURE 1: edit a date via the calendar/date popup -----------------
     // Toggle a small inline <input type="date"> next to a date cell. The wrapper
@@ -12541,7 +12615,7 @@ try {
       var thead = '<th class="pf-hl-disc" aria-label="expand"></th>'
         + '<th>Project</th>';
       highlights.forEach(function(h){
-        var cls = (h.type === 'money' || h.type === 'num') ? ' class="num"' : '';
+        var cls = (h.type === 'money' || h.type === 'num' || h.type === 'effmoney' || h.type === 'bidprice') ? ' class="num"' : '';
         thead += '<th' + cls + '>' + E(h.label || h.key) + '</th>';
       });
       if (opts.actionCol) thead += '<th class="pf-hl-action">Resolution</th>';
@@ -12654,6 +12728,47 @@ try {
             var awTag = (awIdx >= 0 && gcs[awIdx] && gcs[awIdx].company)
               ? ' <span class="pf-gc-awtag" title="Awarded GC of record">awarded</span>' : '';
             row += '<td class="pf-hl-gclist">' + compact + awTag + '</td>';
+            return;
+          }
+          // BID PRICE cell (Actively Pricing only): an editable money input that
+          // persists per bid via setBidPrice. Privileged roles get the input; others
+          // see the read-only formatted value. The cell stops row-expand
+          // propagation so typing/clicking does not toggle the panel. data-prev
+          // holds the last-saved raw value for no-op + revert. The value attribute
+          // is the raw number string (attribute-safe via window.esc).
+          if (h.type === 'bidprice') {
+            var pbid = E(bidLogId(p));
+            var praw = bidPriceInputValue(p);          // raw number string or ''
+            var pInner;
+            if (canResolve()) {
+              pInner = '<span class="pf-bidprice-wrap"><span class="pf-bidprice-sym">$</span>'
+                + '<input type="text" inputmode="decimal" class="pf-bidprice-input" placeholder="0"'
+                + ' value="' + E(praw) + '" aria-label="Bid Price"'
+                + ' onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}"'
+                + ' onblur="pfBidPriceSave(this)"></span>'
+                + '<span class="pf-bidprice-err"></span>';
+            } else {
+              // Read-only DISPLAY: format the bare override number with $ + commas
+              // (cents-aware). Blank renders a muted dash, never "$NaN".
+              pInner = praw !== ''
+                ? E(fmtMoneyDisplay(praw))
+                : '<span class="pf-record-muted">-</span>';
+            }
+            row += '<td class="pf-hl-bidprice pf-bidprice num" data-bid="' + pbid + '"'
+              + ' data-prev="' + E(praw) + '" onclick="event.stopPropagation()">'
+              + pInner + '</td>';
+            return;
+          }
+          // EFFECTIVE MONEY cell (submitted_bids Bid Total): show the entered Bid
+          // Price override if set, else the feed value. Read-only (no input here).
+          if (h.type === 'effmoney') {
+            // effBidValue is the OVERRIDE (bare number) or the FEED (already a
+            // "$460,000" string). fmtMoneyDisplay parses out any existing $ + commas
+            // and formats once, so the feed case never double-dollars ("$$") and the
+            // override case gains thousands separators. Blank -> '-' (no "$NaN").
+            var ev = effBidValue(p);
+            var ecell = (ev === '') ? '' : E(fmtMoneyDisplay(ev));
+            row += '<td class="num">' + ecell + '</td>';
             return;
           }
           var v = f[h.key];
@@ -13408,7 +13523,8 @@ try {
             { key: 'Design Completed Date', label: 'Prelim Design Completed', type: 'effdate', field: 'designCompletedDate', w: '170px' },
             { key: 'Due Date',              label: 'Bid Due Date',           type: 'effdate', field: 'dueDate',             w: '170px' },
             { key: '__sentToGarbin',        label: 'Sent to Garbin?',        type: 'garbin',  w: '130px' },
-            { key: '__biddingGcs',          label: 'Bidding GCs',            type: 'gclist',  w: '160px' }
+            { key: '__biddingGcs',          label: 'Bidding GCs',            type: 'gclist',  w: '160px' },
+            { key: '__bidPrice',            label: 'Bid Price',              type: 'bidprice', w: '140px' }
           ];
           // GROUPED expand detail (Jonathan's spec). Labels map to real feed keys
           // in data/precon-pipeline.js. 'Mirror main row' fields reuse the same
@@ -13462,7 +13578,10 @@ try {
           // overdue / due-soon flag.
           highlights = [
             { key: 'City / State',           label: 'City / State',     type: 'text' },
-            { key: 'Bid Total Value',        label: 'Bid Total',        type: 'money', w: '110px' },
+            // Bid Total = override-or-feed: the entered Bid Price (precon-bid-meta,
+            // carried over from Actively Pricing by bidId) if set, else the feed
+            // Bid Total Value. ONLY this bucket uses the override for the value.
+            { key: 'Bid Total Value',        label: 'Bid Total',        type: 'effmoney', w: '110px' },
             { key: 'Total LF',               label: 'Total LF',         type: 'num',   w: '84px' },
             { key: 'Total Columns',          label: 'Columns',          type: 'num',   w: '80px' },
             { key: 'Date Submitted',         label: 'Submitted',        type: 'date',  w: '100px' },

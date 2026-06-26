@@ -865,6 +865,67 @@ section('Precon bid meta: source-level guards + NO mail');
   const noComments = src.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
   ok('precon-bid-meta makes NO fetch / outbound call', !/\bfetch\s*\(/.test(noComments) && !/https?:\/\//.test(noComments));
   ok('precon-bid-meta calls NO mail API', !/sendMail|\/messages|smtp|nodemailer|mailgun|sendgrid/i.test(noComments));
+  // setBidPrice action exists + validates as a non-negative number (source-level).
+  ok('precon-bid-meta has setBidPrice action', /setBidPrice/.test(src));
+  ok('precon-bid-meta validates price (normPrice, non-negative)', /function normPrice/.test(src) && /n < 0/.test(src));
+}
+
+// Behavioral coverage for the new setBidPrice action via the real handler.
+section('Precon bid meta: setBidPrice action (financial, precon-only)');
+{
+  const mod = await import('../functions/api/precon-bid-meta.js');
+  const kv = (() => { let m = new Map(); return {
+    get: async k => (m.has(k) ? m.get(k) : null), put: async (k, v) => { m.set(k, v); } }; })();
+  const env = { PF_SCHEDULE: kv };
+  const ctx = (role, body) => ({ env,
+    data: { session: role ? { uid: 'u', role, name: 'T' } : null },
+    request: { headers: { get: h => (h.toLowerCase() === 'content-length' ? String((body || '').length) : null) },
+      text: async () => body || '' } });
+  const post = async (role, b) => { const r = await mod.onRequestPost(ctx(role, JSON.stringify(b))); return { status: r.status, body: JSON.parse(await r.text()) }; };
+  const BID = 'ng_price1';
+  let r;
+  ok('setBidPrice field_ops -> 403', (await post('field_ops', { action: 'setBidPrice', bidId: BID, value: 12500 })).status === 403);
+  r = await post('business_dev', { action: 'setBidPrice', bidId: BID, value: '$12,500' });
+  ok('setBidPrice money-string -> 200 + canonical 12500', r.status === 200 && r.body.bids[BID].bidPrice === '12500');
+  r = await post('partner', { action: 'setBidPrice', bidId: BID, value: -5 });
+  ok('negative price -> 400', r.status === 400);
+  r = await post('partner', { action: 'setBidPrice', bidId: BID, value: 'abc' });
+  ok('junk price -> 400', r.status === 400);
+  r = await post('partner', { action: 'setBidPrice', bidId: BID, value: '' });
+  ok('empty price clears -> 200 + bidPrice removed', r.status === 200 && r.body.bids[BID].bidPrice === undefined);
+  r = await post('admin', { action: 'setBidPrice', bidId: '__proto__', value: 100 });
+  ok('setBidPrice __proto__ bidId -> 400', r.status === 400);
+  ok('Object.prototype not polluted by price', ({}).bidPrice === undefined);
+}
+
+// DISPLAY-level guard for the money render path (RO-1 "$$" + RO-2 no-commas bugs).
+// fmtMoneyDisplay lives inline in index.html (not importable); replicate its exact
+// logic here AND assert the render cells route through it (not raw '$' + value).
+section('Precon money display: single $, thousands separators, cents-aware');
+{
+  function fmtMoneyDisplay(v) {
+    if (v == null || String(v).trim() === '') return '-';
+    const n = parseFloat(String(v).replace(/[^0-9.\-]/g, ''));
+    if (!isFinite(n)) return '-';
+    const hasCents = Math.round(n * 100) % 100 !== 0;
+    return '$' + n.toLocaleString('en-US', {
+      minimumFractionDigits: hasCents ? 2 : 0, maximumFractionDigits: 2 });
+  }
+  // RO-1: a feed value that ALREADY has '$' and commas must NOT double-dollar.
+  ok('feed-backed "$460,000" -> single $ with commas', fmtMoneyDisplay('$460,000') === '$460,000');
+  // RO-2: a bare override number must gain thousands separators.
+  ok('override "87250" -> "$87,250"', fmtMoneyDisplay('87250') === '$87,250');
+  ok('override whole "460000" -> "$460,000"', fmtMoneyDisplay('460000') === '$460,000');
+  ok('override cents "12500.5" -> "$12,500.50"', fmtMoneyDisplay('12500.5') === '$12,500.50');
+  ok('blank -> "-" (no $NaN)', fmtMoneyDisplay('') === '-');
+  ok('junk -> "-" (no $NaN)', fmtMoneyDisplay('n/a') === '-');
+  // Source-level: both render cells route money through fmtMoneyDisplay, not raw $.
+  const idx = readFileSync(join(__dir, '../index.html'), 'utf8');
+  ok('index.html defines fmtMoneyDisplay', /function fmtMoneyDisplay\(/.test(idx));
+  ok('effmoney cell uses fmtMoneyDisplay', /effBidValue\(p\)[\s\S]{0,160}fmtMoneyDisplay\(ev\)/.test(idx));
+  ok('read-only Bid Price cell uses fmtMoneyDisplay', /fmtMoneyDisplay\(praw\)/.test(idx));
+  ok('no raw "\\$" + E(effBidValue/praw) double-dollar pattern remains',
+    !/'\$'\s*\+\s*E\(ev\)/.test(idx) && !/'\$'\s*\+\s*E\(praw\)/.test(idx));
 }
 
 section('Precon activity log: source-level guards + NO mail');

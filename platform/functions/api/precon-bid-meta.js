@@ -15,6 +15,7 @@
 //       dates:     { designCompletedDate?, dueDate? },  // ISO YYYY-MM-DD, only set ones present
 //       gcs:       [ { company, contact, email, phone } ],
 //       awardedGc: <int index into gcs, or -1>,
+//       bidPrice:  <non-negative number as a string, or absent>,  // entered Bid Price
 //       by, at
 //     } }
 //   }
@@ -49,6 +50,7 @@ const MAX_EMAIL = 200;      // email cap
 const MAX_GCS = 12;         // bidding GCs per bid cap
 
 const VALID_DATE_FIELD = { designCompletedDate: 1, dueDate: 1 };
+const MAX_PRICE = 1e12;     // sanity cap on the entered Bid Price ($1 trillion)
 
 const JSON_HEADERS = {
   'Content-Type': 'application/json',
@@ -77,6 +79,23 @@ function normIsoDate(v) {
   const y = +m[1], mo = +m[2], d = +m[3];
   if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
   return str;
+}
+
+// Validate / normalize an entered Bid Price to a non-negative number STRING, or
+// '' to clear. Accepts a number or a money-formatted string ('$12,500', '12500').
+// Returns the canonical numeric string (e.g. '12500'); returns null on junk or a
+// negative value (caller -> 400). Stored as a string to avoid float drift in JSON.
+function normPrice(v) {
+  if (v == null) return '';
+  let str = String(v).trim();
+  if (str === '') return '';
+  // Strip currency symbol, thousands separators, and surrounding spaces.
+  str = str.replace(/[$,\s]/g, '');
+  if (!/^\d+(\.\d+)?$/.test(str)) return null; // only non-negative decimals; no '-', no junk
+  const n = Number(str);
+  if (!isFinite(n) || n < 0 || n > MAX_PRICE) return null;
+  // Canonical string: drop a trailing '.0' style but keep cents if present.
+  return String(n);
 }
 
 // Rebuild one GC entry from untrusted input, length-capping every field.
@@ -135,6 +154,7 @@ export async function onRequestGet(context) {
 //   { action:'setDate',      bidId, field:'designCompletedDate'|'dueDate', value:ISO|'' }
 //   { action:'setGcs',       bidId, gcs:[ {company,contact,email,phone}, ... ] }
 //   { action:'setAwardedGc', bidId, index:int }
+//   { action:'setBidPrice',  bidId, value:number|moneyString|'' }
 export async function onRequestPost(context) {
   const { request, env } = context;
   const session = context.data && context.data.session;
@@ -151,7 +171,7 @@ export async function onRequestPost(context) {
     catch { return json({ status: 'error', message: 'Invalid JSON.' }, 400); }
 
     const action = String((parsed && parsed.action) || '');
-    if (action !== 'setDate' && action !== 'setGcs' && action !== 'setAwardedGc') {
+    if (action !== 'setDate' && action !== 'setGcs' && action !== 'setAwardedGc' && action !== 'setBidPrice') {
       return json({ status: 'error', message: 'Unknown action.' }, 400);
     }
 
@@ -181,6 +201,10 @@ export async function onRequestPost(context) {
       gcs: Array.isArray(prev.gcs) ? prev.gcs.slice(0, MAX_GCS).map(normGc) : [],
       awardedGc: Number.isInteger(prev.awardedGc) ? prev.awardedGc : -1,
     };
+    // Carry the existing Bid Price forward (re-validated). Only persisted when set;
+    // an invalid stored value is dropped rather than re-emitted.
+    const prevPrice = normPrice(prev.bidPrice);
+    if (prevPrice) rec.bidPrice = prevPrice;
     // Drop any undefined date keys so we only persist set ones.
     if (rec.dates.designCompletedDate === undefined) delete rec.dates.designCompletedDate;
     if (rec.dates.dueDate === undefined) delete rec.dates.dueDate;
@@ -207,6 +231,11 @@ export async function onRequestPost(context) {
       if (idx < -1) idx = -1;
       if (idx >= rec.gcs.length) return json({ status: 'error', message: 'index is out of range for the GC list.' }, 400);
       rec.awardedGc = idx;
+    } else if (action === 'setBidPrice') {
+      const price = normPrice(parsed && parsed.value);
+      if (price === null) return json({ status: 'error', message: 'value must be a non-negative number or empty.' }, 400);
+      if (price === '') delete rec.bidPrice;
+      else rec.bidPrice = price;
     }
 
     rec.by = (session && (session.name || session.uid)) ? s(session.name || session.uid) : 'unknown';
