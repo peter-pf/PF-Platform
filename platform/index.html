@@ -2756,6 +2756,8 @@ document.addEventListener('click', function(e) {
       #mod-daily-reports .dr-status.approved { background:rgba(63,185,80,.15); color:#3fb950; }
       #mod-daily-reports .dr-status.sentToHR { background:rgba(47,109,246,.15); color:#5b8cff; }
       #mod-daily-reports .btn-sm { font-size:12px; padding:3px 10px; }
+      #mod-daily-reports .dr-rm { flex:0 0 auto; font-size:12px; line-height:1; padding:5px 9px; border:1px solid var(--border,#2a2f3a); border-radius:6px; background:transparent; color:var(--text-3,#8a93a6); cursor:pointer; }
+      #mod-daily-reports .dr-rm:hover { border-color:var(--amber,#d29922); color:var(--amber,#d29922); }
     </style>
     <div id="drNoData" class="dr-muted" style="display:none">Daily reports not available for your role.</div>
     <div id="drWrap">
@@ -16266,15 +16268,24 @@ try {
   function renderOwned() {
     var host = document.getElementById('drOwned');
     if (!host) return;
+    var canRemove = state.owned.length > 1; // keep a minimum of one row
     host.innerHTML = state.owned.map(function (r, i) {
       return '<div class="dr-row">'
         + '<select class="eq" data-i="' + i + '" data-f="machine">' + opts(state.lists.ownedEquipment, r.machine, 'Machine') + '</select>'
         + '<input class="hr" data-i="' + i + '" data-f="hours" placeholder="Machine Hours" inputmode="decimal" value="' + E(r.hours) + '">'
+        + (canRemove ? '<button type="button" class="dr-rm" data-rm="' + i + '" aria-label="Remove row">Remove</button>' : '')
         + '</div>';
     }).join('');
     host.querySelectorAll('[data-i]').forEach(function (el) {
       el.addEventListener('input', function () {
         state.owned[+this.getAttribute('data-i')][this.getAttribute('data-f')] = this.value;
+      });
+    });
+    host.querySelectorAll('button[data-rm]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (state.owned.length <= 1) return; // never drop below one row
+        state.owned.splice(+this.getAttribute('data-rm'), 1);
+        renderOwned();
       });
     });
   }
@@ -16283,15 +16294,24 @@ try {
   function renderRental() {
     var host = document.getElementById('drRental');
     if (!host) return;
+    var canRemove = state.rental.length > 1; // keep a minimum of one row
     host.innerHTML = state.rental.map(function (r, i) {
       return '<div class="dr-row">'
         + '<select class="eq" data-i="' + i + '" data-f="category">' + opts(state.lists.rentalCategories, r.category, 'Rental equipment') + '</select>'
         + '<input class="hr" data-i="' + i + '" data-f="hours" placeholder="Machine Hours" inputmode="decimal" value="' + E(r.hours) + '">'
+        + (canRemove ? '<button type="button" class="dr-rm" data-rm="' + i + '" aria-label="Remove row">Remove</button>' : '')
         + '</div>';
     }).join('');
     host.querySelectorAll('[data-i]').forEach(function (el) {
       el.addEventListener('input', function () {
         state.rental[+this.getAttribute('data-i')][this.getAttribute('data-f')] = this.value;
+      });
+    });
+    host.querySelectorAll('button[data-rm]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (state.rental.length <= 1) return; // never drop below one row
+        state.rental.splice(+this.getAttribute('data-rm'), 1);
+        renderRental();
       });
     });
   }
@@ -16310,6 +16330,9 @@ try {
     var cats = state.lists.maintenanceCategories || [];
     var subs = state.lists.maintenanceSubcategories || {};
     host.innerHTML = cats.map(function (cat) {
+      // count rows for this category so the last row keeps its minimum-of-one
+      var catCount = state.maintenance.filter(function (r) { return r.category === cat; }).length;
+      var canRemove = catCount > 1; // each category must always retain one row
       // rows belonging to this category, with their index in state.maintenance
       var rowsHtml = state.maintenance.map(function (r, i) {
         if (r.category !== cat) return '';
@@ -16319,6 +16342,7 @@ try {
           + '<select class="sc" data-i="' + i + '" data-f="subcategory">' + opts(subOpts, r.subcategory, 'Subcategory') + '</select>'
           + '<input class="item" data-i="' + i + '" data-f="item" placeholder="Detail / notes" value="' + E(r.item) + '">'
           + '<input class="hr" data-i="' + i + '" data-f="hourAtFailure" placeholder="Machine hour at failure" inputmode="decimal" value="' + E(r.hourAtFailure) + '">'
+          + (canRemove ? '<button type="button" class="dr-rm" data-mtrm="' + i + '" aria-label="Remove row">Remove</button>' : '')
           + '</div>';
       }).join('');
       return '<div class="dr-mt-cat">'
@@ -16343,6 +16367,18 @@ try {
         renderMaint();
       });
     });
+    host.querySelectorAll('button[data-mtrm]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var idx = +this.getAttribute('data-mtrm');
+        var row = state.maintenance[idx];
+        if (!row) return;
+        // never let a category drop below one row
+        var catCount = state.maintenance.filter(function (r) { return r.category === row.category; }).length;
+        if (catCount <= 1) return;
+        state.maintenance.splice(idx, 1);
+        renderMaint();
+      });
+    });
   }
 
   // ---- 8. Future issues (fleet dropdown + description) -----------------------
@@ -16357,15 +16393,24 @@ try {
     var host = document.getElementById('drFuture');
     if (!host) return;
     var fleet = fleetOptions();
+    var canRemove = state.future.length > 1; // keep a minimum of one row
     host.innerHTML = state.future.map(function (r, i) {
       return '<div class="dr-row">'
         + '<select class="eq" data-i="' + i + '" data-f="equipment">' + opts(fleet, r.equipment, 'Equipment') + '</select>'
         + '<input class="desc" data-i="' + i + '" data-f="description" placeholder="Maintenance to identify" value="' + E(r.description) + '">'
+        + (canRemove ? '<button type="button" class="dr-rm" data-rm="' + i + '" aria-label="Remove row">Remove</button>' : '')
         + '</div>';
     }).join('');
     host.querySelectorAll('[data-i]').forEach(function (el) {
       el.addEventListener('input', function () {
         state.future[+this.getAttribute('data-i')][this.getAttribute('data-f')] = this.value;
+      });
+    });
+    host.querySelectorAll('button[data-rm]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (state.future.length <= 1) return; // never drop below one row
+        state.future.splice(+this.getAttribute('data-rm'), 1);
+        renderFuture();
       });
     });
   }
