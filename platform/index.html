@@ -1037,6 +1037,16 @@ body.role-field-ops .nav-item[data-fo-hide] {
 .pf-hl-table tr.pf-hl-row.pf-hl-open td { background: var(--accent-light); }
 .pf-hl-name { font-weight: 600; color: var(--text-0); white-space: normal; }
 .pf-hl-name .pf-record-muted { font-weight: 400; }
+/* Actively Pricing only (opts.nameProminent -> .pf-hl-nameprominent): make the
+   Project name the most prominent text in the row and let it wrap to a max of
+   two lines, then ellipsis. The freed width from the no-year date columns flows
+   into this flexible name column. Scoped to this table class so other buckets
+   are untouched. */
+.pf-hl-table.pf-hl-nameprominent .pf-hl-name {
+  font-size: 1.02rem; font-weight: 700; line-height: 1.25;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 .pf-hl-chevron {
   display: inline-block; width: 14px; height: 14px; line-height: 14px;
   color: var(--text-2); transition: transform 0.12s; font-size: 0.8rem; user-select: none;
@@ -12179,10 +12189,18 @@ try {
     }
     // Human-readable display of the effective date (the raw stored/feed string), or
     // a dash when blank. The override gets a small "edited" marker.
-    function effDateDisplay(p, field){
+    function effDateDisplay(p, field, noYear){
       var raw = effDate(p, field);
       if (!raw) return '<span class="pf-record-muted">-</span>';
       var mark = effDateIsOverride(p, field) ? ' <span class="pf-date-edited" title="Date edited">edited</span>' : '';
+      // noYear (opt-in per highlight column): show month/day only, e.g. "6/24"
+      // instead of "6/24/26". DISPLAY only - the stored/effective value is
+      // untouched, so editing and the calendar keep the full date. Falls back to
+      // the full raw string when the date cannot be parsed.
+      if (noYear) {
+        var ymd = calParseYMD(raw);
+        if (ymd) return E((ymd.m + 1) + '/' + ymd.d) + mark;
+      }
       return E(raw) + mark;
     }
 
@@ -12726,7 +12744,7 @@ try {
 
       // Compact mode (smaller font + tighter padding) for buckets with many
       // highlight columns so they fit without horizontal scroll (Submitted Bids).
-      var tableCls = 'pf-hl-table' + (opts.compact ? ' pf-hl-compact' : '');
+      var tableCls = 'pf-hl-table' + (opts.compact ? ' pf-hl-compact' : '') + (opts.nameProminent ? ' pf-hl-nameprominent' : '');
       var html = '<div class="pf-hl-wrap"><table class="' + tableCls + '"><colgroup>'
         + colgroup + '</colgroup><thead><tr>' + thead + '</tr></thead><tbody>';
 
@@ -12817,7 +12835,7 @@ try {
           // stops row-expand propagation so editing never toggles the panel.
           if (h.type === 'effdate') {
             var ebid = E(bidLogId(p));
-            var disp = effDateDisplay(p, h.field);
+            var disp = effDateDisplay(p, h.field, h.noYear);
             var inner = '<span class="pf-date-val">' + disp + '</span>';
             if (canResolve()) {
               var iv = effDateInputValue(p, h.field);
@@ -13676,11 +13694,17 @@ try {
           // the freed slot becomes the persistent "Sent to Garbin?" checkbox.
           hlOpts.subLineKey = 'City / State';
           hlOpts.gcEditor = true; // append the editable Bidding GCs block in the expand detail
+          // Jonathan: drop the YEAR from the two date columns (show "6/24", not
+          // "6/24/26") via noYear:true; with no year to fit, their widths shrink
+          // (170px -> 110px) and Bidding GCs trims (160px -> 140px). The freed
+          // width flows to the flexible Project name column so the name reads as
+          // the most prominent text in the row.
+          hlOpts.nameProminent = true; // scopes the 2-line name-clamp CSS to this bucket only
           highlights = [
-            { key: 'Design Completed Date', label: 'Prelim Design Completed', type: 'effdate', field: 'designCompletedDate', w: '170px' },
-            { key: 'Due Date',              label: 'Bid Due Date',           type: 'effdate', field: 'dueDate',             w: '170px' },
+            { key: 'Design Completed Date', label: 'Prelim Design Completed', type: 'effdate', field: 'designCompletedDate', w: '110px', noYear: true },
+            { key: 'Due Date',              label: 'Bid Due Date',           type: 'effdate', field: 'dueDate',             w: '110px', noYear: true },
             { key: '__sentToGarbin',        label: 'Sent to Garbin?',        type: 'garbin',  w: '130px' },
-            { key: '__biddingGcs',          label: 'Bidding GCs',            type: 'gclist',  w: '160px' },
+            { key: '__biddingGcs',          label: 'Bidding GCs',            type: 'gclist',  w: '140px' },
             { key: '__bidPrice',            label: 'Bid Price',              type: 'bidprice', w: '140px' }
           ];
           // GROUPED expand detail (Jonathan's spec). Labels map to real feed keys
