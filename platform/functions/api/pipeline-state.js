@@ -17,6 +17,12 @@
 //     - status=awarded     -> job shown as Awarded (visible to Project Mgmt)
 //     - status=not_awarded  -> job moves to the persistent Dead Set view
 //     - status=active       -> job returns to Actively Bidding
+//     - status=submitted    -> bid relocates from Actively Bidding to Submitted
+//                              Bids (Jonathan's "Bid Submitted" action). It is
+//                              still a live, un-resolved bid (NOT dead, NOT
+//                              awarded). deadSet stays false. From Submitted Bids
+//                              the existing Mark Awarded / Not Awarded buttons
+//                              then take it the rest of the way.
 //
 // SECURITY MODEL (for the COO security review):
 //   - This endpoint is ALREADY behind the server-side auth gate in
@@ -47,7 +53,7 @@ const MAX_BODY_BYTES = 64 * 1024;   // resolution records are tiny; generous cap
 const MAX_OVERRIDES = 2000;         // bounds storage / blast radius
 const MAX_STR = 200;
 
-const VALID_STATUS = { awarded: 1, not_awarded: 1, active: 1 };
+const VALID_STATUS = { awarded: 1, not_awarded: 1, active: 1, submitted: 1 };
 
 const JSON_HEADERS = {
   'Content-Type': 'application/json',
@@ -160,11 +166,13 @@ export async function onRequestGet(context) {
 }
 
 // ---- POST: set ONE job's resolution -----------------------------------------
-// Body: { jobId, status: 'awarded'|'not_awarded'|'active', meta:{updated} }
+// Body: { jobId, status: 'awarded'|'not_awarded'|'active'|'submitted', meta:{updated} }
 // Transition semantics:
 //   active      -> clears deadSet, stamps reactivatedAt (return to bidding)
 //   awarded     -> deadSet=false (moves into PM/awarded flow)
 //   not_awarded -> deadSet=true  (moves to Dead Set)
+//   submitted   -> deadSet=false (relocates Actively Bidding -> Submitted Bids;
+//                  still a live bid, just past the submission line)
 async function handleWrite(context) {
   const { request, env } = context;
   const session = context.data && context.data.session;
@@ -189,7 +197,7 @@ async function handleWrite(context) {
     if (!jobId) return json({ status: 'error', message: 'jobId is required.' }, 400);
     if (!VALID_STATUS[status]) {
       return json({ status: 'error',
-        message: "status must be 'awarded', 'not_awarded', or 'active'." }, 400);
+        message: "status must be 'awarded', 'not_awarded', 'active', or 'submitted'." }, 400);
     }
 
     if (!env.PF_SCHEDULE) {
@@ -224,6 +232,9 @@ async function handleWrite(context) {
       };
     } else if (status === 'awarded') {
       record = { status: 'awarded', deadSet: false, resolvedAt: stamp, resolvedBy: who };
+    } else if (status === 'submitted') {
+      // Relocate Actively Bidding -> Submitted Bids. Still live (not dead).
+      record = { status: 'submitted', deadSet: false, resolvedAt: stamp, resolvedBy: who };
     } else { // not_awarded
       record = { status: 'not_awarded', deadSet: true, resolvedAt: stamp, resolvedBy: who };
     }

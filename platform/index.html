@@ -884,6 +884,20 @@ body.role-field-ops .nav-item[data-fo-hide] {
 .pf-hl-field .pf-hl-value.num { font-variant-numeric: tabular-nums; }
 .pf-hl-detail-actions { grid-column: 1 / -1; margin-top: 4px; }
 .pf-hl-detail-actions .pf-record-link { font-size: 0.82rem; }
+/* GROUPED detail (Actively Bidding): each group spans full width with a
+   subheading, then its fields laid out across in a responsive sub-grid. No
+   horizontal scroll: the sub-grid wraps. */
+.pf-hl-group { grid-column: 1 / -1; }
+.pf-hl-group + .pf-hl-group { margin-top: 12px; }
+.pf-hl-grouphead {
+  font-size: 0.74rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--accent, #006DB0);
+  padding-bottom: 5px; margin-bottom: 8px; border-bottom: 1px solid var(--border-light);
+}
+.pf-hl-groupgrid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px 22px;
+}
 /* Compact variant for buckets with many highlight columns (Submitted Bids). */
 .pf-hl-table.pf-hl-compact { font-size: 0.8rem; }
 .pf-hl-table.pf-hl-compact th { font-size: 0.66rem; padding: 8px 9px; }
@@ -11572,9 +11586,27 @@ try {
     }
     function fmtMoney0(n){ return n == null ? null : '$' + Math.round(n).toLocaleString(); }
     function fmtNum0(n){ return n == null ? null : Math.round(n).toLocaleString(); }
+    // RESOLUTION KEY (override map key). Every bid is keyed by bidLogId(p) =
+    // 'num_<project number>' when it has a real number, else 'ng_<hash of
+    // name+gc>'. This is the SAME scheme the PM handoff uses (bidId() over there),
+    // so the awarded auto-PM flow stays consistent. Using this instead of the bare
+    // jobKey (Project Number only) is what lets NUMBERLESS bids be resolved/moved.
+    function resolveKey(p){ return bidLogId(p); }
     function overrideFor(p){
-      var k = jobKey(p);
-      return (k && window.PF_PIPELINE.overrides && window.PF_PIPELINE.overrides[k]) || null;
+      var ov = window.PF_PIPELINE.overrides || {};
+      // Primary lookup: the bidLogId key (works for numbered AND numberless bids).
+      var k = resolveKey(p);
+      if (k && ov[k]) return ov[k];
+      // Backward-compatible read: overrides saved BEFORE this change were keyed by
+      // the bare Project Number (jobKey). Fall back to it so existing resolutions
+      // (in KV) still surface. New writes use resolveKey(); a future re-resolve
+      // migrates the key forward. Numberless bids never had a legacy key.
+      // DEF-3 (deferred): a stale legacy key can linger in KV after a re-resolve.
+      // The Dead Set DEF-1 guard (overrideFor precedence) makes it harmless; the
+      // D1 migration will reconcile/clean the legacy keys. Intentionally left here.
+      var jk = jobKey(p);
+      if (jk && ov[jk]) return ov[jk];
+      return null;
     }
     // TWO-WAY (high-level) SYNC: the Awarded row reads the LIVE linked PM overlay
     // record (single source: the bid + pm_projects_v1, keyed by sourceBidId) and
@@ -11621,7 +11653,7 @@ try {
     // everything (the moved job appears/disappears across buckets immediately).
     window.pfResolveBid = function(jobId, status, btn){
       if (!canResolve()) { alert('You do not have permission to change bid status.'); return; }
-      if (!jobId) { alert('This job has no project number, so it cannot be resolved.'); return; }
+      if (!jobId) { alert('This bid could not be identified, so it cannot be resolved.'); return; }
       if (btn) { btn.disabled = true; }
       try {
         var xhr = new XMLHttpRequest();
@@ -11665,10 +11697,19 @@ try {
     };
 
     // The per-row action cell for a given job + the bucket it is rendered in.
-    function actionCell(p, displayBucket){
+    // displayBucket = 'awarded' | 'dead' | 'open' (drives resolve semantics).
+    // realBucket   = the genuine bucket name (actively_bidding, budget_pricing,
+    //                submitted_bids, ...) so we can show the RIGHT buttons per
+    //                bucket. Actively Bidding shows ONLY a single "Bid Submitted"
+    //                button; Submitted Bids + Budget Pricing keep Mark Awarded /
+    //                Not Awarded.
+    function actionCell(p, displayBucket, realBucket){
       if (!canResolve()) return '';
-      var k = jobKey(p);
-      if (!k) return '<span class="pf-resolve-meta">no project number</span>';
+      // Key by resolveKey() (bidLogId) so EVERY bid is actionable, including bids
+      // with no Project Number. The key is internal (the KV override map key); it
+      // is never shown to the user.
+      var k = resolveKey(p);
+      if (!k) return '';
       var kJs = "'" + k.replace(/'/g, "\\'") + "'";
       var ov = overrideFor(p);
       var btns = '';
@@ -11683,8 +11724,15 @@ try {
           ? '<span class="pf-resolve-meta">Awarded by ' + E(ov.resolvedBy)
             + (ov.resolvedAt ? ' &middot; ' + E(String(ov.resolvedAt).slice(0,10)) : '') + '</span>'
           : '';
+      } else if (realBucket === 'actively_bidding') {
+        // Actively Bidding: ONE button. Clicking it submits the bid, which
+        // relocates it into the Submitted Bids module (status 'submitted').
+        btns = '<div class="pf-resolve-cell">'
+          + '<button class="pf-resolve-btn primary" onclick="pfResolveBid(' + kJs + ",'submitted',this)\">Bid Submitted</button>"
+          + '</div>';
       } else {
-        // Open buckets: offer Mark Awarded + Not Awarded.
+        // Other open buckets (Submitted Bids, Budget Pricing): Mark Awarded +
+        // Not Awarded (unchanged).
         btns = '<div class="pf-resolve-cell">'
           + '<button class="pf-resolve-btn primary" onclick="pfResolveBid(' + kJs + ",'awarded',this)\">Mark Awarded</button>"
           + '<button class="pf-resolve-btn" onclick="pfResolveBid(' + kJs + ",'not_awarded',this)\">Not Awarded</button>"
@@ -11724,11 +11772,12 @@ try {
           + (numTxt ? '<div class="pf-record-muted">' + numTxt + '</div>' : '');
         // DRAG-AND-DROP: privileged roles may drag a row onto a resolution
         // drop-zone (Awarded / Not Awarded / Back to Active). The row carries its
-        // stable jobKey + current display bucket so the drop handler can call the
-        // SAME pfResolveBid() path the buttons use. Rows without a project number
-        // (no jobKey) are NOT draggable (they cannot be persisted). field_ops never
-        // reaches this code (canResolve() false + server-gated feed).
-        var jk = jobKey(p);
+        // resolveKey() (bidLogId) + current display bucket so the drop handler can
+        // call the SAME pfResolveBid() path the buttons use. Keying on resolveKey()
+        // (not the bare Project Number) means EVERY bid is draggable, including
+        // numberless bids. field_ops never reaches this code (canResolve() false +
+        // server-gated feed).
+        var jk = resolveKey(p);
         var dragAttrs = (canResolve() && jk)
           ? ' draggable="true" data-jobkey="' + E(jk) + '" data-curbucket="' + E(opts.displayBucket || 'open') + '"'
           : '';
@@ -11754,7 +11803,7 @@ try {
           row += '<td>' + rec + '</td>';
         }
         if (opts.actionCol) {
-          row += '<td>' + actionCell(p, opts.displayBucket) + '</td>';
+          row += '<td>' + actionCell(p, opts.displayBucket, opts.idBucket) + '</td>';
         }
         // Activity-log opener (per bid). data-bid is the stable bid id.
         var bidName = E((p.name || f['Project Name'] || '').toString());
@@ -11853,7 +11902,7 @@ try {
         var nameCell = '<div class="pf-hl-name">' + nameTxt + '</div>'
           + (numTxt ? '<div class="pf-record-muted">' + numTxt + '</div>' : '');
 
-        var jk = jobKey(p);
+        var jk = resolveKey(p);
         var dragAttrs = (canResolve() && jk)
           ? ' draggable="true" data-jobkey="' + E(jk) + '" data-curbucket="' + E(opts.displayBucket || 'open') + '"'
           : '';
@@ -11880,21 +11929,45 @@ try {
         if (opts.actionCol) {
           // The action cell must NOT toggle the panel; stop click propagation.
           row += '<td class="pf-hl-action" onclick="event.stopPropagation()">'
-            + actionCell(p, opts.displayBucket) + '</td>';
+            + actionCell(p, opts.displayBucket, opts.idBucket) + '</td>';
         }
         row += '</tr>';
 
         // ---- detail panel row (collapsed by default) ----
         var span = 2 + highlights.length + (opts.actionCol ? 1 : 0);
         var detail = '';
-        detailCols.forEach(function(c){
-          var v = f[c.key];
-          if (v === undefined || v === null || String(v) === '') return; // skip blanks
-          var cls = (typeMap[c.key] === 'money') ? ' num' : '';
-          detail += '<div class="pf-hl-field">'
-            + '<span class="pf-hl-label">' + E(c.key) + '</span>'
-            + '<span class="pf-hl-value' + cls + '">' + E(v) + '</span></div>';
-        });
+        if (opts.detailGroups && opts.detailGroups.length) {
+          // GROUPED layout (Jonathan's Actively Bidding spec): each group is a
+          // subheading followed by its fields laid out across. Fields map a
+          // display label to a real feed key; a key that is missing/blank renders
+          // an empty value (we never invent data). 'Mirror main row' fields point
+          // at the same feed key shown in the highlight row.
+          opts.detailGroups.forEach(function(g){
+            var fields = '';
+            (g.fields || []).forEach(function(fd){
+              var raw = f[fd.key];
+              var v = (raw === undefined || raw === null) ? '' : raw;
+              var cls = (typeMap[fd.key] === 'money') ? ' num' : '';
+              fields += '<div class="pf-hl-field">'
+                + '<span class="pf-hl-label">' + E(fd.label) + '</span>'
+                + '<span class="pf-hl-value' + cls + '">' + E(v) + '</span></div>';
+            });
+            detail += '<div class="pf-hl-group">'
+              + '<div class="pf-hl-grouphead">' + E(g.title) + '</div>'
+              + '<div class="pf-hl-groupgrid">' + fields + '</div></div>';
+          });
+        } else {
+          // FLAT layout (Budget Pricing, Submitted Bids): every remaining non-blank
+          // field as a labeled value card.
+          detailCols.forEach(function(c){
+            var v = f[c.key];
+            if (v === undefined || v === null || String(v) === '') return; // skip blanks
+            var cls = (typeMap[c.key] === 'money') ? ' num' : '';
+            detail += '<div class="pf-hl-field">'
+              + '<span class="pf-hl-label">' + E(c.key) + '</span>'
+              + '<span class="pf-hl-value' + cls + '">' + E(v) + '</span></div>';
+          });
+        }
         if (!detail) detail = '<div class="pf-hl-field"><span class="pf-hl-value pf-record-muted">No additional fields recorded.</span></div>';
 
         // Record link + Activity opener live in the detail panel (they were
@@ -12006,7 +12079,7 @@ try {
           if (!key && ev.dataTransfer) { try { key = ev.dataTransfer.getData('text/plain'); } catch (e) {} }
           if (!key) { showErr('Could not identify the bid that was dragged. Please try again.'); return; }
           var action = zone.getAttribute('data-act');
-          if (action !== 'awarded' && action !== 'not_awarded' && action !== 'active') {
+          if (action !== 'awarded' && action !== 'not_awarded' && action !== 'active' && action !== 'submitted') {
             showErr('Unknown drop target.'); return;
           }
           showErr('');
@@ -12034,10 +12107,26 @@ try {
 
       // ----- OVERLAY: build the EFFECTIVE list for this bucket -----
       // A job with status=not_awarded leaves every stage bucket (it lives in Dead
-      // Set). A job with status=awarded is pulled INTO the awarded bucket from
-      // wherever it sat. status=active (or none) keeps its auto bucket.
+      // Set). status=awarded is pulled INTO the awarded bucket from wherever it
+      // sat. status=submitted is pulled INTO submitted_bids from wherever it sat
+      // (Jonathan's "Bid Submitted" action; it leaves actively_bidding). status=
+      // active (or none) keeps its auto bucket. RELOCATION dedupes on resolveKey()
+      // so numberless bids are handled too.
       var auto = D[disc][bucket] || [];
       var list = [];
+      // Relocation helper: gather bids from OTHER buckets of this discipline whose
+      // override status matches `want`, skipping ones already in `list`.
+      function pullRelocated(want){
+        var seen = {}; list.forEach(function(p){ seen[resolveKey(p)] = 1; });
+        Object.keys(D[disc]).forEach(function(b){
+          if (b === bucket) return;
+          (D[disc][b] || []).forEach(function(p){
+            var ov = overrideFor(p);
+            var rk = resolveKey(p);
+            if (ov && ov.status === want && !seen[rk]) { list.push(p); seen[rk] = 1; }
+          });
+        });
+      }
       if (bucket === 'awarded') {
         // Auto-awarded jobs that aren't overridden away, PLUS any job in THIS
         // discipline overridden to 'awarded' from another bucket.
@@ -12045,20 +12134,22 @@ try {
           var ov = overrideFor(p);
           if (!ov || ov.status === 'awarded') list.push(p);
         });
-        // Pull in jobs from other buckets of this discipline marked awarded.
-        var seen = {}; list.forEach(function(p){ seen[jobKey(p)] = 1; });
-        Object.keys(D[disc]).forEach(function(b){
-          if (b === 'awarded') return;
-          (D[disc][b] || []).forEach(function(p){
-            var ov = overrideFor(p);
-            if (ov && ov.status === 'awarded' && !seen[jobKey(p)]) { list.push(p); seen[jobKey(p)] = 1; }
-          });
-        });
-      } else {
-        // A stage bucket: drop jobs overridden to awarded or not_awarded.
+        pullRelocated('awarded');
+      } else if (bucket === 'submitted_bids') {
+        // Auto-submitted jobs that aren't overridden away (awarded/not_awarded/
+        // active relocate them out), PLUS any job overridden to 'submitted' from
+        // another bucket (the "Bid Submitted" action moves it here).
         auto.forEach(function(p){
           var ov = overrideFor(p);
-          if (ov && (ov.status === 'awarded' || ov.status === 'not_awarded')) return;
+          if (!ov || ov.status === 'submitted') list.push(p);
+        });
+        pullRelocated('submitted');
+      } else {
+        // A stage bucket (incl. actively_bidding): drop jobs overridden to
+        // awarded, not_awarded, or submitted (they have relocated elsewhere).
+        auto.forEach(function(p){
+          var ov = overrideFor(p);
+          if (ov && (ov.status === 'awarded' || ov.status === 'not_awarded' || ov.status === 'submitted')) return;
           list.push(p);
         });
       }
@@ -12093,11 +12184,15 @@ try {
       var displayBucket = (bucket === 'awarded') ? 'awarded' : 'open';
 
       // DRAG-AND-DROP bar: privileged roles can drag a bid row onto a resolution
-      // drop-zone. The zones map to the THREE states the /api/pipeline-state
-      // endpoint supports (awarded / not_awarded / active). The per-row buttons
-      // still work; this is an additive affordance, NOT a replacement. Hidden on
-      // touch-only devices (drag is impractical there) via the (hover: none) media
-      // rule below; the buttons remain the way to change state on touch.
+      // drop-zone. The zones map to the states /api/pipeline-state supports. The
+      // bar is BUCKET-AWARE so drag-to-act matches the per-row buttons exactly and
+      // users cannot bypass the submit-first flow:
+      //   actively_bidding -> single "Bid Submitted" zone (status 'submitted')
+      //   submitted_bids / budget_pricing -> Awarded + Not Awarded
+      //   awarded -> Not Awarded + Back to Active
+      // The per-row buttons still work; this is an additive affordance, NOT a
+      // replacement. Hidden on touch-only devices via the (hover: none) media rule;
+      // the buttons remain the way to change state on touch.
       if (canResolve()) {
         if (displayBucket === 'awarded') {
           html += '<div class="precon-dnd-bar">'
@@ -12107,6 +12202,12 @@ try {
             + '<span class="precon-dz-sub">drag here to return to bidding</span></div>'
             + '</div>'
             + '<div class="precon-dnd-hint">Drag an awarded bid onto a zone to change its status. The buttons in each row do the same.</div>';
+        } else if (bucket === 'actively_bidding') {
+          html += '<div class="precon-dnd-bar">'
+            + '<div class="precon-dropzone" data-act="submitted">Bid Submitted'
+            + '<span class="precon-dz-sub">drag a bid here to move it to Submitted Bids</span></div>'
+            + '</div>'
+            + '<div class="precon-dnd-hint">Drag a bid row here to mark it submitted. The Bid Submitted button in each row does the same.</div>';
         } else {
           html += '<div class="precon-dnd-bar">'
             + '<div class="precon-dropzone" data-act="awarded">Awarded'
@@ -12142,6 +12243,44 @@ try {
             { key: 'Due Date',              label: 'Bid Due Date',           type: 'date' },
             { key: 'City / State',          label: 'City / State',           type: 'text' },
             { key: 'General Contractor',    label: 'GC',                     type: 'text' }
+          ];
+          // GROUPED expand detail (Jonathan's spec). Labels map to real feed keys
+          // in data/precon-pipeline.js. 'Mirror main row' fields reuse the same
+          // feed key shown on the highlight row (Prelim -> Design Completed Date,
+          // Bid Due -> Due Date, GC -> General Contractor).
+          hlOpts.detailGroups = [
+            { title: 'Project General Items', fields: [
+              { label: 'Address',           key: 'Address' },
+              { label: 'Site Size',         key: 'Site Size (Acres)' },
+              { label: 'Total SF',          key: 'Total SF (Bldg Pad)' },
+              { label: 'Taxable',           key: 'Tax' },
+              { label: 'Wage Requirements', key: 'Wage Req.' }
+            ]},
+            { title: 'Project Schedule', fields: [
+              { label: 'Invite Date',           key: 'Invite Date' },
+              { label: 'Prelim Due Date',       key: 'Design Completed Date' },
+              { label: 'Bid Due Date',          key: 'Due Date' },
+              { label: 'Projected Start Date',  key: 'Projected Start Date' },
+              { label: 'Bid Follow up date',    key: 'Follow Up Date' }
+            ]},
+            { title: 'GC Information', fields: [
+              { label: 'GC',              key: 'General Contractor' },
+              { label: 'GC Contact name', key: 'Contact Name2' },
+              { label: 'GC Email',        key: 'GC Email' },
+              { label: 'GC Phone',        key: 'GC Phone' }
+            ]},
+            { title: 'Agg Pier Info', fields: [
+              { label: 'Total LF',          key: 'Total LF' },
+              { label: 'Total Columns',     key: 'Total Columns' },
+              { label: 'Total Stone (TN)',  key: 'Total Stone (TN)' },
+              { label: 'Project Duration',  key: 'Project Duration (Days)' },
+              { label: 'Top vs Bottom Feed',key: 'Top vs. Bottom Feed' },
+              { label: 'Bid Total Value',   key: 'Bid Total Value' },
+              { label: 'Retainer Month',    key: 'Date Paid' }
+            ]},
+            { title: 'Notes', fields: [
+              { label: 'Notes', key: 'Notes' }
+            ]}
           ];
         } else if (bucket === 'budget_pricing') {
           highlights = [
@@ -12179,6 +12318,7 @@ try {
           recordCol: (bucket === 'awarded'),
           actionCol: canResolve(),
           displayBucket: displayBucket,
+          idBucket: bucket,
           actionColLabel: (bucket === 'awarded') ? 'Awarded' : 'Resolution'
         });
       }
@@ -12301,8 +12441,22 @@ try {
         var dead = [], seen = {};
         Object.keys(D[disc]).forEach(function(b){
           (D[disc][b] || []).forEach(function(p){
-            var k = jobKey(p);
-            if (k && deadKeys[k] && !seen[k]) { dead.push(p); seen[k] = 1; }
+            // deadKeys is a fast pre-filter built from raw override keys (new
+            // resolveKey OR legacy bare-number). But raw-key presence is NOT
+            // authoritative: a bid that had an OLD bare-number not_awarded override
+            // and was later reactivated/submitted/awarded under the NEW key would
+            // still match its STALE legacy key. So after a deadKeys hit we require
+            // the EFFECTIVE status via overrideFor() - the SAME precedence (new key
+            // over legacy key) every other bucket uses. This keeps Dead Set
+            // membership driven by overrideFor(), not raw key presence, so a bid
+            // can never double-show in Dead Set AND its new bucket.
+            var rk = resolveKey(p);
+            var jk = jobKey(p);
+            var hit = (rk && deadKeys[rk]) || (jk && deadKeys[jk]);
+            if (!hit || seen[rk]) return;
+            var eff = overrideFor(p);
+            if (!eff || eff.status !== 'not_awarded') return; // skip stale legacy membership
+            dead.push(p); seen[rk] = 1;
           });
         });
         dead = sortByNumber(dead);
@@ -15373,6 +15527,9 @@ try {
   }
 
   // Awarded bids = the precon awarded bucket + any override marked awarded.
+  // The override map is keyed by bidId() (= the precon resolveKey/bidLogId scheme:
+  // 'num_<number>' or 'ng_<hash>'). We look up by bidId(p), with a backward-compat
+  // fall back to the bare Project Number for overrides saved before the key change.
   function awardedBids() {
     var D = window.PF_PRECON;
     if (!D) return [];
@@ -15384,7 +15541,7 @@ try {
         (D[disc][bucket] || []).forEach(function (p) {
           var k = bidId(p);
           var jk = String((p.number || (p.fields && p.fields['Project Number'])) || '');
-          var o = jk && ov[jk];
+          var o = ov[k] || (jk && ov[jk]) || null;
           var isAwarded = (bucket === 'awarded' && (!o || o.status === 'awarded')) || (o && o.status === 'awarded');
           if (isAwarded && !seen[k]) { out.push(p); seen[k] = 1; }
         });
@@ -15526,25 +15683,28 @@ try {
   };
 
   // AUTO-CREATE on award. Called by pfResolveBid() right after a successful
-  // 'awarded' POST. jobId is the bid's Project Number (jobKey). We find the
-  // matching awarded bid object, build the SAME payload createPM() uses, and POST
-  // create. The server is IDEMPOTENT on sourceBidId, so a re-click (or a bid that
-  // was already handed off) never mints a second number. Best effort + silent:
-  // the award itself already succeeded; a handoff hiccup must not block the UI.
-  // Returns nothing; refreshes window.PF_PM so the Awarded row shows the number.
+  // 'awarded' POST. jobId is the bid's resolveKey (= bidId(): 'num_<number>' or
+  // 'ng_<hash>'), the SAME key the override map + sourceBidId use. We find the
+  // matching awarded bid object by bidId(), build the SAME payload createPM() uses,
+  // and POST create. The server is IDEMPOTENT on sourceBidId, so a re-click (or a
+  // bid that was already handed off) never mints a second number. Best effort +
+  // silent: the award itself already succeeded; a handoff hiccup must not block the
+  // UI. Refreshes window.PF_PM so the Awarded row shows the number.
   window.pfAutoCreatePmOnAward = function (jobId) {
     try {
       var jk = String(jobId || '').trim();
       if (!jk) return;
-      // Find the awarded bid whose jobKey (Project Number) matches.
+      // Find the awarded bid whose bidId() matches the resolve key. Fall back to
+      // a bare Project Number match for legacy callers / overrides.
       var match = null;
       awardedBids().some(function (b) {
         var f = b.fields || {};
+        if (bidId(b) === jk) { match = b; return true; }
         var n = String((b.number || f['Project Number']) || '').trim();
         if (n && n === jk) { match = b; return true; }
         return false;
       });
-      if (!match) return; // no project number to hand off (cannot key a PM record)
+      if (!match) return; // could not resolve the awarded bid object
       // Skip the network call if we already hold a linked record for this bid.
       if (window.pfPmRecordFor(match)) return;
       createPM(match, function () {
