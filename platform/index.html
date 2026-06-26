@@ -2736,6 +2736,10 @@ document.addEventListener('click', function(e) {
       #mod-daily-reports .dr-row input.item { flex:2 1 auto; }
       #mod-daily-reports .dr-row input.desc { flex:2 1 auto; }
       #mod-daily-reports .dr-row .dr-cat { flex:0 0 150px; font-size:12px; color:var(--text-2,#aab1c0); }
+      #mod-daily-reports .dr-row select.ty { flex:0 0 130px; }
+      #mod-daily-reports .dr-row select.sc { flex:1 1 auto; }
+      #mod-daily-reports .dr-mt-cat { margin:10px 0 4px; }
+      #mod-daily-reports .dr-mt-cat-h { display:flex; align-items:center; justify-content:space-between; font-size:12px; font-weight:600; color:var(--text-2,#aab1c0); margin-bottom:4px; }
       #mod-daily-reports .dr-section-h { font-size:13px; font-weight:600; margin:12px 0 4px; }
       #mod-daily-reports .dr-proj-wrap { position:relative; }
       #mod-daily-reports .dr-proj-list { position:absolute; z-index:20; left:0; right:0; max-height:220px; overflow:auto; background:var(--surface-2,#1b212c); border:1px solid var(--border,#2a2f3a); border-radius:6px; display:none; }
@@ -2767,7 +2771,8 @@ document.addEventListener('click', function(e) {
             <div class="dr-proj-list" id="drProjList"></div>
           </div>
           <div><label>2. Foreman</label><select id="drForeman"><option value="">Select foreman</option></select></div>
-          <div><label>Weather</label><input type="text" id="drWeather" placeholder="Clear, 78F"></div>
+          <div><label>Precipitation</label><select id="drPrecip"><option value="">Select</option><option value="Clear">Clear</option><option value="Cloudy">Cloudy</option><option value="Rain">Rain</option><option value="Fog">Fog</option><option value="Snow">Snow</option></select></div>
+          <div><label>Temp</label><input type="text" id="drTemp" placeholder="72 F"></div>
           <div><label>Columns installed today</label><input type="text" id="drCols" placeholder="0" inputmode="numeric"></div>
           <div><label>LF installed today</label><input type="text" id="drLf" placeholder="0" inputmode="numeric"></div>
         </div>
@@ -2786,7 +2791,7 @@ document.addEventListener('click', function(e) {
         <div id="drRental"></div>
         <button type="button" class="btn btn-sm" id="drAddRental">+ Add rental</button>
 
-        <div class="dr-section-h">7. Equipment failures & maintenance</div>
+        <div class="dr-section-h">7. Equipment failures &amp; maintenance</div>
         <div id="drMaint"></div>
 
         <div class="dr-section-h">8. Future issues <span class="dr-flag">(maintenance to identify)</span></div>
@@ -2871,6 +2876,11 @@ document.addEventListener('click', function(e) {
     <div id="flWrap">
       <div class="fl-card fl-muted">These lists power the daily report form. Owners edit owned equipment, personnel and foremen. Rental and maintenance categories are fixed for now. <span class="fl-flag">Seed values are provisional, Derek to correct.</span></div>
       <div id="flEditable"></div>
+      <div class="fl-card">
+        <h3>Maintenance subcategories <span class="fl-flag">(per category, owner-editable)</span></h3>
+        <div class="fl-muted">These feed the Subcategory dropdown in section 7 of the daily report. Pick a category and add its options.</div>
+        <div id="flSubcats"></div>
+      </div>
       <div class="fl-card">
         <h3>Fixed categories <span class="fl-flag">(not editable in v1)</span></h3>
         <div class="fl-muted">Rental categories</div>
@@ -3176,8 +3186,13 @@ const moduleTitles = {
 function showModule(id) {
   document.querySelectorAll('.module-view').forEach(m => m.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.getElementById('mod-' + id).classList.add('active');
-  document.querySelector(`[data-module="${id}"]`).classList.add('active');
+  // Null-guard both lookups so a module with NO matching nav item (e.g.
+  // project-record opened via openProjectRecord, or a dashboard with a mod-
+  // container but no [data-module] link) never throws a TypeError on null.
+  var modEl = document.getElementById('mod-' + id);
+  if (modEl) modEl.classList.add('active');
+  var navEl = document.querySelector(`[data-module="${id}"]`);
+  if (navEl) navEl.classList.add('active');
   document.getElementById('pageTitle').textContent = moduleTitles[id] || id;
   // Lazy-load embedded document iframes on first view (keeps initial load light).
   var frame = document.querySelector('#mod-' + id + ' iframe.doc-frame');
@@ -3208,6 +3223,31 @@ function showModule(id) {
   // Close mobile sidebar
   document.getElementById('sidebar').classList.remove('open');
 }
+
+// ---- DEEP LINK (hash route) -------------------------------------------------
+// A URL like .../#field-lists opens that module on load. Generic: strip the
+// leading '#', and if a matching mod-<id> container exists, call showModule(id).
+// Runs AFTER the auth gate (this whole page only loads for an authenticated
+// session) so it cannot bypass auth; it simply navigates within the SPA. Never
+// throws into the page (wrapped) and no-ops on an unknown hash so existing nav
+// and the default landing module are untouched.
+function applyHashRoute() {
+  try {
+    var id = (location.hash || '').replace(/^#/, '').trim();
+    if (!id) return;
+    if (!/^[a-z0-9-]+$/i.test(id)) return; // only simple module ids
+    if (!document.getElementById('mod-' + id)) return; // unknown module -> no-op
+    // Also require a real nav item: some modules (bd-dashboard, precon-dashboard,
+    // project-record) have a mod- container but NO [data-module] nav entry and are
+    // not meant to be deep-linked. Cleanly no-op for those so we never leave a
+    // half-switched, no-loader state.
+    if (!document.querySelector('[data-module="' + id + '"]')) return;
+    if (typeof window.showModule === 'function') window.showModule(id);
+  } catch (e) { /* never break the page on a bad hash */ }
+}
+window.addEventListener('hashchange', applyHashRoute);
+if (document.readyState !== 'loading') applyHashRoute();
+else document.addEventListener('DOMContentLoaded', applyHashRoute);
 
 // ---- LIVE DASHBOARD (data from LIVE_BIDS / LIVE_PROJECTS injected by embed-data.py) ----
 
@@ -16082,7 +16122,7 @@ try {
   // the selected foreman when the user has not picked someone there manually.
   var state = {
     reports: [], priv: false,
-    lists: { ownedEquipment: [], personnel: [], foremen: [], rentalCategories: [], maintenanceCategories: [] },
+    lists: { ownedEquipment: [], personnel: [], foremen: [], rentalCategories: [], maintenanceCategories: [], maintenanceSubcategories: {} },
     projects: [],
     crew: [{ name: '', hours: '', costCode: '', auto: true }, { name: '', hours: '', costCode: '', auto: false }, { name: '', hours: '', costCode: '', auto: false }],
     owned: [{ machine: '', hours: '' }, { machine: '', hours: '' }],
@@ -16115,10 +16155,15 @@ try {
     state.projects = out;
   }
 
+  function emptyMaintRow(cat) {
+    return { category: cat, type: '', subcategory: '', item: '', hourAtFailure: '' };
+  }
+
   function buildMaintenanceRows() {
-    // 5 FIXED rows, one per maintenance category (from field-lists).
+    // One DEFAULT row per FIXED maintenance category (from field-lists). Each
+    // category is a header and the user can Add more rows under it.
     var cats = state.lists.maintenanceCategories || [];
-    state.maintenance = cats.map(function (c) { return { category: c, item: '', hourAtFailure: '' }; });
+    state.maintenance = cats.map(function (c) { return emptyMaintRow(c); });
   }
 
   function load() {
@@ -16141,6 +16186,7 @@ try {
           foremen: lr.body.foremen || [],
           rentalCategories: lr.body.rentalCategories || [],
           maintenanceCategories: lr.body.maintenanceCategories || [],
+          maintenanceSubcategories: lr.body.maintenanceSubcategories || {},
         };
       }
       buildMaintenanceRows();
@@ -16223,7 +16269,7 @@ try {
     host.innerHTML = state.owned.map(function (r, i) {
       return '<div class="dr-row">'
         + '<select class="eq" data-i="' + i + '" data-f="machine">' + opts(state.lists.ownedEquipment, r.machine, 'Machine') + '</select>'
-        + '<input class="hr" data-i="' + i + '" data-f="hours" placeholder="Op hours" inputmode="decimal" value="' + E(r.hours) + '">'
+        + '<input class="hr" data-i="' + i + '" data-f="hours" placeholder="Machine Hours" inputmode="decimal" value="' + E(r.hours) + '">'
         + '</div>';
     }).join('');
     host.querySelectorAll('[data-i]').forEach(function (el) {
@@ -16239,8 +16285,8 @@ try {
     if (!host) return;
     host.innerHTML = state.rental.map(function (r, i) {
       return '<div class="dr-row">'
-        + '<select class="eq" data-i="' + i + '" data-f="category">' + opts(state.lists.rentalCategories, r.category, 'Rental category') + '</select>'
-        + '<input class="hr" data-i="' + i + '" data-f="hours" placeholder="Op hours" inputmode="decimal" value="' + E(r.hours) + '">'
+        + '<select class="eq" data-i="' + i + '" data-f="category">' + opts(state.lists.rentalCategories, r.category, 'Rental equipment') + '</select>'
+        + '<input class="hr" data-i="' + i + '" data-f="hours" placeholder="Machine Hours" inputmode="decimal" value="' + E(r.hours) + '">'
         + '</div>';
     }).join('');
     host.querySelectorAll('[data-i]').forEach(function (el) {
@@ -16250,20 +16296,51 @@ try {
     });
   }
 
-  // ---- 7. Maintenance (5 FIXED rows: item text + machine hour at failure) ----
+  // ---- 7. Maintenance (per-category HEADER with Type/Subcategory/detail/hour
+  //         rows; each category can hold multiple rows via Add row) -------------
+  // state.maintenance is a flat array of {category,type,subcategory,item,
+  // hourAtFailure}. We render it grouped by the fixed maintenanceCategories so
+  // each category is a header. The subcategory dropdown for a row is fed from
+  // state.lists.maintenanceSubcategories[category] (owner-curated, may be empty).
+  var MAINT_TYPES = ['Failure', 'Maintenance'];
+
   function renderMaint() {
     var host = document.getElementById('drMaint');
     if (!host) return;
-    host.innerHTML = state.maintenance.map(function (r, i) {
-      return '<div class="dr-row">'
-        + '<span class="dr-cat">' + E(r.category) + '</span>'
-        + '<input class="item" data-i="' + i + '" data-f="item" placeholder="Failure or maintenance item" value="' + E(r.item) + '">'
-        + '<input class="hr" data-i="' + i + '" data-f="hourAtFailure" placeholder="Machine hour at failure" inputmode="decimal" value="' + E(r.hourAtFailure) + '">'
+    var cats = state.lists.maintenanceCategories || [];
+    var subs = state.lists.maintenanceSubcategories || {};
+    host.innerHTML = cats.map(function (cat) {
+      // rows belonging to this category, with their index in state.maintenance
+      var rowsHtml = state.maintenance.map(function (r, i) {
+        if (r.category !== cat) return '';
+        var subOpts = (subs && subs[cat]) ? subs[cat] : [];
+        return '<div class="dr-row">'
+          + '<select class="ty" data-i="' + i + '" data-f="type">' + opts(MAINT_TYPES, r.type, 'Type') + '</select>'
+          + '<select class="sc" data-i="' + i + '" data-f="subcategory">' + opts(subOpts, r.subcategory, 'Subcategory') + '</select>'
+          + '<input class="item" data-i="' + i + '" data-f="item" placeholder="Detail / notes" value="' + E(r.item) + '">'
+          + '<input class="hr" data-i="' + i + '" data-f="hourAtFailure" placeholder="Machine hour at failure" inputmode="decimal" value="' + E(r.hourAtFailure) + '">'
+          + '</div>';
+      }).join('');
+      return '<div class="dr-mt-cat">'
+        + '<div class="dr-mt-cat-h"><span>' + E(cat) + '</span>'
+        + '<button type="button" class="btn btn-sm" data-mtadd="' + E(cat) + '">+ Add row</button></div>'
+        + rowsHtml
         + '</div>';
     }).join('');
     host.querySelectorAll('[data-i]').forEach(function (el) {
       el.addEventListener('input', function () {
         state.maintenance[+this.getAttribute('data-i')][this.getAttribute('data-f')] = this.value;
+      });
+    });
+    host.querySelectorAll('button[data-mtadd]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var cat = this.getAttribute('data-mtadd');
+        // insert the new row right after the last existing row for this category
+        var lastIdx = -1;
+        for (var i = 0; i < state.maintenance.length; i++) { if (state.maintenance[i].category === cat) lastIdx = i; }
+        var at = (lastIdx >= 0) ? lastIdx + 1 : state.maintenance.length;
+        state.maintenance.splice(at, 0, emptyMaintRow(cat));
+        renderMaint();
       });
     });
   }
@@ -16351,14 +16428,15 @@ try {
       projectName: pname,
       projectId: pid,
       foreman: document.getElementById('drForeman').value,
-      weather: document.getElementById('drWeather').value,
+      precipitation: document.getElementById('drPrecip').value,
+      temp: document.getElementById('drTemp').value,
       columnsInstalled: document.getElementById('drCols').value,
       lfInstalled: document.getElementById('drLf').value,
       crew: state.crew.filter(function (m) { return (m.name || '').trim(); }).map(function (m) { return { name: m.name, hours: m.hours, costCode: m.costCode }; }),
       workCompleted: document.getElementById('drWork').value,
       equipmentOwned: state.owned.filter(function (r) { return (r.machine || '').trim() || (r.hours || '').toString().trim(); }),
       equipmentRental: state.rental.filter(function (r) { return (r.category || '').trim() || (r.hours || '').toString().trim(); }),
-      maintenance: state.maintenance.filter(function (r) { return (r.item || '').trim() || (r.hourAtFailure || '').toString().trim(); }),
+      maintenance: state.maintenance.filter(function (r) { return (r.type || '').trim() || (r.subcategory || '').trim() || (r.item || '').trim() || (r.hourAtFailure || '').toString().trim(); }),
       futureIssues: state.future.filter(function (r) { return (r.equipment || '').trim() || (r.description || '').trim(); }),
       delays: document.getElementById('drDelays').value,
       safety: document.getElementById('drSafety').value,
@@ -16386,7 +16464,7 @@ try {
   }
 
   function resetForm() {
-    ['drDate', 'drProject', 'drProjectId', 'drForeman', 'drWeather', 'drCols', 'drLf', 'drWork', 'drDelays', 'drSafety'].forEach(function (id) {
+    ['drDate', 'drProject', 'drProjectId', 'drForeman', 'drPrecip', 'drTemp', 'drCols', 'drLf', 'drWork', 'drDelays', 'drSafety'].forEach(function (id) {
       var el = document.getElementById(id); if (el) el.value = '';
     });
     state.crew = [{ name: '', hours: '', costCode: '', auto: true }, { name: '', hours: '', costCode: '', auto: false }, { name: '', hours: '', costCode: '', auto: false }];
@@ -16419,11 +16497,21 @@ try {
       }
       var ownedH = (r.equipmentOwned || []).map(function (e) { return E(e.machine) + (e.hours != null ? ' (' + E(e.hours) + 'h)' : ''); }).join(', ');
       var rentalH = (r.equipmentRental || []).map(function (e) { return E(e.category) + (e.hours != null ? ' (' + E(e.hours) + 'h)' : ''); }).join(', ');
-      var maintH = (r.maintenance || []).filter(function (m) { return (m.item || '').trim(); }).map(function (m) { return E(m.category) + ': ' + E(m.item) + (m.hourAtFailure != null ? ' @' + E(m.hourAtFailure) + 'h' : ''); }).join('; ');
+      var maintH = (r.maintenance || []).filter(function (m) { return (m.type || '').trim() || (m.subcategory || '').trim() || (m.item || '').trim(); }).map(function (m) {
+        var lbl = [];
+        if (m.type) lbl.push(E(m.type));
+        if (m.subcategory) lbl.push(E(m.subcategory));
+        if (m.item) lbl.push(E(m.item));
+        return E(m.category) + ': ' + lbl.join(' - ') + (m.hourAtFailure != null ? ' @' + E(m.hourAtFailure) + 'h' : '');
+      }).join('; ');
+      var weatherH = [];
+      if (r.precipitation) weatherH.push(E(r.precipitation));
+      if (r.temp) weatherH.push(E(r.temp));
+      if (!weatherH.length && r.weather) weatherH.push(E(r.weather)); // legacy records
       var futureH = (r.futureIssues || []).map(function (f) { return E(f.equipment) + (f.description ? ' - ' + E(f.description) : ''); }).join('; ');
       return '<div class="dr-item">'
         + '<div><strong>' + E(r.date) + ' - ' + E(r.projectName || r.projectId || '') + '</strong> ' + statusChip(r.status) + '</div>'
-        + '<div class="dr-muted" style="font-size:12px">Foreman ' + E(r.foreman || '-') + (crewH ? ' - crew ' + crewH : '') + (prod.length ? ' - ' + prod.join(', ') : '') + '</div>'
+        + '<div class="dr-muted" style="font-size:12px">Foreman ' + E(r.foreman || '-') + (crewH ? ' - crew ' + crewH : '') + (prod.length ? ' - ' + prod.join(', ') : '') + (weatherH.length ? ' - ' + weatherH.join(' ') : '') + '</div>'
         + (r.workCompleted ? '<div style="font-size:13px">' + E(r.workCompleted) + '</div>' : '')
         + (ownedH ? '<div class="dr-muted" style="font-size:12px">Owned: ' + ownedH + '</div>' : '')
         + (rentalH ? '<div class="dr-muted" style="font-size:12px">Rental: ' + rentalH + '</div>' : '')
@@ -16494,10 +16582,14 @@ try {
       maint.forEach(function (m) {
         if (!m || typeof m !== 'object') return;
         var item = (m.item == null) ? '' : String(m.item).trim();
+        var type = (m.type == null) ? '' : String(m.type).trim();         // new field (old rows: '')
+        var subcategory = (m.subcategory == null) ? '' : String(m.subcategory).trim(); // new field
         var hasHour = m.hourAtFailure != null && String(m.hourAtFailure) !== '';
-        if (!item && !hasHour) return; // skip empty fixed-category rows
+        if (!item && !type && !subcategory && !hasHour) return; // skip empty rows
         rows.push({
           category: (m.category == null || String(m.category).trim() === '') ? 'Other' : String(m.category),
+          type: type,
+          subcategory: subcategory,
           item: item,
           hourAtFailure: hasHour ? m.hourAtFailure : null,
           projectName: r.projectName || r.projectId || '',
@@ -16592,9 +16684,15 @@ try {
     host.innerHTML = groups.map(function (g) {
       var rowsHtml = g.rows.map(function (r) {
         var hr = (r.hourAtFailure != null) ? '<span class="mt-hr">@ ' + E(r.hourAtFailure) + ' h</span>' : '';
-        var itemTxt = r.item ? E(r.item) : '<span class="mt-muted">(failure logged, no detail)</span>';
+        // Prefix the detail with type + subcategory when present (new rows). Old
+        // rows have neither and render exactly as before.
+        var pre = [];
+        if (r.type) pre.push(E(r.type));
+        if (r.subcategory) pre.push(E(r.subcategory));
+        var preTxt = pre.length ? '<strong>' + pre.join(' - ') + '</strong>' + (r.item ? ': ' : '') : '';
+        var itemTxt = r.item ? E(r.item) : (pre.length ? '' : '<span class="mt-muted">(failure logged, no detail)</span>');
         return '<div class="mt-row">'
-          + '<div class="mt-item">' + itemTxt + hr + '</div>'
+          + '<div class="mt-item">' + preTxt + itemTxt + hr + '</div>'
           + '<div class="mt-meta">' + metaLine(r) + '</div>'
           + '</div>';
       }).join('');
@@ -16723,10 +16821,83 @@ try {
       }).join('');
       wireEditable();
     }
+    renderSubcats();
     var rentalHost = document.getElementById('flRental');
     if (rentalHost) rentalHost.innerHTML = (L.rentalCategories || []).map(function (v) { return '<span class="fl-tag">' + E(v) + '</span>'; }).join('') || '<span class="fl-muted">None</span>';
     var maintHost = document.getElementById('flMaint');
     if (maintHost) maintHost.innerHTML = (L.maintenanceCategories || []).map(function (v) { return '<span class="fl-tag">' + E(v) + '</span>'; }).join('') || '<span class="fl-muted">None</span>';
+  }
+
+  // ---- Maintenance subcategories editor (per fixed category) -----------------
+  // st.lists.maintenanceSubcategories is { <category>: [ ...options ] }. For each
+  // fixed maintenanceCategory we render an editable list (owner) or read-only
+  // tags (business_dev). Saving POSTs { list:'maintenanceSubcategories',
+  // category, items }.
+  function renderSubcats() {
+    var host = document.getElementById('flSubcats');
+    if (!host) return;
+    var L = st.lists || {};
+    var cats = L.maintenanceCategories || [];
+    var subs = L.maintenanceSubcategories || {};
+    host.innerHTML = cats.map(function (cat) {
+      var items = (subs[cat] || []);
+      var rows;
+      if (st.canEdit) {
+        rows = items.map(function (v, i) {
+          return '<div class="fl-row" data-sccat="' + E(cat) + '">'
+            + '<input data-sci="' + i + '" value="' + E(v) + '">'
+            + '<button type="button" class="btn btn-sm" data-scremove="' + i + '">Remove</button>'
+            + '</div>';
+        }).join('');
+        return '<div style="margin-bottom:10px"><div class="fl-muted" style="font-weight:600">' + E(cat) + '</div>'
+          + '<div data-scrows="' + E(cat) + '">' + rows + '</div>'
+          + '<button type="button" class="btn btn-sm" data-scadd="' + E(cat) + '">+ Add</button> '
+          + '<button type="button" class="btn btn-sm" data-scsave="' + E(cat) + '">Save ' + E(cat) + '</button></div>';
+      }
+      rows = items.map(function (v) { return '<span class="fl-tag">' + E(v) + '</span>'; }).join('');
+      return '<div style="margin-bottom:8px"><div class="fl-muted" style="font-weight:600">' + E(cat) + '</div>'
+        + '<div>' + (rows || '<span class="fl-muted">None</span>') + '</div></div>';
+    }).join('');
+    wireSubcats();
+  }
+
+  function wireSubcats() {
+    if (!st.canEdit) return;
+    var host = document.getElementById('flSubcats');
+    if (!host) return;
+    function bag() { return (st.lists.maintenanceSubcategories = st.lists.maintenanceSubcategories || {}); }
+    host.querySelectorAll('button[data-scadd]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var cat = this.getAttribute('data-scadd');
+        var m = bag(); (m[cat] = m[cat] || []).push('');
+        renderSubcats();
+      });
+    });
+    host.querySelectorAll('button[data-scremove]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var row = this.closest('.fl-row'); if (!row) return;
+        var cat = row.getAttribute('data-sccat'); var i = +this.getAttribute('data-scremove');
+        var m = bag(); if (m[cat]) { m[cat].splice(i, 1); renderSubcats(); }
+      });
+    });
+    host.querySelectorAll('div[data-scrows] input[data-sci]').forEach(function (el) {
+      el.addEventListener('input', function () {
+        var cat = this.closest('[data-scrows]').getAttribute('data-scrows');
+        var i = +this.getAttribute('data-sci');
+        var m = bag(); if (m[cat]) m[cat][i] = this.value;
+      });
+    });
+    host.querySelectorAll('button[data-scsave]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var cat = this.getAttribute('data-scsave');
+        var m = bag();
+        var items = (m[cat] || []).filter(function (v) { return (v || '').trim(); });
+        api('/api/field-lists', { method: 'POST', body: JSON.stringify({ list: 'maintenanceSubcategories', category: cat, items: items }) }).then(function (res) {
+          if (!res.ok || !res.body || !res.body.saved) { flmsg((res.body && res.body.message) || 'Save failed.', false); return; }
+          st.lists = res.body; flmsg('Saved.', true); render();
+        }).catch(function () { flmsg('Network error.', false); });
+      });
+    });
   }
 
   function wireEditable() {

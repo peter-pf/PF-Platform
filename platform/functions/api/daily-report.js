@@ -11,11 +11,13 @@
 //   daily_reports_v1 -> JSON { reports:[{
 //     id, date, projectId, projectName, foreman,
 //     crew:[{name, hours, costCode}],        // HOURS only, NO pay rate / $
-//     weather, workCompleted, columnsInstalled, lfInstalled, equipment,
+//     precipitation, temp,                   // weather split: precip dropdown + free-typed temp
+//     weather,                               // LEGACY single weather field (old records only, still read)
+//     workCompleted, columnsInstalled, lfInstalled, equipment,
 //     delays, safety,
-//     equipmentOwned:[{machine, hours}],      // OWNED machines on site + OPERATING hours (for maintenance) -- NO $
-//     equipmentRental:[{category, hours}],    // RENTAL by category + OPERATING hours -- NO $
-//     maintenance:[{category, item, hourAtFailure}], // 5 fixed rows (Excavator/Mast/Vibro/Drill/Rental Equipment) -- NO $
+//     equipmentOwned:[{machine, hours}],      // OWNED machines on site + OPERATING (machine) hours -- NO $
+//     equipmentRental:[{category, hours}],    // RENTAL by category + OPERATING (machine) hours -- NO $
+//     maintenance:[{category, type, subcategory, item, hourAtFailure}], // per-category rows: Failure/Maintenance + subcategory + detail + machine hour -- NO $
 //     futureIssues:[{equipment, description}],// maintenance to identify later (feeds a Phase 2 compiled view) -- NO $
 //     status,                                // 'draft'|'submitted'|'approved'|'sent-to-HR'
 //     createdBy, createdAt, updatedAt,
@@ -50,7 +52,7 @@ const MAX_CREW = 60;
 const MAX_STR = 4000;        // narrative cap
 const MAX_SHORT = 300;       // name/project/date/etc cap
 const MAX_EQUIP_ROWS = 50;   // owned / rental equipment rows cap
-const MAX_MAINT_ROWS = 20;   // maintenance rows cap (UI sends the 5 fixed categories)
+const MAX_MAINT_ROWS = 60;   // maintenance rows cap (5 categories, each can add rows)
 const MAX_FUTURE_ROWS = 50;  // future-issue rows cap
 
 const VALID_ACTIONS = { create: 1, update: 1, submit: 1, approve: 1, 'send-to-hr': 1 };
@@ -160,19 +162,27 @@ function cleanEquipmentRental(input) {
   return out;
 }
 
-// Rebuild a clean MAINTENANCE array: [{category, item, hourAtFailure}]. The UI
-// sends one row per FIXED maintenance category. `hourAtFailure` = the machine
-// hour-meter reading at the failure (NOT capped at 24), NOT money.
+// Rebuild a clean MAINTENANCE array:
+//   [{category, type, subcategory, item, hourAtFailure}].
+// The UI sends one or more rows per FIXED maintenance category (each category is
+// a header that can hold several rows). `type` = 'Failure'|'Maintenance' (a
+// label), `subcategory` = a per-category label chosen from the owner-curated
+// maintenanceSubcategories list, `item` = free-text detail, `hourAtFailure` = the
+// machine hour-meter reading (NOT capped at 24), NOT money. BACKWARD COMPATIBLE:
+// old rows are {category, item, hourAtFailure} (no type/subcategory) and still
+// read fine (type/subcategory become '').
 function cleanMaintenance(input) {
   if (!Array.isArray(input)) return [];
   const out = [];
   for (const r of input.slice(0, MAX_MAINT_ROWS)) {
     if (!r || typeof r !== 'object') continue;
     const category = s(r.category, MAX_SHORT);
+    const type = s(r.type, MAX_SHORT);
+    const subcategory = s(r.subcategory, MAX_SHORT);
     const it = s(r.item, MAX_STR);
     const h = meterHours(r.hourAtFailure);
-    if (!category && !it && h == null) continue;
-    out.push({ category, item: it, hourAtFailure: h });
+    if (!category && !type && !subcategory && !it && h == null) continue;
+    out.push({ category, type, subcategory, item: it, hourAtFailure: h });
   }
   return out;
 }
@@ -289,7 +299,12 @@ export async function onRequestPost(context) {
         projectName: s(src.projectName != null ? src.projectName : base.projectName, MAX_SHORT),
         foreman: s(src.foreman != null ? src.foreman : base.foreman, MAX_SHORT),
         crew: (src.crew != null) ? cleanCrew(src.crew) : (base.crew || []),
-        weather: s(src.weather != null ? src.weather : base.weather, MAX_SHORT),
+        // Weather split into precipitation (dropdown) + temp (free text). The
+        // legacy single 'weather' field is preserved for OLD records (read-through
+        // from base) but the form no longer writes it.
+        precipitation: s(src.precipitation != null ? src.precipitation : base.precipitation, MAX_SHORT),
+        temp: s(src.temp != null ? src.temp : base.temp, MAX_SHORT),
+        weather: s(base.weather, MAX_SHORT),
         workCompleted: s(src.workCompleted != null ? src.workCompleted : base.workCompleted, MAX_STR),
         columnsInstalled: (src.columnsInstalled != null) ? count(src.columnsInstalled) : (base.columnsInstalled != null ? base.columnsInstalled : null),
         lfInstalled: (src.lfInstalled != null) ? count(src.lfInstalled) : (base.lfInstalled != null ? base.lfInstalled : null),

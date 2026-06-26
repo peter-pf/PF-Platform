@@ -972,6 +972,20 @@ section('Field lists: source-level guards (owner-only WRITE, NO mail/money)');
      /isPrivileged\(session\)/.test(src) && /Only an owner can edit the field lists/.test(src));
   ok('field-lists uses env.PF_SCHEDULE', /env\.PF_SCHEDULE/.test(src));
   ok('field-lists keeps foremen a subset of personnel', /foremen\s*=\s*current\.foremen\.filter/.test(src));
+  // maintenanceSubcategories: owner-editable per-category lists, seeded empty,
+  // category validated against the FIXED maintenanceCategories.
+  ok('field-lists supports maintenanceSubcategories edits',
+     /isSubcats\s*=\s*listName\s*===\s*['"]maintenanceSubcategories['"]/.test(src));
+  ok('field-lists validates subcategory category against fixed categories',
+     /MAINTENANCE_CATEGORIES\.indexOf\(category\)\s*<\s*0/.test(src));
+  ok('field-lists subcategory write still owner-only (same POST handler)',
+     /isPrivileged\(session\)/.test(src));
+  ok('field-lists seeds maintenanceSubcategories empty per category',
+     /seedMaintenanceSubcategories/.test(src) && /for\s*\(const c of MAINTENANCE_CATEGORIES\)\s*o\[c\]\s*=\s*\[\]/.test(src));
+  ok('field-lists cleans subcategory items (dedupe/cap/angle-strip via cleanList)',
+     /function cleanMaintSubcats[\s\S]*?cleanList\(/.test(src));
+  ok('field-lists GET returns maintenanceSubcategories',
+     /maintenanceSubcategories:\s*cleanMaintSubcats/.test(src));
   const noComments = src.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
   ok('field-lists makes NO fetch / outbound call', !/\bfetch\s*\(/.test(noComments) && !/https?:\/\//.test(noComments));
   ok('field-lists calls NO mail API', !/sendMail|\/messages|smtp|nodemailer|mailgun|sendgrid/i.test(noComments));
@@ -994,6 +1008,15 @@ section('Field daily reports: new structured fields are operational, NO money');
   ok('daily-report cleanEquipmentRental uses meterHours', /cleanEquipmentRental[\s\S]*?meterHours\(r\.hours\)/.test(src));
   ok('daily-report cleanMaintenance hourAtFailure uses meterHours', /cleanMaintenance[\s\S]*?meterHours\(r\.hourAtFailure\)/.test(src));
   ok('daily-report crew.hours still uses 24-capped hours()', /cleanCrew[\s\S]*?hours:\s*hours\(m\.hours\)/.test(src));
+  // Derek refinements: maintenance row gains type + subcategory (labels, NO $);
+  // weather split into precipitation + temp (legacy weather still read).
+  ok('daily-report maintenance row has type + subcategory',
+     /cleanMaintenance[\s\S]*?type\s*=\s*s\(r\.type/.test(src) && /cleanMaintenance[\s\S]*?subcategory\s*=\s*s\(r\.subcategory/.test(src));
+  ok('daily-report maintenance row keeps category/item/hourAtFailure (backward compat)',
+     /out\.push\(\{\s*category,\s*type,\s*subcategory,\s*item:\s*it,\s*hourAtFailure:\s*h\s*\}\)/.test(src));
+  ok('daily-report stores precipitation + temp (weather split)',
+     /precipitation:\s*s\(/.test(src) && /temp:\s*s\(/.test(src));
+  ok('daily-report still reads legacy weather (old records)', /weather:\s*s\(base\.weather/.test(src));
   const noComments = src.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
   ok('daily-report new fields have NO money handler',
      !/['"](rate|wage|salary|payRate|amount|price|cost)['"]\s*:/.test(noComments));
