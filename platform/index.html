@@ -832,6 +832,26 @@ body.role-field-ops .nav-item[data-fo-hide] {
   background: rgba(0,0,0,0.08); border-radius: 8px; padding: 0 5px;
 }
 .pf-age-btn.active .pf-age-n { background: rgba(255,255,255,0.22); }
+/* ---- Awarded metrics strip (read-only scoreboard, monochrome + amber) ---- */
+.pf-awm-strip {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+  margin: 4px 0 14px;
+}
+@media (max-width: 720px) { .pf-awm-strip { grid-template-columns: repeat(2, 1fr); } }
+.pf-awm-tile {
+  border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
+  background: var(--bg-1, #fff); border-left: 3px solid var(--accent);
+}
+.pf-awm-label {
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em;
+  text-transform: uppercase; color: var(--text-3, #777);
+}
+.pf-awm-val {
+  font-size: 1.25rem; font-weight: 800; color: var(--text-1, #1a1a1a);
+  margin: 4px 0 2px; font-variant-numeric: tabular-nums;
+}
+.pf-awm-n { font-size: 0.7rem; font-weight: 600; color: var(--accent); margin-left: 2px; }
+.pf-awm-sub { font-size: 0.7rem; color: var(--text-3, #777); }
 /* ---- Actively Pricing due-dates CALENDAR (read-only) ---- */
 .pf-cal {
   border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
@@ -12592,6 +12612,74 @@ try {
       return Math.round((today - d.getTime()) / 86400000);
     }
 
+    // ----- AWARDED METRICS STRIP helpers -----
+    // Parse any tolerant date string (ISO or US, via calParseYMD) to a UTC-midnight
+    // epoch so date-to-date deltas are tz-safe (no off-by-one). Returns null on junk.
+    function awUtcMidnight(raw){
+      var ymd = calParseYMD(raw);
+      if (!ymd) return null;
+      return Date.UTC(ymd.y, ymd.m, ymd.d);
+    }
+    // Whole-day delta (date2 - date1) when BOTH parse, else null. Same Y/M/D
+    // UTC-midnight basis as awUtcMidnight so there is no timezone drift.
+    function awDayDelta(rawFrom, rawTo){
+      var a = awUtcMidnight(rawFrom);
+      var b = awUtcMidnight(rawTo);
+      if (a == null || b == null) return null;
+      return Math.round((b - a) / 86400000);
+    }
+    // Award date (ISO) for a bid from its linked PM record (pfPmRecordFor.awardedAt),
+    // or '' when no PM record is linked (that job is skipped from award-based averages).
+    function awAwardDate(p){
+      try {
+        var pm = (typeof window.pfPmRecordFor === 'function') ? window.pfPmRecordFor(p) : null;
+        return (pm && pm.awardedAt) ? String(pm.awardedAt) : '';
+      } catch (e) { return ''; }
+    }
+    // Read-only scoreboard of running AVERAGES across all awarded jobs in the list.
+    // Four metrics, each = mean of (date2 - date1) in whole days across jobs where
+    // BOTH dates parse; jobs missing a needed date are skipped from THAT metric.
+    //   1. Bid turnaround     : Invite Date        -> Bid Due Date
+    //   2. Outstanding bid    : Bid Due Date        -> Award date (PM awardedAt)
+    //   3. Due to start       : Bid Due Date        -> Projected Start Date
+    //   4. Award to start     : Award date          -> Projected Start Date
+    // Dates: Invite/Projected Start = feed; Bid Due = effDate override-or-feed;
+    // Award date = PM record. Each tile shows "avg N days (n=K)" or "-" when K=0.
+    function renderAwardedMetricsStrip(list){
+      var acc = [
+        { label: 'Avg bid turnaround',     sub: 'invite to bid due',   sum: 0, n: 0 },
+        { label: 'Avg outstanding bid',    sub: 'bid due to award',    sum: 0, n: 0 },
+        { label: 'Avg due to start',       sub: 'bid due to start',    sum: 0, n: 0 },
+        { label: 'Avg award to start',     sub: 'award to start',      sum: 0, n: 0 }
+      ];
+      (list || []).forEach(function(p){
+        var f = (p && p.fields) || {};
+        var invite = f['Invite Date'];
+        var bidDue = effDate(p, 'dueDate');            // override-or-feed
+        var projStart = f['Projected Start Date'];
+        var award = awAwardDate(p);                    // '' when no PM record
+
+        var d1 = awDayDelta(invite, bidDue);
+        if (d1 != null) { acc[0].sum += d1; acc[0].n++; }
+        var d2 = award ? awDayDelta(bidDue, award) : null;
+        if (d2 != null) { acc[1].sum += d2; acc[1].n++; }
+        var d3 = awDayDelta(bidDue, projStart);
+        if (d3 != null) { acc[2].sum += d3; acc[2].n++; }
+        var d4 = award ? awDayDelta(award, projStart) : null;
+        if (d4 != null) { acc[3].sum += d4; acc[3].n++; }
+      });
+      var tiles = acc.map(function(a){
+        var val = (a.n > 0)
+          ? (Math.round(a.sum / a.n) + ' days <span class="pf-awm-n">(n=' + a.n + ')</span>')
+          : '<span class="pf-record-muted">-</span>';
+        return '<div class="pf-awm-tile">'
+          + '<div class="pf-awm-label">' + E(a.label) + '</div>'
+          + '<div class="pf-awm-val">' + val + '</div>'
+          + '<div class="pf-awm-sub">' + E(a.sub) + '</div></div>';
+      }).join('');
+      return '<div class="pf-awm-strip">' + tiles + '</div>';
+    }
+
     // HIGHLIGHTS-ROW + CLICK-TO-EXPAND renderer (Actively Bidding + Budget
     // Pricing). A compact full-width table shows only the headline columns; every
     // remaining bid-log field drops into a per-project labeled detail panel that
@@ -12615,7 +12703,7 @@ try {
       var thead = '<th class="pf-hl-disc" aria-label="expand"></th>'
         + '<th>Project</th>';
       highlights.forEach(function(h){
-        var cls = (h.type === 'money' || h.type === 'num' || h.type === 'effmoney' || h.type === 'bidprice') ? ' class="num"' : '';
+        var cls = (h.type === 'money' || h.type === 'num' || h.type === 'effmoney' || h.type === 'bidprice' || h.type === 'diam') ? ' class="num"' : '';
         thead += '<th' + cls + '>' + E(h.label || h.key) + '</th>';
       });
       if (opts.actionCol) thead += '<th class="pf-hl-action">Resolution</th>';
@@ -12650,15 +12738,46 @@ try {
         // ---- main highlights row ----
         var nameTxt = E(p.name || f['Project Name'] || '');
         if (p.completed) nameTxt += ' <span class="pf-tag-completed">Completed</span>';
-        if (ov && ov.status === 'awarded') nameTxt += ' <span class="pf-tag-awarded">Awarded</span>' + pmNumTag(p);
+        // In the Awarded bucket the assigned job number lives in the name sub-line
+        // (opts.subLineAwarded), so the pmNumTag chip would duplicate it; show only
+        // the "Awarded" tag there (+ a "PM complete" marker), keeping pmNumTag for
+        // every other bucket that may surface an awarded row.
+        if (ov && ov.status === 'awarded') {
+          nameTxt += ' <span class="pf-tag-awarded">Awarded</span>';
+          if (!opts.subLineAwarded) {
+            nameTxt += pmNumTag(p);
+          } else {
+            try {
+              var pmDone = (typeof window.pfPmRecordFor === 'function') ? window.pfPmRecordFor(p) : null;
+              if (pmDone && pmDone.status === 'completed') nameTxt += ' <span class="pf-tag-completed">PM complete</span>';
+            } catch (e) {}
+          }
+        }
         if (ov && ov.status === 'not_awarded') nameTxt += ' <span class="pf-tag-dead">Dead</span>';
         if (ov && ov.status === 'not_bidding') nameTxt += ' <span class="pf-tag-dead">Dead</span>';
         // Sub-line under the project name. By default it is the project number;
         // for buckets that set opts.subLineKey (Actively Pricing uses City/State
-        // because no number is assigned yet) it is that field instead.
-        var subTxt = opts.subLineKey
-          ? E(f[opts.subLineKey] || '')
-          : E(p.number || f['Project Number'] || '');
+        // because no number is assigned yet) it is that field instead. The Awarded
+        // bucket sets opts.subLineAwarded: the sub-line is the auto-assigned job
+        // number (from the linked PM record) followed by "City, ST" in the SAME
+        // small font, joined by a middot. Either part may be blank.
+        var subTxt;
+        if (opts.subLineAwarded) {
+          var jobNum = '';
+          try {
+            var pmRec = (typeof window.pfPmRecordFor === 'function') ? window.pfPmRecordFor(p) : null;
+            jobNum = (pmRec && pmRec.projectNumber) ? String(pmRec.projectNumber) : '';
+          } catch (e) { jobNum = ''; }
+          var cityState = f['City / State'] || '';
+          var subParts = [];
+          if (jobNum) subParts.push(E(jobNum));
+          if (cityState) subParts.push(E(cityState));
+          subTxt = subParts.join(' &middot; ');
+        } else {
+          subTxt = opts.subLineKey
+            ? E(f[opts.subLineKey] || '')
+            : E(p.number || f['Project Number'] || '');
+        }
         var nameCell = '<div class="pf-hl-name">' + nameTxt + '</div>'
           + (subTxt ? '<div class="pf-record-muted">' + subTxt + '</div>' : '');
 
@@ -12757,6 +12876,29 @@ try {
             row += '<td class="pf-hl-bidprice pf-bidprice num" data-bid="' + pbid + '"'
               + ' data-prev="' + E(praw) + '" onclick="event.stopPropagation()">'
               + pInner + '</td>';
+            return;
+          }
+          // COLUMN DIAMETER cell (Awarded): there is NO diameter/pier-size field in
+          // the Project Bid Log feed today, so we render a muted dash rather than
+          // invent a value. (Flagged for Jonathan to tell us the source field.)
+          if (h.type === 'diam') {
+            row += '<td class="num"><span class="pf-record-muted">-</span></td>';
+            return;
+          }
+          // AWARDED GC OF RECORD cell (Awarded): the chosen awarded GC if set, else
+          // the lead bidding GC, else the feed GC (window.pfAwardedGcFor). Wraps so
+          // the full name is readable (same .pf-hl-gc treatment as the 'gc' type).
+          if (h.type === 'awgc') {
+            var awgc = '';
+            try {
+              awgc = (typeof window.pfAwardedGcFor === 'function')
+                ? String(window.pfAwardedGcFor(p) || '')
+                : String((p && p.gc) || f['General Contractor'] || '');
+            } catch (e) {
+              awgc = String((p && p.gc) || f['General Contractor'] || '');
+            }
+            var awcell = awgc ? E(awgc) : '<span class="pf-record-muted">-</span>';
+            row += '<td class="pf-hl-gc">' + awcell + '</td>';
             return;
           }
           // EFFECTIVE MONEY cell (submitted_bids Bid Total): show the entered Bid
@@ -13447,6 +13589,13 @@ try {
       if (sLf != null) parts.push('Total LF ' + fmtNum0(sLf));
       html += '<div class="pf-index-meta" style="margin:4px 0 10px">' + E(parts.join('  •  ')) + '</div>';
 
+      // ----- AWARDED METRICS STRIP (read-only scoreboard) -----
+      // Running averages across all awarded jobs of THIS discipline. Sits at the
+      // top of the Awarded module. See renderAwardedMetricsStrip for the formulas.
+      if (bucket === 'awarded') {
+        html += renderAwardedMetricsStrip(list);
+      }
+
       var displayBucket = (bucket === 'awarded') ? 'awarded' : 'open';
 
       // DRAG-AND-DROP bar: privileged roles can drag a bid row onto a resolution
@@ -13494,7 +13643,7 @@ try {
       // Actively Bidding + Budget Pricing + Submitted Bids use the HIGHLIGHTS-ROW
       // + click-to-expand layout (no horizontal scroll). All other buckets keep
       // the WIDE table.
-      var useHighlights = (bucket === 'actively_bidding' || bucket === 'budget_pricing' || bucket === 'submitted_bids');
+      var useHighlights = (bucket === 'actively_bidding' || bucket === 'budget_pricing' || bucket === 'submitted_bids' || bucket === 'awarded');
       if (useHighlights) {
         // Actively Bidding highlight columns are FIXED by Jonathan's spec:
         // Project Name (name cell), Design Completed Date, Due Date, City/State, GC.
@@ -13567,6 +13716,28 @@ try {
             { key: 'City / State',       label: 'City / State',     type: 'text' },
             { key: 'General Contractor', label: 'GC',               type: 'text' },
             { key: 'Bid Total Value',    label: 'Bid Total Value',  type: 'money' }
+          ];
+        } else if (bucket === 'awarded') {
+          // AWARDED bucket (Jonathan's trimmed layout). The name cell carries the
+          // project name with the auto-assigned job number + "City, ST" on the
+          // sub-line (opts.subLineAwarded). The columns are the key award metrics;
+          // everything else drops into the click-to-expand detail.
+          //   Bid Total Value -> override-or-feed (effmoney, single $, commas)
+          //   Total LF / Total Columns / Total Stone -> quantities
+          //   Column diameter (24 vs 30) -> NO feed field exists, render blank
+          //   Projected Start Date -> override-or-feed style (no override field
+          //     today, so it shows the feed value via 'date')
+          //   GC -> awarded GC of record (pfAwardedGcFor), else feed GC ('awgc')
+          hlOpts.compact = true;
+          hlOpts.subLineAwarded = true;
+          highlights = [
+            { key: 'Bid Total Value',      label: 'Bid Total',     type: 'effmoney', w: '110px' },
+            { key: 'Total LF',             label: 'Total LF',      type: 'num',      w: '90px' },
+            { key: 'Total Columns',        label: 'Columns',       type: 'num',      w: '84px' },
+            { key: 'Total Stone (TN)',     label: 'Stone (TN)',    type: 'num',      w: '92px' },
+            { key: '__diameter',           label: 'Diameter',      type: 'diam',     w: '90px' },
+            { key: 'Projected Start Date', label: 'Proj. Start',   type: 'date',     w: '108px' },
+            { key: 'General Contractor',   label: 'GC',            type: 'awgc' }
           ];
         } else {
           // SUBMITTED BIDS - Jonathan's exact order. Project Name lives in the
