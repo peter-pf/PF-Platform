@@ -12697,7 +12697,13 @@ try {
       var hlKeys = { 'Project Name': 1 };
       highlights.forEach(function(h){ hlKeys[h.key] = 1; });
       var allCols = (window.PF_PRECON.columns && window.PF_PRECON.columns[disc]) ? window.PF_PRECON.columns[disc] : [];
-      var detailCols = allCols.filter(function(c){ return !hlKeys[c.key]; });
+      // When the editable Bidding GCs block is shown (gcEditor), the raw GC feed
+      // fields are managed there, so suppress them from the FLAT detail cards to
+      // avoid duplicating GC info (the grouped layout already omits them).
+      var gcFeedKeys = opts.gcEditor
+        ? { 'General Contractor': 1, 'Contact Name2': 1, 'GC Email': 1, 'GC Phone': 1 }
+        : {};
+      var detailCols = allCols.filter(function(c){ return !hlKeys[c.key] && !gcFeedKeys[c.key]; });
 
       // ---- header ----
       var thead = '<th class="pf-hl-disc" aria-label="expand"></th>'
@@ -12969,13 +12975,6 @@ try {
               + '<div class="pf-hl-grouphead">' + E(g.title) + '</div>'
               + '<div class="pf-hl-groupgrid">' + fields + '</div></div>';
           });
-          // BIDDING GCS editor (Actively Pricing only): one tidy editable block per
-          // GC + add/remove + set-as-awarded. Replaces the old read-only GC group.
-          if (opts.gcEditor) {
-            detail += '<div class="pf-hl-group pf-gc-group">'
-              + '<div class="pf-hl-grouphead">Bidding GCs</div>'
-              + pfGcEditorHtml(p) + '</div>';
-          }
         } else {
           // FLAT layout (Budget Pricing, Submitted Bids): every remaining non-blank
           // field as a labeled value card.
@@ -12987,6 +12986,15 @@ try {
               + '<span class="pf-hl-label">' + E(c.key) + '</span>'
               + '<span class="pf-hl-value' + cls + '">' + E(v) + '</span></div>';
           });
+        }
+        // BIDDING GCS editor (Actively Pricing + Budget Pricing): one tidy editable
+        // block per GC + add/remove + set-as-awarded. Appended after EITHER detail
+        // layout (grouped or flat) so multi-GC editing works in both buckets. Keyed
+        // by bidId so the GC list persists per bid regardless of bucket.
+        if (opts.gcEditor) {
+          detail += '<div class="pf-hl-group pf-gc-group">'
+            + '<div class="pf-hl-grouphead">Bidding GCs</div>'
+            + pfGcEditorHtml(p) + '</div>';
         }
         if (!detail) detail = '<div class="pf-hl-field"><span class="pf-hl-value pf-record-muted">No additional fields recorded.</span></div>';
 
@@ -13711,11 +13719,22 @@ try {
             ]}
           ];
         } else if (bucket === 'budget_pricing') {
+          // Jonathan: Budget Pricing mirrors Actively Pricing's identity treatment.
+          // No project number is assigned during pricing, so City / State moves to
+          // the name sub-line (subLineKey) and is dropped as its own column. The
+          // date column header reads "Budget Submission Date" but still maps to the
+          // same feed field "Due Date" (label-only change). A new "Follow Up Date"
+          // column sits right after it. GC reuses the multi-GC list (gclist cell +
+          // editable Bidding GCs block in the expand via gcEditor), keyed by bidId
+          // so it persists per bid exactly like Actively Pricing. Bid Total Value
+          // stays as the feed money column.
+          hlOpts.subLineKey = 'City / State';
+          hlOpts.gcEditor = true; // append the editable Bidding GCs block in the expand detail
           highlights = [
-            { key: 'Due Date',           label: 'Bid Due Date',     type: 'date' },
-            { key: 'City / State',       label: 'City / State',     type: 'text' },
-            { key: 'General Contractor', label: 'GC',               type: 'text' },
-            { key: 'Bid Total Value',    label: 'Bid Total Value',  type: 'money' }
+            { key: 'Due Date',       label: 'Budget Submission Date', type: 'date',   w: '170px' },
+            { key: 'Follow Up Date', label: 'Follow Up Date',         type: 'date',   w: '150px' },
+            { key: '__biddingGcs',   label: 'Bidding GCs',            type: 'gclist', w: '160px' },
+            { key: 'Bid Total Value',label: 'Bid Total Value',        type: 'money' }
           ];
         } else if (bucket === 'awarded') {
           // AWARDED bucket (Jonathan's trimmed layout). The name cell carries the
