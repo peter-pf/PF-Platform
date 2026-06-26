@@ -1,8 +1,9 @@
 // Cloudflare Pages Function -- /api/precon-bid-meta
 // Per-bid PRECONSTRUCTION metadata overlay for the Actively Pricing module.
 // One KV map keyed by the stable bid id holds, per bid:
-//   - date OVERRIDES (Prelim "Design Completed Date" + "Bid Due Date") so an
-//     addendum-shifted date can be corrected without touching the read-only feed;
+//   - date OVERRIDES (Prelim "Design Completed Date", "Bid Due Date" + the
+//     "Award Date") so an addendum-shifted or backfilled date can be corrected
+//     without touching the read-only feed;
 //   - the BIDDING GCS list (multiple GCs can bid the same job);
 //   - the AWARDED GC index (which GC of record won).
 // Mirrors the precon-flag.js / precon-log.js KV + write-hardening pattern.
@@ -12,7 +13,7 @@
 //   precon_bid_meta_v1 -> JSON {
 //     meta: { updated },
 //     bids: { <bidId>: {
-//       dates:     { designCompletedDate?, dueDate? },  // ISO YYYY-MM-DD, only set ones present
+//       dates:     { designCompletedDate?, dueDate?, awardDate? },  // ISO YYYY-MM-DD, only set ones present
 //       gcs:       [ { company, contact, email, phone } ],
 //       awardedGc: <int index into gcs, or -1>,
 //       bidPrice:  <non-negative number as a string, or absent>,  // entered Bid Price
@@ -49,7 +50,7 @@ const MAX_SHORT = 300;      // bidId / company / contact / phone cap
 const MAX_EMAIL = 200;      // email cap
 const MAX_GCS = 12;         // bidding GCs per bid cap
 
-const VALID_DATE_FIELD = { designCompletedDate: 1, dueDate: 1 };
+const VALID_DATE_FIELD = { designCompletedDate: 1, dueDate: 1, awardDate: 1 };
 const MAX_PRICE = 1e12;     // sanity cap on the entered Bid Price ($1 trillion)
 
 const JSON_HEADERS = {
@@ -151,7 +152,7 @@ export async function onRequestGet(context) {
 
 // ---- POST: set one bid's meta via a sub-action -----------------------------
 // Body (one of):
-//   { action:'setDate',      bidId, field:'designCompletedDate'|'dueDate', value:ISO|'' }
+//   { action:'setDate',      bidId, field:'designCompletedDate'|'dueDate'|'awardDate', value:ISO|'' }
 //   { action:'setGcs',       bidId, gcs:[ {company,contact,email,phone}, ... ] }
 //   { action:'setAwardedGc', bidId, index:int }
 //   { action:'setBidPrice',  bidId, value:number|moneyString|'' }
@@ -197,6 +198,7 @@ export async function onRequestPost(context) {
       dates: (prev.dates && typeof prev.dates === 'object') ? {
         designCompletedDate: s(prev.dates.designCompletedDate, 10) || undefined,
         dueDate: s(prev.dates.dueDate, 10) || undefined,
+        awardDate: s(prev.dates.awardDate, 10) || undefined,
       } : {},
       gcs: Array.isArray(prev.gcs) ? prev.gcs.slice(0, MAX_GCS).map(normGc) : [],
       awardedGc: Number.isInteger(prev.awardedGc) ? prev.awardedGc : -1,
@@ -208,11 +210,12 @@ export async function onRequestPost(context) {
     // Drop any undefined date keys so we only persist set ones.
     if (rec.dates.designCompletedDate === undefined) delete rec.dates.designCompletedDate;
     if (rec.dates.dueDate === undefined) delete rec.dates.dueDate;
+    if (rec.dates.awardDate === undefined) delete rec.dates.awardDate;
 
     if (action === 'setDate') {
       const field = String((parsed && parsed.field) || '');
       if (!VALID_DATE_FIELD[field]) {
-        return json({ status: 'error', message: "field must be 'designCompletedDate' or 'dueDate'." }, 400);
+        return json({ status: 'error', message: "field must be 'designCompletedDate', 'dueDate' or 'awardDate'." }, 400);
       }
       const iso = normIsoDate(parsed && parsed.value);
       if (iso === null) return json({ status: 'error', message: 'value must be an ISO date (YYYY-MM-DD) or empty.' }, 400);

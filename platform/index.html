@@ -1777,6 +1777,7 @@ body.role-field-ops .nav-item[data-fo-hide] {
     '/data/budget-actual-poet.js',
     '/data/awarded-projects.js',
     '/data/precon-pipeline.js',
+    '/data/project-master.js',
     '/data/pf-coi.js',
     '/data/pf-dashboard.js'      // company-wide monthly KPI dashboard (financials_global)
   ];
@@ -1809,7 +1810,7 @@ body.role-field-ops .nav-item[data-fo-hide] {
   if (isPrivileged) {
     feeds.push('/data/project-record-poet.js', '/data/project-records.js',
                '/data/budget-actual-poet.js', '/data/awarded-projects.js',
-               '/data/precon-pipeline.js', '/data/pf-coi.js',
+               '/data/precon-pipeline.js', '/data/project-master.js', '/data/pf-coi.js',
                '/data/pf-dashboard.js');
   } else {
     // field_ops: the project LIST comes from the field-safe derivative (no $),
@@ -12112,6 +12113,14 @@ try {
     function effDate(p, field){
       var rec = bidMetaFor(p);
       if (rec && rec.dates && rec.dates[field] != null && rec.dates[field] !== '') return rec.dates[field];
+      // 'awardDate' has NO bid-log feed column. With no override it falls back to the
+      // PF Project Master LOI/NOI date, then the PM record awardedAt (click-time).
+      // (designCompletedDate/dueDate keep their BIDMETA_FEED_KEY feed behavior.)
+      if (field === 'awardDate') {
+        var m = pfMasterFor(p);
+        if (m && m.awardDate) return String(m.awardDate);
+        return awAwardDate(p);
+      }
       var f = (p && p.fields) || {};
       var v = f[BIDMETA_FEED_KEY[field]];
       return (v == null) ? '' : String(v);
@@ -12202,6 +12211,11 @@ try {
         var ymd = calParseYMD(raw);
         if (ymd) return E((ymd.m + 1) + '/' + ymd.d) + mark;
       }
+      // Default display: normalize to US M/D/YYYY when the value parses so an
+      // ISO-stored value (override or PF Project Master award date) reads the same
+      // as the SharePoint feed dates next to it. Unparseable values show raw.
+      var ymdf = calParseYMD(raw);
+      if (ymdf) return E((ymdf.m + 1) + '/' + ymdf.d + '/' + ymdf.y) + mark;
       return E(raw) + mark;
     }
 
@@ -12655,28 +12669,93 @@ try {
         return (pm && pm.awardedAt) ? String(pm.awardedAt) : '';
       } catch (e) { return ''; }
     }
+    // ----- PROJECT MASTER join (window.PF_PROJECT_MASTER, data/project-master.js) -----
+    // Normalize a project name to lowercase alphanumerics only (strip every
+    // non-alphanumeric char). MUST match the normalization used to build byName.
+    function pfMasterNorm(s){ return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, ''); }
+    // Resolve an awarded bid to its PF Project Master record, or null. Lookup order:
+    // (1) by project NUMBER (prefer the linked PM record's number, else the feed
+    //     'Project Number'); (2) by normalized NAME; (3) a normalized-contains scan
+    //     of .projects (tolerates suffixes like " (Garbin)"); else null.
+    function pfMasterFor(p){
+      try {
+        var M = window.PF_PROJECT_MASTER;
+        if (!M) return null;
+        var f = (p && p.fields) || {};
+        // Number: prefer the linked PM record number, else the feed field.
+        var number = '';
+        try {
+          var pm = (typeof window.pfPmRecordFor === 'function') ? window.pfPmRecordFor(p) : null;
+          if (pm && pm.projectNumber) number = String(pm.projectNumber).trim();
+        } catch (e) {}
+        if (!number && f['Project Number'] != null) number = String(f['Project Number']).trim();
+        if (number && M.byNumber && M.byNumber[number]) return M.byNumber[number];
+        // Name (normalized).
+        var name = (f['Project Name'] != null && f['Project Name'] !== '') ? f['Project Name'] : (p && p.name) || '';
+        var nn = pfMasterNorm(name);
+        if (nn && M.byName && M.byName[nn]) return M.byName[nn];
+        // Fallback: normalized-contains scan (either direction).
+        if (nn && Array.isArray(M.projects)) {
+          for (var i = 0; i < M.projects.length; i++) {
+            var rec = M.projects[i];
+            var rn = pfMasterNorm(rec && rec.name);
+            if (rn && (rn.indexOf(nn) !== -1 || nn.indexOf(rn) !== -1)) return rec;
+          }
+        }
+        return null;
+      } catch (e) { return null; }
+    }
+    // TRUE award date (ISO) driving the award-based metrics + the editable Award Date
+    // column default. Order: (1) precon-bid-meta override (effDate when it is an
+    // explicit override); (2) the PF Project Master LOI/NOI date; (3) the PM record
+    // awardedAt (click-time fallback). '' when none.
+    function awTrueAwardDate(p){
+      try {
+        if (effDateIsOverride(p, 'awardDate')) {
+          var ov = effDate(p, 'awardDate');
+          if (ov) return String(ov);
+        }
+        var m = pfMasterFor(p);
+        if (m && m.awardDate) return String(m.awardDate);
+      } catch (e) {}
+      return awAwardDate(p);
+    }
     // Read-only scoreboard of running AVERAGES across all awarded jobs in the list.
     // Four metrics, each = mean of (date2 - date1) in whole days across jobs where
     // BOTH dates parse; jobs missing a needed date are skipped from THAT metric.
     //   1. Bid turnaround     : Invite Date        -> Bid Due Date
-    //   2. Outstanding bid    : Bid Due Date        -> Award date (PM awardedAt)
+    //   2. Outstanding bid    : Bid Due Date        -> Award date (true award date)
     //   3. Due to start       : Bid Due Date        -> Projected Start Date
     //   4. Award to start     : Award date          -> Projected Start Date
+    // Plus THREE dollar-rate averages across awarded jobs (each over the jobs where
+    // both the bid value and the divisor are valid):
+    //   5. Avg $/LF           : effBidValue / Total LF
+    //   6. Avg $/Column       : effBidValue / Total Columns
+    //   7. Avg $/day          : effBidValue / Project Duration (Days)
     // Dates: Invite/Projected Start = feed; Bid Due = effDate override-or-feed;
-    // Award date = PM record. Each tile shows "avg N days (n=K)" or "-" when K=0.
+    // Award date = true award date (override -> master -> PM). Day tiles show
+    // "avg N days (n=K)"; dollar tiles show whole-dollar money "(n=K)"; "-" when K=0.
     function renderAwardedMetricsStrip(list){
+      // Numeric parse of a money value (override bare number OR a feed "$460,000"
+      // string). Returns NaN when there is no usable number.
+      function awMoneyNum(v){ return Number(String(v == null ? '' : v).replace(/[$,]/g, '')); }
       var acc = [
         { label: 'Avg bid turnaround',     sub: 'invite to bid due',   sum: 0, n: 0 },
         { label: 'Avg outstanding bid',    sub: 'bid due to award',    sum: 0, n: 0 },
         { label: 'Avg due to start',       sub: 'bid due to start',    sum: 0, n: 0 },
-        { label: 'Avg award to start',     sub: 'award to start',      sum: 0, n: 0 }
+        { label: 'Avg award to start',     sub: 'award to start',      sum: 0, n: 0 },
+        { label: 'Avg $/LF',               sub: 'bid value per LF',    sum: 0, n: 0, money: true },
+        { label: 'Avg $/Column',           sub: 'bid value per column',sum: 0, n: 0, money: true },
+        { label: 'Avg $/day',              sub: 'bid value per day',   sum: 0, n: 0, money: true }
       ];
       (list || []).forEach(function(p){
         var f = (p && p.fields) || {};
         var invite = f['Invite Date'];
         var bidDue = effDate(p, 'dueDate');            // override-or-feed
         var projStart = f['Projected Start Date'];
-        var award = awAwardDate(p);                    // '' when no PM record
+        // TRUE award date (override -> PF Project Master LOI/NOI -> PM awardedAt).
+        // Drives tiles 2 (outstanding bid) and 4 (award to start). '' when none.
+        var award = awTrueAwardDate(p);
 
         var d1 = awDayDelta(invite, bidDue);
         if (d1 != null) { acc[0].sum += d1; acc[0].n++; }
@@ -12686,11 +12765,29 @@ try {
         if (d3 != null) { acc[2].sum += d3; acc[2].n++; }
         var d4 = award ? awDayDelta(award, projStart) : null;
         if (d4 != null) { acc[3].sum += d4; acc[3].n++; }
+
+        // Dollar-rate metrics: skip the job unless the bid value AND the divisor are
+        // both valid positive numbers (so a missing LF/column/duration just drops
+        // that job from THAT tile, never produces 0 / Infinity / NaN).
+        var val = awMoneyNum(effBidValue(p));
+        if (isFinite(val) && val > 0) {
+          var lf = Number(f['Total LF']);
+          if (isFinite(lf) && lf > 0) { acc[4].sum += val / lf; acc[4].n++; }
+          var cols = Number(f['Total Columns']);
+          if (isFinite(cols) && cols > 0) { acc[5].sum += val / cols; acc[5].n++; }
+          var days = Number(f['Project Duration (Days)']);
+          if (isFinite(days) && days > 0) { acc[6].sum += val / days; acc[6].n++; }
+        }
       });
       var tiles = acc.map(function(a){
-        var val = (a.n > 0)
-          ? (Math.round(a.sum / a.n) + ' days <span class="pf-awm-n">(n=' + a.n + ')</span>')
-          : '<span class="pf-record-muted">-</span>';
+        var val;
+        if (a.n > 0) {
+          var avg = a.sum / a.n;
+          val = (a.money ? E(fmtMoneyDisplay(Math.round(avg))) : (Math.round(avg) + ' days'))
+            + ' <span class="pf-awm-n">(n=' + a.n + ')</span>';
+        } else {
+          val = '<span class="pf-record-muted">-</span>';
+        }
         return '<div class="pf-awm-tile">'
           + '<div class="pf-awm-label">' + E(a.label) + '</div>'
           + '<div class="pf-awm-val">' + val + '</div>'
@@ -12903,11 +13000,15 @@ try {
               + pInner + '</td>';
             return;
           }
-          // COLUMN DIAMETER cell (Awarded): there is NO diameter/pier-size field in
-          // the Project Bid Log feed today, so we render a muted dash rather than
-          // invent a value. (Flagged for Jonathan to tell us the source field.)
+          // COLUMN DIAMETER cell (Awarded): from the PF Project Master (row 17),
+          // joined via pfMasterFor. Display the value verbatim (e.g. '30"', '24"',
+          // or a multi-size string). Muted dash when no master record / no value.
           if (h.type === 'diam') {
-            row += '<td class="num"><span class="pf-record-muted">-</span></td>';
+            var mDia = pfMasterFor(p);
+            var diaCell = (mDia && mDia.diameter)
+              ? E(mDia.diameter)
+              : '<span class="pf-record-muted">-</span>';
+            row += '<td class="num">' + diaCell + '</td>';
             return;
           }
           // AWARDED GC OF RECORD cell (Awarded): the chosen awarded GC if set, else
@@ -13781,6 +13882,10 @@ try {
             { key: 'Total Stone (TN)',     label: 'Stone (TN)',    type: 'num',      w: '92px' },
             { key: '__diameter',           label: 'Diameter',      type: 'diam',     w: '90px' },
             { key: 'Projected Start Date', label: 'Proj. Start',   type: 'date',     w: '108px' },
+            // Editable Award Date (override-or-master-or-PM via effDate 'awardDate').
+            // The 'effdate' cell shows the value + a calendar picker that POSTs
+            // setDate field 'awardDate'; default display is awTrueAwardDate.
+            { key: '__awardDate',          label: 'Award Date',    type: 'effdate',  field: 'awardDate', w: '120px' },
             { key: 'General Contractor',   label: 'GC',            type: 'awgc' }
           ];
         } else {
@@ -17023,7 +17128,7 @@ try {
     var pm = window.PF_PROJECT_MASTER || (window.PF_PROJECTS && window.PF_PROJECTS.projects);
     try {
       var master = window.PF_PROJECT_MASTER;
-      if (master && Array.isArray(master.projects)) master.projects.forEach(function (p) { if (p.project_number) nums.push(p.project_number); });
+      if (master && Array.isArray(master.projects)) master.projects.forEach(function (p) { var n = p.number || p.project_number; if (n) nums.push(n); });
     } catch (e) {}
     // awarded-projects.js (window.PF_AWARDED)
     try {

@@ -1153,6 +1153,7 @@ const FIN_FEEDS = [
   '/data/project-record-poet.js', '/data/budget-actual-poet.js', '/data/awarded-projects.js',
   '/data/project-master.json', '/data/project-history.js', '/data/bid-log.json',
   '/data/precon-pipeline.js', '/data/precon-dashboard.js', '/data/precon-historical.js',
+  '/data/project-master.js',
   '/data/bd-records.js', '/data/bd-dashboard.js', '/data/opportunities.js',
   '/data/gc-targets.js', '/data/bd-templates.js', '/data/pf-coi.js',
   '/data/schedule-data.js', '/data/schedule-seed.js', '/data/estimate-template.json',
