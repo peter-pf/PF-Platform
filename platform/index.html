@@ -2741,10 +2741,6 @@ document.addEventListener('click', function(e) {
       #mod-daily-reports .dr-mt-cat { margin:10px 0 4px; }
       #mod-daily-reports .dr-mt-cat-h { display:flex; align-items:center; justify-content:space-between; font-size:12px; font-weight:600; color:var(--text-2,#aab1c0); margin-bottom:4px; }
       #mod-daily-reports .dr-section-h { font-size:13px; font-weight:600; margin:12px 0 4px; }
-      #mod-daily-reports .dr-proj-wrap { position:relative; }
-      #mod-daily-reports .dr-proj-list { position:absolute; z-index:20; left:0; right:0; max-height:220px; overflow:auto; background:var(--surface-2,#1b212c); border:1px solid var(--border,#2a2f3a); border-radius:6px; display:none; }
-      #mod-daily-reports .dr-proj-opt { padding:6px 10px; cursor:pointer; font-size:13px; }
-      #mod-daily-reports .dr-proj-opt:hover, #mod-daily-reports .dr-proj-opt.active { background:rgba(47,109,246,.18); }
       #mod-daily-reports .dr-muted { color:var(--text-3,#8a93a6); }
       #mod-daily-reports .dr-err { color:#e5534b; font-size:13px; }
       #mod-daily-reports .dr-ok { color:#3fb950; font-size:13px; }
@@ -2766,37 +2762,36 @@ document.addEventListener('click', function(e) {
         <h3 style="margin:0 0 8px">New daily report <span class="dr-flag">(first draft, Derek to iterate)</span></h3>
         <div class="dr-grid">
           <div><label>Date</label><input type="date" id="drDate"></div>
-          <div class="dr-proj-wrap">
-            <label>1. Project</label>
-            <input type="text" id="drProject" placeholder="Type to filter projects" autocomplete="off">
+          <div>
+            <label>Project</label>
+            <select id="drProject"><option value="">Select project</option></select>
             <input type="hidden" id="drProjectId">
-            <div class="dr-proj-list" id="drProjList"></div>
           </div>
-          <div><label>2. Foreman</label><select id="drForeman"><option value="">Select foreman</option></select></div>
-          <div><label>Precipitation</label><select id="drPrecip"><option value="">Select</option><option value="Clear">Clear</option><option value="Cloudy">Cloudy</option><option value="Rain">Rain</option><option value="Fog">Fog</option><option value="Snow">Snow</option></select></div>
+          <div><label>Foreman</label><select id="drForeman"><option value="">Select foreman</option></select></div>
+          <div><label>Weather</label><select id="drPrecip"><option value="">Select</option><option value="Clear">Clear</option><option value="Cloudy">Cloudy</option><option value="Rain">Rain</option><option value="Fog">Fog</option><option value="Snow">Snow</option></select></div>
           <div><label>Temp</label><input type="text" id="drTemp" placeholder="72 F"></div>
           <div><label>Columns installed today</label><input type="text" id="drCols" placeholder="0" inputmode="numeric"></div>
           <div><label>LF installed today</label><input type="text" id="drLf" placeholder="0" inputmode="numeric"></div>
         </div>
 
-        <div class="dr-section-h">3. Crew <span class="dr-flag">(hours worked, no pay)</span></div>
+        <div class="dr-section-h">Crew <span class="dr-flag">(hours worked, no pay)</span></div>
         <div id="drCrew"></div>
 
-        <div class="dr-section-h">4. Work completed</div>
+        <div class="dr-section-h">Work completed</div>
         <textarea id="drWork" placeholder="Narrative of the day's work"></textarea>
 
-        <div class="dr-section-h">5. Equipment on site - owned <span class="dr-flag">(operating hours for maintenance)</span></div>
+        <div class="dr-section-h">Equipment on site - owned <span class="dr-flag">(operating hours for maintenance)</span></div>
         <div id="drOwned"></div>
         <button type="button" class="btn btn-sm" id="drAddOwned">+ Add machine</button>
 
-        <div class="dr-section-h">6. Equipment on site - rental <span class="dr-flag">(operating hours)</span></div>
+        <div class="dr-section-h">Equipment on site - rental <span class="dr-flag">(operating hours)</span></div>
         <div id="drRental"></div>
         <button type="button" class="btn btn-sm" id="drAddRental">+ Add rental</button>
 
-        <div class="dr-section-h">7. Equipment failures &amp; maintenance</div>
+        <div class="dr-section-h">Equipment failures &amp; maintenance</div>
         <div id="drMaint"></div>
 
-        <div class="dr-section-h">8. Future issues <span class="dr-flag">(maintenance to identify)</span></div>
+        <div class="dr-section-h">Future Maintenance Items <span class="dr-flag">(adds to maintenance work list)</span></div>
         <div id="drFuture"></div>
         <button type="button" class="btn btn-sm" id="drAddFuture">+ Add issue</button>
 
@@ -16150,7 +16145,7 @@ try {
         var number = p.number != null ? String(p.number) : '';
         var name = p.name != null ? String(p.name) : '';
         if (!number && !name) return;
-        out.push({ id: number || name, label: (number ? number + ' - ' : '') + name });
+        out.push({ id: number || name, name: name, label: (number ? number + ' - ' : '') + name });
       });
     }
     out.sort(function (a, b) { return a.label.localeCompare(b.label); });
@@ -16194,6 +16189,7 @@ try {
       buildMaintenanceRows();
       state.reports = (dr.ok && dr.body && Array.isArray(dr.body.reports)) ? dr.body.reports : [];
       wireForm();
+      renderProject();
       renderForeman();
       renderCrew();
       renderOwned();
@@ -16204,7 +16200,7 @@ try {
     }).catch(function () {
       if (wrap) wrap.style.display = '';
       state.reports = []; buildMaintenanceRows();
-      wireForm(); renderForeman(); renderCrew(); renderOwned(); renderRental(); renderMaint(); renderFuture(); renderList();
+      wireForm(); renderProject(); renderForeman(); renderCrew(); renderOwned(); renderRental(); renderMaint(); renderFuture(); renderList();
     });
   }
 
@@ -16415,37 +16411,34 @@ try {
     });
   }
 
-  // ---- 1. Project type-to-filter dropdown ------------------------------------
-  function renderProjList(filter) {
-    var box = document.getElementById('drProjList');
-    if (!box) return;
-    var q = (filter || '').toLowerCase();
-    var shown = !q ? state.projects.slice(0, 30)
-      : state.projects.filter(function (p) { return p.label.toLowerCase().indexOf(q) >= 0; }).slice(0, 30);
-    if (!shown.length) { box.style.display = 'none'; return; }
-    box.innerHTML = shown.map(function (p) {
-      return '<div class="dr-proj-opt" data-id="' + E(p.id) + '" data-label="' + E(p.label) + '">' + E(p.label) + '</div>';
-    }).join('');
-    box.style.display = '';
-    box.querySelectorAll('.dr-proj-opt').forEach(function (el) {
-      el.addEventListener('mousedown', function (ev) {
-        ev.preventDefault();
-        var pi = document.getElementById('drProject');
-        var hid = document.getElementById('drProjectId');
-        if (pi) pi.value = this.getAttribute('data-label');
-        if (hid) hid.value = this.getAttribute('data-id');
-        box.style.display = 'none';
-      });
+  // ---- 1. Project dropdown ---------------------------------------------------
+  // A clean <select> sourced from the SAME canonical project list used elsewhere
+  // (state.projects = PF_FO_PROJECTS for field_ops, PF_AWARDED for admin/partner;
+  // see loadProjects). Each option value is the project id (number||name) and
+  // carries the display name via data-name so collectBody can send BOTH
+  // projectId and projectName (daily-report.js accepts either). RBAC-safe: no $,
+  // no GC - loadProjects reads only number/name from the role-correct feed.
+  function renderProject() {
+    var sel = document.getElementById('drProject');
+    if (!sel) return;
+    var cur = sel.value;
+    var html = '<option value="">' + E('Select project') + '</option>';
+    state.projects.forEach(function (p) {
+      var s = (String(p.id) === String(cur)) ? ' selected' : '';
+      // carry the bare name (not the "number - name" label) for projectName
+      html += '<option value="' + E(p.id) + '" data-name="' + E(p.name || p.label) + '"' + s + '>' + E(p.label) + '</option>';
     });
+    sel.innerHTML = html;
   }
 
   function wireForm() {
     var pi = document.getElementById('drProject');
     if (pi && !pi.dataset.wired) {
       pi.dataset.wired = '1';
-      pi.addEventListener('input', function () { document.getElementById('drProjectId').value = ''; renderProjList(this.value); });
-      pi.addEventListener('focus', function () { renderProjList(this.value); });
-      pi.addEventListener('blur', function () { var b = document.getElementById('drProjList'); setTimeout(function () { if (b) b.style.display = 'none'; }, 150); });
+      pi.addEventListener('change', function () {
+        var hid = document.getElementById('drProjectId');
+        if (hid) hid.value = this.value;
+      });
     }
     var fm = document.getElementById('drForeman');
     if (fm && !fm.dataset.wired) { fm.dataset.wired = '1'; fm.addEventListener('change', function () { applyForemanToCrew(this.value); }); }
@@ -16462,12 +16455,15 @@ try {
   }
 
   function collectBody() {
-    // DEF-5: only use the projectId chosen from the dropdown. If the user
-    // free-typed a project (no dropdown pick), leave projectId EMPTY and rely on
-    // projectName - the server create accepts projectId OR projectName. Do NOT
-    // fabricate an id from the typed text.
-    var pid = document.getElementById('drProjectId').value;
-    var pname = document.getElementById('drProject').value;
+    // Project is a <select> over the canonical project list. The option VALUE is
+    // the project id and data-name carries the bare project name. We send BOTH
+    // projectId and projectName (daily-report.js accepts either). drProjectId is
+    // kept in sync by the change handler; we also read the selected option here so
+    // a value set programmatically (e.g. resetForm) stays consistent.
+    var psel = document.getElementById('drProject');
+    var pid = psel ? psel.value : '';
+    var pOpt = (psel && psel.selectedIndex >= 0) ? psel.options[psel.selectedIndex] : null;
+    var pname = pOpt ? (pOpt.getAttribute('data-name') || '') : '';
     return {
       date: document.getElementById('drDate').value,
       projectName: pname,
@@ -16517,7 +16513,7 @@ try {
     state.rental = [{ category: '', hours: '' }, { category: '', hours: '' }];
     state.future = [{ equipment: '', description: '' }];
     buildMaintenanceRows();
-    renderForeman(); renderCrew(); renderOwned(); renderRental(); renderMaint(); renderFuture();
+    renderProject(); renderForeman(); renderCrew(); renderOwned(); renderRental(); renderMaint(); renderFuture();
   }
 
   function statusChip(st) {
