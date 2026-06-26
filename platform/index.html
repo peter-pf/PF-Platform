@@ -874,6 +874,17 @@ body.role-field-ops .nav-item[data-fo-hide] {
 .pf-hl-table th.num, .pf-hl-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .pf-hl-table th.pf-hl-disc, .pf-hl-table td.pf-hl-disc { width: 34px; text-align: center; padding-left: 6px; padding-right: 6px; }
 .pf-hl-table th.pf-hl-action, .pf-hl-table td.pf-hl-action { width: 188px; white-space: normal; }
+/* GC cell: wrap + smaller font so the FULL GC name is readable at any length
+   (no ellipsis truncation), without forcing horizontal scroll. */
+.pf-hl-table td.pf-hl-gc {
+  white-space: normal; overflow: visible; text-overflow: clip;
+  word-break: break-word; font-size: 0.8rem; line-height: 1.25;
+}
+/* Sent-to-Garbin checkbox cell. */
+.pf-hl-table td.pf-hl-garbin { text-align: center; white-space: normal; overflow: visible; }
+.pf-garbin-chk { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent); }
+.pf-garbin-chk:disabled { cursor: default; opacity: 0.6; }
+.pf-garbin-err { display: block; font-size: 0.7rem; color: #b00020; margin-top: 2px; min-height: 0; }
 .pf-hl-table td {
   padding: 9px 12px; border-bottom: 1px solid var(--border-light);
   color: var(--text-1); vertical-align: top;
@@ -11823,6 +11834,71 @@ try {
       window.PF_PIPELINE.loaded = true;
     }
 
+    // PER-BID FLAGS overlay (/api/precon-flag, KV-backed). Today: sentToGarbin.
+    // Loaded once alongside the overrides (same synchronous, fail-soft pattern).
+    // Keyed by resolveKey()=bidLogId(p) so it survives across reloads + numberless
+    // bids. preconstruction-area read; field_ops -> 403 -> empty (no checkboxes).
+    window.PF_GARBIN = window.PF_GARBIN || { flags: {}, meta: { updated: null }, loaded: false };
+    function loadGarbinFlags(){
+      try {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/precon-flag', false);
+        xhr.withCredentials = true;
+        xhr.send(null);
+        if (xhr.status === 200) {
+          var d = JSON.parse(xhr.responseText);
+          window.PF_GARBIN.flags = (d && d.flags) || {};
+          window.PF_GARBIN.meta = (d && d.meta) || { updated: null };
+        } else {
+          window.PF_GARBIN.flags = {};
+          window.PF_GARBIN.meta = { updated: null };
+        }
+      } catch (e) {
+        window.PF_GARBIN.flags = {};
+        window.PF_GARBIN.meta = { updated: null };
+      }
+      window.PF_GARBIN.loaded = true;
+    }
+    // True if all bid docs have been sent to Garbin for this bid.
+    function pfGarbinFlag(p){
+      var k = resolveKey(p);
+      var rec = k && window.PF_GARBIN.flags ? window.PF_GARBIN.flags[k] : null;
+      return !!(rec && rec.sentToGarbin);
+    }
+    // Toggle the Sent-to-Garbin checkbox: optimistic update + blocking POST; on
+    // failure revert the checkbox and show a small inline error. Gated to
+    // privileged roles (field_ops never sees precon and cannot write server-side).
+    window.pfToggleGarbin = function(chk){
+      if (!chk) return;
+      var bid = chk.getAttribute('data-bid');
+      var errEl = chk.parentNode ? chk.parentNode.querySelector('.pf-garbin-err') : null;
+      if (errEl) errEl.textContent = '';
+      if (!canResolve()) { chk.checked = !chk.checked; if (errEl) errEl.textContent = 'No permission.'; return; }
+      if (!bid) { chk.checked = !chk.checked; if (errEl) errEl.textContent = 'Bid not identified.'; return; }
+      var want = !!chk.checked;          // desired state after the click
+      chk.disabled = true;
+      try {
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/precon-flag', false);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.withCredentials = true;
+        xhr.send(JSON.stringify({ bidId: bid, flag: 'sentToGarbin', value: want }));
+        if (xhr.status === 200) {
+          var d = JSON.parse(xhr.responseText);
+          window.PF_GARBIN.flags = (d && d.flags) || window.PF_GARBIN.flags;
+          window.PF_GARBIN.meta = (d && d.meta) || window.PF_GARBIN.meta;
+        } else {
+          chk.checked = !want;           // revert
+          if (errEl) errEl.textContent = 'Save failed.';
+        }
+      } catch (e) {
+        chk.checked = !want;             // revert
+        if (errEl) errEl.textContent = 'Save failed.';
+      } finally {
+        chk.disabled = false;
+      }
+    };
+
     // POST a single job's resolution. On success, update local state + re-render
     // everything (the moved job appears/disappears across buckets immediately).
     window.pfResolveBid = function(jobId, status, btn){
@@ -12103,9 +12179,14 @@ try {
         if (ov && ov.status === 'awarded') nameTxt += ' <span class="pf-tag-awarded">Awarded</span>' + pmNumTag(p);
         if (ov && ov.status === 'not_awarded') nameTxt += ' <span class="pf-tag-dead">Dead</span>';
         if (ov && ov.status === 'not_bidding') nameTxt += ' <span class="pf-tag-dead">Dead</span>';
-        var numTxt = E(p.number || f['Project Number'] || '');
+        // Sub-line under the project name. By default it is the project number;
+        // for buckets that set opts.subLineKey (Actively Pricing uses City/State
+        // because no number is assigned yet) it is that field instead.
+        var subTxt = opts.subLineKey
+          ? E(f[opts.subLineKey] || '')
+          : E(p.number || f['Project Number'] || '');
         var nameCell = '<div class="pf-hl-name">' + nameTxt + '</div>'
-          + (numTxt ? '<div class="pf-record-muted">' + numTxt + '</div>' : '');
+          + (subTxt ? '<div class="pf-record-muted">' + subTxt + '</div>' : '');
 
         var jk = resolveKey(p);
         var dragAttrs = (canResolve() && jk)
@@ -12117,9 +12198,27 @@ try {
         row += '<td class="pf-hl-disc"><span class="pf-hl-chevron">&#9656;</span></td>';
         row += '<td>' + nameCell + '</td>';
         highlights.forEach(function(h){
+          // GARBIN FLAG cell: a persistent checkbox (KV overlay), not a feed
+          // field. Checked = all bid docs sent to Garbin. Toggling stops row-expand
+          // propagation and is gated to privileged roles (read-only otherwise).
+          if (h.type === 'garbin') {
+            var bid = E(bidLogId(p));
+            var checked = pfGarbinFlag(p) ? ' checked' : '';
+            var dis = canResolve() ? '' : ' disabled';
+            row += '<td class="pf-hl-garbin" onclick="event.stopPropagation()">'
+              + '<input type="checkbox" class="pf-garbin-chk" aria-label="Sent to Garbin"'
+              + ' data-bid="' + bid + '"' + checked + dis
+              + ' onchange="pfToggleGarbin(this)">'
+              + '<span class="pf-garbin-err" data-bid="' + bid + '"></span></td>';
+            return;
+          }
           var v = f[h.key];
           var cell = (v === undefined || v === null) ? '' : E(v);
-          var cls = (h.type === 'money' || h.type === 'num') ? ' class="num"' : '';
+          // GC cell wraps (no ellipsis truncation) so the full GC name is always
+          // readable regardless of length; a smaller font keeps the row tight.
+          var cls = (h.type === 'gc')
+            ? ' class="pf-hl-gc"'
+            : ((h.type === 'money' || h.type === 'num') ? ' class="num"' : '');
           // Follow-up date gets an overdue / due-soon flag, matching the precon
           // action-item calendar palette. Same thresholds: past = overdue,
           // within 7 days = due soon. The flag text is static (safe); the date
@@ -12540,11 +12639,16 @@ try {
           // wider action column so they fit side by side; they flex-wrap to stack
           // on narrow screens.
           hlOpts.actionWidth = '232px';
+          // Jonathan: project numbers are NOT assigned during pricing, so the
+          // name sub-line shows City / State (not the project number) for this
+          // bucket only. City / State is therefore dropped as its own column and
+          // the freed slot becomes the persistent "Sent to Garbin?" checkbox.
+          hlOpts.subLineKey = 'City / State';
           highlights = [
             { key: 'Design Completed Date', label: 'Prelim Design Completed', type: 'date' },
             { key: 'Due Date',              label: 'Bid Due Date',           type: 'date' },
-            { key: 'City / State',          label: 'City / State',           type: 'text' },
-            { key: 'General Contractor',    label: 'GC',                     type: 'text' }
+            { key: '__sentToGarbin',        label: 'Sent to Garbin?',        type: 'garbin', w: '130px' },
+            { key: 'General Contractor',    label: 'GC',                     type: 'gc' }
           ];
           // GROUPED expand detail (Jonathan's spec). Labels map to real feed keys
           // in data/precon-pipeline.js. 'Mirror main row' fields reuse the same
@@ -12788,6 +12892,7 @@ try {
 
     function boot(){
       loadOverrides();
+      loadGarbinFlags();
       renderAll();
       renderDeadSet();
     }

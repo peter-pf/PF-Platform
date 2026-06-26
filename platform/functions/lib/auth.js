@@ -451,6 +451,10 @@ export function areaForPath(pathname) {
     // domain: admin + partner + business_dev; field_ops BLOCKED by direct URL.
     // The handler also calls requireArea(session, 'preconstruction').
     if (pathname.startsWith('/api/precon-action'))  return 'preconstruction';
+    // Per-bid precon boolean flags (today: sentToGarbin). BD domain: admin +
+    // partner + business_dev; field_ops BLOCKED by direct URL too. The handler
+    // also calls requireArea(session, 'preconstruction').
+    if (pathname.startsWith('/api/precon-flag'))    return 'preconstruction';
     // Award -> PM handoff (assign next project number, create PM project carrying
     // BD/precon history). A precon action: admin + partner + business_dev;
     // field_ops BLOCKED by direct URL. Handler also calls requireArea.

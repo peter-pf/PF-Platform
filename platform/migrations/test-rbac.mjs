@@ -806,6 +806,36 @@ ok('requireArea(partner, precon-log area) => null (allowed)',
 ok('requireArea(null, precon-log area) => 403 (fail closed)',
    requireArea(null, areaForPath('/api/precon-log'))?.status === 403);
 
+section('Precon flags: /api/precon-flag -> preconstruction');
+for (const p of ['/api/precon-flag']) {
+  const area = areaForPath(p.split('?')[0]);
+  ok(`${p} -> preconstruction (${area})`, area === 'preconstruction');
+  ok(`${p} ALLOWED for admin`, roleCanAccess('admin', area) === true);
+  ok(`${p} ALLOWED for partner`, roleCanAccess('partner', area) === true);
+  ok(`${p} ALLOWED for business_dev`, roleCanAccess('business_dev', area) === true);
+  ok(`${p} BLOCKED for field_ops`, roleCanAccess('field_ops', area) === false);
+}
+ok('requireArea(field_ops, precon-flag area) => 403',
+   requireArea({ uid: 'fo', role: 'field_ops', name: 'Crew' }, areaForPath('/api/precon-flag'))?.status === 403);
+ok('requireArea(business_dev, precon-flag area) => null (allowed)',
+   requireArea({ uid: 'bd', role: 'business_dev', name: 'BD' }, areaForPath('/api/precon-flag')) === null);
+ok('requireArea(partner, precon-flag area) => null (allowed)',
+   requireArea({ uid: 'p', role: 'partner', name: 'JR' }, areaForPath('/api/precon-flag')) === null);
+ok('requireArea(null, precon-flag area) => 403 (fail closed)',
+   requireArea(null, areaForPath('/api/precon-flag'))?.status === 403);
+
+section('Precon flags: source-level guards + NO mail');
+{
+  const src = readFileSync(join(__dir, '../functions/api/precon-flag.js'), 'utf8');
+  ok('precon-flag imports requireArea', /import\s*\{[^}]*requireArea[^}]*\}\s*from/.test(src));
+  ok('precon-flag GET+POST both guard preconstruction', (src.match(/requireArea\([^)]*['"]preconstruction['"]\)/g) || []).length >= 2);
+  ok('precon-flag uses env.PF_SCHEDULE', /env\.PF_SCHEDULE/.test(src));
+  ok('precon-flag documents the KV read-modify-write race', /read-modify-write/.test(src));
+  const noComments = src.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
+  ok('precon-flag makes NO fetch / outbound call', !/\bfetch\s*\(/.test(noComments) && !/https?:\/\//.test(noComments));
+  ok('precon-flag calls NO mail API', !/sendMail|\/messages|smtp|nodemailer|mailgun|sendgrid/i.test(noComments));
+}
+
 section('Precon activity log: source-level guards + NO mail');
 {
   const src = readFileSync(join(__dir, '../functions/api/precon-log.js'), 'utf8');
