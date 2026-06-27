@@ -12116,7 +12116,7 @@ try {
     // 'designCompletedDate' (Prelim) or 'dueDate' (Bid due). Returns a string (the
     // raw display value); '' when neither is set. Used by the row, the detail
     // panel, AND the calendar so an addendum-shifted date moves everywhere.
-    var BIDMETA_FEED_KEY = { designCompletedDate: 'Design Completed Date', dueDate: 'Due Date', projStart: 'Projected Start Date' };
+    var BIDMETA_FEED_KEY = { designCompletedDate: 'Design Completed Date', dueDate: 'Due Date', projStart: 'Projected Start Date', dateSubmitted: 'Date Submitted' };
     function effDate(p, field){
       var rec = bidMetaFor(p);
       if (rec && rec.dates && rec.dates[field] != null && rec.dates[field] !== '') return rec.dates[field];
@@ -12800,6 +12800,57 @@ try {
           + '<div class="pf-awm-val">' + val + '</div>'
           + '<div class="pf-awm-sub">' + E(a.sub) + '</div></div>';
       }).join('');
+      return '<div class="pf-awm-strip">' + tiles + '</div>';
+    }
+
+    // SUBMITTED BIDS metrics strip (Jonathan): a read-only scoreboard at the top of
+    // the Submitted Bids module mirroring the Awarded strip's markup + dollar-ratio
+    // averaging. Five tiles: the TOTAL outstanding submitted bid value + total LF
+    // (running sums), then the average bid value per LF / per column / per day. Uses
+    // effBidValue (override-or-feed) for the value, same as the row + Awarded strip.
+    // Receives the SAME list that is rendered below it, so when an aging filter is
+    // active the strip reflects the FILTERED submitted bids (matches the Awarded
+    // strip, which is also fed the rendered list).
+    function renderSubmittedMetricsStrip(list){
+      function awMoneyNum(v){ return Number(String(v == null ? '' : v).replace(/[$,]/g, '')); }
+      var totalVal = 0, haveVal = false;     // sum of effBidValue across the list
+      var totalLf = 0, haveLf = false;       // sum of Total LF across the list
+      var perLf = { sum: 0, n: 0 };
+      var perCol = { sum: 0, n: 0 };
+      var perDay = { sum: 0, n: 0 };
+      (list || []).forEach(function(p){
+        var f = (p && p.fields) || {};
+        var val = awMoneyNum(effBidValue(p));
+        if (isFinite(val) && val > 0) {
+          totalVal += val; haveVal = true;
+          var lf = Number(f['Total LF']);
+          if (isFinite(lf) && lf > 0) { perLf.sum += val / lf; perLf.n++; }
+          var cols = Number(f['Total Columns']);
+          if (isFinite(cols) && cols > 0) { perCol.sum += val / cols; perCol.n++; }
+          var days = Number(f['Project Duration (Days)']);
+          if (isFinite(days) && days > 0) { perDay.sum += val / days; perDay.n++; }
+        }
+        var lfAll = Number(f['Total LF']);
+        if (isFinite(lfAll) && lfAll > 0) { totalLf += lfAll; haveLf = true; }
+      });
+      function avgTile(label, sub, a){
+        var val = (a.n > 0)
+          ? E(fmtMoneyDisplay(Math.round(a.sum / a.n))) + ' <span class="pf-awm-n">(n=' + a.n + ')</span>'
+          : '<span class="pf-record-muted">-</span>';
+        return '<div class="pf-awm-tile"><div class="pf-awm-label">' + E(label) + '</div>'
+          + '<div class="pf-awm-val">' + val + '</div>'
+          + '<div class="pf-awm-sub">' + E(sub) + '</div></div>';
+      }
+      var tiles = ''
+        + '<div class="pf-awm-tile"><div class="pf-awm-label">Total outstanding bid value</div>'
+        + '<div class="pf-awm-val">' + (haveVal ? E(fmtMoneyDisplay(Math.round(totalVal))) : '<span class="pf-record-muted">-</span>') + '</div>'
+        + '<div class="pf-awm-sub">sum of submitted bids</div></div>'
+        + '<div class="pf-awm-tile"><div class="pf-awm-label">Total LF</div>'
+        + '<div class="pf-awm-val">' + (haveLf ? E(fmtNum0(totalLf)) : '<span class="pf-record-muted">-</span>') + '</div>'
+        + '<div class="pf-awm-sub">sum of submitted bids</div></div>'
+        + avgTile('Avg $/LF', 'bid value per LF', perLf)
+        + avgTile('Avg $/Column', 'bid value per column', perCol)
+        + avgTile('Avg $/day', 'bid value per day', perDay);
       return '<div class="pf-awm-strip">' + tiles + '</div>';
     }
 
@@ -13636,21 +13687,31 @@ try {
       if (bucket === 'submitted_bids') {
         ageFilter = mount.getAttribute('data-age-filter') || 'all';
         // Count how many fall in each threshold (computed from the FULL list).
-        ageCounts = { all: list.length, d30: 0, d60: 0, d90: 0, d180: 0 };
+        ageCounts = { all: list.length, u30: 0, d30: 0, d60: 0, d90: 0, d180: 0 };
         list.forEach(function(p){
-          var ds = daysSince((p.fields || {})['Date Submitted']);
+          var ds = daysSince(effDate(p, 'dateSubmitted'));
           if (ds == null) return;
+          if (ds < 30)   ageCounts.u30++;  // submitted LESS than 30 days ago (fresh)
           if (ds >= 30)  ageCounts.d30++;
           if (ds >= 60)  ageCounts.d60++;
           if (ds >= 90)  ageCounts.d90++;
           if (ds >= 180) ageCounts.d180++;
         });
-        var minDays = { all: null, d30: 30, d60: 60, d90: 90, d180: 180 }[ageFilter];
-        if (minDays != null) {
+        // 'u30' is an UPPER-bound (under 30 days) so it cannot use the minDays
+        // lower-bound map; handle it as a special case. The rest are lower bounds.
+        if (ageFilter === 'u30') {
           list = list.filter(function(p){
-            var ds = daysSince((p.fields || {})['Date Submitted']);
-            return ds != null && ds >= minDays; // blank submitted date drops out of aged views
+            var ds = daysSince(effDate(p, 'dateSubmitted'));
+            return ds != null && ds < 30; // blank submitted date drops out of aged views
           });
+        } else {
+          var minDays = { all: null, d30: 30, d60: 60, d90: 90, d180: 180 }[ageFilter];
+          if (minDays != null) {
+            list = list.filter(function(p){
+              var ds = daysSince(effDate(p, 'dateSubmitted'));
+              return ds != null && ds >= minDays; // blank submitted date drops out of aged views
+            });
+          }
         }
       }
 
@@ -13708,6 +13769,7 @@ try {
       if (bucket === 'submitted_bids' && ageCounts) {
         var ageOpts = [
           { v: 'all',  label: 'All',    n: ageCounts.all },
+          { v: 'u30',  label: '30-',    n: ageCounts.u30 },
           { v: 'd30',  label: '30+',    n: ageCounts.d30 },
           { v: 'd60',  label: '60+',    n: ageCounts.d60 },
           { v: 'd90',  label: '90+',    n: ageCounts.d90 },
@@ -13724,9 +13786,11 @@ try {
 
       if (!list.length) {
         if (bucket === 'submitted_bids' && ageFilter !== 'all') {
-          html += '<div class="pf-empty-state">No submitted bids are '
-            + E(({ d30: '30+', d60: '60+', d90: '90+', d180: '180+' }[ageFilter] || ''))
-            + ' days old. Choose All to see every submitted bid.</div>';
+          html += (ageFilter === 'u30')
+            ? '<div class="pf-empty-state">No submitted bids are under 30 days old. Choose All to see every submitted bid.</div>'
+            : '<div class="pf-empty-state">No submitted bids are '
+              + E(({ d30: '30+', d60: '60+', d90: '90+', d180: '180+' }[ageFilter] || ''))
+              + ' days old. Choose All to see every submitted bid.</div>';
         } else {
           html += '<div class="pf-empty-state">No jobs currently in '
             + E(BUCKET_LABEL[bucket] || bucket) + ' for ' + E(DISC_LABEL[disc] || disc)
@@ -13751,6 +13815,12 @@ try {
       // top of the Awarded module. See renderAwardedMetricsStrip for the formulas.
       if (bucket === 'awarded') {
         html += renderAwardedMetricsStrip(list);
+      }
+      // Submitted Bids metrics strip: outstanding bid value + LF + the $/LF, $/Col,
+      // $/day averages. Fed the (already aging-filtered) list so it tracks the
+      // current view, same as the Awarded strip above.
+      if (bucket === 'submitted_bids') {
+        html += renderSubmittedMetricsStrip(list);
       }
 
       var displayBucket = (bucket === 'awarded') ? 'awarded' : 'open';
@@ -13958,16 +14028,18 @@ try {
           // SUBMITTED BIDS (Jonathan): same clean highlight-row + click-to-expand
           // look as Actively Pricing / Awarded. The name cell carries the project
           // name with "City, ST" on an ITALIC sub-line (subLineKey), so City /
-          // State drops as its own column. City / State and Project Duration are
-          // removed entirely; the freed width flows to the prominent name (the one
-          // flexible col) and the roomy GC. Date columns drop the year (M/D, same
-          // as Actively Pricing / Awarded). Follow Up Date carries the overdue /
-          // due-soon flag.
+          // State drops as its own column. Follow Up Date and Projected Start Date
+          // are removed from the row (the freed width flows to the prominent name +
+          // the multi-GC list). Date Submitted is EDITABLE (effdate, override-or-
+          // feed via 'dateSubmitted') and shows the YEAR, so a bid that has sat for
+          // over a year is plainly dated and can be corrected. GC uses the same
+          // multi-GC Bidding GCs list as Actively Pricing / Budget Pricing so a
+          // submitted bid can carry more than one GC.
           hlOpts.compact = true;
           hlOpts.subLineKey = 'City / State';  // City, ST on the italic name sub-line
           hlOpts.dropSubLineFromDetail = true;  // do not repeat City / State in the flat detail
           hlOpts.nameProminent = true;          // bold, 2-line-clamp name (reuses pf-hl-nameprominent)
-          hlOpts.followUpKey = 'Follow Up Date';
+          hlOpts.gcEditor = true;               // append the editable Bidding GCs block in the expand detail
           highlights = [
             // Bid Total = override-or-feed: the entered Bid Price (precon-bid-meta,
             // carried over from Actively Pricing by bidId) if set, else the feed
@@ -13975,14 +14047,16 @@ try {
             { key: 'Bid Total Value',        label: 'Bid Total',        type: 'effmoney', w: '110px' },
             { key: 'Total LF',               label: 'Total LF',         type: 'num',   w: '84px' },
             { key: 'Total Columns',          label: 'Columns',          type: 'num',   w: '80px' },
-            // Dates drop the year (M/D) to save width, same as Actively Pricing.
-            // These stay read-only feed 'date' cells in this bucket.
-            { key: 'Date Submitted',         label: 'Submitted',        type: 'date',  w: '90px', noYear: true },
-            { key: 'Follow Up Date',         label: 'Follow-up',        type: 'date',  w: '90px', noYear: true },
-            { key: 'Projected Start Date',   label: 'Proj. Start',      type: 'date',  w: '90px', noYear: true },
-            // GC: roomy fixed width + no mid-word break (same as Awarded / Not
-            // Awarded). The freed width from the removed columns flows here + name.
-            { key: 'General Contractor',     label: 'GC',               type: 'text',  w: '180px', gcNoBreak: true }
+            // Date Submitted is EDITABLE (effdate) via the same calendar picker as
+            // the awarded Award Date / Start Date. The override maps to the feed
+            // 'Date Submitted' through BIDMETA_FEED_KEY; setDate field 'dateSubmitted'.
+            // NO noYear here (Jonathan: show the full date with year so a stale bid
+            // is obvious) -> effDateDisplay default renders US M/D/YYYY.
+            { key: 'Date Submitted',         label: 'Submitted',        type: 'effdate', field: 'dateSubmitted', w: '110px' },
+            // GC: multi-GC list (same as Actively Pricing / Budget Pricing). The
+            // editable Bidding GCs block (gcEditor) lives in the expand detail; the
+            // bidGcs/setGcs machinery is keyed by bidId and bucket-agnostic.
+            { key: '__biddingGcs',           label: 'Bidding GCs',      type: 'gclist', w: '170px' }
           ];
         }
         hlOpts.highlights = highlights;
