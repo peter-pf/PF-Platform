@@ -12827,7 +12827,14 @@ try {
       var gcFeedKeys = opts.gcEditor
         ? { 'General Contractor': 1, 'Contact Name2': 1, 'GC Email': 1, 'GC Phone': 1 }
         : {};
-      var detailCols = allCols.filter(function(c){ return !hlKeys[c.key] && !gcFeedKeys[c.key]; });
+      // When opts.dropSubLineFromDetail is set (Not Awarded), the field shown on the
+      // name sub-line (opts.subLineKey, e.g. City / State) is omitted from the flat
+      // detail cards so it is not duplicated. Opt-in only - other buckets that set
+      // subLineKey (budget_pricing) keep their existing detail unchanged.
+      var subLineDrop = (opts.dropSubLineFromDetail && opts.subLineKey)
+        ? (function(o){ o[opts.subLineKey] = 1; return o; })({})
+        : {};
+      var detailCols = allCols.filter(function(c){ return !hlKeys[c.key] && !gcFeedKeys[c.key] && !subLineDrop[c.key]; });
 
       // ---- header ----
       var thead = '<th class="pf-hl-disc" aria-label="expand"></th>'
@@ -13790,7 +13797,7 @@ try {
       // Actively Bidding + Budget Pricing + Submitted Bids use the HIGHLIGHTS-ROW
       // + click-to-expand layout (no horizontal scroll). All other buckets keep
       // the WIDE table.
-      var useHighlights = (bucket === 'actively_bidding' || bucket === 'budget_pricing' || bucket === 'submitted_bids' || bucket === 'awarded');
+      var useHighlights = (bucket === 'actively_bidding' || bucket === 'budget_pricing' || bucket === 'submitted_bids' || bucket === 'awarded' || bucket === 'not_awarded');
       if (useHighlights) {
         // Actively Bidding highlight columns are FIXED by Jonathan's spec:
         // Project Name (name cell), Design Completed Date, Due Date, City/State, GC.
@@ -13917,6 +13924,29 @@ try {
             // GC: roomy fixed width + a scoped class so the name wraps only at
             // spaces (no mid-word break like "RealAmer/ica"), up to 2 lines.
             { key: 'General Contractor',   label: 'GC',            type: 'awgc', w: '150px', gcNoBreak: true }
+          ];
+        } else if (bucket === 'not_awarded') {
+          // NOT AWARDED bucket (Jonathan): same clean highlight-row + click-to-
+          // expand look as Awarded / Actively Pricing. The name cell carries the
+          // project name with "City, ST" on an ITALIC sub-line (subLineKey, same as
+          // Actively Pricing - .pf-record-muted is already italic), so City / State
+          // drops as its own column. Only two data columns remain on the row:
+          //   Bid Total Value -> override-or-feed (effmoney, single $, commas),
+          //     mirroring Awarded's bid-value treatment.
+          //   GC -> the contractor who ran the bid (awgc: awarded-GC-of-record ->
+          //     lead bidding GC -> feed GC), with gcNoBreak so long names do not
+          //     break mid-word, up to 2 lines.
+          // Everything else drops into the flat click-to-expand detail. The per-row
+          // resolution action stays (actionCol defaults to canResolve()): this
+          // bucket feeds the Dead Set, so the existing resolve buttons remain.
+          hlOpts.compact = true;
+          hlOpts.subLineKey = 'City / State';  // City, ST on the italic name sub-line
+          hlOpts.dropSubLineFromDetail = true;  // do not repeat City / State in the flat detail
+          hlOpts.nameProminent = true;          // bold, 2-line-clamp name (reuses pf-hl-nameprominent)
+          highlights = [
+            { key: 'Bid Total Value',    label: 'Bid Total', type: 'effmoney', w: '120px' },
+            // GC: roomy fixed width + no mid-word break (same as Awarded).
+            { key: 'General Contractor', label: 'GC',        type: 'awgc', w: '180px', gcNoBreak: true }
           ];
         } else {
           // SUBMITTED BIDS - Jonathan's exact order. Project Name lives in the
