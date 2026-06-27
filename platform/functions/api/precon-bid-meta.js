@@ -18,6 +18,7 @@
 //       awardedGc: <int index into gcs, or -1>,
 //       bidPrice:  <non-negative number as a string, or absent>,  // entered Bid Price
 //       docs:      [ { label, url } ],  // per-job document links (http(s) ONLY)
+//       hot:       <boolean>,  // "Hot" flag: bid heating up toward award, no LOI yet
 //       by, at
 //     } }
 //   }
@@ -183,6 +184,7 @@ export async function onRequestGet(context) {
 //   { action:'setAwardedGc', bidId, index:int }
 //   { action:'setBidPrice',  bidId, value:number|moneyString|'' }
 //   { action:'setDocs',      bidId, docs:[ {label,url(http(s))}, ... ] }
+//   { action:'setHot',       bidId, value:true|false }
 export async function onRequestPost(context) {
   const { request, env } = context;
   const session = context.data && context.data.session;
@@ -199,7 +201,7 @@ export async function onRequestPost(context) {
     catch { return json({ status: 'error', message: 'Invalid JSON.' }, 400); }
 
     const action = String((parsed && parsed.action) || '');
-    if (action !== 'setDate' && action !== 'setGcs' && action !== 'setAwardedGc' && action !== 'setBidPrice' && action !== 'setDocs') {
+    if (action !== 'setDate' && action !== 'setGcs' && action !== 'setAwardedGc' && action !== 'setBidPrice' && action !== 'setDocs' && action !== 'setHot') {
       return json({ status: 'error', message: 'Unknown action.' }, 400);
     }
 
@@ -236,7 +238,11 @@ export async function onRequestPost(context) {
       docs: Array.isArray(prev.docs)
         ? prev.docs.slice(0, MAX_DOCS).map(normDoc).filter(function (x) { return x; })
         : [],
+      // Carry the "Hot" flag forward as a strict boolean so any other write
+      // (dates/gcs/price/docs) never wipes it. Only persisted when true.
+      hot: !!prev.hot,
     };
+    if (!rec.hot) delete rec.hot;
     // Carry the existing Bid Price forward (re-validated). Only persisted when set;
     // an invalid stored value is dropped rather than re-emitted.
     const prevPrice = normPrice(prev.bidPrice);
@@ -282,6 +288,11 @@ export async function onRequestPost(context) {
       // Sanitize every entry; drop any whose url is not a valid http(s) URL so a
       // bad scheme (javascript:/data:/...) or relative/empty link is never stored.
       rec.docs = arr.map(normDoc).filter(function (x) { return x; });
+    } else if (action === 'setHot') {
+      // Coerce strictly to a boolean (no string injection). Only persist when true.
+      const hot = !!(parsed && parsed.value);
+      if (hot) rec.hot = true;
+      else delete rec.hot;
     }
 
     rec.by = (session && (session.name || session.uid)) ? s(session.name || session.uid) : 'unknown';

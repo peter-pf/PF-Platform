@@ -832,6 +832,29 @@ body.role-field-ops .nav-item[data-fo-hide] {
   background: rgba(0,0,0,0.08); border-radius: 8px; padding: 0 5px;
 }
 .pf-age-btn.active .pf-age-n { background: rgba(255,255,255,0.22); }
+/* Hot affordances use a distinct AMBER (heat) so they read apart from the azure
+   brand accent used elsewhere on the bar. */
+.pf-age-btn-hot { border-color: #d97706; color: #b45309; }
+.pf-age-btn-hot.active { background: #d97706; color: #fff; border-color: #d97706; }
+.pf-age-btn-hot.active .pf-age-n { background: rgba(255,255,255,0.25); }
+/* Inline "Hot" flame toggle on a Submitted Bids row name (no extra column). */
+.pf-hot-toggle {
+  display: inline-flex; align-items: center; gap: 3px; vertical-align: middle;
+  margin-left: 6px; padding: 1px 7px; border-radius: 12px; cursor: pointer;
+  font-size: 0.62rem; font-weight: 800; letter-spacing: 0.03em; line-height: 1.4;
+  border: 1px solid var(--border); color: var(--text-3); background: var(--bg-1);
+  filter: grayscale(1) opacity(0.7); /* muted flame when not hot */
+}
+.pf-hot-toggle:hover { border-color: #d97706; color: #b45309; filter: none; }
+.pf-hot-toggle.is-hot {
+  border-color: #d97706; color: #b45309;
+  background: rgba(217,119,6,0.12); filter: none;
+}
+.pf-hot-toggle.is-readonly { cursor: default; }
+.pf-hot-err { display: none; }
+/* Subtle row highlight for a Hot submitted bid: amber left border + faint tint. */
+.pf-hl-row-hot > td { background: rgba(217,119,6,0.06); }
+.pf-hl-row-hot > td.pf-hl-disc { box-shadow: inset 3px 0 0 #d97706; }
 /* ---- Awarded metrics strip (read-only scoreboard, monochrome + amber) ---- */
 .pf-awm-strip {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
@@ -12013,6 +12036,28 @@ try {
       var rec = k && window.PF_BIDMETA.bids ? window.PF_BIDMETA.bids[k] : null;
       return rec || null;
     }
+    // "Hot" flag: true when a submitted bid is heating up toward award (lots of
+    // activity, no official LOI yet). Persisted per bid in the bid-meta overlay.
+    function pfHotFlag(p){
+      var rec = bidMetaFor(p);
+      return !!(rec && rec.hot);
+    }
+    // Toggle the inline Hot flame on a submitted-bids row: optimistic flip + a
+    // blocking setHot POST, then re-render on success; on failure flip back and
+    // surface an inline error. Gated to privileged roles (read-only users see the
+    // state but the control is not interactive). Mirrors pfToggleGarbin.
+    window.pfToggleHot = function(el){
+      if (!el) return;
+      var bid = el.getAttribute('data-bid');
+      var errEl = el.parentNode ? el.parentNode.querySelector('.pf-hot-err') : null;
+      if (errEl) errEl.textContent = '';
+      if (!canResolve()) { if (errEl) errEl.textContent = 'No permission.'; return; }
+      if (!bid) { if (errEl) errEl.textContent = 'Bid not identified.'; return; }
+      var want = !(el.getAttribute('data-hot') === '1'); // desired state after click
+      var ok = postBidMeta({ action: 'setHot', bidId: bid, value: want });
+      if (ok) { renderAll(); }
+      else if (errEl) { errEl.textContent = 'Save failed.'; }
+    };
     // EFFECTIVE date: the saved override if present, else the feed value. field is
     // 'designCompletedDate' (Prelim) or 'dueDate' (Bid due). Returns a string (the
     // raw display value); '' when neither is set. Used by the row, the detail
@@ -13047,7 +13092,32 @@ try {
             ? E(f[opts.subLineKey] || '')
             : E(p.number || f['Project Number'] || '');
         }
-        var nameCell = '<div class="pf-hl-name">' + nameTxt + '</div>'
+        // INLINE HOT FLAG (submitted_bids only, via opts.hotToggle): a compact flame
+        // control rendered inside the name cell so it adds NO column and never widens
+        // the table. Amber/active when hot, muted outline when not. Privileged roles
+        // click to toggle (stopPropagation so the row does not expand); read-only
+        // users see the state but it is not interactive. data-hot mirrors the current
+        // state for the toggle's flip logic.
+        var hotCtrl = '';
+        var rowHot = false;
+        if (opts.hotToggle) {
+          rowHot = pfHotFlag(p);
+          var hbid = E(bidLogId(p));
+          if (canResolve()) {
+            hotCtrl = ' <span class="pf-hot-toggle' + (rowHot ? ' is-hot' : '')
+              + '" role="button" tabindex="0" title="' + (rowHot ? 'Hot - heating up toward award (click to clear)' : 'Mark Hot (heating up toward award)')
+              + '" aria-label="Toggle Hot" aria-pressed="' + (rowHot ? 'true' : 'false') + '"'
+              + ' data-bid="' + hbid + '" data-hot="' + (rowHot ? '1' : '0') + '"'
+              + ' onclick="event.stopPropagation();pfToggleHot(this)"'
+              + ' onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();event.stopPropagation();pfToggleHot(this);}">'
+              + '&#128293; HOT<span class="pf-hot-err"></span></span>';
+          } else if (rowHot) {
+            // Read-only: show the badge (no toggle), still no extra column.
+            hotCtrl = ' <span class="pf-hot-toggle is-hot is-readonly" title="Hot - heating up toward award" aria-label="Hot">&#128293; HOT</span>';
+          }
+        }
+
+        var nameCell = '<div class="pf-hl-name">' + nameTxt + hotCtrl + '</div>'
           + (subTxt ? '<div class="pf-record-muted">' + subTxt + '</div>' : '');
 
         var jk = resolveKey(p);
@@ -13055,7 +13125,7 @@ try {
           ? ' draggable="true" data-jobkey="' + E(jk) + '" data-curbucket="' + E(opts.displayBucket || 'open') + '"'
           : '';
 
-        var row = '<tr class="pf-hl-row"' + dragAttrs
+        var row = '<tr class="pf-hl-row' + (rowHot ? ' pf-hl-row-hot' : '') + '"' + dragAttrs
           + ' data-detail="' + rid + '" tabindex="0" role="button" aria-expanded="false">';
         row += '<td class="pf-hl-disc"><span class="pf-hl-chevron">&#9656;</span></td>';
         row += '<td>' + nameCell + '</td>';
@@ -13793,9 +13863,12 @@ try {
       var ageCounts = null;
       if (bucket === 'submitted_bids') {
         ageFilter = mount.getAttribute('data-age-filter') || 'all';
-        // Count how many fall in each threshold (computed from the FULL list).
-        ageCounts = { all: list.length, u30: 0, d30: 0, d60: 0, d90: 0, d180: 0 };
+        // Count how many fall in each threshold (computed from the FULL list). 'hot'
+        // is a separate (non-age) filter that composes with this same bar: it counts
+        // submitted bids flagged Hot regardless of age.
+        ageCounts = { all: list.length, u30: 0, d30: 0, d60: 0, d90: 0, d180: 0, hot: 0 };
         list.forEach(function(p){
+          if (pfHotFlag(p)) ageCounts.hot++;
           var ds = daysSince(effDate(p, 'dateSubmitted'));
           if (ds == null) return;
           if (ds < 30)   ageCounts.u30++;  // submitted LESS than 30 days ago (fresh)
@@ -13804,9 +13877,12 @@ try {
           if (ds >= 90)  ageCounts.d90++;
           if (ds >= 180) ageCounts.d180++;
         });
-        // 'u30' is an UPPER-bound (under 30 days) so it cannot use the minDays
-        // lower-bound map; handle it as a special case. The rest are lower bounds.
-        if (ageFilter === 'u30') {
+        // 'hot' shows ONLY Hot-flagged bids (mutually exclusive with the age views,
+        // same as the other buttons). 'u30' is an UPPER-bound; the rest are lower
+        // bounds via the minDays map.
+        if (ageFilter === 'hot') {
+          list = list.filter(function(p){ return pfHotFlag(p); });
+        } else if (ageFilter === 'u30') {
           list = list.filter(function(p){
             var ds = daysSince(effDate(p, 'dateSubmitted'));
             return ds != null && ds < 30; // blank submitted date drops out of aged views
@@ -13897,10 +13973,14 @@ try {
           { v: 'd30',  label: '30+',    n: ageCounts.d30 },
           { v: 'd60',  label: '60+',    n: ageCounts.d60 },
           { v: 'd90',  label: '90+',    n: ageCounts.d90 },
-          { v: 'd180', label: '180+',   n: ageCounts.d180 }
+          { v: 'd180', label: '180+',   n: ageCounts.d180 },
+          // Hot: not an age band; shows only Hot-flagged bids. Flame glyph + amber
+          // active state mark it apart from the age buttons. Composes with the bar
+          // (mutually exclusive, like the others).
+          { v: 'hot',  label: '🔥 Hot', n: ageCounts.hot, hot: true }
         ];
         var ageBtns = ageOpts.map(function(o){
-          return '<button type="button" class="pf-age-btn' + (ageFilter === o.v ? ' active' : '')
+          return '<button type="button" class="pf-age-btn' + (o.hot ? ' pf-age-btn-hot' : '') + (ageFilter === o.v ? ' active' : '')
             + '" data-age="' + E(o.v) + '">' + E(o.label)
             + ' <span class="pf-age-n">' + o.n + '</span></button>';
         }).join('');
@@ -13910,7 +13990,9 @@ try {
 
       if (!list.length) {
         if (bucket === 'submitted_bids' && ageFilter !== 'all') {
-          html += (ageFilter === 'u30')
+          html += (ageFilter === 'hot')
+            ? '<div class="pf-empty-state">No submitted bids are flagged Hot. Click the flame on a bid that is heating up toward award, then choose Hot to see only those. Choose All to see every submitted bid.</div>'
+            : (ageFilter === 'u30')
             ? '<div class="pf-empty-state">No submitted bids are under 30 days old. Choose All to see every submitted bid.</div>'
             : '<div class="pf-empty-state">No submitted bids are '
               + E(({ d30: '30+', d60: '60+', d90: '90+', d180: '180+' }[ageFilter] || ''))
@@ -14185,6 +14267,7 @@ try {
           hlOpts.dropSubLineFromDetail = true;  // do not repeat City / State in the flat detail
           hlOpts.nameProminent = true;          // bold, 2-line-clamp name (reuses pf-hl-nameprominent)
           hlOpts.gcEditor = true;               // append the editable Bidding GCs block in the expand detail
+          hlOpts.hotToggle = true;              // inline "Hot" flame in the name cell (no new column)
           highlights = [
             // Bid Total = override-or-feed: the entered Bid Price (precon-bid-meta,
             // carried over from Actively Pricing by bidId) if set, else the feed
