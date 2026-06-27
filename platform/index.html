@@ -2517,6 +2517,7 @@ document.addEventListener('click', function(e) {
   <div class="module-view" id="mod-precon-overview">
     <div id="precon-overview-kpis"></div>
     <div id="precon-overview-duesoon"></div>
+    <div id="precon-overview-panels"></div>
   </div>
 
   <!-- ESTIMATING -->
@@ -14142,7 +14143,7 @@ try {
     }
     // Exposed so the pm-handoff auto-award hook can refresh the Awarded view once
     // the (async) PM create resolves and the assigned number is known.
-    window.pfRerenderPrecon = function(){ renderAll(); renderDeadSet(); if (typeof renderDueSoon === 'function') renderDueSoon(); };
+    window.pfRerenderPrecon = function(){ renderAll(); renderDeadSet(); if (typeof renderDueSoon === 'function') renderDueSoon(); if (typeof renderOverviewPanels === 'function') renderOverviewPanels(); };
 
     // ----- DEAD SET view: all not-awarded jobs across both disciplines -----
     function renderDeadSet(){
@@ -14294,6 +14295,229 @@ try {
     }
     window.renderPreconDueSoon = renderDueSoon;
 
+    // ----- PRECONSTRUCTION OVERVIEW: five roll-up panels -----
+    // Renders into #precon-overview-panels (a sibling mount BELOW the KPI cards and
+    // the "Bids Due in Next 7 Days" panel). All five are READ-ONLY. Precon $ + GC
+    // data, so they live in the already-precon-gated overview (field_ops cannot open
+    // it and both source feeds are server-denied to field_ops).
+    //
+    // EFFECTIVE BUCKET (full): calEffectiveBucket() is calendar-only and returns
+    // null for the terminal states (awarded / not_awarded / not_bidding), so it
+    // cannot drive an "awarded" or funnel count. effBucketFull() mirrors the SAME
+    // override-vs-auto logic that renderAll's per-bucket lists use, but KEEPS the
+    // terminal states. A bid's effective bucket is therefore exactly the bucket it
+    // renders in on the pipeline. One raw bid object resolves to ONE bucket; we
+    // dedupe across raw arrays by resolveKey so a bid cannot be counted twice.
+    function effBucketFull(p, autoBucket){
+      var ov = overrideFor(p);
+      var st = ov && ov.status;
+      if (st === 'awarded') return 'awarded';
+      if (st === 'not_awarded') return 'not_awarded';
+      if (st === 'not_bidding') return 'not_bidding';
+      if (st === 'submitted') return 'submitted_bids';
+      if (st === 'budget') return 'budget_pricing';
+      // 'active' or no override: the bid stays in its auto feed bucket.
+      return autoBucket;
+    }
+    // Walk every raw bid once; resolve its effective bucket; dedupe by resolveKey.
+    // cb(p, effBucket) is called once per unique bid.
+    function eachPreconBid(D, cb){
+      var seen = {};
+      ['ap','hp'].forEach(function(disc){
+        if (!D[disc]) return;
+        Object.keys(D[disc]).forEach(function(autoBucket){
+          (D[disc][autoBucket] || []).forEach(function(p){
+            var rk = resolveKey(p);
+            if (seen[rk]) return; seen[rk] = 1;
+            cb(p, effBucketFull(p, autoBucket));
+          });
+        });
+      });
+    }
+    function ovProjName(p){
+      var f = (p && p.fields) || {};
+      return String((p && p.name) || f['Project Name'] || 'Unnamed');
+    }
+    function ovGc(p){
+      return (typeof window.pfAwardedGcFor === 'function')
+        ? String(window.pfAwardedGcFor(p) || '')
+        : String((p && p.gc) || ((p && p.fields) || {})['General Contractor'] || '');
+    }
+    function ovDueLabel(raw){
+      var ymd = calParseYMD(raw);
+      return ymd ? ((ymd.m + 1) + '/' + ymd.d) : (raw ? String(raw) : '');
+    }
+    function ovGcCell(gc){
+      return gc ? E(gc) : '<span class="pf-record-muted">-</span>';
+    }
+    function ovMoneyCell(v){
+      return fmtMoney0(v === '' || v == null ? null : +v) || '<span class="pf-record-muted">-</span>';
+    }
+    function ovCard(title, meta, body){
+      return '<div class="pf-index-head"><h2>' + E(title) + '</h2>'
+        + (meta ? '<div class="pf-index-meta">' + E(meta) + '</div>' : '')
+        + '</div>' + body;
+    }
+    function renderOverviewPanels(){
+      var root = document.getElementById('precon-overview-panels');
+      if (!root) return;
+      var D = window.PF_PRECON;
+      if (!D) { root.innerHTML = '<div class="pf-empty-state">Pipeline data not loaded.</div>'; return; }
+
+      // Collect into buckets once.
+      var prelimsOut = [];   // Panel 1: Sent to GGG, prelim not back
+      var followUp = [];     // Panel 2: submitted >= 30 days
+      var awardedAll = [];   // Panel 4: awarded
+      var needPrice = [];    // Panel 5: actively pricing, no bid price
+      var funnel = { feasibility_review: 0, actively_bidding: 0, budget_pricing: 0, submitted_bids: 0,
+                     awarded: 0, not_awarded: 0, not_bidding: 0 };
+
+      eachPreconBid(D, function(p, eff){
+        if (funnel.hasOwnProperty(eff)) funnel[eff]++;
+
+        if (eff === 'actively_bidding') {
+          // Panel 1: Prelims outstanding = Sent to GGG AND prelim not back yet.
+          if (pfGarbinFlag(p) && effDate(p, 'designCompletedDate') === '') {
+            prelimsOut.push({ name: ovProjName(p), gc: ovGc(p),
+              due: effDate(p, 'dueDate'), ds: daysSince(effDate(p, 'dueDate')) });
+          }
+          // Panel 5: Jobs needing a price = no Bid Price entered.
+          if (!bidPriceIsSet(p)) {
+            needPrice.push({ name: ovProjName(p), gc: ovGc(p),
+              due: effDate(p, 'dueDate'), ds: daysSince(effDate(p, 'dueDate')) });
+          }
+        }
+
+        if (eff === 'submitted_bids') {
+          // Panel 2: submitted bids needing follow-up = submitted >= 30 days ago.
+          var subDs = daysSince(effDate(p, 'dateSubmitted'));
+          if (subDs != null && subDs >= 30) {
+            followUp.push({ name: ovProjName(p), gc: ovGc(p), days: subDs,
+              value: effBidValue(p) });
+          }
+        }
+
+        if (eff === 'awarded') {
+          // Panel 4: recently awarded.
+          var ad = (typeof awTrueAwardDate === 'function') ? awTrueAwardDate(p) : '';
+          awardedAll.push({ name: ovProjName(p), gc: ovGc(p), awRaw: ad,
+            awEpoch: awUtcMidnight(ad), value: effBidValue(p) });
+        }
+      });
+
+      var html = '';
+
+      // PANEL 1: PRELIMS OUTSTANDING (due soonest first; daysSince DESC; nulls last)
+      prelimsOut.sort(function(a, b){
+        if (a.ds == null && b.ds == null) return 0;
+        if (a.ds == null) return 1;
+        if (b.ds == null) return -1;
+        return b.ds - a.ds;
+      });
+      var p1 = '';
+      if (!prelimsOut.length) {
+        p1 = '<div class="pf-empty-state">No prelims outstanding. Bids you send to GGG show here until the prelim design comes back.</div>';
+      } else {
+        p1 = '<div class="pf-table-wrap"><table class="pf-table"><thead><tr>'
+          + '<th>Project</th><th>GC</th><th>Bid Due</th></tr></thead><tbody>';
+        prelimsOut.forEach(function(r){
+          p1 += '<tr><td>' + E(r.name) + '</td><td>' + ovGcCell(r.gc) + '</td>'
+            + '<td class="num">' + (ovDueLabel(r.due) ? E(ovDueLabel(r.due)) : '<span class="pf-record-muted">-</span>') + '</td></tr>';
+        });
+        p1 += '</tbody></table></div>';
+      }
+      html += ovCard('Prelims Outstanding',
+        'Bids sent to GGG whose prelim design has not come back yet, soonest bid due first.', p1);
+
+      // PANEL 2: SUBMITTED BIDS NEEDING FOLLOW UP (oldest first; days DESC)
+      followUp.sort(function(a, b){ return b.days - a.days; });
+      var p2 = '';
+      if (!followUp.length) {
+        p2 = '<div class="pf-empty-state">No submitted bids over 30 days old.</div>';
+      } else {
+        p2 = '<div class="pf-table-wrap"><table class="pf-table"><thead><tr>'
+          + '<th>Project</th><th>GC</th><th class="num">Days Since Submitted</th>'
+          + '<th class="num">Bid Value</th></tr></thead><tbody>';
+        followUp.forEach(function(r){
+          p2 += '<tr><td>' + E(r.name) + '</td><td>' + ovGcCell(r.gc) + '</td>'
+            + '<td class="num">' + E(String(r.days)) + '</td>'
+            + '<td class="num">' + ovMoneyCell(r.value) + '</td></tr>';
+        });
+        p2 += '</tbody></table></div>';
+      }
+      html += ovCard('Submitted Bids Needing Follow Up',
+        'Bids submitted 30 or more days ago with no award decision yet, most stale first.', p2);
+
+      // PANEL 3: STAGE FUNNEL COUNTS (count strip, pf-awm tiles)
+      var funnelTiles = [
+        ['Feasibility Review', funnel.feasibility_review],
+        ['Actively Pricing', funnel.actively_bidding],
+        ['Budget Pricing', funnel.budget_pricing],
+        ['Submitted', funnel.submitted_bids],
+        ['Awarded', funnel.awarded],
+        ['Not Awarded', funnel.not_awarded],
+        ['Archive', funnel.not_bidding]
+      ];
+      var p3 = '<div class="pf-awm-strip">';
+      funnelTiles.forEach(function(t){
+        p3 += '<div class="pf-awm-tile"><div class="pf-awm-label">' + E(t[0]) + '</div>'
+          + '<div class="pf-awm-val">' + E(String(t[1])) + '</div></div>';
+      });
+      p3 += '</div>';
+      html += ovCard('Stage Funnel', 'Bid counts by effective pipeline stage.', p3);
+
+      // PANEL 4: RECENTLY AWARDED (award date DESC; nulls last; top 5)
+      awardedAll.sort(function(a, b){
+        if (a.awEpoch == null && b.awEpoch == null) return 0;
+        if (a.awEpoch == null) return 1;
+        if (b.awEpoch == null) return -1;
+        return b.awEpoch - a.awEpoch;
+      });
+      var recent = awardedAll.slice(0, 5);
+      var p4 = '';
+      if (!recent.length) {
+        p4 = '<div class="pf-empty-state">No awarded bids yet.</div>';
+      } else {
+        p4 = '<div class="pf-table-wrap"><table class="pf-table"><thead><tr>'
+          + '<th>Project</th><th>GC</th><th>Awarded</th>'
+          + '<th class="num">Bid Value</th></tr></thead><tbody>';
+        recent.forEach(function(r){
+          p4 += '<tr><td>' + E(r.name) + '</td><td>' + ovGcCell(r.gc) + '</td>'
+            + '<td class="num">' + (ovDueLabel(r.awRaw) ? E(ovDueLabel(r.awRaw)) : '<span class="pf-record-muted">-</span>') + '</td>'
+            + '<td class="num">' + ovMoneyCell(r.value) + '</td></tr>';
+        });
+        p4 += '</tbody></table></div>';
+      }
+      html += ovCard('Recently Awarded', 'The five most recently awarded bids.', p4);
+
+      // PANEL 5: JOBS NEEDING A PRICE (prominent count + list; due soonest first)
+      needPrice.sort(function(a, b){
+        if (a.ds == null && b.ds == null) return 0;
+        if (a.ds == null) return 1;
+        if (b.ds == null) return -1;
+        return b.ds - a.ds;
+      });
+      var p5 = '<div class="pf-awm-strip"><div class="pf-awm-tile">'
+        + '<div class="pf-awm-label">Jobs Needing a Price</div>'
+        + '<div class="pf-awm-val">' + E(String(needPrice.length)) + '</div></div></div>';
+      if (!needPrice.length) {
+        p5 += '<div class="pf-empty-state">Every actively pricing job has a bid price entered.</div>';
+      } else {
+        p5 += '<div class="pf-table-wrap"><table class="pf-table"><thead><tr>'
+          + '<th>Project</th><th>GC</th><th>Bid Due</th></tr></thead><tbody>';
+        needPrice.forEach(function(r){
+          p5 += '<tr><td>' + E(r.name) + '</td><td>' + ovGcCell(r.gc) + '</td>'
+            + '<td class="num">' + (ovDueLabel(r.due) ? E(ovDueLabel(r.due)) : '<span class="pf-record-muted">-</span>') + '</td></tr>';
+        });
+        p5 += '</tbody></table></div>';
+      }
+      html += ovCard('Jobs Needing a Price',
+        'Actively pricing jobs with no bid price entered yet, soonest bid due first.', p5);
+
+      root.innerHTML = html;
+    }
+    window.renderPreconOverviewPanels = renderOverviewPanels;
+
     function boot(){
       loadOverrides();
       loadGarbinFlags();
@@ -14301,6 +14525,7 @@ try {
       renderAll();
       renderDeadSet();
       renderDueSoon();
+      renderOverviewPanels();
     }
     document.addEventListener('DOMContentLoaded', boot);
     if (document.readyState !== 'loading') boot();
