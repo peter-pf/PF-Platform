@@ -12811,6 +12811,40 @@ try {
       return '<div class="pf-awm-strip">' + tiles + '</div>';
     }
 
+    // AWARDED TOTALS strip (Jonathan): a read-only summary at the VERY TOP of the
+    // Awarded module, ABOVE the schedule-average + $/unit metrics strip. Three tiles
+    // showing the TOTAL awarded value (sum of effBidValue, override-or-feed, parsed
+    // the same way as the metrics strip), TOTAL LF, and TOTAL Columns. Fed the SAME
+    // awarded `list` the table renders, so every total is awarded-scoped (awarded
+    // jobs only). Reuses the pf-awm-strip / pf-awm-tile markup for visual consistency.
+    function renderAwardedTotalsStrip(list){
+      function awMoneyNum(v){ return Number(String(v == null ? '' : v).replace(/[$,]/g, '')); }
+      var totalVal = 0, haveVal = false;     // sum of effBidValue across the awarded list
+      var totalLf = 0, haveLf = false;       // sum of Total LF across the awarded list
+      var totalCol = 0, haveCol = false;     // sum of Total Columns across the awarded list
+      (list || []).forEach(function(p){
+        var f = (p && p.fields) || {};
+        var val = awMoneyNum(effBidValue(p));
+        if (isFinite(val) && val > 0) { totalVal += val; haveVal = true; }
+        var lf = Number(f['Total LF']);
+        if (isFinite(lf) && lf > 0) { totalLf += lf; haveLf = true; }
+        var cols = Number(f['Total Columns']);
+        if (isFinite(cols) && cols > 0) { totalCol += cols; haveCol = true; }
+      });
+      var muted = '<span class="pf-record-muted">-</span>';
+      var tiles = ''
+        + '<div class="pf-awm-tile"><div class="pf-awm-label">Total Awarded Value</div>'
+        + '<div class="pf-awm-val">' + (haveVal ? E(fmtMoneyDisplay(Math.round(totalVal))) : muted) + '</div>'
+        + '<div class="pf-awm-sub">sum of awarded jobs</div></div>'
+        + '<div class="pf-awm-tile"><div class="pf-awm-label">Total LF</div>'
+        + '<div class="pf-awm-val">' + (haveLf ? E(fmtNum0(totalLf)) : muted) + '</div>'
+        + '<div class="pf-awm-sub">sum of awarded jobs</div></div>'
+        + '<div class="pf-awm-tile"><div class="pf-awm-label">Total Columns</div>'
+        + '<div class="pf-awm-val">' + (haveCol ? E(fmtNum0(totalCol)) : muted) + '</div>'
+        + '<div class="pf-awm-sub">sum of awarded jobs</div></div>';
+      return '<div class="pf-awm-strip">' + tiles + '</div>';
+    }
+
     // SUBMITTED BIDS metrics strip (Jonathan): a read-only scoreboard at the top of
     // the Submitted Bids module mirroring the Awarded strip's markup + dollar-ratio
     // averaging. Five tiles: the TOTAL outstanding submitted bid value + total LF
@@ -13747,6 +13781,23 @@ try {
             });
           }
         }
+        // ----- SORT: newest submitted first -----
+        // Jonathan: order submitted bids by Date Submitted, most recently sent at
+        // top down to the most stale (2024 bids) at the bottom. daysSince returns
+        // whole days in the past (smaller = more recent), so ASCENDING daysSince =
+        // newest first. Uses effDate(...'dateSubmitted') so a corrected (override)
+        // submit date re-sorts correctly. Blank/unparseable dates (ds == null) sort
+        // to the BOTTOM. Runs AFTER the aging filter so the final rendered rows are
+        // newest-first regardless of the active age view. Submitted Bids ONLY (this
+        // is inside the submitted_bids guard); other buckets keep sortByNumber order.
+        list = list.slice().sort(function(a, b){
+          var da = daysSince(effDate(a, 'dateSubmitted'));
+          var db = daysSince(effDate(b, 'dateSubmitted'));
+          if (da == null && db == null) return 0;
+          if (da == null) return 1;   // a (blank) goes after b
+          if (db == null) return -1;  // b (blank) goes after a
+          return da - db;             // fewer days since = more recent = higher
+        });
       }
 
       var srcLink = D.source_url
@@ -13852,10 +13903,15 @@ try {
       if (sLf != null) parts.push('Total LF ' + fmtNum0(sLf));
       html += '<div class="pf-index-meta" style="margin:4px 0 10px">' + E(parts.join('  •  ')) + '</div>';
 
+      // ----- AWARDED TOTALS STRIP (read-only) -----
+      // Total awarded value + total LF + total Columns at the VERY TOP of the Awarded
+      // module, ABOVE the schedule-average / $-per-unit metrics strip. Fed the SAME
+      // awarded `list`, so the totals are awarded-scoped. See renderAwardedTotalsStrip.
       // ----- AWARDED METRICS STRIP (read-only scoreboard) -----
-      // Running averages across all awarded jobs of THIS discipline. Sits at the
-      // top of the Awarded module. See renderAwardedMetricsStrip for the formulas.
+      // Running averages across all awarded jobs of THIS discipline. Sits below the
+      // totals strip. See renderAwardedMetricsStrip for the formulas.
       if (bucket === 'awarded') {
+        html += renderAwardedTotalsStrip(list);
         html += renderAwardedMetricsStrip(list);
       }
       // Submitted Bids metrics strip: outstanding bid value + LF + the $/LF, $/Col,
