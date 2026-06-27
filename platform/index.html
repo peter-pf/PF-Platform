@@ -985,6 +985,14 @@ body.role-field-ops .nav-item[data-fo-hide] {
   white-space: normal; overflow: visible; text-overflow: clip;
   word-break: break-word; font-size: 0.8rem; line-height: 1.25;
 }
+/* Awarded GC cell only (h.gcNoBreak -> .pf-hl-gc-nobreak): wrap at spaces ONLY so
+   names like "RealAmerica" / "POET Bioprocessing" never break mid-word; clamp to
+   two lines then ellipsis. Scoped to this class so other GC cells are untouched. */
+.pf-hl-table td.pf-hl-gc.pf-hl-gc-nobreak {
+  overflow: hidden; text-overflow: ellipsis;
+  word-break: normal; overflow-wrap: normal;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
 /* Sent-to-Garbin checkbox cell. */
 .pf-hl-table td.pf-hl-garbin { text-align: center; white-space: normal; overflow: visible; }
 .pf-garbin-chk { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent); }
@@ -13024,7 +13032,10 @@ try {
               awgc = String((p && p.gc) || f['General Contractor'] || '');
             }
             var awcell = awgc ? E(awgc) : '<span class="pf-record-muted">-</span>';
-            row += '<td class="pf-hl-gc">' + awcell + '</td>';
+            // gcNoBreak (Awarded): wrap only at spaces (no mid-word break) so names
+            // like "RealAmerica" / "POET Bioprocessing" stay whole, max 2 lines.
+            var awgcCls = 'pf-hl-gc' + (h.gcNoBreak ? ' pf-hl-gc-nobreak' : '');
+            row += '<td class="' + awgcCls + '">' + awcell + '</td>';
             return;
           }
           // EFFECTIVE MONEY cell (submitted_bids Bid Total): show the entered Bid
@@ -13041,6 +13052,14 @@ try {
           }
           var v = f[h.key];
           var cell = (v === undefined || v === null) ? '' : E(v);
+          // noYear (opt-in per highlight): a feed 'date' column shows month/day only
+          // (e.g. "6/24") to save width, mirroring the effdate noYear branch. Only
+          // applies when the value parses via calParseYMD; otherwise the raw value
+          // is kept. Columns that do not set h.noYear are unaffected.
+          if (h.type === 'date' && h.noYear && v !== undefined && v !== null && String(v) !== '') {
+            var dymd = calParseYMD(v);
+            if (dymd) cell = E((dymd.m + 1) + '/' + dymd.d);
+          }
           // GC cell wraps (no ellipsis truncation) so the full GC name is always
           // readable regardless of length; a smaller font keeps the row tight.
           var cls = (h.type === 'gc')
@@ -13875,18 +13894,29 @@ try {
           //   GC -> awarded GC of record (pfAwardedGcFor), else feed GC ('awgc')
           hlOpts.compact = true;
           hlOpts.subLineAwarded = true;
+          // Jonathan: the Awarded table had too much going on - trim it to match
+          // the Actively Pricing look. Stone (TN) and Diameter columns are removed;
+          // the per-row Resolution buttons are removed (the drag-and-drop bar above
+          // remains the way to change an awarded job's status); the project name
+          // gets the same prominent 2-line treatment as Actively Pricing; the date
+          // columns drop the year (M/D) to save space; and GC gets more room with
+          // no mid-word breaks. The freed width flows to the name + GC columns.
+          hlOpts.actionCol = false; // awarded uses the DnD bar, not per-row buttons
+          hlOpts.nameProminent = true; // bold, 2-line-clamp name (reuses pf-hl-nameprominent)
           highlights = [
             { key: 'Bid Total Value',      label: 'Bid Total',     type: 'effmoney', w: '110px' },
             { key: 'Total LF',             label: 'Total LF',      type: 'num',      w: '90px' },
             { key: 'Total Columns',        label: 'Columns',       type: 'num',      w: '84px' },
-            { key: 'Total Stone (TN)',     label: 'Stone (TN)',    type: 'num',      w: '92px' },
-            { key: '__diameter',           label: 'Diameter',      type: 'diam',     w: '90px' },
-            { key: 'Projected Start Date', label: 'Proj. Start',   type: 'date',     w: '108px' },
+            // Proj. Start is a feed 'date' (not effdate); noYear:true renders M/D.
+            { key: 'Projected Start Date', label: 'Proj. Start',   type: 'date',     w: '88px', noYear: true },
             // Editable Award Date (override-or-master-or-PM via effDate 'awardDate').
             // The 'effdate' cell shows the value + a calendar picker that POSTs
-            // setDate field 'awardDate'; default display is awTrueAwardDate.
-            { key: '__awardDate',          label: 'Award Date',    type: 'effdate',  field: 'awardDate', w: '120px' },
-            { key: 'General Contractor',   label: 'GC',            type: 'awgc' }
+            // setDate field 'awardDate'; default display is awTrueAwardDate. noYear
+            // renders M/D (effdate already honors noYear via effDateDisplay).
+            { key: '__awardDate',          label: 'Award Date',    type: 'effdate',  field: 'awardDate', w: '95px', noYear: true },
+            // GC: roomy fixed width + a scoped class so the name wraps only at
+            // spaces (no mid-word break like "RealAmer/ica"), up to 2 lines.
+            { key: 'General Contractor',   label: 'GC',            type: 'awgc', w: '150px', gcNoBreak: true }
           ];
         } else {
           // SUBMITTED BIDS - Jonathan's exact order. Project Name lives in the
