@@ -1785,6 +1785,7 @@ body.role-field-ops .nav-item[data-fo-hide] {
     '/data/budget-actual-poet.js',
     '/data/awarded-projects.js',
     '/data/precon-pipeline.js',
+    '/data/feasibility-history.js',
     '/data/project-master.js',
     '/data/pf-coi.js',
     '/data/pf-dashboard.js'      // company-wide monthly KPI dashboard (financials_global)
@@ -1818,7 +1819,8 @@ body.role-field-ops .nav-item[data-fo-hide] {
   if (isPrivileged) {
     feeds.push('/data/project-record-poet.js', '/data/project-records.js',
                '/data/budget-actual-poet.js', '/data/awarded-projects.js',
-               '/data/precon-pipeline.js', '/data/project-master.js', '/data/pf-coi.js',
+               '/data/precon-pipeline.js', '/data/feasibility-history.js',
+               '/data/project-master.js', '/data/pf-coi.js',
                '/data/pf-dashboard.js');
   } else {
     // field_ops: the project LIST comes from the field-safe derivative (no $),
@@ -1832,9 +1834,10 @@ body.role-field-ops .nav-item[data-fo-hide] {
     feeds.push('/data/precon-dashboard.js', '/data/bd-dashboard.js', '/data/bd-records.js', '/data/opportunities.js',
                '/data/gc-targets.js', '/data/bd-templates.js', '/data/precon-historical.js',
                '/data/project-dashboard.js');
-    // BD also needs the precon pipeline feed (preconstruction area) - previously
-    // only injected for admin/partner; BD is allowed it server-side.
-    if (!isPrivileged) feeds.push('/data/precon-pipeline.js');
+    // BD also needs the precon pipeline + feasibility history feeds
+    // (preconstruction area) - previously only injected for admin/partner; BD is
+    // allowed them server-side.
+    if (!isPrivileged) feeds.push('/data/precon-pipeline.js', '/data/feasibility-history.js');
   }
   // SEC-12: privileged roles get the raw schedule (value/gc_name); field_ops
   // gets the $/GC-stripped derivative. The raw file is server-DENIED to field_ops.
@@ -4598,6 +4601,98 @@ try {
   }
 
   // ---- HISTORY VIEW ----
+  // Shared, read-only feasibility study history. Driven by the server-gated
+  // /data/feasibility-history.js feed (preconstruction area; field_ops denied),
+  // so completed studies are visible to everyone with precon access, not just
+  // the per-browser localStorage history. Read-only: no write, no delete.
+  // Map a study verdict to an existing badge-status class (green/amber/red).
+  function studyVerdictClass(verdict) {
+    var v = (verdict || '').toUpperCase();
+    if (v.indexOf('NO-GO') !== -1 || v.indexOf('NO GO') !== -1) return 'no-bid';
+    if (v.indexOf('CONDITIONAL') !== -1) return 'review';
+    if (v.indexOf('PASS') !== -1 || v === 'GO') return 'bid';
+    return 'pending';
+  }
+
+  function renderStudyHistory() {
+    var feed = window.PF_FEASIBILITY_HISTORY;
+    var studies = (feed && feed.studies) ? feed.studies.slice() : [];
+    if (!studies.length) return '';
+
+    // Newest first by ISO date (string compare is safe for YYYY-MM-DD).
+    studies.sort(function (a, b) {
+      return (b.date || '') < (a.date || '') ? -1 : ((b.date || '') > (a.date || '') ? 1 : 0);
+    });
+
+    var html = '' +
+      '<div style="margin-top:28px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
+          '<span class="card-title">Study History</span>' +
+          '<span style="font-size:0.82rem;color:var(--text-3)">' + studies.length + ' completed stud' + (studies.length !== 1 ? 'ies' : 'y') + ' &middot; shared</span>' +
+        '</div>';
+
+    for (var i = 0; i < studies.length; i++) {
+      var s = studies[i];
+      var cls = studyVerdictClass(s.verdict);
+      var sid = 'feasStudy_' + i;
+
+      html += '<div class="card" style="margin-bottom:12px">';
+      // Header row: project + location + verdict badge + date.
+      html += '' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">' +
+          '<div>' +
+            '<div style="font-weight:600">' + esc(s.project || '--') + '</div>' +
+            '<div style="font-size:0.82rem;color:var(--text-3);margin-top:2px">' + esc(s.location || '') +
+              (s.discipline ? ' &middot; ' + esc(s.discipline) : '') + '</div>' +
+          '</div>' +
+          '<div style="text-align:right;white-space:nowrap">' +
+            '<span class="badge-status ' + cls + '">' + esc(s.verdict || '--') + '</span>' +
+            '<div style="font-size:0.78rem;color:var(--text-3);margin-top:4px">' + esc(s.date || '') + '</div>' +
+          '</div>' +
+        '</div>';
+
+      // One-line summary.
+      if (s.summary) {
+        html += '<p style="margin:10px 0 0;font-size:0.88rem;color:var(--text-2)">' + esc(s.summary) + '</p>';
+      }
+
+      // Expand toggle for drivers + missing.
+      html += '<div style="margin-top:8px">' +
+        '<button class="btn btn-secondary" style="padding:4px 10px;font-size:0.74rem" onclick="window._feasToggleStudy(\'' + sid + '\')">Details</button>' +
+        '</div>';
+
+      html += '<div id="' + sid + '" style="display:none;margin-top:12px">';
+      if (s.verdictNote) {
+        html += '<div style="font-size:0.84rem;color:var(--text-2);margin-bottom:10px"><strong>Verdict:</strong> ' + esc(s.verdictNote) + '</div>';
+      }
+      var drivers = s.drivers || [];
+      if (drivers.length) {
+        html += '<div style="font-size:0.8rem;font-weight:600;color:var(--text-3);margin-bottom:4px">Key drivers</div><ul style="margin:0 0 10px;padding-left:18px;font-size:0.85rem;color:var(--text-2)">';
+        for (var d = 0; d < drivers.length; d++) {
+          html += '<li>' + esc(drivers[d]) + '</li>';
+        }
+        html += '</ul>';
+      }
+      var missing = s.missing || [];
+      if (missing.length) {
+        html += '<div style="font-size:0.8rem;font-weight:600;color:var(--text-3);margin-bottom:4px">What is missing</div><ul style="margin:0 0 10px;padding-left:18px;font-size:0.85rem;color:var(--text-2)">';
+        for (var m = 0; m < missing.length; m++) {
+          html += '<li>' + esc(missing[m]) + '</li>';
+        }
+        html += '</ul>';
+      }
+      if (s.recordPath) {
+        html += '<div style="font-size:0.78rem;color:var(--text-3)">Full record: ' + esc(s.recordPath) + '</div>';
+      }
+      html += '</div>'; // end details
+
+      html += '</div>'; // end card
+    }
+
+    html += '</div>';
+    return html;
+  }
+
   function renderHistoryView() {
     var history = getHistory();
 
@@ -4607,7 +4702,8 @@ try {
           '<div class="empty-icon">&#9670;</div>' +
           '<h3>No Assessments Yet</h3>' +
           '<p>Run your first feasibility assessment to see history here.</p>' +
-        '</div>';
+        '</div>' +
+        renderStudyHistory();
     }
 
     var html = '' +
@@ -4635,6 +4731,7 @@ try {
     }
 
     html += '</tbody></table></div>';
+    html += renderStudyHistory();
     return html;
   }
 
@@ -4864,6 +4961,12 @@ try {
 
   window._feasDeleteHistory = function (idx) {
     deleteHistoryItem(idx);
+  };
+
+  // Expand/collapse a shared study's drivers + missing detail (read-only).
+  window._feasToggleStudy = function (sid) {
+    var box = document.getElementById(sid);
+    if (box) box.style.display = (box.style.display === 'none') ? 'block' : 'none';
   };
 
   // ---- INIT ----

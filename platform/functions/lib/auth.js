@@ -353,6 +353,7 @@ const DATA_FILE_AREAS = {
   '/data/pm-overlay.js':           'financials',      // PROJECT: KV-mirror placeholder (PM overlay read via /api/pm-project) - reserved
   '/data/project-history.js':      'financials',      // PROJECT: per-job ContractValue/totalContractValue
   '/data/precon-pipeline.js':      'preconstruction', // PROJECT/BD: opportunity pipeline ($ per opp) — BD domain
+  '/data/feasibility-history.js':  'preconstruction', // PROJECT/BD: completed feasibility studies (verdict/drivers), no $; precon analysis, field_ops BLOCKED
   '/data/project-master.js':       'preconstruction', // PROJECT/BD: PF Project Master (number/name/diameter/true award date) — no $; precon awarded surface
   '/data/precon-dashboard.js':     'preconstruction', // PROJECT/BD: precon PERIOD KPIs (invites/bids/awarded/win rate) — BD domain, field_ops BLOCKED
   '/data/precon-historical.js':    'preconstruction', // PROJECT/BD: historical win/loss bid log by year (read-only) — BD domain, field_ops BLOCKED
