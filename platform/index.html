@@ -11942,11 +11942,10 @@ try {
       if (v == null || String(v).trim() === '') return '-';
       var n = parseFloat(String(v).replace(/[^0-9.\-]/g, ''));
       if (!isFinite(n)) return '-';
-      var hasCents = Math.round(n * 100) % 100 !== 0;
-      return '$' + n.toLocaleString('en-US', {
-        minimumFractionDigits: hasCents ? 2 : 0,
-        maximumFractionDigits: 2
-      });
+      // Jonathan: bid totals show to the nearest whole dollar, no cents
+      // (343,037 not 343,037.07). Stored values keep their precision; this
+      // is display-only. Aligns with fmtMoney0 / dollar() which also round.
+      return '$' + Math.round(n).toLocaleString('en-US');
     }
     // RESOLUTION KEY (override map key). Every bid is keyed by bidLogId(p) =
     // 'num_<project number>' when it has a real number, else 'ng_<hash of
@@ -12117,7 +12116,7 @@ try {
     // 'designCompletedDate' (Prelim) or 'dueDate' (Bid due). Returns a string (the
     // raw display value); '' when neither is set. Used by the row, the detail
     // panel, AND the calendar so an addendum-shifted date moves everywhere.
-    var BIDMETA_FEED_KEY = { designCompletedDate: 'Design Completed Date', dueDate: 'Due Date' };
+    var BIDMETA_FEED_KEY = { designCompletedDate: 'Design Completed Date', dueDate: 'Due Date', projStart: 'Projected Start Date' };
     function effDate(p, field){
       var rec = bidMetaFor(p);
       if (rec && rec.dates && rec.dates[field] != null && rec.dates[field] !== '') return rec.dates[field];
@@ -13069,9 +13068,13 @@ try {
           }
           // GC cell wraps (no ellipsis truncation) so the full GC name is always
           // readable regardless of length; a smaller font keeps the row tight.
+          // A 'text' GC column may opt into gcNoBreak (wrap only at spaces, no
+          // mid-word break, up to 2 lines) via the same .pf-hl-gc-nobreak class
+          // the 'awgc' type uses (submitted_bids GC).
           var cls = (h.type === 'gc')
             ? ' class="pf-hl-gc"'
-            : ((h.type === 'money' || h.type === 'num') ? ' class="num"' : '');
+            : (h.gcNoBreak ? ' class="pf-hl-gc pf-hl-gc-nobreak"'
+            : ((h.type === 'money' || h.type === 'num') ? ' class="num"' : ''));
           // Follow-up date gets an overdue / due-soon flag, matching the precon
           // action-item calendar palette. Same thresholds: past = overdue,
           // within 7 days = due soon. The flag text is static (safe); the date
@@ -13914,8 +13917,11 @@ try {
             { key: 'Bid Total Value',      label: 'Bid Total',     type: 'effmoney', w: '110px' },
             { key: 'Total LF',             label: 'Total LF',      type: 'num',      w: '90px' },
             { key: 'Total Columns',        label: 'Columns',       type: 'num',      w: '84px' },
-            // Proj. Start is a feed 'date' (not effdate); noYear:true renders M/D.
-            { key: 'Projected Start Date', label: 'Proj. Start',   type: 'date',     w: '88px', noYear: true },
+            // Start Date is editable (override-or-feed) via effDate 'projStart',
+            // same calendar picker as Award Date. The override maps to the feed
+            // 'Projected Start Date' through BIDMETA_FEED_KEY; setDate field
+            // 'projStart'. noYear renders M/D (effdate honors noYear).
+            { key: 'Projected Start Date', label: 'Start Date',    type: 'effdate',  field: 'projStart', w: '88px', noYear: true },
             // Editable Award Date (override-or-master-or-PM via effDate 'awardDate').
             // The 'effdate' cell shows the value + a calendar picker that POSTs
             // setDate field 'awardDate'; default display is awTrueAwardDate. noYear
@@ -13949,29 +13955,35 @@ try {
             { key: 'General Contractor', label: 'GC',        type: 'awgc', w: '180px', gcNoBreak: true }
           ];
         } else {
-          // SUBMITTED BIDS - Jonathan's exact order. Project Name lives in the
-          // name cell; the rest are highlight columns; GC is last before the
-          // action buttons. Explicit widths keep 9 data columns from overflowing;
-          // text columns (City/State, GC) flex + ellipsis-truncate. Compact mode
-          // (smaller font) plus narrow date/number columns make it fit a normal
-          // screen without horizontal scroll. Follow Up Date carries the
-          // overdue / due-soon flag.
+          // SUBMITTED BIDS (Jonathan): same clean highlight-row + click-to-expand
+          // look as Actively Pricing / Awarded. The name cell carries the project
+          // name with "City, ST" on an ITALIC sub-line (subLineKey), so City /
+          // State drops as its own column. City / State and Project Duration are
+          // removed entirely; the freed width flows to the prominent name (the one
+          // flexible col) and the roomy GC. Date columns drop the year (M/D, same
+          // as Actively Pricing / Awarded). Follow Up Date carries the overdue /
+          // due-soon flag.
+          hlOpts.compact = true;
+          hlOpts.subLineKey = 'City / State';  // City, ST on the italic name sub-line
+          hlOpts.dropSubLineFromDetail = true;  // do not repeat City / State in the flat detail
+          hlOpts.nameProminent = true;          // bold, 2-line-clamp name (reuses pf-hl-nameprominent)
+          hlOpts.followUpKey = 'Follow Up Date';
           highlights = [
-            { key: 'City / State',           label: 'City / State',     type: 'text' },
             // Bid Total = override-or-feed: the entered Bid Price (precon-bid-meta,
             // carried over from Actively Pricing by bidId) if set, else the feed
             // Bid Total Value. ONLY this bucket uses the override for the value.
             { key: 'Bid Total Value',        label: 'Bid Total',        type: 'effmoney', w: '110px' },
             { key: 'Total LF',               label: 'Total LF',         type: 'num',   w: '84px' },
             { key: 'Total Columns',          label: 'Columns',          type: 'num',   w: '80px' },
-            { key: 'Date Submitted',         label: 'Submitted',        type: 'date',  w: '100px' },
-            { key: 'Follow Up Date',         label: 'Follow-up',        type: 'date',  w: '120px' },
-            { key: 'Projected Start Date',   label: 'Proj. Start',      type: 'date',  w: '100px' },
-            { key: 'Project Duration (Days)',label: 'Duration',         type: 'num',   w: '82px' },
-            { key: 'General Contractor',     label: 'GC',               type: 'text' }
+            // Dates drop the year (M/D) to save width, same as Actively Pricing.
+            // These stay read-only feed 'date' cells in this bucket.
+            { key: 'Date Submitted',         label: 'Submitted',        type: 'date',  w: '90px', noYear: true },
+            { key: 'Follow Up Date',         label: 'Follow-up',        type: 'date',  w: '90px', noYear: true },
+            { key: 'Projected Start Date',   label: 'Proj. Start',      type: 'date',  w: '90px', noYear: true },
+            // GC: roomy fixed width + no mid-word break (same as Awarded / Not
+            // Awarded). The freed width from the removed columns flows here + name.
+            { key: 'General Contractor',     label: 'GC',               type: 'text',  w: '180px', gcNoBreak: true }
           ];
-          hlOpts.compact = true;
-          hlOpts.followUpKey = 'Follow Up Date';
         }
         hlOpts.highlights = highlights;
         html += renderHighlightTable(disc, list, hlOpts);
