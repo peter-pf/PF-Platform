@@ -17,6 +17,7 @@
 //       gcs:       [ { company, contact, email, phone } ],
 //       awardedGc: <int index into gcs, or -1>,
 //       bidPrice:  <non-negative number as a string, or absent>,  // entered Bid Price
+//       docs:      [ { label, url } ],  // per-job document links (http(s) ONLY)
 //       by, at
 //     } }
 //   }
@@ -49,6 +50,9 @@ const MAX_BIDS = 20000;     // total tracked bids cap
 const MAX_SHORT = 300;      // bidId / company / contact / phone cap
 const MAX_EMAIL = 200;      // email cap
 const MAX_GCS = 12;         // bidding GCs per bid cap
+const MAX_DOCS = 12;        // document links per bid cap
+const MAX_DOC_LABEL = 120;  // document label cap
+const MAX_DOC_URL = 500;    // document url cap
 
 const VALID_DATE_FIELD = { designCompletedDate: 1, dueDate: 1, awardDate: 1, projStart: 1, dateSubmitted: 1 };
 const MAX_PRICE = 1e12;     // sanity cap on the entered Bid Price ($1 trillion)
@@ -110,6 +114,28 @@ function normGc(g) {
   };
 }
 
+// Rebuild one DOCUMENT-link entry from untrusted input. Returns a sanitized
+// { label, url } whose url is STRICTLY an http:// or https:// URL, or null when
+// the url is anything else (javascript:, data:, vbscript:, file:, mailto:,
+// relative, empty, or unparseable). A null return DROPS the entry (the caller
+// filters them out) so a bad link can never be persisted or rendered. The label
+// is length-capped + angle-stripped via s(); the url is length-capped first,
+// then scheme-validated (so an over-long string cannot smuggle a bad scheme).
+function normDoc(d) {
+  d = d || {};
+  const label = s(d.label, MAX_DOC_LABEL);
+  let url = (d.url == null) ? '' : String(d.url);
+  if (url.length > MAX_DOC_URL) url = url.slice(0, MAX_DOC_URL);
+  url = url.trim();
+  if (!url) return null;
+  // Accept ONLY absolute http(s) URLs. URL parsing rejects relative/garbage; the
+  // protocol allow-list rejects every dangerous scheme. Reject anything else.
+  let parsed;
+  try { parsed = new URL(url); } catch { return null; }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+  return { label, url };
+}
+
 function isBadKey(k) {
   return k === '__proto__' || k === 'constructor' || k === 'prototype';
 }
@@ -156,6 +182,7 @@ export async function onRequestGet(context) {
 //   { action:'setGcs',       bidId, gcs:[ {company,contact,email,phone}, ... ] }
 //   { action:'setAwardedGc', bidId, index:int }
 //   { action:'setBidPrice',  bidId, value:number|moneyString|'' }
+//   { action:'setDocs',      bidId, docs:[ {label,url(http(s))}, ... ] }
 export async function onRequestPost(context) {
   const { request, env } = context;
   const session = context.data && context.data.session;
@@ -172,7 +199,7 @@ export async function onRequestPost(context) {
     catch { return json({ status: 'error', message: 'Invalid JSON.' }, 400); }
 
     const action = String((parsed && parsed.action) || '');
-    if (action !== 'setDate' && action !== 'setGcs' && action !== 'setAwardedGc' && action !== 'setBidPrice') {
+    if (action !== 'setDate' && action !== 'setGcs' && action !== 'setAwardedGc' && action !== 'setBidPrice' && action !== 'setDocs') {
       return json({ status: 'error', message: 'Unknown action.' }, 400);
     }
 
@@ -204,6 +231,11 @@ export async function onRequestPost(context) {
       } : {},
       gcs: Array.isArray(prev.gcs) ? prev.gcs.slice(0, MAX_GCS).map(normGc) : [],
       awardedGc: Number.isInteger(prev.awardedGc) ? prev.awardedGc : -1,
+      // Carry existing document links forward (re-sanitized: any entry whose url
+      // is no longer a valid http(s) URL is dropped, never re-emitted).
+      docs: Array.isArray(prev.docs)
+        ? prev.docs.slice(0, MAX_DOCS).map(normDoc).filter(function (x) { return x; })
+        : [],
     };
     // Carry the existing Bid Price forward (re-validated). Only persisted when set;
     // an invalid stored value is dropped rather than re-emitted.
@@ -243,6 +275,13 @@ export async function onRequestPost(context) {
       if (price === null) return json({ status: 'error', message: 'value must be a non-negative number or empty.' }, 400);
       if (price === '') delete rec.bidPrice;
       else rec.bidPrice = price;
+    } else if (action === 'setDocs') {
+      const arr = (parsed && Array.isArray(parsed.docs)) ? parsed.docs : null;
+      if (!arr) return json({ status: 'error', message: 'docs must be an array.' }, 400);
+      if (arr.length > MAX_DOCS) return json({ status: 'error', message: 'Too many documents (max ' + MAX_DOCS + ').' }, 400);
+      // Sanitize every entry; drop any whose url is not a valid http(s) URL so a
+      // bad scheme (javascript:/data:/...) or relative/empty link is never stored.
+      rec.docs = arr.map(normDoc).filter(function (x) { return x; });
     }
 
     rec.by = (session && (session.name || session.uid)) ? s(session.name || session.uid) : 'unknown';

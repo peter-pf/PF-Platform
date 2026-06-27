@@ -1027,6 +1027,23 @@ body.role-field-ops .nav-item[data-fo-hide] {
 .pf-gc-btn.primary { border-color: var(--accent); background: var(--accent); color: #fff; }
 .pf-gc-err { font-size: 0.72rem; color: #b00020; }
 .pf-gc-empty { font-size: 0.8rem; }
+/* Per-job Documents editor (Actively Pricing expand). Mirrors the GC editor. */
+.pf-doc-group { grid-column: 1 / -1; }
+.pf-doc-links { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-bottom: 8px; }
+.pf-doc-link { font-size: 0.8rem; color: var(--accent); text-decoration: none; }
+.pf-doc-link:hover { text-decoration: underline; }
+.pf-doc-empty { font-size: 0.8rem; }
+.pf-doc-rows { display: flex; flex-direction: column; gap: 6px; }
+.pf-doc-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 6px; border: 1px solid var(--border-light); border-radius: 6px; }
+.pf-doc-field { font-size: 0.78rem; padding: 4px 6px; border: 1px solid var(--border-light); border-radius: 4px; flex: 1 1 120px; min-width: 90px; }
+.pf-doc-rm { background: none; border: 1px solid var(--border-light); border-radius: 4px; cursor: pointer; font-size: 0.95rem; line-height: 1; padding: 2px 8px; color: var(--text-2); }
+.pf-doc-ctrls { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.pf-doc-btn { font-size: 0.74rem; padding: 4px 12px; border: 1px solid var(--border-light); background: var(--surface, #fff); border-radius: 4px; cursor: pointer; }
+.pf-doc-btn.primary { border-color: var(--accent); background: var(--accent); color: #fff; }
+.pf-doc-err { font-size: 0.72rem; color: #b00020; }
+/* Needs-Estimate badge on Actively Pricing rows (inline tag, no new column). */
+.pf-tag-estimated { display: inline-block; font-size: 0.62rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; padding: 1px 6px; border-radius: 999px; vertical-align: middle; background: rgba(30,107,51,0.12); color: #1E6B33; }
+.pf-tag-needsprice { display: inline-block; font-size: 0.62rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; padding: 1px 6px; border-radius: 999px; vertical-align: middle; background: rgba(138,109,0,0.14); color: #8A6D00; }
 /* Editable Bid Price cell (Actively Pricing). */
 .pf-hl-table td.pf-hl-bidprice { white-space: normal; overflow: visible; }
 .pf-bidprice-wrap { display: inline-flex; align-items: center; gap: 2px; }
@@ -12038,6 +12055,26 @@ try {
       var rec = bidMetaFor(p);
       return (rec && Number.isInteger(rec.awardedGc)) ? rec.awardedGc : -1;
     }
+    // DOCUMENT LINKS for a bid (geotech, drawings, specs, ...). Overlay-only: the
+    // feed has no document column, so an un-edited bid simply has no links. Returns
+    // the saved [{label,url}] array or [] (never seeded from the feed). The server
+    // already dropped any non-http(s) url, but we re-validate on display too.
+    function bidDocs(p){
+      var rec = bidMetaFor(p);
+      return (rec && Array.isArray(rec.docs)) ? rec.docs : [];
+    }
+    // Display-side url guard: render a link href ONLY when it is an absolute
+    // http(s) URL (defense-in-depth vs the server's normDoc). Returns '' otherwise
+    // so a hostile/relative url can never become a clickable href.
+    function safeDocHref(url){
+      var u = (url == null) ? '' : String(url).trim();
+      if (!u) return '';
+      try {
+        var parsed = new URL(u);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return u;
+      } catch (e) {}
+      return '';
+    }
     // The GC OF RECORD for a bid: the chosen awarded GC if one is set, else the
     // lead (first) bidding GC, else the feed GC. Exposed globally so the award ->
     // PM handoff flow (a separate IIFE) carries the chosen GC into the PM record.
@@ -12153,6 +12190,25 @@ try {
         inp.value = prev;
         if (errEl) errEl.textContent = 'Save failed.';
       }
+    };
+
+    // ---- PHASE 2 SEAM: programmatic Bid Price writeback ---------------------
+    // window.pfSetBidPrice(bidId, value) is the hook the future Estimating module
+    // calls to push a finalized estimate into a job's Bid Price. It wraps the same
+    // setBidPrice path the editable Bid Price cell uses (server-side normPrice
+    // validates: non-negative number / money-string, '' clears, junk -> 400), then
+    // refreshes the precon render on success so the new price flows to the row +
+    // submitted_bids. Returns true on success, false otherwise. Privileged +
+    // preconstruction-gated (same as the cell). NOTE: phase 2 builds the Estimating
+    // engine + a job picker on top of this; do not call it from field-facing code.
+    window.pfSetBidPrice = function(bidId, value){
+      if (!canResolve()) return false;
+      var bid = (bidId == null) ? '' : String(bidId).trim();
+      if (!bid) return false;
+      var val = (value == null) ? '' : String(value).trim();
+      var ok = postBidMeta({ action: 'setBidPrice', bidId: bid, value: val });
+      if (ok) { renderAll(); }
+      return ok;
     };
 
     // ---- FEATURE 1: edit a date via the calendar/date popup -----------------
@@ -12315,6 +12371,98 @@ try {
       // collide. The awarded choice is also enforced server-side by index.
       return '<div class="pf-gc-editor" data-bid="' + bid + '" data-grp="' + grp + '">'
         + '<div class="pf-gc-rows">' + rows + '</div>' + ctrls + '</div>';
+    }
+
+    // ---- DOCUMENTS editor (per-job links, in the expand detail) -------------
+    // Phase 1: manual paste of links (geotech, drawings, specs). One click opens
+    // the doc while estimating. Mirrors the GC editor: Add/Remove operate on the
+    // in-DOM rows, Save serializes + POSTs setDocs. Auto-deriving the SharePoint
+    // folder URL is a later enhancement (NOT attempted now). Privileged edit only;
+    // others see read-only links. URLs are scheme-validated on BOTH server (normDoc)
+    // and display (safeDocHref) so only http(s) ever becomes a clickable href.
+    window.pfDocAddRow = function(btn){
+      if (!canResolve()) return;
+      var editor = btn && btn.closest ? btn.closest('.pf-doc-editor') : null;
+      if (!editor) return;
+      var list = editor.querySelector('.pf-doc-rows');
+      if (!list) return;
+      var idx = list.querySelectorAll('.pf-doc-row').length;
+      if (idx >= 12) { var e0 = editor.querySelector('.pf-doc-err'); if (e0) e0.textContent = 'Max 12 documents.'; return; }
+      list.insertAdjacentHTML('beforeend', pfDocRowHtml({ label: '', url: '' }, idx));
+    };
+    window.pfDocRemoveRow = function(btn){
+      if (!canResolve()) return;
+      var row = btn && btn.closest ? btn.closest('.pf-doc-row') : null;
+      if (row && row.parentNode) row.parentNode.removeChild(row);
+    };
+    window.pfDocSave = function(btn){
+      if (!canResolve()) return;
+      var editor = btn && btn.closest ? btn.closest('.pf-doc-editor') : null;
+      if (!editor) return;
+      var errEl = editor.querySelector('.pf-doc-err');
+      if (errEl) errEl.textContent = '';
+      var bid = editor.getAttribute('data-bid');
+      if (!bid) { if (errEl) errEl.textContent = 'Could not save.'; return; }
+      var docs = [];
+      editor.querySelectorAll('.pf-doc-row').forEach(function(row){
+        docs.push({
+          label: (row.querySelector('.pf-doc-label') || {}).value || '',
+          url:   (row.querySelector('.pf-doc-url') || {}).value || ''
+        });
+      });
+      if (docs.length > 12) { if (errEl) errEl.textContent = 'Max 12 documents.'; return; }
+      var ok = postBidMeta({ action: 'setDocs', bidId: bid, docs: docs });
+      // The server drops any entry whose url is not a valid http(s) URL; re-render
+      // from server truth so a rejected link visibly disappears (not silently kept).
+      if (ok) { renderAll(); }
+      else if (errEl) { errEl.textContent = 'Save failed.'; }
+    };
+    // One editable document row (label + url inputs + remove). idx is its position.
+    function pfDocRowHtml(d, idx){
+      d = d || {};
+      var dis = canResolve() ? '' : ' disabled';
+      return '<div class="pf-doc-row" data-idx="' + idx + '">'
+        + '<input type="text" class="pf-doc-field pf-doc-label" placeholder="Label (e.g. Geotech)" value="' + E(d.label || '') + '"' + dis + '>'
+        + '<input type="text" class="pf-doc-field pf-doc-url" placeholder="https://..." value="' + E(d.url || '') + '"' + dis + '>'
+        + (canResolve() ? '<button type="button" class="pf-doc-rm" onclick="pfDocRemoveRow(this)" title="Remove document">&times;</button>' : '')
+        + '</div>';
+    }
+    // The whole "Documents" block for one bid (used in the expand detail). Shows
+    // the current links as clickable anchors (new tab, noopener) PLUS, for
+    // privileged roles, the editable rows + Add/Save controls.
+    function pfDocEditorHtml(p){
+      var bid = E(bidLogId(p));
+      var docs = bidDocs(p);
+      // Read-only link list (everyone). Only entries with a valid http(s) href are
+      // shown as links; an entry whose url fails the guard is skipped entirely.
+      var links = '';
+      docs.forEach(function(d){
+        var href = safeDocHref(d && d.url);
+        if (!href) return;
+        var text = (d && d.label) ? d.label : d.url;
+        links += '<a class="pf-doc-link" href="' + E(href) + '" target="_blank" rel="noopener noreferrer">'
+          + E(text) + '</a>';
+      });
+      if (!links) links = '<span class="pf-doc-empty pf-record-muted">No documents linked yet.</span>';
+      var linkBlock = '<div class="pf-doc-links">' + links + '</div>';
+      if (!canResolve()) {
+        // Read-only: just the link list.
+        return '<div class="pf-doc-editor" data-bid="' + bid + '">' + linkBlock + '</div>';
+      }
+      // Editable rows mirror the saved docs (raw url string in the input).
+      var rows = '';
+      if (docs.length) {
+        docs.forEach(function(d, i){ rows += pfDocRowHtml(d, i); });
+      } else {
+        rows = pfDocRowHtml({ label: '', url: '' }, 0);
+      }
+      var ctrls = '<div class="pf-doc-ctrls">'
+        + '<button type="button" class="pf-doc-btn" onclick="pfDocAddRow(this)">Add document</button>'
+        + '<button type="button" class="pf-doc-btn primary" onclick="pfDocSave(this)">Save documents</button>'
+        + '<span class="pf-doc-err"></span></div>';
+      return '<div class="pf-doc-editor" data-bid="' + bid + '">'
+        + linkBlock
+        + '<div class="pf-doc-rows">' + rows + '</div>' + ctrls + '</div>';
     }
 
     // POST a single job's resolution. On success, update local state + re-render
@@ -12843,6 +12991,15 @@ try {
         // ---- main highlights row ----
         var nameTxt = E(p.name || f['Project Name'] || '');
         if (p.completed) nameTxt += ' <span class="pf-tag-completed">Completed</span>';
+        // NEEDS-ESTIMATE badge (Actively Pricing only): a compact inline tag so it
+        // does NOT widen the table. "Estimated" once a Bid Price is set, else
+        // "Needs Price". Row-level mirror of the Overview "Jobs Needing a Price"
+        // panel. priceBadge is opt-in (set only for actively_bidding).
+        if (opts.priceBadge) {
+          nameTxt += bidPriceIsSet(p)
+            ? ' <span class="pf-tag-estimated" title="Bid Price entered">Estimated</span>'
+            : ' <span class="pf-tag-needsprice" title="No Bid Price yet">Needs Price</span>';
+        }
         // In the Awarded bucket the assigned job number lives in the name sub-line
         // (opts.subLineAwarded), so the pmNumTag chip would duplicate it; show only
         // the "Awarded" tag there (+ a "PM complete" marker), keeping pmNumTag for
@@ -13120,6 +13277,12 @@ try {
           detail += '<div class="pf-hl-group pf-gc-group">'
             + '<div class="pf-hl-grouphead">Bidding GCs</div>'
             + pfGcEditorHtml(p) + '</div>';
+          // DOCUMENTS block (Jonathan): one click to the geotech, drawings + specs
+          // while estimating. Same expand, keyed by bidId so links persist per bid
+          // across buckets (same model as the GC list + bid price).
+          detail += '<div class="pf-hl-group pf-doc-group">'
+            + '<div class="pf-hl-grouphead">Documents</div>'
+            + pfDocEditorHtml(p) + '</div>';
         }
         if (!detail) detail = '<div class="pf-hl-field"><span class="pf-hl-value pf-record-muted">No additional fields recorded.</span></div>';
 
@@ -13879,6 +14042,7 @@ try {
           // width flows to the flexible Project name column so the name reads as
           // the most prominent text in the row.
           hlOpts.nameProminent = true; // scopes the 2-line name-clamp CSS to this bucket only
+          hlOpts.priceBadge = true;    // inline Estimated/Needs Price tag on the name (no new column)
           highlights = [
             { key: 'Design Completed Date', label: 'Prelim Due', type: 'effdate', field: 'designCompletedDate', w: '110px', noYear: true },
             { key: 'Due Date',              label: 'Bid Due',    type: 'effdate', field: 'dueDate',             w: '110px', noYear: true },
