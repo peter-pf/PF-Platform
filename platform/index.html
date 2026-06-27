@@ -2148,6 +2148,7 @@ window.progress = (function () {
         <a class="nav-item" data-module="precon-ap-submitted-bids" onclick="showModule('precon-ap-submitted-bids')">Submitted Bids</a>
         <a class="nav-item" data-module="precon-ap-awarded" onclick="showModule('precon-ap-awarded')">Awarded</a>
         <a class="nav-item" data-module="precon-ap-not-awarded" onclick="showModule('precon-ap-not-awarded')">Not Awarded</a>
+        <a class="nav-item" data-module="precon-ap-archive" onclick="showModule('precon-ap-archive')">Archive</a>
       </div>
 
       <!-- 4b) Helical Pilings -->
@@ -2159,6 +2160,7 @@ window.progress = (function () {
         <a class="nav-item" data-module="precon-hp-submitted-bids" onclick="showModule('precon-hp-submitted-bids')">Submitted Bids</a>
         <a class="nav-item" data-module="precon-hp-awarded" onclick="showModule('precon-hp-awarded')">Awarded</a>
         <a class="nav-item" data-module="precon-hp-not-awarded" onclick="showModule('precon-hp-not-awarded')">Not Awarded</a>
+        <a class="nav-item" data-module="precon-hp-archive" onclick="showModule('precon-hp-archive')">Archive</a>
       </div>
 
       <!-- 4c) Estimating & Tools (existing working tools) -->
@@ -2172,8 +2174,8 @@ window.progress = (function () {
         <a class="nav-item" data-module="proposals" onclick="showModule('proposals')">Proposals</a>
       </div>
 
-      <!-- 4d) Dead Set - not-awarded / lost bids (item A). One-click Reactivate. -->
-      <a class="nav-item" data-module="dead-set" onclick="showModule('dead-set')">Dead Set</a>
+      <!-- 4d) Archive moved into each discipline (Aggregate Piers / Helical Pilings) -->
+      <!-- as a per-discipline module, alongside Not Awarded. -->
       <!-- 4e) Historical Bid Log - per-year win/loss archive (read-only). -->
       <a class="nav-item" data-module="precon-historical" onclick="showModule('precon-historical')">Historical Bid Log</a>
       <!-- 4f) Action Items + auto bid calendar (write-back via /api/precon-action). -->
@@ -2706,6 +2708,11 @@ document.addEventListener('click', function(e) {
   <div class="module-view" id="mod-precon-ap-not-awarded">
     <div class="pf-index-root precon-mount" data-disc="ap" data-bucket="not_awarded"></div>
   </div>
+  <!-- Archive (declined-to-bid). Per-discipline mount, override-only bucket -->
+  <!-- not_bidding. Same highlight-row layout + Reactivate as Not Awarded. -->
+  <div class="module-view" id="mod-precon-ap-archive">
+    <div class="pf-index-root precon-mount" data-disc="ap" data-bucket="not_bidding"></div>
+  </div>
 
   <div class="module-view" id="mod-precon-hp-actively-bidding">
     <div class="pf-index-root precon-mount" data-disc="hp" data-bucket="actively_bidding"></div>
@@ -2725,11 +2732,10 @@ document.addEventListener('click', function(e) {
   <div class="module-view" id="mod-precon-hp-not-awarded">
     <div class="pf-index-root precon-mount" data-disc="hp" data-bucket="not_awarded"></div>
   </div>
-
-  <!-- Dead Set (item A): every not-awarded / dead job across disciplines, each -->
-  <!-- with one-click Reactivate. Populated by renderDeadSet() from PF_PIPELINE.  -->
-  <div class="module-view" id="mod-dead-set">
-    <div id="deadSetRoot" class="pf-index-root"></div>
+  <!-- Archive (declined-to-bid). Per-discipline mount, override-only bucket -->
+  <!-- not_bidding. Same highlight-row layout + Reactivate as Not Awarded. -->
+  <div class="module-view" id="mod-precon-hp-archive">
+    <div class="pf-index-root precon-mount" data-disc="hp" data-bucket="not_bidding"></div>
   </div>
 
   <div class="module-view" id="mod-precon-historical">
@@ -3320,13 +3326,14 @@ const moduleTitles = {
   'precon-ap-submitted-bids': 'Aggregate Piers - Submitted Bids',
   'precon-ap-awarded': 'Aggregate Piers - Awarded',
   'precon-ap-not-awarded': 'Aggregate Piers - Not Awarded',
+  'precon-ap-archive': 'Aggregate Piers - Archive',
   'precon-hp-actively-bidding': 'Helical Pilings - Actively Pricing',
   'precon-hp-budget-pricing': 'Helical Pilings - Budget Pricing',
   'precon-hp-feasibility-review': 'Helical Pilings - Feasibility Review',
   'precon-hp-submitted-bids': 'Helical Pilings - Submitted Bids',
   'precon-hp-awarded': 'Helical Pilings - Awarded',
   'precon-hp-not-awarded': 'Helical Pilings - Not Awarded',
-  'dead-set': 'Dead Set - Not Awarded / Lost Bids',
+  'precon-hp-archive': 'Helical Pilings - Archive',
   'precon-historical': 'Historical Bid Log',
   'precon-actions': 'Action Items & Calendar',
   'pm-handoff': 'Award to PM Handoff',
@@ -11875,7 +11882,8 @@ try {
       feasibility_review: 'Feasibility Review',
       submitted_bids: 'Submitted Bids',
       awarded: 'Awarded',
-      not_awarded: 'Not Awarded'
+      not_awarded: 'Not Awarded',
+      not_bidding: 'Archive'
     };
     function money(v){
       if (v == null || v === '') return '';
@@ -12940,8 +12948,15 @@ try {
             } catch (e) {}
           }
         }
-        if (ov && ov.status === 'not_awarded') nameTxt += ' <span class="pf-tag-dead">Dead</span>';
-        if (ov && ov.status === 'not_bidding') nameTxt += ' <span class="pf-tag-dead">Dead</span>';
+        // Terminal-bucket reason tags. In a dead view (Not Awarded / Archive) we use
+        // the explicit reason: red "Lost" for bid-and-lost, amber "Declined" for
+        // declined-to-bid. Anywhere else a relocated dead bid shows a generic Dead tag.
+        if (opts.displayBucket === 'dead') {
+          if (ov && ov.status === 'not_awarded') nameTxt += ' <span class="pf-tag-dead">Lost</span>';
+          else if (ov && ov.status === 'not_bidding') nameTxt += ' <span class="pf-tag-declined">Declined</span>';
+        } else {
+          if (ov && (ov.status === 'not_awarded' || ov.status === 'not_bidding')) nameTxt += ' <span class="pf-tag-dead">Dead</span>';
+        }
         // Sub-line under the project name. By default it is the project number;
         // for buckets that set opts.subLineKey (Actively Pricing uses City/State
         // because no number is assigned yet) it is that field instead. The Awarded
@@ -13604,7 +13619,10 @@ try {
       var D = window.PF_PRECON;
       var title = (DISC_LABEL[disc] || disc) + ' - ' + (BUCKET_LABEL[bucket] || bucket);
 
-      if (!D || !D[disc] || !D[disc][bucket]) {
+      // not_bidding (Archive) is an OVERRIDE-ONLY bucket: there is no feed bucket
+      // for it, so we only require the discipline to be loaded, not D[disc][bucket].
+      var overrideOnly = (bucket === 'not_bidding');
+      if (!D || !D[disc] || (!overrideOnly && !D[disc][bucket])) {
         mount.innerHTML = '<div class="pf-placeholder"><div class="pf-placeholder-icon">&#9635;</div>'
           + '<h2>' + title + '</h2><p>Pipeline data not loaded. Run '
           + '<code>sync/build-precon-pipeline.py</code> to generate '
@@ -13662,6 +13680,22 @@ try {
           if (!ov || ov.status === 'budget') list.push(p);
         });
         pullRelocated('budget');
+      } else if (bucket === 'not_awarded') {
+        // NOT AWARDED (bid-and-lost). Auto not_awarded jobs from the feed that are
+        // not overridden away, PLUS any job overridden to 'not_awarded' from
+        // another bucket (the "Not Awarded" action on a submitted/budget bid).
+        // Excludes not_bidding (declined-to-bid), which lives in Archive.
+        auto.forEach(function(p){
+          var ov = overrideFor(p);
+          if (!ov || ov.status === 'not_awarded') list.push(p);
+        });
+        pullRelocated('not_awarded');
+      } else if (bucket === 'not_bidding') {
+        // ARCHIVE (declined-to-bid). There is NO not_bidding feed bucket, so this
+        // list is built ENTIRELY from overrides: every job (any discipline bucket)
+        // overridden to 'not_bidding' via the "Not Bidding" action. Excludes
+        // not_awarded (bid-and-lost), which stays in Not Awarded.
+        pullRelocated('not_bidding');
       } else {
         // A stage bucket (incl. actively_bidding): drop jobs overridden to a status
         // that relocates them elsewhere (awarded, not_awarded, not_bidding,
@@ -13791,6 +13825,14 @@ try {
             : '<div class="pf-empty-state">No submitted bids are '
               + E(({ d30: '30+', d60: '60+', d90: '90+', d180: '180+' }[ageFilter] || ''))
               + ' days old. Choose All to see every submitted bid.</div>';
+        } else if (bucket === 'not_bidding') {
+          html += '<div class="pf-empty-state">Nothing archived for '
+            + E(DISC_LABEL[disc] || disc)
+            + '. Projects you mark Not Bidding land here. Use Reactivate to send one back to Actively Pricing.</div>';
+        } else if (bucket === 'not_awarded') {
+          html += '<div class="pf-empty-state">No Not Awarded bids for '
+            + E(DISC_LABEL[disc] || disc)
+            + '. Bids you mark Not Awarded land here. Use Reactivate to send one back to Actively Pricing.</div>';
         } else {
           html += '<div class="pf-empty-state">No jobs currently in '
             + E(BUCKET_LABEL[bucket] || bucket) + ' for ' + E(DISC_LABEL[disc] || disc)
@@ -13823,7 +13865,11 @@ try {
         html += renderSubmittedMetricsStrip(list);
       }
 
-      var displayBucket = (bucket === 'awarded') ? 'awarded' : 'open';
+      // Not Awarded (bid-and-lost) + Archive (declined-to-bid) are TERMINAL buckets:
+      // they show the same Reactivate action + lost/declined reason tags as the old
+      // Dead Set view, so they render with displayBucket 'dead'.
+      var isDeadBucket = (bucket === 'not_awarded' || bucket === 'not_bidding');
+      var displayBucket = (bucket === 'awarded') ? 'awarded' : (isDeadBucket ? 'dead' : 'open');
 
       // DRAG-AND-DROP bar: privileged roles can drag a bid row onto a resolution
       // drop-zone. The zones map to the states /api/pipeline-state supports. The
@@ -13835,11 +13881,11 @@ try {
       // The per-row buttons still work; this is an additive affordance, NOT a
       // replacement. Hidden on touch-only devices via the (hover: none) media rule;
       // the buttons remain the way to change state on touch.
-      if (canResolve()) {
+      if (canResolve() && !isDeadBucket) {
         if (displayBucket === 'awarded') {
           html += '<div class="precon-dnd-bar">'
             + '<div class="precon-dropzone" data-act="not_awarded">Not Awarded'
-            + '<span class="precon-dz-sub">drag here to send to the Dead Set</span></div>'
+            + '<span class="precon-dz-sub">drag here to mark the bid Not Awarded</span></div>'
             + '<div class="precon-dropzone" data-act="active">Back to Active'
             + '<span class="precon-dz-sub">drag here to return to bidding</span></div>'
             + '</div>'
@@ -13852,7 +13898,7 @@ try {
             + '<div class="precon-dropzone" data-act="budget">Budget Sent'
             + '<span class="precon-dz-sub">drag a bid here to move it to Budget Pricing</span></div>'
             + '<div class="precon-dropzone" data-act="not_bidding">Not Bidding'
-            + '<span class="precon-dz-sub">drag a bid here to send to the Dead Set (declined)</span></div>'
+            + '<span class="precon-dz-sub">drag a bid here to send to the Archive (declined)</span></div>'
             + '</div>'
             + '<div class="precon-dnd-hint">Drag a bid row onto a zone to change its status. The buttons in each row do the same.</div>';
         } else {
@@ -13860,7 +13906,7 @@ try {
             + '<div class="precon-dropzone" data-act="awarded">Awarded'
             + '<span class="precon-dz-sub">drag a bid here to mark it Awarded</span></div>'
             + '<div class="precon-dropzone" data-act="not_awarded">Not Awarded'
-            + '<span class="precon-dz-sub">drag a bid here to send to the Dead Set</span></div>'
+            + '<span class="precon-dz-sub">drag a bid here to mark it Not Awarded</span></div>'
             + '</div>'
             + '<div class="precon-dnd-hint">Drag a bid row onto a zone to change its status. The buttons in each row do the same.</div>';
         }
@@ -13870,7 +13916,7 @@ try {
       // Actively Bidding + Budget Pricing + Submitted Bids use the HIGHLIGHTS-ROW
       // + click-to-expand layout (no horizontal scroll). All other buckets keep
       // the WIDE table.
-      var useHighlights = (bucket === 'actively_bidding' || bucket === 'budget_pricing' || bucket === 'submitted_bids' || bucket === 'awarded' || bucket === 'not_awarded');
+      var useHighlights = (bucket === 'actively_bidding' || bucket === 'budget_pricing' || bucket === 'submitted_bids' || bucket === 'awarded' || bucket === 'not_awarded' || bucket === 'not_bidding');
       if (useHighlights) {
         // Actively Bidding highlight columns are FIXED by Jonathan's spec:
         // Project Name (name cell), Design Completed Date, Due Date, City/State, GC.
@@ -14001,20 +14047,23 @@ try {
             // spaces (no mid-word break like "RealAmer/ica"), up to 2 lines.
             { key: 'General Contractor',   label: 'GC',            type: 'awgc', w: '150px', gcNoBreak: true }
           ];
-        } else if (bucket === 'not_awarded') {
-          // NOT AWARDED bucket (Jonathan): same clean highlight-row + click-to-
-          // expand look as Awarded / Actively Pricing. The name cell carries the
-          // project name with "City, ST" on an ITALIC sub-line (subLineKey, same as
-          // Actively Pricing - .pf-record-muted is already italic), so City / State
-          // drops as its own column. Only two data columns remain on the row:
+        } else if (bucket === 'not_awarded' || bucket === 'not_bidding') {
+          // NOT AWARDED (bid-and-lost) + ARCHIVE (declined-to-bid) (Jonathan): same
+          // clean highlight-row + click-to-expand look as Awarded / Actively Pricing.
+          // The config is IDENTICAL for both terminal buckets (the only difference is
+          // displayBucket 'dead' -> the row's Reactivate action + the lost/declined
+          // reason tag). The name cell carries the project name with "City, ST" on an
+          // ITALIC sub-line (subLineKey, same as Actively Pricing - .pf-record-muted
+          // is already italic), so City / State drops as its own column. Only two data
+          // columns remain on the row:
           //   Bid Total Value -> override-or-feed (effmoney, single $, commas),
           //     mirroring Awarded's bid-value treatment.
           //   GC -> the contractor who ran the bid (awgc: awarded-GC-of-record ->
           //     lead bidding GC -> feed GC), with gcNoBreak so long names do not
           //     break mid-word, up to 2 lines.
           // Everything else drops into the flat click-to-expand detail. The per-row
-          // resolution action stays (actionCol defaults to canResolve()): this
-          // bucket feeds the Dead Set, so the existing resolve buttons remain.
+          // Reactivate action (displayBucket 'dead') lets a job go back to Actively
+          // Pricing from either bucket.
           hlOpts.compact = true;
           hlOpts.subLineKey = 'City / State';  // City, ST on the italic name sub-line
           hlOpts.dropSubLineFromDetail = true;  // do not repeat City / State in the flat detail
