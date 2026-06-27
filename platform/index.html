@@ -2761,31 +2761,67 @@ document.addEventListener('click', function(e) {
     <style>
       #mod-precon-historical .ph-toolbar { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; align-items:center; }
       #mod-precon-historical .ph-search { flex:1 1 240px; padding:7px 10px; }
-      #mod-precon-historical .ph-year-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
-      #mod-precon-historical .ph-year { padding:6px 14px; border:1px solid var(--border,#2a2f3a); border-radius:8px; cursor:pointer; }
-      #mod-precon-historical .ph-year.active { background:var(--surface-2,#1b212c); border-color:var(--accent,#2f6df6); }
-      #mod-precon-historical .ph-summary { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:6px 16px; margin:8px 0 14px; }
-      #mod-precon-historical .ph-sline { font-size:13px; }
-      #mod-precon-historical .ph-sline .lbl { color:var(--text-3,#8a93a6); }
       #mod-precon-historical .ph-muted { color:var(--text-3,#8a93a6); }
-      #mod-precon-historical tr.ph-win td:first-child { border-left:3px solid #3fb950; }
-      #mod-precon-historical tr.ph-loss td:first-child { border-left:3px solid #e5534b; }
-      #mod-precon-historical tr.ph-other td:first-child { border-left:3px solid var(--border,#2a2f3a); }
-      #mod-precon-historical .ph-tag { font-size:11px; padding:1px 7px; border-radius:10px; }
-      #mod-precon-historical .ph-tag.win { background:rgba(63,185,80,.15); color:#3fb950; }
-      #mod-precon-historical .ph-tag.loss { background:rgba(229,83,75,.15); color:#e5534b; }
-      #mod-precon-historical .ph-tag.other { background:var(--surface-2,#1b212c); color:var(--text-3,#8a93a6); }
+      /* Year-over-year heading: one block per year, summary strip on top */
+      #mod-precon-historical .ph-yoy-block { margin:4px 0 18px; }
+      #mod-precon-historical .ph-yoy-head {
+        font-size:1.1rem; font-weight:800; color:var(--text-0,#1a1a1a);
+        margin:2px 0 8px; letter-spacing:0.01em;
+      }
+      /* Outcome group expanders (Wins / Losses / Other) */
+      #mod-precon-historical .ph-group { border:1px solid var(--border,#2a2f3a); border-radius:10px; margin:0 0 10px; overflow:hidden; }
+      #mod-precon-historical .ph-group-head {
+        display:flex; align-items:center; gap:8px; width:100%; text-align:left;
+        padding:11px 14px; background:var(--bg-1,#fff); border:0; cursor:pointer;
+        font-size:0.92rem; font-weight:700; color:var(--text-1,#1a1a1a);
+      }
+      #mod-precon-historical .ph-group-head:hover { background:var(--accent-light,#f0f6fc); }
+      #mod-precon-historical .ph-group-head .ph-chev {
+        display:inline-block; transition:transform .15s ease; color:var(--text-3,#8a93a6); font-size:0.8rem;
+      }
+      #mod-precon-historical .ph-group.open .ph-chev { transform:rotate(90deg); color:var(--accent,#2f6df6); }
+      #mod-precon-historical .ph-group-dot { width:9px; height:9px; border-radius:50%; flex:0 0 auto; }
+      #mod-precon-historical .ph-group-dot.win { background:#3fb950; }
+      #mod-precon-historical .ph-group-dot.loss { background:#e5534b; }
+      #mod-precon-historical .ph-group-dot.other { background:var(--text-3,#8a93a6); }
+      #mod-precon-historical .ph-group-n { margin-left:auto; font-size:0.78rem; font-weight:600; color:var(--text-3,#8a93a6); }
+      #mod-precon-historical .ph-group-body { border-top:1px solid var(--border-light,#222834); }
+      #mod-precon-historical .ph-group-body.ph-hidden { display:none; }
+      /* Clean rows inside a group: name + sub-line, bid price, GC, click to expand */
+      #mod-precon-historical .ph-row { border-bottom:1px solid var(--border-light,#222834); }
+      #mod-precon-historical .ph-row:last-child { border-bottom:0; }
+      #mod-precon-historical .ph-row-main {
+        display:grid; grid-template-columns:34px 1fr 150px 1fr; gap:10px; align-items:center;
+        padding:9px 14px; cursor:pointer; width:100%; text-align:left; background:transparent; border:0; color:inherit;
+      }
+      #mod-precon-historical .ph-row-main:hover { background:var(--bg-1,#fff); }
+      #mod-precon-historical .ph-row.open .ph-row-main { background:var(--accent-light,#f0f6fc); }
+      #mod-precon-historical .ph-rchev { text-align:center; color:var(--text-3,#8a93a6); font-size:0.8rem; transition:transform .15s ease; }
+      #mod-precon-historical .ph-row.open .ph-rchev { transform:rotate(90deg); color:var(--accent,#2f6df6); }
+      #mod-precon-historical .ph-name { font-weight:600; color:var(--text-0,#1a1a1a); }
+      #mod-precon-historical .ph-sub { font-size:0.78rem; color:var(--text-3,#8a93a6); }
+      #mod-precon-historical .ph-price { text-align:right; font-weight:700; font-variant-numeric:tabular-nums; color:var(--text-1,#1a1a1a); }
+      #mod-precon-historical .ph-gc { font-size:0.84rem; color:var(--text-1,#1a1a1a); word-break:break-word; }
+      #mod-precon-historical .ph-detail { padding:10px 14px 14px 58px; background:var(--bg-1,#fff);
+        display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:8px 22px; }
+      #mod-precon-historical .ph-detail.ph-hidden { display:none; }
+      #mod-precon-historical .ph-fld .ph-flabel { display:block; font-size:0.66rem; font-weight:600; text-transform:uppercase;
+        letter-spacing:0.03em; color:var(--text-3,#8a93a6); margin-bottom:1px; }
+      #mod-precon-historical .ph-fld .ph-fval { display:block; font-size:0.84rem; color:var(--text-1,#1a1a1a); word-break:break-word; }
+      @media (max-width:640px) {
+        #mod-precon-historical .ph-row-main { grid-template-columns:28px 1fr; }
+        #mod-precon-historical .ph-price, #mod-precon-historical .ph-gc { grid-column:2; text-align:left; }
+        #mod-precon-historical .ph-detail { padding-left:14px; }
+      }
     </style>
     <div id="phNoData" class="ph-muted" style="display:none">No historical bid log available for your role.</div>
     <div id="phWrap">
-      <div class="ph-year-tabs" id="phYearTabs"></div>
-      <div id="phSummary"></div>
       <div class="ph-toolbar">
-        <input type="text" class="ph-search" id="phSearch" placeholder="Search this year (project, GC, status)" autocomplete="off">
+        <input type="text" class="ph-search" id="phSearch" placeholder="Search (project, GC, status)" autocomplete="off">
         <span class="ph-muted" id="phCount" style="font-size:12px"></span>
         <span class="ph-muted" id="phSource" style="font-size:12px"></span>
       </div>
-      <div id="phTable"></div>
+      <div id="phYears"></div>
     </div>
   </div>
 
@@ -16912,10 +16948,19 @@ try {
 (function () {
   'use strict';
   var E = window.esc || function (s) { return s == null ? '' : String(s); };
-  var state = { year: null, filter: '' };
+  var state = { filter: '' };
 
   function base() { return window.PF_PRECON_HISTORICAL || null; }
-  function yearObj(y) { var b = base(); return b && (b.years || []).find(function (x) { return x.year === y; }); }
+
+  // whole-dollar formatter (self-contained: dollar()/fmtMoney0 live in other IIFEs)
+  function moneyNum(v) { return Number(String(v == null ? '' : v).replace(/[$,]/g, '')); }
+  function money0(v) { var n = moneyNum(v); return isFinite(n) ? '$' + Math.round(n).toLocaleString('en-US') : null; }
+
+  // find a summary row by exact label (case-insensitive)
+  function sumVal(y, label) {
+    var s = (y.summary || []).find(function (x) { return String(x.label || '').toLowerCase() === label.toLowerCase(); });
+    return s ? s.totalCount : null;
+  }
 
   function load() {
     var b = base();
@@ -16924,90 +16969,180 @@ try {
     if (!b || !(b.years || []).length) { if (noData) noData.style.display = ''; if (wrap) wrap.style.display = 'none'; return; }
     if (noData) noData.style.display = 'none';
     if (wrap) wrap.style.display = '';
-    if (state.year == null) state.year = b.years[0].year; // newest first
-    renderTabs(); renderYear();
-  }
-
-  function renderTabs() {
-    var host = document.getElementById('phYearTabs');
-    var b = base();
-    host.innerHTML = (b.years || []).map(function (y) {
-      return '<div class="ph-year' + (y.year === state.year ? ' active' : '') + '" data-year="' + y.year + '">'
-        + E(y.year) + ' Historical Bid Log</div>';
-    }).join('');
-    host.querySelectorAll('.ph-year[data-year]').forEach(function (t) {
-      t.addEventListener('click', function () { state.year = +this.getAttribute('data-year'); state.filter = ''; var s = document.getElementById('phSearch'); if (s) s.value = ''; renderTabs(); renderYear(); });
-    });
-  }
-
-  function renderYear() {
-    var y = yearObj(state.year);
-    var sumEl = document.getElementById('phSummary');
-    var tableEl = document.getElementById('phTable');
-    var countEl = document.getElementById('phCount');
-    var srcEl = document.getElementById('phSource');
-    var b = base();
-    if (!y) { if (tableEl) tableEl.innerHTML = ''; return; }
-
-    // summary stats block
-    if (sumEl) {
-      sumEl.innerHTML = (y.summary && y.summary.length)
-        ? '<div class="ph-summary">' + y.summary.map(function (s) {
-            var extra = [];
-            // Rate rows (e.g. "Win Rate ...") store a 0..1 ratio in totalCount and
-            // a formula caption in prelimUsed. Show them as a percent, not "count".
-            var rate = parseFloat(s.totalCount);
-            var isRate = /win rate/i.test(s.label || '') && isFinite(rate) && rate >= 0 && rate <= 1;
-            if (isRate) {
-              extra.push((rate * 100).toFixed(1) + '%');
-            } else {
-              if (s.totalCount != null) extra.push('count ' + E(s.totalCount));
-              if (s.prelimUsed != null) extra.push('prelim ' + E(s.prelimUsed));
-              if (s.prelimPct != null) { var p = parseFloat(s.prelimPct); extra.push(isFinite(p) ? (p * 100).toFixed(0) + '%' : E(s.prelimPct)); }
-            }
-            return '<div class="ph-sline"><span class="lbl">' + E(s.label) + ':</span> ' + E(extra.join(' • ')) + '</div>';
-          }).join('') + '</div>'
-        : '';
-    }
 
     // wire search once
     var search = document.getElementById('phSearch');
     if (search && !search.dataset.wired) {
       search.dataset.wired = '1';
-      search.addEventListener('input', function () { state.filter = (this.value || '').toLowerCase(); renderTable(); });
+      search.addEventListener('input', function () { state.filter = (this.value || '').toLowerCase(); renderAll(); });
     }
+    // source caption (once)
+    var srcEl = document.getElementById('phSource');
     if (srcEl) {
       var link = b.source_url ? '<a href="' + E(b.source_url) + '" target="_blank" rel="noopener noreferrer">Project Bid Log</a>' : E(b.source || '');
-      srcEl.innerHTML = 'Source: ' + link + ' • ' + E(b.generated || '');
+      srcEl.innerHTML = 'Source: ' + link + ' &bull; ' + E(b.generated || '');
     }
-    renderTable();
+    renderAll();
+  }
 
-    function renderTable() {
-      var f = state.filter;
-      var rows = y.rows.filter(function (r) {
-        if (!f) return true;
-        var fld = r.fields || {};
-        return ['Project Name', 'General Contractor', 'Bid Status', 'City / State'].some(function (k) {
-          return String(fld[k] || '').toLowerCase().indexOf(f) >= 0;
-        });
-      });
-      var wins = rows.filter(function (r) { return r.outcome === 'win'; }).length;
-      var losses = rows.filter(function (r) { return r.outcome === 'loss'; }).length;
-      if (countEl) countEl.textContent = rows.length + ' rows (win ' + wins + ' / loss ' + losses + ')';
-      // columns: show Project Name first then the rest
-      var cols = (y.columns || []).filter(function (c) { return c !== 'Project Name'; });
-      var thead = '<th class="pf-sticky-col">Project</th><th>Outcome</th>'
-        + cols.map(function (c) { return '<th>' + E(c) + '</th>'; }).join('');
-      var body = rows.map(function (r) {
-        var fld = r.fields || {};
-        var tag = '<span class="ph-tag ' + E(r.outcome) + '">' + E(r.outcome) + '</span>';
-        var tds = '<td class="pf-sticky-col">' + E(fld['Project Name'] || '') + '</td><td>' + tag + '</td>'
-          + cols.map(function (c) { var v = fld[c]; var cell = (v == null) ? '' : E(v); return '<td title="' + cell + '">' + cell + '</td>'; }).join('');
-        return '<tr class="ph-' + E(r.outcome) + '">' + tds + '</tr>';
-      }).join('');
-      tableEl.innerHTML = '<div class="pf-wide-wrap"><table class="pf-wide"><thead><tr>' + thead + '</tr></thead><tbody>'
-        + (body || '<tr><td class="pf-sticky-col ph-muted">No rows match.</td></tr>') + '</tbody></table></div>';
+  // YEAR-OVER-YEAR summary strip (Jonathan): one block per year. Replaces the old
+  // cluttered raw-summary heading with four headline tiles per year:
+  //   Awarded / Completed - won-outcome rows ($ + count). For a closed historical
+  //     year there is no separate "completed" flag, so completed == the won set.
+  //   Total Work Awarded - $ sum of won rows' Bid Total Value (+ win count = 18).
+  //   Total Jobs Bid - summary "Total Projects Bid Submitted" if present, else
+  //     a count of rows that carry a real Bid Status.
+  //   Win Rate Total % - summary "Win Rate Total" (0..1 ratio) x 100, 1 decimal.
+  function summaryStrip(y) {
+    var won = (y.rows || []).filter(function (r) { return r.outcome === 'win'; });
+    var wonSum = 0, haveSum = false;
+    won.forEach(function (r) { var m = moneyNum((r.fields || {})['Bid Total Value']); if (isFinite(m) && m > 0) { wonSum += m; haveSum = true; } });
+    var wonCount = won.length;
+
+    var jobsBid = sumVal(y, 'Total Projects Bid Submitted');
+    if (jobsBid == null) {
+      jobsBid = (y.rows || []).filter(function (r) { return String((r.fields || {})['Bid Status'] || '').trim(); }).length;
     }
+
+    var rateRaw = sumVal(y, 'Win Rate Total');
+    var rate = parseFloat(rateRaw);
+    var ratePct = (isFinite(rate)) ? (rate * 100).toFixed(1) + '%' : '<span class="ph-muted">-</span>';
+
+    var muted = '<span class="ph-muted">-</span>';
+    function tile(label, val, sub) {
+      return '<div class="pf-awm-tile"><div class="pf-awm-label">' + E(label) + '</div>'
+        + '<div class="pf-awm-val">' + val + '</div>'
+        + '<div class="pf-awm-sub">' + E(sub) + '</div></div>';
+    }
+    var tiles = ''
+      + tile('Awarded / Completed', haveSum ? E(money0(wonSum)) : muted, wonCount + ' jobs')
+      + tile('Total Work Awarded', haveSum ? E(money0(wonSum)) : muted, wonCount + ' awarded')
+      + tile('Total Jobs Bid', E(String(jobsBid)), 'bids submitted')
+      + tile('Win Rate Total', ratePct, 'awarded / total');
+    return '<div class="pf-awm-strip">' + tiles + '</div>';
+  }
+
+  // OUTCOME GROUPS: collapsible Wins / Losses / No Bid or Other expanders. Each
+  // shows its count; expand to reveal clean rows. Wins open by default.
+  var GROUPS = [
+    { key: 'win', label: 'Wins', open: true },
+    { key: 'loss', label: 'Losses', open: false },
+    { key: 'other', label: 'No Bid / Other', open: false }
+  ];
+
+  // CLEAN ROW: project name + city/state sub-line, bid price (whole dollar), GC.
+  // Everything else drops into a click-to-expand detail panel (historical archive
+  // does not need every column visible). Read-only - no resolve/edit actions.
+  function rowHtml(y, r, rid) {
+    var f = r.fields || {};
+    var name = E(f['Project Name'] || '(unnamed)');
+    var loc = E(f['City / State'] || '');
+    var price = money0(f['Bid Total Value']);
+    var priceCell = price ? E(price) : '<span class="ph-muted">-</span>';
+    var gc = E(f['General Contractor'] || '') || '<span class="ph-muted">-</span>';
+
+    // detail = every column NOT already on the headline row
+    var shown = { 'Project Name': 1, 'City / State': 1, 'Bid Total Value': 1, 'General Contractor': 1 };
+    var detail = (y.columns || []).filter(function (c) { return !shown[c]; }).map(function (c) {
+      var v = f[c];
+      if (v == null || String(v).trim() === '') return '';
+      return '<div class="ph-fld"><span class="ph-flabel">' + E(c) + '</span><span class="ph-fval">' + E(v) + '</span></div>';
+    }).join('');
+    if (!detail) detail = '<div class="ph-muted" style="font-size:0.82rem">No additional detail.</div>';
+
+    return '<div class="ph-row" data-row="' + rid + '">'
+      + '<button type="button" class="ph-row-main" data-toggle="' + rid + '" aria-expanded="false">'
+      + '<span class="ph-rchev">&#9656;</span>'
+      + '<span><span class="ph-name">' + name + '</span>' + (loc ? '<span class="ph-sub">' + loc + '</span>' : '') + '</span>'
+      + '<span class="ph-price">' + priceCell + '</span>'
+      + '<span class="ph-gc">' + gc + '</span>'
+      + '</button>'
+      + '<div class="ph-detail ph-hidden" id="' + rid + '">' + detail + '</div>'
+      + '</div>';
+  }
+
+  function groupHtml(y, g, yIdx) {
+    var rows = (y.rows || []).filter(function (r) {
+      if (r.outcome !== g.key) return false;
+      var f = state.filter; if (!f) return true;
+      var fld = r.fields || {};
+      return ['Project Name', 'General Contractor', 'Bid Status', 'City / State'].some(function (k) {
+        return String(fld[k] || '').toLowerCase().indexOf(f) >= 0;
+      });
+    });
+    // when a search filter hides every row in a group, drop the group entirely
+    if (state.filter && !rows.length) return '';
+    var openCls = g.open ? ' open' : '';
+    var bodyHidden = g.open ? '' : ' ph-hidden';
+    var bid = 'phg_' + y.year + '_' + g.key;
+    var inner = rows.length
+      ? rows.map(function (r, i) { return rowHtml(y, r, bid + '_r' + i); }).join('')
+      : '<div class="ph-muted" style="padding:11px 14px;font-size:0.84rem">No rows.</div>';
+    return '<div class="ph-group' + openCls + '" data-group="' + bid + '">'
+      + '<button type="button" class="ph-group-head" data-gtoggle="' + bid + '" aria-expanded="' + (g.open ? 'true' : 'false') + '">'
+      + '<span class="ph-chev">&#9656;</span>'
+      + '<span class="ph-group-dot ' + g.key + '"></span>'
+      + '<span>' + E(g.label) + '</span>'
+      + '<span class="ph-group-n">' + rows.length + '</span>'
+      + '</button>'
+      + '<div class="ph-group-body' + bodyHidden + '" id="' + bid + '">' + inner + '</div>'
+      + '</div>';
+  }
+
+  function renderAll() {
+    var b = base();
+    var host = document.getElementById('phYears');
+    var countEl = document.getElementById('phCount');
+    if (!host) return;
+
+    var totalShown = 0;
+    var html = (b.years || []).map(function (y, yIdx) {
+      var block = '<div class="ph-yoy-block">'
+        + '<div class="ph-yoy-head">' + E(y.year) + '</div>'
+        + summaryStrip(y)
+        + GROUPS.map(function (g) {
+            var part = groupHtml(y, g, yIdx);
+            return part;
+          }).join('')
+        + '</div>';
+      return block;
+    }).join('');
+    host.innerHTML = html || '<div class="ph-muted">No historical data.</div>';
+
+    // overall row count for the toolbar caption (respects the active filter)
+    (b.years || []).forEach(function (y) {
+      (y.rows || []).forEach(function (r) {
+        var f = state.filter; if (!f) { totalShown++; return; }
+        var fld = r.fields || {};
+        if (['Project Name', 'General Contractor', 'Bid Status', 'City / State'].some(function (k) {
+          return String(fld[k] || '').toLowerCase().indexOf(f) >= 0;
+        })) totalShown++;
+      });
+    });
+    if (countEl) countEl.textContent = totalShown + (state.filter ? ' matching rows' : ' rows');
+
+    // wire group expanders
+    host.querySelectorAll('[data-gtoggle]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var grp = this.closest('.ph-group');
+        var body = document.getElementById(this.getAttribute('data-gtoggle'));
+        if (!grp || !body) return;
+        var open = grp.classList.toggle('open');
+        body.classList.toggle('ph-hidden', !open);
+        this.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+    });
+    // wire clean-row expanders
+    host.querySelectorAll('[data-toggle]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var row = this.closest('.ph-row');
+        var det = document.getElementById(this.getAttribute('data-toggle'));
+        if (!row || !det) return;
+        var open = row.classList.toggle('open');
+        det.classList.toggle('ph-hidden', !open);
+        this.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+    });
   }
 
   var prev = window.showModule;
