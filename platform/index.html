@@ -2139,6 +2139,9 @@ window.progress = (function () {
     <div class="nav-section collapsed">
       <div class="nav-section-label" onclick="this.parentElement.classList.toggle('collapsed')">Preconstruction</div>
 
+      <!-- 4.0) Overview: roll-up KPIs + bids due in the next 7 days -->
+      <a class="nav-item" data-module="precon-overview" onclick="showModule('precon-overview')">Preconstruction Overview</a>
+
       <!-- 4a) Aggregate Piers -->
       <div class="nav-sub collapsed">
         <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Aggregate Piers</div>
@@ -2167,7 +2170,6 @@ window.progress = (function () {
       <div class="nav-sub collapsed">
         <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Estimating &amp; Tools</div>
         <a class="nav-item" data-module="feasibility" onclick="showModule('feasibility')">Feasibility Tool</a>
-        <a class="nav-item" data-module="pipeline" onclick="showModule('pipeline')">Bid Pipeline</a>
         <a class="nav-item" data-module="estimating" onclick="showModule('estimating')">Estimating</a>
         <a class="nav-item" data-module="materials" onclick="showModule('materials')">Material Costs</a>
         <a class="nav-item" data-module="pricing" onclick="showModule('pricing')">Stone &amp; Transport Pricing</a>
@@ -2501,8 +2503,18 @@ document.addEventListener('click', function(e) {
     <div id="feasibility-app"></div>
   </div>
 
-  <!-- BID PIPELINE (rendered by modules/pipeline.js) -->
-  <div class="module-view" id="mod-pipeline"></div>
+  <!-- PRECONSTRUCTION OVERVIEW: roll-up KPI cards (rendered by the overview KPI
+       IIFE into #precon-overview-kpis from LIVE_BIDS via window.kpi) PLUS a
+       "Bids Due in Next 7 Days" panel (rendered by the precon-pipeline IIFE into
+       #precon-overview-duesoon from window.PF_PRECON). Two separate child mounts
+       so neither renderer clobbers the other's innerHTML.
+       GATING: lives inside the Preconstruction nav-section (CSS-hidden for
+       field_ops) and both source feeds (live-data.js, precon-pipeline.js) are
+       server-DENIED to field_ops, so no $ data reaches the field crew. -->
+  <div class="module-view" id="mod-precon-overview">
+    <div id="precon-overview-kpis"></div>
+    <div id="precon-overview-duesoon"></div>
+  </div>
 
   <!-- ESTIMATING -->
   <div class="module-view" id="mod-estimating">
@@ -3288,7 +3300,6 @@ document.addEventListener('click', function(e) {
 const moduleTitles = {
   dashboard: 'Dashboard',
   feasibility: 'Feasibility / No-Go Tool',
-  pipeline: 'Bid Pipeline',
   estimating: 'Estimating',
   materials: 'Material Costs',
   projects: 'Active Projects Summary',
@@ -3351,6 +3362,7 @@ const moduleTitles = {
   'schedule-awarded': 'Awarded Projects Schedule',
   'financials-wip': 'WIP & Cashflow',
   'pf-dashboard': 'PF Dashboard',
+  'precon-overview': 'Preconstruction Overview',
   'precon-dashboard': 'Preconstruction Dashboard',
   'bd-dashboard': 'Business Development Dashboard',
   'bd-companies': 'Companies & Contacts',
@@ -5253,11 +5265,13 @@ try {
 </script>
 
 <script>
-// ---- MODULE: pipeline ----
+// ---- MODULE: precon-overview (KPI cards) ----
 try {
 // ============================================================
-// Pier Foundations - Bid Pipeline Module
-// Renders into #mod-pipeline
+// Pier Foundations - Preconstruction Overview (KPI cards)
+// Renders the roll-up KPI cards into #precon-overview-kpis (the top of the
+// Preconstruction Overview module). The "Bids Due in Next 7 Days" panel below
+// is rendered separately by the precon-pipeline IIFE into #precon-overview-duesoon.
 // ============================================================
 
 (function () {
@@ -5333,7 +5347,7 @@ try {
   // ---- RENDER (KPIs only - per-bid detail lives in the precon modules) ----
   function render() {
     recalcFY();
-    var container = document.getElementById('mod-pipeline');
+    var container = document.getElementById('precon-overview-kpis');
     if (!container) return;
 
     var activeCount = countActiveBids();
@@ -5379,7 +5393,7 @@ try {
 })();
 
 } catch(e) {
-  console.error("Module pipeline failed to load:", e);
+  console.error("Module precon-overview (KPIs) failed to load:", e);
 }
 </script>
 
@@ -13989,7 +14003,7 @@ try {
     }
     // Exposed so the pm-handoff auto-award hook can refresh the Awarded view once
     // the (async) PM create resolves and the assigned number is known.
-    window.pfRerenderPrecon = function(){ renderAll(); renderDeadSet(); };
+    window.pfRerenderPrecon = function(){ renderAll(); renderDeadSet(); if (typeof renderDueSoon === 'function') renderDueSoon(); };
 
     // ----- DEAD SET view: all not-awarded jobs across both disciplines -----
     function renderDeadSet(){
@@ -14061,12 +14075,93 @@ try {
     }
     window.renderDeadSet = renderDeadSet;
 
+    // ----- PRECONSTRUCTION OVERVIEW: "Bids Due in Next 7 Days" -----
+    // Renders into #precon-overview-duesoon (below the roll-up KPI cards). The
+    // in-play, to-be-bid jobs are the bids effectively in actively_bidding or
+    // budget_pricing across BOTH disciplines (same effective-bucket logic the
+    // calendar uses, so override relocations are honored). A bid qualifies when
+    // its effective Due Date is today or up to 7 days in the FUTURE.
+    //
+    // daysSince(dueDate) returns POSITIVE for PAST dates and NEGATIVE for FUTURE
+    // dates (today - dueDate). So "due within the next 7 days" = daysSince in the
+    // CLOSED range [-7, 0]: 0 = due today, -1 = due tomorrow, -7 = due in 7 days.
+    // An overdue bid (daysSince > 0) and a bid 8+ days out (daysSince < -7) are
+    // both excluded. Sorted soonest-first (largest daysSince first within range).
+    function renderDueSoon(){
+      var root = document.getElementById('precon-overview-duesoon');
+      if (!root) return;
+      var D = window.PF_PRECON;
+
+      var html = '<div class="pf-index-head"><h2>Bids Due in Next 7 Days</h2>'
+        + '<div class="pf-index-meta">Actively Pricing and Budget Pricing jobs whose due date is today or within the next 7 days, soonest first.</div></div>';
+
+      if (!D) {
+        root.innerHTML = html + '<div class="pf-empty-state">Pipeline data not loaded.</div>';
+        return;
+      }
+
+      var rows = [];
+      var seen = {}; // dedupe a bid across raw buckets by resolveKey + effective bucket
+      ['ap','hp'].forEach(function(disc){
+        if (!D[disc]) return;
+        Object.keys(D[disc]).forEach(function(autoBucket){
+          (D[disc][autoBucket] || []).forEach(function(p){
+            var eff = calEffectiveBucket(p, autoBucket);
+            // Only the to-be-bid stages: Actively Pricing + Budget Pricing.
+            if (eff !== 'actively_bidding' && eff !== 'budget_pricing') return;
+            var rk = resolveKey(p) + '|' + eff;
+            if (seen[rk]) return; seen[rk] = 1;
+            var raw = effDate(p, 'dueDate');
+            var ds = daysSince(raw);
+            if (ds == null) return;        // no/unparseable due date -> skip
+            if (ds > 0 || ds < -7) return; // overdue or 8+ days out -> not "next 7 days"
+            var ymd = calParseYMD(raw);
+            var f = p.fields || {};
+            rows.push({
+              ds: ds,
+              name: String((p && p.name) || f['Project Name'] || 'Unnamed'),
+              gc: (typeof window.pfAwardedGcFor === 'function')
+                ? String(window.pfAwardedGcFor(p) || '')
+                : String((p && p.gc) || f['General Contractor'] || ''),
+              dueLabel: ymd ? ((ymd.m + 1) + '/' + ymd.d) : String(raw),
+              value: effBidValue(p)
+            });
+          });
+        });
+      });
+
+      if (!rows.length) {
+        root.innerHTML = html + '<div class="pf-empty-state">No bids due in the next 7 days.</div>';
+        return;
+      }
+
+      // Soonest first: due date ascending == daysSince DESCENDING (0 before -7).
+      rows.sort(function(a, b){ return b.ds - a.ds; });
+
+      html += '<div class="pf-table-wrap"><table class="pf-table"><thead><tr>'
+        + '<th>Project</th><th>GC</th><th>Due</th><th class="num">Bid Value</th>'
+        + '</tr></thead><tbody>';
+      rows.forEach(function(r){
+        html += '<tr>'
+          + '<td>' + E(r.name) + '</td>'
+          + '<td>' + (r.gc ? E(r.gc) : '<span class="pf-record-muted">-</span>') + '</td>'
+          + '<td class="num">' + E(r.dueLabel) + '</td>'
+          + '<td class="num">' + (fmtMoney0(r.value === '' ? null : +r.value) || '<span class="pf-record-muted">-</span>') + '</td>'
+          + '</tr>';
+      });
+      html += '</tbody></table></div>';
+
+      root.innerHTML = html;
+    }
+    window.renderPreconDueSoon = renderDueSoon;
+
     function boot(){
       loadOverrides();
       loadGarbinFlags();
       loadBidMeta();
       renderAll();
       renderDeadSet();
+      renderDueSoon();
     }
     document.addEventListener('DOMContentLoaded', boot);
     if (document.readyState !== 'loading') boot();
