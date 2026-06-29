@@ -461,6 +461,10 @@ export function areaForPath(pathname) {
     // GCs list + awarded-GC index. BD domain: admin + partner + business_dev;
     // field_ops BLOCKED by direct URL too. Handler also calls requireArea.
     if (pathname.startsWith('/api/precon-bid-meta')) return 'preconstruction';
+    // Manual bid intake (Actively Pricing): add/remove a manually-entered bid that
+    // is not yet in the synced feed. BD domain: admin + partner + business_dev;
+    // field_ops BLOCKED by direct URL too. Handler also calls requireArea.
+    if (pathname.startsWith('/api/precon-manual-bid')) return 'preconstruction';
     // Award -> PM handoff (assign next project number, create PM project carrying
     // BD/precon history). A precon action: admin + partner + business_dev;
     // field_ops BLOCKED by direct URL. Handler also calls requireArea.

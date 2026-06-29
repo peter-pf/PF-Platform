@@ -870,6 +870,42 @@ section('Precon bid meta: source-level guards + NO mail');
   ok('precon-bid-meta validates price (normPrice, non-negative)', /function normPrice/.test(src) && /n < 0/.test(src));
 }
 
+section('Precon manual bid: /api/precon-manual-bid -> preconstruction');
+for (const p of ['/api/precon-manual-bid']) {
+  const area = areaForPath(p.split('?')[0]);
+  ok(`${p} -> preconstruction (${area})`, area === 'preconstruction');
+  ok(`${p} ALLOWED for admin`, roleCanAccess('admin', area) === true);
+  ok(`${p} ALLOWED for partner`, roleCanAccess('partner', area) === true);
+  ok(`${p} ALLOWED for business_dev`, roleCanAccess('business_dev', area) === true);
+  ok(`${p} BLOCKED for field_ops`, roleCanAccess('field_ops', area) === false);
+}
+ok('requireArea(field_ops, precon-manual-bid area) => 403',
+   requireArea({ uid: 'fo', role: 'field_ops', name: 'Crew' }, areaForPath('/api/precon-manual-bid'))?.status === 403);
+ok('requireArea(business_dev, precon-manual-bid area) => null (allowed)',
+   requireArea({ uid: 'bd', role: 'business_dev', name: 'BD' }, areaForPath('/api/precon-manual-bid')) === null);
+ok('requireArea(partner, precon-manual-bid area) => null (allowed)',
+   requireArea({ uid: 'p', role: 'partner', name: 'JR' }, areaForPath('/api/precon-manual-bid')) === null);
+ok('requireArea(null, precon-manual-bid area) => 403 (fail closed)',
+   requireArea(null, areaForPath('/api/precon-manual-bid'))?.status === 403);
+
+section('Precon manual bid: source-level guards + NO mail');
+{
+  const src = readFileSync(join(__dir, '../functions/api/precon-manual-bid.js'), 'utf8');
+  ok('precon-manual-bid imports requireArea', /import\s*\{[^}]*requireArea[^}]*\}\s*from/.test(src));
+  ok('precon-manual-bid GET+POST both guard preconstruction', (src.match(/requireArea\([^)]*['"]preconstruction['"]\)/g) || []).length >= 2);
+  ok('precon-manual-bid uses env.PF_SCHEDULE', /env\.PF_SCHEDULE/.test(src));
+  ok('precon-manual-bid documents the KV read-modify-write race', /read-modify-write/.test(src));
+  ok('precon-manual-bid guards prototype-pollution id', /__proto__/.test(src) && /constructor/.test(src) && /prototype/.test(src));
+  ok('precon-manual-bid requires Project Name (400)', /Project Name is required/.test(src));
+  ok('precon-manual-bid validates ISO dates (normIsoDate)', /function normIsoDate/.test(src));
+  ok('precon-manual-bid caps total manual bids (MAX_MANUAL)', /MAX_MANUAL/.test(src));
+  ok('precon-manual-bid soft-deletes (archived) on remove', /archived\s*=\s*true/.test(src));
+  ok('precon-manual-bid rejects unknown action (400)', /Unknown action/.test(src));
+  const noComments = src.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
+  ok('precon-manual-bid makes NO fetch / outbound call', !/\bfetch\s*\(/.test(noComments) && !/https?:\/\//.test(noComments));
+  ok('precon-manual-bid calls NO mail API', !/sendMail|\/messages|smtp|nodemailer|mailgun|sendgrid/i.test(noComments));
+}
+
 // Behavioral coverage for the new setBidPrice action via the real handler.
 section('Precon bid meta: setBidPrice action (financial, precon-only)');
 {

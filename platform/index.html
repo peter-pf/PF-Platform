@@ -739,6 +739,54 @@ body.role-field-ops .nav-item[data-fo-hide] {
   text-transform: uppercase; vertical-align: middle;
 }
 .pf-resolve-meta { color: var(--text-3); font-size: 0.72rem; font-style: italic; }
+/* Manual-bid intake (Actively Pricing): "Manual" row tag + inline Remove control,
+   plus the Add-Bid button + form. Azure accent only, matches the existing tags. */
+.pf-tag-manual {
+  display: inline-block; margin-left: 6px; padding: 1px 7px;
+  background: var(--accent-light); color: var(--accent-dark); border-radius: 9px;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em;
+  text-transform: uppercase; vertical-align: middle;
+}
+.pf-manual-rm {
+  display: inline-block; margin-left: 6px; padding: 1px 8px;
+  border: 1px solid var(--border); border-radius: 7px; cursor: pointer;
+  font-size: 0.7rem; font-weight: 600; color: var(--text-2);
+  background: var(--bg-1); white-space: nowrap; vertical-align: middle;
+}
+.pf-manual-rm:hover { border-color: #A12626; color: #A12626; }
+.pf-manualbid { margin: 4px 0 12px; }
+.pf-manualbid-add, .pf-manualbid-save {
+  background: var(--accent); color: #fff; font-size: 0.82rem;
+}
+.pf-manualbid-add:hover, .pf-manualbid-save:hover { background: var(--accent-dark); }
+.pf-manualbid-save:disabled { opacity: 0.6; cursor: default; }
+.pf-manualbid-form.pf-hidden { display: none; }
+.pf-manualbid-form {
+  margin-top: 10px; padding: 14px; border: 1px solid var(--border);
+  border-radius: 10px; background: var(--bg-1);
+}
+.pf-manualbid-grid {
+  display: grid; gap: 10px 14px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+.pf-manualbid-grid label {
+  font-size: 0.74rem; font-weight: 600; color: var(--text-2);
+}
+.pf-manualbid-grid input,
+.pf-manualbid-grid textarea {
+  width: 100%; margin-top: 3px; padding: 6px 8px; box-sizing: border-box;
+  border: 1px solid var(--border); border-radius: 7px;
+  font-size: 0.86rem; font-family: inherit; color: var(--text-1);
+  background: var(--bg-0);
+}
+.pf-manualbid-grid input:focus,
+.pf-manualbid-grid textarea:focus { outline: none; border-color: var(--accent); }
+.pf-manualbid-notes { grid-column: 1 / -1; }
+.pf-req { color: #A12626; }
+.pf-manualbid-actions {
+  display: flex; align-items: center; gap: 12px; margin-top: 12px;
+}
+.pf-manualbid-msg { font-size: 0.8rem; }
 /* Wide, horizontally-scrollable bid-log table for Preconstruction stage panels.
    Mirrors the spreadsheet: every bid-log column in sheet order, with a sticky
    first column (Project) so the row stays identifiable while scrolling right. */
@@ -12106,6 +12154,183 @@ try {
       var rec = k && window.PF_BIDMETA.bids ? window.PF_BIDMETA.bids[k] : null;
       return rec || null;
     }
+
+    // ====================================================================
+    // MANUAL BIDS (/api/precon-manual-bid, KV-backed). Phase 1 of the
+    // Estimating intake flow: a privileged user can ADD a fresh GC bid invite
+    // that is not yet in the synced Project Bid Log, and REMOVE one, right in
+    // Actively Pricing. The read-only feed (PF_PRECON) is never mutated.
+    //
+    // A manual bid is shaped EXACTLY like a feed bid: a .fields map with the
+    // same keys, plus top-level name/gc/number so bidLogId(p)/resolveKey(p)
+    // resolves it to a STABLE 'ng_<hash of name+gc>' id (it has no real number).
+    // That stable id is what lets every per-bid overlay (precon-bid-meta dates/
+    // gcs/bidPrice/hot/docs) AND pipeline-state status moves work on a manual bid
+    // identically to a synced one. We INJECT manual bids into the AP discipline's
+    // actively_bidding feed bucket so renderMount's existing relocation logic
+    // (pullRelocated across D[disc]) moves them to submitted/budget/awarded/dead
+    // exactly like a synced bid. _manual:true tags them for the Remove control.
+    // preconstruction-area read; field_ops -> 403 -> empty (no manual bids shown).
+    window.PF_MANUAL_BIDS = window.PF_MANUAL_BIDS || { bids: [], meta: { updated: null }, loaded: false };
+    function loadManualBids(){
+      try {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/precon-manual-bid', false);
+        xhr.withCredentials = true;
+        xhr.send(null);
+        if (xhr.status === 200) {
+          var d = JSON.parse(xhr.responseText);
+          window.PF_MANUAL_BIDS.bids = (d && Array.isArray(d.bids)) ? d.bids : [];
+          window.PF_MANUAL_BIDS.meta = (d && d.meta) || { updated: null };
+        } else {
+          window.PF_MANUAL_BIDS.bids = [];
+          window.PF_MANUAL_BIDS.meta = { updated: null };
+        }
+      } catch (e) {
+        window.PF_MANUAL_BIDS.bids = [];
+        window.PF_MANUAL_BIDS.meta = { updated: null };
+      }
+      window.PF_MANUAL_BIDS.loaded = true;
+    }
+    // Build a feed-shaped bid object from a stored manual record. The .fields map
+    // mirrors the feed keys so renderHighlightTable / effDate / bidGcs treat it
+    // identically; top-level name/gc (and number:'x') drive bidLogId -> stable
+    // ng_<hash>. _manual + _manualId carry the soft-delete handle for the Remove
+    // control. NOTE: bidId stability depends on name+gc never changing, so a
+    // manual bid is intake-only here (no inline rename); its quantities/price/
+    // dates are edited through the SAME overlays as feed bids.
+    function manualToBid(m){
+      var f = (m && m.fields) || {};
+      var name = f['Project Name'] || '';
+      var gc = f['General Contractor'] || '';
+      return {
+        number: 'x',
+        name: name,
+        gc: gc,
+        city_state: f['City / State'] || '',
+        value: f['Bid Total Value'] || '',
+        due_date: f['Due Date'] || '',
+        completed: false,
+        record: null,
+        _manual: true,
+        _manualId: (m && m.id) || '',
+        fields: {
+          'Project Number': 'x',
+          'Project Name': name,
+          'City / State': f['City / State'] || '',
+          'General Contractor': gc,
+          'Total LF': f['Total LF'] || '',
+          'Total Columns': f['Total Columns'] || '',
+          'Bid Total Value': f['Bid Total Value'] || '',
+          'Due Date': f['Due Date'] || '',
+          'Design Completed Date': f['Design Completed Date'] || '',
+          'Notes': f['Notes'] || ''
+        }
+      };
+    }
+    // Inject the loaded manual bids into the AP discipline's actively_bidding feed
+    // bucket (idempotent: strip any previously-injected manual entries first so a
+    // reload does not duplicate). Manual bids ride the AP discipline because AP is
+    // the primary VSC pipeline; their per-bid overlays + status moves work the same
+    // regardless of discipline. Runs after PF_PRECON + the manual feed are loaded.
+    function injectManualBids(){
+      var D = window.PF_PRECON;
+      if (!D || !D.ap) return;
+      if (!Array.isArray(D.ap.actively_bidding)) D.ap.actively_bidding = [];
+      // Remove prior injections (idempotent re-inject on reload).
+      D.ap.actively_bidding = D.ap.actively_bidding.filter(function(p){ return !p._manual; });
+      var manual = (window.PF_MANUAL_BIDS && window.PF_MANUAL_BIDS.bids) || [];
+      manual.forEach(function(m){ D.ap.actively_bidding.push(manualToBid(m)); });
+    }
+    // Generic POST helper for the manual-bid endpoint: blocking POST; on success
+    // refreshes the local manual cache + re-injects. Returns true on success.
+    function postManualBid(payload){
+      try {
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/precon-manual-bid', false);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.withCredentials = true;
+        xhr.send(JSON.stringify(payload));
+        if (xhr.status === 200) {
+          var d = JSON.parse(xhr.responseText);
+          window.PF_MANUAL_BIDS.bids = (d && Array.isArray(d.bids)) ? d.bids : window.PF_MANUAL_BIDS.bids;
+          window.PF_MANUAL_BIDS.meta = (d && d.meta) || window.PF_MANUAL_BIDS.meta;
+          injectManualBids();
+          return true;
+        }
+      } catch (e) {}
+      return false;
+    }
+    // Remove (soft-delete) a manual bid by its stored man_<n> id. Confirms first.
+    // Gated to privileged roles (read-only users never see the control). On
+    // success re-renders the whole precon surface.
+    window.pfManualBidRemove = function(el){
+      if (!el) return;
+      if (!canResolve()) return;
+      var id = el.getAttribute('data-manid');
+      var name = el.getAttribute('data-manname') || 'this bid';
+      if (!id) return;
+      if (!window.confirm('Remove "' + name + '" from Actively Pricing? This archives the manual bid (it can be restored from KV if needed).')) return;
+      var ok = postManualBid({ action: 'remove', id: id });
+      if (ok) { window.pfRerenderPrecon ? window.pfRerenderPrecon() : renderAll(); }
+      else { window.alert('Could not remove the bid. Please try again.'); }
+    };
+    // Toggle the inline Add-Bid form open/closed (rendered into the AP actively
+    // pricing mount header). Privileged-only; the button is not rendered otherwise.
+    window.pfManualBidFormToggle = function(btn){
+      if (!btn) return;
+      var host = document.getElementById('pf-manualbid-form');
+      if (!host) return;
+      var open = host.classList.toggle('pf-hidden') === false;
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open) {
+        var first = host.querySelector('input[name="Project Name"]');
+        if (first) first.focus();
+      }
+    };
+    // Submit the Add-Bid form: gather fields, POST add, then re-render. Project
+    // Name is required client-side (the server re-validates + re-sanitizes). On
+    // success the form clears + closes and the new bid appears in Actively Pricing.
+    window.pfManualBidSubmit = function(btn){
+      if (!btn) return;
+      if (!canResolve()) return;
+      var host = document.getElementById('pf-manualbid-form');
+      if (!host) return;
+      var msg = host.querySelector('.pf-manualbid-msg');
+      if (msg) { msg.textContent = ''; msg.style.color = ''; }
+      function val(n){ var el = host.querySelector('[name="' + n + '"]'); return el ? String(el.value || '').trim() : ''; }
+      var name = val('Project Name');
+      if (!name) {
+        if (msg) { msg.textContent = 'Project Name is required.'; msg.style.color = '#e5534b'; }
+        var pn = host.querySelector('input[name="Project Name"]'); if (pn) pn.focus();
+        return;
+      }
+      var payload = { action: 'add', fields: {
+        'Project Name': name,
+        'City / State': val('City / State'),
+        'General Contractor': val('General Contractor'),
+        'Due Date': val('Due Date'),
+        'Design Completed Date': val('Design Completed Date'),
+        'Total LF': val('Total LF'),
+        'Total Columns': val('Total Columns'),
+        'Bid Total Value': val('Bid Total Value'),
+        'Notes': val('Notes')
+      } };
+      btn.disabled = true;
+      var ok = postManualBid(payload);
+      btn.disabled = false;
+      if (ok) {
+        // Clear + close the form, then refresh the precon surface.
+        host.querySelectorAll('input, textarea').forEach(function(el){ el.value = ''; });
+        host.classList.add('pf-hidden');
+        var addBtn = document.querySelector('.pf-manualbid-add');
+        if (addBtn) addBtn.setAttribute('aria-expanded', 'false');
+        window.pfRerenderPrecon ? window.pfRerenderPrecon() : renderAll();
+      } else if (msg) {
+        msg.textContent = 'Could not add the bid. Check the dates (YYYY-MM-DD) and try again.';
+        msg.style.color = '#e5534b';
+      }
+    };
     // "Hot" flag: true when a submitted bid is heating up toward award (lots of
     // activity, no official LOI yet). Persisted per bid in the bid-meta overlay.
     function pfHotFlag(p){
@@ -13187,7 +13412,26 @@ try {
           }
         }
 
-        var nameCell = '<div class="pf-hl-name">' + nameTxt + hotCtrl + '</div>'
+        // MANUAL-BID controls (manually-added bids only): a small "Manual" tag so
+        // the row is distinguishable from synced feed rows, plus (for privileged
+        // roles) a Remove control that soft-deletes via /api/precon-manual-bid.
+        // Synced feed rows get NEITHER (they come from the read-only spreadsheet
+        // and cannot be removed here). stopPropagation so neither toggles row
+        // expand. The name is passed for the confirm prompt (attribute-escaped).
+        var manualCtrl = '';
+        if (p._manual) {
+          manualCtrl += ' <span class="pf-tag-manual" title="Manually added bid (not from the synced Bid Log)">Manual</span>';
+          if (canResolve() && p._manualId) {
+            manualCtrl += ' <span class="pf-manual-rm" role="button" tabindex="0"'
+              + ' title="Remove this manual bid" aria-label="Remove manual bid"'
+              + ' data-manid="' + E(p._manualId) + '" data-manname="' + E(p.name || f['Project Name'] || '') + '"'
+              + ' onclick="event.stopPropagation();pfManualBidRemove(this)"'
+              + ' onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();event.stopPropagation();pfManualBidRemove(this);}">'
+              + '&times; Remove</span>';
+          }
+        }
+
+        var nameCell = '<div class="pf-hl-name">' + nameTxt + hotCtrl + manualCtrl + '</div>'
           + (subTxt ? '<div class="pf-record-muted">' + subTxt + '</div>' : '');
 
         var jk = resolveKey(p);
@@ -14031,6 +14275,35 @@ try {
         + ' &middot; ' + E(D.generated || '') + '</div>'
         + '</div>';
 
+      // ----- MANUAL BID intake (Actively Pricing only, privileged roles) -----
+      // An "Add Bid" button + an inline form to enter a fresh GC bid invite that
+      // is not yet in the synced feed. The form posts to /api/precon-manual-bid
+      // (server re-sanitizes every field); the new bid then renders here like a
+      // synced bid. Static markup (no data interpolation) so it is XSS-safe; the
+      // VALUES the user types are sent to the server, never reflected unescaped.
+      if (bucket === 'actively_bidding' && disc === 'ap' && canResolve()) {
+        html += '<div class="pf-manualbid">'
+          + '<button type="button" class="btn pf-manualbid-add" aria-expanded="false" aria-controls="pf-manualbid-form" onclick="pfManualBidFormToggle(this)">+ Add Bid</button>'
+          + '<div id="pf-manualbid-form" class="pf-manualbid-form pf-hidden">'
+          + '<div class="pf-manualbid-grid">'
+          + '<label>Project Name <span class="pf-req">*</span><br><input type="text" name="Project Name" maxlength="200" placeholder="Required"></label>'
+          + '<label>General Contractor<br><input type="text" name="General Contractor" maxlength="200"></label>'
+          + '<label>City / State<br><input type="text" name="City / State" maxlength="200"></label>'
+          + '<label>Bid Due Date<br><input type="date" name="Due Date"></label>'
+          + '<label>Prelim Due Date<br><input type="date" name="Design Completed Date"></label>'
+          + '<label>Total LF<br><input type="text" name="Total LF" maxlength="200" inputmode="numeric"></label>'
+          + '<label>Total Columns<br><input type="text" name="Total Columns" maxlength="200" inputmode="numeric"></label>'
+          + '<label>Bid Total Value<br><input type="text" name="Bid Total Value" maxlength="200" inputmode="numeric" placeholder="$"></label>'
+          + '<label class="pf-manualbid-notes">Notes<br><textarea name="Notes" maxlength="4000" rows="2"></textarea></label>'
+          + '</div>'
+          + '<div class="pf-manualbid-actions">'
+          + '<button type="button" class="btn pf-manualbid-save" onclick="pfManualBidSubmit(this)">Add to Actively Pricing</button>'
+          + '<span class="pf-manualbid-msg" role="status"></span>'
+          + '</div>'
+          + '</div>'
+          + '</div>';
+      }
+
       // ----- aging filter bar (Submitted Bids only) -----
       // Built BEFORE the empty-state check so the user can switch back to All even
       // when the current aged view is empty. Buttons are static (safe); counts are
@@ -14839,6 +15112,8 @@ try {
       loadOverrides();
       loadGarbinFlags();
       loadBidMeta();
+      loadManualBids();
+      injectManualBids();
       renderAll();
       renderDeadSet();
       renderDueSoon();
