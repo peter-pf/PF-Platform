@@ -1932,6 +1932,12 @@ body.role-field-ops .nav-item[data-fo-hide] {
   feeds.push('/data/timesheets.js',
              isPrivileged ? SCHEDULE_PRIVILEGED : SCHEDULE_FIELD);
 
+  // Field Ops smart-search detail index (vendors/contacts/materials/schedule/
+  // safety/QAQC) for the Phase 1 Field Ops search. MONEY-SCRUBBED derivative,
+  // server-gated field_ops in DATA_FILE_AREAS so every role can load it. The
+  // full project-record-poet.js stays privileged-only (it carries contract $).
+  feeds.push('/data/fo-detail-index.js');
+
   // Inject synchronously and IN ORDER via document.write so they execute before
   // the inline module scripts that follow (same semantics as static tags).
   for (var i = 0; i < feeds.length; i++) {
@@ -15140,6 +15146,22 @@ try {
 <!-- are never read into the view. List shows NO value column.      -->
 <!-- ALL data-derived strings rendered via window.esc.              -->
 <!-- ============================================================ -->
+<style>
+  .fo-answers-wrap{margin:10px 0 18px;padding:12px 14px;border:1px solid var(--line,#e2e6ea);border-radius:8px;background:var(--surface-2,#f7f9fb)}
+  .fo-answers-title{font-weight:600;font-size:13px;letter-spacing:.02em;text-transform:uppercase;color:var(--ink-2,#5a6672);margin-bottom:8px}
+  .fo-answers-count{display:inline-block;min-width:18px;padding:0 6px;margin-left:6px;border-radius:10px;background:var(--accent,#0a66c2);color:#fff;font-size:11px;text-align:center}
+  .fo-answer{padding:10px 12px;margin:8px 0;border:1px solid var(--line,#e2e6ea);border-left:3px solid var(--accent,#0a66c2);border-radius:6px;background:#fff}
+  .fo-ans-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+  .fo-ans-proj{font-weight:600;color:var(--ink,#1f2a36)}
+  .fo-ans-cat{font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--accent,#0a66c2);border:1px solid currentColor;border-radius:4px;padding:1px 6px}
+  .fo-ans-co{font-weight:600;color:var(--ink,#1f2a36)}
+  .fo-ans-name{color:var(--ink-2,#5a6672);margin:2px 0}
+  .fo-ans-scope{color:var(--ink-3,#8a96a2);font-size:13px}
+  .fo-ans-contact{font-size:14px;margin-top:4px}
+  .fo-ans-contact a{color:var(--accent,#0a66c2);text-decoration:none}
+  .fo-ans-note{font-size:13px;color:var(--ink-3,#8a96a2);margin-top:4px;font-style:italic}
+  .fo-answers-more{font-size:12px;color:var(--ink-3,#8a96a2);margin-top:6px}
+</style>
 <script>
 (function(){
   try {
@@ -15164,6 +15186,8 @@ try {
       var t = String(s);
       // remove "$22.50/TN", "$1,200 per pier", "$15-20/LF", bare "$343,037.07", etc.
       t = t.replace(/\$\s?\d[\d,]*(?:\.\d+)?\s*(?:[-–]\s*\d[\d,]*(?:\.\d+)?)?\s*(?:\/\s*\w+|per\s+\w+)?/gi, '[price omitted]');
+      // bare unit price without a $ sign: "22.50/TN", "15-20 per LF" (mirrors the build-time scrub)
+      t = t.replace(/\b\d[\d,]*(?:\.\d+)?\s*(?:\/\s*(?:TN|LF|ton|cy|yd|day|hr|hour|ea|each)\b|per\s+(?:TN|LF|ton|cy|yd|day|hr|hour|pier|column|ea|each)\b)/gi, '[price omitted]');
       // collapse leftover separators around the redaction
       t = t.replace(/\s*[-–]\s*\[price omitted\]/g, ' [price omitted]');
       return t;
@@ -15232,6 +15256,177 @@ try {
       return m ? (+m[2]) + '/' + (+m[3]) + '/' + m[1] : String(s);
     }
 
+    // ===================== SMART SEARCH (Phase 1, client-side) =====================
+    // Searches BOTH the project list AND the field-safe detail index
+    // (window.PF_FO_DETAIL_INDEX). NO external API. NO financial field is ever
+    // read here: the index is a money-scrubbed derivative and carries no $,
+    // contract value, margin, or gc_name. All output escaped via E().
+
+    // Stopwords stripped from a natural-language question.
+    var FO_STOPWORDS = {
+      who:1, is:1, my:1, the:1, what:1, whats:1, "what's":1, for:1, of:1, a:1,
+      an:1, on:1, at:1, in:1, to:1, me:1, our:1, we:1, are:1, get:1, find:1,
+      show:1, list:1, give:1, please:1, project:1, projects:1, job:1, contact:1,
+      number:1, phone:1, "phone#":1, info:1
+    };
+
+    // Intent / synonym map: casual word -> scope keywords to match.
+    //   onlyVendor:true  restricts the intent to the VENDORS array so a material
+    //                    word ("aggregate") does not match an Engineering scope
+    //                    like "Aggregate Pier Design" or a PF "Aggregate Pier
+    //                    Contractor" role.
+    var FO_INTENT = [
+      { words: ['stone','rock','aggregate','gravel','agg','limestone'], scope: ['stone','aggregate'], label: 'Stone Vendor', onlyVendor: true },
+      { words: ['fuel','diesel','gas','gasoline'], scope: ['fuel'], label: 'Fuel Vendor', onlyVendor: true },
+      { words: ['truck','trucking','hauler','hauling','transport','rig','rigs'], scope: ['trucking','transport'], label: 'Trucking / Transport', onlyVendor: true },
+      { words: ['equipment','rental','rentals','skid','excavator','machine','deere'], scope: ['equipment rental','rental'], label: 'Equipment Rental', onlyVendor: true },
+      { words: ['safety','consultant'], scope: ['safety'], label: 'Safety Consultant', onlyVendor: true },
+      { words: ['survey','surveying','surveyor','staking','layout','stake'], scope: ['survey','staking'], label: 'Surveying & Staking' },
+      { words: ['geotech','geotechnical','soil','soils'], scope: ['geotech'], label: 'Geotech Engineer' },
+      { words: ['engineer','engineering','garbin'], scope: ['design','engineer','geotech','structural'], label: 'Engineering' }
+    ];
+
+    function foNormalize(q){
+      var raw = String(q == null ? '' : q).toLowerCase();
+      raw = raw.replace(/[?!.,;:]/g, ' ');
+      var toks = raw.split(/\s+/).filter(function(t){ return t && !FO_STOPWORDS[t]; });
+      return { raw: raw.trim(), tokens: toks };
+    }
+
+    // Resolve which project(s) a query targets. Returns {projects, used} where
+    // `used` is the set of query tokens consumed as a project alias (so they are
+    // NOT re-used as content keywords, which would match the project's own
+    // company/website/email and flood the results).
+    function foResolveProjects(idx, norm){
+      if (!idx || !idx.projects) return { projects: [], used: {} };
+      var used = {};
+      var hits = idx.projects.filter(function(p){
+        var aliases = (p.aliases || []).slice();
+        aliases.push(String(p.number||'').toLowerCase());
+        aliases.push(String(p.name||'').toLowerCase());
+        var matched = false;
+        aliases.forEach(function(al){
+          if (!al) return;
+          if (norm.tokens.indexOf(al) >= 0) { matched = true; used[al] = 1; }
+          else if (al.indexOf(' ') >= 0 && norm.raw.indexOf(al) >= 0) {
+            matched = true;
+            al.split(/\s+/).forEach(function(w){ used[w] = 1; });
+          }
+        });
+        return matched;
+      });
+      return hits.length ? { projects: hits, used: used }
+                         : { projects: idx.projects.slice(), used: used };
+    }
+
+    // Score a contact's scope against the query intent. `isVendor` says whether
+    // this contact came from the vendors array (vs site/engineering contacts);
+    // a material intent (onlyVendor) is ignored for non-vendor contacts.
+    function foMatchScope(scope, norm, isVendor){
+      var s = String(scope || '').toLowerCase();
+      var best = null;
+      for (var i = 0; i < FO_INTENT.length; i++) {
+        var intent = FO_INTENT[i];
+        if (intent.onlyVendor && !isVendor) continue;
+        var asked = intent.words.some(function(w){ return norm.tokens.indexOf(w) >= 0 || norm.raw.indexOf(w) >= 0; });
+        if (!asked) continue;
+        var scopeHit = intent.scope.some(function(sc){ return s.indexOf(sc) >= 0; });
+        if (scopeHit) best = intent.label;
+      }
+      return best; // category label if intent matched this scope, else null
+    }
+
+    // Generic words that should never drive a content match on their own.
+    var FO_GENERIC = { vendor:1, vendors:1, supplier:1, suppliers:1, company:1,
+      sub:1, subcontractor:1, who:1, contact:1, person:1, guy:1, name:1 };
+
+    // Substring fallback: does ANY *content* query token appear in this haystack?
+    // `used` tokens (consumed as a project alias) and generic words are excluded
+    // so "...for POET" does not match the project's own company/website/email.
+    function foKeywordHit(haystack, norm, used){
+      var h = String(haystack || '').toLowerCase();
+      if (!h) return false;
+      return norm.tokens.some(function(t){
+        if (t.length < 3) return false;
+        if (used && used[t]) return false;
+        if (FO_GENERIC[t]) return false;
+        return h.indexOf(t) >= 0;
+      });
+    }
+
+    // Build an answer card for a matched contact/vendor. NO $ - the index has none.
+    function foAnswerCard(projName, category, c){
+      var lines = [];
+      if (c.company) lines.push('<div class="fo-ans-co">'+E(c.company)+'</div>');
+      var who = [];
+      if (c.name) who.push(E(c.name));
+      if (c.scope && c.scope.toLowerCase() !== String(category||'').toLowerCase()) who.push('<span class="fo-ans-scope">'+E(c.scope)+'</span>');
+      if (who.length) lines.push('<div class="fo-ans-name">'+who.join(' &middot; ')+'</div>');
+      var ct = [];
+      if (c.phone) ct.push('Office: '+E(c.phone));
+      if (c.cell)  ct.push('Cell: '+E(c.cell));
+      if (c.email) ct.push('<a href="mailto:'+E(c.email)+'">'+E(c.email)+'</a>');
+      if (c.website) ct.push('<a href="'+(/^https?:/i.test(c.website)?E(c.website):'https://'+E(c.website))+'" target="_blank" rel="noopener noreferrer">'+E(c.website)+'</a>');
+      if (ct.length) lines.push('<div class="fo-ans-contact">'+ct.join(' &nbsp; ')+'</div>');
+      if (c.notes) lines.push('<div class="fo-ans-note">'+E(scrubMoney(c.notes))+'</div>');
+      return '<div class="fo-answer">'
+        + '<div class="fo-ans-head"><span class="fo-ans-proj">'+E(projName)+'</span>'
+        +   '<span class="fo-ans-cat">'+E(category)+'</span></div>'
+        + lines.join('')
+        + '</div>';
+    }
+
+    // Produce the Answers HTML (or '' if no query / no matches).
+    function foAnswers(norm){
+      var idx = window.PF_FO_DETAIL_INDEX;
+      if (!idx || !norm.tokens.length) return '';
+      var res = foResolveProjects(idx, norm);
+      var projects = res.projects;
+      var used = res.used;
+
+      // Did the query express a vendor INTENT (stone/fuel/trucking/...)? If so we
+      // show ONLY intent matches and suppress the broad keyword fallback, so a
+      // focused question returns a focused answer.
+      var hasIntent = FO_INTENT.some(function(intent){
+        return intent.words.some(function(w){
+          return (norm.tokens.indexOf(w) >= 0 || norm.raw.indexOf(w) >= 0) && !used[w];
+        });
+      });
+
+      // Are there any content tokens left after removing project aliases +
+      // generic words? If not (e.g. just "POET"), there is nothing specific to
+      // answer, so we let the LIST filter handle it (no noisy card dump).
+      var contentTokens = norm.tokens.filter(function(t){
+        return t.length >= 3 && !used[t] && !FO_GENERIC[t];
+      });
+      if (!hasIntent && !contentTokens.length) return '';
+
+      var intentCards = [];
+      var kwCards = [];
+      projects.forEach(function(p){
+        var people = (p.vendors || []).map(function(c){ return { c: c, isVendor: true }; })
+                     .concat((p.siteContacts || []).map(function(c){ return { c: c, isVendor: false }; }));
+        people.forEach(function(row){
+          var c = row.c;
+          var cat = foMatchScope(c.scope, norm, row.isVendor);
+          if (cat) { intentCards.push(foAnswerCard(p.name, cat, c)); return; }
+          if (hasIntent) return; // focused intent query -> no keyword fallback
+          var kw = foKeywordHit(c.company, norm, used) || foKeywordHit(c.name, norm, used)
+                || foKeywordHit(c.scope, norm, used) || foKeywordHit(c.notes, norm, used);
+          if (kw) kwCards.push(foAnswerCard(p.name, c.category || 'Contact', c));
+        });
+      });
+
+      var cards = intentCards.concat(kwCards);
+      if (!cards.length) return '';
+      var capped = cards.slice(0, 12);
+      return '<div class="fo-answers-wrap">'
+        + '<div class="fo-answers-title">Answers <span class="fo-answers-count">'+capped.length+'</span></div>'
+        + capped.join('')
+        + (cards.length > capped.length ? '<div class="fo-answers-more">Showing first '+capped.length+' of '+cards.length+'. Add the project name or vendor type to narrow.</div>' : '')
+        + '</div>';
+    }
+
     // ===================== LIST VIEW (NO $ COLUMN) =====================
     function renderList(){
       var root = document.getElementById('foProjRoot');
@@ -15248,23 +15443,30 @@ try {
       var list = D.projects.slice();
       list.sort(function(a,b){ return String(a.number).localeCompare(String(b.number)); });
 
-      // ---- crew SEARCH (project number / name / city / scope) - no $ shown ----
-      var q = (window.__foProjFilter || '').toLowerCase();
+      // ---- crew SEARCH (list filter + smart Answers) - no $ shown ----
+      var rawQ = window.__foProjFilter || '';
+      var q = rawQ.toLowerCase();
+      // List filter keeps the original behavior (number/name/city/scope).
       var shown = !q ? list : list.filter(function(p){
         return [p.number, p.name, p.city_state, p.discipline].some(function(v){
           return String(v == null ? '' : v).toLowerCase().indexOf(q) >= 0;
         });
       });
+      // Smart Answers searches the field-safe detail index (vendors/contacts).
+      var norm = foNormalize(rawQ);
+      var answersHtml = foAnswers(norm);
 
       var html = '<div class="pf-index-head">'
         + '<h2>Projects - Field</h2>'
         + '<p class="pf-index-sub">Operational view for the field team. Scope, schedule, safety, '
         + 'site readiness, equipment, material and QA/QC - <strong>no financials</strong>.</p>'
-        + '<input type="text" id="foProjSearch" placeholder="Search projects you can access" '
-        + 'autocomplete="off" value="' + E(window.__foProjFilter || '') + '" '
-        + 'style="width:100%;max-width:360px;padding:7px 10px;margin:6px 0">'
+        + '<input type="text" id="foProjSearch" placeholder="Ask anything: who is my stone vendor for POET?" '
+        + 'autocomplete="off" value="' + E(rawQ) + '" '
+        + 'style="width:100%;max-width:480px;padding:7px 10px;margin:6px 0">'
         + '<div class="pf-index-meta">' + shown.length + ' of ' + list.length + ' active / awarded projects</div>'
         + '</div>';
+      // Answers section sits ABOVE the filtered list.
+      html += answersHtml;
       list = shown;
 
       html += '<div class="pf-table-wrap"><table class="pf-table"><thead><tr>'

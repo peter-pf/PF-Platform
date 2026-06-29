@@ -339,6 +339,7 @@ const DATA_FILE_AREAS = {
   '/data/progress-data.js':          'field_ops', // GUHMA % completion — no $
   '/data/timesheets.js':             'field_ops', // hours/cost-codes/names — no $ wages
   '/data/fo-projects-field.js':      'field_ops', // SEC-09 field-safe project list (no $/GC/contract)
+  '/data/fo-detail-index.js':        'field_ops', // Field Ops smart-search detail index (vendors/contacts/materials/schedule/QAQC) — money-scrubbed, no $/contract/gc_name
   '/data/schedule-field.js':         'schedule',  // SEC-12 field-safe schedule derivative (no value/gc_name)
 
   // ---- PROJECT-LEVEL financials (admin/partner/business_dev — field_ops BLOCKED) ----

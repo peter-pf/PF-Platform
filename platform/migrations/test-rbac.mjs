@@ -102,6 +102,7 @@ const DATA_FIELD_SAFE = [
   '/data/schedule-field.js',     // SEC-12 field-safe schedule derivative (no value/gc_name)
   '/data/timesheets.js',         // hours/cost-codes/names (no $ wages)
   '/data/fo-projects-field.js',  // field-safe project list (no $/GC/contract)
+  '/data/fo-detail-index.js',    // Field Ops smart-search detail index (money-scrubbed: no $/contract/gc_name)
 ];
 
 // --- 1. areaForPath classification + default-deny ---------------------------
@@ -1206,7 +1207,7 @@ for (const p of FIN_APIS) {
   ok(`field_ops BLOCKED from ${p}`, roleCanAccess('field_ops', areaForPath(p)) === false);
 }
 // ...and field_ops IS allowed only its operational surface (no $).
-const FIELD_OK = ['/data/fo-projects-field.js', '/data/production-data.js', '/data/progress-data.js',
+const FIELD_OK = ['/data/fo-projects-field.js', '/data/fo-detail-index.js', '/data/production-data.js', '/data/progress-data.js',
   '/data/timesheets.js', '/data/schedule-field.js', '/api/daily-report', '/api/field-lists', '/api/schedule', '/api/me'];
 for (const p of FIELD_OK) {
   ok(`field_ops ALLOWED ${p} (operational, no $)`, roleCanAccess('field_ops', areaForPath(p)) === true);
