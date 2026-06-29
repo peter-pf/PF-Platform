@@ -2829,6 +2829,11 @@ document.addEventListener('click', function(e) {
       #mod-precon-historical .ph-group-body { border-top:1px solid var(--border-light,#222834); }
       #mod-precon-historical .ph-group-body.ph-hidden { display:none; }
       #mod-precon-historical .pf-awm-src { font-size:0.72rem; margin:6px 2px 0; }
+      /* scoped: the YoY strip now carries up to 6 tiles - lay them 3-up (then 2-up,
+         then 1-up) without touching the shared .pf-awm-strip (4-up) used elsewhere */
+      #mod-precon-historical .pf-awm-strip { grid-template-columns:repeat(3, 1fr); }
+      @media (max-width:900px) { #mod-precon-historical .pf-awm-strip { grid-template-columns:repeat(2, 1fr); } }
+      @media (max-width:560px) { #mod-precon-historical .pf-awm-strip { grid-template-columns:1fr; } }
       /* Clean rows inside a group: name + sub-line, bid price, GC, click to expand */
       #mod-precon-historical .ph-row { border-bottom:1px solid var(--border-light,#222834); }
       #mod-precon-historical .ph-row:last-child { border-bottom:0; }
@@ -2836,6 +2841,11 @@ document.addEventListener('click', function(e) {
         display:grid; grid-template-columns:34px 1fr 150px 1fr; gap:10px; align-items:center;
         padding:9px 14px; cursor:pointer; width:100%; text-align:left; background:transparent; border:0; color:inherit;
       }
+      /* won rows carry two extra inline cells: LF + Columns (Jonathan) */
+      #mod-precon-historical .ph-row-main.ph-win {
+        grid-template-columns:34px 1fr 150px 90px 90px 1fr;
+      }
+      #mod-precon-historical .ph-qty { text-align:right; font-weight:600; font-variant-numeric:tabular-nums; color:var(--text-1,#1a1a1a); font-size:0.86rem; }
       #mod-precon-historical .ph-row-main:hover { background:var(--bg-1,#fff); }
       #mod-precon-historical .ph-row.open .ph-row-main { background:var(--accent-light,#f0f6fc); }
       #mod-precon-historical .ph-rchev { text-align:center; color:var(--text-3,#8a93a6); font-size:0.8rem; transition:transform .15s ease; }
@@ -2851,8 +2861,10 @@ document.addEventListener('click', function(e) {
         letter-spacing:0.03em; color:var(--text-3,#8a93a6); margin-bottom:1px; }
       #mod-precon-historical .ph-fld .ph-fval { display:block; font-size:0.84rem; color:var(--text-1,#1a1a1a); word-break:break-word; }
       @media (max-width:640px) {
-        #mod-precon-historical .ph-row-main { grid-template-columns:28px 1fr; }
-        #mod-precon-historical .ph-price, #mod-precon-historical .ph-gc { grid-column:2; text-align:left; }
+        #mod-precon-historical .ph-row-main,
+        #mod-precon-historical .ph-row-main.ph-win { grid-template-columns:28px 1fr; }
+        #mod-precon-historical .ph-price, #mod-precon-historical .ph-gc,
+        #mod-precon-historical .ph-qty { grid-column:2; text-align:left; }
         #mod-precon-historical .ph-detail { padding-left:14px; }
       }
     </style>
@@ -17518,15 +17530,19 @@ try {
   // YEAR-OVER-YEAR summary strip (Jonathan): one block per year. PREFERS the year's
   // authoritative block (reconciled WIP/Completed financials + Win Loss Log counts)
   // when present; otherwise falls back to values computed from the rows/summary feed.
-  //   Awarded / Completed - authoritative.awardedValue + awardedCount (closed-year
-  //     figure; for a closed year completed == the awarded set). Fallback: $ sum +
-  //     count of won-outcome rows.
-  //   Total Work Awarded - same authoritative.awardedValue / awardedCount (Jonathan
-  //     confirmed these are identical for a closed year). Fallback: won-row $ sum.
+  //   Total Completed Work - authoritative.completedValue (exact cents) + completedCount.
+  //     Fallback: won-row $ sum (money0) + won-row count.
+  //   Total Awarded Work - authoritative.awardedValue (exact cents) + awardedCount.
+  //     Now DISTINCT from completed (different keys). Fallback: won-row $ sum + count.
+  //   LF Installed - authoritative.totalLF (thousands separators, no $). OMITTED when
+  //     absent (no fallback) so a partial block never renders blank/NaN.
+  //   Columns Installed - authoritative.totalColumns. OMITTED when absent.
   //   Total Jobs Bid - authoritative.totalBid. Fallback: summary "Total Projects Bid
   //     Submitted", else a count of rows that carry a real Bid Status.
   //   Win Rate Total % - authoritative.winRatePct (already a percent, 1 decimal).
   //     Fallback: summary "Win Rate Total" (0..1 ratio) x 100, 1 decimal.
+  //   Every authoritative field is guarded (!= null && isFinite) so a partial block
+  //   degrades gracefully instead of showing NaN.
   function summaryStrip(y) {
     var a = y.authoritative || null;
 
@@ -17543,26 +17559,48 @@ try {
 
     var rateFb = parseFloat(sumVal(y, 'Win Rate Total'));
 
+    // exact dollars-and-cents for reconciled financial totals (e.g. $2,171,548.57)
+    function money2(n) {
+      return isFinite(n) ? '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : null;
+    }
+    // whole-number quantity with thousands separators, no currency (e.g. 57,281)
+    function qtyNum(n) {
+      return isFinite(n) ? Math.round(Number(n)).toLocaleString('en-US') : null;
+    }
+
     // --- resolve display values (authoritative wins) ---
     var muted = '<span class="ph-muted">-</span>';
-    var awardedVal, awardedSub, jobsBid, ratePct;
+    var completedVal, completedSub, awardedVal, awardedSub, lfVal, colsVal, jobsBid, ratePct;
+    var haveLF = false, haveCols = false;
 
     if (a) {
-      // authoritative awarded value is a reconciled financial figure - show exact
-      // dollars-and-cents (e.g. $2,171,548.57), not the whole-dollar money0 rounding
-      // used for individual bid rows.
+      // Completed and Awarded are now DISTINCT reconciled totals (different keys).
+      var cv = Number(a.completedValue);
+      completedVal = (a.completedValue != null && isFinite(cv)) ? E(money2(cv)) : muted;
+      var cc = Number(a.completedCount);
+      completedSub = (a.completedCount != null && isFinite(cc)) ? cc + ' jobs' : '-';
+
       var av = Number(a.awardedValue);
-      awardedVal = isFinite(av) ? E('$' + av.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : muted;
+      awardedVal = (a.awardedValue != null && isFinite(av)) ? E(money2(av)) : muted;
       var ac = Number(a.awardedCount);
-      awardedSub = (isFinite(ac) ? ac : '-') + ' jobs';
+      awardedSub = (a.awardedCount != null && isFinite(ac)) ? ac + ' jobs' : '-';
+
+      // installed-quantity tiles only render when the authoritative figure is present
+      if (a.totalLF != null && isFinite(Number(a.totalLF))) { lfVal = E(qtyNum(Number(a.totalLF))); haveLF = true; }
+      if (a.totalColumns != null && isFinite(Number(a.totalColumns))) { colsVal = E(qtyNum(Number(a.totalColumns))); haveCols = true; }
+
       jobsBid = (a.totalBid == null) ? muted : E(String(a.totalBid));
       var wr = Number(a.winRatePct);
-      ratePct = isFinite(wr) ? wr.toFixed(1) + '%' : muted;
+      ratePct = (a.winRatePct != null && isFinite(wr)) ? wr.toFixed(1) + '%' : muted;
     } else {
+      // fallback for years without an authoritative block: computed from rows/summary.
+      completedVal = haveSum ? E(money0(wonSum)) : muted;
+      completedSub = wonCount + ' jobs';
       awardedVal = haveSum ? E(money0(wonSum)) : muted;
       awardedSub = wonCount + ' jobs';
       jobsBid = E(String(jobsBidFb));
       ratePct = isFinite(rateFb) ? (rateFb * 100).toFixed(1) + '%' : muted;
+      // no totalLF/totalColumns without authoritative - omit those tiles (haveLF/haveCols stay false)
     }
 
     function tile(label, val, sub) {
@@ -17571,8 +17609,10 @@ try {
         + '<div class="pf-awm-sub">' + E(sub) + '</div></div>';
     }
     var tiles = ''
-      + tile('Awarded / Completed', awardedVal, awardedSub)
-      + tile('Total Work Awarded', awardedVal, awardedSub)
+      + tile('Total Completed Work', completedVal, completedSub)
+      + tile('Total Awarded Work', awardedVal, awardedSub)
+      + (haveLF ? tile('LF Installed', lfVal, 'linear feet') : '')
+      + (haveCols ? tile('Columns Installed', colsVal, 'stone columns') : '')
       + tile('Total Jobs Bid', jobsBid, 'bids submitted')
       + tile('Win Rate Total', ratePct, 'awarded / total');
 
@@ -17588,10 +17628,13 @@ try {
     { key: 'other', label: 'No Bid / Other', open: false }
   ];
 
-  // CLEAN ROW: project name + city/state sub-line, bid price (whole dollar), GC.
-  // Everything else drops into a click-to-expand detail panel (historical archive
-  // does not need every column visible). Read-only - no resolve/edit actions.
-  function rowHtml(y, r, rid) {
+  // CLEAN ROW: project name + city/state sub-line, contract/bid value (whole dollar), GC.
+  // For WON projects (isWin) Jonathan wants LF + Columns visible inline as two extra
+  // cells, so a won row reads: Name + City/State | Value | LF | Columns | GC. Those two
+  // cells are added only when isWin AND the row actually carries LF/Columns (guards a
+  // future win row that lacks the figures). Everything else stays in the click-to-expand
+  // detail panel. Read-only - no resolve/edit actions.
+  function rowHtml(y, r, rid, isWin) {
     var f = r.fields || {};
     var name = E(f['Project Name'] || '(unnamed)');
     var loc = E(f['City / State'] || '');
@@ -17599,8 +17642,19 @@ try {
     var priceCell = price ? E(price) : '<span class="ph-muted">-</span>';
     var gc = E(f['General Contractor'] || '') || '<span class="ph-muted">-</span>';
 
-    // detail = every column NOT already on the headline row
+    // whole-number LF / Columns (only meaningful for wins). Treat blank/non-numeric as absent.
+    var lfRaw = f['Total LF'], colRaw = f['Total Columns'];
+    var lfN = moneyNum(lfRaw), colN = moneyNum(colRaw);
+    var hasLF = lfRaw != null && String(lfRaw).trim() !== '' && isFinite(lfN);
+    var hasCol = colRaw != null && String(colRaw).trim() !== '' && isFinite(colN);
+    var showQty = isWin && (hasLF || hasCol);
+    var lfCell = hasLF ? E(Math.round(lfN).toLocaleString('en-US')) : '<span class="ph-muted">-</span>';
+    var colCell = hasCol ? E(Math.round(colN).toLocaleString('en-US')) : '<span class="ph-muted">-</span>';
+
+    // detail = every column NOT already on the headline row. For wins, LF/Columns are
+    // now on the headline, so drop them from detail too.
     var shown = { 'Project Name': 1, 'City / State': 1, 'Bid Total Value': 1, 'General Contractor': 1 };
+    if (showQty) { shown['Total LF'] = 1; shown['Total Columns'] = 1; }
     var detail = (y.columns || []).filter(function (c) { return !shown[c]; }).map(function (c) {
       var v = f[c];
       if (v == null || String(v).trim() === '') return '';
@@ -17608,11 +17662,16 @@ try {
     }).join('');
     if (!detail) detail = '<div class="ph-muted" style="font-size:0.82rem">No additional detail.</div>';
 
+    var qtyCells = showQty
+      ? '<span class="ph-qty">' + lfCell + '</span><span class="ph-qty">' + colCell + '</span>'
+      : '';
+
     return '<div class="ph-row" data-row="' + rid + '">'
-      + '<button type="button" class="ph-row-main" data-toggle="' + rid + '" aria-expanded="false">'
+      + '<button type="button" class="ph-row-main' + (showQty ? ' ph-win' : '') + '" data-toggle="' + rid + '" aria-expanded="false">'
       + '<span class="ph-rchev">&#9656;</span>'
       + '<span><span class="ph-name">' + name + '</span>' + (loc ? '<span class="ph-sub">' + loc + '</span>' : '') + '</span>'
       + '<span class="ph-price">' + priceCell + '</span>'
+      + qtyCells
       + '<span class="ph-gc">' + gc + '</span>'
       + '</button>'
       + '<div class="ph-detail ph-hidden" id="' + rid + '">' + detail + '</div>'
@@ -17633,8 +17692,9 @@ try {
     var openCls = g.open ? ' open' : '';
     var bodyHidden = g.open ? '' : ' ph-hidden';
     var bid = 'phg_' + y.year + '_' + g.key;
+    var isWin = g.key === 'win';
     var inner = rows.length
-      ? rows.map(function (r, i) { return rowHtml(y, r, bid + '_r' + i); }).join('')
+      ? rows.map(function (r, i) { return rowHtml(y, r, bid + '_r' + i, isWin); }).join('')
       : '<div class="ph-muted" style="padding:11px 14px;font-size:0.84rem">No rows.</div>';
     return '<div class="ph-group' + openCls + '" data-group="' + bid + '">'
       + '<button type="button" class="ph-group-head" data-gtoggle="' + bid + '" aria-expanded="' + (g.open ? 'true' : 'false') + '">'
