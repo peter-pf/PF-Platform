@@ -2828,6 +2828,7 @@ document.addEventListener('click', function(e) {
       #mod-precon-historical .ph-group-n { margin-left:auto; font-size:0.78rem; font-weight:600; color:var(--text-3,#8a93a6); }
       #mod-precon-historical .ph-group-body { border-top:1px solid var(--border-light,#222834); }
       #mod-precon-historical .ph-group-body.ph-hidden { display:none; }
+      #mod-precon-historical .pf-awm-src { font-size:0.72rem; margin:6px 2px 0; }
       /* Clean rows inside a group: name + sub-line, bid price, GC, click to expand */
       #mod-precon-historical .ph-row { border-bottom:1px solid var(--border-light,#222834); }
       #mod-precon-historical .ph-row:last-child { border-bottom:0; }
@@ -8416,7 +8417,7 @@ try {
             </div>
           </div>
           <div style="margin-top:8px">
-            <button class="btn btn-primary">Generate Proposal</button>
+            <button class="btn btn-primary" onclick="previewProposalFormat()">Generate Proposal</button>
             <button class="btn btn-secondary" onclick="document.getElementById('newProposalForm').style.display='none'">Cancel</button>
           </div>
         </div>
@@ -8524,6 +8525,63 @@ try {
               <span class="badge-status active" style="font-size:0.65rem">Included</span>
             </div>
           `).join('')}
+        </div>
+      </div>
+    `;
+    detail.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // Generate Proposal -> read-only PREVIEW of the standard proposal format. Uses a
+  // representative awarded project already in the module so Jonathan can SEE the
+  // structure the module will produce. No persistence, no network. Live generation
+  // (autofill from the finalized estimate) ships in Estimating phase 2.
+  window.previewProposalFormat = function () {
+    var sample = proposals.find(function (x) { return x.status === 'Awarded'; }) || proposals[0];
+    var detail = document.getElementById('proposalDetail');
+    if (!detail || !sample) return;
+    detail.style.display = 'block';
+    detail.innerHTML = `
+      <div class="card" style="margin-top:16px">
+        <div class="card-header">
+          <span class="card-title">Standard Proposal Format - Preview</span>
+          <button class="btn btn-secondary" onclick="document.getElementById('proposalDetail').style.display='none'">Close</button>
+        </div>
+        <div style="padding:10px 12px;margin-bottom:14px;border:1px solid var(--border);border-left:3px solid var(--accent,#2f6df6);border-radius:var(--radius);background:var(--bg-1);font-size:0.82rem">
+          Preview of the standard proposal format. Live generation will autofill project details and pricing from the finalized estimate (Estimating phase 2).
+        </div>
+        <div style="padding:8px 0 4px">
+          <strong>Sample project:</strong> ${esc(sample.project)} (${esc(sample.id)})<br>
+          <strong>General Contractor:</strong> ${esc(sample.gc)}<br>
+          <strong>Location:</strong> ${esc(sample.location)}<br>
+          <strong>Engineer:</strong> ${esc(sample.engineer)}<br>
+          <strong>Scope:</strong> ${esc(sample.scope)}
+        </div>
+        <div class="grid grid-4" style="margin:14px 0">
+          <div class="stat-card">
+            <div class="stat-label">Proposal Value</div>
+            <div class="stat-value">${fmt(sample.value)}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Columns</div>
+            <div class="stat-value">${sample.columns || '--'}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Linear Feet</div>
+            <div class="stat-value">${sample.lf ? sample.lf.toLocaleString() : '--'}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Column Diameter</div>
+            <div class="stat-value">${esc(sample.diameter)}</div>
+          </div>
+        </div>
+        <div style="margin-top:8px">
+          <div class="card-subtitle" style="margin-bottom:8px">Sections (in order)</div>
+          ${proposalSections.map(function (s, i) { return `
+            <div style="padding:6px 0;border-bottom:1px solid var(--border-light);font-size:0.82rem;display:flex;justify-content:space-between;align-items:center">
+              <span>${i + 1}. ${esc(s)}</span>
+              <span class="badge-status active" style="font-size:0.65rem">Template Ready</span>
+            </div>
+          `; }).join('')}
         </div>
       </div>
     `;
@@ -17457,41 +17515,69 @@ try {
     renderAll();
   }
 
-  // YEAR-OVER-YEAR summary strip (Jonathan): one block per year. Replaces the old
-  // cluttered raw-summary heading with four headline tiles per year:
-  //   Awarded / Completed - won-outcome rows ($ + count). For a closed historical
-  //     year there is no separate "completed" flag, so completed == the won set.
-  //   Total Work Awarded - $ sum of won rows' Bid Total Value (+ win count = 18).
-  //   Total Jobs Bid - summary "Total Projects Bid Submitted" if present, else
-  //     a count of rows that carry a real Bid Status.
-  //   Win Rate Total % - summary "Win Rate Total" (0..1 ratio) x 100, 1 decimal.
+  // YEAR-OVER-YEAR summary strip (Jonathan): one block per year. PREFERS the year's
+  // authoritative block (reconciled WIP/Completed financials + Win Loss Log counts)
+  // when present; otherwise falls back to values computed from the rows/summary feed.
+  //   Awarded / Completed - authoritative.awardedValue + awardedCount (closed-year
+  //     figure; for a closed year completed == the awarded set). Fallback: $ sum +
+  //     count of won-outcome rows.
+  //   Total Work Awarded - same authoritative.awardedValue / awardedCount (Jonathan
+  //     confirmed these are identical for a closed year). Fallback: won-row $ sum.
+  //   Total Jobs Bid - authoritative.totalBid. Fallback: summary "Total Projects Bid
+  //     Submitted", else a count of rows that carry a real Bid Status.
+  //   Win Rate Total % - authoritative.winRatePct (already a percent, 1 decimal).
+  //     Fallback: summary "Win Rate Total" (0..1 ratio) x 100, 1 decimal.
   function summaryStrip(y) {
+    var a = y.authoritative || null;
+
+    // --- computed fallbacks (used only when no authoritative block) ---
     var won = (y.rows || []).filter(function (r) { return r.outcome === 'win'; });
     var wonSum = 0, haveSum = false;
     won.forEach(function (r) { var m = moneyNum((r.fields || {})['Bid Total Value']); if (isFinite(m) && m > 0) { wonSum += m; haveSum = true; } });
     var wonCount = won.length;
 
-    var jobsBid = sumVal(y, 'Total Projects Bid Submitted');
-    if (jobsBid == null) {
-      jobsBid = (y.rows || []).filter(function (r) { return String((r.fields || {})['Bid Status'] || '').trim(); }).length;
+    var jobsBidFb = sumVal(y, 'Total Projects Bid Submitted');
+    if (jobsBidFb == null) {
+      jobsBidFb = (y.rows || []).filter(function (r) { return String((r.fields || {})['Bid Status'] || '').trim(); }).length;
     }
 
-    var rateRaw = sumVal(y, 'Win Rate Total');
-    var rate = parseFloat(rateRaw);
-    var ratePct = (isFinite(rate)) ? (rate * 100).toFixed(1) + '%' : '<span class="ph-muted">-</span>';
+    var rateFb = parseFloat(sumVal(y, 'Win Rate Total'));
 
+    // --- resolve display values (authoritative wins) ---
     var muted = '<span class="ph-muted">-</span>';
+    var awardedVal, awardedSub, jobsBid, ratePct;
+
+    if (a) {
+      // authoritative awarded value is a reconciled financial figure - show exact
+      // dollars-and-cents (e.g. $2,171,548.57), not the whole-dollar money0 rounding
+      // used for individual bid rows.
+      var av = Number(a.awardedValue);
+      awardedVal = isFinite(av) ? E('$' + av.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : muted;
+      var ac = Number(a.awardedCount);
+      awardedSub = (isFinite(ac) ? ac : '-') + ' jobs';
+      jobsBid = (a.totalBid == null) ? muted : E(String(a.totalBid));
+      var wr = Number(a.winRatePct);
+      ratePct = isFinite(wr) ? wr.toFixed(1) + '%' : muted;
+    } else {
+      awardedVal = haveSum ? E(money0(wonSum)) : muted;
+      awardedSub = wonCount + ' jobs';
+      jobsBid = E(String(jobsBidFb));
+      ratePct = isFinite(rateFb) ? (rateFb * 100).toFixed(1) + '%' : muted;
+    }
+
     function tile(label, val, sub) {
       return '<div class="pf-awm-tile"><div class="pf-awm-label">' + E(label) + '</div>'
         + '<div class="pf-awm-val">' + val + '</div>'
         + '<div class="pf-awm-sub">' + E(sub) + '</div></div>';
     }
     var tiles = ''
-      + tile('Awarded / Completed', haveSum ? E(money0(wonSum)) : muted, wonCount + ' jobs')
-      + tile('Total Work Awarded', haveSum ? E(money0(wonSum)) : muted, wonCount + ' awarded')
-      + tile('Total Jobs Bid', E(String(jobsBid)), 'bids submitted')
+      + tile('Awarded / Completed', awardedVal, awardedSub)
+      + tile('Total Work Awarded', awardedVal, awardedSub)
+      + tile('Total Jobs Bid', jobsBid, 'bids submitted')
       + tile('Win Rate Total', ratePct, 'awarded / total');
-    return '<div class="pf-awm-strip">' + tiles + '</div>';
+
+    var cap = (a && a.source) ? '<div class="pf-awm-src ph-muted">Source: ' + E(a.source) + '</div>' : '';
+    return '<div class="pf-awm-strip">' + tiles + '</div>' + cap;
   }
 
   // OUTCOME GROUPS: collapsible Wins / Losses / No Bid or Other expanders. Each
