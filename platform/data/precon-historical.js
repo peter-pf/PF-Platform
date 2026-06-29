@@ -6290,7 +6290,7 @@ window.PF_PRECON_HISTORICAL = {
           "outcome": "win",
           "fields": {
             "Project Number": "25-2002",
-            "Project Name": "Herrick Village",
+            "Project Name": "Habitat Homes",
             "City / State": "Racine, WI",
             "Address": "Racine, WI",
             "Site Size (Acres)": "1",
