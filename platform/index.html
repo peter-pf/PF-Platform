@@ -2338,11 +2338,16 @@ window.progress = (function () {
         <span class="nav-icon">&#9635;</span> Projects
       </a>
 
+      <!-- Maintenance (TOP-LEVEL, promoted out of Daily Reports). Interactive,
+           completion-tracked checklist compiled from every daily report. -->
+      <a class="nav-item" data-module="maintenance" onclick="showModule('maintenance')">
+        <span class="nav-icon">&#128295;</span> Maintenance
+      </a>
+
       <!-- Daily Reports -->
       <div class="nav-sub collapsed">
         <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Daily Reports</div>
         <a class="nav-item" data-module="daily-reports" onclick="showModule('daily-reports')">Submit Daily Report</a>
-        <a class="nav-item" data-module="maintenance" onclick="showModule('maintenance')">Maintenance</a>
         <a class="nav-item" data-module="dailyproduction" onclick="showModule('dailyproduction')">Daily Production</a>
         <a class="nav-item" data-module="dailylogs" onclick="showModule('dailylogs')">Daily Logs</a>
       </div>
@@ -3177,38 +3182,54 @@ document.addEventListener('click', function(e) {
   </div>
 
   <div class="module-view" id="mod-maintenance">
-    <!-- COMPILED MAINTENANCE view (Phase 2 of Derek's daily-report). READ-ONLY:
-         it aggregates the maintenance[] and futureIssues[] rows from EVERY daily
-         report (the existing /api/daily-report GET, field_ops area) into one place
-         so owners can see all open maintenance, failures and future issues to
-         schedule against. ZERO financials: equipment names, item text, machine
-         operating hours, project + date + foreman only - no dollars/rates/costs.
-         No write surface in v1. All data via window.esc. -->
+    <!-- COMPILED MAINTENANCE checklist (Phase 3 of Derek's daily-report).
+         INTERACTIVE + COMPLETION-TRACKED: it aggregates the maintenance[] and
+         futureIssues[] rows from EVERY daily report (the read-only
+         /api/daily-report GET, field_ops area) into one grouped checklist, and
+         lets owners check each item OFF. The completion record (done +
+         completedAt + completedBy, all server-set) persists via the separate
+         /api/maintenance-status overlay (field_ops area, KV) so the historical
+         daily reports stay IMMUTABLE. Completed items fade to the bottom of their
+         group (a collapsed "Completed" group) so the open list stays clean.
+         ZERO financials: equipment names, item text, machine operating hours,
+         project + date + foreman + completed-by name only - no dollars/rates/
+         costs. All data via window.esc. -->
     <style>
       #mod-maintenance .mt-sum { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
       #mod-maintenance .mt-stat { border:1px solid var(--border,#2a2f3a); border-radius:8px; padding:10px 16px; min-width:120px; }
       #mod-maintenance .mt-stat .n { font-size:22px; font-weight:600; }
       #mod-maintenance .mt-stat .l { font-size:11px; color:var(--text-3,#8a93a6); text-transform:uppercase; letter-spacing:.04em; }
       #mod-maintenance .mt-stat.amber .n { color:#d29922; }
+      #mod-maintenance .mt-stat.done .n { color:#3fb950; }
       #mod-maintenance .mt-group { border:1px solid var(--border,#2a2f3a); border-radius:8px; margin-bottom:12px; overflow:hidden; }
       #mod-maintenance .mt-group-h { display:flex; justify-content:space-between; align-items:center; padding:9px 14px; background:var(--surface-2,#1b212c); font-size:13px; font-weight:600; }
       #mod-maintenance .mt-group-h .ct { font-size:11px; color:var(--text-3,#8a93a6); font-weight:400; }
-      #mod-maintenance .mt-row { border-top:1px solid var(--border,#2a2f3a); padding:9px 14px; }
+      #mod-maintenance .mt-row { display:flex; gap:10px; align-items:flex-start; border-top:1px solid var(--border,#2a2f3a); padding:9px 14px; }
       #mod-maintenance .mt-row:first-child { border-top:none; }
+      #mod-maintenance .mt-chk { flex:0 0 auto; margin-top:2px; width:15px; height:15px; cursor:pointer; }
+      #mod-maintenance .mt-chk:disabled { cursor:default; opacity:.5; }
+      #mod-maintenance .mt-body { flex:1 1 auto; min-width:0; }
       #mod-maintenance .mt-item { font-size:13px; color:var(--text,#e6e9ef); }
       #mod-maintenance .mt-hr { display:inline-block; font-size:11px; color:#d29922; background:rgba(210,153,34,.15); border-radius:10px; padding:1px 8px; margin-left:6px; }
       #mod-maintenance .mt-meta { font-size:11px; color:var(--text-3,#8a93a6); margin-top:3px; }
+      #mod-maintenance .mt-done-tag { font-size:11px; color:#3fb950; margin-top:3px; }
+      /* Completed rows fade + strike so the open list stays clean (Brad's pref). */
+      #mod-maintenance .mt-row.done .mt-item { color:var(--text-3,#8a93a6); text-decoration:line-through; }
+      #mod-maintenance .mt-row.done { opacity:.7; }
+      #mod-maintenance .mt-subgroup-h { padding:7px 14px; background:rgba(63,185,80,.06); border-top:1px solid var(--border,#2a2f3a); font-size:11px; font-weight:600; color:#3fb950; text-transform:uppercase; letter-spacing:.04em; cursor:pointer; }
+      #mod-maintenance .mt-subgroup-h .caret { font-weight:400; color:var(--text-3,#8a93a6); }
+      #mod-maintenance .mt-completed.collapsed .mt-row { display:none; }
       #mod-maintenance .mt-section-h { font-size:14px; font-weight:600; margin:18px 0 8px; }
       #mod-maintenance .mt-muted { color:var(--text-3,#8a93a6); }
       #mod-maintenance .mt-empty { border:1px dashed var(--border,#2a2f3a); border-radius:8px; padding:22px 16px; text-align:center; color:var(--text-3,#8a93a6); font-size:13px; }
     </style>
     <div id="mtNoData" class="mt-muted" style="display:none">Maintenance data is not available for your role.</div>
     <div id="mtWrap">
-      <div class="mt-muted" style="font-size:13px;margin-bottom:12px">A compiled, read-only view of every equipment failure, maintenance item and future issue logged on the daily reports, grouped so you can schedule against them. Source is the daily reports. No financial data. This view is read-only in v1.</div>
+      <div class="mt-muted" style="font-size:13px;margin-bottom:12px">A compiled checklist of every equipment failure, maintenance item and future issue logged on the daily reports, grouped so you can schedule against them. Check an item off when it's handled. We record who completed it and when. Source is the daily reports. No financial data.</div>
       <div class="mt-sum" id="mtSummary"></div>
       <div class="mt-section-h">Failures &amp; maintenance logged</div>
       <div id="mtMaint"></div>
-      <div class="mt-section-h">Future issues to watch</div>
+      <div class="mt-section-h">Future maintenance items</div>
       <div id="mtFuture"></div>
     </div>
   </div>
@@ -19549,9 +19570,14 @@ try {
   'use strict';
   var E = window.esc || function (s) { return s == null ? '' : String(s); };
 
-  // The fixed maintenance categories (display + grouping order). Any other
-  // category found in the data is appended after these under its own group.
+  // The fixed maintenance categories (display + grouping order). Mirrors
+  // MAINTENANCE_CATEGORIES in functions/api/field-lists.js. Any other category
+  // found in the data is appended after these under its own group.
   var CATEGORY_ORDER = ['Excavator', 'Mast', 'Vibro', 'Drill', 'Rental Equipment'];
+
+  // Completion overlay map { <itemKey>: { done, completedAt, completedBy } },
+  // loaded from /api/maintenance-status alongside the compiled rows.
+  var statusMap = {};
 
   function api(path, opts) {
     return fetch(path, Object.assign({ credentials: 'same-origin',
@@ -19559,9 +19585,36 @@ try {
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); });
   }
 
+  // djb2 string hash -> unsigned base-36 string. The SERVER (maintenance-status.js)
+  // treats the itemKey as opaque, so the CLIENT is the single source of truth for
+  // key derivation. Keep this hash + the field-join order in sync with that file's
+  // documented ITEM KEY SCHEME. Editing a row's text changes its key (v1, accepted).
+  function djb2(str) {
+    var h = 5381;
+    str = String(str == null ? '' : str);
+    for (var i = 0; i < str.length; i++) {
+      h = ((h << 5) + h + str.charCodeAt(i)) | 0; // h*33 + c, 32-bit
+    }
+    return (h >>> 0).toString(36); // unsigned -> base-36
+  }
+
+  // Stable, deterministic key for a maintenance row:
+  //   `${reportId}::${djb2(category|type|subcategory|item|hourAtFailure)}`
+  function maintKey(reportId, m) {
+    var parts = [m.category, m.type, m.subcategory, m.item,
+      (m.hourAtFailure == null ? '' : m.hourAtFailure)].join('|');
+    return String(reportId || '') + '::' + djb2(parts);
+  }
+  // Stable key for a futureIssue row (note the 'f' prefix on the hash so a future
+  // issue can never collide with a maintenance row from the same report):
+  //   `${reportId}::f${djb2(equipment|description)}`
+  function futureKey(reportId, f) {
+    return String(reportId || '') + '::f' + djb2([f.equipment, f.description].join('|'));
+  }
+
   // Flatten every maintenance[] row WITH content (item text or a machine hour at
-  // failure present) across all reports, attaching the report's project, date and
-  // foreman so the row is self-describing.
+  // failure present) across all reports, attaching the report's id, project, date
+  // and foreman so the row is self-describing AND can compute a stable itemKey.
   function collectMaintenance(reports) {
     var rows = [];
     reports.forEach(function (r) {
@@ -19573,7 +19626,15 @@ try {
         var subcategory = (m.subcategory == null) ? '' : String(m.subcategory).trim(); // new field
         var hasHour = m.hourAtFailure != null && String(m.hourAtFailure) !== '';
         if (!item && !type && !subcategory && !hasHour) return; // skip empty rows
+        // Key is derived from the SAME raw fields the report stored (not the
+        // 'Other' display fallback) so it matches across reloads.
+        var key = maintKey(r.id, {
+          category: (m.category == null ? '' : m.category),
+          type: type, subcategory: subcategory, item: item,
+          hourAtFailure: hasHour ? m.hourAtFailure : '',
+        });
         rows.push({
+          itemKey: key,
           category: (m.category == null || String(m.category).trim() === '') ? 'Other' : String(m.category),
           type: type,
           subcategory: subcategory,
@@ -19599,7 +19660,9 @@ try {
         var equipment = (f.equipment == null) ? '' : String(f.equipment).trim();
         var description = (f.description == null) ? '' : String(f.description).trim();
         if (!equipment && !description) return;
+        var key = futureKey(r.id, { equipment: equipment, description: description });
         rows.push({
+          itemKey: key,
           equipment: equipment || 'Unspecified',
           description: description,
           projectName: r.projectName || r.projectId || '',
@@ -19610,6 +19673,21 @@ try {
       });
     });
     return rows;
+  }
+
+  // Completion lookup for a compiled row (by its stable itemKey).
+  function statusOf(row) {
+    var st = statusMap[row.itemKey];
+    return (st && st.done) ? st : null;
+  }
+  function isDone(row) { return !!statusOf(row); }
+
+  // "Completed <date> by <name>" line for a done row.
+  function doneLine(st) {
+    var when = '';
+    if (st.completedAt) { when = String(st.completedAt).slice(0, 10); }
+    var who = st.completedBy ? E(st.completedBy) : 'unknown';
+    return 'Completed' + (when ? ' ' + E(when) : '') + ' by ' + who;
   }
 
   // Group rows by a key, preserving a preferred order then any extras (sorted),
@@ -19647,17 +19725,79 @@ try {
   function renderSummary(maintRows, futureRows) {
     var host = document.getElementById('mtSummary');
     if (!host) return;
+    // Count OPEN (not-done) maintenance per category for the summary chips, plus a
+    // total-completed chip. Future issues counted separately (open only).
     var byCat = {};
-    maintRows.forEach(function (r) { byCat[r.category] = (byCat[r.category] || 0) + 1; });
+    var openMaint = 0, doneMaint = 0;
+    maintRows.forEach(function (r) {
+      if (isDone(r)) { doneMaint++; return; }
+      openMaint++;
+      byCat[r.category] = (byCat[r.category] || 0) + 1;
+    });
+    var openFuture = 0;
+    futureRows.forEach(function (r) { if (!isDone(r)) openFuture++; });
     var html = ''
-      + '<div class="mt-stat amber"><div class="n">' + maintRows.length + '</div><div class="l">Open maintenance items</div></div>'
-      + '<div class="mt-stat"><div class="n">' + futureRows.length + '</div><div class="l">Future issues</div></div>';
+      + '<div class="mt-stat amber"><div class="n">' + openMaint + '</div><div class="l">Open maintenance items</div></div>'
+      + '<div class="mt-stat"><div class="n">' + openFuture + '</div><div class="l">Open future items</div></div>'
+      + '<div class="mt-stat done"><div class="n">' + doneMaint + '</div><div class="l">Completed</div></div>';
     var catKeys = CATEGORY_ORDER.filter(function (c) { return byCat[c]; })
       .concat(Object.keys(byCat).filter(function (c) { return CATEGORY_ORDER.indexOf(c) < 0; }).sort());
     catKeys.forEach(function (c) {
       html += '<div class="mt-stat"><div class="n">' + byCat[c] + '</div><div class="l">' + E(c) + '</div></div>';
     });
     host.innerHTML = html;
+  }
+
+  // Render one checklist row. `kind` ('m'|'f') + the row's itemKey ride on the
+  // checkbox as data attributes so the change handler can POST without a closure.
+  function rowHtml(r, innerHtml) {
+    var st = statusOf(r);
+    var done = !!st;
+    var chk = '<input type="checkbox" class="mt-chk" data-mt-key="' + E(r.itemKey) + '"'
+      + (done ? ' checked' : '') + ' aria-label="Mark complete">';
+    var doneTag = done ? '<div class="mt-done-tag">' + doneLine(st) + '</div>' : '';
+    return '<div class="mt-row' + (done ? ' done' : '') + '">'
+      + chk
+      + '<div class="mt-body">'
+      + '<div class="mt-item">' + innerHtml + '</div>'
+      + '<div class="mt-meta">' + metaLine(r) + '</div>'
+      + doneTag
+      + '</div>'
+      + '</div>';
+  }
+
+  function maintInner(r) {
+    var hr = (r.hourAtFailure != null) ? '<span class="mt-hr">@ ' + E(r.hourAtFailure) + ' h</span>' : '';
+    var pre = [];
+    if (r.type) pre.push(E(r.type));
+    if (r.subcategory) pre.push(E(r.subcategory));
+    var preTxt = pre.length ? '<strong>' + pre.join(' - ') + '</strong>' + (r.item ? ': ' : '') : '';
+    var itemTxt = r.item ? E(r.item) : (pre.length ? '' : '<span class="mt-muted">(failure logged, no detail)</span>');
+    return preTxt + itemTxt + hr;
+  }
+  function futureInner(r) {
+    return r.description ? E(r.description) : '<span class="mt-muted">(no description)</span>';
+  }
+
+  // Build a group block: OPEN rows first, then a collapsed "Completed (n)"
+  // sub-group so done items move to the bottom and stay out of the way.
+  function groupBlock(g, innerFn) {
+    var open = [], done = [];
+    g.rows.forEach(function (r) { (isDone(r) ? done : open).push(r); });
+    var openHtml = open.map(function (r) { return rowHtml(r, innerFn(r)); }).join('')
+      || '<div class="mt-row"><div class="mt-body"><span class="mt-muted" style="font-size:12px">All items completed.</span></div></div>';
+    var doneHtml = '';
+    if (done.length) {
+      doneHtml = '<div class="mt-completed collapsed">'
+        + '<div class="mt-subgroup-h" data-mt-toggle="1">Completed (' + done.length + ') <span class="caret">show</span></div>'
+        + done.map(function (r) { return rowHtml(r, innerFn(r)); }).join('')
+        + '</div>';
+    }
+    return '<div class="mt-group">'
+      + '<div class="mt-group-h"><span>' + E(g.key) + '</span><span class="ct">'
+      + open.length + ' open' + (done.length ? ' / ' + done.length + ' done' : '') + '</span></div>'
+      + openHtml + doneHtml
+      + '</div>';
   }
 
   function renderMaint(maintRows) {
@@ -19668,69 +19808,104 @@ try {
       return;
     }
     var groups = groupBy(maintRows, function (r) { return r.category; }, CATEGORY_ORDER);
-    host.innerHTML = groups.map(function (g) {
-      var rowsHtml = g.rows.map(function (r) {
-        var hr = (r.hourAtFailure != null) ? '<span class="mt-hr">@ ' + E(r.hourAtFailure) + ' h</span>' : '';
-        // Prefix the detail with type + subcategory when present (new rows). Old
-        // rows have neither and render exactly as before.
-        var pre = [];
-        if (r.type) pre.push(E(r.type));
-        if (r.subcategory) pre.push(E(r.subcategory));
-        var preTxt = pre.length ? '<strong>' + pre.join(' - ') + '</strong>' + (r.item ? ': ' : '') : '';
-        var itemTxt = r.item ? E(r.item) : (pre.length ? '' : '<span class="mt-muted">(failure logged, no detail)</span>');
-        return '<div class="mt-row">'
-          + '<div class="mt-item">' + preTxt + itemTxt + hr + '</div>'
-          + '<div class="mt-meta">' + metaLine(r) + '</div>'
-          + '</div>';
-      }).join('');
-      return '<div class="mt-group">'
-        + '<div class="mt-group-h"><span>' + E(g.key) + '</span><span class="ct">' + g.rows.length + ' item' + (g.rows.length === 1 ? '' : 's') + '</span></div>'
-        + rowsHtml
-        + '</div>';
-    }).join('');
+    host.innerHTML = groups.map(function (g) { return groupBlock(g, maintInner); }).join('');
   }
 
   function renderFuture(futureRows) {
     var host = document.getElementById('mtFuture');
     if (!host) return;
     if (!futureRows.length) {
-      host.innerHTML = '<div class="mt-empty">No future issues logged yet.</div>';
+      host.innerHTML = '<div class="mt-empty">No future maintenance items logged yet.</div>';
       return;
     }
     var groups = groupBy(futureRows, function (r) { return r.equipment; }, []);
-    host.innerHTML = groups.map(function (g) {
-      var rowsHtml = g.rows.map(function (r) {
-        var desc = r.description ? E(r.description) : '<span class="mt-muted">(no description)</span>';
-        return '<div class="mt-row">'
-          + '<div class="mt-item">' + desc + '</div>'
-          + '<div class="mt-meta">' + metaLine(r) + '</div>'
-          + '</div>';
-      }).join('');
-      return '<div class="mt-group">'
-        + '<div class="mt-group-h"><span>' + E(g.key) + '</span><span class="ct">' + g.rows.length + ' item' + (g.rows.length === 1 ? '' : 's') + '</span></div>'
-        + rowsHtml
-        + '</div>';
-    }).join('');
+    host.innerHTML = groups.map(function (g) { return groupBlock(g, futureInner); }).join('');
+  }
+
+  // Cache of the last compiled rows so an optimistic check-off can re-render
+  // without re-fetching the daily reports (only the status map changed).
+  var lastMaint = [], lastFuture = [];
+  function renderAll() {
+    renderSummary(lastMaint, lastFuture);
+    renderMaint(lastMaint);
+    renderFuture(lastFuture);
+  }
+
+  // Check / uncheck one item -> POST to /api/maintenance-status. Optimistic: we
+  // update statusMap + re-render immediately, then reconcile from the server
+  // response (server-set completedAt/completedBy). The checkbox is disabled while
+  // the request is in flight to prevent a double-fire. On error we roll back.
+  function setDone(itemKey, done, checkboxEl) {
+    if (!itemKey) return;
+    if (checkboxEl) checkboxEl.disabled = true;
+    var prevState = statusMap[itemKey];
+    // Optimistic local state (the real completedAt/By come back from the server).
+    if (done) statusMap[itemKey] = { done: true, completedAt: new Date().toISOString(), completedBy: (window.PF_ME && (window.PF_ME.name || window.PF_ME.uid)) || 'you' };
+    else delete statusMap[itemKey];
+    renderAll();
+    api('/api/maintenance-status', { method: 'POST', body: JSON.stringify({ action: 'set', itemKey: itemKey, done: done }) })
+      .then(function (res) {
+        if (res.ok && res.body && res.body.status) {
+          statusMap = res.body.status; // authoritative map (server-set fields)
+        } else {
+          // Roll back on a non-OK response.
+          if (prevState) statusMap[itemKey] = prevState; else delete statusMap[itemKey];
+        }
+        renderAll();
+      })
+      .catch(function () {
+        if (prevState) statusMap[itemKey] = prevState; else delete statusMap[itemKey];
+        renderAll();
+      });
+  }
+
+  // One delegated listener for the whole module (checkbox change + Completed
+  // sub-group toggle). Survives every re-render (the wrapper is never replaced).
+  function wireDelegation() {
+    var wrap = document.getElementById('mtWrap');
+    if (!wrap || wrap.getAttribute('data-mt-wired')) return;
+    wrap.setAttribute('data-mt-wired', '1');
+    wrap.addEventListener('change', function (ev) {
+      var t = ev.target;
+      if (t && t.classList && t.classList.contains('mt-chk')) {
+        setDone(t.getAttribute('data-mt-key'), !!t.checked, t);
+      }
+    });
+    wrap.addEventListener('click', function (ev) {
+      var h = ev.target;
+      while (h && h !== wrap && !(h.getAttribute && h.getAttribute('data-mt-toggle'))) h = h.parentNode;
+      if (h && h !== wrap && h.getAttribute('data-mt-toggle')) {
+        var box = h.parentNode;
+        if (box && box.classList) {
+          box.classList.toggle('collapsed');
+          var caret = h.querySelector('.caret');
+          if (caret) caret.textContent = box.classList.contains('collapsed') ? 'show' : 'hide';
+        }
+      }
+    });
   }
 
   function load() {
     var noData = document.getElementById('mtNoData');
     var wrap = document.getElementById('mtWrap');
-    api('/api/daily-report').then(function (dr) {
+    wireDelegation();
+    // Fetch the compiled feed AND the completion overlay in parallel.
+    Promise.all([api('/api/daily-report'), api('/api/maintenance-status')]).then(function (res) {
+      var dr = res[0], ms = res[1];
       if (dr.status === 403) { if (noData) noData.style.display = ''; if (wrap) wrap.style.display = 'none'; return; }
       if (noData) noData.style.display = 'none';
       if (wrap) wrap.style.display = '';
       var reports = (dr.ok && dr.body && Array.isArray(dr.body.reports)) ? dr.body.reports : [];
-      var maintRows = collectMaintenance(reports);
-      var futureRows = collectFuture(reports);
-      renderSummary(maintRows, futureRows);
-      renderMaint(maintRows);
-      renderFuture(futureRows);
+      // The status overlay is best-effort: if it 403s or fails, show everything as
+      // not-done rather than blocking the compiled list.
+      statusMap = (ms && ms.ok && ms.body && ms.body.status && typeof ms.body.status === 'object') ? ms.body.status : {};
+      lastMaint = collectMaintenance(reports);
+      lastFuture = collectFuture(reports);
+      renderAll();
     }).catch(function () {
       if (wrap) wrap.style.display = '';
-      renderSummary([], []);
-      renderMaint([]);
-      renderFuture([]);
+      statusMap = {}; lastMaint = []; lastFuture = [];
+      renderAll();
     });
   }
 
