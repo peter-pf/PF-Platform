@@ -2,12 +2,12 @@ window.PF_PRODUCTION = {
   "generated": "2026-06-10",
   "headline": {
     "projects": 16,
-    "days": 53,
-    "cols": 3571,
-    "lf": 51478,
-    "lfPerDay": 971,
-    "colsPerDay": 67.4,
-    "minLfDay": 525,
+    "days": 54,
+    "cols": 3944,
+    "lf": 58515.7,
+    "lfPerDay": 1084,
+    "colsPerDay": 73.0,
+    "minLfDay": 537,
     "maxLfDay": 2645
   },
   "projects": [
@@ -53,11 +53,11 @@ window.PF_PRODUCTION = {
     },
     {
       "project": "25-027 - IU Launch - Wilhelm",
-      "cols": 173,
-      "lf": 3150,
-      "days": 6,
-      "colsDay": 28.8,
-      "lfDay": 525
+      "cols": 546,
+      "lf": 10187.7,
+      "days": 7,
+      "colsDay": 78.0,
+      "lfDay": 1455.4
     },
     {
       "project": "24-045 - Grand Vista - Wolverine",

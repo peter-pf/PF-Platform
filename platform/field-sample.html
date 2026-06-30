@@ -301,8 +301,11 @@
       </form>
       <div class="chips" id="chips">
         <span class="chip" data-q="who is my stone vendor for POET?">Stone vendor for POET</span>
-        <span class="chip" data-q="what's my next project?">My next project</span>
-        <span class="chip" data-q="who do I call about a flat tire on the rig?">Maintenance contact</span>
+        <span class="chip" data-q="who do I call for fuel?">Fuel vendor</span>
+        <span class="chip" data-q="who is hauling my stone?">Trucking contact</span>
+        <span class="chip" data-q="any open maintenance?">Open maintenance</span>
+        <span class="chip" data-q="what is my next project?">My next project</span>
+        <span class="chip" data-q="who is our engineer?">Our engineer</span>
       </div>
       <div class="answer" id="answer" role="status" aria-live="polite">
         <p class="a-q" id="ansQ"></p>
@@ -403,33 +406,127 @@ document.getElementById("loginForm").addEventListener("submit", function(e){
 document.getElementById("signoutBtn").addEventListener("click", showLogin);
 
 // ---- Field Companion demo Q&A ----
+// Front-end sample. Answers are grounded in field-safe project records
+// (vendors, contacts, schedule). No financial data anywhere by design.
+//
+// Each entry has:
+//   any    : keyword/synonym list. A match on ANY single keyword scores the entry.
+//   all    : optional list of groups; EACH group must have a hit (helps disambiguate).
+//   weight : optional bump so more specific intents win ties.
+//   text   : the answer shown to the crew.
 var ANSWERS = [
   {
-    match: ["stone vendor", "stone", "rock", "aggregate"],
-    needsPoet: false,
-    text: "Your stone vendor for POET is Rush County Stone Company. Contact Carleigh at 765-629-2211 or Mike.Malinoff@jrjnet.com."
+    // Stone / aggregate vendor
+    any: ["stone", "rock", "aggregate", "gravel", "57s", "number 8", "#8", "material vendor", "stone vendor", "stone supplier", "more stone", "order stone"],
+    text: "Your stone and aggregate vendor for POET is Rush County Stone Company. Contact Carleigh at 765-629-2211 or Mike.Malinoff@jrjnet.com. They handle the stone and the delivery to the site."
   },
   {
-    match: ["next project", "next job", "next site", "what's next", "whats next", "where am i going"],
-    needsPoet: false,
-    text: "Your next project is the Madison Parking Structure in Madison. It is scheduled to start once POET wraps. The crew of 4 stays together and Seth M. remains foreman."
+    // Fuel
+    any: ["fuel", "diesel", "def", "gas", "fill up", "fuel up", "out of fuel", "low on fuel", "fuel truck", "fuel vendor", "fuel delivery"],
+    text: "For fuel, call Jackson Oil. Your contact is Avin Kazmierzak at 800-221-4603, cell 317-502-7800. They run fuel delivery to the POET site."
   },
   {
-    match: ["flat tire", "maintenance contact", "who do i call", "rig down", "breakdown", "repair", "mechanic"],
-    needsPoet: false,
-    text: "For rig maintenance and breakdowns, open a Maintenance item in the app and it routes to the yard. For urgent field repairs call the shop line first, then log the item so it stays on record."
+    // Trucking / hauling
+    any: ["truck", "trucking", "hauler", "hauling", "haul", "transport", "lowboy", "move the rig", "moving the rig", "float", "who hauls", "who is hauling", "rig transport", "move equipment"],
+    text: "Trucking and rig transport is handled by Paddacks Trucking. Contact Craig Hogwood at 317-896-3206, cell 317-690-6923, or chogwood@paddacks.com."
+  },
+  {
+    // Equipment rental
+    any: ["rental", "rent", "equipment rental", "skid steer", "skid", "rented", "macallister", "cat rental", "loaner", "extra machine", "need a machine"],
+    text: "For equipment rentals, call Bryson Moore at Caterpillar / MacAllister Rentals, cell 512-897-7353, Bryson.Moore@cat.com. The current rental on POET is a skid steer."
+  },
+  {
+    // Next project / schedule
+    any: ["next project", "next job", "next site", "whats next", "what is next", "coming up", "after poet", "where am i going", "where do i go next", "upcoming", "on the schedule", "schedule", "future jobs", "what's next"],
+    text: "Your next project after POET is the Madison Style District Parking Garage in South Bend, IN. The crew stays together and Seth M. remains foreman. The Field Companion will show the exact start date once the schedule is live."
+  },
+  {
+    // Project status / percent complete
+    any: ["status", "percent", "percent complete", "how far along", "how much is done", "progress", "are we done", "how close", "complete", "completion", "where are we at"],
+    text: "POET in Shelbyville is in progress and most of the piers are installed. Open My Projects on the home screen for the live completion bar, which is driven by linear feet from the QA/QC logs."
+  },
+  {
+    // Open maintenance / wear parts -> route to Maintenance tab
+    any: ["maintenance", "open maintenance", "maintenance due", "wear part", "wear parts", "service due", "open items", "rig down", "breakdown", "flat tire", "repair", "mechanic", "fix the rig", "broke down", "down equipment", "pm due", "grease", "oil change", "track", "teeth", "what needs fixed"],
+    text: "Open the Maintenance tab on the home screen to see open items by category. There are 2 open items on the rig right now. For an urgent breakdown, call the yard shop line first, then log the item so it stays on record."
+  },
+  {
+    // Site contact / foreman on POET
+    any: ["foreman", "site contact", "who is the foreman", "who is in charge", "crew lead", "site lead", "who runs the site", "superintendent on site", "my foreman"],
+    text: "The PF foreman on POET is Seth M. with a crew of 4. John Willis is the lead aggregate pier contractor for PF. On the GC side, the superintendent on site is Larry and the project manager is Tanner Schweer at POET Design & Construction."
+  },
+  {
+    // GC contact
+    any: ["gc", "general contractor", "gc contact", "gc pm", "owner contact", "who is the gc", "poet contact", "project manager", "pm contact"],
+    text: "The general contractor on POET is POET Design & Construction. The project manager is Tanner Schweer at tanner.schweer@poet.com, 605-965-4955. The on-site superintendent is Larry."
+  },
+  {
+    // Engineer
+    any: ["engineer", "our engineer", "design engineer", "garbin", "ggg", "geostructural", "pier design", "design contact", "eor", "engineer of record"],
+    text: "Our pier design engineer is Ed Garbin at Garbin Geostructural (GGG). Reach him at 904-299-3482 or ed@garbingeostructural.com. Jake Campbell at GGG is the backup design contact."
+  },
+  {
+    // Geotech
+    any: ["geotech", "geotechnical", "soils", "soil report", "boring", "borings", "patriot", "soil engineer"],
+    text: "The geotech engineer on POET is Salim Ilmudeen, P.E. at Patriot Engineering in Indianapolis. Use the Field Companion or the project folder for the soils report and borings."
+  },
+  {
+    // Surveying / staking / layout
+    any: ["survey", "surveyor", "staking", "stake", "layout", "stakes", "miller land", "control points", "where are the columns", "column layout"],
+    text: "Surveying and staking on POET is by Miller Land Surveying. Contact Rob Mariucci at 260-489-8571, cell 260-701-7176, rob@mlswebsite.us, for layout and stakes."
+  },
+  {
+    // Daily report / log production
+    any: ["daily report", "submit report", "log production", "log my day", "where do i submit", "how do i log", "report production", "end of day report", "turn in", "daily log", "log columns", "log piers", "log footage"],
+    text: "Tap Submit Daily Report on the home screen to log your production for the day. Enter your columns and linear feet there. It is not started yet for today. You can also start it from the Today card at the top."
+  },
+  {
+    // Safety
+    any: ["safety", "safety contact", "safety question", "incident", "near miss", "injury", "hurt", "ppe", "jha", "toolbox talk", "osha", "who do i call for safety", "report an incident"],
+    text: "For a safety question or to report an incident or near miss, contact George Austin at Progressive Safety, 704-288-0644, gaustin@progressivesafety.com. Report anything urgent to your foreman Seth M. first, then log it."
   }
 ];
 
+// Question words and filler stripped before matching so phrasing does not block a hit.
+var STOP = /\b(who|what|whats|whos|where|when|how|do|does|did|is|are|am|the|a|an|my|our|for|on|at|to|of|i|we|me|call|need|should|can|please|about|with|get|find|tell|know|here|this|that)\b/g;
+
+function normalize(s){
+  return String(s || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9# ]+/g, " ") // keep # for "#8" style references
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function answerFor(rawQ){
-  var q = String(rawQ || "").toLowerCase();
+  var raw = normalize(rawQ);
+  if (!raw){
+    return "Ask a question about your job and I will pull the answer from the project records.";
+  }
+  // Stripped version for looser keyword hits.
+  var stripped = (" " + raw + " ").replace(STOP, " ").replace(/\s+/g, " ").trim();
+  var hay = raw + " " + stripped;
+
+  var best = null;
+  var bestScore = 0;
   for (var i = 0; i < ANSWERS.length; i++){
     var a = ANSWERS[i];
-    for (var j = 0; j < a.match.length; j++){
-      if (q.indexOf(a.match[j]) !== -1){
-        return a.text;
+    var score = 0;
+    for (var j = 0; j < a.any.length; j++){
+      var kw = a.any[j];
+      if (hay.indexOf(kw) !== -1){
+        // Longer keyword phrases score higher (more specific).
+        score += kw.indexOf(" ") !== -1 ? 3 : 1;
       }
     }
+    if (a.weight) score += (score > 0 ? a.weight : 0);
+    if (score > bestScore){
+      bestScore = score;
+      best = a;
+    }
+  }
+  if (best && bestScore > 0){
+    return best.text;
   }
   return "I will pull that from the project records once we connect the live data.";
 }
