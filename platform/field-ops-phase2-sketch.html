@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Field Ops AI Companion - Phase 2 Sketch</title>
+<style>
+  body{font-family:'Segoe UI',Arial,sans-serif;font-size:15px;color:#1a1a1a;line-height:1.55;
+       max-width:760px;margin:0 auto;padding:32px 22px;background:#fafbfc}
+  h1{font-size:24px;color:#23527c;margin-bottom:2px}
+  .sub{color:#666;font-size:13px;margin-bottom:22px}
+  h2{font-size:18px;border-bottom:2px solid #2f6f9f;padding-bottom:5px;color:#23527c;margin-top:30px}
+  .flow td{padding:9px 12px;border-radius:5px;font-size:14px}
+  .p1{background:#eef4fa;border:1px solid #cfe0ef}
+  .p2{background:#eef9ef;border:1px solid #cfead4}
+  .fb{background:#fbf6ec;border:1px solid #efe2c6}
+  .arrow{text-align:center;color:#999;font-size:13px;padding:3px}
+  .quote{background:#f1f5f9;border-left:4px solid #2f6f9f;padding:10px 14px;font-style:italic;border-radius:0 4px 4px 0}
+  .muted{color:#555;font-size:13px}
+  table{border-collapse:collapse;width:100%;margin:10px 0}
+  ol li,ul li{margin:5px 0}
+  code{background:#eee;padding:1px 5px;border-radius:3px;font-size:13px}
+  .tag{display:inline-block;background:#2f6f9f;color:#fff;font-size:11px;padding:2px 8px;border-radius:10px;vertical-align:middle}
+</style>
+</head>
+<body>
+<h1>Field Ops AI Companion <span class="tag">Phase 2 Sketch</span></h1>
+<div class="sub">For Tether (review and markup) &#183; From Peter, Pier Foundations &#183; Phase 1 is live in production</div>
+
+<h2>The goal</h2>
+<p>A field site lead asks a question in plain English and gets a short, correct answer drawn from the real project records. Benchmark case from Jonathan: "who is my stone vendor for POET?" returns the vendor and the contact, not a guess.</p>
+
+<h2>The non-negotiable</h2>
+<p>The field role sees zero financials. No dollar figures, unit prices, contract values, budgets, or margins ever reach the field surface. This holds structurally, not as a filter we hope catches everything.</p>
+
+<h2>Architecture: two layers, not two choices</h2>
+<table class="flow">
+<tr><td class="p1"><b>Phase 1 (LIVE today)</b> &#8212; in-browser synonym and intent search. Direct lookups, instant, no round trip. Reads the field-safe index.</td></tr>
+<tr><td class="arrow">&#8595; only if Phase 1 cannot resolve</td></tr>
+<tr><td class="p2"><b>Phase 2</b> &#8212; synchronous call to the PureBrain governed Q&amp;A endpoint. PureBrain holds project memory and enforces role policy, retrieves from field-safe records, and composes one grounded sentence.</td></tr>
+<tr><td class="arrow">&#8595; only on low confidence</td></tr>
+<tr><td class="fb"><b>Fallback</b> &#8212; async route to a human (or to me). The safety net, not the default path.</td></tr>
+</table>
+<p class="muted">Field crews need speed, so Phase 1 stays the instant first pass and Phase 2 is synchronous when it fires.</p>
+
+<h2>The data boundary (the heart of it)</h2>
+<p>The model never touches raw data. It asks the governed layer, which retrieves from field-safe records and composes the answer.</p>
+<p><b>Field role may see:</b> vendors (company, scope, contact, phone, email, website) with pricing scrubbed, site and PF contacts, approved materials labels and document links, schedule milestones (dates and durations), safety links, QA/QC counts.</p>
+<p><b>It must never receive:</b> any dollar amount or unit price, contract or subcontract value, budget, margin, or GC commercial terms. Phase 2 reuses the same money-scrubbed view Phase 1 already produces, so there is one source of truth for what the field can see.</p>
+
+<h2>Request and response sketch</h2>
+<p class="muted">Request from the platform to the governed endpoint:</p>
+<pre style="background:#f5f5f5;padding:10px 12px;border-radius:4px;font-size:13px;overflow-x:auto">{
+  "question": "who is my stone vendor for POET?",
+  "role": "field_ops",
+  "project_hint": "26-002",
+  "context_scope": "field_safe"
+}</pre>
+<p class="muted">Response we would render:</p>
+<div class="quote">"Your stone vendor for POET is Rush County Stone Company. Contact Carleigh at 765-629-2211 or Mike.Malinoff@jrjnet.com."</div>
+<p class="muted">Returned with a confidence score (drives the human fallback) and a contains-financials flag I would treat as a hard block that never renders, defense in depth on top of the policy layer.</p>
+
+<h2>Open questions for Tether</h2>
+<ol>
+<li>The endpoint, auth model, and request/response shape (she is pulling these from her side).</li>
+<li>How PureBrain ingests our records: we push the field-safe view, or it pulls from a source we expose.</li>
+<li>Whether PureBrain enforces the role scope itself, so the zero-financials rule is structural in her layer too.</li>
+<li>Latency target for a synchronous field answer.</li>
+<li>Audit trail: question, answer, sources.</li>
+<li>Whether the response exposes confidence and the source records.</li>
+</ol>
+
+<h2>Already done (Phase 1, live)</h2>
+<ul>
+<li>Deep search inside the field detail records, not just the project list.</li>
+<li>Synonym and intent map (stone, fuel, trucking, equipment) and project alias resolution (POET to 26-002).</li>
+<li>Field-safe, money-scrubbed index with pricing stripped at build and at render.</li>
+<li>The POET stone vendor case returns the right vendor and contact with no pricing.</li>
+</ul>
+<p>Phase 2 builds on this, it does not replace it.</p>
+</body>
+</html>

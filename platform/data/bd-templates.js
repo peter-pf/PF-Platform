@@ -46,7 +46,7 @@ window.PF_BD_TEMPLATES = {
     "senderTitle",
     "projectName"
   ],
-  "generated": "2026-06-24T13:42:30Z",
+  "generated": "2026-06-30T06:00:11Z",
   "source": "authored defaults (no workbook source)",
   "_note": "Actual document files (2-pager, resume, project list) are PENDING from Brad/Derek; references are empty until supplied. Email sending is intentionally OFF: quick-send only QUEUES a record."
 };
