@@ -73,8 +73,8 @@ tr:last-child td{border-bottom:none}
     swTot.cols+=d.cols; swTot.lf+=d.lf;
     return '<tr><td>'+d.date+'</td><td class="num">'+d.cols+'</td><td class="num">'+n(d.lf)+'</td><td class="num">'+(d.lf/d.cols).toFixed(1)+' ft</td></tr>';
   }).join('') + '<tr class="tot"><td>Total ('+sw.byday.length+' days)</td><td class="num">'+swTot.cols+'</td><td class="num">'+n(swTot.lf)+'</td><td class="num">'+n(swTot.lf/sw.byday.length)+' LF/day</td></tr>';
-  // Projects
-  document.getElementById('projBody').innerHTML = P.projects.map(function(p){
+  // Projects, ordered by highest LF/day to lowest (per Jonathan)
+  document.getElementById('projBody').innerHTML = P.projects.slice().sort(function(a,b){return b.lfDay - a.lfDay;}).map(function(p){
     return '<tr><td>'+p.project+'</td><td class="num">'+n(p.cols)+'</td><td class="num">'+n(p.lf)+'</td><td class="num">'+p.days+'</td><td class="num">'+p.colsDay+'</td><td class="num">'+n(p.lfDay)+'</td></tr>';
   }).join('') + '<tr class="tot"><td>Total / Blended</td><td class="num">'+n(h.cols)+'</td><td class="num">'+n(h.lf)+'</td><td class="num">'+h.days+'</td><td class="num">'+h.colsPerDay+'</td><td class="num">'+n(h.lfPerDay)+'</td></tr>';
   document.getElementById('estNote').innerHTML = '<b>Estimating use:</b> a job’s total LF ÷ ~'+n(h.lfPerDay)+' LF/day ≈ field (install) days. Add mobilization, layout, and travel separately. Use the range ('+n(h.minLfDay)+'–'+n(h.maxLfDay)+' LF/day) to bracket conservative vs. optimistic schedules. Sample sizes per project are small (1–6 days) and tighten as more jobs close.';
