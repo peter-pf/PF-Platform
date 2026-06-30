@@ -1,14 +1,14 @@
 window.PF_PRODUCTION = {
   "generated": "2026-06-10",
   "headline": {
-    "projects": 14,
-    "days": 47,
-    "cols": 3001,
-    "lf": 41301,
-    "lfPerDay": 879,
-    "colsPerDay": 63.9,
+    "projects": 16,
+    "days": 53,
+    "cols": 3571,
+    "lf": 51478,
+    "lfPerDay": 971,
+    "colsPerDay": 67.4,
     "minLfDay": 525,
-    "maxLfDay": 1879
+    "maxLfDay": 2645
   },
   "projects": [
     {
@@ -122,10 +122,26 @@ window.PF_PRODUCTION = {
       "days": 1,
       "colsDay": 71.0,
       "lfDay": 806
+    },
+    {
+      "project": "26-005 - Southwark Metals - Peterson",
+      "cols": 514,
+      "lf": 9337,
+      "days": 5,
+      "colsDay": 102.8,
+      "lfDay": 1867.4
+    },
+    {
+      "project": "26-009 - International School - Gilliatte",
+      "cols": 56,
+      "lf": 840,
+      "days": 1,
+      "colsDay": 56.0,
+      "lfDay": 840
     }
   ],
   "southwark": {
-    "project": "26-005 - Southwark Metals (active)",
+    "project": "26-005 - Southwark Metals",
     "byday": [
       {
         "date": "2026-06-04",
@@ -161,7 +177,7 @@ window.PF_PRODUCTION = {
       "project": "26-005 - Southwark Metals",
       "cols": 140,
       "lf": 2645,
-      "active": true
+      "active": false
     },
     {
       "rank": 2,
@@ -169,7 +185,7 @@ window.PF_PRODUCTION = {
       "project": "26-005 - Southwark Metals",
       "cols": 130,
       "lf": 2280,
-      "active": true
+      "active": false
     },
     {
       "rank": 3,
@@ -185,7 +201,7 @@ window.PF_PRODUCTION = {
       "project": "26-005 - Southwark Metals",
       "cols": 121,
       "lf": 2121,
-      "active": true
+      "active": false
     },
     {
       "rank": 5,
