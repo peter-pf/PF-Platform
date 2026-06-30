@@ -1,0 +1,106 @@
+# Statement of Work: Field Operations Smart Search
+
+**Project:** Pier Foundations -- Field Operations Smart Search (Phase 1)
+**Version:** 1.0
+**Date:** June 30, 2026
+**Prepared by:** Peter (AI COO)
+**Approved by:** _Pending Brad/Jonathan review_
+**Implementation Status:** v1.0 BUILT -- deployed to production (commit 2172b98)
+
+---
+
+## 1. Purpose
+
+The "Projects - Field" search only matched the project list row (number, name, city, scope). Anything stored inside a project's Field Detail record was invisible to search. A field user asking "who is my stone vendor for POET?" got nothing back, even though that vendor is recorded in the detail.
+
+This work makes the field search read inside the detail content too, while keeping field users walled off from all financials. Phase 1 is a fast in-browser solution with no AI model.
+
+## 2. Scope
+
+### In Scope (Phase 1)
+- New field-safe, money-scrubbed index `data/fo-detail-index.js`
+- Generator `sync/build-fo-detail-index.js` that builds the index and scrubs money at build time
+- Search reads inside the index for vendors, contacts, materials, schedule milestones, safety links, QA/QC counts
+- Synonym / intent map (stone / rock / aggregate, fuel, trucking, equipment)
+- Project alias resolution (example: POET -> 26-002)
+- Answer cards returning vendor plus contact
+- Render-time pricing scrub as a second guard
+- field_ops RBAC classification in `functions/lib/auth.js`
+
+### Out of Scope (Phase 1)
+- Any financial data in the field experience
+- Natural-language model answers (that is Phase 2)
+- Editing Field Detail records from the search
+- Cross-project rollups or analytics
+
+## 3. Stakeholders
+
+| Role | Name | Involvement |
+|------|------|-------------|
+| End User (Primary) | Field Foreman / Operator | Searches for vendors, contacts, materials in the field |
+| End User | Jonathan Reinking | Reviews field search accuracy |
+| Decision Maker | Brad Reinking | Approves field data exposure and Phase 2 |
+| Builder | Peter (AI COO) | Designs, builds, and maintains the feature |
+
+## 4. Deliverables
+
+| # | Deliverable | Format | Description |
+|---|-------------|--------|-------------|
+| 1 | Detail index | `data/fo-detail-index.js` | Field-safe, money-scrubbed content index |
+| 2 | Index generator | `sync/build-fo-detail-index.js` | Builds the index, scrubs money at build time |
+| 3 | Search extension | In-platform JS | Reads inside the index, synonyms, aliases, answer cards |
+| 4 | RBAC classification | `functions/lib/auth.js` | field_ops, zero financials |
+| 5 | Phase 2 design sketch | `platform/field-ops-phase2-sketch.html` | Hermes-backed field-ops companion design |
+| 6 | SRS + SOW + Manual | .md files | Documentation |
+
+## 5. Success Criteria
+
+- A field user asking "who is my stone vendor for POET?" gets an answer card with vendor plus contact
+- No pricing is ever returned, at build time or render time
+- field_ops users cannot reach any financials through search
+- Search still matches the project list as before
+
+## 6. Timeline
+
+| Milestone | Duration (AI time) |
+|-----------|--------------------|
+| SOW + SRS | 15 min |
+| Build index generator + index | 25 min |
+| Extend search (synonyms, aliases, cards) | 20 min |
+| Triple-check (security, qa, reviewer) | 15 min |
+| Deploy to production | 10 min |
+| Phase 2 front end (Peter) | In progress for the State of Pier Foundations meeting |
+| Phase 2 meld with Hermes back end | _Dependent on Corey's Hermes back end_ |
+
+## 7. Assumptions
+
+- Field Detail records hold vendors, contacts, materials, milestones, safety links, QA/QC counts
+- Field users must never see financials
+- Phase 1 runs in the browser with no AI model
+- Phase 2 will run on Corey's Hermes inference layer (M2.7), not PureBrain and not Claude, for cost and reduced Anthropic dependency
+- Peter builds the Phase 2 field-ops front end, Corey (with True Bearing) builds the Hermes back end, Melanie and Corey meld the two
+- PureBrain stays as the ADMIN tier full-access tool (Brad, Derek, Jonathan), not the field-ops companion
+
+## 8. Risks
+
+| Risk | Mitigation |
+|------|------------|
+| A price leaks into the field index | Scrub at build time and again at render time, SEC-15 guard |
+| Alias or synonym misses a real question | Maintain the intent map, fall through to Phase 2 when ready |
+| Detail content drifts from the index | Regenerate `fo-detail-index.js` on each sync |
+| Phase 2 model touches raw data | Phase 2 is retrieval-grounded, Hermes never sees raw data |
+| Front end and Hermes back end drift apart | Melanie and Corey own the meld, keep the field-safe contract fixed |
+
+## 9. Verification Evidence
+
+- Commit 2172b98, LIVE in production
+- SEC-15 data-classification guard 6/6 clean
+- rbac suite 778 passed, 0 failed
+- Triple-checked by security-auditor, reviewer, and qa-engineer, all approved
+
+## 10. Implementation Notes
+
+- **Platform:** pf-platform.pages.dev/platform/
+- **Index:** `data/fo-detail-index.js` (generated by `sync/build-fo-detail-index.js`)
+- **RBAC:** `functions/lib/auth.js`, field_ops, zero financials
+- **Phase 2:** Planned, approach decided. Runs on Corey's Hermes (M2.7). Peter builds the front end, Corey (with True Bearing) builds the back end, Melanie and Corey meld them. PureBrain is ADMIN tier only.

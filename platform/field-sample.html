@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Field Crew - Pier Foundations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* ---- PF brand tokens (matched to platform/index.html) ---- */
+  :root{
+    --bg-1:#F9FAFD;
+    --bg-2:#F3F5F8;
+    --card:#ffffff;
+    --border:#C8D5DC;
+    --border-light:#E2EAF0;
+    --text-0:#0B1722;
+    --text-1:#2B2F36;
+    --text-2:#5A6370;
+    --text-3:#8A9AAB;
+    --accent:#006DB0;
+    --accent-light:#E0F0FF;
+    --accent-dark:#005A91;
+    --green:#16a34a;
+    --green-light:#dcfce7;
+    --amber:#d97706;
+    --amber-light:#fef3c7;
+    --radius:12px;
+    --shadow-sm:0 1px 2px rgba(0,0,0,0.05);
+    --shadow-md:0 4px 10px -2px rgba(0,40,80,0.10);
+    --shadow-lg:0 14px 40px rgba(0,40,80,0.12);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+    color:var(--text-1);
+    background:var(--bg-1);
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+    font-size:16px;
+    line-height:1.45;
+  }
+  .screen{display:none;}
+  .screen.active{display:block;}
+
+  /* ================= SCREEN 1: LOGIN ================= */
+  #login.active{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    min-height:100vh;
+    padding:24px;
+    background:linear-gradient(135deg,#E9F1F8 0%,#F2F5F9 55%,#FFFFFF 100%);
+  }
+  .login-box{
+    width:100%;max-width:400px;
+    background:var(--card);
+    border:1px solid var(--border-light);
+    border-radius:16px;
+    box-shadow:var(--shadow-lg);
+    padding:34px 28px 26px;
+  }
+  .brand{text-align:center;margin-bottom:24px;}
+  .mark{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:60px;height:60px;border-radius:15px;
+    background:var(--accent);color:#fff;
+    font-weight:800;font-size:1.5rem;letter-spacing:0.5px;
+    margin-bottom:14px;box-shadow:var(--shadow-md);
+  }
+  .brand .wordmark{font-size:1.18rem;font-weight:700;color:var(--text-0);margin:0;}
+  .brand .sub{font-size:0.9rem;color:var(--text-2);margin:5px 0 0;font-weight:500;}
+  .field-tag{
+    display:inline-block;margin-top:12px;
+    background:var(--accent-light);color:var(--accent-dark);
+    font-size:0.72rem;font-weight:700;letter-spacing:0.6px;
+    text-transform:uppercase;padding:4px 11px;border-radius:999px;
+  }
+  .login-box h2{
+    font-size:1.05rem;font-weight:700;color:var(--text-0);
+    text-align:center;margin:6px 0 18px;
+  }
+  label{
+    display:block;font-size:0.78rem;font-weight:600;color:var(--text-2);
+    margin:14px 0 6px;letter-spacing:0.2px;
+  }
+  input[type=text],input[type=password]{
+    width:100%;padding:13px 14px;
+    border:1px solid var(--border);border-radius:10px;
+    font-size:1rem;font-family:inherit;color:var(--text-1);
+    background:#FBFCFE;transition:border-color .15s, box-shadow .15s;
+  }
+  input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-light);}
+  .btn-primary{
+    width:100%;margin-top:24px;padding:14px;
+    background:var(--accent);color:#fff;border:none;border-radius:10px;
+    font-size:1rem;font-weight:700;font-family:inherit;cursor:pointer;
+    transition:background .15s, transform .05s;
+  }
+  .btn-primary:hover{background:var(--accent-dark);}
+  .btn-primary:active{transform:translateY(1px);}
+  .login-caption{
+    text-align:center;margin-top:20px;
+    font-size:0.76rem;color:var(--text-3);line-height:1.5;
+  }
+
+  /* ================= SCREEN 2: FIELD HOME ================= */
+  .topbar{
+    position:sticky;top:0;z-index:50;
+    background:#1E2A38;color:#fff;
+    display:flex;align-items:center;gap:12px;
+    padding:12px 16px;
+    padding-top:max(12px, env(safe-area-inset-top));
+  }
+  .topbar .tb-mark{
+    width:34px;height:34px;border-radius:9px;flex:0 0 auto;
+    background:var(--accent);display:flex;align-items:center;justify-content:center;
+    font-weight:800;font-size:0.92rem;letter-spacing:0.4px;color:#fff;
+  }
+  .topbar .tb-meta{display:flex;flex-direction:column;line-height:1.2;min-width:0;}
+  .topbar .tb-role{font-size:0.72rem;color:#9FB3C4;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;}
+  .topbar .tb-user{font-size:0.98rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .topbar .tb-signout{
+    margin-left:auto;flex:0 0 auto;
+    background:rgba(255,255,255,0.10);color:#fff;border:1px solid rgba(255,255,255,0.16);
+    font-size:0.82rem;font-weight:600;padding:8px 13px;border-radius:8px;cursor:pointer;
+    transition:background .15s;
+  }
+  .topbar .tb-signout:hover{background:rgba(255,255,255,0.20);}
+
+  .home-wrap{max-width:680px;margin:0 auto;padding:18px 16px 48px;}
+
+  /* Companion search */
+  .companion{
+    background:var(--card);
+    border:1px solid var(--border-light);
+    border-radius:16px;
+    box-shadow:var(--shadow-md);
+    padding:20px 18px 18px;
+    margin-bottom:20px;
+  }
+  .companion-head{display:flex;align-items:center;gap:10px;margin-bottom:4px;}
+  .companion-head .ci{
+    width:36px;height:36px;border-radius:10px;flex:0 0 auto;
+    background:var(--accent-light);color:var(--accent-dark);
+    display:flex;align-items:center;justify-content:center;font-size:1.15rem;
+  }
+  .companion-head h2{font-size:1.08rem;font-weight:700;color:var(--text-0);margin:0;}
+  .preview-tag{
+    margin-left:auto;background:var(--amber-light);color:var(--amber);
+    font-size:0.66rem;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;
+    padding:3px 9px;border-radius:999px;white-space:nowrap;
+  }
+  .companion .hint{font-size:0.84rem;color:var(--text-2);margin:6px 0 14px;}
+  .ask-row{display:flex;gap:8px;}
+  .ask-row input{
+    flex:1 1 auto;min-width:0;padding:13px 14px;
+    border:1px solid var(--border);border-radius:10px;
+    font-size:1rem;font-family:inherit;color:var(--text-1);background:#FBFCFE;
+  }
+  .ask-row input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-light);}
+  .ask-row button{
+    flex:0 0 auto;padding:0 18px;border:none;border-radius:10px;
+    background:var(--accent);color:#fff;font-weight:700;font-size:0.95rem;cursor:pointer;
+    transition:background .15s;
+  }
+  .ask-row button:hover{background:var(--accent-dark);}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+  .chip{
+    background:var(--bg-2);border:1px solid var(--border-light);
+    color:var(--text-2);font-size:0.8rem;font-weight:500;
+    padding:7px 12px;border-radius:999px;cursor:pointer;transition:all .12s;
+  }
+  .chip:hover{background:var(--accent-light);border-color:var(--accent);color:var(--accent-dark);}
+  .answer{
+    display:none;margin-top:16px;
+    background:var(--bg-2);border:1px solid var(--border-light);
+    border-left:3px solid var(--accent);
+    border-radius:10px;padding:14px 16px;
+  }
+  .answer.show{display:block;}
+  .answer .a-q{font-size:0.8rem;font-weight:600;color:var(--text-3);margin:0 0 6px;}
+  .answer .a-body{font-size:0.98rem;color:var(--text-0);line-height:1.55;}
+  .answer .a-foot{font-size:0.74rem;color:var(--text-3);margin-top:10px;}
+
+  /* Today strip */
+  .today{
+    background:linear-gradient(135deg,#10324F 0%,#1E2A38 100%);
+    color:#fff;border-radius:16px;padding:18px;margin-bottom:20px;
+  }
+  .today .t-label{font-size:0.72rem;font-weight:700;letter-spacing:0.7px;text-transform:uppercase;color:#9FB3C4;}
+  .today .t-proj{font-size:1.22rem;font-weight:800;margin:4px 0 2px;}
+  .today .t-sub{font-size:0.88rem;color:#C7D6E2;}
+  .today .t-actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;}
+  .today .t-btn{
+    flex:1 1 auto;text-align:center;
+    background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.18);
+    color:#fff;font-weight:600;font-size:0.9rem;padding:11px 12px;border-radius:10px;
+    cursor:pointer;transition:background .15s;
+  }
+  .today .t-btn:hover{background:rgba(255,255,255,0.22);}
+
+  /* Quick-action cards */
+  .section-label{font-size:0.78rem;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;color:var(--text-3);margin:6px 2px 12px;}
+  .cards{display:grid;grid-template-columns:1fr;gap:12px;}
+  .qcard{
+    background:var(--card);border:1px solid var(--border-light);
+    border-radius:14px;padding:16px 16px;cursor:pointer;
+    box-shadow:var(--shadow-sm);transition:box-shadow .15s, transform .05s, border-color .15s;
+    display:flex;align-items:center;gap:14px;
+  }
+  .qcard:hover{box-shadow:var(--shadow-md);border-color:var(--border);}
+  .qcard:active{transform:translateY(1px);}
+  .qcard .q-icon{
+    width:48px;height:48px;border-radius:12px;flex:0 0 auto;
+    display:flex;align-items:center;justify-content:center;font-size:1.4rem;
+    background:var(--accent-light);color:var(--accent-dark);
+  }
+  .qcard .q-text{flex:1 1 auto;min-width:0;}
+  .qcard .q-title{font-size:1.04rem;font-weight:700;color:var(--text-0);}
+  .qcard .q-sum{font-size:0.86rem;color:var(--text-2);margin-top:2px;}
+  .qcard .q-arrow{flex:0 0 auto;color:var(--text-3);font-size:1.2rem;}
+  .badge{
+    display:inline-block;font-size:0.72rem;font-weight:700;
+    padding:2px 9px;border-radius:999px;margin-left:6px;vertical-align:middle;
+  }
+  .badge.green{background:var(--green-light);color:var(--green);}
+  .badge.amber{background:var(--amber-light);color:var(--amber);}
+
+  /* progress bar */
+  .pbar{margin-top:8px;height:7px;border-radius:999px;background:var(--bg-2);overflow:hidden;}
+  .pbar > span{display:block;height:100%;border-radius:999px;background:var(--accent);}
+  .pbar-label{font-size:0.76rem;color:var(--text-3);margin-top:4px;}
+
+  .home-foot{text-align:center;margin-top:28px;font-size:0.78rem;color:var(--text-3);line-height:1.5;}
+
+  @media (min-width:560px){
+    .cards{grid-template-columns:1fr 1fr;}
+    .qcard.span2{grid-column:1 / -1;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ SCREEN 1: FIELD CREW LOGIN ============ -->
+<section id="login" class="screen active">
+  <form class="login-box" id="loginForm" autocomplete="on" novalidate>
+    <div class="brand">
+      <div class="mark">PF</div>
+      <p class="wordmark">Pier Foundations</p>
+      <p class="sub">Field Operations</p>
+      <span class="field-tag">Field Crew Access</span>
+    </div>
+
+    <h2>Field Crew Sign In</h2>
+
+    <label for="fc-user">Username</label>
+    <input type="text" id="fc-user" name="username" autocomplete="username"
+           placeholder="Your crew username" autofocus>
+
+    <label for="fc-pass">Password</label>
+    <input type="password" id="fc-pass" name="password"
+           autocomplete="current-password" placeholder="Your password">
+
+    <button type="submit" class="btn-primary">Sign In</button>
+
+    <p class="login-caption">
+      Sample preview of the Pier Foundations field portal.<br>
+      No real account is needed to explore this demo.
+    </p>
+  </form>
+</section>
+
+<!-- ============ SCREEN 2: FIELD HOME ============ -->
+<section id="home" class="screen">
+  <div class="topbar">
+    <div class="tb-mark">PF</div>
+    <div class="tb-meta">
+      <span class="tb-role">Field Crew</span>
+      <span class="tb-user">Seth M.</span>
+    </div>
+    <button type="button" class="tb-signout" id="signoutBtn">Sign out</button>
+  </div>
+
+  <main class="home-wrap">
+
+    <!-- AI Companion (centerpiece) -->
+    <div class="companion">
+      <div class="companion-head">
+        <div class="ci" aria-hidden="true">&#128172;</div>
+        <h2>Ask the Field Companion</h2>
+        <span class="preview-tag">Sample preview</span>
+      </div>
+      <p class="hint">Ask a plain question about your job and get a straight answer. No digging through folders.</p>
+      <form class="ask-row" id="askForm">
+        <input type="text" id="askInput" autocomplete="off"
+               placeholder="Ask about your job... e.g. who is my stone vendor for POET?">
+        <button type="submit">Ask</button>
+      </form>
+      <div class="chips" id="chips">
+        <span class="chip" data-q="who is my stone vendor for POET?">Stone vendor for POET</span>
+        <span class="chip" data-q="what's my next project?">My next project</span>
+        <span class="chip" data-q="who do I call about a flat tire on the rig?">Maintenance contact</span>
+      </div>
+      <div class="answer" id="answer" role="status" aria-live="polite">
+        <p class="a-q" id="ansQ"></p>
+        <div class="a-body" id="ansBody"></div>
+        <p class="a-foot">Field Companion - operational answers only. Live answers connect at Phase 2.</p>
+      </div>
+    </div>
+
+    <!-- Today strip -->
+    <div class="today">
+      <div class="t-label">Today</div>
+      <div class="t-proj">POET - Shelbyville</div>
+      <div class="t-sub">Foreman: Seth M. &nbsp;&bull;&nbsp; Crew of 4 &nbsp;&bull;&nbsp; Day shift</div>
+      <div class="t-actions">
+        <div class="t-btn" data-go="report">Start daily report</div>
+        <div class="t-btn" data-go="maint">Log maintenance</div>
+      </div>
+    </div>
+
+    <!-- Quick actions -->
+    <div class="section-label">Field Tools</div>
+    <div class="cards">
+      <div class="qcard span2" data-go="projects" tabindex="0" role="button">
+        <div class="q-icon" aria-hidden="true">&#128511;</div>
+        <div class="q-text">
+          <div class="q-title">My Projects</div>
+          <div class="q-sum">POET - Shelbyville, in progress</div>
+          <div class="pbar"><span style="width:62%"></span></div>
+          <div class="pbar-label">62% complete by linear feet</div>
+        </div>
+        <div class="q-arrow" aria-hidden="true">&rsaquo;</div>
+      </div>
+
+      <div class="qcard" data-go="report" tabindex="0" role="button">
+        <div class="q-icon" aria-hidden="true">&#128221;</div>
+        <div class="q-text">
+          <div class="q-title">Submit Daily Report</div>
+          <div class="q-sum">Not started for today</div>
+        </div>
+        <div class="q-arrow" aria-hidden="true">&rsaquo;</div>
+      </div>
+
+      <div class="qcard" data-go="maint" tabindex="0" role="button">
+        <div class="q-icon" aria-hidden="true">&#128295;</div>
+        <div class="q-text">
+          <div class="q-title">Maintenance
+            <span class="badge amber">2 open</span>
+          </div>
+          <div class="q-sum">2 open items on the rig</div>
+        </div>
+        <div class="q-arrow" aria-hidden="true">&rsaquo;</div>
+      </div>
+    </div>
+
+    <p class="home-foot">
+      Field view - operational only, no financial data.
+    </p>
+  </main>
+</section>
+
+<script>
+"use strict";
+
+// ---- Safe HTML escaping for any dynamic text ----
+function esc(s){
+  return String(s == null ? "" : s)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#39;");
+}
+
+var loginScreen = document.getElementById("login");
+var homeScreen  = document.getElementById("home");
+
+function showHome(){
+  loginScreen.classList.remove("active");
+  homeScreen.classList.add("active");
+  window.scrollTo(0,0);
+}
+function showLogin(){
+  homeScreen.classList.remove("active");
+  loginScreen.classList.add("active");
+  // reset companion answer for a clean re-entry
+  var a = document.getElementById("answer");
+  if (a) a.classList.remove("show");
+  window.scrollTo(0,0);
+}
+
+// ---- Login (no real auth, demo only) ----
+document.getElementById("loginForm").addEventListener("submit", function(e){
+  e.preventDefault();
+  showHome();
+});
+
+// ---- Sign out ----
+document.getElementById("signoutBtn").addEventListener("click", showLogin);
+
+// ---- Field Companion demo Q&A ----
+var ANSWERS = [
+  {
+    match: ["stone vendor", "stone", "rock", "aggregate"],
+    needsPoet: false,
+    text: "Your stone vendor for POET is Rush County Stone Company. Contact Carleigh at 765-629-2211 or Mike.Malinoff@jrjnet.com."
+  },
+  {
+    match: ["next project", "next job", "next site", "what's next", "whats next", "where am i going"],
+    needsPoet: false,
+    text: "Your next project is the Madison Parking Structure in Madison. It is scheduled to start once POET wraps. The crew of 4 stays together and Seth M. remains foreman."
+  },
+  {
+    match: ["flat tire", "maintenance contact", "who do i call", "rig down", "breakdown", "repair", "mechanic"],
+    needsPoet: false,
+    text: "For rig maintenance and breakdowns, open a Maintenance item in the app and it routes to the yard. For urgent field repairs call the shop line first, then log the item so it stays on record."
+  }
+];
+
+function answerFor(rawQ){
+  var q = String(rawQ || "").toLowerCase();
+  for (var i = 0; i < ANSWERS.length; i++){
+    var a = ANSWERS[i];
+    for (var j = 0; j < a.match.length; j++){
+      if (q.indexOf(a.match[j]) !== -1){
+        return a.text;
+      }
+    }
+  }
+  return "I will pull that from the project records. (Live answers connect at Phase 2.)";
+}
+
+function runAsk(rawQ){
+  var q = (rawQ || "").trim();
+  if (!q) return;
+  var box  = document.getElementById("answer");
+  var qEl  = document.getElementById("ansQ");
+  var bEl  = document.getElementById("ansBody");
+  qEl.textContent = "You asked: " + q;
+  bEl.textContent = answerFor(q);
+  box.classList.add("show");
+}
+
+document.getElementById("askForm").addEventListener("submit", function(e){
+  e.preventDefault();
+  runAsk(document.getElementById("askInput").value);
+});
+
+// ---- Suggestion chips ----
+var chipWrap = document.getElementById("chips");
+chipWrap.addEventListener("click", function(e){
+  var chip = e.target.closest(".chip");
+  if (!chip) return;
+  var q = chip.getAttribute("data-q") || chip.textContent;
+  document.getElementById("askInput").value = q;
+  runAsk(q);
+});
+
+// ---- Quick-action + today demo taps (no destination yet, friendly nudge) ----
+function demoNudge(){
+  var input = document.getElementById("askInput");
+  // For the demo these modules are placeholders; keep it honest and calm.
+  var box = document.getElementById("answer");
+  document.getElementById("ansQ").textContent = "Sample preview";
+  document.getElementById("ansBody").textContent =
+    "This module opens in the full field portal. This page is a front-end sample of the experience.";
+  box.classList.add("show");
+  box.scrollIntoView({behavior:"smooth", block:"center"});
+}
+document.querySelectorAll("[data-go]").forEach(function(el){
+  el.addEventListener("click", demoNudge);
+  el.addEventListener("keydown", function(e){
+    if (e.key === "Enter" || e.key === " "){ e.preventDefault(); demoNudge(); }
+  });
+});
+</script>
+</body>
+</html>
