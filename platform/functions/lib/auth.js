@@ -453,6 +453,13 @@ export function areaForPath(pathname) {
     // business_dev/field_ops). The handler also calls requireArea(session,
     // 'field_ops') on GET + POST. ZERO financials (a boolean + timestamp + name).
     if (pathname.startsWith('/api/maintenance-status')) return 'field_ops';
+    // Manual maintenance items (add/remove) for the compiled Maintenance tab.
+    // Same readership as the daily reports + the maintenance-status overlay they
+    // join (field_ops area = admin/partner/business_dev/field_ops). The handler
+    // also calls requireArea(session, 'field_ops') on GET + POST. category is
+    // validated against the 5 fixed categories. ZERO financials (category + type
+    // + free-text + optional equipment/subcategory only).
+    if (pathname.startsWith('/api/maintenance-manual')) return 'field_ops';
     // Bid-resolution fork + Dead Set (item A): preconstruction action.
     // admin + partner + business_dev allowed; field_ops BLOCKED by direct URL.
     if (pathname.startsWith('/api/pipeline-state')) return 'preconstruction';

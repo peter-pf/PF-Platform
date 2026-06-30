@@ -3222,11 +3222,84 @@ document.addEventListener('click', function(e) {
       #mod-maintenance .mt-section-h { font-size:14px; font-weight:600; margin:18px 0 8px; }
       #mod-maintenance .mt-muted { color:var(--text-3,#8a93a6); }
       #mod-maintenance .mt-empty { border:1px dashed var(--border,#2a2f3a); border-radius:8px; padding:22px 16px; text-align:center; color:var(--text-3,#8a93a6); font-size:13px; }
+      /* Manual item ADD control + per-row remove affordance + manual tag. */
+      #mod-maintenance .mt-addbar { margin-bottom:14px; }
+      #mod-maintenance .mt-addbtn { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:var(--text,#e6e9ef); background:var(--surface-2,#1b212c); border:1px solid var(--border,#2a2f3a); border-radius:7px; padding:7px 14px; cursor:pointer; }
+      #mod-maintenance .mt-addbtn:hover { border-color:#d29922; }
+      #mod-maintenance .mt-addform { display:none; border:1px solid var(--border,#2a2f3a); border-radius:8px; padding:14px; margin-top:10px; background:var(--surface-2,#1b212c); }
+      #mod-maintenance .mt-addform.open { display:block; }
+      #mod-maintenance .mt-fgrid { display:flex; flex-wrap:wrap; gap:12px; }
+      #mod-maintenance .mt-field { display:flex; flex-direction:column; gap:4px; }
+      #mod-maintenance .mt-field.wide { flex:1 1 100%; }
+      #mod-maintenance .mt-field label { font-size:11px; color:var(--text-3,#8a93a6); text-transform:uppercase; letter-spacing:.04em; }
+      #mod-maintenance .mt-field select, #mod-maintenance .mt-field input { font-size:13px; color:var(--text,#e6e9ef); background:var(--surface,#11161f); border:1px solid var(--border,#2a2f3a); border-radius:6px; padding:7px 9px; min-width:160px; }
+      #mod-maintenance .mt-field input { width:100%; box-sizing:border-box; }
+      #mod-maintenance .mt-form-actions { display:flex; gap:8px; align-items:center; margin-top:12px; }
+      #mod-maintenance .mt-form-actions button { font-size:12px; font-weight:600; border-radius:6px; padding:7px 16px; cursor:pointer; border:1px solid var(--border,#2a2f3a); }
+      #mod-maintenance .mt-save { background:#d29922; color:#11161f; border-color:#d29922; }
+      #mod-maintenance .mt-save:disabled { opacity:.5; cursor:default; }
+      #mod-maintenance .mt-cancel { background:transparent; color:var(--text-3,#8a93a6); }
+      #mod-maintenance .mt-form-err { font-size:12px; color:#f85149; margin-left:4px; }
+      #mod-maintenance .mt-tag { display:inline-block; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:var(--text-3,#8a93a6); border:1px solid var(--border,#2a2f3a); border-radius:9px; padding:0 6px; margin-left:6px; vertical-align:middle; }
+      #mod-maintenance .mt-rm { flex:0 0 auto; font-size:14px; line-height:1; color:var(--text-3,#8a93a6); background:transparent; border:none; cursor:pointer; padding:2px 4px; margin-top:1px; }
+      #mod-maintenance .mt-rm:hover { color:#f85149; }
+      #mod-maintenance .mt-rm:disabled { opacity:.4; cursor:default; }
+      #mod-maintenance .mt-list-err { font-size:12px; color:#f85149; margin:0 0 10px; }
+      #mod-maintenance .mt-list-err:empty { display:none; }
     </style>
     <div id="mtNoData" class="mt-muted" style="display:none">Maintenance data is not available for your role.</div>
     <div id="mtWrap">
-      <div class="mt-muted" style="font-size:13px;margin-bottom:12px">A compiled checklist of every equipment failure, maintenance item and future issue logged on the daily reports, grouped so you can schedule against them. Check an item off when it's handled. We record who completed it and when. Source is the daily reports. No financial data.</div>
+      <div class="mt-muted" style="font-size:13px;margin-bottom:12px">A compiled checklist of every equipment failure, maintenance item and future issue logged on the daily reports, grouped so you can schedule against them. Check an item off when it's handled. We record who completed it and when. You can also add your own items here. Source is the daily reports plus anything you add. No financial data.</div>
+      <!-- Manual ADD control: add a maintenance item that no foreman logged on a
+           daily report (a shop task, a scheduled service, a failure to track). It
+           merges into the SAME grouped checklist and is check-offable + removable.
+           Daily-report rows can only be checked off, never removed. -->
+      <div class="mt-addbar">
+        <button type="button" class="mt-addbtn" id="mtAddToggle">&#43; Add item</button>
+        <div class="mt-addform" id="mtAddForm">
+          <div class="mt-fgrid">
+            <div class="mt-field">
+              <label for="mtAddCategory">Maintenance type</label>
+              <select id="mtAddCategory">
+                <option value="Excavator">Excavator</option>
+                <option value="Mast">Mast</option>
+                <option value="Vibro">Vibro</option>
+                <option value="Drill">Drill</option>
+                <option value="Rental Equipment">Rental Equipment</option>
+              </select>
+            </div>
+            <div class="mt-field">
+              <label for="mtAddType">Issue type</label>
+              <select id="mtAddType">
+                <option value="Maintenance" selected>Maintenance</option>
+                <option value="Failure">Failure</option>
+              </select>
+            </div>
+            <div class="mt-field">
+              <label for="mtAddEquipment">Equipment (optional)</label>
+              <input type="text" id="mtAddEquipment" maxlength="200" placeholder="e.g. Cat 336 Vibro Rig">
+            </div>
+            <div class="mt-field">
+              <label for="mtAddSub">Subcategory (optional)</label>
+              <input type="text" id="mtAddSub" maxlength="200" placeholder="e.g. Hydraulics">
+            </div>
+            <div class="mt-field wide">
+              <label for="mtAddItem">Item description</label>
+              <input type="text" id="mtAddItem" maxlength="1000" placeholder="What needs doing">
+            </div>
+          </div>
+          <div class="mt-form-actions">
+            <button type="button" class="mt-save" id="mtAddSave">Add item</button>
+            <button type="button" class="mt-cancel" id="mtAddCancel">Cancel</button>
+            <span class="mt-form-err" id="mtAddErr"></span>
+          </div>
+        </div>
+      </div>
       <div class="mt-sum" id="mtSummary"></div>
+      <!-- aria-live error slot for a failed Remove (mirrors the Add form's
+           mtAddErr). Shown briefly when a remove POST fails, then the manual list
+           is re-fetched so the UI reconciles with server truth. -->
+      <div class="mt-list-err" id="mtListErr" role="status" aria-live="polite"></div>
       <div class="mt-section-h">Failures &amp; maintenance logged</div>
       <div id="mtMaint"></div>
       <div class="mt-section-h">Future maintenance items</div>
@@ -19579,6 +19652,12 @@ try {
   // loaded from /api/maintenance-status alongside the compiled rows.
   var statusMap = {};
 
+  // Manual maintenance items (added in-platform via /api/maintenance-manual),
+  // merged into the SAME grouped checklist as the daily-report rows. Each manual
+  // row carries manual:true so it shows a "manual" tag + a Remove affordance and
+  // is the only kind of row that can be removed (daily-report rows are immutable).
+  var manualItems = [];
+
   function api(path, opts) {
     return fetch(path, Object.assign({ credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' } }, opts || {}))
@@ -19675,6 +19754,39 @@ try {
     return rows;
   }
 
+  // Turn the manual items (/api/maintenance-manual) into checklist rows shaped
+  // like the daily-report maintenance rows so they group + render + check off
+  // identically. The itemKey IS the item id ('mm_<n>') -- the SAME key the
+  // completion overlay (/api/maintenance-status) stores against, so checking a
+  // manual item off works through the exact same path. manual:true marks the row
+  // as removable (and adds the "manual" tag); manualId carries the id for remove.
+  function collectManual(items) {
+    var rows = [];
+    (Array.isArray(items) ? items : []).forEach(function (it) {
+      if (!it || typeof it !== 'object') return;
+      var cat = (it.category == null) ? '' : String(it.category).trim();
+      if (!cat) return; // server only emits valid categories, but be defensive
+      rows.push({
+        itemKey: String(it.id || ''),   // manual id == overlay itemKey
+        manual: true,
+        manualId: String(it.id || ''),
+        category: cat,
+        type: (it.type == null) ? '' : String(it.type).trim(),
+        subcategory: (it.subcategory == null) ? '' : String(it.subcategory).trim(),
+        equipment: (it.equipment == null) ? '' : String(it.equipment).trim(),
+        item: (it.item == null) ? '' : String(it.item).trim(),
+        hourAtFailure: null,
+        // Manual items have no project/date/foreman; show who added it + when.
+        projectName: '',
+        date: (it.createdAt ? String(it.createdAt).slice(0, 10) : ''),
+        foreman: '',
+        addedBy: (it.createdBy == null) ? '' : String(it.createdBy).trim(),
+        createdAt: it.createdAt || '',
+      });
+    });
+    return rows;
+  }
+
   // Completion lookup for a compiled row (by its stable itemKey).
   function statusOf(row) {
     var st = statusMap[row.itemKey];
@@ -19719,6 +19831,15 @@ try {
     if (row.projectName) bits.push(E(row.projectName));
     if (row.date) bits.push(E(row.date));
     if (row.foreman) bits.push('Foreman ' + E(row.foreman));
+    // Manual rows have no project/foreman; show who added it instead. Drop the
+    // "by <name>" clause entirely when the creator is missing or 'unknown' so the
+    // line reads "Added" / "Added <date>" rather than "Added by unknown".
+    if (row.manual) {
+      if (row.equipment) bits.push(E(row.equipment));
+      var who = row.addedBy ? String(row.addedBy).trim() : '';
+      var hasWho = who && who.toLowerCase() !== 'unknown';
+      bits.push('Added' + (hasWho ? ' by ' + E(who) : ''));
+    }
     return bits.join(' - ');
   }
 
@@ -19756,13 +19877,20 @@ try {
     var chk = '<input type="checkbox" class="mt-chk" data-mt-key="' + E(r.itemKey) + '"'
       + (done ? ' checked' : '') + ' aria-label="Mark complete">';
     var doneTag = done ? '<div class="mt-done-tag">' + doneLine(st) + '</div>' : '';
+    // Manual items (added in-platform) get a "manual" tag and a Remove button.
+    // Daily-report rows have NEITHER -- they can only be checked off, not removed.
+    var tag = r.manual ? '<span class="mt-tag">manual</span>' : '';
+    var rm = r.manual
+      ? '<button type="button" class="mt-rm" data-mt-rm="' + E(r.manualId) + '" aria-label="Remove item" title="Remove item">&times;</button>'
+      : '';
     return '<div class="mt-row' + (done ? ' done' : '') + '">'
       + chk
       + '<div class="mt-body">'
-      + '<div class="mt-item">' + innerHtml + '</div>'
+      + '<div class="mt-item">' + innerHtml + tag + '</div>'
       + '<div class="mt-meta">' + metaLine(r) + '</div>'
       + doneTag
       + '</div>'
+      + rm
       + '</div>';
   }
 
@@ -19822,9 +19950,18 @@ try {
     host.innerHTML = groups.map(function (g) { return groupBlock(g, futureInner); }).join('');
   }
 
-  // Cache of the last compiled rows so an optimistic check-off can re-render
-  // without re-fetching the daily reports (only the status map changed).
-  var lastMaint = [], lastFuture = [];
+  // Cache of the last compiled rows so an optimistic check-off / a manual
+  // add-remove can re-render without re-fetching the daily reports. dailyMaint =
+  // the rows derived from the daily reports (re-fetched only on load); lastMaint =
+  // dailyMaint MERGED with the manual items, the combined list the UI renders.
+  var dailyMaint = [], lastMaint = [], lastFuture = [];
+
+  // Recompute lastMaint = daily-report rows + manual items. Call after the manual
+  // list changes (add/remove) or after a fresh load.
+  function rebuildMaint() {
+    lastMaint = dailyMaint.concat(collectManual(manualItems));
+  }
+
   function renderAll() {
     renderSummary(lastMaint, lastFuture);
     renderMaint(lastMaint);
@@ -19859,8 +19996,123 @@ try {
       });
   }
 
+  // Show / clear a brief inline error in the list-level error slot (used by a
+  // failed Remove, mirroring how the Add form uses mtAddErr).
+  function setListErr(msg) {
+    var el = document.getElementById('mtListErr');
+    if (el) el.textContent = msg || '';
+  }
+
+  // Re-fetch ONLY the manual items and re-render, so the UI reconciles with
+  // server truth after a failed remove (e.g. the item was already gone, or KV
+  // recovered). Best-effort: a failed re-fetch leaves the current state in place.
+  function refetchManual() {
+    return api('/api/maintenance-manual').then(function (res) {
+      if (res.ok && res.body && Array.isArray(res.body.items)) {
+        manualItems = res.body.items;
+        rebuildMaint();
+        renderAll();
+      }
+    }).catch(function () { /* leave current state; the error is already shown */ });
+  }
+
+  // Remove a manual item -> POST {action:'remove'} to /api/maintenance-manual
+  // (soft delete). On success the server returns the fresh item list; we re-merge
+  // and re-render. The Remove button is disabled during the request (anti
+  // double-fire). On FAILURE (503 KV down, 400 unknown id, network) we surface a
+  // brief inline error AND re-fetch the manual list so the UI reconciles with
+  // server truth rather than looking like a dead click. Only manual rows have a
+  // Remove button, so only manual items can ever be removed; daily reports are
+  // immutable.
+  function removeManual(id, btnEl) {
+    if (!id) return;
+    if (btnEl) btnEl.disabled = true;
+    setListErr('');
+    api('/api/maintenance-manual', { method: 'POST', body: JSON.stringify({ action: 'remove', id: id }) })
+      .then(function (res) {
+        if (res.ok && res.body && Array.isArray(res.body.items)) {
+          manualItems = res.body.items;
+          rebuildMaint();
+          renderAll();
+        } else {
+          setListErr((res.body && res.body.message) ? String(res.body.message) : 'Could not remove the item.');
+          if (btnEl) btnEl.disabled = false; // re-enable so the user can retry
+          refetchManual(); // reconcile with server truth
+        }
+      })
+      .catch(function () {
+        setListErr('Could not remove the item.');
+        if (btnEl) btnEl.disabled = false;
+        refetchManual();
+      });
+  }
+
+  // Add a manual item -> POST {action:'add'} to /api/maintenance-manual. The Save
+  // button is disabled while in flight (anti double-fire). On success the server
+  // returns the fresh list; we re-merge, re-render, clear + close the form.
+  function submitAdd() {
+    var saveBtn = document.getElementById('mtAddSave');
+    var errEl = document.getElementById('mtAddErr');
+    var catEl = document.getElementById('mtAddCategory');
+    var typeEl = document.getElementById('mtAddType');
+    var equipEl = document.getElementById('mtAddEquipment');
+    var subEl = document.getElementById('mtAddSub');
+    var itemEl = document.getElementById('mtAddItem');
+    if (errEl) errEl.textContent = '';
+    var category = catEl ? catEl.value : '';
+    var itemText = itemEl ? String(itemEl.value || '').trim() : '';
+    if (!itemText) {
+      if (errEl) errEl.textContent = 'Item description is required.';
+      if (itemEl) itemEl.focus();
+      return;
+    }
+    if (saveBtn) saveBtn.disabled = true;
+    var payload = {
+      action: 'add',
+      category: category,
+      type: typeEl ? typeEl.value : 'Maintenance',
+      item: itemText,
+      subcategory: subEl ? String(subEl.value || '').trim() : '',
+      equipment: equipEl ? String(equipEl.value || '').trim() : '',
+    };
+    api('/api/maintenance-manual', { method: 'POST', body: JSON.stringify(payload) })
+      .then(function (res) {
+        if (res.ok && res.body && Array.isArray(res.body.items)) {
+          manualItems = res.body.items;
+          rebuildMaint();
+          renderAll();
+          // Clear + close the form.
+          if (itemEl) itemEl.value = '';
+          if (equipEl) equipEl.value = '';
+          if (subEl) subEl.value = '';
+          closeAddForm();
+        } else {
+          if (errEl) errEl.textContent = (res.body && res.body.message) ? String(res.body.message) : 'Could not add the item.';
+        }
+        if (saveBtn) saveBtn.disabled = false;
+      })
+      .catch(function () {
+        if (errEl) errEl.textContent = 'Could not add the item.';
+        if (saveBtn) saveBtn.disabled = false;
+      });
+  }
+
+  function openAddForm() {
+    var f = document.getElementById('mtAddForm');
+    if (f) f.classList.add('open');
+    var itemEl = document.getElementById('mtAddItem');
+    if (itemEl) itemEl.focus();
+  }
+  function closeAddForm() {
+    var f = document.getElementById('mtAddForm');
+    if (f) f.classList.remove('open');
+    var errEl = document.getElementById('mtAddErr');
+    if (errEl) errEl.textContent = '';
+  }
+
   // One delegated listener for the whole module (checkbox change + Completed
-  // sub-group toggle). Survives every re-render (the wrapper is never replaced).
+  // sub-group toggle + manual remove + add-form controls). Survives every
+  // re-render (the wrapper is never replaced).
   function wireDelegation() {
     var wrap = document.getElementById('mtWrap');
     if (!wrap || wrap.getAttribute('data-mt-wired')) return;
@@ -19872,7 +20124,24 @@ try {
       }
     });
     wrap.addEventListener('click', function (ev) {
-      var h = ev.target;
+      var t = ev.target;
+      // Manual remove button (walk up in case the click lands on the glyph).
+      var rm = t;
+      while (rm && rm !== wrap && !(rm.getAttribute && rm.getAttribute('data-mt-rm'))) rm = rm.parentNode;
+      if (rm && rm !== wrap && rm.getAttribute && rm.getAttribute('data-mt-rm')) {
+        removeManual(rm.getAttribute('data-mt-rm'), rm);
+        return;
+      }
+      // Add-form controls.
+      if (t && t.id === 'mtAddToggle') {
+        var f = document.getElementById('mtAddForm');
+        if (f && f.classList.contains('open')) closeAddForm(); else openAddForm();
+        return;
+      }
+      if (t && t.id === 'mtAddSave') { submitAdd(); return; }
+      if (t && t.id === 'mtAddCancel') { closeAddForm(); return; }
+      // Completed sub-group toggle.
+      var h = t;
       while (h && h !== wrap && !(h.getAttribute && h.getAttribute('data-mt-toggle'))) h = h.parentNode;
       if (h && h !== wrap && h.getAttribute('data-mt-toggle')) {
         var box = h.parentNode;
@@ -19883,28 +20152,39 @@ try {
         }
       }
     });
+    // Enter in the description field submits the add form.
+    wrap.addEventListener('keydown', function (ev) {
+      var t = ev.target;
+      if (t && t.id === 'mtAddItem' && (ev.key === 'Enter' || ev.keyCode === 13)) {
+        ev.preventDefault();
+        submitAdd();
+      }
+    });
   }
 
   function load() {
     var noData = document.getElementById('mtNoData');
     var wrap = document.getElementById('mtWrap');
     wireDelegation();
-    // Fetch the compiled feed AND the completion overlay in parallel.
-    Promise.all([api('/api/daily-report'), api('/api/maintenance-status')]).then(function (res) {
-      var dr = res[0], ms = res[1];
+    // Fetch the compiled feed, the completion overlay AND the manual items in
+    // parallel. The overlay + manual list are best-effort: if either 403s or
+    // fails, we fall back gracefully rather than blocking the compiled list.
+    Promise.all([api('/api/daily-report'), api('/api/maintenance-status'), api('/api/maintenance-manual')]).then(function (res) {
+      var dr = res[0], ms = res[1], mm = res[2];
       if (dr.status === 403) { if (noData) noData.style.display = ''; if (wrap) wrap.style.display = 'none'; return; }
       if (noData) noData.style.display = 'none';
       if (wrap) wrap.style.display = '';
       var reports = (dr.ok && dr.body && Array.isArray(dr.body.reports)) ? dr.body.reports : [];
-      // The status overlay is best-effort: if it 403s or fails, show everything as
-      // not-done rather than blocking the compiled list.
       statusMap = (ms && ms.ok && ms.body && ms.body.status && typeof ms.body.status === 'object') ? ms.body.status : {};
-      lastMaint = collectMaintenance(reports);
+      manualItems = (mm && mm.ok && mm.body && Array.isArray(mm.body.items)) ? mm.body.items : [];
+      dailyMaint = collectMaintenance(reports);
       lastFuture = collectFuture(reports);
+      rebuildMaint();
       renderAll();
     }).catch(function () {
       if (wrap) wrap.style.display = '';
-      statusMap = {}; lastMaint = []; lastFuture = [];
+      statusMap = {}; manualItems = []; dailyMaint = []; lastFuture = [];
+      rebuildMaint();
       renderAll();
     });
   }
