@@ -19,6 +19,7 @@
 //     equipmentRental:[{category, hours}],    // RENTAL by category + OPERATING (machine) hours -- NO $
 //     maintenance:[{category, type, subcategory, item, hourAtFailure}], // per-category rows: Failure/Maintenance + subcategory + detail + machine hour -- NO $
 //     futureIssues:[{equipment, description}],// maintenance to identify later (feeds a Phase 2 compiled view) -- NO $
+//     attachments:[{name, itemId, webUrl, bucket}], // SharePoint file refs from /api/field-upload (Hand Logs / GUHM Data) -- refs only, bytes live in SharePoint, NO $
 //     status,                                // 'draft'|'submitted'|'approved'|'sent-to-HR'
 //     createdBy, createdAt, updatedAt,
 //     submittedBy, submittedAt,              // set from session on submit
@@ -54,6 +55,7 @@ const MAX_SHORT = 300;       // name/project/date/etc cap
 const MAX_EQUIP_ROWS = 50;   // owned / rental equipment rows cap
 const MAX_MAINT_ROWS = 60;   // maintenance rows cap (5 categories, each can add rows)
 const MAX_FUTURE_ROWS = 50;  // future-issue rows cap
+const MAX_ATTACH_ROWS = 50;  // attachment refs cap (SharePoint drive-item refs)
 
 const VALID_ACTIONS = { create: 1, update: 1, submit: 1, approve: 1, 'send-to-hr': 1 };
 const VALID_STATUS = { draft: 1, submitted: 1, approved: 1, 'sent-to-HR': 1 };
@@ -202,6 +204,33 @@ function cleanFutureIssues(input) {
   return out;
 }
 
+// Rebuild a clean ATTACHMENTS array: [{name, itemId, webUrl, bucket}]. These are
+// SharePoint drive-item references produced by /api/field-upload (the raw bytes
+// already live in SharePoint; we store only the refs here). NO $ -- file metadata
+// only. bucket is constrained to the known upload buckets. Same angle-bracket
+// strip + length caps as every other field; webUrl is bounded to MAX_STR.
+const VALID_ATTACH_BUCKETS = { handlogs: 1, guhma: 1 };
+function cleanAttachments(input) {
+  if (!Array.isArray(input)) return [];
+  const out = [];
+  for (const a of input.slice(0, MAX_ATTACH_ROWS)) {
+    if (!a || typeof a !== 'object') continue;
+    const name = s(a.name, MAX_SHORT);
+    const itemId = s(a.itemId, MAX_SHORT);
+    if (!name && !itemId) continue;       // skip wholly empty refs
+    const bucketRaw = s(a.bucket, MAX_SHORT);
+    const bucket = VALID_ATTACH_BUCKETS[bucketRaw] ? bucketRaw : '';
+    // [SEC MED-01] webUrl is later rendered into an href. Only persist an https://
+    // URL so a crafted javascript:/data: scheme can never be stored and replayed.
+    // Anything that does not start with https:// is blanked (the ref still keeps
+    // its name/itemId, just no clickable link).
+    const wu = s(a.webUrl, MAX_STR);
+    const webUrl = /^https:\/\//i.test(wu) ? wu : '';
+    out.push({ name, itemId, webUrl, bucket });
+  }
+  return out;
+}
+
 function isPrivileged(session) {
   const r = session && session.role;
   return r === 'admin' || r === 'partner';
@@ -271,7 +300,7 @@ export async function onRequestPost(context) {
     const action = String((parsed && parsed.action) || '');
     if (!VALID_ACTIONS[action]) {
       return json({ status: 'error',
-        message: "action must be 'create', 'update', 'submit', 'approve', or 'send-to-hr'." }, 400);
+        message: "action must be 'create', 'update', 'submit', 'approve' or 'send-to-hr'." }, 400);
     }
 
     // Approval-tier actions require admin/partner. A field_ops session can
@@ -316,6 +345,10 @@ export async function onRequestPost(context) {
         equipmentRental: (src.equipmentRental != null) ? cleanEquipmentRental(src.equipmentRental) : (base.equipmentRental || []),
         maintenance: (src.maintenance != null) ? cleanMaintenance(src.maintenance) : (base.maintenance || []),
         futureIssues: (src.futureIssues != null) ? cleanFutureIssues(src.futureIssues) : (base.futureIssues || []),
+        // SharePoint file refs uploaded via /api/field-upload (Hand Logs / GUHM
+        // Data). Refs only (name/itemId/webUrl/bucket) -- the bytes live in
+        // SharePoint, NOT in KV. NO $.
+        attachments: (src.attachments != null) ? cleanAttachments(src.attachments) : (base.attachments || []),
       };
     }
 

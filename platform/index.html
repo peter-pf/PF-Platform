@@ -3090,6 +3090,18 @@ document.addEventListener('click', function(e) {
       #mod-daily-reports .btn-sm { font-size:12px; padding:3px 10px; }
       #mod-daily-reports .dr-rm { flex:0 0 auto; font-size:12px; line-height:1; padding:5px 9px; border:1px solid var(--border,#2a2f3a); border-radius:6px; background:transparent; color:var(--text-3,#8a93a6); cursor:pointer; }
       #mod-daily-reports .dr-rm:hover { border-color:var(--amber,#d29922); color:var(--amber,#d29922); }
+      #mod-daily-reports .dr-upload { border:1px dashed var(--border,#2a2f3a); border-radius:8px; padding:10px 12px; }
+      #mod-daily-reports .dr-up-hint { font-size:12px; color:var(--text-3,#8a93a6); margin-top:6px; }
+      #mod-daily-reports .dr-up-list { margin-top:8px; }
+      #mod-daily-reports .dr-up-row { display:flex; align-items:center; gap:8px; font-size:12px; padding:3px 0; }
+      #mod-daily-reports .dr-up-row .dr-up-name { flex:1 1 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      #mod-daily-reports .dr-up-row .dr-up-stat { flex:0 0 auto; color:var(--text-3,#8a93a6); }
+      #mod-daily-reports .dr-up-row a { color:#5b8cff; text-decoration:none; }
+      #mod-daily-reports .dr-up-row a:hover { text-decoration:underline; }
+      #mod-daily-reports .dr-up-row.done .dr-up-stat { color:#3fb950; }
+      #mod-daily-reports .dr-up-row.err .dr-up-stat { color:#e5534b; }
+      #mod-daily-reports .dr-up-msg { font-size:12px; margin-top:6px; }
+      #mod-daily-reports input[type=file]:disabled { opacity:.55; cursor:not-allowed; }
     </style>
     <div id="drNoData" class="dr-muted" style="display:none">Daily reports not available for your role.</div>
     <div id="drWrap">
@@ -3130,6 +3142,22 @@ document.addEventListener('click', function(e) {
         <div class="dr-section-h">Future Maintenance Items <span class="dr-flag">(adds to maintenance work list)</span></div>
         <div id="drFuture"></div>
         <button type="button" class="btn btn-sm" id="drAddFuture">+ Add issue</button>
+
+        <div class="dr-section-h">Upload Hand Logs <span class="dr-flag">(paper QA/QC logs, photos, PDFs)</span></div>
+        <div class="dr-upload" id="drUpHandlogs">
+          <input type="file" id="drFileHandlogs" multiple disabled>
+          <div class="dr-up-hint" data-up-hint>Select a project first to enable uploads.</div>
+          <div class="dr-up-list" data-up-list></div>
+          <div class="dr-up-msg" data-up-msg></div>
+        </div>
+
+        <div class="dr-section-h">Upload GUHM Data <span class="dr-flag">(raw .guh column logger export)</span></div>
+        <div class="dr-upload" id="drUpGuhma">
+          <input type="file" id="drFileGuhma" multiple disabled>
+          <div class="dr-up-hint" data-up-hint>Select a project first to enable uploads.</div>
+          <div class="dr-up-list" data-up-list></div>
+          <div class="dr-up-msg" data-up-msg></div>
+        </div>
 
         <div class="dr-section-h">Delays / issues</div>
         <textarea id="drDelays"></textarea>
@@ -18849,6 +18877,15 @@ try {
     rental: [{ category: '', hours: '' }, { category: '', hours: '' }],
     maintenance: [],
     future: [{ equipment: '', description: '' }],
+    // SharePoint file refs returned by /api/field-upload, kept per bucket so they
+    // ride along when the daily report is saved. {name,itemId,webUrl,bucket}.
+    attachments: { handlogs: [], guhma: [] },
+  };
+
+  // Map a bucket key to its file input id + container id.
+  var UP_BUCKETS = {
+    handlogs: { input: 'drFileHandlogs', wrap: 'drUpHandlogs', label: 'Hand Logs' },
+    guhma:    { input: 'drFileGuhma',    wrap: 'drUpGuhma',    label: 'GUHM Data' },
   };
 
   function api(path, opts) {
@@ -19161,8 +19198,23 @@ try {
       pi.addEventListener('change', function () {
         var hid = document.getElementById('drProjectId');
         if (hid) hid.value = this.value;
+        updateUploadEnabled();
       });
     }
+    // Wire each upload file input once. On change, upload the chosen files to the
+    // matching bucket then clear the picker so the same file can be re-picked.
+    Object.keys(UP_BUCKETS).forEach(function (bk) {
+      var inp = document.getElementById(UP_BUCKETS[bk].input);
+      if (inp && !inp.dataset.wired) {
+        inp.dataset.wired = '1';
+        inp.addEventListener('change', function () {
+          var files = this.files ? Array.prototype.slice.call(this.files) : [];
+          if (files.length) { uploadFiles(bk, files); }
+          this.value = '';
+        });
+      }
+    });
+    updateUploadEnabled();
     var fm = document.getElementById('drForeman');
     if (fm && !fm.dataset.wired) { fm.dataset.wired = '1'; fm.addEventListener('change', function () { applyForemanToCrew(this.value); }); }
     var ao = document.getElementById('drAddOwned');
@@ -19175,6 +19227,164 @@ try {
     if (sd && !sd.dataset.wired) { sd.dataset.wired = '1'; sd.addEventListener('click', function () { save(false); }); }
     var sub = document.getElementById('drSubmit');
     if (sub && !sub.dataset.wired) { sub.dataset.wired = '1'; sub.addEventListener('click', function () { save(true); }); }
+  }
+
+  // ---- file upload (Hand Logs / GUHM Data -> SharePoint via /api/field-upload) -
+  var UP_ALLOWED = ['.guh', '.jpg', '.jpeg', '.png', '.heic', '.pdf', '.zip', '.xlsx'];
+  var UP_MAX_BYTES = 50 * 1024 * 1024; // 50MB, mirrors the server cap
+  var UP_MAX_FILES = 25;
+
+  // The selected project's NUMBER. drProject option value is the project id, which
+  // is the project number when one exists (loadProjects uses number || name). We
+  // only treat it as a number if it matches the NN-NNN shape the server requires.
+  function selectedProjectNumber() {
+    var psel = document.getElementById('drProject');
+    var v = psel ? String(psel.value || '').trim() : '';
+    return /^[0-9]{2}-[0-9]{2,4}$/.test(v) ? v : '';
+  }
+  function selectedProjectName() {
+    var psel = document.getElementById('drProject');
+    var o = (psel && psel.selectedIndex >= 0) ? psel.options[psel.selectedIndex] : null;
+    return o ? (o.getAttribute('data-name') || '') : '';
+  }
+  function reportDateValue() {
+    var d = document.getElementById('drDate');
+    var v = d ? String(d.value || '').trim() : '';
+    return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : '';
+  }
+
+  // Enable the pickers only once a project with a valid NN-NNN number is chosen.
+  function updateUploadEnabled() {
+    var num = selectedProjectNumber();
+    Object.keys(UP_BUCKETS).forEach(function (bk) {
+      var inp = document.getElementById(UP_BUCKETS[bk].input);
+      var wrap = document.getElementById(UP_BUCKETS[bk].wrap);
+      if (inp) inp.disabled = !num;
+      if (wrap) {
+        var hint = wrap.querySelector('[data-up-hint]');
+        if (hint) hint.textContent = num
+          ? 'Files upload to this project QA/QC folder for the report date. Allowed: .guh .jpg .jpeg .png .heic .pdf .zip .xlsx, up to 50MB each.'
+          : 'Select a project first to enable uploads.';
+      }
+    });
+  }
+
+  function extOk(name) {
+    var n = String(name || '').toLowerCase();
+    var dot = n.lastIndexOf('.');
+    var ext = dot >= 0 ? n.slice(dot) : '';
+    return UP_ALLOWED.indexOf(ext) >= 0;
+  }
+
+  function upMsg(bk, text, ok) {
+    var wrap = document.getElementById(UP_BUCKETS[bk].wrap);
+    if (!wrap) return;
+    var m = wrap.querySelector('[data-up-msg]');
+    if (m) { m.textContent = text || ''; m.className = 'dr-up-msg ' + (ok ? 'dr-ok' : (ok === false ? 'dr-err' : '')); }
+  }
+
+  // Render the per-bucket list: already-saved refs (linked) + any in-flight rows.
+  // [SEC MED-01] Render a file as a link ONLY when its url is an http(s) URL.
+  // An attacker who POSTs a crafted attachments[].webUrl (e.g. javascript:...)
+  // directly to /api/daily-report would otherwise get it rendered into an href.
+  // A non-http(s) scheme falls back to plain escaped text (no anchor). Mirrors
+  // the scheme guard at index.html:15397.
+  function safeFileLink(url, labelHtml) {
+    if (url && /^https?:\/\//i.test(url)) {
+      return '<a href="' + E(url) + '" target="_blank" rel="noopener">' + labelHtml + '</a>';
+    }
+    return labelHtml;
+  }
+
+  function renderUpList(bk, pending) {
+    var wrap = document.getElementById(UP_BUCKETS[bk].wrap);
+    if (!wrap) return;
+    var host = wrap.querySelector('[data-up-list]');
+    if (!host) return;
+    var html = '';
+    (state.attachments[bk] || []).forEach(function (a) {
+      var label = E(a.name || a.itemId || 'file');
+      var link = safeFileLink(a.webUrl, label);
+      html += '<div class="dr-up-row done"><span class="dr-up-name">' + link + '</span><span class="dr-up-stat">uploaded</span></div>';
+    });
+    (pending || []).forEach(function (p) {
+      var cls = p.error ? 'err' : '';
+      var stat = p.error ? E(p.error) : 'uploading...';
+      html += '<div class="dr-up-row ' + cls + '"><span class="dr-up-name">' + E(p.name) + '</span><span class="dr-up-stat">' + stat + '</span></div>';
+    });
+    host.innerHTML = html;
+  }
+
+  function uploadFiles(bk, files) {
+    var num = selectedProjectNumber();
+    if (!num) { upMsg(bk, 'Select a project first.', false); return; }
+    var date = reportDateValue();
+    if (!date) { upMsg(bk, 'Set the report date first.', false); return; }
+
+    // Client-side guardrails (the server re-checks all of these).
+    var existing = (state.attachments[bk] || []).length;
+    if (existing + files.length > UP_MAX_FILES) { upMsg(bk, 'Too many files (max ' + UP_MAX_FILES + ' per bucket).', false); return; }
+    var pending = [];
+    var fd = new FormData();
+    fd.append('projectNumber', num);
+    fd.append('projectName', selectedProjectName());
+    fd.append('bucket', bk);
+    fd.append('reportDate', date);
+    var accepted = 0;
+    files.forEach(function (f) {
+      if (!extOk(f.name)) { pending.push({ name: f.name, error: 'type not allowed' }); return; }
+      if (f.size > UP_MAX_BYTES) { pending.push({ name: f.name, error: 'over 50MB' }); return; }
+      fd.append('file', f, f.name);
+      pending.push({ name: f.name });
+      accepted++;
+    });
+    renderUpList(bk, pending);
+    if (!accepted) { upMsg(bk, 'No valid files to upload.', false); return; }
+
+    upMsg(bk, 'Uploading ' + accepted + ' file' + (accepted === 1 ? '' : 's') + '...', null);
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/field-upload', true);
+    xhr.withCredentials = true;
+    if (xhr.upload) {
+      xhr.upload.onprogress = function (ev) {
+        if (ev.lengthComputable) {
+          var pct = Math.round((ev.loaded / ev.total) * 100);
+          upMsg(bk, 'Uploading ' + accepted + ' file' + (accepted === 1 ? '' : 's') + '... ' + pct + '%', null);
+        }
+      };
+    }
+    xhr.onload = function () {
+      var body = null;
+      try { body = JSON.parse(xhr.responseText); } catch (e) { body = null; }
+      // The server returns errors:[{name, error}] on BOTH a partial success
+      // (200 + some refs + some errors) and a total failure (502 + errors). We
+      // surface them as pending-style rows (each shows p.error) so a foreman sees
+      // WHICH file failed and why, and we reflect the reasons in the message.
+      var errs = (body && Array.isArray(body.errors)) ? body.errors : [];
+      function errSummary() {
+        return errs.map(function (e) { return E(e.name || 'file') + ' (' + E(e.error || 'failed') + ')'; }).join(', ');
+      }
+      if (xhr.status >= 200 && xhr.status < 300 && body && body.ok && Array.isArray(body.refs)) {
+        body.refs.forEach(function (r) { state.attachments[bk].push(r); });
+        // Keep the failed rows visible under the uploaded ones, with their reasons.
+        renderUpList(bk, errs);
+        if (errs.length) {
+          upMsg(bk, body.refs.length + ' uploaded, ' + errs.length + ' failed: ' + errSummary(), false);
+        } else {
+          upMsg(bk, body.refs.length + ' uploaded.', true);
+        }
+      } else {
+        // Total failure (e.g. 502 with errors[]). Show each file's reason.
+        renderUpList(bk, errs);
+        if (errs.length) {
+          upMsg(bk, 'Upload failed: ' + errSummary(), false);
+        } else {
+          upMsg(bk, (body && body.message) || 'Upload failed.', false);
+        }
+      }
+    };
+    xhr.onerror = function () { renderUpList(bk, []); upMsg(bk, 'Network error during upload.', false); };
+    xhr.send(fd);
   }
 
   function collectBody() {
@@ -19204,6 +19414,9 @@ try {
       futureIssues: state.future.filter(function (r) { return (r.equipment || '').trim() || (r.description || '').trim(); }),
       delays: document.getElementById('drDelays').value,
       safety: document.getElementById('drSafety').value,
+      // SharePoint file refs from /api/field-upload (the bytes already live in
+      // SharePoint; we persist only the refs on the report record).
+      attachments: (state.attachments.handlogs || []).concat(state.attachments.guhma || []),
     };
   }
 
@@ -19235,8 +19448,12 @@ try {
     state.owned = [{ machine: '', hours: '' }, { machine: '', hours: '' }];
     state.rental = [{ category: '', hours: '' }, { category: '', hours: '' }];
     state.future = [{ equipment: '', description: '' }];
+    state.attachments = { handlogs: [], guhma: [] };
     buildMaintenanceRows();
     renderProject(); renderForeman(); renderCrew(); renderOwned(); renderRental(); renderMaint(); renderFuture();
+    renderUpList('handlogs', []); renderUpList('guhma', []);
+    upMsg('handlogs', '', null); upMsg('guhma', '', null);
+    updateUploadEnabled();
   }
 
   function statusChip(st) {
@@ -19273,6 +19490,11 @@ try {
       if (r.temp) weatherH.push(E(r.temp));
       if (!weatherH.length && r.weather) weatherH.push(E(r.weather)); // legacy records
       var futureH = (r.futureIssues || []).map(function (f) { return E(f.equipment) + (f.description ? ' - ' + E(f.description) : ''); }).join('; ');
+      var attachH = (r.attachments || []).map(function (a) {
+        var nm = E(a.name || a.itemId || 'file');
+        var b = a.bucket ? ' [' + E(a.bucket === 'guhma' ? 'GUHM' : 'Hand Log') + ']' : '';
+        return safeFileLink(a.webUrl, nm) + b;
+      }).join(', ');
       return '<div class="dr-item">'
         + '<div><strong>' + E(r.date) + ' - ' + E(r.projectName || r.projectId || '') + '</strong> ' + statusChip(r.status) + '</div>'
         + '<div class="dr-muted" style="font-size:12px">Foreman ' + E(r.foreman || '-') + (crewH ? ' - crew ' + crewH : '') + (prod.length ? ' - ' + prod.join(', ') : '') + (weatherH.length ? ' - ' + weatherH.join(' ') : '') + '</div>'
@@ -19282,6 +19504,7 @@ try {
         + (maintH ? '<div class="dr-muted" style="font-size:12px">Maintenance: ' + maintH + '</div>' : '')
         + (futureH ? '<div class="dr-muted" style="font-size:12px">Future issues: ' + futureH + '</div>' : '')
         + (r.safety ? '<div class="dr-muted" style="font-size:12px">Safety: ' + E(r.safety) + '</div>' : '')
+        + (attachH ? '<div class="dr-muted" style="font-size:12px">Files: ' + attachH + '</div>' : '')
         + '<div class="dr-muted" style="font-size:11px">'
         + (r.submittedBy ? 'submitted by ' + E(r.submittedBy) + ' ' + E((r.submittedAt || '').slice(0, 10)) : '')
         + (r.approvedBy ? ' - approved by ' + E(r.approvedBy) + ' ' + E((r.approvedAt || '').slice(0, 10)) : '')

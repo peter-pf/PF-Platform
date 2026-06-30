@@ -443,6 +443,11 @@ export function areaForPath(pathname) {
     // list (POST) is restricted to admin/partner IN the handler. ZERO financials
     // (names + categories only).
     if (pathname.startsWith('/api/field-lists'))   return 'field_ops';
+    // Field raw-file upload to SharePoint (Hand Logs / GUHM Data) attached to a
+    // daily report. field_ops so the crew can upload; the handler also calls
+    // requireArea(session, 'field_ops'). ZERO financials (files only). Without
+    // this line the default-deny posture would block the crew (admin-only).
+    if (pathname.startsWith('/api/field-upload'))  return 'field_ops';
     // Bid-resolution fork + Dead Set (item A): preconstruction action.
     // admin + partner + business_dev allowed; field_ops BLOCKED by direct URL.
     if (pathname.startsWith('/api/pipeline-state')) return 'preconstruction';
