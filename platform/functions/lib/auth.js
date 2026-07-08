@@ -202,7 +202,7 @@ export function clearSessionCookie() {
 // API endpoints with a required area. The default-deny posture: an endpoint
 // tagged with an area that the role does NOT hold returns 403.
 
-export const ROLES = ['admin', 'partner', 'business_dev', 'field_ops'];
+export const ROLES = ['admin', 'partner', 'business_dev', 'field_ops', 'hr'];
 
 // Area -> which roles may access it. Anything not listed defaults to admin-only.
 //
@@ -237,6 +237,16 @@ const AREA_ROLES = {
   business_dev:     ['admin', 'partner', 'business_dev'],
   documents:        ['admin', 'partner', 'business_dev'], // /api/doc proxy — BD needs it to view embedded contracts/subcontracts (Brad 2026-06-23)
   general:          ['admin', 'partner', 'business_dev', 'field_ops'], // non-sensitive shared data
+  // HR module — TIGHT scope (Melanie confirmed): admin + the dedicated `hr`
+  // role ONLY. Partners are NOT included. Employee records, onboarding, time
+  // off, performance, and compliance are HR-confidential. Default-deny: any
+  // role not listed here is blocked from the /hr/ area by direct URL too.
+  hr:               ['admin', 'hr'],
+  // CRM module (future) — admin + partner + business_dev. Agreed target scope
+  // for the upcoming CRM area. Harmless to pre-declare: no /crm/ path is mapped
+  // yet, so this only takes effect once the CRM module is wired. Default-deny
+  // still applies to any role not listed.
+  crm:              ['admin', 'partner', 'business_dev'],
   // Admin-only
   user_admin:       ['admin'],
   // Opportunity email-bridge (the external email daemon authenticates as admin):
@@ -536,6 +546,18 @@ export function areaForPath(pathname) {
     // (Field-safe / BD-safe data files must be added to DATA_FILE_AREAS explicitly.)
     return 'user_admin';
   }
+
+  // ---- HR module (same-origin embed at /hr/) — TIGHT gate -----------------
+  // The HR module is served as static files under /hr/. It carries HR-confidential
+  // surfaces (employee records, onboarding, time off, performance, compliance),
+  // so the ENTIRE /hr/ prefix is gated to the `hr` area (admin + hr role ONLY),
+  // NOT the permissive 'general' bucket used for /design-studio/. This branch is
+  // placed BEFORE the STATIC_ASSET_PREFIXES / extension checks so no /hr/ path
+  // (the index, or any future /hr/ asset) can fall through to 'general' or to the
+  // static-extension allow-list. A non-hr, non-admin session hitting /hr/ resolves
+  // to 'hr' -> roleCanAccess() false -> middleware deny() (302 /denied for HTML,
+  // 403 JSON for fetch). Fails closed.
+  if (pathname === '/hr' || pathname.startsWith('/hr/')) return 'hr';
 
   // ---- Static assets (styling/scripts/media) safe for everyone ----
   if (STATIC_ASSET_PREFIXES.some(p => pathname.startsWith(p))) return 'general';

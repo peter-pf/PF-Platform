@@ -2438,6 +2438,9 @@ window.progress = (function () {
       <a class="nav-item" data-module="quickbooks" onclick="showModule('quickbooks')">
         <span class="nav-icon">&#128178;</span> QuickBooks Setup
       </a>
+      <a class="nav-item" data-module="hr" onclick="showModule('hr')" title="Human Resources (admin + HR role only)">
+        <span class="nav-icon">&#128100;</span> HR
+      </a>
       <a class="nav-item" href="/design-studio/" target="_blank" rel="noopener noreferrer" title="Open PF Design Studio in a new tab">
         <span class="nav-icon">&#9998;</span> Design Studio <span style="opacity:.45;font-size:.75em">&#8599;</span>
       </a>
@@ -2665,6 +2668,12 @@ document.addEventListener('click', function(e) {
   <div class="module-view" id="mod-schedule"><iframe class="doc-frame" data-src="/schedule.html" data-interactive="1" title="Crew Schedule"></iframe></div>
   <div class="module-view" id="mod-cheatsheet"><iframe class="doc-frame" data-src="/peter-cheatsheet.html" title="Meet Peter"></iframe></div>
   <div class="module-view" id="mod-onboarding"><iframe class="doc-frame" data-src="/onboarding.html" title="Role Onboarding"></iframe></div>
+  <!-- HR module (Meridian-PT, external, Peter-vetted). Interactive same-origin
+       iframe (data-interactive="1") mirroring the design-studio embed pattern:
+       showModule() sets frame.src=/hr/ and the live session cookie authenticates
+       the request. The /hr/ path is gated to the `hr` area (admin + hr role) in
+       functions/lib/auth.js areaForPath(); a non-hr session hitting it is denied. -->
+  <div class="module-view" id="mod-hr"><iframe class="doc-frame" data-src="/hr/" data-interactive="1" title="Human Resources"></iframe></div>
 
   <div class="module-view" id="mod-docs">
     <div class="card">
@@ -3597,6 +3606,7 @@ const moduleTitles = {
   subcontracts: 'Subcontracts',
   cheatsheet: 'Meet Peter (One-Pager)',
   onboarding: 'Role Onboarding',
+  hr: 'Human Resources',
   // ---- Phase 1 placeholders ----
   pfadmin: 'PF Admin',
   'bd-targets': 'Business Development - Target Accounts',

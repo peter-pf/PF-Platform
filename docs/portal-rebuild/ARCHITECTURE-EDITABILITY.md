@@ -45,7 +45,15 @@ Design (build security-first, server-side enforced — not just hidden in the UI
   - Owner/Admin (Brad): full access + all edit + user management.
   - Partner (Jonathan, Derek): full view; edit their domains (estimating/BD/PM).
   - Field Ops (John Willis + crew, each own password): ONLY Field Operations — their projects field view, daily logs/timesheets entry, safety. NO financials, NO preconstruction, NO contracts.
+  - HR (added 2026-07-08): the dedicated `hr` role. Access to the HR module ONLY (the `hr` area — employee records, onboarding, policies, time off, performance, org chart, compliance). TIGHT scope confirmed by Melanie: **admin + `hr` role ONLY — partners are NOT included** (HR data is confidential). The `hr` role holds NO other area (no financials, precon, contracts, field ops), enforced server-side + default-deny by direct URL.
   - (future) Office/Accounting; limited external Agency role (the agency layer noted earlier).
+
+**Area map additions (2026-07-08, `functions/lib/auth.js`):**
+- `ROLES` now includes `hr` (alongside admin, partner, business_dev, field_ops).
+- `AREA_ROLES.hr = ['admin', 'hr']` — the HR module area. Served same-origin at `/hr/`; `areaForPath()` maps the entire `/hr/` prefix to the `hr` area (placed before the static-asset allow-list so no `/hr/` path leaks to the permissive `general` bucket used by `/design-studio/`). Fails closed: a non-hr, non-admin session hitting `/hr/` is denied (302 → `/denied.html` for HTML navs, 403 JSON for fetch).
+- `AREA_ROLES.crm = ['admin', 'partner', 'business_dev']` — pre-declared for the FUTURE CRM module (agreed target scope). No `/crm/` path is mapped yet, so it is inert until the CRM module is wired; default-deny applies meanwhile.
+
+**NOTE / gap flagged for provisioning:** the D1 schema CHECK constraint in `platform/migrations/0001_init.sql` is `CHECK (role IN ('admin', 'partner', 'field_ops'))` — it predates both `business_dev` and `hr`. Before an `hr` (or `business_dev`) user can be inserted into the live D1 `users` table, that CHECK must be widened to include the new roles. This does NOT affect the current HR module, which is DEMO-only (no live backend); it is a note for whoever provisions the first HR user.
 - **Enforcement is server-side**: the Functions check the user's role before serving data or accepting an edit (a field-ops user can't reach financial endpoints even by URL). Reuse the financials-stripped field-view pattern for what field-ops sees.
 - **Audit**: every edit logged with the user id (ties to the project-log requirement).
 NEEDS FROM BRAD before building: the staff list + which role each person gets, and confirmation of the role→access map above.
