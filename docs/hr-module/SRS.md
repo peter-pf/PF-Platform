@@ -97,3 +97,6 @@ var q = 'Based on "' + sec.title + '": Which of the following is correct?';
 ```
 
 `q` is **escaped at render** -- it is emitted as `... + esc(q) + ...` at ~line 1156, and `sec.title` is separately escaped again via `esc(sec.title)` in the "Review the ... section" feedback string at ~line 1158. `esc()` is a proper text-node-based HTML escaper (`document.createTextNode(...).innerHTML`). Because the SOP content is user-supplied and read locally (never from an attacker-controlled network source) and is escaped on the render path, this is **low risk / no action required**. Noted for completeness.
+
+## v2.1 Security Fix (2026-07-09, provenance 2b09f5b)
+Resolved the SEC-01 LOW self-XSS flagged at v2 review. Meridian added `escAttr()` (escapes single and double quotes, not just angle brackets) and applied it to all inline onclick handlers that interpolate SOP headings or employee names (e.g. the Audio Script Play button, the review Open button). Attribute/JS-string breakout is now blocked. Also removed `.docx` from the upload accept list (now `.txt`/`.md` only, which `FileReader.readAsText` handles correctly; server-side `.docx` parsing deferred to the Pure Work backend). Byte-swap sha256-verified; RBAC and network posture (zero egress) unchanged.

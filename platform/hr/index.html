@@ -481,6 +481,12 @@
     return d.innerHTML;
   }
 
+  /** Escape for use inside HTML attribute values (handles quotes) */
+  function escAttr(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
   function toast(msg) {
     var t = document.createElement('div');
     t.className = 'pf-toast';
@@ -794,7 +800,7 @@
         '<td>' + (r.rating ? '<span style="color:var(--pf-blue);font-weight:700;">' + r.rating + '/5</span>' : '<span style="color:var(--pf-muted-light);">--</span>') + '</td>' +
         '<td>' + r.goalsMetStr + '</td>' +
         '<td>' + statusChip(r.status) + '</td>' +
-        '<td>' + (r.status !== 'completed' ? '<button class="pf-btn secondary sm" onclick="toast(\'Opening review for ' + esc(r.name) + '\')">Open</button>' : '<span style="color:var(--pf-muted-light);font-size:.75rem;">View</span>') + '</td>' +
+        '<td>' + (r.status !== 'completed' ? '<button class="pf-btn secondary sm" onclick="toast(\'Opening review for ' + escAttr(r.name) + '\')">Open</button>' : '<span style="color:var(--pf-muted-light);font-size:.75rem;">View</span>') + '</td>' +
       '</tr>';
     }).join('');
 
@@ -995,11 +1001,11 @@
         '<span style="font-size:1.3rem;">&#x1F4E4;</span>' +
         '<div>' +
           '<div style="font-weight:700;color:var(--pf-text-light);">Upload an SOP</div>' +
-          '<div style="font-size:.75rem;color:var(--pf-muted-light);">Upload a .docx or .txt file to auto-generate training</div>' +
+          '<div style="font-size:.75rem;color:var(--pf-muted-light);">Upload a .txt or .md file to auto-generate training</div>' +
         '</div>' +
       '</div>' +
       '<div style="display:flex;gap:.8rem;align-items:center;">' +
-        '<input type="file" id="pf-sop-upload" accept=".docx,.txt,.md" style="display:none;" onchange="handlePFUpload(this)">' +
+        '<input type="file" id="pf-sop-upload" accept=".txt,.md" style="display:none;" onchange="handlePFUpload(this)">' +
         '<button class="pf-btn primary" onclick="document.getElementById(\'pf-sop-upload\').click()">Choose File</button>' +
         '<span id="pf-upload-status" style="font-size:.8rem;color:var(--pf-muted-light);"></span>' +
       '</div>' +
@@ -1191,7 +1197,7 @@
       return '<div class="pf-card">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">' +
           '<span style="font-size:.65rem;color:var(--pf-muted-light);font-weight:700;letter-spacing:.15em;">SEGMENT ' + (i+1) + ' | ~' + mins + ' MIN</span>' +
-          '<button class="pf-btn secondary sm" onclick="toast(\'Playing: ' + esc(sec.title) + '\')">&#x25B6; Play</button>' +
+          '<button class="pf-btn secondary sm" onclick="toast(\'Playing: ' + escAttr(sec.title) + '\')">&#x25B6; Play</button>' +
         '</div>' +
         '<div style="font-weight:600;color:var(--pf-blue);margin-bottom:.5rem;">' + esc(sec.title) + '</div>' +
         '<div style="background:var(--pf-card-light);border:1px solid var(--pf-border-light);border-radius:6px;padding:.8rem;font-size:.82rem;color:var(--pf-muted-light);line-height:1.8;white-space:pre-line;font-style:italic;">' + esc(intro + transition + sec.content + closing) + '</div>' +

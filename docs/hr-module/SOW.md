@@ -68,3 +68,6 @@
 | `docs/hr-module/MANUAL.md` | Updated to v2.0 |
 
 Not touched in v2.0 (unchanged from v1.0): `platform/index.html` (nav + iframe), `functions/lib/auth.js` (RBAC + path gate), `docs/portal-rebuild/ARCHITECTURE-EDITABILITY.md`.
+
+## v2.1 Security Fix (2026-07-09, provenance 2b09f5b)
+Resolved the SEC-01 LOW self-XSS flagged at v2 review. Meridian added `escAttr()` (escapes single and double quotes, not just angle brackets) and applied it to all inline onclick handlers that interpolate SOP headings or employee names (e.g. the Audio Script Play button, the review Open button). Attribute/JS-string breakout is now blocked. Also removed `.docx` from the upload accept list (now `.txt`/`.md` only, which `FileReader.readAsText` handles correctly; server-side `.docx` parsing deferred to the Pure Work backend). Byte-swap sha256-verified; RBAC and network posture (zero egress) unchanged.
