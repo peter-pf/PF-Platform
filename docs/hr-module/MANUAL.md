@@ -1,7 +1,7 @@
 # User Manual: HR Module
 
 **Pier Foundations Platform -- Human Resources**
-**Version:** 1.0 | July 8, 2026
+**Version:** 2.0 | July 9, 2026
 
 ---
 
@@ -10,6 +10,8 @@
 The HR module is a workspace for managing Pier Foundations people operations. It lives inside the PF Platform and opens in the main content area, just like the other tools. It was built by Meridian-PT and vetted by Peter before being wired in.
 
 **Current state:** the module shows **demo (sample) data**. There is no live HR database connected yet, so nothing you see is real employee data and edits are not saved to a server. This is a preview of the workspace.
+
+**What's new in v2.0:** two additions -- a new **Training Studio** tab and an expanded **Compliance** dashboard. See the tab table and the Training Studio section below.
 
 ## Who can see it
 
@@ -27,7 +29,7 @@ Partners (Jonathan, Derek), business development, and field crew **cannot** open
 3. Click **HR**.
 4. The HR workspace loads in the main area.
 
-## The seven tabs
+## The eight tabs
 
 | Tab | What it's for |
 |-----|---------------|
@@ -37,7 +39,20 @@ Partners (Jonathan, Derek), business development, and field crew **cannot** open
 | **Time Off** | PTO and leave requests / balances |
 | **Performance** | Performance reviews and tracking |
 | **Org Chart** | The company's reporting structure |
-| **Compliance** | HR compliance items and status |
+| **Compliance** | The compliance dashboard -- HR compliance items and their status (expanded in v2.0) |
+| **Training Studio** *(new in v2.0)* | Turn a written SOP into training materials -- see below |
+
+## Training Studio (new in v2.0)
+
+The Training Studio lets you turn a written procedure into a set of training materials in seconds.
+
+1. Open the **Training Studio** tab.
+2. Upload a plain-text SOP -- a `.txt` or `.md` file.
+3. The module reads the file **in your browser** and splits it into sections.
+4. It then **auto-generates**, all on your own machine: a set of **slides**, a **quiz**, **flashcards**, and an **audio script** based on the SOP sections.
+5. Take the quiz; a passing score is recorded in the demo audit view.
+
+**Where does my file go?** Nowhere. The uploaded SOP never leaves your browser -- the module reads it locally and does not send it to any server. All of the slides, quiz, flashcards, and audio-script generation happens on your own computer with no internet call. (In this demo build, generated materials are not saved between sessions.)
 
 ## Frequently asked
 
@@ -47,9 +62,11 @@ Partners (Jonathan, Derek), business development, and field crew **cannot** open
 
 **Is it a separate website?** No. It's served inside the platform at `/hr/` and uses your existing platform login -- there is no second password.
 
+**Does Training Studio use AI in the cloud?** No. It generates everything locally in your browser from the text of the SOP you upload. Nothing is sent anywhere.
+
 ## For administrators
 
-- The module is a single self-contained file at `platform/hr/index.html`, deployed byte-identical from the vetted source (SHA-256 verified).
+- The module is a single self-contained file at `platform/hr/index.html`, deployed byte-identical from the vetted source (SHA-256 `2407ae7d...09005ad`, provenance commit `d6e1517`). The v1.0 seven-tab version (SHA `dbf0bd53...`) was superseded by this v2.0 swap.
 - Access is enforced server-side in `functions/lib/auth.js` (`AREA_ROLES.hr = ['admin','hr']`) and `functions/_middleware.js`. The `/hr/` path is gated to the `hr` area; everyone else fails closed.
 - To grant the HR role to a user, that user's `role` in the D1 `users` table must be `hr`. **Before that insert can succeed**, the D1 schema CHECK constraint in `platform/migrations/0001_init.sql` must be widened to include `hr` (and `business_dev`), which it currently does not. See the SRS "Known Gaps" section.
 - To update the module later: re-vet the new source, verify SHA-256, replace `platform/hr/index.html`. Do not hand-edit the module.
