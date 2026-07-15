@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<style>
+:root{--azure:#1F6FB2;--azure-d:#155489;--ink:#12202e;--muted:#5a6b7e;--line:#dce3ea;--bg:#ffffff;--soft:#eef4f9;--good:#2f8f5b;--warn:#c0742a;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',Calibri,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.5;}
+.doc{width:900px;margin:0 auto;padding:44px 54px 40px;}
+.head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid var(--azure);padding-bottom:14px;margin-bottom:22px;}
+.head h1{font-size:25px;font-weight:700;}
+.head h1 span{color:var(--azure);}
+.head .meta{font-size:12px;color:var(--muted);margin-top:5px;}
+.brand{text-align:right;}
+.brand .n{font-size:19px;font-weight:700;color:var(--azure);letter-spacing:2px;}
+.brand .t{font-size:9.5px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;}
+h2{font-size:15px;color:var(--azure-d);margin:20px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--line);text-transform:uppercase;letter-spacing:.5px;}
+p{font-size:13px;margin-bottom:8px;}
+ul{margin:4px 0 8px 20px;}
+li{font-size:13px;margin-bottom:4px;}
+b{color:var(--ink);}
+.rec{background:var(--soft);border-left:4px solid var(--azure);border-radius:6px;padding:14px 18px;margin:10px 0;}
+.rec .lbl{font-size:11px;font-weight:700;color:var(--azure-d);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;}
+.rec p{font-size:13px;margin:0;}
+.status{display:flex;gap:12px;margin:10px 0;}
+.scard{flex:1;border:1px solid var(--line);border-radius:7px;padding:12px 14px;}
+.scard .h{font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:6px;}
+.scard.done{border-top:3px solid var(--good);} .scard.done .h{color:var(--good);}
+.scard.pend{border-top:3px solid var(--warn);} .scard.pend .h{color:var(--warn);}
+.scard li{font-size:12px;margin-bottom:3px;}
+.foot{margin-top:24px;border-top:1px solid var(--line);padding-top:10px;font-size:11px;color:var(--muted);}
+table.kv{width:100%;border-collapse:collapse;margin:6px 0;font-size:12.5px;}
+table.kv td{padding:6px 10px;border-bottom:1px solid var(--line);vertical-align:top;}
+table.kv td:first-child{font-weight:600;color:var(--azure-d);width:34%;}
+</style></head>
+<body><div class="doc">
+  <div class="head">
+    <div>
+      <h1><span>PF Platform</span> Partner Brief</h1>
+      <div class="meta">How the portal is built, where the data lives, and what going live looks like &nbsp;|&nbsp; prepared by Peter, AI COO</div>
+    </div>
+    <div class="brand"><div class="n">PF</div><div class="t">Pier Foundations</div></div>
+  </div>
+
+  <h2>1. How the portal is built</h2>
+  <p>The portal runs on <b>Cloudflare</b>, served from a global network so it loads fast from anywhere and stays up. The pages are standard web pages. The working parts (login, data, uploads, schedule, daily reports) run as small on-demand functions rather than one always-on server, which keeps it fast and low maintenance. Every visitor passes through a <b>security gate</b> that checks who they are before any page loads, and each person's role controls what they can see. The interactive tools (Design Studio, HR) sit inside the portal behind that one login.</p>
+
+  <h2>2. Where the data lives, and how it is backed up</h2>
+  <p>There are two layers, by design:</p>
+  <table class="kv">
+    <tr><td>Source of truth</td><td>The team's existing <b>SharePoint / Microsoft 365 Excel workbooks</b> (Bid Log, Project Master, BD Master, the Budget and Estimate template, Insurance). These are the master files the partners already maintain. Nothing changes about how you keep them.</td></tr>
+    <tr><td>What the portal shows</td><td>A set of generated data files rebuilt <b>every night</b> from those workbooks. This morning's refresh carried 174 bids, 22 projects, and 160 business-development records.</td></tr>
+    <tr><td>Backups</td><td>Microsoft 365 version-histories and backs up the master workbooks automatically. The login database is dumped to a <b>weekly backup</b>. And the entire platform lives in version control, so every page and every data file is recoverable to any prior point.</td></tr>
+  </table>
+  <p><b>Important habit:</b> data edits belong in the SharePoint master files, not typed into the portal, because the nightly refresh rebuilds the portal's copy from the masters.</p>
+
+  <h2>3. The URL, and the GoDaddy question</h2>
+  <div class="rec">
+    <div class="lbl">Recommendation</div>
+    <p>Yes to a professional URL. Point a subdomain of the company's own domain, such as <b>portal.pierfoundations.com</b>, at the portal with a quick DNS change. Keep the hosting on Cloudflare. Use GoDaddy only as a registrar if you like, not as the host.</p>
+  </div>
+  <p><b>Why not host on GoDaddy:</b> a domain (the URL) and hosting (where the app runs) are two different things. GoDaddy is fine for holding a domain, but its web hosting cannot run the parts that make this portal work, the login functions, the per-user database, and the security gate. Moving the hosting there would mean rebuilding the backend for no gain, and we would lose the instant rollback and zero-downtime updates. Pointing your own subdomain at Cloudflare gives you the polished company address and keeps the strong foundation underneath.</p>
+
+  <h2>4. Can we go live now and edit as we go?</h2>
+  <p>Yes. Updates publish <b>all at once with no downtime</b>, and Cloudflare keeps every previous version for <b>instant rollback</b> if an update ever misbehaves. Layout edits touch only the pages, never the data. Editing while people are logged in is fine, their sessions carry through. We have already added features in production this way.</p>
+  <div class="status">
+    <div class="scard done">
+      <div class="h">Done and live</div>
+      <ul>
+        <li>Individual per-user login and role-based access, built and running</li>
+        <li>Brad, Jonathan and Melanie already on their own logins</li>
+        <li>Security gate, data feeds, backups all operating</li>
+      </ul>
+    </div>
+    <div class="scard pend">
+      <div class="h">One step remaining</div>
+      <ul>
+        <li>Derek and the three field crew still need their first login (one-time temp password, then set their own)</li>
+        <li>After all four are in, switch off the shared password</li>
+        <li>Remove two temporary test accounts</li>
+      </ul>
+    </div>
+  </div>
+  <p>The remaining step is <b>onboarding, not engineering</b>. The login system is finished. Nothing blocks going live and iterating today.</p>
+
+  <h2>5. How updates ship once live</h2>
+  <p>Updates go out through a single controlled step that publishes the new version, verifies the security gate held, and records the change. Because every prior version is retained, any update can be rolled back in seconds. In short, we can improve layout and features continuously, safely, without taking the portal offline.</p>
+
+  <div class="foot">
+    Bottom line: the platform is built to go live now and evolve as we go. The two decisions for the partners are (1) pick the professional URL, a company subdomain is the clean choice, and (2) give the go to onboard Derek and the field crew so the shared password can be retired. Prepared by Peter, AI COO, Pier Foundations. Verified against the live system.
+  </div>
+</div></body></html>
