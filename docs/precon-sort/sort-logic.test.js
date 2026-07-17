@@ -165,6 +165,74 @@ function applyHlSort(state, list, highlights){
   return decorated.map(function(d){ return d.p; });
 }
 
+// ---- mirrors of the WIDE-table (feasibility_review) sort helpers ------------
+// The wide table (renderTable) sorts by each column's DECLARED feed type
+// ('text' | 'money' | 'date'), reading the raw feed value f[key] verbatim (same as
+// the cell render). Behaviour-identical to wideColSortKind / wideSortValue /
+// applyWideSort in index.html.
+function wideColSortKind(type){
+  if (type === 'money' || type === 'num') return 'money';
+  if (type === 'date') return 'date';
+  return 'text';
+}
+function wideSortValue(p, col){
+  var f = (p && p.fields) || {};
+  var raw = f[col.key];
+  var kind = wideColSortKind(col.type);
+  if (kind === 'money') {
+    if (raw == null || String(raw).trim() === '') return null;
+    var n = parseFloat(String(raw).replace(/[^0-9.\-]/g, ''));
+    return isFinite(n) ? n : null;
+  }
+  if (kind === 'date') {
+    var ymd = calParseYMD(raw);
+    if (!ymd) return null;
+    return Date.UTC(ymd.y, ymd.m, ymd.d);
+  }
+  return String(raw == null ? '' : raw).trim().toLowerCase();
+}
+function wideNameSortValue(p){
+  var f = (p && p.fields) || {};
+  return String((p && p.name) || f['Project Name'] || '').trim().toLowerCase();
+}
+function applyWideSort(state, list, dataCols){
+  if (state == null || state.idx == null || state.idx === '') return list;
+  var idx = parseInt(state.idx, 10);
+  if (isNaN(idx)) return list;
+  var dir = (state.dir === 'desc') ? 'desc' : 'asc';
+  var sign = (dir === 'asc') ? 1 : -1;
+  var kind, getVal;
+  if (idx < 0) {
+    kind = 'text';
+    getVal = function(p){ return wideNameSortValue(p); };
+  } else {
+    var col = dataCols[idx];
+    if (!col) return list;
+    kind = wideColSortKind(col.type);
+    getVal = function(p){ return wideSortValue(p, col); };
+  }
+  var decorated = list.map(function(p, i){ return { p: p, v: getVal(p), i: i }; });
+  decorated.sort(function(a, b){
+    var av = a.v, bv = b.v;
+    if (kind === 'text') {
+      var ae = (av === '' || av == null), be = (bv === '' || bv == null);
+      if (ae && be) return a.i - b.i;
+      if (ae) return 1;
+      if (be) return -1;
+      var c = String(av).localeCompare(String(bv));
+      if (c !== 0) return sign * c;
+      return a.i - b.i;
+    }
+    if (av == null && bv == null) return a.i - b.i;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (av < bv) return sign * -1;
+    if (av > bv) return sign * 1;
+    return a.i - b.i;
+  });
+  return decorated.map(function(d){ return d.p; });
+}
+
 // ---- tiny assert harness ----------------------------------------------------
 var pass = 0, fail = 0;
 function eq(actual, expected, msg){
@@ -261,6 +329,72 @@ var tie = [
 ];
 eq(names(applyHlSort({idx:4, dir:'asc'},  tie, highlights)), ['x1','x2','x3'], 'equal GC keeps incoming order (stable) ASC');
 eq(names(applyHlSort({idx:4, dir:'desc'}, tie, highlights)), ['x1','x2','x3'], 'equal GC keeps incoming order (stable) DESC');
+
+// ======================================================================
+// WIDE table (feasibility_review) sort assertions
+// ======================================================================
+// dataCols mirror the real feed types from data/precon-pipeline.js:
+//   'Bid Total Value' -> money, 'Due Date' -> date, 'City / State' -> text.
+// NOTE: quantity columns like 'Total LF' are typed 'text' in the feed, so they
+// sort as TEXT in the wide table (the raw feed dump does not retype them). This
+// is the honest declared-type behaviour and is asserted below.
+var wDataCols = [
+  { key: 'City / State',     type: 'text'  },  // idx 0
+  { key: 'Bid Total Value',  type: 'money' },  // idx 1
+  { key: 'Due Date',         type: 'date'  },  // idx 2
+  { key: 'Total LF',         type: 'text'  },  // idx 3 (feed-typed text)
+];
+var wrows = [
+  { name: 'Bravo',   fields: { 'Project Name': 'Bravo',   'City / State': 'Fort Wayne, IN', 'Bid Total Value': '$460,000',   'Due Date': '2026-06-24', 'Total LF': '1200' } },
+  { name: 'alpha',   fields: { 'Project Name': 'alpha',   'City / State': 'Akron, OH',      'Bid Total Value': '1250000',    'Due Date': '2026-01-15', 'Total LF': '300'  } },
+  { name: 'Delta',   fields: { 'Project Name': 'Delta',   'City / State': 'Muncie, IN',     'Bid Total Value': '$75,000.50', 'Due Date': '6/1/2026',   'Total LF': '5000' } },
+  { name: 'charlie', fields: { 'Project Name': 'charlie', 'City / State': '',               'Bid Total Value': '',           'Due Date': '',           'Total LF': ''     } }, // BLANKS
+];
+
+console.log('\n=== WIDE table (feasibility_review) sort self-check ===\n');
+
+console.log('[wide classification]');
+eq(wideColSortKind('text'),  'text',  'text -> text');
+eq(wideColSortKind('money'), 'money', 'money -> money');
+eq(wideColSortKind('date'),  'date',  'date -> date');
+eq(wideColSortKind('num'),   'money', 'num (future) -> money');
+
+console.log('\n[wide text: Project (sticky, idx -1)]');
+eq(names(applyWideSort({idx:-1, dir:'asc'},  wrows, wDataCols)), ['alpha','Bravo','charlie','Delta'], 'Project ASC A->Z');
+eq(names(applyWideSort({idx:-1, dir:'desc'}, wrows, wDataCols)), ['Delta','charlie','Bravo','alpha'], 'Project DESC Z->A');
+
+console.log('\n[wide text: City / State (idx 0), blank last]');
+// cities: Akron, Fort Wayne, Muncie, [blank last]
+eq(names(applyWideSort({idx:0, dir:'asc'},  wrows, wDataCols)), ['alpha','Bravo','Delta','charlie'], 'City ASC A->Z, blank LAST');
+eq(names(applyWideSort({idx:0, dir:'desc'}, wrows, wDataCols)), ['Delta','Bravo','alpha','charlie'], 'City DESC Z->A, blank LAST');
+
+console.log('\n[wide money: Bid Total Value (idx 1), blank last]');
+// values: Bravo 460k, alpha 1.25M, Delta 75k, charlie BLANK
+eq(names(applyWideSort({idx:1, dir:'desc'}, wrows, wDataCols)), ['alpha','Bravo','Delta','charlie'], 'money DESC large->small, blank LAST');
+eq(names(applyWideSort({idx:1, dir:'asc'},  wrows, wDataCols)), ['Delta','Bravo','alpha','charlie'], 'money ASC small->large, blank LAST');
+
+console.log('\n[wide date: Due Date (idx 2), blank last]');
+// dates: Bravo 6/24, alpha 1/15, Delta 6/1, charlie BLANK
+eq(names(applyWideSort({idx:2, dir:'desc'}, wrows, wDataCols)), ['Bravo','Delta','alpha','charlie'], 'date DESC newest->oldest, blank LAST');
+eq(names(applyWideSort({idx:2, dir:'asc'},  wrows, wDataCols)), ['alpha','Delta','Bravo','charlie'], 'date ASC oldest->newest, blank LAST');
+
+console.log('\n[wide text-typed quantity: Total LF (idx 3) sorts as TEXT]');
+// text sort of '1200','300','5000','' -> '1200' < '300' < '5000', blank last
+eq(names(applyWideSort({idx:3, dir:'asc'},  wrows, wDataCols)), ['Bravo','alpha','Delta','charlie'], 'Total LF ASC as TEXT (feed type), blank LAST');
+eq(names(applyWideSort({idx:3, dir:'desc'}, wrows, wDataCols)), ['Delta','alpha','Bravo','charlie'], 'Total LF DESC as TEXT (feed type), blank LAST');
+
+console.log('\n[wide guards]');
+eq(names(applyWideSort(null, wrows, wDataCols)),                ['Bravo','alpha','Delta','charlie'], 'no sort state returns default order unchanged');
+eq(names(applyWideSort({idx:99, dir:'asc'}, wrows, wDataCols)), ['Bravo','alpha','Delta','charlie'], 'stale/out-of-range index returns list unchanged');
+
+console.log('\n[wide stability]');
+var wtie = [
+  { name: 'y1', fields: { 'City / State': 'Same, IN' } },
+  { name: 'y2', fields: { 'City / State': 'Same, IN' } },
+  { name: 'y3', fields: { 'City / State': 'Same, IN' } },
+];
+eq(names(applyWideSort({idx:0, dir:'asc'},  wtie, wDataCols)), ['y1','y2','y3'], 'equal City keeps incoming order (stable) ASC');
+eq(names(applyWideSort({idx:0, dir:'desc'}, wtie, wDataCols)), ['y1','y2','y3'], 'equal City keeps incoming order (stable) DESC');
 
 // ---- summary ----------------------------------------------------------------
 console.log('\n=== ' + pass + ' passed, ' + fail + ' failed ===\n');

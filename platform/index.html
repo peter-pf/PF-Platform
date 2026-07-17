@@ -816,6 +816,13 @@ body.role-field-ops .nav-item[data-fo-hide] {
   max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .pf-wide td.num, .pf-wide th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Clickable sortable column headers (wide feasibility_review table). Hover
+   highlight + no text selection on repeated clicks; the active column shows an
+   up/down arrow (wideArrow). Record / Resolution / Activity headers are NOT
+   .pf-wide-sortable, so they get no cursor and no hover. */
+.pf-wide th.pf-wide-sortable { cursor: pointer; -webkit-user-select: none; user-select: none; }
+.pf-wide th.pf-wide-sortable:hover { color: var(--text-0); background: var(--bg-1); }
+.pf-wide th.pf-wide-sortable:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .pf-wide tr:last-child td { border-bottom: none; }
 .pf-wide tr:hover td { background: var(--bg-1); }
 /* Sticky first column (Project) - stays pinned while scrolling horizontally. */
@@ -13101,18 +13108,174 @@ try {
       return btns;
     }
 
+    // ======================================================================
+    // COLUMN-HEADER SORTING for the WIDE bid-log table (feasibility_review)
+    // ======================================================================
+    // feasibility_review renders through this WIDE renderer (renderTable), not the
+    // highlight (pf-hl-table) render. Brad: "we want ALL tables to function the same
+    // in this manner", so the wide table gets the SAME clickable-header sorting UX as
+    // the bucket tables. Sort state lives on the mount (data-sort-idx / data-sort-dir)
+    // exactly like the bucket tables + the age filter, so it is independent for this
+    // view and survives renderMount() re-renders. Until a header is clicked the mount
+    // has no sort state and the wide table keeps its default order (sortByNumber).
+    //
+    // The wide table's data columns come from window.PF_PRECON.columns[disc], each
+    // with a declared {key, type}. type is one of 'text' | 'money' | 'date' (verified
+    // in data/precon-pipeline.js). We sort by that DECLARED type so what sorts matches
+    // what the feed types the column as. The sticky Project column is sortable text
+    // (index -1). The Record / Resolution / Activity columns are per-row CONTROLS
+    // (links + action buttons), NOT data, so they are excluded (no sortable header).
+
+    // Sort KIND for a wide column's declared feed type. 'money' also covers a numeric
+    // feed type if one is ever added; anything unrecognized falls back to text.
+    function wideColSortKind(type){
+      if (type === 'money' || type === 'num') return 'money';
+      if (type === 'date') return 'date';
+      return 'text';
+    }
+
+    // Comparable sort VALUE for row `p` under a wide data column `col` ({key,type}),
+    // using the SAME raw feed value the cell renders (f[col.key] verbatim):
+    //   money -> finite Number (or null when blank/unparseable)
+    //   date  -> UTC-midnight epoch (or null when blank/unparseable)
+    //   text  -> lowercased trimmed String
+    function wideSortValue(p, col){
+      var f = (p && p.fields) || {};
+      var raw = f[col.key];
+      var kind = wideColSortKind(col.type);
+      if (kind === 'money') {
+        if (raw == null || String(raw).trim() === '') return null;
+        var n = parseFloat(String(raw).replace(/[^0-9.\-]/g, ''));
+        return isFinite(n) ? n : null;
+      }
+      if (kind === 'date') {
+        var ymd = calParseYMD(raw);
+        if (!ymd) return null;
+        return Date.UTC(ymd.y, ymd.m, ymd.d);
+      }
+      return String(raw == null ? '' : raw).trim().toLowerCase();
+    }
+
+    // Project (name) sort value for the wide table's sticky column (index -1).
+    function wideNameSortValue(p){
+      var f = (p && p.fields) || {};
+      return String((p && p.name) || f['Project Name'] || '').trim().toLowerCase();
+    }
+
+    // Apply the mount's active column sort to `list`, returning a sorted COPY.
+    // idx === -1 sorts the sticky Project column (text); idx >= 0 sorts
+    // dataCols[idx]. No sort state -> list unchanged (default order preserved).
+    // Blank/unparseable money+date values (null) and blank text sort to the BOTTOM in
+    // both directions; sort is STABLE (equal values keep incoming/default order).
+    function applyWideSort(mount, list, dataCols){
+      var idxRaw = mount.getAttribute('data-sort-idx');
+      if (idxRaw == null || idxRaw === '') return list;
+      var idx = parseInt(idxRaw, 10);
+      if (isNaN(idx)) return list;
+      var dir = (mount.getAttribute('data-sort-dir') === 'desc') ? 'desc' : 'asc';
+      var sign = (dir === 'asc') ? 1 : -1;
+
+      var kind, getVal;
+      if (idx < 0) {
+        kind = 'text';
+        getVal = function(p){ return wideNameSortValue(p); };
+      } else {
+        var col = dataCols[idx];
+        if (!col) return list;                               // stale index -> ignore
+        kind = wideColSortKind(col.type);
+        getVal = function(p){ return wideSortValue(p, col); };
+      }
+
+      var decorated = list.map(function(p, i){ return { p: p, v: getVal(p), i: i }; });
+      decorated.sort(function(a, b){
+        var av = a.v, bv = b.v;
+        if (kind === 'text') {
+          var ae = (av === '' || av == null), be = (bv === '' || bv == null);
+          if (ae && be) return a.i - b.i;
+          if (ae) return 1;
+          if (be) return -1;
+          var c = String(av).localeCompare(String(bv));
+          if (c !== 0) return sign * c;
+          return a.i - b.i;
+        }
+        if (av == null && bv == null) return a.i - b.i;
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        if (av < bv) return sign * -1;
+        if (av > bv) return sign * 1;
+        return a.i - b.i;
+      });
+      return decorated.map(function(d){ return d.p; });
+    }
+
+    // Wire clickable column-header sorting for one WIDE-table mount. Each sortable
+    // header carries data-wide-sort (the dataCols index, or -1 for the sticky Project
+    // column) + data-wide-kind (text|money|date) so the first-click direction can be
+    // chosen without any external state: text = ascending (A->Z), money/date =
+    // large->small / newest->oldest (Brad's convention, matching the bucket tables).
+    // Same column again flips the direction. State on the mount, then renderMount.
+    // Record / Resolution / Activity headers have NO data-wide-sort -> not wired.
+    function wireWideSort(mount){
+      var ths = mount.querySelectorAll('th.pf-wide-sortable[data-wide-sort]');
+      if (!ths.length) return;
+      function activate(th){
+        var idx = th.getAttribute('data-wide-sort');
+        if (idx == null) return;
+        var cur = mount.getAttribute('data-sort-idx');
+        if (cur === idx) {
+          var d = (mount.getAttribute('data-sort-dir') === 'desc') ? 'asc' : 'desc';
+          mount.setAttribute('data-sort-dir', d);
+        } else {
+          var kind = th.getAttribute('data-wide-kind') || 'text';
+          mount.setAttribute('data-sort-idx', idx);
+          mount.setAttribute('data-sort-dir', (kind === 'money' || kind === 'date') ? 'desc' : 'asc');
+        }
+        renderMount(mount);
+      }
+      ths.forEach(function(th){
+        th.addEventListener('click', function(){ activate(th); });
+        th.addEventListener('keydown', function(ev){
+          if (ev.key === 'Enter' || ev.key === ' ' || ev.key === 'Spacebar') {
+            ev.preventDefault(); activate(th);
+          }
+        });
+      });
+    }
+
     // Build the WIDE bid-log table HTML for a list of jobs.
-    // opts: { recordCol, actionCol, displayBucket, actionColLabel }.
+    // opts: { recordCol, actionCol, displayBucket, actionColLabel, sortIdx, sortDir }.
     function renderTable(disc, list, opts){
       opts = opts || {};
       var cols = (window.PF_PRECON.columns && window.PF_PRECON.columns[disc]) ? window.PF_PRECON.columns[disc] : [];
       var dataCols = cols.filter(function(c){ return c.key !== 'Project Name'; });
 
-      var thead = '<th class="pf-sticky-col">Project</th>';
-      dataCols.forEach(function(c){
-        var cls = (c.type === 'money') ? ' class="num"' : '';
-        thead += '<th' + cls + '>' + E(c.key) + '</th>';
+      // CLICKABLE COLUMN SORTING (same UX as the bucket tables). The sticky Project
+      // column (data-wide-sort="-1", text) and every DATA column header are clickable
+      // + keyboard-operable; the active column shows an up (asc) / down (desc) arrow.
+      // The Record / Resolution / Activity columns are per-row CONTROLS, not data, so
+      // their headers stay plain (no cursor, no arrow, no data-wide-sort, no handler).
+      // opts.sortIdx / opts.sortDir carry the mount's current sort state in.
+      var wIdx = (opts.sortIdx == null || opts.sortIdx === '') ? null : parseInt(opts.sortIdx, 10);
+      if (wIdx != null && isNaN(wIdx)) wIdx = null;
+      var wDir = (opts.sortDir === 'desc') ? 'desc' : 'asc';
+      function wideArrow(colIdx){
+        if (wIdx == null || wIdx !== colIdx) return '';
+        return wDir === 'asc' ? ' &#9650;' : ' &#9660;';    // up = asc, down = desc
+      }
+      // Sticky Project column = sortable text, index -1.
+      var thead = '<th class="pf-sticky-col pf-wide-sortable" data-wide-sort="-1"'
+        + ' data-wide-kind="text" role="button" tabindex="0" aria-label="Sort by Project"'
+        + ' style="cursor:pointer">Project' + wideArrow(-1) + '</th>';
+      dataCols.forEach(function(c, ci){
+        var kind = wideColSortKind(c.type);
+        var numCls = (c.type === 'money') ? ' num' : '';
+        var thCls = ('pf-wide-sortable' + numCls).trim();
+        thead += '<th class="' + thCls + '" data-wide-sort="' + ci + '"'
+          + ' data-wide-kind="' + kind + '" role="button" tabindex="0"'
+          + ' aria-label="Sort by ' + E(c.key) + '" style="cursor:pointer">'
+          + E(c.key) + wideArrow(ci) + '</th>';
       });
+      // Record / Resolution / Activity = per-row controls, NOT sortable.
       if (opts.recordCol) thead += '<th>Record</th>';
       if (opts.actionCol) thead += '<th>' + E(opts.actionColLabel || 'Resolution') + '</th>';
       thead += '<th>Activity</th>';
@@ -15063,12 +15226,21 @@ try {
         hlOpts.sortDir = mount.getAttribute('data-sort-dir');
         html += renderHighlightTable(disc, list, hlOpts);
       } else {
+        // WIDE table (feasibility_review): apply the mount's active column sort (if
+        // any) to the default-sorted list, then hand the current sort state to the
+        // renderer so the clicked header draws its arrow. No header clicked -> the
+        // list is returned unchanged and the default (sortByNumber) order stands.
+        var wideCols = (window.PF_PRECON.columns && window.PF_PRECON.columns[disc]) ? window.PF_PRECON.columns[disc] : [];
+        var wideDataCols = wideCols.filter(function(c){ return c.key !== 'Project Name'; });
+        list = applyWideSort(mount, list, wideDataCols);
         html += renderTable(disc, list, {
           recordCol: (bucket === 'awarded'),
           actionCol: canResolve(),
           displayBucket: displayBucket,
           idBucket: bucket,
-          actionColLabel: (bucket === 'awarded') ? 'Awarded' : 'Resolution'
+          actionColLabel: (bucket === 'awarded') ? 'Awarded' : 'Resolution',
+          sortIdx: mount.getAttribute('data-sort-idx'),
+          sortDir: mount.getAttribute('data-sort-dir')
         });
       }
       // a per-mount activity-log panel host (one open at a time within the mount)
@@ -15083,6 +15255,7 @@ try {
       if (useHighlights) wireHighlightExpand(mount);
       // ----- wire clickable column-header sorting -----
       if (useHighlights) wireHlSort(mount, hlHighlights);
+      else wireWideSort(mount);   // WIDE table (feasibility_review) header sorting
       // ----- wire the Submitted Bids aging filter -----
       wireAgeFilter(mount);
 

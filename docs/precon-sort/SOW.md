@@ -49,17 +49,49 @@ same way.
    direction. Then `renderMount(mount)`. Wired alongside `wireHighlightExpand` /
    `wireAgeFilter` (only when `useHighlights`).
 
+### Follow-up: feasibility_review WIDE table (`renderTable`)
+
+Extended the SAME UX to the one precon table on the other renderer (the wide raw-feed
+`renderTable`, used only by `feasibility_review`). All in `platform/index.html`:
+
+6. **CSS** — added `.pf-wide th.pf-wide-sortable` (cursor, hover, `user-select:none`,
+   `:focus-visible`). Record / Resolution / Activity headers are NOT given this class.
+
+7. **Wide sort helper block** (inserted before `renderTable`):
+   - `wideColSortKind(type)` → maps the column's declared feed `type`
+     (`money|num`→money, `date`→date, else text).
+   - `wideSortValue(p, col)` → comparable value from the raw feed `fields[col.key]`
+     verbatim (money → Number/null, date → UTC epoch/null via `calParseYMD`, text →
+     lowercased String).
+   - `wideNameSortValue(p)` → sticky Project column (idx -1) text.
+   - `applyWideSort(mount, list, dataCols)` → same comparator shape as `applyHlSort`
+     (blanks-to-bottom, stable, no-state passthrough).
+   - `wireWideSort(mount)` → binds click + Enter/Space on `th.pf-wide-sortable`;
+     first-click direction read off the header's `data-wide-kind`.
+
+8. **Header render** (in `renderTable`) — the sticky Project header
+   (`data-wide-sort="-1"`) and each DATA column header carry `pf-wide-sortable`,
+   `data-wide-sort="<idx>"`, `data-wide-kind`, `role="button" tabindex="0"`, cursor, and
+   an up/down arrow via `wideArrow()` (from `opts.sortIdx`/`opts.sortDir`). Record /
+   Resolution / Activity headers stay plain.
+
+9. **renderMount `else` branch** — applies `applyWideSort(mount, list, wideDataCols)` to
+   the default-sorted list and passes the mount's sort state into the `renderTable` opts.
+   Wired `wireWideSort(mount)` in the `else` of the sort-wiring line.
+
 ### Files
-- `platform/index.html` — feature.
-- `docs/precon-sort/SRS.md` — spec (buckets, columns, Resolution exclusion, semantics).
+- `platform/index.html` — feature (bucket highlight render + wide feasibility_review render).
+- `docs/precon-sort/SRS.md` — spec (buckets + feasibility_review columns, exclusions, semantics).
 - `docs/precon-sort/SOW.md` — this file.
-- `docs/precon-sort/sort-logic.test.js` — runnable node self-check (23 assertions).
+- `docs/precon-sort/sort-logic.test.js` — runnable node self-check (41 assertions).
 
 ## Verification (evidence)
 
-- `node docs/precon-sort/sort-logic.test.js` → **23 passed, 0 failed** (text/money/
-  numeric/date asc+desc, blanks-to-bottom, garbin non-sortable, no-state + stale-index
-  passthrough, stability).
+- `node docs/precon-sort/sort-logic.test.js` → **41 passed, 0 failed** — 23 bucket
+  (text/money/numeric/date asc+desc, blanks-to-bottom, garbin non-sortable, no-state +
+  stale-index passthrough, stability) + 18 wide (feasibility_review Project/City/Bid
+  Total/Due Date/text-typed-quantity asc+desc, blanks-to-bottom, wide type mapping,
+  guards, stability).
 - `node --check` on the extracted main script block of index.html → clean (the only
   regex-split "failure" is a pre-existing false positive from a `</script>` string
   inside a JS comment, unrelated to this change and present at HEAD).
@@ -67,10 +99,11 @@ same way.
   `env=production` → `auth gate on root: HTTP 401`.
 
 ## Definition of Done
-- [x] Feature in index.html (shared render, all highlight buckets, both disciplines).
-- [x] Resolution + garbin excluded from sort.
-- [x] Default order preserved until a header is clicked.
-- [x] Node self-check passes (asc + desc for text/money/date, blanks-to-bottom).
-- [x] SRS + SOW written.
+- [x] Feature in index.html — bucket highlight render (all buckets, both disciplines).
+- [x] Feature in index.html — feasibility_review WIDE render (all data cols, both disciplines).
+- [x] Resolution + garbin (bucket) and Record/Resolution/Activity (wide) excluded from sort.
+- [x] Default order preserved until a header is clicked (both renders).
+- [x] Node self-check passes (41/41; asc + desc for text/money/date, blanks-to-bottom).
+- [x] SRS + SOW updated.
 - [x] Deployed to production, 401 gate confirmed.
 - [x] Committed + pushed to `website-build-20260609`.

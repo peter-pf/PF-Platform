@@ -36,13 +36,37 @@ therefore covers every subpage below, for BOTH disciplines:
 The Project name cell (always the first data column) is sortable via a `data-hl-sort="-1"`
 header.
 
+### Also in scope — feasibility_review (WIDE table, `renderTable`)
+
+Per Brad's follow-up ("we want ALL tables to function the same in this manner"), the
+`feasibility_review` subpage — which renders through the DIFFERENT wide renderer
+`renderTable()` (a raw bid-log feed dump: sticky Project column + every feed column) —
+now gets the SAME clickable-header sorting UX. Implemented via a parallel shared helper
+set (`wideColSortKind` / `wideSortValue` / `applyWideSort` / `wireWideSort`) plus header
+affordances in `renderTable`.
+
+- **Sticky Project column** (`data-wide-sort="-1"`) is sortable text.
+- **Every DATA column** is sortable by its DECLARED feed type from
+  `window.PF_PRECON.columns[disc]`: `text` → A→Z / Z→A, `money` → large→small /
+  small→large, `date` → newest→oldest / oldest→newest.
+  - The feed types 7 date columns (Invite Date, Due Date, Date Submitted, Projected
+    Start Date, Follow Up Date, Design Completed Date, Date Paid) and 6 money columns
+    (Bid Total Value, Price Per SF, Price Per LF, Price Per Day, Price Per Column,
+    Prelim Design Fee). The remaining ~20 columns are typed `text`.
+  - NOTE: quantity columns (Total LF, Total Columns, etc.) are typed `text` in the feed,
+    so they sort as TEXT in the wide table (the raw feed dump does not retype them). This
+    is the honest declared-type behaviour and is asserted in the node test.
+- **EXCLUDED (per-row controls, not data):** the Record, Resolution, and Activity
+  columns. Their headers stay plain (no cursor, no arrow, no `data-wide-sort`, no
+  handler).
+- Same mount-scoped state (`data-sort-idx` / `data-sort-dir`), same default-order
+  preservation (until a header is clicked the wide table keeps `sortByNumber`), same
+  blanks-to-bottom + stable behaviour as the bucket tables.
+
 ### Out of scope
-- **`feasibility_review`** renders through the DIFFERENT wide renderer `renderTable()`
-  (a raw bid-log feed dump with a sticky Project column + every feed column), not the
-  styled `pf-hl-table`. It is intentionally left unchanged — it is not one of the
-  styled highlight bucket tables Brad referenced, and its columns are the raw feed set.
 - Non-precon tables (Projects, financials, HR, etc.) — untouched. The change is scoped
-  to `renderHighlightTable` + `renderMount` + a small shared sort helper block.
+  to `renderHighlightTable` + `renderTable` (feasibility_review path) + `renderMount` +
+  the two small shared sort-helper blocks.
 
 ## 3. Functional Requirements
 
@@ -93,6 +117,18 @@ sorts):
 | `garbin`                | (none)    | non-sortable |
 | Project name (idx -1)   | text      | `p.name` / `fields['Project Name']` |
 
+**Wide table (feasibility_review)** sorts by the column's DECLARED feed `type`, reading
+the raw feed value `fields[key]` verbatim (same as the cell render):
+
+| Wide col `type` | Sort kind | Value source |
+|-----------------|-----------|--------------|
+| `money`         | money     | `fields[key]` |
+| `num` (future)  | money     | `fields[key]` |
+| `date`          | date      | `fields[key]` via `calParseYMD` → UTC epoch |
+| `text` / other  | text      | `fields[key]` |
+| Project (idx -1)| text      | `p.name` / `fields['Project Name']` |
+| Record / Resolution / Activity | (none) | non-sortable per-row controls |
+
 Money parse strips `$`, commas, etc. via `parseFloat(String(raw).replace(/[^0-9.\-]/g,''))`.
 Date parse uses `calParseYMD` (ISO `YYYY-MM-DD` + US `M/D/YY[YY]`) to a UTC-midnight epoch.
 Text compares case-insensitively via `localeCompare`.
@@ -100,9 +136,12 @@ Text compares case-insensitively via `localeCompare`.
 ## 5. Verification
 
 - **Node self-check:** `docs/precon-sort/sort-logic.test.js` re-implements the exact
-  comparator + extraction rules and asserts asc AND desc ordering for text, money,
-  numeric, and date columns, blanks-to-bottom, classification (garbin = non-sortable),
-  no-state passthrough, stale-index passthrough, and stability. **23/23 pass.**
+  comparator + extraction rules (both the bucket `applyHlSort` and the wide
+  `applyWideSort`) and asserts asc AND desc ordering for text, money, numeric, and date
+  columns, blanks-to-bottom, classification (garbin = non-sortable; wide type mapping),
+  no-state passthrough, stale-index passthrough, and stability. **41/41 pass**
+  (23 bucket + 18 wide, incl. the feasibility_review Project/City/Bid Total/Due Date/
+  text-typed-quantity cases).
 - **Static review:** `node --check` on the extracted main script block — clean.
 - **Live:** deployed to production; auth gate (`/` = HTTP 401) confirmed.
 
