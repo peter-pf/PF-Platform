@@ -199,33 +199,66 @@ export class PdfDoc {
     return this;
   }
 
-  // The azure brand header band on page 1: wordmark + title in white.
-  brandHeader(title, subtitle) {
-    const bandH = 74;
-    const top = PAGE_H;                 // band hugs the very top edge
-    const bandY = top - bandH;
-    // full-bleed azure band
+  // The azure brand masthead on page 1. LEFT: wordmark + tagline + report title.
+  // RIGHT: a labeled metadata block (label:value pairs) filling the right side of
+  // the band, so the job info lives IN the header (not duplicated in the body).
+  //   title  : the report title (e.g. "Daily Field Report")
+  //   meta   : array of { label, value } rendered right-aligned as a block. The
+  //            caller decides the field order (project number goes among these).
+  brandHeader(title, meta) {
+    meta = Array.isArray(meta) ? meta.filter((m) => m && (m.label || m.value)) : [];
+    const bandH = 96;                   // taller masthead to hold the meta block
+    const bandY = PAGE_H - bandH;
+    // full-bleed azure band + a thin darker base line for depth
     this.fillRect(0, bandY, PAGE_W, bandH, PF.azure);
-    // a thin darker azure base line for depth
     this.fillRect(0, bandY, PAGE_W, 4, PF.azureDark);
 
-    // wordmark (Eurostile) top-left, white
-    const wm = 'PIER FOUNDATIONS';
-    this._draw(wm, 15, 'euro', MARGIN, bandY + bandH - 26, PF.white);
-    // tagline under the wordmark
-    this._draw('VIBRATORY STONE COLUMNS', 7.5, 'helvb', MARGIN, bandY + bandH - 40, PF.azureLight);
+    // ---- LEFT: wordmark / tagline / title ----
+    this._draw('PIER FOUNDATIONS', 16, 'euro', MARGIN, bandY + bandH - 28, PF.white);
+    this._draw('VIBRATORY STONE COLUMNS', 7.5, 'helvb', MARGIN, bandY + bandH - 43, PF.azureLight);
+    this._draw(title, 18, 'euro', MARGIN, bandY + 20, PF.white);
 
-    // report title (Eurostile) lower-left, white, larger
-    this._draw(title, 17, 'euro', MARGIN, bandY + 16, PF.white);
-
-    // right-aligned subtitle (project) in white
-    if (subtitle) {
-      const w = measure(toWinAnsi(subtitle), 10, 'helvb');
-      this._draw(subtitle, 10, 'helvb', PAGE_W - MARGIN - w, bandY + 18, PF.white);
+    // ---- RIGHT: labeled metadata block ----
+    // A right-aligned two-column mini-table: muted-white labels, solid-white
+    // values. Right edge sits at the page margin; the block grows leftward.
+    if (meta.length) {
+      const mSize = 9.5;
+      const mLead = 14.5;
+      const rightEdge = PAGE_W - MARGIN;
+      // vertically center the block within the band's usable height
+      const blockH = meta.length * mLead;
+      let by = bandY + (bandH - blockH) / 2 + blockH - mLead + 3;
+      // label column width = widest label; value column width = widest value.
+      let labelW = 0, valueW = 0;
+      const rows = meta.map((m) => {
+        const label = toWinAnsi((m.label || '') + ':');
+        const value = toWinAnsi(m.value == null || m.value === '' ? '-' : String(m.value));
+        labelW = Math.max(labelW, measure(label, mSize, 'helvb'));
+        valueW = Math.max(valueW, measure(value, mSize, 'helvb'));
+        return { label, value };
+      });
+      const gap = 6;
+      // clamp so the block never collides with the left title area
+      const maxBlockW = (PAGE_W - MARGIN) - (MARGIN + 240);
+      let blockW = labelW + gap + valueW;
+      if (blockW > maxBlockW) { valueW = Math.max(60, maxBlockW - gap - labelW); blockW = labelW + gap + valueW; }
+      const labelRightX = rightEdge - valueW - gap;   // labels right-aligned to here
+      const valueLeftX = rightEdge - valueW;          // values start here
+      for (const r of rows) {
+        // label: right-aligned within the label column, muted white
+        const lw = measure(r.label, mSize, 'helvb');
+        this._draw(r.label, mSize, 'helvb', labelRightX - lw, by, PF.azureLight);
+        // value: left-aligned in the value column, solid white (clip if huge)
+        let v = r.value;
+        while (v.length > 1 && measure(v, mSize, 'helvb') > valueW) v = v.slice(0, -1);
+        if (v !== r.value && v.length > 1) v = v.slice(0, -1) + '.';
+        this._draw(v, mSize, 'helvb', valueLeftX, by, PF.white);
+        by -= mLead;
+      }
     }
 
-    // move cursor below the band with a little breathing room
-    this.y = bandY - 16;
+    // cursor below the band with breathing room; body starts at first section
+    this.y = bandY - 18;
     return this;
   }
 
@@ -302,6 +335,80 @@ export class PdfDoc {
     }
     if (rightStr) {
       this._draw(rightStr, size, 'helvb', rightX, yStart, opts.rightColor || PF.azureDark);
+    }
+    return this;
+  }
+
+  // A clean data TABLE: rows of { label, value } with a LEFT-aligned label column
+  // and a CENTERED value column on the right, plus subtle ZEBRA striping so
+  // multi-row areas are easy to scan. Pro field-report look (Fieldwire/Procore/
+  // Raken pattern). opts:
+  //   valueW      : width (pt) of the right value column (default 130)
+  //   size        : font size (default 10)
+  //   rowH        : row height (default size*1.9)
+  //   labelColor  : label text colour (default PF.body)
+  //   valueColor  : value text colour (default PF.azureDark, bold)
+  //   subLabels   : Set of labels to render as a bold sub-heading row (no value,
+  //                 no stripe) -- used for "Owned"/"Rental" group headers.
+  table(rows, opts) {
+    opts = opts || {};
+    rows = Array.isArray(rows) ? rows : [];
+    if (!rows.length) return this;
+    const size = opts.size || 10;
+    const rowH = opts.rowH || size * 1.9;
+    const valueW = opts.valueW || 130;
+    const gap = 10;
+    const labelX = MARGIN + 8;                       // small inset from the stripe edge
+    const valueCenterX = PAGE_W - MARGIN - valueW / 2;
+    const labelMaxW = CONTENT_W - valueW - gap - 16;
+    const labelColor = opts.labelColor || PF.body;
+    const valueColor = opts.valueColor || PF.azureDark;
+    const subLabels = opts.subLabels || null;
+
+    let idx = 0; // stripe index (only advances on real data rows)
+    for (const r of rows) {
+      const rawLabel = String(r.label == null ? '' : r.label);
+      const isSub = subLabels && subLabels.has(rawLabel) && (r.value == null || r.value === '');
+      // page-break guard
+      if (this._ensure(rowH)) { /* new page: no header repeat needed for a report */ }
+      const rowTop = this.y;
+      const rowBot = this.y - rowH;
+
+      if (isSub) {
+        // group sub-heading: azure-dark bold, no stripe, no value
+        this._draw(toWinAnsi(rawLabel), size - 0.5, 'helvb',
+          MARGIN, rowBot + (rowH - size) / 2 + size * 0.2, PF.azureDark);
+        this.y = rowBot;
+        continue;
+      }
+
+      // zebra background on alternate data rows
+      if (idx % 2 === 1) this.fillRect(MARGIN, rowBot, CONTENT_W, rowH, PF.bg1);
+      idx++;
+
+      // label (left, wrapped to one visible line; clip with ellipsis if needed)
+      let label = toWinAnsi(rawLabel);
+      const indent = r.indent ? r.indent : 0;
+      const lx = labelX + indent;
+      const lMax = labelMaxW - indent;
+      if (measure(label, size, 'helv') > lMax) {
+        while (label.length > 1 && measure(label + '...', size, 'helv') > lMax) label = label.slice(0, -1);
+        label = label + '...';
+      }
+      const baseline = rowBot + (rowH - size) / 2 + size * 0.22;
+      this._draw(label, size, 'helv', lx, baseline, labelColor);
+
+      // value (CENTERED in the value column, bold)
+      const value = toWinAnsi(r.value == null ? '' : String(r.value));
+      if (value) {
+        const vw = measure(value, size, 'helvb');
+        this._draw(value, size, 'helvb', valueCenterX - vw / 2, baseline, valueColor);
+      }
+
+      // thin row separator under each data row
+      this.cur.push(`${col(PF.borderLt)} RG 0.4 w ${MARGIN.toFixed(2)} ${rowBot.toFixed(2)} m ${(PAGE_W - MARGIN).toFixed(2)} ${rowBot.toFixed(2)} l S`);
+
+      this.y = rowBot;
     }
     return this;
   }

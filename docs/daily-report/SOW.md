@@ -122,3 +122,43 @@ to Helvetica-Bold display + color-only branding.
   `016ISVH6YRVVK5A2HWJVG2EN45BSME6YP2`, 70,348 bytes, in the TEST folder;
   sendMail AS peter@ -> 202 Accepted to `pfpeter@agentmail.to` ONLY; folder
   listing confirms the file. NOT deployed; recipient stays on TEST.
+
+---
+
+## Round 3 (2026-07-17) - layout/readability polish (styling ONLY)
+
+Derek reviewed the branded PDF and asked for pro field-report layout refinements
+(Fieldwire/Procore/Raken pattern): labeled masthead + tabular body with zebra
+rows and aligned value columns. Brand from Round 2 kept. Function unchanged.
+
+### Changed files
+- `platform/functions/lib/pdf.js`:
+  - `brandHeader(title, meta)` reworked into a real masthead. Band heightened to
+    96pt; LEFT keeps wordmark/tagline/title; RIGHT renders a labeled job-info
+    block (`meta` = array of {label, value}) with right-aligned azure-light labels
+    and solid-white values. Replaces the lone floating project number.
+  - New `table(rows, opts)` primitive: left labels + CENTERED value column +
+    subtle zebra striping (`#F9FAFD` alt rows) + thin row separators. `subLabels`
+    renders group headers (Owned/Rental) as bold sub-heading rows.
+- `platform/functions/lib/daily-report-doc.js`:
+  - Passes the job-info `meta` block to `brandHeader`; REMOVED the duplicate body
+    Project/Date/Foreman/Weather key-value list. Body now starts at Production.
+  - Production, Crew, Equipment, Maintenance render via `table()`. Narrative
+    sections stay as wrapped text. Still ZERO financials.
+
+### Unchanged (verified)
+- `functions/api/daily-report.js` NOT touched. Submit flow, recipients
+  (TEST = pfpeter@ only), TEST folder id, and the Eurostile embed + ToUnicode CMap
+  are identical to Round 2.
+
+### Verification (Round 3)
+- `node --check` passes on `pdf.js` + `daily-report-doc.js`.
+- PyMuPDF: 2 pages; EurostileExtended still embedded (Type0/ttf); section titles +
+  masthead labels (Production/Crew/Equipment/Project/Foreman/Weather...) all
+  searchable. Sample overwritten at `/home/aiciv/daily-report-build/sample.pdf`
+  (71,193 bytes); both page PNGs eyeballed - clean masthead, centered values,
+  zebra rows, no clutter.
+- Live Graph e2e (Round 3 PDF): SharePoint PUT -> 201 Created, id
+  `016ISVH6ZTE2N3KXDCK5GIEKSVQETVDY6L`, 71,193 bytes, in the TEST folder;
+  sendMail AS peter@ -> 202 Accepted to `pfpeter@agentmail.to` ONLY; folder
+  listing confirms the file. NOT deployed; recipient stays on TEST.

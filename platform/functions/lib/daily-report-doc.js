@@ -19,35 +19,35 @@ import { GRAPH } from './graph.js';
 // ---------------------------------------------------------------------------
 export function renderDailyReportPdf(rec) {
   const doc = new PdfDoc();
-  const projLabel = rec.projectId ? `#${rec.projectId}` : (rec.projectName || '');
-  // Azure brand header band (wordmark + report title in white).
-  doc.brandHeader('Daily Field Report', projLabel);
-
-  // ---- header facts (label in PF secondary, value in body) ----
-  doc.spacer(2);
-  doc.keyVal('Project', rec.projectName || '-');
-  doc.keyVal('Project Number', rec.projectId || '-');
-  doc.keyVal('Date', rec.date || '-');
-  doc.keyVal('Foreman', rec.foreman || '-');
   const weather = [rec.precipitation, rec.temp].filter(Boolean).join('  ');
-  doc.keyVal('Weather', weather || rec.weather || '-');
+  // Azure masthead: LEFT = wordmark/tagline/title, RIGHT = labeled job-info block.
+  // Derek: put the categories (with text labels) in the header, project number
+  // AMONG them (after the named fields). This block replaces the old duplicate
+  // Project/Date/Foreman/Weather list that used to sit in the body.
+  doc.brandHeader('Daily Field Report', [
+    { label: 'Project',    value: rec.projectName || '-' },
+    { label: 'Date',       value: rec.date || '-' },
+    { label: 'Foreman',    value: rec.foreman || '-' },
+    { label: 'Weather',    value: weather || rec.weather || '-' },
+    { label: 'Project No', value: rec.projectId || '-' },
+  ]);
+  doc.spacer(2);
 
-  // ---- production ----
+  // ---- production (table: centered value column + zebra rows) ----
   doc.heading('Production');
-  const cols = (rec.columnsInstalled != null) ? String(rec.columnsInstalled) : '-';
-  const lf = (rec.lfInstalled != null) ? String(rec.lfInstalled) : '-';
-  doc.row('Columns installed', cols, { rightW: 110 });
-  doc.row('Linear feet installed', lf, { rightW: 110 });
+  doc.table([
+    { label: 'Columns installed',    value: (rec.columnsInstalled != null) ? String(rec.columnsInstalled) : '-' },
+    { label: 'Linear feet installed', value: (rec.lfInstalled != null) ? String(rec.lfInstalled) : '-' },
+  ], { valueW: 130 });
 
   // ---- crew (name + HOURS only, never pay) ----
   doc.heading('Crew');
   const crew = Array.isArray(rec.crew) ? rec.crew.filter((c) => c && (c.name || c.hours != null)) : [];
   if (crew.length) {
-    for (const c of crew) {
-      const label = c.costCode ? `${c.name || '-'}  (${c.costCode})` : (c.name || '-');
-      const hrs = (c.hours != null && c.hours !== '') ? `${c.hours} h` : '';
-      doc.row(label, hrs, { rightW: 80 });
-    }
+    doc.table(crew.map((c) => ({
+      label: c.costCode ? `${c.name || '-'}  (${c.costCode})` : (c.name || '-'),
+      value: (c.hours != null && c.hours !== '') ? `${c.hours} h` : '',
+    })), { valueW: 90 });
   } else {
     doc.text('No crew recorded.', { size: 10 });
   }
@@ -57,20 +57,22 @@ export function renderDailyReportPdf(rec) {
   const rental = Array.isArray(rec.equipmentRental) ? rec.equipmentRental.filter((e) => e && (e.category || e.hours != null)) : [];
   if (owned.length || rental.length) {
     doc.heading('Equipment');
+    const eqRows = [];
     if (owned.length) {
-      doc.text('Owned', { bold: true, size: 9.5, color: PF.azureDark });
+      eqRows.push({ label: 'Owned', value: '' }); // sub-heading row
       for (const e of owned) {
-        const hrs = (e.hours != null && e.hours !== '') ? `${e.hours} hr meter` : '';
-        doc.row(e.machine || '-', hrs, { rightW: 110, indent: 10 });
+        eqRows.push({ label: e.machine || '-', indent: 12,
+          value: (e.hours != null && e.hours !== '') ? `${e.hours} hr` : '' });
       }
     }
     if (rental.length) {
-      doc.text('Rental', { bold: true, size: 9.5, color: PF.azureDark });
+      eqRows.push({ label: 'Rental', value: '' }); // sub-heading row
       for (const e of rental) {
-        const hrs = (e.hours != null && e.hours !== '') ? `${e.hours} hr meter` : '';
-        doc.row(e.category || '-', hrs, { rightW: 110, indent: 10 });
+        eqRows.push({ label: e.category || '-', indent: 12,
+          value: (e.hours != null && e.hours !== '') ? `${e.hours} hr` : '' });
       }
     }
+    doc.table(eqRows, { valueW: 110, subLabels: new Set(['Owned', 'Rental']) });
   }
 
   // ---- maintenance (category / type / subcategory / detail / hour-at-failure) --
@@ -79,11 +81,13 @@ export function renderDailyReportPdf(rec) {
     : [];
   if (maint.length) {
     doc.heading('Maintenance');
-    for (const m of maint) {
+    doc.table(maint.map((m) => {
       const bits = [m.type, m.subcategory, m.item].filter(Boolean).join(' - ');
-      const hr = (m.hourAtFailure != null && m.hourAtFailure !== '') ? `@ ${m.hourAtFailure} hr` : '';
-      doc.row(`${m.category || 'General'}: ${bits || '-'}`, hr, { rightW: 90 });
-    }
+      return {
+        label: `${m.category || 'General'}: ${bits || '-'}`,
+        value: (m.hourAtFailure != null && m.hourAtFailure !== '') ? `${m.hourAtFailure} hr` : '',
+      };
+    }), { valueW: 90 });
   }
 
   // ---- future issues (equipment + description, no $) ----

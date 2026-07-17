@@ -134,6 +134,45 @@ section titles + wordmark words are searchable; the branded PDF still uploads
 (201) to the TEST folder and sendMail returns 202 to pfpeter@ only. The function
 behavior (submit -> PDF -> email -> SharePoint) is byte-for-byte unchanged.
 
+## 6c. PDF Layout Polish (Round 3, 2026-07-17)
+
+Derek reviewed the branded version and asked for readability/layout refinements,
+inspired by professional construction daily-report templates (Fieldwire, Procore,
+Raken): a labeled masthead job-info block, then clean tabular body sections with
+zebra rows and aligned value columns. Layout ONLY - the PF brand from Round 2 is
+kept (azure band, Eurostile, light-azure chips). Function unchanged.
+
+Header rework ("fix the head", "use the space on the right", "categories in text
+before the project number"):
+- `brandHeader(title, meta)` now takes a `meta` array of `{label, value}`. LEFT of
+  the azure band keeps the wordmark + "VIBRATORY STONE COLUMNS" tagline + report
+  title. RIGHT of the band renders a labeled job-info block (labels right-aligned
+  in azure-light, values in solid white): Project / Date / Foreman / Weather /
+  Project No - the named categories in text with the project number AMONG them.
+  The band was heightened (74->96pt) to hold the block and no longer looks empty
+  on the right.
+- The DUPLICATE Project/Project Number/Date/Foreman/Weather list that used to sit
+  in the body under the header is REMOVED (it now lives only in the masthead). The
+  body starts at the first section (Production).
+
+Data rows ("center the right columns", "light background to break up multiple row
+areas"):
+- New `table(rows, opts)` primitive renders Production, Crew, Equipment, and
+  Maintenance as clean tables: labels LEFT-aligned, values CENTERED in a fixed
+  right-hand value column (azure-dark bold), a thin row separator, and subtle
+  ZEBRA striping (alternating `#F9FAFD` background on every other data row) so
+  multi-row areas scan easily.
+- `subLabels` option renders the "Owned"/"Rental" equipment group headers as
+  azure-dark bold sub-heading rows (no stripe, no value).
+- The azure section chips + Eurostile section titles + azure rule are unchanged.
+- Narrative sections (Future Issues, Delays, Safety, Work Completed, Attachments)
+  stay as flowing wrapped text under their chips.
+
+Verified (Round 3): PyMuPDF shows EurostileExtended still embedded (Type0/ttf) +
+searchable via the ToUnicode CMap (EURO_OK fallback intact); the refined PDF
+(71,193 bytes, 2 pages) uploads 201 to the TEST folder + sendMail 202 to pfpeter@
+only. api/daily-report.js untouched.
+
 ## 7. Out of Scope
 
 - No change to `field-upload.js` (Hand Logs / GUHMA attachments still upload to the
