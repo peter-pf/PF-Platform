@@ -173,6 +173,40 @@ searchable via the ToUnicode CMap (EURO_OK fallback intact); the refined PDF
 (71,193 bytes, 2 pages) uploads 201 to the TEST folder + sendMail 202 to pfpeter@
 only. api/daily-report.js untouched.
 
+## 6d. Charcoal Header + Logo + Value Alignment (Round 4, 2026-07-17)
+
+Derek reviewed v3 and asked for four header/alignment changes. Body styling
+(azure section chips, Eurostile titles, zebra rows) is kept. Function unchanged.
+
+1. Tagline removed - "VIBRATORY STONE COLUMNS" text is gone from the header.
+2. Header background changed from azure to CHARCOAL GREY `#2B2F36` (PF's dark text
+   colour; `PF.charcoal`), with a thin azure `#006DB0` accent line at the band
+   base. All header text is white/light: the title in white, metadata labels in a
+   muted light grey (`#C8D5DC`, `PF.lightGrey`), values in solid white.
+3. PF LOGO embedded in the header. The prepared JPEG (`dr-v4/pf-header-logo.jpg`,
+   1392x950, the white "PF + PIER FOUNDATIONS" lockup pre-flattened onto the same
+   `#2B2F36` charcoal so it sits with no visible box) is embedded as a DCTDecode
+   Image XObject: raw JPEG bytes in the stream with `/Filter /DCTDecode`,
+   `/ColorSpace /DeviceRGB`, `/BitsPerComponent 8`, `/Width 1392 /Height 950`,
+   drawn via a `cm` matrix + `/Im0 Do`. It is baseline JPEG, 3-component, no Adobe
+   APP14 -> DeviceRGB is correct. The band grew to 104pt to fit the lockup cleanly.
+   The separate Eurostile "PIER FOUNDATIONS" wordmark TEXT was REMOVED (the logo
+   carries it); the "Daily Field Report" title (white) is kept, placed on its own
+   baseline below the lockup so they never overlap. Font data + logo data are
+   generated into `lib/pf-logo.js` (base64 JPEG + dims). A `LOGO_OK` guard falls
+   back to a text wordmark if the asset is ever missing, so the header can't break.
+4. Value column ALIGNED vertically. The `table()` primitive now RIGHT-ALIGNS every
+   value to a single shared right edge (`PAGE_W - MARGIN - 8`) instead of centering
+   per cell, so all values (34, 612, 10 h, 9.5 h, 1452.3 hr, 210 hr, ...) line up
+   on one vertical axis top-to-bottom across every section (Derek: "the text needs
+   to be aligned going up and down the page").
+
+Verified (Round 4): PyMuPDF reports 1 image on page 1 (1392x950, DeviceRGB,
+DCTDecode) + EurostileExtended still embedded (Type0/ttf) and section titles /
+masthead labels searchable; the wordmark is no longer duplicated as PDF text (it
+lives in the logo image). The PDF (135,142 bytes, 2 pages) uploads 201 to the TEST
+folder + sendMail 202 to pfpeter@ only. api/daily-report.js untouched.
+
 ## 7. Out of Scope
 
 - No change to `field-upload.js` (Hand Logs / GUHMA attachments still upload to the

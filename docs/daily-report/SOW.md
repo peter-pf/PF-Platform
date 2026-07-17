@@ -162,3 +162,60 @@ rows and aligned value columns. Brand from Round 2 kept. Function unchanged.
   `016ISVH6ZTE2N3KXDCK5GIEKSVQETVDY6L`, 71,193 bytes, in the TEST folder;
   sendMail AS peter@ -> 202 Accepted to `pfpeter@agentmail.to` ONLY; folder
   listing confirms the file. NOT deployed; recipient stays on TEST.
+
+---
+
+## Round 4 (2026-07-17) - charcoal header + PF logo + value alignment (styling ONLY)
+
+Derek reviewed v3 and asked for four header/alignment changes. Body styling kept.
+Function unchanged.
+
+### Changed / new files
+- `platform/functions/lib/pf-logo.js` (new, generated): base64 of
+  `dr-v4/pf-header-logo.jpg` (1392x950 baseline JPEG, 3-component RGB) + dims.
+  Same offline-generation pattern as `eurostile-font.js` so the Worker stays
+  filesystem-free.
+- `platform/functions/lib/pdf.js`:
+  - `brandHeader`: band is now CHARCOAL `#2B2F36` (was azure) with a thin azure
+    base line; band grew to 104pt. Draws the PF logo lockup (upper-left) via a new
+    `drawImage(x,y,w,h)` primitive; REMOVED the Eurostile "PIER FOUNDATIONS"
+    wordmark text and the "VIBRATORY STONE COLUMNS" tagline (the logo carries the
+    name). Title stays white on its own baseline below the lockup. Metadata labels
+    -> `PF.lightGrey`, values -> white. `LOGO_OK` guard falls back to a text
+    wordmark if the asset is missing.
+  - `drawImage`: emits `q w 0 0 h x y cm /Im0 Do Q`, sets a usage flag.
+  - `toBytes`: registers the logo as a DCTDecode Image XObject (DeviceRGB, 8bpc)
+    and adds `/XObject << /Im0 N 0 R >>` to each page's Resources.
+  - `table`: values now RIGHT-ALIGNED to a shared right edge
+    (`PAGE_W - MARGIN - 8`) instead of per-cell centered, so the value column
+    lines up top-to-bottom across all sections.
+  - Added `PF.charcoal` (#2B2F36) + `PF.lightGrey` (#C8D5DC) to the palette.
+- `platform/functions/lib/daily-report-doc.js`: unchanged logic; values now align
+  by virtue of the table() change.
+
+### Unchanged (verified)
+- `functions/api/daily-report.js` NOT touched. Submit flow, recipients
+  (TEST = pfpeter@ only), TEST folder id, Eurostile embed + ToUnicode CMap
+  identical to Round 3.
+
+### PDF approach note (logo embed)
+JPEG/DCTDecode was chosen over PNG: the prepared JPEG is baseline, 3-component,
+no Adobe APP14 marker, so the raw bytes drop straight into the stream with
+`/Filter /DCTDecode` + `/ColorSpace /DeviceRGB` - no PNG/zlib decode, no alpha
+compositing. The logo is pre-flattened onto the header charcoal so it needs no
+transparency. Reused the existing `{head, bin}` binary-stream mechanism in
+`toBytes()` (same one used for the embedded TTF).
+
+### Verification (Round 4)
+- `node --check` passes on `pf-logo.js`, `pdf.js`, `daily-report-doc.js`,
+  `daily-report.js`.
+- PyMuPDF: 2 pages; 1 image on page 1 (1392x950, DeviceRGB, DCTDecode); Eurostile
+  still embedded (Type0/ttf); section titles + masthead labels searchable; the
+  wordmark is NOT duplicated as PDF text (it lives in the logo). Sample overwritten
+  at `/home/aiciv/daily-report-build/sample.pdf` (135,142 bytes); both page PNGs
+  eyeballed - charcoal header, seamless logo (no box), title clear of the lockup,
+  values aligned on one vertical axis.
+- Live Graph e2e (Round 4 PDF): SharePoint PUT -> 201 Created, id
+  `016ISVH6YD2BE5FBR3YJHYS4DR7RK7QREX`, 135,142 bytes, in the TEST folder;
+  sendMail AS peter@ -> 202 Accepted to `pfpeter@agentmail.to` ONLY; folder
+  listing confirms the file. NOT deployed; recipient stays on TEST.

@@ -25,6 +25,10 @@
 // GID strings, so they cannot break the content stream either.
 
 import { EURO, EURO_TTF_B64 } from './eurostile-font.js';
+import { PF_LOGO, PF_LOGO_JPG_B64 } from './pf-logo.js';
+
+// Whether the embedded header logo is usable this run.
+const LOGO_OK = !!(PF_LOGO && PF_LOGO.width && PF_LOGO_JPG_B64 && PF_LOGO_JPG_B64.length > 100);
 
 const PAGE_W = 612;   // US Letter width  (8.5in * 72)
 const PAGE_H = 792;   // US Letter height (11in * 72)
@@ -46,6 +50,8 @@ export const PF = {
   body:       rgb(0x2B, 0x2F, 0x36),
   secondary:  rgb(0x5A, 0x63, 0x70),
   muted:      rgb(0x8A, 0x9A, 0xAB),
+  charcoal:   rgb(0x2B, 0x2F, 0x36),  // PF dark text = the header band background (Round 4)
+  lightGrey:  rgb(0xC8, 0xD5, 0xDC),  // muted light label text on charcoal
 };
 function rgb(r, g, b) { return [r / 255, g / 255, b / 255]; }
 function col(c) { return `${c[0].toFixed(3)} ${c[1].toFixed(3)} ${c[2].toFixed(3)}`; }
@@ -165,6 +171,16 @@ export class PdfDoc {
     return this;
   }
 
+  // Draw the header logo (Image XObject /Im0) at (x, y) lower-left, scaled to
+  // w x h user-space points via the cm matrix. Wrapped in q/Q so the image CTM
+  // does not leak into subsequent text ops. Only valid when LOGO_OK; the header
+  // guards the call. Sets a flag so toBytes() emits the XObject + resource.
+  drawImage(x, y, w, h) {
+    this._usesLogo = true;
+    this.cur.push(`q ${w.toFixed(2)} 0 0 ${h.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)} cm /Im0 Do Q`);
+    return this;
+  }
+
   // Draw one text line. kind: 'helv' | 'helvb' | 'euro'. color optional.
   _draw(text, size, kind, x, baselineY, color) {
     const c = color ? `${col(color)} rg ` : '';
@@ -207,28 +223,46 @@ export class PdfDoc {
   //            caller decides the field order (project number goes among these).
   brandHeader(title, meta) {
     meta = Array.isArray(meta) ? meta.filter((m) => m && (m.label || m.value)) : [];
-    const bandH = 96;                   // taller masthead to hold the meta block
+    // CHARCOAL masthead (Round 4). Taller band so the logo lockup fits cleanly.
+    const bandH = 104;
     const bandY = PAGE_H - bandH;
-    // full-bleed azure band + a thin darker base line for depth
-    this.fillRect(0, bandY, PAGE_W, bandH, PF.azure);
-    this.fillRect(0, bandY, PAGE_W, 4, PF.azureDark);
+    // full-bleed charcoal band (#2B2F36) + a thin azure base line for a brand cue
+    this.fillRect(0, bandY, PAGE_W, bandH, PF.charcoal);
+    this.fillRect(0, bandY, PAGE_W, 3, PF.azure);
 
-    // ---- LEFT: wordmark / tagline / title ----
-    this._draw('PIER FOUNDATIONS', 16, 'euro', MARGIN, bandY + bandH - 28, PF.white);
-    this._draw('VIBRATORY STONE COLUMNS', 7.5, 'helvb', MARGIN, bandY + bandH - 43, PF.azureLight);
-    this._draw(title, 18, 'euro', MARGIN, bandY + 20, PF.white);
+    // ---- LEFT: the PF logo lockup (already contains "PIER FOUNDATIONS") ----
+    // The JPEG is pre-flattened onto the same charcoal so it sits seamlessly with
+    // no visible box. The lockup is placed in the UPPER-left; the report title
+    // sits on its own baseline BELOW the lockup so they never overlap. The
+    // wordmark TEXT is intentionally REMOVED (the logo already carries it).
+    const titleBaseline = bandY + 15;               // fixed title baseline near band bottom
+    if (LOGO_OK) {
+      const topPad = 12;
+      const gapBelowLogo = 8;
+      // logo occupies from just below the top edge down to just above the title
+      const logoTopY = bandY + bandH - topPad;              // top edge of logo
+      const logoBottomY = titleBaseline + 16 + gapBelowLogo; // keep clear of the title
+      let logoH = logoTopY - logoBottomY;
+      let logoW = PF_LOGO.width * (logoH / PF_LOGO.height);
+      const maxW = 250;                             // cap width so it never crowds the meta
+      if (logoW > maxW) { const s2 = maxW / logoW; logoW = maxW; logoH = logoH * s2; }
+      const logoX = MARGIN - 2;
+      const logoY = logoTopY - logoH;               // lower-left of the image
+      this.drawImage(logoX, logoY, logoW, logoH);
+    } else {
+      this._draw('PIER FOUNDATIONS', 16, 'euro', MARGIN, bandY + bandH - 30, PF.white);
+    }
 
-    // ---- RIGHT: labeled metadata block ----
-    // A right-aligned two-column mini-table: muted-white labels, solid-white
-    // values. Right edge sits at the page margin; the block grows leftward.
+    // report title (white Eurostile), lower-left, clear of the logo lockup above
+    this._draw(title, 16, 'euro', MARGIN, titleBaseline, PF.white);
+
+    // ---- RIGHT: labeled metadata block (light-grey labels, white values) ----
     if (meta.length) {
       const mSize = 9.5;
-      const mLead = 14.5;
+      const mLead = 15;
       const rightEdge = PAGE_W - MARGIN;
-      // vertically center the block within the band's usable height
       const blockH = meta.length * mLead;
       let by = bandY + (bandH - blockH) / 2 + blockH - mLead + 3;
-      // label column width = widest label; value column width = widest value.
       let labelW = 0, valueW = 0;
       const rows = meta.map((m) => {
         const label = toWinAnsi((m.label || '') + ':');
@@ -238,17 +272,16 @@ export class PdfDoc {
         return { label, value };
       });
       const gap = 6;
-      // clamp so the block never collides with the left title area
-      const maxBlockW = (PAGE_W - MARGIN) - (MARGIN + 240);
+      const maxBlockW = (PAGE_W - MARGIN) - (MARGIN + 275); // leave room for logo+title
       let blockW = labelW + gap + valueW;
       if (blockW > maxBlockW) { valueW = Math.max(60, maxBlockW - gap - labelW); blockW = labelW + gap + valueW; }
-      const labelRightX = rightEdge - valueW - gap;   // labels right-aligned to here
-      const valueLeftX = rightEdge - valueW;          // values start here
+      const labelRightX = rightEdge - valueW - gap;
+      const valueLeftX = rightEdge - valueW;
       for (const r of rows) {
-        // label: right-aligned within the label column, muted white
         const lw = measure(r.label, mSize, 'helvb');
-        this._draw(r.label, mSize, 'helvb', labelRightX - lw, by, PF.azureLight);
-        // value: left-aligned in the value column, solid white (clip if huge)
+        // labels: muted light grey
+        this._draw(r.label, mSize, 'helvb', labelRightX - lw, by, PF.lightGrey);
+        // values: solid white (clip if huge)
         let v = r.value;
         while (v.length > 1 && measure(v, mSize, 'helvb') > valueW) v = v.slice(0, -1);
         if (v !== r.value && v.length > 1) v = v.slice(0, -1) + '.';
@@ -340,10 +373,16 @@ export class PdfDoc {
   }
 
   // A clean data TABLE: rows of { label, value } with a LEFT-aligned label column
-  // and a CENTERED value column on the right, plus subtle ZEBRA striping so
-  // multi-row areas are easy to scan. Pro field-report look (Fieldwire/Procore/
-  // Raken pattern). opts:
-  //   valueW      : width (pt) of the right value column (default 130)
+  // and a RIGHT-ALIGNED value column, plus subtle ZEBRA striping so multi-row
+  // areas are easy to scan. Pro field-report look (Fieldwire/Procore/Raken).
+  //
+  // Round 4 (Derek): values are RIGHT-ALIGNED to a single shared right edge
+  // (VALUE_RIGHT_X = the content right margin) instead of per-cell centered, so
+  // the whole value column lines up "going up and down the page". Every table in
+  // the document shares the same right edge, so Production/Crew/Equipment/
+  // Maintenance values all align on one vertical axis.
+  //   valueW      : reserved width (pt) of the value column (kept for the label
+  //                 wrap budget; alignment itself is to the shared right edge)
   //   size        : font size (default 10)
   //   rowH        : row height (default size*1.9)
   //   labelColor  : label text colour (default PF.body)
@@ -359,7 +398,9 @@ export class PdfDoc {
     const valueW = opts.valueW || 130;
     const gap = 10;
     const labelX = MARGIN + 8;                       // small inset from the stripe edge
-    const valueCenterX = PAGE_W - MARGIN - valueW / 2;
+    // SHARED right edge for every value in every table: the content right margin,
+    // pulled in a touch so values do not kiss the zebra edge.
+    const valueRightX = PAGE_W - MARGIN - 8;
     const labelMaxW = CONTENT_W - valueW - gap - 16;
     const labelColor = opts.labelColor || PF.body;
     const valueColor = opts.valueColor || PF.azureDark;
@@ -398,11 +439,12 @@ export class PdfDoc {
       const baseline = rowBot + (rowH - size) / 2 + size * 0.22;
       this._draw(label, size, 'helv', lx, baseline, labelColor);
 
-      // value (CENTERED in the value column, bold)
+      // value (RIGHT-ALIGNED to the shared right edge, bold) so the value column
+      // lines up top-to-bottom across every section.
       const value = toWinAnsi(r.value == null ? '' : String(r.value));
       if (value) {
         const vw = measure(value, size, 'helvb');
-        this._draw(value, size, 'helvb', valueCenterX - vw / 2, baseline, valueColor);
+        this._draw(value, size, 'helvb', valueRightX - vw, baseline, valueColor);
       }
 
       // thin row separator under each data row
@@ -492,6 +534,20 @@ export class PdfDoc {
       );
     }
 
+    // ---- embedded header logo (DCTDecode Image XObject /Im0) ---------------
+    // Baseline JPEG, 3-component -> DeviceRGB. The raw JPEG bytes go straight into
+    // the stream with /Filter /DCTDecode (no decode needed). Referenced from the
+    // page Resources /XObject and drawn via `cm ... /Im0 Do` in brandHeader.
+    let logoObjNum = 0;
+    if (LOGO_OK) {
+      const jpg = base64ToBytes(PF_LOGO_JPG_B64);
+      logoObjNum = pushBin(objects, push,
+        `<< /Type /XObject /Subtype /Image /Width ${PF_LOGO.width} /Height ${PF_LOGO.height} ` +
+        `/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpg.length} >>`,
+        jpg);
+    }
+    const xobjRes = logoObjNum ? ` /XObject << /Im0 ${logoObjNum} 0 R >>` : '';
+
     const pagesObjNum = objects.length + 1;
     push('');
 
@@ -501,7 +557,7 @@ export class PdfDoc {
       const streamObjNum = push(`<< /Length ${enc.encode(stream).length} >>\nstream\n${stream}\nendstream`);
       const pageObjNum = push(
         `<< /Type /Page /Parent ${pagesObjNum} 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] ` +
-        `/Resources << /Font << /F1 ${fontRegular} 0 R /F2 ${fontBold} 0 R /F3 ${fontDisplayNum} 0 R >> >> ` +
+        `/Resources << /Font << /F1 ${fontRegular} 0 R /F2 ${fontBold} 0 R /F3 ${fontDisplayNum} 0 R >>${xobjRes} >> ` +
         `/Contents ${streamObjNum} 0 R >>`
       );
       pageObjNums.push(pageObjNum);
