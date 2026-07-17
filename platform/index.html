@@ -401,10 +401,45 @@ table thead th {
   color: #ffffff;
   background: #2B3E50;
   border-bottom: none;
-  white-space: nowrap;
 }
 table thead th:first-child { border-radius: 6px 0 0 0; }
 table thead th:last-child { border-radius: 0 6px 0 0; }
+
+/* ============================================================
+   DEREK: WRAPPING COLUMN HEADERS (all data tables)
+   ------------------------------------------------------------
+   Column HEADER cells must show their FULL label. If the text
+   does not fit the column width, it WRAPS onto multiple lines and
+   the header row grows taller (auto height) so every column name
+   is readable. Applies to EVERY table th on the platform. Headers
+   wrap WITHIN their existing column width (we never widen the
+   column); body cells keep their own behaviour.
+     - white-space: normal   -> allow wrapping (overrides any nowrap)
+     - overflow: visible + no text-overflow -> never clip/ellipsis
+     - overflow-wrap/word-break -> break a long single word if needed
+     - height: auto + line-height -> row grows to the tallest header
+     - vertical-align: bottom -> a 1-line and a 3-line header in the
+       same row align on their baseline (labels sit just above the
+       body), so mixed heights look tidy and the sort ▲/▼ (appended
+       inline at the end of the label) stays with its last line.
+   ============================================================ */
+table th,
+.pf-table th,
+.pf-wide th,
+.pf-hl-table th,
+.pfdash-table th,
+.ts-day-table th,
+.ts-sum-table th,
+.ba-table th {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  height: auto;
+  line-height: 1.25;
+  vertical-align: bottom;
+}
 
 table tbody td {
   padding: 10px 12px;
@@ -808,7 +843,13 @@ body.role-field-ops .nav-item[data-fo-hide] {
   text-align: left; padding: 9px 12px; background: var(--bg-2);
   color: var(--text-2); font-weight: 600; font-size: 0.72rem;
   text-transform: uppercase; letter-spacing: 0.03em;
-  border-bottom: 1px solid var(--border); white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+  /* The wide table is width:max-content (content-sized columns, no fixed
+     layout), so a header with no width bound would stretch its column to fit
+     the label on one line. Cap the header width (matching the body cell max)
+     so a long label WRAPS instead of widening the column. The wrap itself is
+     enabled by the global header rule (white-space:normal !important). */
+  max-width: 320px; vertical-align: bottom;
 }
 .pf-wide td {
   padding: 9px 12px; border-bottom: 1px solid var(--border-light);
@@ -1061,7 +1102,11 @@ body.role-field-ops .nav-item[data-fo-hide] {
   color: var(--text-2); font-weight: 600; font-size: 0.72rem;
   text-transform: uppercase; letter-spacing: 0.03em;
   border-bottom: 1px solid var(--border);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  /* Headers WRAP within their fixed colgroup width (see the global header rule)
+     so the full column name is readable; the header row auto-grows to fit. The
+     table stays table-layout:fixed with its colgroup widths - wrapping does NOT
+     change column widths. (Was: overflow:hidden + ellipsis + nowrap = clipped.) */
+  vertical-align: bottom;
 }
 .pf-hl-table th.num, .pf-hl-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
 /* Clickable sortable column headers (precon bucket tables). Hover highlight +
