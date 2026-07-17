@@ -1057,6 +1057,13 @@ body.role-field-ops .nav-item[data-fo-hide] {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .pf-hl-table th.num, .pf-hl-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+/* Clickable sortable column headers (precon bucket tables). Hover highlight +
+   no text selection on repeated clicks; the active column shows an up/down arrow
+   inline (rendered by hlArrow). The Resolution + Sent-to-GGG columns are NOT
+   .pf-hl-sortable, so they get no cursor and no hover. */
+.pf-hl-table th.pf-hl-sortable { cursor: pointer; -webkit-user-select: none; user-select: none; }
+.pf-hl-table th.pf-hl-sortable:hover { color: var(--text-0); background: var(--bg-1); }
+.pf-hl-table th.pf-hl-sortable:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .pf-hl-table th.pf-hl-disc, .pf-hl-table td.pf-hl-disc { width: 34px; text-align: center; padding-left: 6px; padding-right: 6px; }
 .pf-hl-table th.pf-hl-action, .pf-hl-table td.pf-hl-action { width: 188px; white-space: normal; }
 /* GC cell: wrap + smaller font so the FULL GC name is readable at any length
@@ -13447,6 +13454,156 @@ try {
       return '<div class="pf-awm-strip">' + tiles + '</div>';
     }
 
+    // ======================================================================
+    // COLUMN-HEADER SORTING for the precon highlight (bucket) tables
+    // ======================================================================
+    // Every precon subpage (Actively Bidding, Budget Pricing, Submitted Bids,
+    // Awarded, Not Awarded, Archive - both AP and HP disciplines) renders through
+    // ONE shared function (renderHighlightTable). These helpers add clickable
+    // column-header sorting to that shared render so it applies uniformly, matching
+    // the Projects-table UX (up/down arrow, first click asc, second click desc).
+    //
+    // Sort state lives ON THE MOUNT (data-sort-idx = the highlight column index,
+    // -1 for the Project name column; data-sort-dir = 'asc'|'desc'). Because each
+    // precon-mount DOM element persists across renderMount() (only innerHTML is
+    // replaced), the state is INDEPENDENT per bucket + discipline and survives
+    // re-renders, exactly like the Projects table's window._projectsSort state and
+    // the age-filter's data-age-filter. When no header has been clicked, the mount
+    // carries no sort state and the bucket's EXISTING default order is preserved
+    // (submitted_bids = Date Submitted newest-first; others = sortByNumber).
+
+    // Classify a highlight column into a sort KIND, or null when the column is not
+    // sortable. Resolution (the action column) has no highlight entry at all, so it
+    // is never passed here. 'garbin' is a per-row checkbox control, not data -> not
+    // sortable. Everything else maps to text / money / date by its render type.
+    function hlColSortKind(h){
+      if (!h) return null;
+      switch (h.type) {
+        case 'garbin':   return null;          // checkbox control, not sortable data
+        case 'money':                          // feed money string
+        case 'effmoney':                       // override-or-feed money
+        case 'bidprice':                       // editable money override
+        case 'num':                            // quantity (LF, columns)
+        case 'diam':                           // column diameter (numeric-ish)
+          return 'money';
+        case 'date':                           // feed date
+        case 'effdate':                        // override-or-feed date
+          return 'date';
+        case 'gc':                             // feed GC name
+        case 'awgc':                           // awarded-GC-of-record
+        case 'gclist':                         // multi-GC list (sort by lead GC)
+        case 'text':                           // plain feed text
+        default:
+          return 'text';                       // any remaining feed column is text
+      }
+    }
+
+    // The comparable sort VALUE for a row `p` under highlight column `h`, using the
+    // SAME effective helpers the cell render uses (so what you see is what sorts):
+    //   money -> a finite Number (or null when blank/unparseable)
+    //   date  -> a UTC-midnight epoch Number (or null when blank/unparseable)
+    //   text  -> a lowercased String ('' when blank)
+    // null is returned for blank/unparseable money+date so blanks sort to the
+    // BOTTOM regardless of direction (handled in the comparator below).
+    function hlSortValue(disc, p, h){
+      var kind = hlColSortKind(h);
+      var f = (p && p.fields) || {};
+      if (kind === 'money') {
+        var raw;
+        if (h.type === 'effmoney')      raw = effBidValue(p);
+        else if (h.type === 'bidprice') raw = bidPriceRaw(p);
+        else if (h.type === 'diam')     { var m = pfMasterFor(p); raw = (m && m.diameter) ? m.diameter : ''; }
+        else                            raw = f[h.key];
+        if (raw == null || String(raw).trim() === '') return null;
+        var n = parseFloat(String(raw).replace(/[^0-9.\-]/g, ''));
+        return isFinite(n) ? n : null;
+      }
+      if (kind === 'date') {
+        var draw;
+        if (h.type === 'effdate' && h.field) draw = effDate(p, h.field);
+        else                                 draw = f[h.key];
+        var ymd = calParseYMD(draw);
+        if (!ymd) return null;
+        return Date.UTC(ymd.y, ymd.m, ymd.d);
+      }
+      // text
+      var t;
+      if (h.type === 'awgc' || h.type === 'gclist') {
+        try { t = (typeof window.pfAwardedGcFor === 'function') ? window.pfAwardedGcFor(p) : (p && p.gc); }
+        catch (e) { t = (p && p.gc) || f['General Contractor'] || ''; }
+      } else {
+        t = f[h.key];
+      }
+      return String(t == null ? '' : t).trim().toLowerCase();
+    }
+
+    // The comparable sort VALUE for the always-present Project (name) column.
+    function hlNameSortValue(p){
+      var f = (p && p.fields) || {};
+      return String((p && p.name) || f['Project Name'] || '').trim().toLowerCase();
+    }
+
+    // Apply the mount's active column sort to `list`, returning a sorted COPY. When
+    // the mount has no sort state (no header clicked yet) the list is returned
+    // unchanged so the bucket's default order stands. idx === -1 sorts the Project
+    // name column; idx >= 0 sorts highlights[idx]. Blank/unparseable money+date
+    // values (null) always sort to the BOTTOM in both directions; text compares via
+    // localeCompare. dir 'asc' is A->Z / small->large / oldest->newest; 'desc' is
+    // the reverse - BUT note the headers are labeled so a money/date column's FIRST
+    // click is large->small / newest->oldest (see the arrow + dir default in the
+    // header build + click handler), matching Brad's spec.
+    function applyHlSort(mount, list, highlights){
+      var idxRaw = mount.getAttribute('data-sort-idx');
+      if (idxRaw == null || idxRaw === '') return list;      // no sort chosen -> default order
+      var idx = parseInt(idxRaw, 10);
+      if (isNaN(idx)) return list;
+      var dir = (mount.getAttribute('data-sort-dir') === 'desc') ? 'desc' : 'asc';
+      var sign = (dir === 'asc') ? 1 : -1;
+
+      var kind, getVal;
+      if (idx < 0) {
+        kind = 'text';
+        getVal = function(p){ return hlNameSortValue(p); };
+      } else {
+        var h = highlights[idx];
+        if (!h) return list;                                 // stale index -> ignore
+        kind = hlColSortKind(h);
+        if (kind == null) return list;                       // non-sortable column
+        getVal = function(p){ return hlSortValue(disc, p, h); };
+      }
+
+      // Precompute (value, original-index) so the sort is STABLE (equal values keep
+      // their incoming order, which is the bucket default) and value extraction runs
+      // once per row (not O(n log n) times).
+      var decorated = list.map(function(p, i){ return { p: p, v: getVal(p), i: i }; });
+      decorated.sort(function(a, b){
+        var av = a.v, bv = b.v;
+        if (kind === 'text') {
+          // Blank text sorts to the bottom in BOTH directions (parity with money/date).
+          var ae = (av === '' || av == null), be = (bv === '' || bv == null);
+          if (ae && be) return a.i - b.i;
+          if (ae) return 1;
+          if (be) return -1;
+          var c = String(av).localeCompare(String(bv));
+          if (c !== 0) return sign * c;
+          return a.i - b.i;                                  // stable tiebreak
+        }
+        // money / date: null (blank/unparseable) always LAST, regardless of dir.
+        if (av == null && bv == null) return a.i - b.i;
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        if (av < bv) return sign * -1;
+        if (av > bv) return sign * 1;
+        return a.i - b.i;                                    // stable tiebreak
+      });
+      return decorated.map(function(d){ return d.p; });
+    }
+
+    // A discipline `disc` is bound inside renderMount when it calls these; but the
+    // helpers above take disc explicitly so they are pure. renderMount passes its
+    // own disc. hlSortValue's only disc use is future-proofing (all current lookups
+    // are disc-agnostic), kept in the signature for symmetry with colTypeMap(disc).
+
     // HIGHLIGHTS-ROW + CLICK-TO-EXPAND renderer (Actively Bidding + Budget
     // Pricing). A compact full-width table shows only the headline columns; every
     // remaining bid-log field drops into a per-project labeled detail panel that
@@ -13480,12 +13637,40 @@ try {
       var detailCols = allCols.filter(function(c){ return !hlKeys[c.key] && !gcFeedKeys[c.key] && !subLineDrop[c.key]; });
 
       // ---- header ----
+      // CLICKABLE COLUMN SORTING: each sortable header carries data-hl-sort (the
+      // highlight column index, or -1 for the Project name column) so wireHlSort()
+      // can bind a click that toggles the mount's data-sort-idx/data-sort-dir and
+      // re-renders. The active column shows an up (asc) / down (desc) arrow, exactly
+      // like the Projects table's sortArrow. opts.sortIdx / opts.sortDir carry the
+      // mount's current state in so the arrow renders on the right header. The
+      // Resolution action column (opts.actionCol) and the 'garbin' checkbox column
+      // are NON-sortable: no cursor, no arrow, no data-hl-sort, no click (per Brad -
+      // Resolution holds per-row action buttons, not sortable data).
+      var sIdx = (opts.sortIdx == null || opts.sortIdx === '') ? null : parseInt(opts.sortIdx, 10);
+      if (sIdx != null && isNaN(sIdx)) sIdx = null;
+      var sDir = (opts.sortDir === 'desc') ? 'desc' : 'asc';
+      function hlArrow(colIdx){
+        if (sIdx == null || sIdx !== colIdx) return '';
+        return sDir === 'asc' ? ' &#9650;' : ' &#9660;';   // up = asc, down = desc
+      }
+      // Project (name) column is the always-present sortable text column, idx -1.
       var thead = '<th class="pf-hl-disc" aria-label="expand"></th>'
-        + '<th>Project</th>';
-      highlights.forEach(function(h){
-        var cls = (h.type === 'money' || h.type === 'num' || h.type === 'effmoney' || h.type === 'bidprice' || h.type === 'diam') ? ' class="num"' : '';
-        thead += '<th' + cls + '>' + E(h.label || h.key) + '</th>';
+        + '<th class="pf-hl-sortable" data-hl-sort="-1" role="button" tabindex="0"'
+        + ' aria-label="Sort by Project" style="cursor:pointer">Project' + hlArrow(-1) + '</th>';
+      highlights.forEach(function(h, hi){
+        var cls = (h.type === 'money' || h.type === 'num' || h.type === 'effmoney' || h.type === 'bidprice' || h.type === 'diam') ? ' num' : '';
+        var lbl = E(h.label || h.key);
+        if (hlColSortKind(h) == null) {
+          // Non-sortable highlight column (garbin checkbox): plain header.
+          thead += '<th' + (cls ? ' class="' + cls.trim() + '"' : '') + '>' + lbl + '</th>';
+        } else {
+          var thCls = ('pf-hl-sortable' + cls).trim();
+          thead += '<th class="' + thCls + '" data-hl-sort="' + hi + '" role="button"'
+            + ' tabindex="0" aria-label="Sort by ' + lbl + '" style="cursor:pointer">'
+            + lbl + hlArrow(hi) + '</th>';
+        }
       });
+      // Resolution: explicitly NOT sortable (no cursor, no arrow, no handler).
       if (opts.actionCol) thead += '<th class="pf-hl-action">Resolution</th>';
 
       // table-layout:fixed needs a colgroup so columns size sensibly. A highlight
@@ -13900,6 +14085,51 @@ try {
         tr.addEventListener('keydown', function(ev){
           if (ev.key === 'Enter' || ev.key === ' ' || ev.key === 'Spacebar') {
             ev.preventDefault(); toggle();
+          }
+        });
+      });
+    }
+
+    // Wire clickable column-header sorting for one precon highlight mount. Each
+    // sortable header carries data-hl-sort (the highlight index, or -1 for the
+    // Project name column). Clicking toggles the mount's sort state and re-renders:
+    //   - New column: set data-sort-idx to it, and pick the FIRST-CLICK direction by
+    //     column type per Brad's spec -- text = ascending (A->Z), money/numeric =
+    //     large->small, date = newest->oldest.
+    //   - Same column again: flip data-sort-dir (asc <-> desc).
+    // The state lives on the mount (survives renderMount, independent per bucket +
+    // discipline). Keyboard (Enter/Space) mirrors the click for accessibility. The
+    // Resolution column and the garbin checkbox column have NO data-hl-sort, so they
+    // are never wired -> not sortable.
+    function wireHlSort(mount, highlights){
+      var ths = mount.querySelectorAll('th.pf-hl-sortable[data-hl-sort]');
+      if (!ths.length) return;
+      function firstDir(idx){
+        // Text sorts ascending first; money + date sort large/newest first.
+        if (idx < 0) return 'asc';                       // Project name = text
+        var h = highlights && highlights[idx];
+        var kind = h ? hlColSortKind(h) : 'text';
+        return (kind === 'money' || kind === 'date') ? 'desc' : 'asc';
+      }
+      function activate(th){
+        var idx = th.getAttribute('data-hl-sort');
+        if (idx == null) return;
+        var cur = mount.getAttribute('data-sort-idx');
+        if (cur === idx) {
+          // Same column: toggle direction.
+          var d = (mount.getAttribute('data-sort-dir') === 'desc') ? 'asc' : 'desc';
+          mount.setAttribute('data-sort-dir', d);
+        } else {
+          mount.setAttribute('data-sort-idx', idx);
+          mount.setAttribute('data-sort-dir', firstDir(parseInt(idx, 10)));
+        }
+        renderMount(mount);
+      }
+      ths.forEach(function(th){
+        th.addEventListener('click', function(){ activate(th); });
+        th.addEventListener('keydown', function(ev){
+          if (ev.key === 'Enter' || ev.key === ' ' || ev.key === 'Spacebar') {
+            ev.preventDefault(); activate(th);
           }
         });
       });
@@ -14624,6 +14854,7 @@ try {
       // + click-to-expand layout (no horizontal scroll). All other buckets keep
       // the WIDE table.
       var useHighlights = (bucket === 'actively_bidding' || bucket === 'budget_pricing' || bucket === 'submitted_bids' || bucket === 'awarded' || bucket === 'not_awarded' || bucket === 'not_bidding');
+      var hlHighlights = null;   // lifted so wireHlSort (after innerHTML) can see the columns
       if (useHighlights) {
         // Actively Bidding highlight columns are FIXED by Jonathan's spec:
         // Project Name (name cell), Design Completed Date, Due Date, City/State, GC.
@@ -14818,6 +15049,18 @@ try {
           ];
         }
         hlOpts.highlights = highlights;
+        hlHighlights = highlights;   // expose for wireHlSort after render
+        // COLUMN-HEADER SORT: apply the mount's active column sort (if any) to the
+        // (already default-sorted + filtered) list, then hand the current sort state
+        // to the renderer so the clicked header draws its arrow. When no header has
+        // been clicked the mount has no data-sort-idx and applyHlSort returns the
+        // list unchanged, preserving each bucket's default order (submitted_bids =
+        // Date Submitted newest-first; others = sortByNumber). Runs AFTER the
+        // submitted-bids aging/Hot filter (the filter already ran on `list` above),
+        // so sorting composes with filtering on the filtered rows.
+        list = applyHlSort(mount, list, highlights);
+        hlOpts.sortIdx = mount.getAttribute('data-sort-idx');
+        hlOpts.sortDir = mount.getAttribute('data-sort-dir');
         html += renderHighlightTable(disc, list, hlOpts);
       } else {
         html += renderTable(disc, list, {
@@ -14838,6 +15081,8 @@ try {
       if (canResolve()) wireDnd(mount);
       // ----- wire highlight-row expand/collapse -----
       if (useHighlights) wireHighlightExpand(mount);
+      // ----- wire clickable column-header sorting -----
+      if (useHighlights) wireHlSort(mount, hlHighlights);
       // ----- wire the Submitted Bids aging filter -----
       wireAgeFilter(mount);
 
