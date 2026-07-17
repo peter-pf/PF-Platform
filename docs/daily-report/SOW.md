@@ -331,7 +331,27 @@ requirement (filename format), then we went to production.
 - `daily-report.js` submit logic, SharePoint TEST folder id, logo + Eurostile
   embeds, and the v6 layout are otherwise unchanged.
 
-### Deploy evidence
-See the primary report / commit for the exact deploy console lines (docs gate ok,
-"Compiled Worker successfully", Functions bundle, canonical env=production, root
-HTTP 401).
+### Deploy evidence (actual console, 2026-07-17)
+```
+  ok docs gate passed
+  -> deploying to --branch main ...
+✨ Uploading _redirects
+✨ Uploading Functions bundle
+🌎 Deploying...
+✨ Deployment complete! Take a peek over at https://20600334.pf-platform.pages.dev
+     canonical: env=production branch=main created=2026-07-17T18:49:00.326567Z
+     auth gate on root: HTTP 401 (expect 401)
+```
+Note: for a Pages Functions deploy, wrangler prints "Uploading Functions bundle"
++ "Deployment complete!" (the "Compiled Worker successfully" phrasing is the
+Workers-script path); the Functions bundle uploaded and canonical is production,
+so the updated /api/daily-report endpoint is live.
+
+### Deploy gotcha hit + resolved (transient)
+The first `./deploy.sh` failed at the `npx wrangler` spawn with "sh: 1: Cannot
+fork" - the box was at ~288/300 live threads. Root cause: an ABANDONED wrangler
+deploy from a dead session (started 00:11, ~18h old) was hung holding resources.
+Confirmed nothing half-deployed (canonical still the prior day's). Cleaned up the
+orphaned deploy tree by explicit PID (not a broad pkill), cleared the stale
+`.wrangler/cache/pages.json`, thread count dropped to ~243, and re-ran a single
+clean deploy which succeeded (exit 0). No container/Docker action taken.
