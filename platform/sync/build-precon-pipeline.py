@@ -84,7 +84,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.normpath(os.path.join(HERE, "..", "data"))
 DL_DIR = os.path.join(HERE, "downloads")
 
-BID_LOG_ITEM = "016ISVH6Y7M7KQIB5C5FDLNKI5H3IZFXRK"
+# TEST MODE (2026-07-17): pointed at TEST - Write-Back Dev / Master Workbooks (TEST) /
+# PETER TEST - Project Bid Log.xlsx so the portal reflects the test workbook during
+# the write-back test phase. RESTORE the LIVE id below when done testing.
+BID_LOG_ITEM = "016ISVH63P6E5TKIHTZZHIVNYR2VMJMP62"  # TEST: PETER TEST - Project Bid Log.xlsx
+# LIVE (restore when done testing): BID_LOG_ITEM = "016ISVH6Y7M7KQIB5C5FDLNKI5H3IZFXRK"
 BID_LOG_WEBURL = (
     "https://pierfoundations.sharepoint.com/sites/pf/_layouts/15/Doc.aspx?"
     "sourcedoc=%7B04D5671F-A207-46E9-B6A9-1D3ED192DE2A%7D&file=Project%20Bid%20Log.xlsx"
