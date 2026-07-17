@@ -37,15 +37,34 @@ the privileged approve/send-to-HR actions, and the owner-only buttons) is REMOVE
   equipment owned/rental (machine + meter hours), maintenance rows, future issues,
   delays, safety, work-completed narrative, and attachment file names.
 
-## 3. Recipients (the single flip point)
+## 3. Recipients (the single flip point) -- LIVE
 
 - Server-side constant `ACTIVE_RECIPIENTS` in `functions/api/daily-report.js`.
-- TEST (current): `pfpeter@agentmail.to` ONLY. The three partners are never
-  emailed during the build/test.
-- PRODUCTION (go-live): `dfranke@`, `jreinking@`, `breinking@` (all @pierfoundations.com).
-- To flip: set `ACTIVE_RECIPIENTS = PROD_RECIPIENTS` (one line, clearly commented),
-  OR set the `DAILY_REPORT_RECIPIENTS` env var (comma-separated) which overrides
-  the constant with no code change. The client can NEVER influence recipients.
+- **PRODUCTION (LIVE as of 2026-07-17)**: `ACTIVE_RECIPIENTS = PROD_RECIPIENTS` =
+  `dfranke@pierfoundations.com`, `jreinking@pierfoundations.com`,
+  `breinking@pierfoundations.com`. Submitting a daily report now emails all three
+  partners.
+- TEST: `pfpeter@agentmail.to` ONLY (`TEST_RECIPIENTS`) - used during the six
+  layout-review rounds. To revert, set `ACTIVE_RECIPIENTS = TEST_RECIPIENTS`.
+- Emergency override without a deploy: set the `DAILY_REPORT_RECIPIENTS` env var
+  (comma-separated) which overrides the constant. The client can NEVER influence
+  recipients (server-side only).
+
+## 3b. PDF Filename Convention (Round 7, 2026-07-17)
+
+Derek's format: **`YY-MMDD-[project name].pdf`** (implemented in `pdfFilename()`
+in `lib/daily-report-doc.js`).
+- `YY-MMDD` is derived from the report DATE: `2026-07-17` -> `26-0717`
+  (2-digit year, then MMDD). Falls back to today's date if the record date is
+  malformed.
+- Then `-` then the readable PROJECT NAME, then `.pdf`. Example:
+  `26-0717-Test Data Center - Phase 1.pdf`.
+- The project name is sanitized by `safeProjectName()`: strips ONLY the
+  SharePoint/OneDrive-illegal characters (`\ / : * ? " < > |`) + control chars,
+  collapses whitespace, trims, and drops leading/trailing dots. Spaces and hyphens
+  are KEPT. Bounded to 80 chars, never empty (falls back to `Project`).
+- Upload keeps conflictBehavior `rename`, so a same-day duplicate gets a numeric
+  suffix (`... 1.pdf`).
 
 ## 4. SharePoint Target
 

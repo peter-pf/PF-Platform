@@ -293,3 +293,45 @@ with lines instead. `table()`-only change.
   `016ISVH6Y2WU2CGEU6BBCLOMZEYAQYNZRC`, 134,882 bytes, in the TEST folder;
   sendMail AS peter@ -> 202 Accepted to `pfpeter@agentmail.to` ONLY; folder
   listing confirms the file. NOT deployed; recipient stays on TEST.
+
+---
+
+## Round 7 (2026-07-17) - filename convention + GO LIVE (DEPLOYED)
+
+Derek approved the v6 layout ("use that going forward") and gave one final
+requirement (filename format), then we went to production.
+
+### Changed files
+- `platform/functions/lib/daily-report-doc.js`:
+  - `pdfFilename()` rewritten to Derek's format `YY-MMDD-[project name].pdf`
+    (e.g. `26-0717-Test Data Center - Phase 1.pdf`). YY-MMDD from the report date.
+  - New `safeProjectName()` strips only SharePoint-illegal chars
+    (`\ / : * ? " < > |`) + control chars, keeps spaces/hyphens, trims,
+    drops leading/trailing dots, bounds to 80 chars.
+- `platform/functions/api/daily-report.js`:
+  - `ACTIVE_RECIPIENTS` flipped `TEST_RECIPIENTS` -> `PROD_RECIPIENTS`
+    (dfranke@ / jreinking@ / breinking@ pierfoundations.com). GO LIVE.
+
+### Go-live sequence (executed in order)
+1. Filename code change; local sample regenerated -> `26-0717-Test Data Center -
+   Phase 1.pdf`; PyMuPDF confirms logo + Eurostile intact.
+2. TEST verification (recipients STILL pfpeter@): live Graph e2e uploaded
+   `26-0717-Test Data Center - Phase 1.pdf` to the TEST folder (201 Created, id
+   `016ISVH667OKJ576IU6FAIKRDDKFG7O2ZC`, 134,882 bytes) + sendMail 202 to
+   `pfpeter@agentmail.to` ONLY. Filename format confirmed in the folder listing.
+3. Flipped `ACTIVE_RECIPIENTS` -> `PROD_RECIPIENTS`.
+4. Deployed via `./deploy.sh` (docs gate passed; Compiled Worker successfully;
+   Functions bundle uploaded; live root returns HTTP 401 auth gate).
+5. NO post-deploy submission (would have emailed the three partners). The flow was
+   already proven end-to-end in step 2.
+
+### Confirmation
+- NO email was sent to the three partners during this process (the only test send
+  went to pfpeter@ before the flip; no submission after the flip).
+- `daily-report.js` submit logic, SharePoint TEST folder id, logo + Eurostile
+  embeds, and the v6 layout are otherwise unchanged.
+
+### Deploy evidence
+See the primary report / commit for the exact deploy console lines (docs gate ok,
+"Compiled Worker successfully", Functions bundle, canonical env=production, root
+HTTP 401).

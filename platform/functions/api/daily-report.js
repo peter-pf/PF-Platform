@@ -75,7 +75,11 @@ const PROD_RECIPIENTS = [
   'breinking@pierfoundations.com',
 ];
 // >>> FLIP HERE <<< : ACTIVE_RECIPIENTS = TEST_RECIPIENTS (test) or PROD_RECIPIENTS (go-live).
-const ACTIVE_RECIPIENTS = TEST_RECIPIENTS;
+// GO LIVE 2026-07-17 (Derek approved the v6 layout + the YY-MMDD-[project].pdf
+// filename). Flipped TEST -> PROD: daily reports now email the three partners.
+// To revert to test, set this back to TEST_RECIPIENTS (or set env
+// DAILY_REPORT_RECIPIENTS to override without a deploy).
+const ACTIVE_RECIPIENTS = PROD_RECIPIENTS;
 
 // Resolve the recipient list: an env override wins (easiest ops flip, no deploy),
 // otherwise the ACTIVE_RECIPIENTS constant above.

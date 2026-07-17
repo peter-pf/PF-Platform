@@ -140,11 +140,36 @@ export function safeComponent(v, fallback) {
   return s || fallback;
 }
 
+// Sanitize a project NAME for a SharePoint filename: strip only the characters
+// SharePoint/OneDrive forbid ( \ / : * ? " < > | ) plus control chars; KEEP
+// spaces and hyphens (Derek wants the readable project name). Collapse repeat
+// whitespace, trim, and drop any leading/trailing dots (SharePoint dislikes
+// leading/trailing dots + spaces). Bounded length. Never empty.
+export function safeProjectName(v, fallback) {
+  let s = String(v == null ? '' : v)
+    .replace(/[\\/:*?"<>|]/g, '')     // SharePoint-illegal characters
+    .replace(/[\x00-\x1f]/g, '')       // control chars
+    .replace(/\s+/g, ' ')              // collapse whitespace
+    .trim()
+    .replace(/^\.+/, '').replace(/\.+$/, '') // no leading/trailing dots
+    .trim()
+    .slice(0, 80)
+    .trim();
+  return s || (fallback || 'Project');
+}
+
+// Derek's filename convention: "YY-MMDD-[project name].pdf".
+//   YY-MMDD is derived from the report DATE (e.g. 2026-07-17 -> 26-0717).
+//   [project name] is the readable, SharePoint-safe project name.
+// conflictBehavior 'rename' on upload gives same-day duplicates a numeric suffix.
 export function pdfFilename(rec) {
-  const proj = safeComponent(rec.projectId || rec.projectName, 'project');
-  const date = safeComponent(rec.date, new Date().toISOString().slice(0, 10));
-  const short = safeComponent(rec.id, 'dr').slice(0, 12);
-  return `DailyReport_${proj}_${date}_${short}.pdf`;
+  const iso = /^\d{4}-\d{2}-\d{2}/.test(String(rec.date || ''))
+    ? String(rec.date).slice(0, 10)
+    : new Date().toISOString().slice(0, 10);
+  const [yyyy, mm, dd] = iso.split('-');
+  const datePart = `${yyyy.slice(2)}-${mm}${dd}`;               // YY-MMDD
+  const name = safeProjectName(rec.projectName || rec.projectId, 'Project');
+  return `${datePart}-${name}.pdf`;
 }
 
 // ---------------------------------------------------------------------------
