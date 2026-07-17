@@ -870,7 +870,11 @@ body.role-field-ops .nav-item[data-fo-hide] {
 .pf-wide th.pf-sticky-col, .pf-wide td.pf-sticky-col {
   position: -webkit-sticky; position: sticky; left: 0; z-index: 2;
   background: var(--bg-0); border-right: 1px solid var(--border);
-  max-width: 240px; white-space: normal;
+  /* DEREK: the sticky Project column was capped at 240px and project names were
+     cramped. Roughly double it: min-width 320px guarantees room, max-width 480px lets
+     a long name use up to ~2x the old width. The table is width:max-content so the
+     column grows to its content within these bounds; the rest of the row scrolls. */
+  min-width: 320px; max-width: 480px; white-space: normal;
 }
 .pf-wide th.pf-sticky-col { background: var(--bg-2); z-index: 3; }
 .pf-wide tr:hover td.pf-sticky-col { background: var(--bg-1); }
@@ -1093,7 +1097,12 @@ body.role-field-ops .nav-item[data-fo-hide] {
    disclosure chevron. Clicking the row drops down a labeled detail panel with
    every remaining field. No horizontal scroll: the table fits the page width. */
 .pf-hl-wrap {
-  border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+  border: 1px solid var(--border); border-radius: 10px;
+  /* Scroll horizontally (not clip) when the widened Project/name column + the other
+     columns exceed the panel width, so the name column keeps its full width and the
+     project name stays readable (Derek). overflow-y stays visible so nothing clips
+     vertically. -webkit-overflow-scrolling for smooth touch scroll. */
+  overflow-x: auto; overflow-y: visible; -webkit-overflow-scrolling: touch;
   background: var(--bg-0); margin-top: 14px;
 }
 .pf-hl-table { border-collapse: collapse; width: 100%; table-layout: fixed; font-size: 0.84rem; }
@@ -6258,7 +6267,7 @@ try {
           '<table>' +
             '<thead><tr>' +
               '<th style="cursor:pointer" onclick="window._projectsSort(\'id\')">Project #' + sortArrow('id') + '</th>' +
-              '<th style="cursor:pointer" onclick="window._projectsSort(\'name\')">Name' + sortArrow('name') + '</th>' +
+              '<th style="cursor:pointer;min-width:280px" onclick="window._projectsSort(\'name\')">Name' + sortArrow('name') + '</th>' +
               '<th style="cursor:pointer" onclick="window._projectsSort(\'gc\')">GC' + sortArrow('gc') + '</th>' +
               '<th style="cursor:pointer" onclick="window._projectsSort(\'value\')">Value' + sortArrow('value') + '</th>' +
               '<th style="cursor:pointer" onclick="window._projectsSort(\'pct\')">% Complete' + sortArrow('pct') + '</th>' +
@@ -6273,7 +6282,7 @@ try {
       html += '' +
         '<tr style="cursor:pointer" onclick="window._projectsToggleDetail(\'' + p.id + '\')">' +
           '<td style="font-weight:500">' + p.id + '</td>' +
-          '<td style="font-weight:500">' + esc(p.name) + '</td>' +
+          '<td style="font-weight:500;min-width:280px">' + esc(p.name) + '</td>' +
           '<td>' + esc(p.gc) + '</td>' +
           '<td>' + fmt(p.value) + '</td>' +
           '<td>' +
@@ -13886,17 +13895,49 @@ try {
       // table-layout:fixed needs a colgroup so columns size sensibly. A highlight
       // column may declare an explicit width (h.w) to keep wide rows from
       // overflowing; otherwise money columns default to 140px and the rest flex.
-      var colgroup = '<col style="width:34px"><col>';
+      //
+      // DEREK: the PROJECT / NAME column (the 2nd col, after the 34px disc col) used
+      // to be the ONLY flex column, so on a busy bucket (Actively Pricing = 5
+      // highlight cols + price badge + GC editor + a wide action col) it was squeezed
+      // to ~200px and the project name was unreadable. Give the name column an
+      // EXPLICIT width about 2x that (NAME_W), and compute the table's total width so
+      // the wrapper can scroll horizontally rather than crush the name. Name
+      // readability wins over fitting everything on one screen (Derek's priority).
+      var NAME_W = 340;                 // ~2x the old cramped flex width (~170-200px)
+      var totalW = 34 + NAME_W;         // running sum for the table min-width
+      var colgroup = '<col style="width:34px"><col style="width:' + NAME_W + 'px">';
       highlights.forEach(function(h){
+        // Trim slack from a couple of over-wide columns so the extra name width does
+        // not add unnecessary horizontal scroll (priority 2a: trim before scrolling).
         var w = h.w ? h.w : (h.type === 'money' ? '140px' : '');
-        colgroup += w ? ('<col style="width:' + w + '">') : '<col>';
+        if (w) {
+          var px = parseInt(w, 10);
+          if (h.key === '__sentToGarbin' && px > 108) px = 108; // 130 -> 108 (checkbox)
+          if (h.key === '__biddingGcs'  && px > 124) px = 124; // 140/160 -> 124 (GC list)
+          w = px + 'px';
+          totalW += px;
+          colgroup += '<col style="width:' + w + '">';
+        } else {
+          // a still-flexing highlight col (rare); reserve a nominal 120px for the sum
+          totalW += 120;
+          colgroup += '<col>';
+        }
       });
-      if (opts.actionCol) colgroup += '<col style="width:' + (opts.actionWidth || '188px') + '">';
+      if (opts.actionCol) {
+        var actW = parseInt(opts.actionWidth || '188px', 10);
+        totalW += actW;
+        colgroup += '<col style="width:' + (opts.actionWidth || '188px') + '">';
+      }
 
       // Compact mode (smaller font + tighter padding) for buckets with many
       // highlight columns so they fit without horizontal scroll (Submitted Bids).
       var tableCls = 'pf-hl-table' + (opts.compact ? ' pf-hl-compact' : '') + (opts.nameProminent ? ' pf-hl-nameprominent' : '');
-      var html = '<div class="pf-hl-wrap"><table class="' + tableCls + '"><colgroup>'
+      // min-width = the sum of all column widths. When that exceeds the panel the
+      // .pf-hl-wrap scrolls horizontally (overflow-x:auto) instead of shrinking the
+      // name column below NAME_W. When the panel is wider than totalW, width:100%
+      // lets the name column absorb the extra room.
+      var tableStyle = ' style="min-width:' + totalW + 'px"';
+      var html = '<div class="pf-hl-wrap"><table class="' + tableCls + '"' + tableStyle + '><colgroup>'
         + colgroup + '</colgroup><thead><tr>' + thead + '</tr></thead><tbody>';
 
       list.forEach(function(p, idx){

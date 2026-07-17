@@ -1,11 +1,16 @@
-# SRS — Wrapping Column Headers (all data tables)
+# SRS — Wrapping Column Headers + Wider Name Column (all data tables)
 
 **Module:** Platform-wide table styling
-**File:** `platform/index.html` (single-file SPA, CSS in `<style>`)
+**File:** `platform/index.html` (single-file SPA, CSS in `<style>` + `renderHighlightTable` colgroup)
 **Branch:** `website-build-20260609`
-**Owner request:** Derek — "In the header of each of those columns, if you cannot fit the
-text in the viewable area on screen, have it wrap the text and make the header height
+**Owner request 1 (wrap):** Derek — "In the header of each of those columns, if you cannot fit
+the text in the viewable area on screen, have it wrap the text and make the header height
 larger so I can actually read what each column is. Apply this to all tables."
+**Owner request 2 (name width):** Derek — "make the project header width about twice as wide as
+it is now on all pages so you can read the project name, for example i cannot see it in the
+actively pricing tab."
+
+> Section 7 covers the name-column widening. Sections 1–6 cover header wrapping.
 
 ---
 
@@ -88,3 +93,35 @@ short words that fit on one line; multi-word labels (`Budget Submission Date`, `
 Date`) wrap to 2 lines within their width. No column has an unbreakable token wider than its
 column, so no header overflows. `word-break: break-word` is the fallback if a future long
 single-token label is added to a very narrow column.
+
+---
+
+## 7. PROJECT / NAME column widened ~2x
+
+**Why:** the precon bucket tables (`pf-hl-table`) are `table-layout: fixed; width: 100%` with a
+colgroup; the NAME column was the only flex `<col>`, so on a busy bucket (Actively Pricing) it
+was squeezed to ~200px and the project name was unreadable.
+
+**Requirements:**
+- **FR-N1** Precon bucket name column gets an explicit width `NAME_W = 340px` (~2x the old ~200px
+  flex effective width). Applies to every `pf-hl-table` bucket, both disciplines.
+- **FR-N2** The table gets an explicit `min-width` = sum of all column widths, and `.pf-hl-wrap`
+  becomes `overflow-x: auto` so the row scrolls horizontally when it exceeds the panel instead of
+  crushing the name (name readability > one-screen fit — Derek's priority).
+- **FR-N3** Slack is trimmed from over-wide columns first (`Sent to GGG?` 130→108px, `Bidding GCs`
+  140/160→124px) so the wider name adds less horizontal scroll.
+- **FR-N4** The wide feasibility_review sticky Project column: `min-width: 320px; max-width: 480px`
+  (~2x the old `max-width: 240px`); still `position: sticky`.
+- **FR-N5** The Projects table Name `th` + `td`: `min-width: 280px` (auto-layout reserves room).
+- **FR-N6** Sorting, the sort ▲/▼, header wrapping, the 2-line name clamp, and sticky positioning
+  are all preserved.
+
+**Measured before/after (AP name column):** ~200px (flex) → **340px** (explicit) ≈ 1.7–2x.
+
+**Verification:** `docs/table-headers/name-width.test.js` (jsdom, computed `<col>`/style widths):
+**14/14**, with a proven before/after (old flex copy reports 0/flex and fails ≥320px; current file
+reports 340px and passes). Sort **20/20** + header-wrap **17/17** regressions green.
+
+**Caveat:** widening the name to 340px on a busy bucket pushes the table past a narrow panel, so a
+horizontal scrollbar appears on `.pf-hl-wrap`. This is intended (Derek: readable name beats fitting
+everything without scroll). On wide screens `width: 100%` still lets the name absorb extra room.
