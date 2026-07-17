@@ -207,6 +207,31 @@ masthead labels searchable; the wordmark is no longer duplicated as PDF text (it
 lives in the logo image). The PDF (135,142 bytes, 2 pages) uploads 201 to the TEST
 folder + sendMail 202 to pfpeter@ only. api/daily-report.js untouched.
 
+## 6e. Black Body Text, No Blue-on-Blue (Round 5, 2026-07-17)
+
+Derek: "I dont like the blue text over the blue background, use all black text in
+the body and headers please." BODY-ONLY change. The charcoal header (logo, white
+title, white/light-grey metadata, azure base line) is UNCHANGED from Round 4.
+
+- All body text -> BLACK (`PF.heading` #000000): section-header titles (still in
+  the Eurostile font, just black instead of azure), the Owned/Rental sub-headings,
+  the table row labels, AND the right-aligned values. `table()` label/value
+  defaults changed from `PF.body`/`PF.azureDark` to `PF.heading`; the narrative
+  `text()` primitive default color changed from `PF.body` to `PF.heading`.
+- Section-header chip background: light-azure `#E0F0FF` -> neutral light grey
+  `#F3F5F8` (`PF.bg2`). No blue behind the headers.
+- Section-header underline rule: azure -> neutral medium grey `#C8D5DC`
+  (`PF.border`).
+- Zebra row striping (light grey), section chips, Eurostile titles, and the
+  overall layout are kept. The only non-black body element is the small footer
+  caption (deliberately `PF.muted` grey - it is metadata, not report content).
+
+Verified (Round 5): PyMuPDF still reports the logo image on page 1 (1392x950,
+DeviceRGB, DCTDecode) + EurostileExtended embedded (Type0/ttf) and titles
+searchable; the PDF (135,142 bytes, 2 pages) uploads 201 to the TEST folder +
+sendMail 202 to pfpeter@ only. The charcoal header + api/daily-report.js are
+untouched.
+
 ## 7. Out of Scope
 
 - No change to `field-upload.js` (Hand Logs / GUHMA attachments still upload to the

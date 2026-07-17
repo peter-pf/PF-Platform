@@ -194,6 +194,8 @@ export class PdfDoc {
 
   // ---- content blocks ----------------------------------------------------
   // Body text (word-wrapped). opts: {size, bold, color, leading, indent}
+  // Round 5 (Derek): default body text is BLACK. Callers that want grey (e.g. the
+  // footer) pass an explicit color.
   text(str, opts) {
     opts = opts || {};
     const size = opts.size || 10;
@@ -202,7 +204,7 @@ export class PdfDoc {
     const indent = opts.indent || 0;
     const x = MARGIN + indent;
     const maxW = CONTENT_W - indent;
-    const color = opts.color || PF.body;
+    const color = opts.color || PF.heading;
     const segments = String(str == null ? '' : str).split(/\r?\n/);
     for (const seg of segments) {
       const lines = wrap(toWinAnsi(seg), size, kind, maxW);
@@ -295,8 +297,8 @@ export class PdfDoc {
     return this;
   }
 
-  // A section heading rendered as a light-azure chip with an azure Eurostile
-  // title and an azure rule beneath. opts: {top}
+  // A section heading rendered as a neutral LIGHT-GREY chip with a BLACK Eurostile
+  // title and a neutral grey rule beneath (Round 5: no blue in the body). opts: {top}
   heading(str, opts) {
     opts = opts || {};
     const size = 12;
@@ -306,13 +308,13 @@ export class PdfDoc {
     // page-break guard: header + a couple of body lines should fit
     if (this.y - (chipH + 24) < MARGIN) { this._newPage(); this.y -= 6; }
     const chipY = this.y - chipH;
-    // light-azure chip spanning the content width
-    this.fillRect(MARGIN, chipY, CONTENT_W, chipH, PF.azureLight);
-    // azure title inside the chip (Eurostile)
-    this._draw(str, size, 'euro', MARGIN + 8, chipY + 6, PF.azure);
+    // neutral light-grey chip spanning the content width (was light-azure)
+    this.fillRect(MARGIN, chipY, CONTENT_W, chipH, PF.bg2);
+    // BLACK title inside the chip (Eurostile)
+    this._draw(str, size, 'euro', MARGIN + 8, chipY + 6, PF.heading);
     this.y = chipY - 2;
-    // azure rule under the chip
-    this.rule(1.2, PF.azure);
+    // neutral medium-grey rule under the chip (was azure)
+    this.rule(1.2, PF.border);
     this.y -= 4;
     return this;
   }
@@ -385,8 +387,8 @@ export class PdfDoc {
   //                 wrap budget; alignment itself is to the shared right edge)
   //   size        : font size (default 10)
   //   rowH        : row height (default size*1.9)
-  //   labelColor  : label text colour (default PF.body)
-  //   valueColor  : value text colour (default PF.azureDark, bold)
+  //   labelColor  : label text colour (default PF.heading = black; Round 5)
+  //   valueColor  : value text colour (default PF.heading = black bold; Round 5)
   //   subLabels   : Set of labels to render as a bold sub-heading row (no value,
   //                 no stripe) -- used for "Owned"/"Rental" group headers.
   table(rows, opts) {
@@ -402,8 +404,9 @@ export class PdfDoc {
     // pulled in a touch so values do not kiss the zebra edge.
     const valueRightX = PAGE_W - MARGIN - 8;
     const labelMaxW = CONTENT_W - valueW - gap - 16;
-    const labelColor = opts.labelColor || PF.body;
-    const valueColor = opts.valueColor || PF.azureDark;
+    // Round 5 (Derek): BLACK body text, no blue. Labels + values default black.
+    const labelColor = opts.labelColor || PF.heading;
+    const valueColor = opts.valueColor || PF.heading;
     const subLabels = opts.subLabels || null;
 
     let idx = 0; // stripe index (only advances on real data rows)
@@ -416,9 +419,9 @@ export class PdfDoc {
       const rowBot = this.y - rowH;
 
       if (isSub) {
-        // group sub-heading: azure-dark bold, no stripe, no value
+        // group sub-heading: BLACK bold (Round 5), no stripe, no value
         this._draw(toWinAnsi(rawLabel), size - 0.5, 'helvb',
-          MARGIN, rowBot + (rowH - size) / 2 + size * 0.2, PF.azureDark);
+          MARGIN, rowBot + (rowH - size) / 2 + size * 0.2, PF.heading);
         this.y = rowBot;
         continue;
       }

@@ -219,3 +219,42 @@ transparency. Reused the existing `{head, bin}` binary-stream mechanism in
   `016ISVH6YD2BE5FBR3YJHYS4DR7RK7QREX`, 135,142 bytes, in the TEST folder;
   sendMail AS peter@ -> 202 Accepted to `pfpeter@agentmail.to` ONLY; folder
   listing confirms the file. NOT deployed; recipient stays on TEST.
+
+---
+
+## Round 5 (2026-07-17) - black body text, no blue-on-blue (styling ONLY)
+
+Derek: no blue text on blue background; all black body + headers. BODY-ONLY.
+The charcoal header from Round 4 is untouched.
+
+### Changed files
+- `platform/functions/lib/pdf.js` ONLY:
+  - `heading()`: chip `PF.azureLight` -> `PF.bg2` (neutral light grey #F3F5F8);
+    title colour `PF.azure` -> `PF.heading` (black, still Eurostile); underline
+    rule `PF.azure` -> `PF.border` (grey #C8D5DC).
+  - `table()`: default `labelColor` `PF.body` -> `PF.heading`; default
+    `valueColor` `PF.azureDark` -> `PF.heading`; Owned/Rental sub-heading colour
+    `PF.azureDark` -> `PF.heading`.
+  - `text()`: default body colour `PF.body` -> `PF.heading` (narrative sections
+    now black; the footer still passes `PF.muted` explicitly).
+
+### Unchanged (verified)
+- `brandHeader()` (charcoal band, logo XObject, white title, white/light-grey
+  metadata, azure base line) NOT touched.
+- `functions/api/daily-report.js` NOT touched. Submit flow, recipients
+  (TEST = pfpeter@ only), TEST folder id, logo embed, Eurostile embed + ToUnicode
+  CMap all identical to Round 4.
+- `daily-report-doc.js` NOT touched (it only passes neutral `PF.border`/`PF.muted`
+  to the footer; body colours now come from the primitives' new black defaults).
+
+### Verification (Round 5)
+- `node --check` passes on `pdf.js` + `daily-report-doc.js`.
+- PyMuPDF: 2 pages; logo image still present on page 1 (1392x950, DeviceRGB,
+  DCTDecode); EurostileExtended still embedded (Type0/ttf); titles searchable.
+  Sample overwritten at `/home/aiciv/daily-report-build/sample.pdf` (135,142
+  bytes); both page PNGs eyeballed - all body text black, grey section chips + grey
+  rules (no blue in the body), charcoal header unchanged.
+- Live Graph e2e (Round 5 PDF): SharePoint PUT -> 201 Created, id
+  `016ISVH65JMRKHHXGZONFKWSUXYK7SINU3`, 135,142 bytes, in the TEST folder;
+  sendMail AS peter@ -> 202 Accepted to `pfpeter@agentmail.to` ONLY; folder
+  listing confirms the file. NOT deployed; recipient stays on TEST.
