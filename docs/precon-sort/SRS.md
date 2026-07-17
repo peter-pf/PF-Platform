@@ -133,15 +133,45 @@ Money parse strips `$`, commas, etc. via `parseFloat(String(raw).replace(/[^0-9.
 Date parse uses `calParseYMD` (ISO `YYYY-MM-DD` + US `M/D/YY[YY]`) to a UTC-midnight epoch.
 Text compares case-insensitively via `localeCompare`.
 
+## 4a. ROOT-CAUSE BUG + FIX (shipped broken, then corrected)
+
+**Symptom (Brad, live):** clicking the Project header reordered rows, but clicking ANY
+other column header did nothing.
+
+**Root cause:** `applyHlSort` called `hlSortValue(disc, p, h)` for every `idx>=0`
+column, but `applyHlSort` had NO `disc` in scope — its signature was
+`applyHlSort(mount, list, highlights)`. Referencing the free `disc` threw
+`ReferenceError: disc is not defined` INSIDE the click handler's `renderMount` call, so
+the re-render aborted and the table never updated. The Project column (`idx === -1`)
+used `hlNameSortValue(p)`, which takes NO `disc`, so ONLY Project worked. This was the
+shared factor across every non-Project column. (A misleading code comment had even
+claimed "renderMount passes its own disc" — it did not.)
+
+**Why the original test missed it:** `sort-logic.test.js` tested the comparator in
+ISOLATION and passed `'ap'` as a literal `disc`, so it never exercised the real
+`applyHlSort` scope. Comparator-correct, integration-broken.
+
+**Fix:** `applyHlSort(disc, mount, list, highlights)` — `disc` is now the first arg,
+forwarded to `hlSortValue`. Callsite in `renderMount` passes its own `disc`. The wide
+`applyWideSort` was NOT affected (its `wideSortValue(p, col)` takes no `disc`).
+
+**Proof (before/after, real render path):** the runtime harness run against a scratch
+copy with the bug re-introduced FAILS with the exact `ReferenceError: disc is not
+defined` on the non-Project click; against the fixed file it PASSES 20/20.
+
 ## 5. Verification
 
-- **Node self-check:** `docs/precon-sort/sort-logic.test.js` re-implements the exact
-  comparator + extraction rules (both the bucket `applyHlSort` and the wide
-  `applyWideSort`) and asserts asc AND desc ordering for text, money, numeric, and date
-  columns, blanks-to-bottom, classification (garbin = non-sortable; wide type mapping),
-  no-state passthrough, stale-index passthrough, and stability. **41/41 pass**
-  (23 bucket + 18 wide, incl. the feasibility_review Project/City/Bid Total/Due Date/
-  text-typed-quantity cases).
+- **RUNTIME test (the one that would have caught it):** `docs/precon-sort/runtime-sort.test.js`
+  loads the REAL precon IIFE from index.html into jsdom with REAL columns + REAL sample
+  rows (`data/precon-pipeline.js`), renders `submitted_bids` + `feasibility_review`,
+  dispatches REAL clicks on NON-Project headers, and asserts the rendered ROW ORDER
+  actually changes and is correct asc AND desc (money/date/text), Project still sorts,
+  and Resolution/control columns stay inert. **20/20 pass.** `PF_INDEX_OVERRIDE=<path>`
+  points it at a scratch copy to prove before(fail)/after(pass).
+- **Comparator self-check:** `docs/precon-sort/sort-logic.test.js` (bucket `applyHlSort`
+  + wide `applyWideSort` rules): asc/desc for text/money/numeric/date, blanks-to-bottom,
+  classification, passthroughs, stability. **41/41 pass.** (Kept as a fast unit check,
+  now BACKED by the runtime test.)
 - **Static review:** `node --check` on the extracted main script block — clean.
 - **Live:** deployed to production; auth gate (`/` = HTTP 401) confirmed.
 

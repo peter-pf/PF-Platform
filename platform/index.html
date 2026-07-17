@@ -13715,7 +13715,7 @@ try {
     // the reverse - BUT note the headers are labeled so a money/date column's FIRST
     // click is large->small / newest->oldest (see the arrow + dir default in the
     // header build + click handler), matching Brad's spec.
-    function applyHlSort(mount, list, highlights){
+    function applyHlSort(disc, mount, list, highlights){
       var idxRaw = mount.getAttribute('data-sort-idx');
       if (idxRaw == null || idxRaw === '') return list;      // no sort chosen -> default order
       var idx = parseInt(idxRaw, 10);
@@ -13762,10 +13762,12 @@ try {
       return decorated.map(function(d){ return d.p; });
     }
 
-    // A discipline `disc` is bound inside renderMount when it calls these; but the
-    // helpers above take disc explicitly so they are pure. renderMount passes its
-    // own disc. hlSortValue's only disc use is future-proofing (all current lookups
-    // are disc-agnostic), kept in the signature for symmetry with colTypeMap(disc).
+    // NOTE: applyHlSort takes `disc` as its FIRST arg and forwards it to
+    // hlSortValue(disc, p, h). This is load-bearing: earlier this function tried to
+    // reference a free `disc` variable that is NOT in its scope, which threw
+    // ReferenceError inside the click handler for EVERY idx>=0 column (Project used
+    // hlNameSortValue with no disc, so only Project worked). renderMount MUST pass
+    // its own disc: applyHlSort(disc, mount, list, highlights).
 
     // HIGHLIGHTS-ROW + CLICK-TO-EXPAND renderer (Actively Bidding + Budget
     // Pricing). A compact full-width table shows only the headline columns; every
@@ -15221,7 +15223,7 @@ try {
         // Date Submitted newest-first; others = sortByNumber). Runs AFTER the
         // submitted-bids aging/Hot filter (the filter already ran on `list` above),
         // so sorting composes with filtering on the filtered rows.
-        list = applyHlSort(mount, list, highlights);
+        list = applyHlSort(disc, mount, list, highlights);
         hlOpts.sortIdx = mount.getAttribute('data-sort-idx');
         hlOpts.sortDir = mount.getAttribute('data-sort-dir');
         html += renderHighlightTable(disc, list, hlOpts);

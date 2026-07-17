@@ -79,31 +79,52 @@ Extended the SAME UX to the one precon table on the other renderer (the wide raw
    the default-sorted list and passes the mount's sort state into the `renderTable` opts.
    Wired `wireWideSort(mount)` in the `else` of the sort-wiring line.
 
+## BUGFIX (Round 3): non-Project columns did nothing
+
+**Root cause:** `applyHlSort(mount, list, highlights)` called `hlSortValue(disc, p, h)`
+for `idx>=0` columns, but `disc` was NOT a parameter of `applyHlSort` and not in scope
+-> `ReferenceError: disc is not defined` thrown inside the click handler's
+`renderMount`, aborting the re-render. Project (`idx===-1`) used `hlNameSortValue(p)`
+(no disc) so ONLY Project worked. Original isolation test passed a literal `'ap'` disc,
+so it never hit the real scope -> false green.
+
+**Fix (all in `platform/index.html`):**
+- `applyHlSort` signature -> `applyHlSort(disc, mount, list, highlights)`; `disc`
+  forwarded to `hlSortValue`.
+- Callsite in `renderMount` -> `list = applyHlSort(disc, mount, list, highlights);`.
+- Corrected the misleading comment that claimed disc was already passed.
+- `applyWideSort` unaffected (its `wideSortValue(p, col)` never took `disc`).
+
 ### Files
-- `platform/index.html` — feature (bucket highlight render + wide feasibility_review render).
-- `docs/precon-sort/SRS.md` — spec (buckets + feasibility_review columns, exclusions, semantics).
+- `platform/index.html` — feature + the disc bugfix.
+- `docs/precon-sort/SRS.md` — spec + §4a root cause.
 - `docs/precon-sort/SOW.md` — this file.
-- `docs/precon-sort/sort-logic.test.js` — runnable node self-check (41 assertions).
+- `docs/precon-sort/runtime-sort.test.js` — **NEW** jsdom runtime test (real click ->
+  render path, 20 assertions). This is the test that would have caught the bug.
+- `docs/precon-sort/sort-logic.test.js` — comparator unit check (41 assertions).
 
 ## Verification (evidence)
 
-- `node docs/precon-sort/sort-logic.test.js` → **41 passed, 0 failed** — 23 bucket
-  (text/money/numeric/date asc+desc, blanks-to-bottom, garbin non-sortable, no-state +
-  stale-index passthrough, stability) + 18 wide (feasibility_review Project/City/Bid
-  Total/Due Date/text-typed-quantity asc+desc, blanks-to-bottom, wide type mapping,
-  guards, stability).
-- `node --check` on the extracted main script block of index.html → clean (the only
-  regex-split "failure" is a pre-existing false positive from a `</script>` string
-  inside a JS comment, unrelated to this change and present at HEAD).
+- **RUNTIME (jsdom, real click->render):** `node docs/precon-sort/runtime-sort.test.js`
+  → **20 passed, 0 failed**. Loads the real precon IIFE + real columns/rows, renders
+  submitted_bids + feasibility_review, dispatches real header clicks, asserts row order
+  actually reorders asc+desc for money/date/text, Project sorts, Resolution inert.
+- **Before/after proof:** running the harness with `PF_INDEX_OVERRIDE` pointed at a copy
+  with the bug re-introduced FAILS with the exact `ReferenceError: disc is not defined`
+  on the non-Project click; the fixed file PASSES 20/20.
+- **Comparator unit check:** `node docs/precon-sort/sort-logic.test.js` → **41 passed,
+  0 failed** (23 bucket + 18 wide).
+- `node --check` on the extracted main script block of index.html → clean.
 - Deploy: `Uploading Functions bundle` → `Deployment complete!` → canonical
   `env=production` → `auth gate on root: HTTP 401`.
 
 ## Definition of Done
+- [x] Root cause found + fixed (`disc` passed into `applyHlSort`).
+- [x] RUNTIME test proves non-Project columns reorder rows asc+desc (before-fail/after-pass).
 - [x] Feature in index.html — bucket highlight render (all buckets, both disciplines).
 - [x] Feature in index.html — feasibility_review WIDE render (all data cols, both disciplines).
 - [x] Resolution + garbin (bucket) and Record/Resolution/Activity (wide) excluded from sort.
 - [x] Default order preserved until a header is clicked (both renders).
-- [x] Node self-check passes (41/41; asc + desc for text/money/date, blanks-to-bottom).
-- [x] SRS + SOW updated.
+- [x] SRS + SOW updated with root cause + runtime test.
 - [x] Deployed to production, 401 gate confirmed.
 - [x] Committed + pushed to `website-build-20260609`.
