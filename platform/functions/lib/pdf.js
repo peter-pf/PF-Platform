@@ -409,7 +409,6 @@ export class PdfDoc {
     const valueColor = opts.valueColor || PF.heading;
     const subLabels = opts.subLabels || null;
 
-    let idx = 0; // stripe index (only advances on real data rows)
     for (const r of rows) {
       const rawLabel = String(r.label == null ? '' : r.label);
       const isSub = subLabels && subLabels.has(rawLabel) && (r.value == null || r.value === '');
@@ -419,16 +418,15 @@ export class PdfDoc {
       const rowBot = this.y - rowH;
 
       if (isSub) {
-        // group sub-heading: BLACK bold (Round 5), no stripe, no value
+        // group sub-heading: BLACK bold (Round 5), no value
         this._draw(toWinAnsi(rawLabel), size - 0.5, 'helvb',
           MARGIN, rowBot + (rowH - size) / 2 + size * 0.2, PF.heading);
         this.y = rowBot;
         continue;
       }
 
-      // zebra background on alternate data rows
-      if (idx % 2 === 1) this.fillRect(MARGIN, rowBot, CONTENT_W, rowH, PF.bg1);
-      idx++;
+      // Round 6 (Derek): NO row background fill. Rows sit on plain white and are
+      // delineated by a thin grey separator LINE under each row instead.
 
       // label (left, wrapped to one visible line; clip with ellipsis if needed)
       let label = toWinAnsi(rawLabel);
@@ -450,8 +448,9 @@ export class PdfDoc {
         this._draw(value, size, 'helvb', valueRightX - vw, baseline, valueColor);
       }
 
-      // thin row separator under each data row
-      this.cur.push(`${col(PF.borderLt)} RG 0.4 w ${MARGIN.toFixed(2)} ${rowBot.toFixed(2)} m ${(PAGE_W - MARGIN).toFixed(2)} ${rowBot.toFixed(2)} l S`);
+      // thin grey separator LINE under each data row (#C8D5DC, 0.5pt) -- the sole
+      // row delineation now that the zebra fill is removed.
+      this.cur.push(`${col(PF.border)} RG 0.5 w ${MARGIN.toFixed(2)} ${rowBot.toFixed(2)} m ${(PAGE_W - MARGIN).toFixed(2)} ${rowBot.toFixed(2)} l S`);
 
       this.y = rowBot;
     }

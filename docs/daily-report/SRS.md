@@ -232,6 +232,29 @@ searchable; the PDF (135,142 bytes, 2 pages) uploads 201 to the TEST folder +
 sendMail 202 to pfpeter@ only. The charcoal header + api/daily-report.js are
 untouched.
 
+## 6f. Lined Rows, No Row Shading (Round 6, 2026-07-17)
+
+Derek: "Leave the background color behind headers, but remove it behind rows in
+the body. Just use lines to delineate between rows of the body." `table()`-only
+change; everything else stays as v5.
+
+- KEEP the grey section-header chips (`PF.bg2` #F3F5F8 behind Production/Crew/
+  Equipment/etc.) - unchanged.
+- REMOVE the zebra striping: the alternating `PF.bg1` row-background `fillRect`
+  (and its stripe index) is deleted. Data rows now sit on plain white.
+- The thin per-row separator LINE under each data row is kept and made the sole
+  delineation, bumped to `PF.border` (#C8D5DC) at 0.5pt for a clean lined table.
+
+Everything else unchanged from v5: all-black body text, right-aligned values,
+black Eurostile section titles, grey underline rule under the section chips, and
+the charcoal header (logo, white title, white/light-grey metadata, azure base
+line).
+
+Verified (Round 6): PyMuPDF still reports the logo image on page 1 (1392x950,
+DeviceRGB, DCTDecode) + EurostileExtended embedded (Type0/ttf) and titles
+searchable; the PDF (134,882 bytes, 2 pages) uploads 201 to the TEST folder +
+sendMail 202 to pfpeter@ only. Header + api/daily-report.js untouched.
+
 ## 7. Out of Scope
 
 - No change to `field-upload.js` (Hand Logs / GUHMA attachments still upload to the

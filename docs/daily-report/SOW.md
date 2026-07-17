@@ -258,3 +258,38 @@ The charcoal header from Round 4 is untouched.
   `016ISVH65JMRKHHXGZONFKWSUXYK7SINU3`, 135,142 bytes, in the TEST folder;
   sendMail AS peter@ -> 202 Accepted to `pfpeter@agentmail.to` ONLY; folder
   listing confirms the file. NOT deployed; recipient stays on TEST.
+
+---
+
+## Round 6 (2026-07-17) - lined rows, no row shading (styling ONLY)
+
+Derek: keep the header chip background, remove the row background; delineate rows
+with lines instead. `table()`-only change.
+
+### Changed files
+- `platform/functions/lib/pdf.js` ONLY, in `table()`:
+  - Removed the zebra `fillRect(MARGIN, rowBot, CONTENT_W, rowH, PF.bg1)` on odd
+    rows and the now-unused stripe `idx` counter. Rows sit on plain white.
+  - Kept the per-row separator line and made it the sole delineation:
+    `PF.borderLt`/0.4pt -> `PF.border` (#C8D5DC) / 0.5pt.
+
+### Unchanged (verified)
+- `heading()` grey chips (`PF.bg2`) + black Eurostile titles + grey underline rule
+  NOT touched. All-black body text, right-aligned values NOT touched.
+- `brandHeader()` (charcoal band, logo, white title, metadata, azure base line)
+  NOT touched.
+- `functions/api/daily-report.js` + `daily-report-doc.js` NOT touched. Submit flow,
+  recipients (TEST = pfpeter@ only), TEST folder id, logo + Eurostile embeds all
+  identical to Round 5.
+
+### Verification (Round 6)
+- `node --check` passes on `pdf.js`.
+- PyMuPDF: 2 pages; logo image still present (1392x950, DeviceRGB, DCTDecode);
+  EurostileExtended still embedded (Type0/ttf); titles searchable. Sample
+  overwritten at `/home/aiciv/daily-report-build/sample.pdf` (134,882 bytes); both
+  page PNGs eyeballed - grey header chips kept, data rows on white with thin grey
+  separator lines (no shading), charcoal header unchanged.
+- Live Graph e2e (Round 6 PDF): SharePoint PUT -> 201 Created, id
+  `016ISVH6Y2WU2CGEU6BBCLOMZEYAQYNZRC`, 134,882 bytes, in the TEST folder;
+  sendMail AS peter@ -> 202 Accepted to `pfpeter@agentmail.to` ONLY; folder
+  listing confirms the file. NOT deployed; recipient stays on TEST.
