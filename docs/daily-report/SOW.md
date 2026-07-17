@@ -76,3 +76,49 @@ deploy via `./deploy.sh`.
   is the intended folder or a placeholder for a production "Daily Report Output".
 - KV read-modify-write concurrency limitation is unchanged (one foreman per report
   in practice); durable fix is a future D1 migration.
+
+---
+
+## Round 2 (2026-07-17) - PF brand restyle (styling ONLY, no behavior change)
+
+Derek approved the function ("function is great") and asked for the PDF to match
+the PF website: more colorful + font changes. Achieved BOTH priorities:
+color branding AND Eurostile Extended embedding.
+
+### Changed / new files
+- `platform/functions/lib/pdf.js` (rewrote v2): added RGB fill/stroke colour, the
+  `PF` brand palette, `fillRect`, an azure `brandHeader` band, azure-chip
+  `heading`, coloured `keyVal`/`row`/`rule`, and EMBEDDED Eurostile (Type0 /
+  CIDFontType2, Identity-H) with a chunked `/ToUnicode` CMap. `EURO_OK` guard
+  falls back to Helvetica-Bold if the embed data is ever missing. `toBytes()`
+  reworked to byte-exact assembly so it can embed the raw TTF stream.
+- `platform/functions/lib/eurostile-font.js` (new, generated): uni->gid map,
+  per-gid widths, descriptor metrics, and base64 of the raw TTF. Generated from
+  `website/site/fonts/EurostileExtended.ttf` via fontTools.
+- `platform/functions/lib/daily-report-doc.js`: switched to `brandHeader`,
+  coloured the Owned/Rental subheads + footer, indented equipment rows. Same
+  fields, same data, ZERO financials.
+
+### Unchanged (verified)
+- `functions/api/daily-report.js` NOT touched. Submit flow (PDF -> email ->
+  SharePoint), recipients (TEST = pfpeter@ only), and the TEST folder id are
+  identical to Round 1.
+
+### PDF approach note
+Full (non-subset) TrueType embed was chosen over subsetting: the TTF is small
+(57KB) with complete ASCII coverage and intact glyf/loca/cmap/hmtx tables, so
+full embedding is both safe and simpler (no glyph renumbering). It did NOT
+threaten reliability, so it shipped. Had it been risky, the plan was to fall back
+to Helvetica-Bold display + color-only branding.
+
+### Verification (Round 2)
+- `node --check` passes on `pdf.js`, `eurostile-font.js`, `daily-report-doc.js`,
+  `daily-report.js`.
+- PyMuPDF: 2 pages, valid; every page reports `EurostileExtended` embedded
+  (Type0, ttf); section titles + wordmark words are searchable via the ToUnicode
+  CMap. Sample overwritten at `/home/aiciv/daily-report-build/sample.pdf`
+  (70,348 bytes) + rendered PNGs eyeballed - clean azure branding, no clutter.
+- Live Graph e2e (branded PDF): SharePoint PUT -> 201 Created, id
+  `016ISVH6YRVVK5A2HWJVG2EN45BSME6YP2`, 70,348 bytes, in the TEST folder;
+  sendMail AS peter@ -> 202 Accepted to `pfpeter@agentmail.to` ONLY; folder
+  listing confirms the file. NOT deployed; recipient stays on TEST.

@@ -91,8 +91,52 @@ Why not client-side jsPDF (approach B): a client-generated PDF is not
 authoritative and would move report layout/logic into the browser. Server-side
 keeps a single source of truth and keeps the crew UI thin.
 
+## 6b. PDF Branding / Styling (Round 2, 2026-07-17)
+
+Derek reviewed the Round 1 sample ("function is great" - no behavior change) and
+asked for the PDF to be restyled to match the Pier Foundations website
+(www.pierfoundations.com): "a little more colorful with some font changes similar
+to how our website is styled." Layout + aesthetics ONLY. Achieved: **color +
+Eurostile (both Priority 1 and Priority 2).**
+
+Brand tokens applied (from the live site stylesheet), in `lib/pdf.js` `PF` palette:
+- Accent azure `#006DB0`, azure-dark `#005A91`, azure-light `#E0F0FF`.
+- Text: heading `#000000`, body `#2B2F36`, secondary `#5A6370`, muted `#8A9AAB`.
+- Borders `#C8D5DC` / `#E2EAF0`; light backgrounds `#F9FAFD` / `#F3F5F8` / `#E8EEF2`.
+
+Visual treatment:
+- Full-bleed azure (`#006DB0`) header band across the top with a darker azure base
+  line; the wordmark "PIER FOUNDATIONS" + "Daily Field Report" title in WHITE
+  Eurostile, a "VIBRATORY STONE COLUMNS" tagline in azure-light, and the project
+  number right-aligned in white.
+- Each section title ("Production", "Crew", "Equipment", "Maintenance",
+  "Delays", "Safety", "Work Completed", "Attachments"...) sits in a light-azure
+  (`#E0F0FF`) chip with an azure Eurostile title and an azure rule beneath.
+- Right-hand values (hours, counts) in azure-dark bold; labels in secondary grey;
+  body in `#2B2F36`; muted footer.
+
+Font embedding (Priority 2 - shipped):
+- Eurostile Extended (the PF display font,
+  `website/site/fonts/EurostileExtended.ttf`, 57KB, full ASCII coverage) is
+  embedded FULL (non-subset) as a Type0 / CIDFontType2 with Identity-H encoding.
+  Display strings are encoded to 2-byte glyph IDs at write time - the most robust
+  TrueType path (no WinAnsi limits, no glyph re-mapping).
+- A `/ToUnicode` CMap (chunked into <=100-entry `bfchar` blocks) maps GIDs back to
+  Unicode so the display text stays SELECTABLE / SEARCHABLE / accessible.
+- Font data is generated into `lib/eurostile-font.js` (uni->gid map, per-gid
+  widths, descriptor metrics, base64 TTF) from the source TTF via fontTools.
+- SAFETY FALLBACK: if the embed data is unavailable, `/F3` falls back to
+  Helvetica-Bold and display text renders via the WinAnsi path, so the PDF can
+  never be broken by the branding (`EURO_OK` guard).
+
+Verified: PyMuPDF reports EurostileExtended embedded (Type0/ttf) on every page;
+section titles + wordmark words are searchable; the branded PDF still uploads
+(201) to the TEST folder and sendMail returns 202 to pfpeter@ only. The function
+behavior (submit -> PDF -> email -> SharePoint) is byte-for-byte unchanged.
+
 ## 7. Out of Scope
 
 - No change to `field-upload.js` (Hand Logs / GUHMA attachments still upload to the
   project QA/QC folder as before; the daily-report PDF is a separate output).
+- No behavior change in Round 2 - styling/layout only.
 - No production live-send in this build (recipient constant stays on TEST).
