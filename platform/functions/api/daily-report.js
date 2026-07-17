@@ -1,11 +1,18 @@
 // Cloudflare Pages Function -- /api/daily-report
 // FIELD OPERATIONS daily reports. This is the FIRST field_ops WRITE surface.
 // A foreman/leader submits a daily report per project per day; the crew hours on
-// it feed a timesheet view; the report carries an in-platform APPROVAL STATUS
-// flow (submitted -> approved -> sent-to-HR). NO mail anywhere (the "sent for
-// approval" step is a STATUS transition only). ZERO financials: this endpoint
+// it feed a timesheet view.
+//
+// NEW SUBMIT FLOW (Derek's spec, 2026-07): the OLD in-platform approval queue
+// (submitted -> approved -> sent-to-HR STATUS transitions, NO mail) is REMOVED.
+// On SUBMIT the platform now does EXACTLY THREE things and nothing else:
+//   1. Render the daily report into a PDF (server-side, see lib/daily-report-doc).
+//   2. Auto-email that PDF to a mailing list (Graph sendMail AS peter@).
+//   3. Save the same PDF into the SharePoint "Daily Report Output (Test)" folder.
+// A lightweight record is STILL written to KV for the portal's own history list,
+// but every approval-state machine field is gone. ZERO financials: this endpoint
 // stores hours, narrative, production counts, safety - NO dollars, rates, or
-// costs are accepted or returned.
+// costs are accepted, returned, or printed into the PDF.
 //
 // WHAT IT STORES
 //   daily_reports_v1 -> JSON { reports:[{
@@ -20,11 +27,10 @@
 //     maintenance:[{category, type, subcategory, item, hourAtFailure}], // per-category rows: Failure/Maintenance + subcategory + detail + machine hour -- NO $
 //     futureIssues:[{equipment, description}],// maintenance to identify later (feeds a Phase 2 compiled view) -- NO $
 //     attachments:[{name, itemId, webUrl, bucket}], // SharePoint file refs from /api/field-upload (Hand Logs / GUHM Data) -- refs only, bytes live in SharePoint, NO $
-//     status,                                // 'draft'|'submitted'|'approved'|'sent-to-HR'
+//     status,                                // 'draft'|'sent'  (no approval states anymore)
 //     createdBy, createdAt, updatedAt,
 //     submittedBy, submittedAt,              // set from session on submit
-//     approvedBy, approvedAt,                // privileged-only transition
-//     sentToHrBy, sentToHrAt                 // privileged-only transition (NO email)
+//     pdfName, pdfWebUrl, emailedTo, sentAt  // side-effect audit of the 3-step submit
 //   }], meta:{updated} }
 //   ALL fields are "v1 default - confirm with Brad".
 //
@@ -36,15 +42,64 @@
 //     field_ops area = admin/partner/business_dev/field_ops, so the CREW can
 //     read+write daily reports. /api/daily-report -> 'field_ops' in areaForPath.
 //     This area exposes ZERO financials - it is operational only.
-//   - APPROVAL transitions ('approve', 'send-to-hr') require a PRIVILEGED role
-//     (admin/partner): a field_ops session can CREATE/UPDATE/SUBMIT a report but
-//     CANNOT approve it or send it to HR. Enforced in-handler.
+//   - SUBMIT is available to any field_ops session (the crew files + distributes
+//     their own report). There is NO privileged approval tier anymore.
 //   - WRITE hardening (mirrors precon-log/bd-interaction): body cap, strict JSON
 //     -> 400, fields rebuilt + length-capped, angle brackets stripped, server-set
 //     audit + submittedBy/At from session, no eval. Private no-store.
-//   - NO mail, NO outbound fetch.
+//   - OUTBOUND: on SUBMIT ONLY, Graph sendMail + a single SharePoint PUT. Both use
+//     the app-only token minted server-side (lib/graph.js). Graph creds +
+//     SP_DRIVE_ID must all be present or submit FAILS CLOSED (5xx) - a report is
+//     NEVER silently dropped.
 
 import { requireArea } from '../lib/auth.js';
+import { graphConfigured, getGraphToken } from '../lib/graph.js';
+import {
+  renderDailyReportPdf, pdfFilename,
+  sendReportEmail, buildEmailBody, uploadReportPdf,
+} from '../lib/daily-report-doc.js';
+
+// ===========================================================================
+// RECIPIENTS  --  *** THE ONE PLACE TO FLIP TEST -> PRODUCTION ***
+// ===========================================================================
+// During build/test the daily-report PDF email goes ONLY to Peter so the three
+// partners are never bothered while the layout is being reviewed. Once Peter/Derek
+// approve the layout, comment out TEST_RECIPIENTS and uncomment PROD_RECIPIENTS
+// (or set env.DAILY_REPORT_RECIPIENTS to a comma-separated list, which overrides
+// both). This is deliberately a single server-side constant - the client can
+// NEVER influence who receives the report.
+const TEST_RECIPIENTS = ['pfpeter@agentmail.to'];
+const PROD_RECIPIENTS = [
+  'dfranke@pierfoundations.com',
+  'jreinking@pierfoundations.com',
+  'breinking@pierfoundations.com',
+];
+// >>> FLIP HERE <<< : ACTIVE_RECIPIENTS = TEST_RECIPIENTS (test) or PROD_RECIPIENTS (go-live).
+const ACTIVE_RECIPIENTS = TEST_RECIPIENTS;
+
+// Resolve the recipient list: an env override wins (easiest ops flip, no deploy),
+// otherwise the ACTIVE_RECIPIENTS constant above.
+function resolveRecipients(env) {
+  const raw = env && env.DAILY_REPORT_RECIPIENTS;
+  if (raw && String(raw).trim()) {
+    const list = String(raw).split(',').map((s) => s.trim()).filter((s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s));
+    if (list.length) return list;
+  }
+  return ACTIVE_RECIPIENTS;
+}
+
+// The SharePoint "Daily Reports Output (TEST)" folder drive-item id. FIXED on the
+// server (never client-supplied). env override so production can point at the real
+// folder without a code change; falls back to the known test folder id.
+// NOTE: the full driveItem id is 34 chars. The spec quoted the first 20
+// (016ISVH6546BCGQXTIBF); the live folder resolves to the full id below (verified
+// via a Graph folder listing during the build test). Folder lives in SP_DRIVE_ID
+// at /TEST - Write-Back Dev/Daily Reports Output (TEST).
+const DAILY_OUTPUT_FOLDER_ID_DEFAULT = '016ISVH6546BCGQXTIBFFKDG4HC7AZI27B';
+function outputFolderId(env) {
+  const v = env && env.PF_DAILY_OUTPUT_FOLDER_ID;
+  return (v && String(v).trim()) ? String(v).trim() : DAILY_OUTPUT_FOLDER_ID_DEFAULT;
+}
 
 const KV_KEY = 'daily_reports_v1';
 const MAX_BODY_BYTES = 32 * 1024;
@@ -57,9 +112,10 @@ const MAX_MAINT_ROWS = 60;   // maintenance rows cap (5 categories, each can add
 const MAX_FUTURE_ROWS = 50;  // future-issue rows cap
 const MAX_ATTACH_ROWS = 50;  // attachment refs cap (SharePoint drive-item refs)
 
-const VALID_ACTIONS = { create: 1, update: 1, submit: 1, approve: 1, 'send-to-hr': 1 };
-const VALID_STATUS = { draft: 1, submitted: 1, approved: 1, 'sent-to-HR': 1 };
-const PRIVILEGED_ACTIONS = { approve: 1, 'send-to-hr': 1 };
+// Approval actions ('approve','send-to-hr') are REMOVED. The remaining actions
+// are create/update (draft persistence) and submit (the 3-step PDF+email+SP flow).
+const VALID_ACTIONS = { create: 1, update: 1, submit: 1 };
+const VALID_STATUS = { draft: 1, sent: 1 };
 
 const JSON_HEADERS = {
   'Content-Type': 'application/json',
@@ -231,11 +287,6 @@ function cleanAttachments(input) {
   return out;
 }
 
-function isPrivileged(session) {
-  const r = session && session.role;
-  return r === 'admin' || r === 'partner';
-}
-
 // KNOWN LIMITATION: KV read-modify-write (load list -> mutate -> put), no
 // transaction, so two simultaneous writes can last-writer-wins and drop one.
 // Acceptable for the field daily-report flow (one foreman per report); the
@@ -281,7 +332,7 @@ export async function onRequestGet(context) {
   }
 }
 
-// ---- POST: create / update / submit / approve / send-to-hr -----------------
+// ---- POST: create / update / submit ----------------------------------------
 export async function onRequestPost(context) {
   const { request, env } = context;
   const session = context.data && context.data.session;
@@ -300,14 +351,7 @@ export async function onRequestPost(context) {
     const action = String((parsed && parsed.action) || '');
     if (!VALID_ACTIONS[action]) {
       return json({ status: 'error',
-        message: "action must be 'create', 'update', 'submit', 'approve' or 'send-to-hr'." }, 400);
-    }
-
-    // Approval-tier actions require admin/partner. A field_ops session can
-    // create/update/submit but NOT approve or send to HR.
-    if (PRIVILEGED_ACTIONS[action] && !isPrivileged(session)) {
-      return json({ status: 'forbidden',
-        message: 'Only an owner can approve or send a daily report to HR.' }, 403);
+        message: "action must be 'create', 'update' or 'submit'." }, 400);
     }
 
     if (!env.PF_SCHEDULE) {
@@ -367,8 +411,9 @@ export async function onRequestPost(context) {
         createdAt: nowIso,
         updatedAt: nowIso,
         submittedBy: null, submittedAt: null,
-        approvedBy: null, approvedAt: null,
-        sentToHrBy: null, sentToHrAt: null,
+        // side-effect audit (populated on submit): PDF name + SharePoint url,
+        // who it was emailed to, and when the 3-step submit completed.
+        pdfName: null, pdfWebUrl: null, emailedTo: null, sentAt: null,
       }, body);
       list.reports.push(rec);
       const stamp = await saveList(env, list.reports);
@@ -383,26 +428,85 @@ export async function onRequestPost(context) {
     if (action === 'update') {
       Object.assign(rec, buildBody(parsed, rec));
       rec.updatedAt = nowIso;
-    } else if (action === 'submit') {
-      rec.status = 'submitted';
-      rec.submittedBy = who;       // from the session
-      rec.submittedAt = nowIso;
-      rec.updatedAt = nowIso;
-    } else if (action === 'approve') {
-      rec.status = 'approved';
-      rec.approvedBy = who;
-      rec.approvedAt = nowIso;
-      rec.updatedAt = nowIso;
-    } else if (action === 'send-to-hr') {
-      // IN-PLATFORM STATUS ONLY - no email is sent.
-      rec.status = 'sent-to-HR';
-      rec.sentToHrBy = who;
-      rec.sentToHrAt = nowIso;
-      rec.updatedAt = nowIso;
+      const stamp = await saveList(env, list.reports);
+      return json({ ok: true, saved: true, action, record: rec, meta: { updated: stamp } });
     }
 
+    // ---- SUBMIT: the 3-step flow (PDF -> email -> SharePoint) ---------------
+    // NO approval queue. On submit we render the PDF, email it, and save it to
+    // SharePoint. FAIL CLOSED: if Graph/SharePoint are not configured we do NOT
+    // flip the record to 'sent' and we do NOT silently drop the report - the
+    // caller gets a 5xx and the draft is preserved so they can retry.
+    // action === 'submit'
+    if (!graphConfigured(env)) {
+      // Graph creds / SP_DRIVE_ID missing -> cannot email or upload. Fail closed.
+      return json({ status: 'error',
+        message: 'Submit is unavailable: the server email/SharePoint integration is not configured. Your draft is saved.' }, 503);
+    }
+
+    const recipients = resolveRecipients(env);
+    if (!recipients.length) {
+      return json({ status: 'error', message: 'Submit is unavailable: no recipient list is configured.' }, 503);
+    }
+
+    // Stamp submit audit onto a working copy used to render (so the PDF footer
+    // and email reflect the submit), but only persist 'sent' AFTER both side
+    // effects succeed.
+    rec.submittedBy = who;
+    rec.submittedAt = nowIso;
+
+    let token;
+    try {
+      token = await getGraphToken(env);
+    } catch (e) {
+      console.error('api/daily-report submit: token mint failed:', e && e.message);
+      return json({ status: 'error', message: 'Submit failed: could not reach the mail/SharePoint service. Your draft is saved.' }, 502);
+    }
+
+    // 1) Render the PDF (pure computation; ZERO $).
+    let pdfBytes, filename;
+    try {
+      pdfBytes = renderDailyReportPdf(rec);
+      filename = pdfFilename(rec);
+    } catch (e) {
+      console.error('api/daily-report submit: pdf render failed:', e && e.message);
+      return json({ status: 'error', message: 'Submit failed while building the PDF. Your draft is saved.' }, 500);
+    }
+
+    // 2) Email the PDF to the mailing list (AS peter@). 3) Upload to SharePoint.
+    //    Run both; require BOTH to succeed before flipping the record to 'sent'.
+    let uploaded;
+    try {
+      const subject = `PF Daily Report - ${rec.projectName || rec.projectId || 'Project'} - ${rec.date || ''}`.trim();
+      const bodyText = buildEmailBody(rec);
+      await sendReportEmail(env, token, { recipients, subject, bodyText, pdfBytes, filename });
+    } catch (e) {
+      console.error('api/daily-report submit: email failed:', e && e.message);
+      return json({ status: 'error', message: 'Submit failed while sending the email. Your draft is saved; please retry.' }, 502);
+    }
+    try {
+      uploaded = await uploadReportPdf(env, token, outputFolderId(env), filename, pdfBytes);
+    } catch (e) {
+      console.error('api/daily-report submit: SharePoint upload failed:', e && e.message);
+      // Email already went out, but SharePoint failed. Report the partial failure
+      // clearly rather than claiming success. The record stays a draft.
+      return json({ status: 'error',
+        message: 'The report was emailed but could NOT be saved to SharePoint. Please retry or notify an admin.' }, 502);
+    }
+
+    // Both side effects succeeded -> finalize the record.
+    rec.status = 'sent';
+    rec.pdfName = filename;
+    rec.pdfWebUrl = (uploaded && uploaded.webUrl) || null;
+    rec.emailedTo = recipients.slice();
+    rec.sentAt = new Date().toISOString();
+    rec.updatedAt = rec.sentAt;
+
     const stamp = await saveList(env, list.reports);
-    return json({ ok: true, saved: true, action, record: rec, meta: { updated: stamp } });
+    return json({
+      ok: true, saved: true, action, record: rec, meta: { updated: stamp },
+      distribution: { emailedTo: recipients, pdf: filename, sharepoint: uploaded },
+    });
   } catch (err) {
     console.error('api/daily-report POST error:', err);
     return json({ status: 'error', message: 'An internal error occurred.' }, 500);

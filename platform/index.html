@@ -3079,9 +3079,10 @@ document.addEventListener('click', function(e) {
   <div class="module-view" id="mod-daily-reports">
     <!-- FIELD daily reports. field_ops CAN read + write here (first field_ops
          write surface). ZERO financials: hours, narrative, production counts,
-         safety only - no dollars/rates/costs. Approval is an in-platform STATUS
-         flow (submitted -> approved -> sent-to-HR); NO email. Reads/writes
-         /api/daily-report. All data via window.esc. -->
+         safety only - no dollars/rates/costs. SUBMIT now runs a 3-step flow
+         (render PDF -> email the mailing list -> save the PDF to the SharePoint
+         "Daily Report Output (Test)" folder); the old approval queue is REMOVED.
+         Reads/writes /api/daily-report. All data via window.esc. -->
     <style>
       #mod-daily-reports .dr-card { border:1px solid var(--border,#2a2f3a); border-radius:8px; padding:14px 16px; margin-bottom:12px; }
       #mod-daily-reports label { display:block; font-size:12px; color:var(--text-3,#8a93a6); margin:8px 0 3px; }
@@ -3189,7 +3190,7 @@ document.addEventListener('click', function(e) {
 
         <div style="margin-top:12px">
           <button type="button" class="btn" id="drSaveDraft">Save draft</button>
-          <button type="button" class="btn" id="drSubmit">Submit for approval</button>
+          <button type="button" class="btn" id="drSubmit">Submit &amp; send report</button>
           <span class="dr-muted" style="font-size:12px;margin-left:8px">No email is sent. Submit is an in-platform status.</span>
         </div>
         <div class="dr-msg" data-msg style="margin-top:6px"></div>
@@ -19009,10 +19010,11 @@ try {
 <script>
 // ============================================================
 // MODULE: daily-reports - field daily report write-back (FIRST field_ops WRITE)
-// field_ops creates/submits; admin/partner approve + send-to-HR (status only, NO
-// email). Reads/writes /api/daily-report (field_ops area, ZERO financials). All
-// data via window.esc. Approval is in-platform status (submitted/approved/
-// sent-to-HR), never mail.
+// field_ops creates a draft and SUBMITS it. Submit runs the 3-step flow on the
+// server (render PDF -> email the mailing list -> save to the "Daily Report
+// Output (Test)" SharePoint folder). The old approval queue (approve/send-to-HR
+// status transitions) is REMOVED. Reads/writes /api/daily-report (field_ops
+// area, ZERO financials). All data via window.esc.
 // ============================================================
 try {
 (function () {
@@ -19582,9 +19584,21 @@ try {
       if (!res.ok || !res.body || !res.body.saved) { msg((res.body && res.body.message) || 'Save failed.', false); return; }
       var rec = res.body.record;
       if (submit) {
+        // SUBMIT = the 3-step flow: render PDF -> email the mailing list -> save
+        // the PDF to the "Daily Report Output (Test)" SharePoint folder. No
+        // approval queue. On success the record status is 'sent'.
         api('/api/daily-report', { method: 'POST', body: JSON.stringify({ action: 'submit', id: rec.id }) }).then(function (r2) {
-          if (r2.ok && r2.body && r2.body.saved) { state.reports.push(r2.body.record); msg('Submitted for approval (no email sent).', true); resetForm(); renderList(); }
-          else { state.reports.push(rec); msg((r2.body && r2.body.message) || 'Saved draft but submit failed.', false); renderList(); }
+          if (r2.ok && r2.body && r2.body.saved) {
+            state.reports.push(r2.body.record);
+            var to = (r2.body.distribution && r2.body.distribution.emailedTo) || [];
+            msg('Report sent: emailed' + (to.length ? ' to ' + to.length + ' recipient(s)' : '') + ' and saved to SharePoint.', true);
+            resetForm(); renderList();
+          } else {
+            // Draft was saved; the send step failed. Keep the draft visible.
+            state.reports.push(rec);
+            msg((r2.body && r2.body.message) || 'Draft saved but the report could not be sent. Please retry.', false);
+            renderList();
+          }
         });
       } else {
         state.reports.push(rec); msg('Draft saved.', true); resetForm(); renderList();
@@ -19609,8 +19623,11 @@ try {
   }
 
   function statusChip(st) {
-    var cls = st === 'sent-to-HR' ? 'sentToHR' : st;
-    return '<span class="dr-status ' + cls + '">' + E(st) + '</span>';
+    // Statuses are now just 'draft' and 'sent' (approval queue removed). Legacy
+    // records may still carry 'submitted'/'approved'/'sent-to-HR' - show them as-is.
+    var cls = st === 'sent' ? 'approved' : (st === 'sent-to-HR' ? 'sentToHR' : st);
+    var label = st === 'sent' ? 'sent' : st;
+    return '<span class="dr-status ' + cls + '">' + E(label) + '</span>';
   }
 
   function renderList() {
@@ -19623,10 +19640,11 @@ try {
       var prod = [];
       if (r.columnsInstalled != null) prod.push(r.columnsInstalled + ' cols');
       if (r.lfInstalled != null) prod.push(r.lfInstalled + ' LF');
+      // Approval queue removed: no Approve / Send-to-HR actions. A 'sent' report
+      // links to its PDF in SharePoint when available.
       var actions = '';
-      if (state.priv) {
-        if (r.status === 'submitted') actions += '<button type="button" class="btn btn-sm" data-approve="' + E(r.id) + '">Approve</button> ';
-        if (r.status === 'approved') actions += '<button type="button" class="btn btn-sm" data-hr="' + E(r.id) + '">Send to HR</button> ';
+      if (r.status === 'sent' && r.pdfWebUrl) {
+        actions += safeFileLink(r.pdfWebUrl, 'View PDF') + ' ';
       }
       var ownedH = (r.equipmentOwned || []).map(function (e) { return E(e.machine) + (e.hours != null ? ' (' + E(e.hours) + 'h)' : ''); }).join(', ');
       var rentalH = (r.equipmentRental || []).map(function (e) { return E(e.category) + (e.hours != null ? ' (' + E(e.hours) + 'h)' : ''); }).join(', ');
@@ -19665,17 +19683,8 @@ try {
         + (actions ? '<div style="margin-top:6px">' + actions + '</div>' : '')
         + '</div>';
     }).join('');
-    host.querySelectorAll('button[data-approve]').forEach(function (b) { b.addEventListener('click', function () { transition('approve', this.getAttribute('data-approve')); }); });
-    host.querySelectorAll('button[data-hr]').forEach(function (b) { b.addEventListener('click', function () { transition('send-to-hr', this.getAttribute('data-hr')); }); });
-  }
-
-  function transition(action, id) {
-    api('/api/daily-report', { method: 'POST', body: JSON.stringify({ action: action, id: id }) }).then(function (res) {
-      if (!res.ok || !res.body || !res.body.saved) return;
-      var i = state.reports.findIndex(function (r) { return r.id === id; });
-      if (i >= 0) state.reports[i] = res.body.record;
-      renderList();
-    }).catch(function () {});
+    // Approval queue removed - no data-approve / data-hr buttons to wire. The
+    // only per-report action is the "View PDF" SharePoint link (a plain anchor).
   }
 
   var prev = window.showModule;
