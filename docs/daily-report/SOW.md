@@ -355,3 +355,45 @@ Confirmed nothing half-deployed (canonical still the prior day's). Cleaned up th
 orphaned deploy tree by explicit PID (not a broad pkill), cleared the stale
 `.wrangler/cache/pages.json`, thread count dropped to ~243, and re-ran a single
 clean deploy which succeeded (exit 0). No container/Docker action taken.
+
+---
+
+## Round 8 (2026-07-18) - header logo + title vertical-center (LIVE, styling ONLY)
+
+Derek: "Move the logo centered vertically, still on the left. then move the
+'daily field report' text center vertically, but to the right of the logo."
+`brandHeader()`-only change. Flow stays LIVE to the 3 partners.
+
+### Changed files
+- `platform/functions/lib/pdf.js` ONLY, in `brandHeader()`:
+  - Logo: was placed upper-left (top-aligned, occupying most of the band height);
+    now sized to `bandH - 2*20pt`, width capped at 190pt, and drawn VERTICALLY
+    CENTERED on `bandCenterY = bandY + bandH/2`. Tracks its right edge
+    (`logoRightX`).
+  - Title "Daily Field Report": was on a fixed baseline BELOW the logo; now drawn
+    to the RIGHT of the logo (`titleX = logoRightX + 18`) and vertically centered
+    on `bandCenterY` (baseline `bandCenterY - titleSize*0.35`).
+  - Metadata block, charcoal background, azure base line, band height (104pt) all
+    unchanged.
+
+### Unchanged (verified)
+- Body (`heading()` grey chips + black Eurostile titles, `table()` black lined
+  rows + right-aligned values) NOT touched.
+- `functions/api/daily-report.js` NOT touched; `ACTIVE_RECIPIENTS` stays
+  `PROD_RECIPIENTS` (dfranke@ / jreinking@ / breinking@). Filename convention,
+  logo + Eurostile embeds all unchanged.
+
+### Verification (Round 8) - LOCAL ONLY (no live submission)
+- `node --check` passes on `pdf.js`.
+- Local render harness overwrote `/home/aiciv/daily-report-build/sample.pdf`
+  (134,883 bytes). PyMuPDF: 2 pages; logo image present (1392x950, DeviceRGB,
+  DCTDecode); EurostileExtended embedded; "Daily Field Report" searchable. Page-1
+  PNG confirms: logo vertically centered on the left, title vertically centered
+  immediately to its right, metadata block still on the far right, no overlap,
+  body unchanged.
+- NO live end-to-end submission (would email the 3 partners). Verification is
+  local render + post-deploy 401 gate only.
+
+### Deploy evidence
+See the primary report / commit for the deploy console (docs gate ok, Functions
+bundle uploaded, canonical env=production, root HTTP 401).

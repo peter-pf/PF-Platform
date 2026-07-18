@@ -274,6 +274,34 @@ DeviceRGB, DCTDecode) + EurostileExtended embedded (Type0/ttf) and titles
 searchable; the PDF (134,882 bytes, 2 pages) uploads 201 to the TEST folder +
 sendMail 202 to pfpeter@ only. Header + api/daily-report.js untouched.
 
+## 6g. Header Logo + Title Vertical-Center (Round 8, 2026-07-18)
+
+Derek: "Move the logo centered vertically, still on the left. then move the
+'daily field report' text center vertically, but to the right of the logo."
+`brandHeader()`-only change; the body + recipients (LIVE, 3 partners) unchanged.
+
+- The PF logo stays on the LEFT but is now VERTICALLY CENTERED on the band's
+  center line (`bandCenterY = bandY + bandH/2`), not top-aligned. Height =
+  `bandH - 2*vPad` (vPad 20pt); width capped at 190pt so the title fits beside it.
+- The "Daily Field Report" title moved to the RIGHT of the logo (starts at the
+  logo's right edge + an 18pt gap) and is also vertically centered on the same
+  center line (`baseline = bandCenterY - titleSize*0.35` for optical centering).
+  It no longer sits below the logo.
+- The right-side metadata block (Project / Date / Foreman / Weather / Project No)
+  is unchanged on the far right. No overlap between title and metadata.
+- Charcoal `#2B2F36` background, white title, azure `#006DB0` base accent line,
+  and the entire body (grey chips, black text, lined rows, right-aligned values)
+  are all unchanged. Band height stays 104pt.
+- `LOGO_OK` fallback: a vertically-centered white "PIER FOUNDATIONS" text wordmark
+  with the title placed after its measured width.
+
+Verified (Round 8): PyMuPDF reports the logo image on page 1 (1392x950, DeviceRGB,
+DCTDecode) + EurostileExtended embedded (Type0/ttf); "Daily Field Report" is
+searchable. Local sample render confirms the logo vertically centered on the left
+with the title vertically centered immediately to its right, metadata still on the
+far right, no overlap. Verified via LOCAL render only (no live submission - the
+flow is live to the 3 partners). Recipients stay PROD.
+
 ## 7. Out of Scope
 
 - No change to `field-upload.js` (Hand Logs / GUHMA attachments still upload to the

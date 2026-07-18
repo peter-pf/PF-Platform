@@ -232,31 +232,37 @@ export class PdfDoc {
     this.fillRect(0, bandY, PAGE_W, bandH, PF.charcoal);
     this.fillRect(0, bandY, PAGE_W, 3, PF.azure);
 
-    // ---- LEFT: the PF logo lockup (already contains "PIER FOUNDATIONS") ----
-    // The JPEG is pre-flattened onto the same charcoal so it sits seamlessly with
-    // no visible box. The lockup is placed in the UPPER-left; the report title
-    // sits on its own baseline BELOW the lockup so they never overlap. The
-    // wordmark TEXT is intentionally REMOVED (the logo already carries it).
-    const titleBaseline = bandY + 15;               // fixed title baseline near band bottom
+    // ---- LEFT: the PF logo lockup, VERTICALLY CENTERED in the band ----
+    // (Round 8, Derek) The JPEG is pre-flattened onto the same charcoal so it
+    // sits seamlessly with no visible box. It carries the "PIER FOUNDATIONS"
+    // wordmark, so the separate text wordmark stays removed. The logo is now
+    // centered on the band's vertical center line (not top-aligned).
+    const bandCenterY = bandY + bandH / 2;
+    let logoRightX = MARGIN;                          // where the title will start after the logo
     if (LOGO_OK) {
-      const topPad = 12;
-      const gapBelowLogo = 8;
-      // logo occupies from just below the top edge down to just above the title
-      const logoTopY = bandY + bandH - topPad;              // top edge of logo
-      const logoBottomY = titleBaseline + 16 + gapBelowLogo; // keep clear of the title
-      let logoH = logoTopY - logoBottomY;
+      const vPad = 20;                               // top+bottom breathing room
+      let logoH = bandH - vPad * 2;                  // logo height, band minus padding
       let logoW = PF_LOGO.width * (logoH / PF_LOGO.height);
-      const maxW = 250;                             // cap width so it never crowds the meta
+      const maxW = 190;                              // keep logo compact so the title fits beside it
       if (logoW > maxW) { const s2 = maxW / logoW; logoW = maxW; logoH = logoH * s2; }
       const logoX = MARGIN - 2;
-      const logoY = logoTopY - logoH;               // lower-left of the image
+      const logoY = bandCenterY - logoH / 2;         // vertically centered
       this.drawImage(logoX, logoY, logoW, logoH);
+      logoRightX = logoX + logoW;
     } else {
-      this._draw('PIER FOUNDATIONS', 16, 'euro', MARGIN, bandY + bandH - 30, PF.white);
+      // fallback text wordmark, vertically centered
+      const wmSize = 15;
+      this._draw('PIER FOUNDATIONS', wmSize, 'euro', MARGIN, bandCenterY - wmSize * 0.35, PF.white);
+      logoRightX = MARGIN + measure('PIER FOUNDATIONS', wmSize, 'euro');
     }
 
-    // report title (white Eurostile), lower-left, clear of the logo lockup above
-    this._draw(title, 16, 'euro', MARGIN, titleBaseline, PF.white);
+    // ---- report title (white Eurostile), to the RIGHT of the logo, also ----
+    // vertically centered on the band center line. Sits in the gap between the
+    // logo's right edge and the metadata block on the far right.
+    const titleSize = 16;
+    const titleX = logoRightX + 18;                  // small gap after the logo
+    const titleBaseline = bandCenterY - titleSize * 0.35; // optical vertical centering
+    this._draw(title, titleSize, 'euro', titleX, titleBaseline, PF.white);
 
     // ---- RIGHT: labeled metadata block (light-grey labels, white values) ----
     if (meta.length) {
