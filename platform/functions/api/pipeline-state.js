@@ -60,7 +60,11 @@ const MAX_BODY_BYTES = 64 * 1024;   // resolution records are tiny; generous cap
 const MAX_OVERRIDES = 2000;         // bounds storage / blast radius
 const MAX_STR = 200;
 
-const VALID_STATUS = { awarded: 1, not_awarded: 1, active: 1, submitted: 1, budget: 1, not_bidding: 1 };
+// pricing -> RELOCATE a bid INTO Actively Pricing (actively_bidding). The reverse of
+// 'budget'/'submitted': lets a Budget Pricing (or Submitted) bid be moved back to
+// Actively Pricing regardless of whether it landed there by bid-log SECTION or by a
+// prior override. Live item (deadSet=false), same as budget/submitted/active.
+const VALID_STATUS = { awarded: 1, not_awarded: 1, active: 1, submitted: 1, budget: 1, pricing: 1, not_bidding: 1 };
 
 // Statuses that land a job in the Dead Set, each with its distinguishing reason.
 //   not_awarded -> we bid and LOST   (reason: 'lost')

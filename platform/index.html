@@ -1236,12 +1236,21 @@ body.role-field-ops .nav-item[data-fo-hide] {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 8px 22px;
 }
+/* DEREK: detail-dropdown fields must WRAP within their own card. min-width:0 lets a
+   grid/flex cell shrink below its content (default min-width:auto is what lets a long
+   value push past its track and collide with the next field, e.g. Address running into
+   Site Size). white-space:normal + overflow-wrap/word-break make a long value stack
+   inside its own card instead of overflowing. overflow:hidden clips any residue. */
 .pf-hl-field { min-width: 0; }
 .pf-hl-field .pf-hl-label {
   display: block; font-size: 0.68rem; font-weight: 600; text-transform: uppercase;
   letter-spacing: 0.03em; color: var(--text-3); margin-bottom: 1px;
+  white-space: normal; overflow-wrap: break-word; word-break: break-word;
 }
-.pf-hl-field .pf-hl-value { display: block; font-size: 0.86rem; color: var(--text-1); word-break: break-word; }
+.pf-hl-field .pf-hl-value {
+  display: block; font-size: 0.86rem; color: var(--text-1); min-width: 0;
+  white-space: normal; overflow-wrap: break-word; word-break: break-word;
+}
 .pf-hl-field .pf-hl-value.num { font-variant-numeric: tabular-nums; }
 .pf-hl-detail-actions { grid-column: 1 / -1; margin-top: 4px; }
 .pf-hl-detail-actions .pf-record-link { font-size: 0.82rem; }
@@ -2319,7 +2328,7 @@ window.progress = (function () {
       <!-- 4a) Aggregate Piers -->
       <div class="nav-sub collapsed">
         <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Aggregate Piers</div>
-        <a class="nav-item" data-module="precon-ap-actively-bidding" onclick="showModule('precon-ap-actively-bidding')">Actively Pricing</a>
+        <a class="nav-item" data-module="precon-ap-actively-bidding" onclick="showModule('precon-ap-actively-bidding')">Actively Bidding</a>
         <a class="nav-item" data-module="precon-ap-budget-pricing" onclick="showModule('precon-ap-budget-pricing')">Budget Pricing</a>
         <a class="nav-item" data-module="precon-ap-feasibility-review" onclick="showModule('precon-ap-feasibility-review')">Feasibility Review</a>
         <a class="nav-item" data-module="precon-ap-submitted-bids" onclick="showModule('precon-ap-submitted-bids')">Submitted Bids</a>
@@ -2331,7 +2340,7 @@ window.progress = (function () {
       <!-- 4b) Helical Pilings -->
       <div class="nav-sub collapsed">
         <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Helical Pilings</div>
-        <a class="nav-item" data-module="precon-hp-actively-bidding" onclick="showModule('precon-hp-actively-bidding')">Actively Pricing</a>
+        <a class="nav-item" data-module="precon-hp-actively-bidding" onclick="showModule('precon-hp-actively-bidding')">Actively Bidding</a>
         <a class="nav-item" data-module="precon-hp-budget-pricing" onclick="showModule('precon-hp-budget-pricing')">Budget Pricing</a>
         <a class="nav-item" data-module="precon-hp-feasibility-review" onclick="showModule('precon-hp-feasibility-review')">Feasibility Review</a>
         <a class="nav-item" data-module="precon-hp-submitted-bids" onclick="showModule('precon-hp-submitted-bids')">Submitted Bids</a>
@@ -3688,14 +3697,14 @@ const moduleTitles = {
   // ---- Phase 1 placeholders ----
   pfadmin: 'PF Admin',
   'bd-targets': 'Business Development - Target Accounts',
-  'precon-ap-actively-bidding': 'Aggregate Piers - Actively Pricing',
+  'precon-ap-actively-bidding': 'Aggregate Piers - Actively Bidding',
   'precon-ap-budget-pricing': 'Aggregate Piers - Budget Pricing',
   'precon-ap-feasibility-review': 'Aggregate Piers - Feasibility Review',
   'precon-ap-submitted-bids': 'Aggregate Piers - Submitted Bids',
   'precon-ap-awarded': 'Aggregate Piers - Awarded',
   'precon-ap-not-awarded': 'Aggregate Piers - Not Awarded',
   'precon-ap-archive': 'Aggregate Piers - Archive',
-  'precon-hp-actively-bidding': 'Helical Pilings - Actively Pricing',
+  'precon-hp-actively-bidding': 'Helical Pilings - Actively Bidding',
   'precon-hp-budget-pricing': 'Helical Pilings - Budget Pricing',
   'precon-hp-feasibility-review': 'Helical Pilings - Feasibility Review',
   'precon-hp-submitted-bids': 'Helical Pilings - Submitted Bids',
@@ -12166,7 +12175,7 @@ try {
     var E = window.esc;
     var DISC_LABEL = { ap: 'Aggregate Piers', hp: 'Helical Pilings' };
     var BUCKET_LABEL = {
-      actively_bidding: 'Actively Pricing',
+      actively_bidding: 'Actively Bidding',
       budget_pricing: 'Budget Pricing',
       feasibility_review: 'Feasibility Review',
       submitted_bids: 'Submitted Bids',
@@ -12525,7 +12534,7 @@ try {
       var id = el.getAttribute('data-manid');
       var name = el.getAttribute('data-manname') || 'this bid';
       if (!id) return;
-      if (!window.confirm('Remove "' + name + '" from Actively Pricing? This archives the manual bid (it can be restored from KV if needed).')) return;
+      if (!window.confirm('Remove "' + name + '" from Actively Bidding? This archives the manual bid (it can be restored from KV if needed).')) return;
       var ok = postManualBid({ action: 'remove', id: id });
       if (ok) { window.pfRerenderPrecon ? window.pfRerenderPrecon() : renderAll(); }
       else { window.alert('Could not remove the bid. Please try again.'); }
@@ -13151,9 +13160,19 @@ try {
           + '<button class="pf-resolve-btn" onclick="pfResolveBid(' + kJs + ",'budget',this)\">Budget Sent</button>"
           + '<button class="pf-resolve-btn" onclick="pfResolveBid(' + kJs + ",'not_bidding',this)\">Not Bidding</button>"
           + '</div>';
+      } else if (realBucket === 'budget_pricing') {
+        // Budget Pricing: Mark Awarded + Not Awarded, PLUS "Actively Pricing" -- the
+        // reverse of Actively Pricing's "Budget Sent". Posts status 'pricing', which
+        // relocates the bid back into Actively Pricing regardless of whether it landed
+        // in Budget Pricing by bid-log section or by a prior 'budget' override. This
+        // is the touch-friendly mirror of the new DnD "Actively Pricing" zone.
+        btns = '<div class="pf-resolve-cell">'
+          + '<button class="pf-resolve-btn primary" onclick="pfResolveBid(' + kJs + ",'awarded',this)\">Mark Awarded</button>"
+          + '<button class="pf-resolve-btn" onclick="pfResolveBid(' + kJs + ",'not_awarded',this)\">Not Awarded</button>"
+          + '<button class="pf-resolve-btn" onclick="pfResolveBid(' + kJs + ",'pricing',this)\">Actively Bidding</button>"
+          + '</div>';
       } else {
-        // Other open buckets (Submitted Bids, Budget Pricing): Mark Awarded +
-        // Not Awarded (unchanged).
+        // Other open buckets (Submitted Bids): Mark Awarded + Not Awarded (unchanged).
         btns = '<div class="pf-resolve-cell">'
           + '<button class="pf-resolve-btn primary" onclick="pfResolveBid(' + kJs + ",'awarded',this)\">Mark Awarded</button>"
           + '<button class="pf-resolve-btn" onclick="pfResolveBid(' + kJs + ",'not_awarded',this)\">Not Awarded</button>"
@@ -14448,7 +14467,8 @@ try {
           if (!key) { showErr('Could not identify the bid that was dragged. Please try again.'); return; }
           var action = zone.getAttribute('data-act');
           if (action !== 'awarded' && action !== 'not_awarded' && action !== 'active'
-              && action !== 'submitted' && action !== 'budget' && action !== 'not_bidding') {
+              && action !== 'submitted' && action !== 'budget' && action !== 'pricing'
+              && action !== 'not_bidding') {
             showErr('Unknown drop target.'); return;
           }
           showErr('');
@@ -14534,6 +14554,9 @@ try {
       if (st === 'awarded' || st === 'not_awarded' || st === 'not_bidding') return null;
       if (st === 'submitted') return 'submitted_bids';
       if (st === 'budget') return 'budget_pricing';
+      // 'pricing' RELOCATES a bid back INTO Actively Pricing (actively_bidding) from
+      // Budget Pricing / Submitted, regardless of its auto (section) bucket.
+      if (st === 'pricing') return 'actively_bidding';
       if (st === 'active' || !st) {
         // No relocating override: it stays in its auto bucket. Only the three
         // in-play stage buckets contribute events.
@@ -14821,15 +14844,30 @@ try {
         // overridden to 'not_bidding' via the "Not Bidding" action. Excludes
         // not_awarded (bid-and-lost), which stays in Not Awarded.
         pullRelocated('not_bidding');
-      } else {
-        // A stage bucket (incl. actively_bidding): drop jobs overridden to a status
-        // that relocates them elsewhere (awarded, not_awarded, not_bidding,
-        // submitted, budget). Everything else (active / none) stays.
+      } else if (bucket === 'actively_bidding') {
+        // ACTIVELY PRICING. Auto actively_bidding jobs NOT overridden away (awarded/
+        // not_awarded/not_bidding/submitted/budget relocate them out; 'pricing' KEEPS
+        // them here), PLUS any job overridden to 'pricing' from ANOTHER bucket -- e.g.
+        // a Budget Pricing bid moved back via the new "Actively Pricing" action. The
+        // pullRelocated('pricing') is what makes the reverse move work for a bid whose
+        // AUTO (section) bucket is budget_pricing.
         auto.forEach(function(p){
           var ov = overrideFor(p);
           if (ov && (ov.status === 'awarded' || ov.status === 'not_awarded'
                   || ov.status === 'not_bidding' || ov.status === 'submitted'
                   || ov.status === 'budget')) return;
+          list.push(p);
+        });
+        pullRelocated('pricing');
+      } else {
+        // Any other stage bucket: drop jobs overridden to a status that relocates
+        // them elsewhere (awarded, not_awarded, not_bidding, submitted, budget,
+        // pricing). Everything else (active / none) stays.
+        auto.forEach(function(p){
+          var ov = overrideFor(p);
+          if (ov && (ov.status === 'awarded' || ov.status === 'not_awarded'
+                  || ov.status === 'not_bidding' || ov.status === 'submitted'
+                  || ov.status === 'budget' || ov.status === 'pricing')) return;
           list.push(p);
         });
       }
@@ -14965,7 +15003,7 @@ try {
           + '<label class="pf-manualbid-notes">Notes<br><textarea name="Notes" maxlength="4000" rows="2"></textarea></label>'
           + '</div>'
           + '<div class="pf-manualbid-actions">'
-          + '<button type="button" class="btn pf-manualbid-save" onclick="pfManualBidSubmit(this)">Add to Actively Pricing</button>'
+          + '<button type="button" class="btn pf-manualbid-save" onclick="pfManualBidSubmit(this)">Add to Actively Bidding</button>'
           + '<span class="pf-manualbid-msg" role="status"></span>'
           + '</div>'
           + '</div>'
@@ -15011,11 +15049,11 @@ try {
         } else if (bucket === 'not_bidding') {
           html += '<div class="pf-empty-state">Nothing archived for '
             + E(DISC_LABEL[disc] || disc)
-            + '. Projects you mark Not Bidding land here. Use Reactivate to send one back to Actively Pricing.</div>';
+            + '. Projects you mark Not Bidding land here. Use Reactivate to send one back to Actively Bidding.</div>';
         } else if (bucket === 'not_awarded') {
           html += '<div class="pf-empty-state">No Not Awarded bids for '
             + E(DISC_LABEL[disc] || disc)
-            + '. Bids you mark Not Awarded land here. Use Reactivate to send one back to Actively Pricing.</div>';
+            + '. Bids you mark Not Awarded land here. Use Reactivate to send one back to Actively Bidding.</div>';
         } else {
           html += '<div class="pf-empty-state">No jobs currently in '
             + E(BUCKET_LABEL[bucket] || bucket) + ' for ' + E(DISC_LABEL[disc] || disc)
@@ -15087,6 +15125,19 @@ try {
             + '<span class="precon-dz-sub">drag a bid here to move it to Budget Pricing</span></div>'
             + '<div class="precon-dropzone" data-act="not_bidding">Not Bidding'
             + '<span class="precon-dz-sub">drag a bid here to send to the Archive (declined)</span></div>'
+            + '</div>'
+            + '<div class="precon-dnd-hint">Drag a bid row onto a zone to change its status. The buttons in each row do the same.</div>';
+        } else if (bucket === 'budget_pricing') {
+          // Budget Pricing: Awarded + Not Awarded, PLUS "Actively Pricing" -- the
+          // reverse of Actively Pricing's "Budget Sent" -- so a bid can move back into
+          // Actively Pricing (posts status 'pricing').
+          html += '<div class="precon-dnd-bar">'
+            + '<div class="precon-dropzone" data-act="awarded">Awarded'
+            + '<span class="precon-dz-sub">drag a bid here to mark it Awarded</span></div>'
+            + '<div class="precon-dropzone" data-act="not_awarded">Not Awarded'
+            + '<span class="precon-dz-sub">drag a bid here to mark it Not Awarded</span></div>'
+            + '<div class="precon-dropzone" data-act="pricing">Actively Bidding'
+            + '<span class="precon-dz-sub">drag a bid here to move it back to Actively Bidding</span></div>'
             + '</div>'
             + '<div class="precon-dnd-hint">Drag a bid row onto a zone to change its status. The buttons in each row do the same.</div>';
         } else {
@@ -15191,6 +15242,10 @@ try {
           // stays as the feed money column.
           hlOpts.subLineKey = 'City / State';
           hlOpts.gcEditor = true; // append the editable Bidding GCs block in the expand detail
+          // Budget Pricing now carries THREE per-row buttons (Mark Awarded / Not
+          // Awarded / Actively Pricing), so widen the action column to match Actively
+          // Pricing's 3-button width; they flex-wrap to stack on narrow screens.
+          hlOpts.actionWidth = '232px';
           highlights = [
             { key: 'Due Date',       label: 'Budget Submission Date', type: 'date',   w: '170px' },
             { key: 'Follow Up Date', label: 'Follow Up Date',         type: 'date',   w: '150px' },
@@ -15436,7 +15491,7 @@ try {
       var ov = window.PF_PIPELINE.overrides || {};
 
       var html = '<div class="pf-index-head"><h2>Dead Set - Lost &amp; Declined Bids</h2>'
-        + '<div class="pf-index-meta">Bids we lost (Not Awarded) and projects we declined to bid (Not Bidding) land here. Use Reactivate to send one back to Actively Pricing.</div></div>';
+        + '<div class="pf-index-meta">Bids we lost (Not Awarded) and projects we declined to bid (Not Bidding) land here. Use Reactivate to send one back to Actively Bidding.</div></div>';
 
       if (!D) {
         root.innerHTML = html + '<div class="pf-empty-state">Pipeline data not loaded.</div>';
@@ -15516,7 +15571,7 @@ try {
       var D = window.PF_PRECON;
 
       var html = '<div class="pf-index-head"><h2>Bids Due in Next 7 Days</h2>'
-        + '<div class="pf-index-meta">Actively Pricing and Budget Pricing jobs whose due date is today or within the next 7 days, soonest first.</div></div>';
+        + '<div class="pf-index-meta">Actively Bidding and Budget Pricing jobs whose due date is today or within the next 7 days, soonest first.</div></div>';
 
       if (!D) {
         root.innerHTML = html + '<div class="pf-empty-state">Pipeline data not loaded.</div>';
@@ -15599,6 +15654,10 @@ try {
       if (st === 'not_bidding') return 'not_bidding';
       if (st === 'submitted') return 'submitted_bids';
       if (st === 'budget') return 'budget_pricing';
+      // 'pricing' relocates a bid back INTO Actively Pricing (actively_bidding), the
+      // reverse of 'budget'. Works even if the bid's auto (section) bucket is
+      // budget_pricing, because we return the target here rather than autoBucket.
+      if (st === 'pricing') return 'actively_bidding';
       // 'active' or no override: the bid stays in its auto feed bucket.
       return autoBucket;
     }
@@ -15734,7 +15793,7 @@ try {
       // PANEL 3: STAGE FUNNEL COUNTS (count strip, pf-awm tiles)
       var funnelTiles = [
         ['Feasibility Review', funnel.feasibility_review],
-        ['Actively Pricing', funnel.actively_bidding],
+        ['Actively Bidding', funnel.actively_bidding],
         ['Budget Pricing', funnel.budget_pricing],
         ['Submitted', funnel.submitted_bids],
         ['Awarded', funnel.awarded],
