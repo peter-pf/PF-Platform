@@ -87,7 +87,11 @@ DL_DIR = os.path.join(HERE, "downloads")
 # TEST MODE (2026-07-17): pointed at TEST - Write-Back Dev / Master Workbooks (TEST) /
 # PETER TEST - Project Bid Log.xlsx so the portal reflects the test workbook during
 # the write-back test phase. RESTORE the LIVE id below when done testing.
-BID_LOG_ITEM = "016ISVH63P6E5TKIHTZZHIVNYR2VMJMP62"  # TEST: PETER TEST - Project Bid Log.xlsx
+#
+# NOTE (2026-07-18): ONLY hp still reads this section-based bid log. ap now reads the
+# FLAT metadata sheet (see AP_META_* below) — its Stage COLUMN drives the buckets. This
+# BID_LOG_ITEM pointer is preserved UNCHANGED (test id) and drives hp only.
+BID_LOG_ITEM = "016ISVH63P6E5TKIHTZZHIVNYR2VMJMP62"  # TEST: PETER TEST - Project Bid Log.xlsx (hp only)
 # LIVE (restore when done testing): BID_LOG_ITEM = "016ISVH6Y7M7KQIB5C5FDLNKI5H3IZFXRK"
 BID_LOG_WEBURL = (
     "https://pierfoundations.sharepoint.com/sites/pf/_layouts/15/Doc.aspx?"
@@ -95,9 +99,50 @@ BID_LOG_WEBURL = (
     "&action=default&mobileredirect=true"
 )
 
-# Sheets to scan -> discipline key for the output payload.
+# ---------------------------------------------------------------------------
+# ap SOURCE (2026-07-18): FLAT metadata sheet — "PETER TEST - Bidding Metadata.xlsx".
+# This is the "portal reads Stage from the metadata sheet" half of the write-back
+# project. The ap discipline reads THIS workbook (Stage COLUMN -> bucket), NOT the
+# section-based bid log above. TEST WORKBOOK — do NOT point at production.
+#   Layout: row 1 = colored CATEGORY bands (ignored), row 2 = field headers,
+#           rows 3+ = one project per row. Read with data_only=True.
+AP_META_DRIVE = "b!ogeNU-bvwUevFyKNf9PvlnJJzsEhnrxMv1zdx5x3u8NS2DUHVpM_Q7YocCSzzqgA"  # TEST drive
+AP_META_ITEM = "016ISVH66XMEC5VHR24BD2SER5BIH2PMJL"  # TEST: PETER TEST - Bidding Metadata.xlsx
+AP_META_TAB = "Agg Pier Metadata"
+AP_META_HEADER_ROW = 2   # row 1 = category bands (ignore); row 2 = field headers; 3+ = data
+AP_META_SOURCE = ("SharePoint/TEST - Write-Back Dev/PETER TEST - Bidding Metadata.xlsx"
+                  " [Agg Pier Metadata]")
+
+# metadata "Stage" cell -> stage bucket (the ap replacement for section_to_bucket).
+# Blank/unknown Stage -> actively_bidding (logged as a defaulted row).
+STAGE_TO_BUCKET = {
+    "actively bidding": "actively_bidding",
+    "budget pricing": "budget_pricing",
+    "feasibility review": "feasibility_review",
+    "submitted bids": "submitted_bids",
+    "awarded": "awarded",
+    "not awarded": "not_awarded",
+}
+
+# metadata header -> portal field key rename (metadata names otherwise pass through 1:1).
+# The portal UI reads "Contact Name2"; the metadata sheet calls it "Contact Name".
+META_HEADER_RENAME = {
+    "Contact Name": "Contact Name2",
+}
+
+# The four per-unit price columns are FORMULAS in the sheet -> data_only returns None
+# (Excel hasn't cached them). We DERIVE them in the builder from the raw numerics.
+# {emitted price key: (numerator header, denominator header)}
+DERIVED_PRICES = {
+    "Price Per SF": ("Bid Total Value", "Total SF (Bldg Pad)"),
+    "Price Per LF": ("Bid Total Value", "Total LF"),
+    "Price Per Day": ("Bid Total Value", "Project Duration (Days)"),
+    "Price Per Column": ("Bid Total Value", "Total Columns"),
+}
+
+# Sheets to scan -> discipline key for the output payload. ap is handled SEPARATELY
+# from the metadata sheet (see build_ap_from_metadata); only hp reads the bid log here.
 SHEETS = [
-    ("Agg Pier Bid Log", "ap"),
     ("Helical Pier Bid Log", "hp"),
 ]
 
@@ -408,18 +453,170 @@ def extract(ws, disc_key):
     return buckets, uncategorized, columns
 
 
+def download_ap_metadata():
+    """Download the FLAT ap metadata workbook (TEST) to downloads/."""
+    os.makedirs(DL_DIR, exist_ok=True)
+    fp = os.path.join(DL_DIR, "AP_Bidding_Metadata.xlsx")
+    url = "https://graph.microsoft.com/v1.0/drives/%s/items/%s/content" % (
+        AP_META_DRIVE, AP_META_ITEM)
+    req = urllib.request.Request(url, headers={"Authorization": "Bearer " + _token()})
+    with urllib.request.urlopen(req, timeout=120) as r, open(fp, "wb") as f:
+        f.write(r.read())
+    print("  downloaded AP_Bidding_Metadata.xlsx (%d bytes)" % os.path.getsize(fp))
+    return fp
+
+
+def meta_ordered_headers(ws):
+    """[(raw_header, emitted_key, 1-indexed col)] for the metadata header row (row 2),
+    in sheet order. Applies META_HEADER_RENAME (Contact Name -> Contact Name2)."""
+    out = []
+    for c in range(1, ws.max_column + 1):
+        v = ws.cell(row=AP_META_HEADER_ROW, column=c).value
+        if v in (None, ""):
+            continue
+        raw = str(v).strip()
+        emit = META_HEADER_RENAME.get(raw, raw)
+        out.append((raw, emit, c))
+    return out
+
+
+def stage_to_bucket_meta(stage_val):
+    """Map a metadata Stage cell to a bucket. Returns (bucket, defaulted_flag).
+    Blank/unknown -> actively_bidding with defaulted_flag=True (logged)."""
+    low = clean(stage_val).strip().lower()
+    if low in STAGE_TO_BUCKET:
+        return STAGE_TO_BUCKET[low], False
+    return "actively_bidding", True   # blank/unknown default (clearly logged)
+
+
+def build_ap_from_metadata():
+    """Build the ap payload (buckets, columns) from the FLAT metadata sheet.
+
+    Stage COLUMN drives the buckets (NOT section headings). One project per row from
+    row 3 down. Emits the SAME record shape the section-based path did (convenience
+    keys + `fields` dict + `columns` schema) so the portal UI + write-back overrides
+    read it identically. jobId is derived CLIENT-SIDE from number/name/gc, so we emit
+    those convenience keys exactly as before -> stable ids preserved.
+
+    Returns (buckets_dict, columns_list, defaulted_rows_list)."""
+    fp = download_ap_metadata()
+    wb = openpyxl.load_workbook(fp, read_only=True, data_only=True)
+    if AP_META_TAB not in wb.sheetnames:
+        raise SystemExit("  FATAL: ap metadata tab '%s' not found (have: %s)" %
+                         (AP_META_TAB, ", ".join(wb.sheetnames)))
+    ws = wb[AP_META_TAB]
+
+    ordered = meta_ordered_headers(ws)          # [(raw, emit, col)]
+    by_raw = {raw: col for (raw, _e, col) in ordered}   # raw header -> col (for lookups)
+
+    # columns schema: emitted keys in sheet order, typed via the shared column_type().
+    # (column_type: any header containing "date" -> date; money headers -> money;
+    #  Hot / Sent to Garbin / Feasibility Verdict / etc. -> text.)
+    columns = [{"key": emit, "type": column_type(emit)} for (_raw, emit, _c) in ordered]
+
+    buckets = {b: [] for b in BUCKETS}
+    defaulted = []   # rows whose Stage was blank/unknown -> defaulted to actively_bidding
+
+    c_num = by_raw.get("Project Number")
+    c_name = by_raw.get("Project Name")
+    c_city = by_raw.get("City / State")
+    c_gc = by_raw.get("General Contractor")
+    c_stat = by_raw.get("Bid Status")
+    c_val = by_raw.get("Bid Total Value")
+    c_due = by_raw.get("Due Date")
+    c_invite = by_raw.get("Invite Date")
+    c_stage = by_raw.get("Stage")
+
+    def rawnum(header):
+        """Raw numeric of a metadata cell by header, or None (for derived prices)."""
+        col = by_raw.get(header)
+        if not col:
+            return None
+        return num_or_none(ws.cell(row=_r, column=col).value)
+
+    counted = 0
+    for _r in range(AP_META_HEADER_ROW + 1, ws.max_row + 1):
+        number = clean(ws.cell(row=_r, column=c_num).value) if c_num else ""
+        name = clean(ws.cell(row=_r, column=c_name).value) if c_name else ""
+        # A row is a project if it has a name or number; skip pure spacer rows.
+        if not name and not number:
+            continue
+        if name.lower() in NON_JOB_NAMES:
+            continue
+
+        stage_val = ws.cell(row=_r, column=c_stage).value if c_stage else None
+        bucket, was_defaulted = stage_to_bucket_meta(stage_val)
+
+        status_raw = ws.cell(row=_r, column=c_stat).value if c_stat else None
+        completed = clean(status_raw).lower().startswith("completed")
+
+        # FULL field set, keyed by EMITTED header (Contact Name -> Contact Name2),
+        # in sheet order. Blank cells stay blank; money/date formatted for display.
+        row_fields = {}
+        for (raw, emit, col) in ordered:
+            row_fields[emit] = fmt_cell(ws.cell(row=_r, column=col).value,
+                                        column_type(emit))
+
+        # DERIVE per-unit prices (sheet formulas are uncached -> None). Guard div-by-0
+        # / missing -> blank. Overwrite whatever blank the raw formula cell produced.
+        val_num = rawnum("Bid Total Value")
+        for pkey, (num_h, den_h) in DERIVED_PRICES.items():
+            n = rawnum(num_h)
+            d = rawnum(den_h)
+            if n is None or d in (None, 0):
+                row_fields[pkey] = ""      # can't derive -> blank (never a divide error)
+            else:
+                row_fields[pkey] = fmt_money(n / d)
+
+        job = {
+            # convenience keys (jobId derived client-side from number/name/gc — keep
+            # these identical to the section path so ids stay stable).
+            "number": number,
+            "name": name,
+            "city_state": clean(ws.cell(row=_r, column=c_city).value) if c_city else "",
+            "gc": clean(ws.cell(row=_r, column=c_gc).value) if c_gc else "",
+            "value": val_num,
+            "due_date": clean_date(ws.cell(row=_r, column=c_due).value) if c_due else "",
+            "invite_date": clean_date(ws.cell(row=_r, column=c_invite).value) if c_invite else "",
+            "completed": completed,
+            "record": RECORD_LINKS.get(number),
+            "fields": row_fields,
+        }
+        buckets[bucket].append(job)
+        counted += 1
+        if was_defaulted:
+            defaulted.append({"name": name, "number": number,
+                              "stage_raw": clean(stage_val)})
+
+    print("  ap (metadata sheet '%s'): %d projects bucketed by Stage COLUMN" %
+          (AP_META_TAB, counted))
+    for b in BUCKETS:
+        print("      %-18s %d" % (b, len(buckets[b])))
+    if defaulted:
+        for d in defaulted:
+            print("      DEFAULTED (blank/unknown Stage %r) -> actively_bidding: %s" %
+                  (d["stage_raw"], d["name"]))
+    print("      columns captured: %d -> %s" %
+          (len(columns), ", ".join(c["key"] for c in columns)))
+    return buckets, columns, defaulted
+
+
 def main():
     print("PF Preconstruction pipeline build — %s UTC" %
           datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"))
-    print("Authenticating + downloading bid log...")
+    print("Building ap from FLAT metadata sheet (Stage COLUMN drives buckets)...")
+    ap_buckets, ap_columns, ap_defaulted = build_ap_from_metadata()
+
+    print("Authenticating + downloading bid log (hp)...")
     fp = download_bid_log()
     wb = openpyxl.load_workbook(fp, read_only=True, data_only=True)
 
-    out = {"ap": {b: [] for b in BUCKETS}, "hp": {b: [] for b in BUCKETS}}
-    cols = {"ap": [], "hp": []}
+    # ap comes from the metadata sheet (built above); hp from the bid-log section path.
+    out = {"ap": ap_buckets, "hp": {b: [] for b in BUCKETS}}
+    cols = {"ap": ap_columns, "hp": []}
     uncategorized = []
 
-    for sheet_name, disc_key in SHEETS:
+    for sheet_name, disc_key in SHEETS:   # SHEETS = hp only now
         if sheet_name not in wb.sheetnames:
             print("  WARN: sheet '%s' not present — skipping" % sheet_name)
             continue
@@ -430,9 +627,11 @@ def main():
 
     payload = {
         "generated": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M") + " UTC",
-        "source": "SharePoint/01 - Admin/13 - Master Spreadsheets/Project Bid Log.xlsx",
+        # ap now reads the metadata sheet (Stage COLUMN); hp still reads the bid log.
+        "source": "ap: " + AP_META_SOURCE +
+                  "  |  hp: SharePoint/01 - Admin/13 - Master Spreadsheets/Project Bid Log.xlsx",
         "source_url": BID_LOG_WEBURL,
-        "columns": cols,        # per-discipline FULL bid-log column set, in sheet order
+        "columns": cols,        # per-discipline FULL column set, in sheet order
         "ap": out["ap"],
         "hp": out["hp"],
         "uncategorized": uncategorized,
@@ -442,7 +641,9 @@ def main():
     out_path = os.path.join(DATA_DIR, "precon-pipeline.js")
     with open(out_path, "w") as f:
         f.write("// AUTO-GENERATED by sync/build-precon-pipeline.py — do not edit by hand.\n")
-        f.write("// Preconstruction pipeline: every Project Bid Log row bucketed by its col-A SECTION (stage block).\n")
+        f.write("// Preconstruction pipeline. ap: one row per project from the FLAT metadata\n")
+        f.write("// sheet, bucketed by its Stage COLUMN. hp: Project Bid Log rows bucketed by\n")
+        f.write("// their col-A SECTION (stage block).\n")
         f.write("window.PF_PRECON = ")
         json.dump(payload, f, indent=2)
         f.write(";\n")
