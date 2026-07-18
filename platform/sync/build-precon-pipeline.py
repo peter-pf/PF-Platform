@@ -219,16 +219,45 @@ def ordered_headers(ws, hr):
 
 
 # Header substrings -> formatting type. First match wins (case-insensitive).
-# 'money'  -> dollar-formatted; 'date' -> YYYY-MM-DD as the sheet shows; else 'text'.
+# 'money' -> dollar-formatted; 'num' -> percent/quantity numeric; 'date' -> YYYY-MM-DD;
+# else 'text'. Original bid-log columns typed by SUBSTRING; the PM/financial columns
+# folded in from the Project Master (2026-07-18) are typed by EXACT header so free-text
+# fields (e.g. "Invoice Due By Date" holds "20th", NOT a date) don't get mis-typed.
 _MONEY_HEADERS = ("bid total value", "price per", "prelim design fee")
-_DATE_HEADERS = ("date", "due date")  # any header containing "date" is a date field
+
+# EXACT-match sets for the folded-in PM columns (spec: dollars=money, %/qty=num,
+# dates=date, rest=text). Exact match avoids false hits (e.g. "Invoice Due By Date").
+_MONEY_EXACT = {
+    "subcontract value", "paid", "unpaid", "projected pa #1 income",
+    "retainage amount",
+}
+_NUM_EXACT = {                      # percentages + quantities -> numeric column
+    "work % complete", "retain %", "estimated spoils (cy)",
+}
+_DATE_EXACT = {                     # real date columns whose header lacks the word "date"
+    "scheduled completion", "submittals received from engineer",
+    "submittals sent to gc", "submittals approved & returned",
+    "submittals & shop dwgs saved", "submittals & shop dwgs sent to gc",
+    "shop drawings ready for pickup", "docs sent to surveyor / layout",
+}
+_TEXT_EXACT = {                     # header CONTAINS "date" but the value is free text
+    "invoice due by date",
+}
 
 
 def column_type(header):
     low = (header or "").strip().lower()
+    if low in _TEXT_EXACT:
+        return "text"
     for m in _MONEY_HEADERS:
         if m in low:
             return "money"
+    if low in _MONEY_EXACT:
+        return "money"
+    if low in _NUM_EXACT:
+        return "num"
+    if low in _DATE_EXACT:
+        return "date"
     if "date" in low:
         return "date"
     return "text"
@@ -246,12 +275,28 @@ def fmt_money(v):
     return "$" + format(n, ",.2f")
 
 
-def fmt_cell(v, ctype):
+def fmt_num(v, header=""):
+    """Format a numeric (non-dollar) column. Headers with '%' are fractional
+    percentages (0.68 -> '68%'); everything else is a plain quantity (1 decimal
+    dropped when whole). Non-numeric content passes through trimmed."""
+    n = num_or_none(v)
+    if n is None:
+        return clean(v)
+    if "%" in (header or ""):
+        return format(round(n * 100), "d") + "%"
+    if float(n).is_integer():
+        return format(int(round(n)), ",")
+    return format(n, ",.1f")
+
+
+def fmt_cell(v, ctype, header=""):
     """Format a raw cell value for display per its column type. Blank stays blank."""
     if v is None or (isinstance(v, str) and not v.strip()):
         return ""
     if ctype == "money":
         return fmt_money(v)
+    if ctype == "num":
+        return fmt_num(v, header)
     if ctype == "date":
         return clean_date(v)
     return clean(v)
@@ -421,7 +466,7 @@ def extract(ws, disc_key):
         row_fields = {}
         for (hname, hcol) in ordered:
             row_fields[hname] = fmt_cell(ws.cell(row=r, column=hcol).value,
-                                         column_type(hname))
+                                         column_type(hname), hname)
 
         job = {
             # convenience keys (kept for backward compatibility with other consumers)
@@ -555,7 +600,7 @@ def build_ap_from_metadata():
         row_fields = {}
         for (raw, emit, col) in ordered:
             row_fields[emit] = fmt_cell(ws.cell(row=_r, column=col).value,
-                                        column_type(emit))
+                                        column_type(emit), emit)
 
         # DERIVE per-unit prices (sheet formulas are uncached -> None). Guard div-by-0
         # / missing -> blank. Overwrite whatever blank the raw formula cell produced.
