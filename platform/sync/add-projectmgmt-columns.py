@@ -142,6 +142,14 @@ KNOWN_DUPES = [
     "Award Date", "GC Email", "GC Phone", "Bidding GCs", "Awarded GC",
 ]
 
+# WIP-match EXCLUSIONS: project numbers where the metadata project and the WIP
+# "same-number" row are DIFFERENT projects (cross-workbook number collision), so
+# pulling WIP financials/contacts would attach the WRONG project's data.
+#   25-014: metadata = "Cleveland West Veterans Project" (Ozanne, Budget Pricing,
+#           no WIP record); the 2025-WIP "25-014" is a mis-keyed, column-shifted
+#           "Fostoria Schools" row (Touchstone CPM). Verified 2026-07-20.
+WIP_MATCH_EXCLUDE = {"25-014"}
+
 
 def graph_get(item):
     tok = _d.token(_d.load_env())
@@ -332,7 +340,9 @@ def main():
             if kind == "dash":
                 val = dash.get(pnum, {}).get(key)
             elif kind == "wip":
-                val = wip.get(pnum, {}).get(key)
+                # Skip WIP for known cross-workbook number collisions (wrong project).
+                if pnum not in WIP_MATCH_EXCLUDE:
+                    val = wip.get(pnum, {}).get(key)
             # kind == "none" -> structural, stays blank
             if val is not None:
                 cell.value = coerce(fmt, val)
