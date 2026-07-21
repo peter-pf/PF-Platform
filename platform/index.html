@@ -3184,10 +3184,11 @@ document.addEventListener('click', function(e) {
       #mod-daily-reports input, #mod-daily-reports select, #mod-daily-reports textarea { width:100%; padding:7px 10px; box-sizing:border-box; }
       #mod-daily-reports textarea { min-height:54px; font-family:inherit; }
       #mod-daily-reports .dr-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:4px 16px; }
-      #mod-daily-reports .dr-row { display:flex; gap:8px; margin-bottom:6px; align-items:center; }
-      #mod-daily-reports .dr-row select.nm, #mod-daily-reports .dr-row select.eq { flex:2 1 auto; }
+      #mod-daily-reports .dr-row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:6px; align-items:center; }
+      #mod-daily-reports .dr-row select.nm, #mod-daily-reports .dr-row select.eq { flex:2 1 180px; min-width:150px; }
+      #mod-daily-reports .dr-row input.tm { flex:0 0 120px; min-width:110px; }
       #mod-daily-reports .dr-row input.hr { flex:0 0 110px; }
-      #mod-daily-reports .dr-row input.cc { flex:1 1 auto; }
+      #mod-daily-reports .dr-row input.cc { flex:1 1 130px; min-width:120px; }
       #mod-daily-reports .dr-row input.item { flex:2 1 auto; }
       #mod-daily-reports .dr-row input.desc { flex:2 1 auto; }
       #mod-daily-reports .dr-row .dr-cat { flex:0 0 150px; font-size:12px; color:var(--text-2,#aab1c0); }
@@ -19653,7 +19654,7 @@ try {
     reports: [], priv: false,
     lists: { ownedEquipment: [], personnel: [], foremen: [], rentalCategories: [], maintenanceCategories: [], maintenanceSubcategories: {} },
     projects: [],
-    crew: [{ name: '', hours: '', costCode: '', auto: true }, { name: '', hours: '', costCode: '', auto: false }, { name: '', hours: '', costCode: '', auto: false }],
+    crew: [{ name: '', start: '', end: '', hours: '', costCode: '', auto: true }, { name: '', start: '', end: '', hours: '', costCode: '', auto: false }, { name: '', start: '', end: '', hours: '', costCode: '', auto: false }],
     owned: [{ machine: '', hours: '' }, { machine: '', hours: '' }],
     rental: [{ category: '', hours: '' }, { category: '', hours: '' }],
     maintenance: [],
@@ -19777,8 +19778,10 @@ try {
     host.innerHTML = state.crew.map(function (m, i) {
       return '<div class="dr-row">'
         + '<select class="nm" data-i="' + i + '" data-f="name">' + opts(state.lists.personnel, m.name, 'Crew member') + '</select>'
+        + '<input class="tm" data-i="' + i + '" data-f="start" type="time" title="Start time" aria-label="Start time" value="' + E(m.start) + '">'
+        + '<input class="tm" data-i="' + i + '" data-f="end" type="time" title="End time" aria-label="End time" value="' + E(m.end) + '">'
         + '<input class="hr" data-i="' + i + '" data-f="hours" placeholder="Hrs worked" inputmode="decimal" value="' + E(m.hours) + '">'
-        + '<input class="cc" data-i="' + i + '" data-f="costCode" placeholder="Cost code (optional)" value="' + E(m.costCode) + '">'
+        + '<input class="cc" data-i="' + i + '" data-f="costCode" placeholder="Cost Code" value="' + E(m.costCode) + '">'
         + '</div>';
     }).join('');
     host.querySelectorAll('[data-i]').forEach(function (el) {
@@ -19786,8 +19789,30 @@ try {
         var i = +this.getAttribute('data-i'), f = this.getAttribute('data-f');
         state.crew[i][f] = this.value;
         if (f === 'name') state.crew[i].auto = false; // user picked manually
+        // Auto-fill Hrs worked from start/end when both are set.
+        if (f === 'start' || f === 'end') recalcCrewHours(i);
       });
     });
+  }
+
+  // Compute decimal hours (2dp) from a row's start/end times and write the result
+  // into state.crew[i].hours AND that row's Hrs input. Times are "HH:MM" (24h).
+  // end <= start yields blank (no negatives; e.g. overnight is not auto-computed).
+  function recalcCrewHours(i) {
+    var m = state.crew[i];
+    if (!m) return;
+    var start = (m.start || '').trim(), end = (m.end || '').trim();
+    if (!start || !end) return; // need both; leave any manual value in place
+    var sp = start.split(':'), ep = end.split(':');
+    if (sp.length < 2 || ep.length < 2) return;
+    var sMin = (+sp[0]) * 60 + (+sp[1]);
+    var eMin = (+ep[0]) * 60 + (+ep[1]);
+    if (isNaN(sMin) || isNaN(eMin)) return;
+    var diff = eMin - sMin;
+    var hrs = diff > 0 ? Math.round((diff / 60) * 100) / 100 : 0;
+    m.hours = String(hrs);
+    var el = document.querySelector('#drCrew [data-i="' + i + '"][data-f="hours"]');
+    if (el) el.value = m.hours;
   }
 
   // When the foreman changes, prefill crew row 1 if it is empty or still auto.
@@ -20187,7 +20212,7 @@ try {
       temp: document.getElementById('drTemp').value,
       columnsInstalled: document.getElementById('drCols').value,
       lfInstalled: document.getElementById('drLf').value,
-      crew: state.crew.filter(function (m) { return (m.name || '').trim(); }).map(function (m) { return { name: m.name, hours: m.hours, costCode: m.costCode }; }),
+      crew: state.crew.filter(function (m) { return (m.name || '').trim(); }).map(function (m) { return { name: m.name, start: m.start, end: m.end, hours: m.hours, costCode: m.costCode }; }),
       workCompleted: document.getElementById('drWork').value,
       equipmentOwned: state.owned.filter(function (r) { return (r.machine || '').trim() || (r.hours || '').toString().trim(); }),
       equipmentRental: state.rental.filter(function (r) { return (r.category || '').trim() || (r.hours || '').toString().trim(); }),
@@ -20237,7 +20262,7 @@ try {
     ['drDate', 'drProject', 'drProjectId', 'drForeman', 'drPrecip', 'drTemp', 'drCols', 'drLf', 'drWork', 'drDelays', 'drSafety'].forEach(function (id) {
       var el = document.getElementById(id); if (el) el.value = '';
     });
-    state.crew = [{ name: '', hours: '', costCode: '', auto: true }, { name: '', hours: '', costCode: '', auto: false }, { name: '', hours: '', costCode: '', auto: false }];
+    state.crew = [{ name: '', start: '', end: '', hours: '', costCode: '', auto: true }, { name: '', start: '', end: '', hours: '', costCode: '', auto: false }, { name: '', start: '', end: '', hours: '', costCode: '', auto: false }];
     state.owned = [{ machine: '', hours: '' }, { machine: '', hours: '' }];
     state.rental = [{ category: '', hours: '' }, { category: '', hours: '' }];
     state.future = [{ equipment: '', description: '' }];

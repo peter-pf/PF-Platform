@@ -44,10 +44,13 @@ export function renderDailyReportPdf(rec) {
   doc.heading('Crew');
   const crew = Array.isArray(rec.crew) ? rec.crew.filter((c) => c && (c.name || c.hours != null)) : [];
   if (crew.length) {
-    doc.table(crew.map((c) => ({
-      label: c.costCode ? `${c.name || '-'}  (${c.costCode})` : (c.name || '-'),
-      value: (c.hours != null && c.hours !== '') ? `${c.hours} h` : '',
-    })), { valueW: 90 });
+    doc.table(crew.map((c) => {
+      const span = (c.start && c.end) ? `  ${c.start}-${c.end}` : '';
+      return {
+        label: (c.costCode ? `${c.name || '-'}  (${c.costCode})` : (c.name || '-')) + span,
+        value: (c.hours != null && c.hours !== '') ? `${c.hours} h` : '',
+      };
+    }), { valueW: 90 });
   } else {
     doc.text('No crew recorded.', { size: 10 });
   }
