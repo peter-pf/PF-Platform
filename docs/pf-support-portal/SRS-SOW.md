@@ -33,8 +33,9 @@ guarantees that. Do not add any dependency on Peter's server, ever.
 pf-support/
   index.html          # Landing page: title, intro, grid of topic cards
   peter-stuck.html    # Article 1: "If Peter Seems Stuck" (from PETER-CHEAT-SHEET-BJD.md)
+  compact-peter.html  # Article 2: "How to Compact Peter" (Compact vs Restart; /compact from terminal)
   assets/
-    style.css         # Shared stylesheet (brand azure #006DB0, light theme, mobile-first)
+    style.css         # Shared stylesheet (brand azure #006DB0, light theme, mobile-first). Includes inline <code> style for /compact.
     pf-wordmark.svg   # PF wordmark logo (copied from website/assets/brand)
 ```
 
@@ -102,3 +103,18 @@ Then redeploy (section 5) and re-verify. That's it.
 - `assets/style.css` → 200, `assets/pf-wordmark.svg` → 200
 - 0 `<script>` tags on all pages → confirmed fully static / independent of Peter's server
 - Mobile viewport meta + `@media (max-width:640px)` responsive rules live
+
+## 8. Topic 2 — "How to Compact Peter" (added 2026-07-21)
+
+- File: `pf-support/compact-peter.html`, linked from a second topic card on `index.html`.
+- Content: what compacting is, a highlighted **Compact or Restart?** callout (slow-but-answering → Compact/Restart button; fully stuck → Restart, links to the peter-stuck article), portal instructions (Restart button is the portal-accessible relief), terminal instructions (`/compact` in the tmux session, rendered in monospace `<code>`), and a note that Peter compacts himself proactively.
+- Added a global inline `code { … }` rule to `assets/style.css` for the monospace `/compact` styling.
+- Verification (2026-07-21): `/compact-peter` → 200; body contains `/compact` (×2), `Compact or Restart` (×1), and literal `<code>/compact</code>`. `index.html` now links `compact-peter.html` and still links `peter-stuck.html`.
+
+## 9. Main-portal integration — Help / Support nav link (added 2026-07-21)
+
+- **Where:** `platform/index.html`, sidebar nav **Estimating & Tools** section, immediately after the "Content Board" external link (~line 2547). Follows the same external-new-tab pattern as Design Studio / Content Board.
+- **Markup:** `<a class="nav-item" href="https://pf-support.pages.dev/" target="_blank" rel="noopener noreferrer">` with a `❔` icon, label "Help / Support", and the `↗` external-tab indicator.
+- **Independence:** it is a plain external anchor straight to the standalone static pf-support site. It does NOT route through Peter's backend or any `/api/*` — so it keeps working when Peter is down (which is the whole point). Given as a normal-color nav item (not the red data-source overlay) because it is a genuine always-working external link.
+- **Surgical:** single anchor added; the single-login shell (Basic Auth gate) and all existing nav items are untouched.
+- Verification (2026-07-21): `pf-platform` deploy compiled Worker successfully + Functions bundle uploaded; prod root returns `401` Basic-Auth realm "PF Operations Platform" (gate intact, expected); `/login.html` → 308 (login page still public, shell not broken); the Help anchor with `target="_blank"` + `href="https://pf-support.pages.dev/"` confirmed in the deployed `platform/index.html` (line 2547).
