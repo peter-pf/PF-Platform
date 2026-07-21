@@ -453,6 +453,11 @@ export function areaForPath(pathname) {
     // list (POST) is restricted to admin/partner IN the handler. ZERO financials
     // (names + categories only).
     if (pathname.startsWith('/api/field-lists'))   return 'field_ops';
+    // LIVE timesheet roll-up derived from submitted daily reports (/api/timesheets).
+    // Same readership as the daily reports it summarizes: field_ops area =
+    // admin/partner/business_dev/field_ops. ZERO financials (HOURS only, no wages/$).
+    // Read-only GET; the handler also calls requireArea(session,'field_ops').
+    if (pathname.startsWith('/api/timesheets'))    return 'field_ops';
     // Field raw-file upload to SharePoint (Hand Logs / GUHM Data) attached to a
     // daily report. field_ops so the crew can upload; the handler also calls
     // requireArea(session, 'field_ops'). ZERO financials (files only). Without

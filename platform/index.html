@@ -3188,6 +3188,9 @@ document.addEventListener('click', function(e) {
       #mod-daily-reports .dr-row select.nm, #mod-daily-reports .dr-row select.eq { flex:2 1 180px; min-width:150px; }
       #mod-daily-reports .dr-row input.tm { flex:0 0 120px; min-width:110px; }
       #mod-daily-reports .dr-row input.hr { flex:0 0 110px; }
+      #mod-daily-reports .dr-row .dr-regot { flex:0 0 auto; font-size:12px; color:var(--text-3,#8a93a6); white-space:nowrap; padding:0 2px; }
+      #mod-daily-reports .dr-row .dr-regot strong { color:var(--text-2,#aab1c0); font-weight:600; }
+      #mod-daily-reports .dr-row .dr-regot .dr-ot { color:#d29922; }
       #mod-daily-reports .dr-row input.cc { flex:1 1 130px; min-width:120px; }
       #mod-daily-reports .dr-row input.item { flex:2 1 auto; }
       #mod-daily-reports .dr-row input.desc { flex:2 1 auto; }
@@ -16790,6 +16793,9 @@ try {
       paint();
     }
 
+    // Expose re-render + a state reset so the live-merge coordinator can repaint
+    // the weekly view after /api/timesheets data is folded into PF_TIMESHEETS.
+    window.PF_TS_RENDER_WEEKLY = function(){ STATE.week = null; render(); };
     document.addEventListener('DOMContentLoaded', render);
     if (document.readyState !== 'loading') render();
   } catch(e) {
@@ -16884,12 +16890,103 @@ try {
       el.innerHTML = html;
     }
 
+    window.PF_TS_RENDER_SUMMARY = render;
     document.addEventListener('DOMContentLoaded', render);
     if (document.readyState !== 'loading') render();
   } catch(e) {
     console.error("TimeSheets Summary panel failed to load:", e);
   }
 })();
+</script>
+
+<!-- ============================================================ -->
+<!-- TIMESHEETS - LIVE FEED. Folds the server roll-up of SUBMITTED  -->
+<!-- daily reports (/api/timesheets, hours only, NO $) into          -->
+<!-- window.PF_TIMESHEETS, then repaints the Weekly + Summary views. -->
+<!-- Live weeks WIN over the static SharePoint weeks on the same     -->
+<!-- Sunday (week_start); live employee-year rows override by name.  -->
+<!-- BACKWARD COMPATIBLE: if the fetch fails or returns no weeks, the -->
+<!-- static data path is untouched and the UI keeps working.         -->
+<!-- Reg/OT come from the shared OT engine (Brad-approved rule).      -->
+<!-- ============================================================ -->
+<script>
+(function(){
+  try {
+    function num(n){ n = +n; return isFinite(n) ? n : 0; }
+
+    // Merge live weeks over the static PF_TIMESHEETS in place. Keyed by
+    // week_start (the Sunday). A live week fully REPLACES a static week with the
+    // same Sunday (the daily reports are the source of truth for that week);
+    // weeks that exist only in one source are kept. Result is re-sorted by start.
+    function mergeWeeks(staticWeeks, liveWeeks){
+      var byStart = {};
+      (staticWeeks || []).forEach(function(w){ if (w && w.week_start) byStart[w.week_start] = w; });
+      (liveWeeks || []).forEach(function(w){ if (w && w.week_start) byStart[w.week_start] = w; });
+      var out = Object.keys(byStart).map(function(k){ return byStart[k]; });
+      out.sort(function(a,b){ return (a.week_start < b.week_start) ? -1 : (a.week_start > b.week_start ? 1 : 0); });
+      return out;
+    }
+
+    // Merge live per-employee-year rows over static, keyed by name+number. Live
+    // rows (derived from daily reports) override a matching static row; unmatched
+    // static rows are kept so nothing that was already there disappears.
+    function mergeEmployeeYear(staticRows, liveRows){
+      var key = function(r){ return String(r.name||'') + '|' + String(r.number||''); };
+      var by = {};
+      (staticRows || []).forEach(function(r){ by[key(r)] = r; });
+      (liveRows || []).forEach(function(r){ by[key(r)] = r; });
+      return Object.keys(by).map(function(k){ return by[k]; })
+        .sort(function(a,b){ return num(b.total) - num(a.total); });
+    }
+
+    function recomputeGrand(rows){
+      var g = { regular:0, ot:0, total:0, per_diem_nights:0 };
+      (rows || []).forEach(function(r){
+        g.regular += num(r.regular); g.ot += num(r.ot);
+        g.total += num(r.total); g.per_diem_nights += num(r.per_diem_nights);
+      });
+      var r2 = function(n){ return Math.round(n*100)/100; };
+      return { regular:r2(g.regular), ot:r2(g.ot), total:r2(g.total), per_diem_nights:r2(g.per_diem_nights) };
+    }
+
+    function apply(live){
+      if (!live || !live.ok) return;
+      var D = window.PF_TIMESHEETS;
+      // If there is no static data at all, seed a minimal container so the
+      // renderers have something to read.
+      if (!D || typeof D !== 'object'){
+        D = window.PF_TIMESHEETS = { weeks: [], by_employee_year: [], year_grand_total: {regular:0,ot:0,total:0,per_diem_nights:0},
+          cost_code_names: {}, year: (live.year||''), source_file: 'Live daily reports', generated: (live.generated||'') };
+      }
+      var liveWeeks = Array.isArray(live.weeks) ? live.weeks : [];
+      if (!liveWeeks.length && !(live.by_employee_year||[]).length) return; // nothing to fold in
+
+      D.weeks = mergeWeeks(D.weeks, liveWeeks);
+      D.by_employee_year = mergeEmployeeYear(D.by_employee_year, live.by_employee_year);
+      D.year_grand_total = recomputeGrand(D.by_employee_year);
+
+      // Prefer the live latest-week-with-hours when present (the freshest data).
+      if (live.latest_week_with_hours) D.latest_week_with_hours = live.latest_week_with_hours;
+
+      // Repaint whichever views are wired up.
+      if (typeof window.PF_TS_RENDER_WEEKLY === 'function') { try { window.PF_TS_RENDER_WEEKLY(); } catch(e){} }
+      if (typeof window.PF_TS_RENDER_SUMMARY === 'function') { try { window.PF_TS_RENDER_SUMMARY(); } catch(e){} }
+    }
+
+    function load(){
+      fetch('/api/timesheets', { cache:'no-store', credentials:'same-origin', headers:{ 'Accept':'application/json' } })
+        .then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(j){ if (j) apply(j); })
+        .catch(function(){ /* offline / blocked -> keep static data, no error to user */ });
+    }
+
+    document.addEventListener('DOMContentLoaded', load);
+    if (document.readyState !== 'loading') load();
+  } catch(e) {
+    console.error("TimeSheets live feed failed to load:", e);
+  }
+})();
+</script>
 </script>
 
 <!-- ============================================================ -->
@@ -19779,15 +19876,36 @@ try {
   }
 
   // ---- 3. Crew (3 rows, each a personnel dropdown) ---------------------------
+  // DAILY Reg/OT split for a single row's hours. MIRRORS the shared OT engine
+  // (functions/lib/ot-engine.mjs daySplit): reg = min(h,8), ot = max(h-8,0). This
+  // is the DAILY split ONLY -- a single daily report cannot know the weekly (40h)
+  // OT, so the WEEKLY Reg/OT is computed server-side in /api/timesheets and shown
+  // on the Timesheet module. Keeping this identical to the engine keeps the two
+  // read-outs consistent. Returns {reg, ot} as numbers.
+  function drDaySplit(h) {
+    var n = parseFloat(String(h == null ? '' : h).replace(/[^0-9.\-]/g, ''));
+    if (!isFinite(n) || n < 0) n = 0;
+    if (n > 24) n = 24;
+    n = Math.round(n * 100) / 100;
+    var reg = Math.min(n, 8), ot = Math.max(n - 8, 0);
+    return { reg: Math.round(reg * 100) / 100, ot: Math.round(ot * 100) / 100 };
+  }
+  // Trim trailing .0 for a whole number, else 2dp.
+  function drNum(n) { n = +n; if (!isFinite(n)) return '0'; return (n % 1 === 0) ? String(n) : n.toFixed(2).replace(/\.?0+$/, ''); }
+
   function renderCrew() {
     var host = document.getElementById('drCrew');
     if (!host) return;
     host.innerHTML = state.crew.map(function (m, i) {
+      var sp = drDaySplit(m.hours);
       return '<div class="dr-row">'
         + '<select class="nm" data-i="' + i + '" data-f="name">' + opts(state.lists.personnel, m.name, 'Crew member') + '</select>'
         + '<input class="tm" data-i="' + i + '" data-f="start" type="time" title="Start time" aria-label="Start time" value="' + E(m.start) + '">'
         + '<input class="tm" data-i="' + i + '" data-f="end" type="time" title="End time" aria-label="End time" value="' + E(m.end) + '">'
         + '<input class="hr" data-i="' + i + '" data-f="hours" placeholder="Hrs worked" inputmode="decimal" value="' + E(m.hours) + '">'
+        + '<span class="dr-regot" data-regot="' + i + '" title="Daily split: Regular = first 8h, Overtime = hours over 8. Weekly OT (over 40) is figured on the Timesheet.">'
+        +   'Reg <strong class="dr-reg">' + drNum(sp.reg) + '</strong> / OT <strong class="dr-ot">' + drNum(sp.ot) + '</strong>'
+        + '</span>'
         + '<input class="cc" data-i="' + i + '" data-f="costCode" placeholder="Cost Code" value="' + E(m.costCode) + '">'
         + '</div>';
     }).join('');
@@ -19798,8 +19916,22 @@ try {
         if (f === 'name') state.crew[i].auto = false; // user picked manually
         // Auto-fill Hrs worked from start/end when both are set.
         if (f === 'start' || f === 'end') recalcCrewHours(i);
+        // Any change to hours (manual or via start/end) refreshes the Reg/OT readout.
+        if (f === 'hours' || f === 'start' || f === 'end') updateRegOt(i);
       });
     });
+  }
+
+  // Refresh the "Reg X / OT Y" readout for row i from its current hours (no
+  // re-render, so focus/caret is preserved while typing).
+  function updateRegOt(i) {
+    var m = state.crew[i]; if (!m) return;
+    var sp = drDaySplit(m.hours);
+    var host = document.querySelector('#drCrew [data-regot="' + i + '"]');
+    if (!host) return;
+    var reg = host.querySelector('.dr-reg'), ot = host.querySelector('.dr-ot');
+    if (reg) reg.textContent = drNum(sp.reg);
+    if (ot) ot.textContent = drNum(sp.ot);
   }
 
   // Compute decimal hours (2dp) from a row's start/end times and write the result
@@ -19820,6 +19952,7 @@ try {
     m.hours = String(hrs);
     var el = document.querySelector('#drCrew [data-i="' + i + '"][data-f="hours"]');
     if (el) el.value = m.hours;
+    updateRegOt(i);
   }
 
   // When the foreman changes, prefill crew row 1 if it is empty or still auto.

@@ -36,6 +36,12 @@ the privileged approve/send-to-HR actions, and the owner-only buttons) is REMOVE
   (name + HOURS, no pay), production (columns + LF), weather (precip + temp),
   equipment owned/rental (machine + meter hours), maintenance rows, future issues,
   delays, safety, work-completed narrative, and attachment file names.
+- FR7 - (2026-07-21) Each crew row on the FORM shows a DAILY Reg/OT split derived
+  from the row's hours: `Reg = min(hours, 8)`, `OT = max(hours - 8, 0)`. Read-only,
+  auto-updates as hours change. This is the DAILY split only; the WEEKLY (over-40)
+  overtime is computed server-side and shown on the Timesheet module. Crew line
+  record shape is `{name, start, end, hours, costCode}`. The daily reports feed
+  `/api/timesheets` (see `docs/timesheets/`). NO $ - hours only.
 
 ## 3. Recipients (the single flip point) -- LIVE
 
