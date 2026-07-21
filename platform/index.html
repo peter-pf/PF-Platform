@@ -588,6 +588,12 @@ body.role-field-ops .sidebar-nav > .nav-section:not([data-fo-safe]):not([data-fo
 body.role-field-ops .nav-section[data-fo-mixed] .nav-item:not([data-fo-safe]) {
   display: none !important;
 }
+/* Inside a mixed section, hide whole nav-sub subgroups that aren't field-safe
+   (e.g. TimeSheets lives under Project Management but only field-safe subgroups
+   should render for the crew; PM's Projects/Financials/etc. stay hidden). */
+body.role-field-ops .nav-section[data-fo-mixed] .nav-sub:not([data-fo-safe]) {
+  display: none !important;
+}
 body.role-field-ops .nav-item[data-fo-hide] {
   display: none !important;
 }
@@ -2386,7 +2392,7 @@ window.progress = (function () {
     </div>
 
     <!-- 5) PROJECT MANAGEMENT -->
-    <div class="nav-section collapsed">
+    <div class="nav-section collapsed" data-fo-mixed="1">
       <div class="nav-section-label" onclick="this.parentElement.classList.toggle('collapsed')">Project Management</div>
 
       <!-- 5a) Projects -->
@@ -2431,6 +2437,14 @@ window.progress = (function () {
         <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Equipment</div>
         <a class="nav-item" data-module="equipment" onclick="showModule('equipment')" style="color:#d64545">Equipment</a>
       </div>
+
+      <!-- TimeSheets (moved here from Field Operations). Hours-only, no financials.
+           field-safe so the crew keeps access even though PM is otherwise hidden. -->
+      <div class="nav-sub collapsed" data-fo-safe="1">
+        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">TimeSheets</div>
+        <a class="nav-item" data-fo-safe="1" data-module="fo-timesheets" onclick="showModule('fo-timesheets')" style="color:#d64545">Weekly</a>
+        <a class="nav-item" data-fo-safe="1" data-module="ts-summary" onclick="showModule('ts-summary')" style="color:#d64545">Summary</a>
+      </div>
     </div>
 
     <!-- 5.5) FIELD OPERATIONS -->
@@ -2454,13 +2468,6 @@ window.progress = (function () {
         <a class="nav-item" data-module="daily-reports" onclick="showModule('daily-reports')" style="color:#d64545">Submit Daily Report</a>
         <a class="nav-item" data-module="dailyproduction" onclick="showModule('dailyproduction')" style="color:#d64545">Daily Production</a>
         <a class="nav-item" data-module="dailylogs" onclick="showModule('dailylogs')" style="color:#d64545">Daily Logs</a>
-      </div>
-
-      <!-- TimeSheets (dropdown: Weekly + Summary) -->
-      <div class="nav-sub collapsed">
-        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">TimeSheets</div>
-        <a class="nav-item" data-module="fo-timesheets" onclick="showModule('fo-timesheets')" style="color:#d64545">Weekly</a>
-        <a class="nav-item" data-module="ts-summary" onclick="showModule('ts-summary')" style="color:#d64545">Summary</a>
       </div>
 
       <!-- Safety (also linked under Project Management) -->
