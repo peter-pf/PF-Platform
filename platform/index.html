@@ -3228,6 +3228,9 @@ document.addEventListener('click', function(e) {
       <div class="dr-card dr-muted" style="font-size:13px">Daily reports capture field work for the day. Hours entered here feed the timesheets. The crew hours, production, weather, equipment, delays and safety are recorded - no financial data. Approval is in-platform status only, no email is sent. All fields are a v1 draft, confirm with Brad.</div>
       <div class="dr-card">
         <h3 style="margin:0 0 8px">New daily report <span class="dr-flag">(first draft, Derek to iterate)</span></h3>
+        <div id="drEditBanner" style="display:none;background:rgba(210,153,34,.14);border:1px solid rgba(210,153,34,.4);border-radius:6px;padding:8px 10px;margin:0 0 10px;font-size:13px;color:#d29922">
+          Editing an existing report (id <code data-edit-id></code>). Saving replaces it in place and re-sends the PDF. Use <strong>Start new report</strong> to cancel.
+        </div>
         <div class="dr-grid">
           <div><label>Date</label><input type="date" id="drDate"></div>
           <div>
@@ -3287,7 +3290,7 @@ document.addEventListener('click', function(e) {
         <div style="margin-top:12px">
           <button type="button" class="btn" id="drSaveDraft">Save draft</button>
           <button type="button" class="btn" id="drSubmit">Submit &amp; send report</button>
-          <span class="dr-muted" style="font-size:12px;margin-left:8px">No email is sent. Submit is an in-platform status.</span>
+          <button type="button" class="btn" id="drNewReport" style="display:none">Start new report</button>
         </div>
         <div class="dr-msg" data-msg style="margin-top:6px"></div>
       </div>
@@ -19652,6 +19655,10 @@ try {
   // the selected foreman when the user has not picked someone there manually.
   var state = {
     reports: [], priv: false,
+    // When set, the form is EDITING an existing report (its id). Submitting with
+    // an editingId set REPLACES that record on the server instead of creating a
+    // new one. Cleared by resetForm() and after a successful save. null = new report.
+    editingId: null,
     lists: { ownedEquipment: [], personnel: [], foremen: [], rentalCategories: [], maintenanceCategories: [], maintenanceSubcategories: {} },
     projects: [],
     crew: [{ name: '', start: '', end: '', hours: '', costCode: '', auto: true }, { name: '', start: '', end: '', hours: '', costCode: '', auto: false }, { name: '', start: '', end: '', hours: '', costCode: '', auto: false }],
@@ -20033,6 +20040,8 @@ try {
     if (sd && !sd.dataset.wired) { sd.dataset.wired = '1'; sd.addEventListener('click', function () { save(false); }); }
     var sub = document.getElementById('drSubmit');
     if (sub && !sub.dataset.wired) { sub.dataset.wired = '1'; sub.addEventListener('click', function () { save(true); }); }
+    var nr = document.getElementById('drNewReport');
+    if (nr && !nr.dataset.wired) { nr.dataset.wired = '1'; nr.addEventListener('click', function () { resetForm(); msg('Started a new report.', true); }); }
   }
 
   // ---- file upload (Hand Logs / GUHM Data -> SharePoint via /api/field-upload) -
@@ -20228,37 +20237,188 @@ try {
 
   function msg(t, ok) { var m = document.querySelector('#mod-daily-reports [data-msg]'); if (m) { m.textContent = t; m.className = 'dr-msg ' + (ok ? 'dr-ok' : 'dr-err'); } }
 
+  // Show/hide a small banner + relabel the submit button so the user knows they
+  // are editing an existing report (vs filing a new one). Purely cosmetic; the
+  // real edit signal is state.editingId. Safe if the banner element is absent.
+  function updateEditBanner() {
+    var b = document.getElementById('drEditBanner');
+    if (b) {
+      if (state.editingId) {
+        b.style.display = '';
+        b.querySelector('[data-edit-id]') && (b.querySelector('[data-edit-id]').textContent = state.editingId);
+      } else {
+        b.style.display = 'none';
+      }
+    }
+    var sub = document.getElementById('drSubmit');
+    if (sub) sub.textContent = state.editingId ? 'Update & re-send report' : 'Submit & send report';
+    var nr = document.getElementById('drNewReport');
+    if (nr) nr.style.display = state.editingId ? '' : 'none';
+  }
+
+  // Rebuild state.maintenance from a stored record's maintenance[] rows, GROUPED
+  // under the current fixed maintenance categories so renderMaint() (which iterates
+  // categories) shows every saved row. Every category keeps at least one row (an
+  // empty default) so the UI never collapses a category. Rows whose category is no
+  // longer a known category are still preserved under their original category so
+  // nothing is silently dropped on edit.
+  function maintenanceFromRecord(saved) {
+    var cats = state.lists.maintenanceCategories || [];
+    var rows = Array.isArray(saved) ? saved.slice() : [];
+    var out = [];
+    var used = {};
+    cats.forEach(function (cat) {
+      var mine = rows.filter(function (r) { return r && r.category === cat; });
+      if (mine.length) {
+        mine.forEach(function (r) {
+          used[rows.indexOf(r)] = 1;
+          out.push({ category: cat, type: r.type || '', subcategory: r.subcategory || '', item: r.item || '', hourAtFailure: (r.hourAtFailure != null ? r.hourAtFailure : '') });
+        });
+      } else {
+        out.push(emptyMaintRow(cat)); // keep the category present with one empty row
+      }
+    });
+    // Preserve any saved rows whose category is not in the current category list.
+    rows.forEach(function (r, i) {
+      if (used[i]) return;
+      if (!r || cats.indexOf(r.category) >= 0) return;
+      out.push({ category: r.category || '', type: r.type || '', subcategory: r.subcategory || '', item: r.item || '', hourAtFailure: (r.hourAtFailure != null ? r.hourAtFailure : '') });
+    });
+    return out;
+  }
+
+  // Load a stored report record into the form for editing. Populates every simple
+  // field + the repeatable state arrays (crew / owned / rental / maintenance /
+  // future / attachments), re-renders the form, remembers the id in
+  // state.editingId, and scrolls to the top of the form. BACKWARD COMPATIBLE:
+  // records missing the newer fields (start/end/costCode, precip/temp split,
+  // structured maintenance) load with sensible blanks and never throw.
+  function loadReportIntoForm(id) {
+    var r = null;
+    for (var i = 0; i < state.reports.length; i++) { if (state.reports[i].id === id) { r = state.reports[i]; break; } }
+    if (!r) { msg('That report could not be found to edit.', false); return; }
+    state.editingId = r.id;
+
+    // Simple fields.
+    function setVal(elId, v) { var el = document.getElementById(elId); if (el) el.value = (v == null ? '' : String(v)); }
+    setVal('drDate', r.date);
+    setVal('drForeman', r.foreman);
+    // Weather: prefer the precip/temp split; fall back to the legacy single field.
+    setVal('drPrecip', r.precipitation);
+    setVal('drTemp', r.temp || (r.precipitation ? '' : r.weather));
+    setVal('drCols', r.columnsInstalled);
+    setVal('drLf', r.lfInstalled);
+    setVal('drWork', r.workCompleted);
+    setVal('drDelays', r.delays);
+    setVal('drSafety', r.safety);
+
+    // Project <select> + its hidden id mirror. renderProject() injects a matching
+    // option (opts()/renderProject handle a value not in the current list).
+    var psel = document.getElementById('drProject');
+    if (psel) {
+      var pid = (r.projectId != null && String(r.projectId).trim()) ? String(r.projectId) : (r.projectName || '');
+      // Ensure the option exists so the value sticks after renderProject.
+      var present = false;
+      for (var k = 0; k < state.projects.length; k++) { if (String(state.projects[k].id) === pid) { present = true; break; } }
+      if (!present && pid) { state.projects.unshift({ id: pid, name: r.projectName || pid, label: (r.projectId ? r.projectId + ' - ' : '') + (r.projectName || pid) }); }
+      psel.value = pid;
+      var hid = document.getElementById('drProjectId'); if (hid) hid.value = pid;
+    }
+
+    // Repeatable arrays. Crew keeps at least the saved rows (or 3 blanks if none).
+    var crew = (Array.isArray(r.crew) ? r.crew : []).map(function (m) {
+      return { name: m.name || '', start: m.start || '', end: m.end || '', hours: (m.hours != null ? m.hours : ''), costCode: m.costCode || '', auto: false };
+    });
+    while (crew.length < 3) crew.push({ name: '', start: '', end: '', hours: '', costCode: '', auto: false });
+    state.crew = crew;
+
+    var owned = (Array.isArray(r.equipmentOwned) ? r.equipmentOwned : []).map(function (e) { return { machine: e.machine || '', hours: (e.hours != null ? e.hours : '') }; });
+    while (owned.length < 1) owned.push({ machine: '', hours: '' });
+    state.owned = owned;
+
+    var rental = (Array.isArray(r.equipmentRental) ? r.equipmentRental : []).map(function (e) { return { category: e.category || '', hours: (e.hours != null ? e.hours : '') }; });
+    while (rental.length < 1) rental.push({ category: '', hours: '' });
+    state.rental = rental;
+
+    state.maintenance = maintenanceFromRecord(r.maintenance);
+
+    var future = (Array.isArray(r.futureIssues) ? r.futureIssues : []).map(function (f) { return { equipment: f.equipment || '', description: f.description || '' }; });
+    while (future.length < 1) future.push({ equipment: '', description: '' });
+    state.future = future;
+
+    // Attachments: re-bucket the saved refs so they ride along on re-submit.
+    var att = { handlogs: [], guhma: [] };
+    (Array.isArray(r.attachments) ? r.attachments : []).forEach(function (a) {
+      var bk = (a.bucket === 'guhma') ? 'guhma' : 'handlogs';
+      att[bk].push({ name: a.name || '', itemId: a.itemId || '', webUrl: a.webUrl || '', bucket: bk });
+    });
+    state.attachments = att;
+
+    // Re-render everything, reflect the edit state, and scroll to the form.
+    renderProject(); renderForeman(); renderCrew(); renderOwned(); renderRental(); renderMaint(); renderFuture();
+    renderUpList('handlogs', []); renderUpList('guhma', []);
+    upMsg('handlogs', '', null); upMsg('guhma', '', null);
+    updateUploadEnabled();
+    updateEditBanner();
+    msg('Editing report ' + (r.date || '') + ' - ' + (r.projectName || r.projectId || '') + '. Update the fields and re-send, or start a new report to cancel.', true);
+    var wrap = document.getElementById('drWrap') || document.getElementById('mod-daily-reports');
+    if (wrap && wrap.scrollIntoView) wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // Replace an existing report in state.reports (matched by id) with the returned
+  // record, or push it if it is new. Keeps the client list a single source of
+  // truth so an edited record is updated in place, never duplicated.
+  function upsertReport(rec) {
+    if (!rec || !rec.id) return;
+    var idx = -1;
+    for (var i = 0; i < state.reports.length; i++) { if (state.reports[i].id === rec.id) { idx = i; break; } }
+    if (idx >= 0) state.reports[idx] = rec; else state.reports.push(rec);
+  }
+
   function save(submit) {
     var body = collectBody();
     if (!body.projectName || !body.projectName.trim()) { msg('A project is required.', false); return; }
-    var payload = Object.assign({ action: 'create' }, body);
-    api('/api/daily-report', { method: 'POST', body: JSON.stringify(payload) }).then(function (res) {
+    // EDIT vs NEW: if state.editingId is set we UPDATE that record (action:update,
+    // id included) so the server replaces it in place; otherwise we CREATE a new
+    // record. Either path returns the saved record; SUBMIT then re-runs the 3-step
+    // flow against that same id.
+    var editing = !!state.editingId;
+    var first = editing
+      ? Object.assign({ action: 'update', id: state.editingId }, body)
+      : Object.assign({ action: 'create' }, body);
+    api('/api/daily-report', { method: 'POST', body: JSON.stringify(first) }).then(function (res) {
       if (!res.ok || !res.body || !res.body.saved) { msg((res.body && res.body.message) || 'Save failed.', false); return; }
       var rec = res.body.record;
       if (submit) {
         // SUBMIT = the 3-step flow: render PDF -> email the mailing list -> save
         // the PDF to the "Daily Report Output (Test)" SharePoint folder. No
-        // approval queue. On success the record status is 'sent'.
+        // approval queue. On success the record status is 'sent'. The id is the
+        // same whether this was a create or an update, so an edit re-sends the
+        // SAME record (server preserves original submittedBy/At, stamps editedBy/At).
         api('/api/daily-report', { method: 'POST', body: JSON.stringify({ action: 'submit', id: rec.id }) }).then(function (r2) {
           if (r2.ok && r2.body && r2.body.saved) {
-            state.reports.push(r2.body.record);
+            upsertReport(r2.body.record);
             var to = (r2.body.distribution && r2.body.distribution.emailedTo) || [];
-            msg('Report sent: emailed' + (to.length ? ' to ' + to.length + ' recipient(s)' : '') + ' and saved to SharePoint.', true);
+            msg((editing ? 'Report updated and re-sent' : 'Report sent') + ': emailed' + (to.length ? ' to ' + to.length + ' recipient(s)' : '') + ' and saved to SharePoint.', true);
             resetForm(); renderList();
           } else {
-            // Draft was saved; the send step failed. Keep the draft visible.
-            state.reports.push(rec);
-            msg((r2.body && r2.body.message) || 'Draft saved but the report could not be sent. Please retry.', false);
+            // Change was saved server-side; the send step failed. Keep it visible.
+            upsertReport(rec);
+            msg((r2.body && r2.body.message) || 'Changes saved but the report could not be sent. Please retry.', false);
             renderList();
           }
         });
       } else {
-        state.reports.push(rec); msg('Draft saved.', true); resetForm(); renderList();
+        upsertReport(rec); msg(editing ? 'Changes saved.' : 'Draft saved.', true); resetForm(); renderList();
       }
     }).catch(function () { msg('Network error.', false); });
   }
 
   function resetForm() {
+    // Starting a fresh report: clear any editing state so the next save creates a
+    // new record rather than replacing the one that was being edited.
+    state.editingId = null;
+    updateEditBanner();
     ['drDate', 'drProject', 'drProjectId', 'drForeman', 'drPrecip', 'drTemp', 'drCols', 'drLf', 'drWork', 'drDelays', 'drSafety'].forEach(function (id) {
       var el = document.getElementById(id); if (el) el.value = '';
     });
@@ -20292,9 +20452,11 @@ try {
       var prod = [];
       if (r.columnsInstalled != null) prod.push(r.columnsInstalled + ' cols');
       if (r.lfInstalled != null) prod.push(r.lfInstalled + ' LF');
-      // Approval queue removed: no Approve / Send-to-HR actions. A 'sent' report
-      // links to its PDF in SharePoint when available.
+      // Approval queue removed: no Approve / Send-to-HR actions. Every report gets
+      // an Edit button (loads it back into the form to re-send in place); a 'sent'
+      // report also links to its PDF in SharePoint when available.
       var actions = '';
+      actions += '<button type="button" class="btn btn-sm" data-edit="' + E(r.id) + '">Edit</button> ';
       if (r.status === 'sent' && r.pdfWebUrl) {
         actions += safeFileLink(r.pdfWebUrl, 'View PDF') + ' ';
       }
@@ -20329,14 +20491,18 @@ try {
         + (attachH ? '<div class="dr-muted" style="font-size:12px">Files: ' + attachH + '</div>' : '')
         + '<div class="dr-muted" style="font-size:11px">'
         + (r.submittedBy ? 'submitted by ' + E(r.submittedBy) + ' ' + E((r.submittedAt || '').slice(0, 10)) : '')
+        + (r.editedBy ? ' - edited by ' + E(r.editedBy) + ' ' + E((r.editedAt || '').slice(0, 10)) : '')
         + (r.approvedBy ? ' - approved by ' + E(r.approvedBy) + ' ' + E((r.approvedAt || '').slice(0, 10)) : '')
         + (r.sentToHrBy ? ' - sent to HR by ' + E(r.sentToHrBy) + ' ' + E((r.sentToHrAt || '').slice(0, 10)) : '')
         + '</div>'
         + (actions ? '<div style="margin-top:6px">' + actions + '</div>' : '')
         + '</div>';
     }).join('');
-    // Approval queue removed - no data-approve / data-hr buttons to wire. The
-    // only per-report action is the "View PDF" SharePoint link (a plain anchor).
+    // Wire the per-report Edit buttons: load that record back into the form for
+    // an in-place re-send. (The "View PDF" link is a plain anchor, no wiring.)
+    host.querySelectorAll('button[data-edit]').forEach(function (b) {
+      b.addEventListener('click', function () { loadReportIntoForm(this.getAttribute('data-edit')); });
+    });
   }
 
   var prev = window.showModule;

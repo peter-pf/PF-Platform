@@ -29,7 +29,8 @@
 //     attachments:[{name, itemId, webUrl, bucket}], // SharePoint file refs from /api/field-upload (Hand Logs / GUHM Data) -- refs only, bytes live in SharePoint, NO $
 //     status,                                // 'draft'|'sent'  (no approval states anymore)
 //     createdBy, createdAt, updatedAt,
-//     submittedBy, submittedAt,              // set from session on submit
+//     submittedBy, submittedAt,              // set from session on FIRST submit (never overwritten by an edit)
+//     editedBy, editedAt,                    // set from session when a previously-submitted report is re-submitted (edited)
 //     pdfName, pdfWebUrl, emailedTo, sentAt  // side-effect audit of the 3-step submit
 //   }], meta:{updated} }
 //   ALL fields are "v1 default - confirm with Brad".
@@ -415,6 +416,7 @@ export async function onRequestPost(context) {
         createdAt: nowIso,
         updatedAt: nowIso,
         submittedBy: null, submittedAt: null,
+        editedBy: null, editedAt: null,
         // side-effect audit (populated on submit): PDF name + SharePoint url,
         // who it was emailed to, and when the 3-step submit completed.
         pdfName: null, pdfWebUrl: null, emailedTo: null, sentAt: null,
@@ -453,11 +455,22 @@ export async function onRequestPost(context) {
       return json({ status: 'error', message: 'Submit is unavailable: no recipient list is configured.' }, 503);
     }
 
-    // Stamp submit audit onto a working copy used to render (so the PDF footer
-    // and email reflect the submit), but only persist 'sent' AFTER both side
-    // effects succeed.
-    rec.submittedBy = who;
-    rec.submittedAt = nowIso;
+    // Stamp submit audit onto the record used to render (so the PDF footer and
+    // email reflect the submit), but only persist 'sent' AFTER both side effects
+    // succeed. EDIT SEMANTICS: if this report was ALREADY submitted once
+    // (submittedAt set OR status already 'sent'), this submit is an EDIT/re-send:
+    // preserve the ORIGINAL submittedBy/submittedAt and record editedBy/editedAt
+    // from the session instead. A first-time submit sets submittedBy/submittedAt
+    // as before and leaves editedBy/editedAt null.
+    const isEdit = !!(rec.submittedAt || rec.status === 'sent');
+    if (isEdit) {
+      rec.editedBy = who;
+      rec.editedAt = nowIso;
+      // keep rec.submittedBy / rec.submittedAt exactly as originally recorded
+    } else {
+      rec.submittedBy = who;
+      rec.submittedAt = nowIso;
+    }
 
     let token;
     try {

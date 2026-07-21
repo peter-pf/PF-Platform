@@ -308,3 +308,35 @@ flow is live to the 3 partners). Recipients stay PROD.
   project QA/QC folder as before; the daily-report PDF is a separate output).
 - No behavior change in Round 2 - styling/layout only.
 - No production live-send in this build (recipient constant stays on TEST).
+
+## Round 9 - Editable submitted reports (2026-07-21)
+
+Previously submitted daily reports can now be edited and re-sent in place (built
+on branch `website-build-20260721-dailyreport`, on top of the per-employee
+Start/End/Hrs + "Cost Code" work).
+
+### Requirements
+- Each report in the "Recent daily reports" history list (`#drList`) has an
+  **Edit** button.
+- Clicking Edit loads that stored record back into the daily-report form: every
+  simple field (date, project, foreman, precip/temp, columns/LF, work completed,
+  delays, safety) plus the repeatable arrays (crew incl. name/start/end/hours/
+  costCode, owned/rental equipment, maintenance rows, future issues, attachments).
+  The report's id is remembered in `state.editingId`; the form scrolls into view
+  and shows an "editing" banner; the submit button relabels to
+  "Update & re-send report"; a "Start new report" button appears to cancel.
+- Saving/submitting while `state.editingId` is set REPLACES the same KV record
+  (never appends a duplicate): the client sends `action:'update'` with the id,
+  then `action:'submit'` with the same id.
+- On a re-submit of an already-sent report the server PRESERVES the original
+  `submittedBy`/`submittedAt` and records `editedBy`/`editedAt` from the session.
+  A first-time submit behaves exactly as before (sets `submittedBy`/`submittedAt`,
+  leaves `editedBy`/`editedAt` null).
+- Editing requires the SAME auth as submitting (`requireArea(session,'field_ops')`
+  on POST). No auth is loosened.
+- Backward compatible: legacy records missing the newer fields load and edit
+  without errors (weather falls back from the legacy single field into Temp).
+
+### New record fields
+- `editedBy`, `editedAt` - session name + ISO timestamp of the most recent edit
+  re-submit (null until a report is edited after being sent).

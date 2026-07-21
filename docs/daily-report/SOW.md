@@ -397,3 +397,36 @@ Derek: "Move the logo centered vertically, still on the left. then move the
 ### Deploy evidence
 See the primary report / commit for the deploy console (docs gate ok, Functions
 bundle uploaded, canonical env=production, root HTTP 401).
+
+## Round 9 - Editable submitted reports (2026-07-21)
+
+### Files touched
+- `functions/api/daily-report.js`
+  - Record scaffold on `create` now seeds `editedBy:null, editedAt:null`.
+  - SUBMIT path: if the record was already submitted (`submittedAt` set or status
+    `sent`), the submit is treated as an EDIT - it preserves the original
+    `submittedBy`/`submittedAt` and stamps `editedBy`/`editedAt` from the session
+    instead of overwriting the submit audit. First-time submit unchanged.
+  - The existing `update`-by-id action (replace in place) is reused for edits; no
+    new endpoint. GET already returns full records, so no GET-by-id was needed.
+- `index.html` (daily-reports module)
+  - `state.editingId` added; `save()` sends `update`+id when editing (else
+    `create`); `upsertReport()` replaces the record in `state.reports` in place.
+  - `loadReportIntoForm(id)` populates the form from a stored record + re-renders;
+    `maintenanceFromRecord()` groups saved maintenance rows under the categories.
+  - `renderList()` adds an **Edit** button per row (wired to `loadReportIntoForm`)
+    and shows an "edited by" audit line.
+  - `resetForm()` clears `editingId`; edit banner + "Start new report" button +
+    relabeled submit button reflect edit state (`updateEditBanner`).
+
+### Verification
+- `node --check functions/api/daily-report.js` passes.
+- The daily-reports client module extracted from `index.html` passes `node --check`.
+- Node self-check (`/tmp/dr-edit-test.mjs`) drives the REAL `onRequestPost`/
+  `onRequestGet` over an in-memory KV (Graph/SharePoint fetches stubbed): 33/33
+  assertions pass, proving (a) Edit loads a stored record's fields, (b) an edit
+  update+submit REPLACES the same record (list length unchanged, same id, content
+  updated, original submittedBy/At preserved, editedBy/At stamped), (c) a submit
+  with no editingId creates a NEW record, and legacy records load without error.
+- NOT deployed. Left on branch `website-build-20260721-dailyreport` for Peter's
+  review + gated deploy.
