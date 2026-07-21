@@ -107,9 +107,10 @@ Then redeploy (section 5) and re-verify. That's it.
 ## 8. Topic 2 — "How to Compact Peter" (added 2026-07-21)
 
 - File: `pf-support/compact-peter.html`, linked from a second topic card on `index.html`.
-- Content: what compacting is, a highlighted **Compact or Restart?** callout (slow-but-answering → Compact/Restart button; fully stuck → Restart, links to the peter-stuck article), portal instructions (Restart button is the portal-accessible relief), terminal instructions (`/compact` in the tmux session, rendered in monospace `<code>`), and a note that Peter compacts himself proactively.
-- Added a global inline `code { … }` rule to `assets/style.css` for the monospace `/compact` styling.
-- Verification (2026-07-21): `/compact-peter` → 200; body contains `/compact` (×2), `Compact or Restart` (×1), and literal `<code>/compact</code>`. `index.html` now links `compact-peter.html` and still links `peter-stuck.html`.
+- Content: what compacting is, a highlighted **Compact or Restart?** callout (slow-but-answering → Compact; fully stuck → Restart, links to the peter-stuck article), a single **step-by-step** section, and a note that Peter compacts himself proactively.
+- Added a global inline `code { … }` rule to `assets/style.css` for the monospace `/compact` styling, plus `ol` list styling.
+- **REVISION (2026-07-21, Brad):** simplified per Brad — the portal already has a **Terminal panel** (left sidebar → PANELS → "Terminal") that shows Peter's live tmux session and is typeable, so there is no SSH/container-access gap and no need for a separate button. Replaced the earlier two sections ("From the portal" / "From the terminal") with ONE positive step-by-step section: open portal → PANELS → Terminal → click in → type `/compact` → Enter. Removed the confusing "you can't compact from the portal" caveat (that was about the chat box only). Footer quick-version updated to: "Peter slow but still talking? → Terminal panel → type /compact → Enter. Peter fully frozen? → Restart button (see If Peter Seems Stuck)."
+- Verification (2026-07-21, post-revision): `/compact-peter` → 200; body contains `PANELS`, the Terminal step wording, `/compact` (×2), heading "How to compact Peter (step by step)"; old "From the portal" section and "can't run a true compact" caveat both gone; callout preserved.
 
 ## 9. Main-portal integration — Help / Support nav link (added 2026-07-21)
 
