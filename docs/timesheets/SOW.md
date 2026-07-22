@@ -40,6 +40,17 @@ module from submitted daily reports, applying the Brad-approved pay rule.
 7. Docs: this SOW + `docs/timesheets/SRS.md`; note added to
    `docs/daily-report/SRS.md`.
 
+### Added: per-employee Start / End / Activity display (branch `website-build-20260722-timesheet-activity`, commit 6cdcc64)
+
+- `functions/lib/timesheet-rollup.mjs` - the crew-ingest loop now captures each
+  crew member's start/end and the report-level `workCompleted` activity, populates
+  the `dayRows` start/end/activity fields (previously hardcoded blank), with
+  sensible same-day multi-report aggregation. DISPLAY ONLY; OT/hours math unchanged.
+- `index.html` - the per-employee day table's Activity/Start/End columns now show
+  real data; added `.ts-time` / `.ts-activity` CSS and refreshed the intro copy.
+  XSS-safe.
+- `sync/test-timesheet-activity.mjs` - 33 assertions; the 46 OT assertions stay green.
+
 ### Out of scope / follow-ups
 
 - Wages / pay rates ($) - intentionally never added (field_ops = no financials).

@@ -87,3 +87,21 @@ Required cases (asserted in `sync/test-ot-engine.mjs`):
   no-cross-week pyramiding.
 - Handler integration: `onRequestGet` driven with a mocked KV + field_ops session
   returns status 200 and the correct week/employee-year shape.
+
+## 7. Per-employee Start / End / Activity display (added)
+
+- FR6 - The per-employee day table (Timesheet Weekly view, `#tsRoot` empBlock)
+  surfaces each employee's daily **Start**, **End**, and **Activity** pulled from
+  the submitted daily report. Start/End come from the crew row (`m.start`/`m.end`);
+  Activity is the report-level `workCompleted` narrative that applies to every crew
+  member on that report.
+- Same-day multi-report aggregation: earliest non-blank start, latest non-blank
+  end (compared by "HH:MM" -> minutes), distinct activities joined with "; ".
+- DISPLAY ONLY - the OT / hours math (`daySplit` / `weeklyTotals`) is byte-identical
+  and untouched; the 46-assertion OT suite still passes. Blank fields render empty
+  (never `undefined`). Output is XSS-safe (escaped via `window.esc` / `E()`).
+- Styling: `.ts-time` (nowrap tabular times) and `.ts-activity` (wrapping, 320px
+  cap) on `.ts-day-table`.
+- Verification: `node sync/test-timesheet-activity.mjs` - 33 assertions (single
+  report, one employee across two reports in a week, same-day aggregation,
+  backward-compat blanks).
