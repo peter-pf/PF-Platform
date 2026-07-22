@@ -10,6 +10,18 @@ import {
 
 function r2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
 
+// "HH:MM" (24h) -> minutes since midnight, for picking earliest start / latest end
+// when an employee appears on more than one report the same day. Blank/garbage
+// returns null so it never wins a min/max comparison.
+function toMinutes(t) {
+  const s = String(t == null ? '' : t).trim();
+  const m = /^(\d{1,2}):(\d{2})$/.exec(s);
+  if (!m) return null;
+  const hh = Number(m[1]); const mm = Number(m[2]);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm) || hh > 23 || mm > 59) return null;
+  return hh * 60 + mm;
+}
+
 // Build the live weekly timesheet structure from daily-report records.
 // reports: [{ date, status, projectId, projectName, crew:[{name,hours,costCode}] }]
 // opts.includeDrafts: include status!=='sent' records too (preview).
@@ -28,19 +40,42 @@ export function buildWeeks(reports, opts) {
     if (!weeks.has(wk)) weeks.set(wk, { week_start: wb.week_start, week_end: wb.week_end, emps: new Map() });
     const W = weeks.get(wk);
     const job = String(rep.projectId || rep.projectName || '').trim();
+    // The day's work narrative is a REPORT-LEVEL field that applies to every crew
+    // member on this report (what the crew did that day). DISPLAY ONLY.
+    const activity = String(rep.workCompleted || '').trim();
     for (const m of (Array.isArray(rep.crew) ? rep.crew : [])) {
       if (!m || typeof m !== 'object') continue;
       const name = String(m.name || '').trim();
       if (!name) continue;
       const h = toDayHours(m.hours);
       const costCode = String(m.costCode || '').trim();
+      const start = String(m.start || '').trim();
+      const end = String(m.end || '').trim();
       if (!W.emps.has(name)) W.emps.set(name, { name, daysByDate: new Map() });
       const emp = W.emps.get(name);
-      if (!emp.daysByDate.has(date)) emp.daysByDate.set(date, { date, hours: 0, job, cost_code: costCode, lines: [] });
+      if (!emp.daysByDate.has(date)) {
+        emp.daysByDate.set(date, { date, hours: 0, job, cost_code: costCode, start: '', end: '', activities: [], lines: [] });
+      }
       const dayRec = emp.daysByDate.get(date);
       dayRec.hours = r2(dayRec.hours + h);
       if (!dayRec.job && job) dayRec.job = job;
       if (!dayRec.cost_code && costCode) dayRec.cost_code = costCode;
+      // Same-day multi-report aggregation (rare): earliest non-blank start, latest
+      // non-blank end. Keep the raw "HH:MM" string; compare by minutes.
+      if (start) {
+        const cur = toMinutes(dayRec.start);
+        const nw = toMinutes(start);
+        if (nw != null && (cur == null || nw < cur)) dayRec.start = start;
+        else if (!dayRec.start) dayRec.start = start;
+      }
+      if (end) {
+        const cur = toMinutes(dayRec.end);
+        const nw = toMinutes(end);
+        if (nw != null && (cur == null || nw > cur)) dayRec.end = end;
+        else if (!dayRec.end) dayRec.end = end;
+      }
+      // Collect distinct non-blank activities; joined with "; " at render time.
+      if (activity && !dayRec.activities.includes(activity)) dayRec.activities.push(activity);
       dayRec.lines.push({ hours: h, job, cost_code: costCode });
     }
   }
@@ -66,7 +101,9 @@ export function buildWeeks(reports, opts) {
         dayRows.push({
           day: WEEKDAYS[i], date: iso,
           job: rec ? rec.job : '', cost_code: rec ? rec.cost_code : '',
-          activity: '', start: '', end: '',
+          activity: rec ? (rec.activities || []).join('; ') : '',
+          start: rec ? (rec.start || '') : '',
+          end: rec ? (rec.end || '') : '',
           regular: reg, ot: ot, total: r2(h), per_diem: '',
         });
         if (rec) {
