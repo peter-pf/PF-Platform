@@ -25,9 +25,11 @@
 -- Apply:
 --   npx wrangler@3 d1 execute pf-platform-db --remote --file=platform/migrations/0003_widen_role_check.sql
 
-PRAGMA foreign_keys = OFF;
-
-BEGIN TRANSACTION;
+-- NOTE (D1): do NOT use explicit BEGIN TRANSACTION / COMMIT here. D1's remote
+-- executor rejects raw SQL transaction control ("please use state.storage.transaction()")
+-- and it already wraps a --file execution atomically (all-or-nothing; on failure the
+-- DB returns to its original state). PRAGMA statements are likewise omitted (D1 manages
+-- foreign_keys). The statements below run in order as one atomic batch.
 
 CREATE TABLE users_new (
   id            TEXT PRIMARY KEY,
@@ -53,7 +55,3 @@ DROP TABLE users;
 ALTER TABLE users_new RENAME TO users;
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
-
-COMMIT;
-
-PRAGMA foreign_keys = ON;
