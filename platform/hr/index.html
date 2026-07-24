@@ -316,24 +316,47 @@
      Shell owns nav/chrome. RBAC enforced at platform/functions layer.
      ================================================================ */
 
-  /* -- Auth: reads pf_auth_token cookie (set by the PF shell) -- */
-  function getPFAuthToken() {
-    var match = document.cookie.match(/(?:^|;\s*)pf_auth_token=([^;]*)/);
-    return match ? decodeURIComponent(match[1]) : null;
+  /* -- Auth + live data ----------------------------------------------------
+     The real PF session cookie is `pf_session` (HttpOnly) — JS CANNOT read it,
+     so we do NOT sniff a cookie. Instead, same-origin fetches automatically
+     carry the HttpOnly session cookie. We ask the server who we are via
+     /api/me, then load the real directory via /api/hr. If either fetch fails
+     (true standalone / no session), we fall back to the built-in demo data so
+     the page still renders for local preview. -------------------------------- */
+
+  /* Fetch the REAL identity from the platform (server reads the HttpOnly cookie). */
+  function fetchMe() {
+    return fetch('/api/me', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .catch(function() { return null; });
+  }
+
+  /* Fetch the REAL, curated, non-sensitive HR directory roster. */
+  function fetchRoster() {
+    return fetch('/api/hr', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .catch(function() { return null; });
   }
 
   /* -- Init: self-start on DOMContentLoaded -- */
-  /* In production (same-origin), the cookie authenticates us automatically. */
-  /* In standalone demo mode, we init with demo data. */
   document.addEventListener('DOMContentLoaded', function() {
-    var token = getPFAuthToken();
-    if (token) {
-      /* Production: cookie present, fetch real user from platform functions */
-      initModule({ name: 'Authenticated User', email: '' }, 'admin');
-    } else {
-      /* Demo/standalone: no cookie, use demo data */
-      initModule({ name: 'Brad Thompson', email: 'brad@pierfoundations.ca' }, 'admin');
-    }
+    fetchMe().then(function(me) {
+      if (me && me.status === 'ok' && me.role) {
+        /* Production: authenticated via same-origin session. Load the REAL roster. */
+        fetchRoster().then(function(data) {
+          if (data && data.ok && Array.isArray(data.employees)) {
+            STATE.employees = data.employees;   /* REAL data replaces demo array */
+            STATE.rosterMeta = data.meta || null;
+            STATE.liveData = true;
+          }
+          initModule({ name: me.name || 'Authenticated User', email: '' }, me.role);
+        });
+      } else {
+        /* Standalone / no session: keep the built-in demo data. */
+        STATE.liveData = false;
+        initModule({ name: 'Brad Thompson', email: 'brad@pierfoundations.ca' }, 'admin');
+      }
+    });
   });
 
   var STATE = {
@@ -533,18 +556,33 @@
     var compDone = STATE.compliance.filter(function(c){return c.status==='done'}).length;
     var stats = '<div class="pf-grid-sm" style="margin-bottom:1.4rem;">' +
       '<div class="stat-box"><div class="stat-value">' + STATE.employees.length + '</div><div class="stat-label">Employees</div></div>' +
-      '<div class="stat-box"><div class="stat-value">' + STATE.employees.filter(function(e){return e.status==='onboarding'}).length + '</div><div class="stat-label">Onboarding</div></div>' +
+      '<div class="stat-box"><div class="stat-value">' + STATE.employees.filter(function(e){return String(e.status||'').toLowerCase()==='onboarding'}).length + '</div><div class="stat-label">Onboarding</div></div>' +
       '<div class="stat-box"><div class="stat-value" style="color:var(--pf-green);">' + STATE.policies.filter(function(p){return p.status==='acknowledged'}).length + '/' + STATE.policies.length + '</div><div class="stat-label">Policies Signed</div></div>' +
       '<div class="stat-box"><div class="stat-value" style="color:var(--pf-orange);">' + STATE.ptoRequests.filter(function(r){return r.status==='pending'}).length + '</div><div class="stat-label">PTO Pending</div></div>' +
       '<div class="stat-box"><div class="stat-value" style="color:var(--pf-blue);">' + reviewsDone + '/' + STATE.reviews.length + '</div><div class="stat-label">Reviews Done</div></div>' +
       '<div class="stat-box"><div class="stat-value" style="color:var(--pf-green);">' + compDone + '/' + STATE.compliance.length + '</div><div class="stat-label">Compliance</div></div>' +
     '</div>';
 
+    /* Provenance banner: on the Employee Records tab, tell the user which employee
+       data is REAL (from /api/hr) vs DEMO/placeholder (other tabs are Phase-2 demo). */
+    var dataBanner = '';
+    if (STATE.currentTab === 'records') {
+      if (STATE.liveData) {
+        dataBanner = '<div class="pf-card" style="border-left:3px solid var(--pf-green);margin-bottom:1rem;padding:.7rem 1rem;font-size:.85rem;color:var(--pf-muted);">' +
+          'Employee Records show <strong>live directory data</strong> from the platform. This is a directory and org view only — compensation, tax, and benefits data are not shown here. Fields marked <strong>TBD</strong> await confirmation from Brad or Derek.' +
+          '</div>';
+      } else {
+        dataBanner = '<div class="pf-card" style="border-left:3px solid var(--pf-orange);margin-bottom:1rem;padding:.7rem 1rem;font-size:.85rem;color:var(--pf-muted);">' +
+          'Standalone preview — showing <strong>demo data</strong> (no active session).' +
+          '</div>';
+      }
+    }
+
     document.getElementById('app').innerHTML = '' +
       '<div class="section-label">PIER FOUNDATIONS</div>' +
       '<div class="page-title">Human Resources</div>' +
       '<div class="page-subtitle">Employee records, onboarding, policies, time off, compliance, and training</div>' +
-      stats + tabNav + content;
+      stats + tabNav + dataBanner + content;
   }
 
   /* ================================================================
@@ -553,9 +591,10 @@
 
   function renderRecords() {
     var statusChip = function(s) {
-      if (s === 'active') return '<span class="pf-chip green">ACTIVE</span>';
-      if (s === 'onboarding') return '<span class="pf-chip orange">ONBOARDING</span>';
-      return '<span class="pf-chip muted">' + s.toUpperCase() + '</span>';
+      var v = String(s || '').toLowerCase();
+      if (v === 'active') return '<span class="pf-chip green">ACTIVE</span>';
+      if (v === 'onboarding') return '<span class="pf-chip orange">ONBOARDING</span>';
+      return '<span class="pf-chip muted">' + esc(String(s || '').toUpperCase()) + '</span>';
     };
 
     var rows = STATE.employees.map(function(e) {
@@ -589,8 +628,17 @@
     if (!e) return;
 
     var info = function(k, v) {
+      if (v === undefined || v === null || v === '') return '';
       return '<div class="info-row"><span class="info-key">' + k + '</span><span class="info-val">' + esc(v) + '</span></div>';
     };
+
+    /* Real /api/hr shape uses workEmail/workPhone; demo used email/phone. Support both.
+       Emergency Contact is intentionally OMITTED for live data (PII stays out of the
+       directory) — info() drops any field that is empty/absent, so it simply won't show. */
+    var email = e.workEmail || e.email || '';
+    var phone = e.workPhone || e.phone || '';
+    var statusLabel = String(e.status || '');
+    statusLabel = statusLabel ? statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1) : '';
 
     document.getElementById('employee-detail').innerHTML = '' +
       '<div class="pf-card accent-gold" style="margin-top:.8rem;">' +
@@ -601,12 +649,12 @@
         info('Employee ID', e.id) +
         info('Title', e.title) +
         info('Department', e.department) +
-        info('Email', e.email) +
-        info('Phone', e.phone) +
+        info('Email', email) +
+        info('Phone', phone) +
         info('Location', e.location) +
         info('Start Date', e.startDate) +
         info('Emergency Contact', e.emergencyContact) +
-        info('Status', e.status.charAt(0).toUpperCase() + e.status.slice(1)) +
+        info('Status', statusLabel) +
       '</div>';
   }
 
@@ -865,7 +913,7 @@
     var deptCards = STATE.orgChart.departments.map(function(dept) {
       var empList = STATE.employees.filter(function(e) { return e.department === dept.name; });
       var empRows = empList.map(function(e) {
-        var statusChip = e.status === 'active' ? '<span class="pf-chip green">ACTIVE</span>' : '<span class="pf-chip orange">ONBOARDING</span>';
+        var statusChip = String(e.status||'').toLowerCase() === 'active' ? '<span class="pf-chip green">ACTIVE</span>' : '<span class="pf-chip orange">ONBOARDING</span>';
         return '<tr>' +
           '<td><strong>' + esc(e.name) + '</strong></td>' +
           '<td>' + esc(e.title) + '</td>' +

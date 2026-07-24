@@ -375,6 +375,15 @@ const DATA_FILE_AREAS = {
   '/data/gc-targets.js':           'business_dev',    // BD CRM: GC target accounts by sector (read-only) — BD's own tool, field_ops BLOCKED
   '/data/bd-templates.js':         'business_dev',    // BD CRM: email-template + doc-registry seed (read-only) — BD's own tool, field_ops BLOCKED
 
+  // ---- HR DIRECTORY (admin + hr ONLY — everyone else BLOCKED) ----
+  // Curated NON-SENSITIVE HR directory roster (name/title/dept/location/startDate/
+  // status/workEmail/workPhone ONLY). Contains ZERO comp/tax/SSN/benefits/payment
+  // data (those stay document-only in SharePoint). Gated to the `hr` area
+  // (admin + hr role) as defense-in-depth: even a direct GET of the raw file is
+  // denied to non-hr roles. The portal HR module reads this through /api/hr, not
+  // the raw file, but this classification ensures the file itself never leaks.
+  '/data/hr-roster.json':          'hr',              // HR directory: safe fields only, admin+hr
+
   // ---- COMPANY-WIDE / GLOBAL financials (admin/partner ONLY — BD + field_ops BLOCKED) ----
   // Item E: cross-job rollups, company P&L, the global pricing master, company
   // insurance, sync-meta, the company estimating template. BD must NOT see these.
@@ -523,6 +532,13 @@ export function areaForPath(pathname) {
     // BD sees the full bid log (Brad 2026-06-23) -> classify as financials
     // (project/BD tier). field_ops still BLOCKED (not in the financials area).
     if (pathname.startsWith('/api/data'))          return 'financials';
+    // /api/hr serves the curated NON-SENSITIVE HR directory roster (name/title/
+    // dept/location/startDate/status/workEmail/workPhone ONLY). Gated to the `hr`
+    // area = admin + hr role ONLY. Without this line it would fall through to the
+    // default 'user_admin' (admin-only) and the `hr` role could not read it. The
+    // handler ALSO calls requireArea(session,'hr') as a defense-in-depth backstop.
+    // It NEVER reads or returns comp/tax/SSN/benefits/payment data.
+    if (pathname.startsWith('/api/hr'))            return 'hr';
     // /api/me returns ONLY the caller's own {name, role} (no business data).
     // Reachable by any authenticated role so the SPA can tailor its UI.
     if (pathname.startsWith('/api/me'))            return 'general';
