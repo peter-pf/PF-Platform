@@ -1756,6 +1756,63 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 .pr-field-value { font-size: 0.9rem; color: var(--text-1); word-break: break-word; }
 .pr-field-value.empty { color: var(--text-3); }
 .pr-field-src { font-size: 0.66rem; color: var(--text-3); font-style: italic; }
+.pr-field-edited { margin-left: 5px; color: var(--accent); font-size: 0.7rem; }
+
+/* ---- per-section manual-override editor ---- */
+.pr-edit-btn {
+  margin-right: 10px;
+  padding: 3px 12px;
+  font-size: 0.74rem; font-weight: 600;
+  color: var(--accent);
+  background: var(--bg-0);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.pr-edit-btn:hover { background: var(--accent); color: #fff; }
+.pr-editor { display: flex; flex-direction: column; gap: 10px; }
+.pr-edit-note { font-size: 0.76rem; color: var(--text-3); font-style: italic; }
+.pr-edit-row { display: flex; flex-direction: column; gap: 3px; }
+.pr-edit-label {
+  font-size: 0.72rem; font-weight: 600; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: 0.03em;
+}
+.pr-edit-input, .pr-edit-newlabel, .pr-edit-newvalue {
+  padding: 7px 9px;
+  font-size: 0.9rem;
+  color: var(--text-1);
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.pr-edit-input:focus, .pr-edit-newlabel:focus, .pr-edit-newvalue:focus {
+  outline: none; border-color: var(--accent);
+}
+.pr-edit-add { flex-direction: row; gap: 8px; margin-top: 4px; }
+.pr-edit-add .pr-edit-newlabel { flex: 0 0 40%; }
+.pr-edit-add .pr-edit-newvalue { flex: 1 1 auto; }
+.pr-edit-err {
+  font-size: 0.82rem; color: #c0392b; font-weight: 600;
+  padding: 8px 10px;
+  background: rgba(192,57,43,0.08);
+  border: 1px solid rgba(192,57,43,0.3);
+  border-radius: 6px;
+}
+.pr-edit-actions { display: flex; gap: 8px; margin-top: 4px; }
+.pr-save-btn, .pr-cancel-btn {
+  padding: 7px 18px;
+  font-size: 0.82rem; font-weight: 600;
+  border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--border);
+}
+.pr-save-btn { color: #fff; background: var(--accent); border-color: var(--accent); }
+.pr-save-btn:hover { filter: brightness(1.08); }
+.pr-save-btn:disabled { opacity: 0.6; cursor: default; }
+.pr-cancel-btn { color: var(--text-2); background: var(--bg-1); }
+.pr-cancel-btn:hover { background: var(--bg-2); }
 
 /* ---- SUBCONTRACT ANALYSIS card (migrated from standalone Subcontracts tool) ---- */
 .pr-verdict {
@@ -11513,19 +11570,77 @@ try {
   try {
     var E = window.esc; // canonical escape helper (defined at top of page)
 
+    // ---- MANUAL OVERRIDE state (per project, per section) ------------------
+    // window.PF_PROJECT_OVERRIDES = { num: { sections:{ key:{label:value} }, _meta } }
+    // Loaded synchronously per project in openProjectRecord() (like the precon
+    // pipeline overrides), merged on top of the synced record at render time so a
+    // manual override ALWAYS wins over the synced source. field() consults the
+    // active section's override map (set via _curSection before each card group).
+    window.PF_PROJECT_OVERRIDES = window.PF_PROJECT_OVERRIDES || {};
+    var _curNum = '';        // project number currently being rendered
+    var _curSection = '';    // section key of the card currently being built
+    var _curOverrides = {};  // sections map for the current project ({} if none)
+    var _curMeta = null;     // _meta of the current project's overrides
+
+    // Can the current user edit? Office roles only (mirrors the SERVER gate:
+    // financials area = admin/partner/business_dev). field_ops sees NO Edit
+    // buttons; the server is the real boundary (a field_ops POST -> 403).
+    function canEdit(){
+      var r = (window.PF_ME && window.PF_ME.role) || '';
+      return r === 'admin' || r === 'partner' || r === 'business_dev';
+    }
+
+    // Override lookup for (section, label). Returns { has, value } where has=true
+    // means an override exists for this field (value may be an empty string, which
+    // is a legitimate manual "blank this" override).
+    function ovLookup(sectionKey, label){
+      var sec = _curOverrides && _curOverrides[sectionKey];
+      if (sec && Object.prototype.hasOwnProperty.call(sec, label)) {
+        return { has: true, value: sec[label] };
+      }
+      return { has: false, value: null };
+    }
+
     // ---- field renderers (label always shown; blank -> em-dash) ----
+    // If a manual override exists for (_curSection, label), it WINS over the
+    // synced value and the field is tagged as edited (subtle indicator).
     function field(label, val, src){
+      var ov = ovLookup(_curSection, label);
+      var edited = ov.has;
+      if (edited) { val = ov.value; src = 'Manual override'; }
       var v = (val === undefined || val === null || String(val).trim() === "") ? "" : String(val);
       var cls = v ? "pr-field-value" : "pr-field-value empty";
       var shown = v ? E(v) : "-";
       var srcHtml = (src && v) ? '<span class="pr-field-src">'+E(src)+'</span>' : '';
-      return '<div class="pr-field"><span class="pr-field-label">'+E(label)+'</span>'
+      var editMark = edited ? '<span class="pr-field-edited" title="Manually edited">&#9998;</span>' : '';
+      // data-pr-label lets the section editor read every field's label back out
+      // of the DOM without re-deriving it from the source expressions.
+      return '<div class="pr-field" data-pr-label="'+E(label)+'"><span class="pr-field-label">'+E(label)+editMark+'</span>'
            + '<span class="'+cls+'">'+shown+'</span>'+srcHtml+'</div>';
     }
     function fields(rows){
       return '<div class="pr-fields">'+rows.join('')+'</div>';
     }
     function subhead(t){ return '<div class="pr-subhead">'+E(t)+'</div>'; }
+
+    // ---- override "extras" for LIST-type sections (PF Team, Equipment) --------
+    // These sections render CONTACT lists, not a flat pr-fields grid, so a manual
+    // override added to them has no synced pr-field row to attach to. ovExtras
+    // renders every stored override for the section as its OWN editable pr-field
+    // (so it shows on load AND is captured by the section editor's DOM scan).
+    // Sets _curSection so field()'s override lookup marks them edited. A section
+    // with no overrides renders nothing.
+    function ovExtras(sectionKey){
+      var sec = _curOverrides && _curOverrides[sectionKey];
+      if (!sec) return '';
+      var labels = Object.keys(sec);
+      if (!labels.length) return '';
+      var prev = _curSection;
+      _curSection = sectionKey;
+      var rows = labels.map(function(lbl){ return field(lbl, '', ''); });
+      _curSection = prev;
+      return subhead('Manual Fields') + fields(rows);
+    }
 
     // ---- contact card ----
     function contactBlock(c){
@@ -11586,13 +11701,36 @@ try {
     }
 
     // ---- collapsible card ----
-    function card(num, title, meta, bodyHtml, open){
-      var metaHtml = meta ? '<span class="pr-card-meta">'+E(meta)+'</span>' : '';
-      return '<div class="pr-card'+(open?' open':'')+'">'
+    // sectionKey (optional, last arg) ties this card to the override store so an
+    // office user gets a per-section Edit button (right of the header). When
+    // present AND the user can edit, an Edit button is injected; clicking it turns
+    // that ONE section's fields into inputs (see the section-editor script below).
+    // The button lives in the head but stops click-propagation so it does not also
+    // toggle the collapse. Cards without a sectionKey (e.g. 3b Subcontract
+    // Analysis, which is a computed summary) get no Edit button.
+    function card(num, title, meta, bodyHtml, open, sectionKey){
+      // If this section carries manual overrides, surface a subtle "edited by /
+      // when" note (from the project-wide _meta) next to the header.
+      var editedNote = '';
+      if (sectionKey && _curOverrides && _curOverrides[sectionKey]
+          && Object.keys(_curOverrides[sectionKey]).length && _curMeta && _curMeta.updatedBy) {
+        var when = '';
+        try { when = _curMeta.updatedAt ? new Date(_curMeta.updatedAt).toLocaleDateString() : ''; } catch(e){}
+        editedNote = '<span class="pr-card-meta" title="This section has manual overrides">&#9998; edited by '
+          + E(_curMeta.updatedBy) + (when ? ' · ' + E(when) : '') + '</span>';
+      }
+      var metaHtml = (meta ? '<span class="pr-card-meta">'+E(meta)+'</span>' : '') + editedNote;
+      var editBtn = (sectionKey && canEdit())
+        ? '<button type="button" class="pr-edit-btn" data-pr-section="'+E(sectionKey)+'" '
+          + 'onclick="event.stopPropagation();window.pfEditSection(this)">Edit</button>'
+        : '';
+      var secAttr = sectionKey ? ' data-pr-section="'+E(sectionKey)+'"' : '';
+      return '<div class="pr-card'+(open?' open':'')+'"'+secAttr+'>'
         + '<div class="pr-card-head" onclick="this.parentElement.classList.toggle(\'open\')">'
         +   '<span class="pr-card-num">'+E(String(num))+'</span>'
         +   '<span class="pr-card-title">'+E(title)+'</span>'
         +   metaHtml
+        +   editBtn
         +   '<span class="pr-chev">&#9654;</span>'
         + '</div>'
         + '<div class="pr-card-body">'+bodyHtml+'</div>'
@@ -11615,6 +11753,15 @@ try {
       var q = D.qaqc || null;
       var SF = (D.subcontract && D.subcontract.fields) || {}; // subcontract-sourced fields
       var SS = 'Subcontract'; // source tag for subcontract-derived fields
+
+      // ---- activate the manual-override overlay for THIS project ----
+      // _curNum drives which override map field() reads; _curOverrides is the
+      // per-section {label:value} map loaded (synchronously) in openProjectRecord.
+      _curNum = String(D.project_number || '');
+      var _ovStore = window.PF_PROJECT_OVERRIDES[_curNum] || null;
+      _curOverrides = (_ovStore && _ovStore.sections) ? _ovStore.sections : {};
+      _curMeta = (_ovStore && _ovStore._meta) || null;
+      _curSection = '';
 
       // ----- header -----
       var status = bid.bid_status || '';
@@ -11642,6 +11789,7 @@ try {
       }
 
       // ----- 1. General Info -----
+      _curSection = 'general';
       html += card(1, 'General Info', null,
         fields([
           field('General Contractor', bid.gc_name || SF.gc_party, bid.gc_name ? 'Bid Log' : SS),
@@ -11668,13 +11816,15 @@ try {
           field('Estimated Project Completion', ''),
           field('Subcontract / Bid Value', bid.bid_total_value ? ('$'+bid.bid_total_value) : SF.subcontract_value, bid.bid_total_value ? 'Bid Log' : SS),
           field('Award Status', bid.bid_status, 'Bid Log')
-        ]) + linkRow(L.general), true);
+        ]) + linkRow(L.general), true, 'general');
 
       // ----- 2. PF Team -----
+      _curSection = 'pfTeam';
       html += card(2, 'PF Team', (g.pf_team?g.pf_team.length+' members':null),
-        contactList(g.pf_team));
+        contactList(g.pf_team) + ovExtras('pfTeam'), false, 'pfTeam');
 
       // ----- 3. Contract Info -----
+      _curSection = 'contract';
       html += card(3, 'Contract Info', null,
         fields([
           field('Bid Invite Date', bid.invite_date, 'Bid Log'),
@@ -11708,7 +11858,7 @@ try {
         + docEmbed((D.subcontract && D.subcontract.item_id),
                    L.contract,
                    (D.subcontract && D.subcontract.source_file))
-        + linkRow(L.contract));
+        + linkRow(L.contract), false, 'contract');
 
       // ----- 3b. Subcontract Analysis (migrated from the standalone Subcontracts tool) -----
       // PM-view only. Renders when the record carries an analysis block. Same content the
@@ -11785,6 +11935,7 @@ try {
       }
 
       // ----- 4. Engineering & Design -----
+      _curSection = 'engineering';
       var engBody = subhead('Engineering & Design Contacts') + contactList(g.engineering)
         + fields([
             field('AP Design Firm', bid.engineer_firm, 'Bid Log'),
@@ -11801,9 +11952,10 @@ try {
             field('Shop Drawings Ready for Pickup', ''),
             field('Jack to Be Used for Testing (Big/Small)', '')
           ]) + linkRow(L.engineering);
-      html += card(4, 'Engineering & Design', null, engBody);
+      html += card(4, 'Engineering & Design', null, engBody, false, 'engineering');
 
       // ----- 5. Project Safety -----
+      _curSection = 'safety';
       html += card(5, 'Project Safety', null,
         fields([
           field('Site Specific Safety Plan (SSSP)', 'On file (see link)', 'SharePoint'),
@@ -11817,9 +11969,10 @@ try {
           field('Date Locates Called In', ''),
           field('Date Ticket Cleared to Start', ''),
           field('Date Ticket Expires', '')
-        ]) + linkRow(L.safety));
+        ]) + linkRow(L.safety), false, 'safety');
 
       // ----- 6. Site Readiness -----
+      _curSection = 'siteReadiness';
       html += card(6, 'Site Readiness', null,
         fields([
           field('Mod Load Test Report', ''),
@@ -11829,9 +11982,10 @@ try {
           field('Bldg Pad Prep Notes', ''),
           field('Project Files in PM & Field OneDrive', ''),
           field('Field Ops Mgr Jobsite Visit w/ GC', '')
-        ]) + linkRow(L.site));
+        ]) + linkRow(L.site), false, 'siteReadiness');
 
       // ----- 7. Equipment -----
+      _curSection = 'equipment';
       var equipVendors = (g.vendors||[]).filter(function(c){return /equipment|rental|trucking|transport/i.test(c.scope||'');});
       html += card(7, 'Equipment', null,
         subhead('PF Equipment Mobilization to Site')
@@ -11842,9 +11996,11 @@ try {
             field('Fall Off Load', '')
           ])
         + subhead('Rental Equipment & Transport (vendors)')
-        + contactList(equipVendors));
+        + contactList(equipVendors)
+        + ovExtras('equipment'), false, 'equipment');
 
       // ----- 8. Material -----
+      _curSection = 'material';
       var matVendors = (g.vendors||[]).filter(function(c){return /stone|aggregate|fuel/i.test(c.scope||'');});
       html += card(8, 'Material', null,
         subhead('Stone / Fuel Vendors')
@@ -11859,9 +12015,10 @@ try {
             field('Helical Material Approved by Eng', ''),
             field('Fuel Tank/Containment', ''),
             field('Fuel Delivery', '')
-          ]) + linkRow(L.material));
+          ]) + linkRow(L.material), false, 'material');
 
       // ----- 9. QA / QC -----
+      _curSection = 'qaqc';
       var qaRows;
       if (q) {
         qaRows = [
@@ -11881,9 +12038,10 @@ try {
       }
       var qaMeta = q ? (q.installed_columns + ' cols / ' + q.installed_lf + ' LF') : null;
       var qaNote = '<div class="pr-empty-note">Baseline pending - approved Garbin design totals not yet confirmed, so % complete is withheld (installed quantities shown).</div>';
-      html += card(9, 'QA / QC', qaMeta, qaNote + fields(qaRows) + linkRow(L.qaqc));
+      html += card(9, 'QA / QC', qaMeta, qaNote + fields(qaRows) + linkRow(L.qaqc), false, 'qaqc');
 
       // ----- 10. Financials -----
+      _curSection = 'financials';
       var jobCostLink = (window.PF_BUDGET_ACTUAL_POET)
         ? '<div class="pr-links"><a class="pr-link" href="#" '
           + 'onclick="showModule(\'budget-actual-poet\');return false;">'
@@ -11900,9 +12058,10 @@ try {
           field('Retainage Paid', ''),
           field('Vendor Invoices', ''),
           field('Job Cost Report', '')
-        ]) + jobCostLink + linkRow(L.financials));
+        ]) + jobCostLink + linkRow(L.financials), false, 'financials');
 
       // ----- 11. Project Closeout -----
+      _curSection = 'closeout';
       html += card(11, 'Project Closeout', null,
         fields([
           field('Final As Built Dwgs to Garbin Geo', ''),
@@ -11912,7 +12071,7 @@ try {
           field('Final As Built Dwgs from Garbin Geo', ''),
           field('PF Check Garbin As Builts vs PF', ''),
           field('Final As Built Dwgs Sent to GC', '')
-        ]));
+        ]), false, 'closeout');
 
       // ----- Owner (general info supplement) appended into General? Render owner under General as a sub. -----
       // (Owner contacts surfaced inside General Info card for completeness.)
@@ -11923,12 +12082,41 @@ try {
       if (genCard && g.owner && g.owner.length) {
         genCard.insertAdjacentHTML('beforeend', subhead('Owner') + contactList(g.owner) + subhead('General Contractor Contacts') + contactList(g.gc));
       }
+      _curSection = ''; // done rendering this record
     }
 
     // ---- expose a reusable renderer + project-aware opener ----
     // renderProjectRecord(num, root): resolve a record by number and render it.
     // Resolution: PF_PROJECT_RECORDS[num] (bulk file) first; POET falls back to its
     // deeper PF_PROJECT_POET record so POET keeps subcontract fields + contract embed.
+    // NEW-PROJECT fallback: a project created from the estimating/award flow lives
+    // in the pm_projects_v1 overlay (window.PF_PM) and has NO synced static record
+    // yet. For those we SYNTHESIZE a minimal blank record (number + name only) so
+    // the SAME editable card view renders with mostly-blank fields the office can
+    // fill in via the per-section overrides. This is what makes "new projects from
+    // estimating render in the same editable format" work automatically.
+    function synthRecord(num){
+      // Find the PM overlay record for this project number (if the app-wide PM
+      // overlay is loaded). pfPmRecordFor is keyed by bidId, so we scan byBidId.
+      var name = '', gc = '';
+      try {
+        var idx = (window.PF_PM && window.PF_PM.byBidId) || {};
+        Object.keys(idx).forEach(function(k){
+          var p = idx[k];
+          if (p && String(p.projectNumber) === num) { name = p.name || name; gc = p.gc || gc; }
+        });
+      } catch(e){}
+      return {
+        project_number: num,
+        project_name: name || ('Project ' + num),
+        location: '',
+        data_note: 'New project - no synced record yet. Use the per-section Edit '
+          + 'buttons to enter details; entries are saved as manual overrides.',
+        bid_log: gc ? { gc_name: gc } : {},
+        contacts: { groups: {} },
+        links: {}, qaqc: null, _synthetic: true
+      };
+    }
     function resolveRecord(num){
       num = String(num || '').trim();
       var bulk = (window.PF_PROJECT_RECORDS && window.PF_PROJECT_RECORDS.records)
@@ -11938,8 +12126,38 @@ try {
       if (window.PF_PROJECT_POET && String(window.PF_PROJECT_POET.project_number) === num) {
         return window.PF_PROJECT_POET;
       }
-      return null;
+      // No synced record: synthesize a blank editable one (new/awarded project).
+      return synthRecord(num);
     }
+
+    // ---- manual-override loader (synchronous, fail-soft) ---------------------
+    // Load THIS project's overrides BEFORE rendering so the merge is in place on
+    // first paint (same synchronous, fail-soft pattern the precon pipeline uses).
+    // A 403 (field_ops) or any error -> no overrides (the record renders plain,
+    // and the office-only Edit buttons never show for that role anyway). Never
+    // throws; never fabricates.
+    function loadOverridesSync(num){
+      num = String(num || '').trim();
+      if (!num) return;
+      try {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/project-override?num=' + encodeURIComponent(num), false);
+        xhr.withCredentials = true;
+        xhr.send(null);
+        if (xhr.status === 200) {
+          var d = JSON.parse(xhr.responseText);
+          window.PF_PROJECT_OVERRIDES[num] = {
+            sections: (d && d.sections) || {},
+            _meta: (d && d._meta) || null
+          };
+        } else {
+          window.PF_PROJECT_OVERRIDES[num] = { sections: {}, _meta: null };
+        }
+      } catch (e) {
+        window.PF_PROJECT_OVERRIDES[num] = { sections: {}, _meta: null };
+      }
+    }
+
     window.renderProjectRecord = function(num, root){
       renderInto(resolveRecord(num), root || document.getElementById('prGenericRoot'));
     };
@@ -11947,6 +12165,8 @@ try {
     // POET still has its own module (project-poet) for legacy direct links; everything
     // else (and POET too, if linked this way) opens through the generic view.
     window.openProjectRecord = function(num){
+      num = String(num || '').trim();
+      loadOverridesSync(num);                 // pull overrides before first render
       var root = document.getElementById('prGenericRoot');
       window.renderProjectRecord(num, root);
       var rec = resolveRecord(num);
@@ -11959,8 +12179,161 @@ try {
       } catch(e){}
     };
 
-    // POET keeps auto-rendering into its dedicated #prRoot module (deep record, unchanged).
-    function renderPoet(){ renderInto(window.PF_PROJECT_POET, document.getElementById('prRoot')); }
+    // =======================================================================
+    // PER-SECTION EDITOR
+    // =======================================================================
+    // pfEditSection(btn): turn ONE section's fields into inputs with Save/Cancel.
+    // Reads every .pr-field[data-pr-label] in the card body (works for both the
+    // flat pr-fields grid AND the ovExtras manual rows), plus lets the user ADD a
+    // new manual field. Save POSTs {num, section, fields} to /api/project-override.
+    // FAIL CLOSED: on any non-ok response we STAY in edit mode and show an inline
+    // error - we NEVER show "saved" or collapse the editor when the save failed.
+    function esc2(s){ return window.esc ? window.esc(s) : String(s); }
+
+    window.pfEditSection = function(btn){
+      var card = btn.closest ? btn.closest('.pr-card') : null;
+      if (!card) return;
+      var section = card.getAttribute('data-pr-section') || btn.getAttribute('data-pr-section');
+      var body = card.querySelector('.pr-card-body');
+      if (!section || !body) return;
+      // Ensure the card is open so the editor is visible.
+      card.classList.add('open');
+
+      // Collect current (label -> displayed value) from the rendered fields.
+      var rows = [];
+      body.querySelectorAll('.pr-field[data-pr-label]').forEach(function(f){
+        var label = f.getAttribute('data-pr-label') || '';
+        var valEl = f.querySelector('.pr-field-value');
+        var raw = valEl ? valEl.textContent : '';
+        if (raw === '-') raw = ''; // em-dash placeholder = empty
+        if (label) rows.push({ label: label, value: raw });
+      });
+
+      // Build the editor form. Each existing field -> a labeled text input. An
+      // extra "add manual field" row lets the office introduce a brand-new field
+      // (useful on synthetic/new-project records that start mostly blank).
+      var inputs = rows.map(function(r, i){
+        return '<div class="pr-edit-row">'
+          + '<label class="pr-edit-label">' + esc2(r.label) + '</label>'
+          + '<input class="pr-edit-input" type="text" data-pr-field-label="' + esc2(r.label) + '" '
+          +   'value="' + esc2(r.value) + '">'
+          + '</div>';
+      }).join('');
+
+      var addRow = '<div class="pr-edit-row pr-edit-add">'
+        + '<input class="pr-edit-newlabel" type="text" placeholder="New field name (optional)">'
+        + '<input class="pr-edit-newvalue" type="text" placeholder="Value">'
+        + '</div>';
+
+      var form = '<div class="pr-editor" data-pr-section="' + esc2(section) + '">'
+        + '<div class="pr-edit-note">Manual override - what you enter here wins over the synced data and is saved for the whole office.</div>'
+        + inputs
+        + addRow
+        + '<div class="pr-edit-err" style="display:none"></div>'
+        + '<div class="pr-edit-actions">'
+        +   '<button type="button" class="pr-save-btn" onclick="window.pfSaveSection(this)">Save</button>'
+        +   '<button type="button" class="pr-cancel-btn" onclick="window.pfCancelSection(this)">Cancel</button>'
+        + '</div>'
+        + '</div>';
+
+      // Stash the original body so Cancel can restore it verbatim.
+      body.setAttribute('data-pr-orig', body.innerHTML);
+      body.innerHTML = form;
+      // Hide the Edit button while editing.
+      btn.style.display = 'none';
+    };
+
+    // Restore the section to its pre-edit rendering (no save).
+    window.pfCancelSection = function(btn){
+      var card = btn.closest('.pr-card');
+      if (!card) return;
+      var body = card.querySelector('.pr-card-body');
+      var orig = body ? body.getAttribute('data-pr-orig') : null;
+      if (body && orig != null) { body.innerHTML = orig; body.removeAttribute('data-pr-orig'); }
+      var eb = card.querySelector('.pr-edit-btn');
+      if (eb) eb.style.display = '';
+    };
+
+    // Collect + POST the section's field overrides. FAIL CLOSED on error.
+    window.pfSaveSection = function(btn){
+      var card = btn.closest('.pr-card');
+      if (!card) return;
+      var editor = card.querySelector('.pr-editor');
+      var section = card.getAttribute('data-pr-section') || (editor && editor.getAttribute('data-pr-section'));
+      var errEl = editor ? editor.querySelector('.pr-edit-err') : null;
+      var num = _curNum || '';
+      if (!num || !section) return;
+
+      function showErr(msg){
+        if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
+      }
+      function setBusy(b){
+        btn.disabled = b;
+        btn.textContent = b ? 'Saving...' : 'Save';
+      }
+
+      // Gather fields: every existing input keyed by its label + the optional new
+      // manual field. An empty value is a legitimate "blank this field" override.
+      var fields = {};
+      editor.querySelectorAll('.pr-edit-input[data-pr-field-label]').forEach(function(inp){
+        var lbl = inp.getAttribute('data-pr-field-label');
+        if (lbl) fields[lbl] = inp.value;
+      });
+      var nl = editor.querySelector('.pr-edit-newlabel');
+      var nv = editor.querySelector('.pr-edit-newvalue');
+      if (nl && nl.value && nl.value.trim()) {
+        fields[nl.value.trim()] = nv ? nv.value : '';
+      }
+
+      if (errEl) errEl.style.display = 'none';
+      setBusy(true);
+
+      fetch('/api/project-override', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ num: num, section: section, fields: fields })
+      }).then(function(res){
+        return res.json().then(function(body){ return { ok: res.ok, status: res.status, body: body }; })
+          .catch(function(){ return { ok: res.ok, status: res.status, body: null }; });
+      }).then(function(r){
+        // FAIL CLOSED: anything that is not a clean {ok:true, saved:true} keeps
+        // the user in edit mode with an honest error. NEVER show success on a
+        // failed save; NEVER fabricate a saved state.
+        if (!r.ok || !r.body || r.body.ok !== true || r.body.saved !== true) {
+          var msg = (r.body && r.body.message)
+            ? r.body.message
+            : (r.status === 403
+                ? 'You do not have permission to edit this project.'
+                : 'Save failed (' + r.status + '). Your changes were NOT saved - please retry.');
+          setBusy(false);
+          showErr(msg);
+          return; // stay in edit mode
+        }
+        // Success: adopt the server's authoritative override object, then re-render
+        // the WHOLE record so the override merge (and the "edited" markers) show.
+        window.PF_PROJECT_OVERRIDES[num] = {
+          sections: (r.body.sections) || {},
+          _meta: (r.body._meta) || null
+        };
+        // Re-render into the ROOT this card actually lives in (POET uses #prRoot,
+        // every other project uses #prGenericRoot) so editing either view works.
+        var root = card.closest('.pr-root') || card.parentElement || document.getElementById('prGenericRoot');
+        window.renderProjectRecord(num, root);
+      }).catch(function(){
+        setBusy(false);
+        showErr('Save failed: could not reach the server. Your changes were NOT saved - please retry.');
+      });
+    };
+
+    // POET keeps auto-rendering into its dedicated #prRoot module (deep record).
+    // Load POET's overrides first so its per-section Edit buttons + override merge
+    // work in the dedicated module too (same fail-soft sync loader).
+    function renderPoet(){
+      var P = window.PF_PROJECT_POET;
+      if (P && P.project_number) loadOverridesSync(String(P.project_number));
+      renderInto(P, document.getElementById('prRoot'));
+    }
     document.addEventListener('DOMContentLoaded', renderPoet);
     if (document.readyState !== 'loading') renderPoet();
   } catch(e) {

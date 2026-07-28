@@ -511,6 +511,15 @@ export function areaForPath(pathname) {
     // BD/precon history). A precon action: admin + partner + business_dev;
     // field_ops BLOCKED by direct URL. Handler also calls requireArea.
     if (pathname.startsWith('/api/pm-project'))     return 'preconstruction';
+    // Per-project per-section MANUAL OVERRIDES for the office project-record view
+    // (a user hand-enters/edits any field in any section; stored in KV, merged on
+    // top of the synced record at render). PROJECT-level financials area:
+    // admin + partner + business_dev (the office); field_ops BLOCKED by direct URL
+    // too. The handler ALSO calls requireArea(session, 'financials') on GET+POST.
+    // Same readership as the project record it overlays (project-records.js is
+    // classified 'financials'). Without this line it would fall through to the
+    // default 'user_admin' (admin-only) and the office (partner/BD) could not edit.
+    if (pathname.startsWith('/api/project-override')) return 'financials';
     // BD CRM write-back (companies/contacts overlay + interactions log). BD's
     // own tool: admin + partner + business_dev allowed; field_ops BLOCKED by
     // direct URL too. Each endpoint ALSO calls requireArea('business_dev').
