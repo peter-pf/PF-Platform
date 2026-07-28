@@ -597,6 +597,12 @@ body.role-field-ops .nav-section[data-fo-mixed] .nav-sub:not([data-fo-safe]) {
 body.role-field-ops .nav-item[data-fo-hide] {
   display: none !important;
 }
+/* A whole nav-sub subgroup can be marked data-fo-hide to hide its label + items
+   from the crew even inside a field-safe section (e.g. Equipment: office/admin
+   only because it exposes daily rates + service costs). */
+body.role-field-ops .nav-sub[data-fo-hide] {
+  display: none !important;
+}
 
 /* ---- NESTED COLLAPSE (Level 2: subcategory, Level 3: sub-subcategory) ---- */
 /* A nav-sub groups a subcategory label + its items inside a top-level nav-section.
@@ -2403,6 +2409,7 @@ window.progress = (function () {
         <a class="nav-item" data-module="projects" onclick="showModule('projects')" style="color:#d64545">Project Summary</a>
         <a class="nav-item" data-module="awarded-projects" onclick="showModule('awarded-projects')" style="color:#d64545">Active Projects</a>
         <a class="nav-item" data-module="projecthistory" onclick="showModule('projecthistory')" style="color:#d64545">Completed Projects</a>
+        <a class="nav-item" data-module="dead-projects" onclick="showModule('dead-projects')" style="color:#d64545">Dead Projects</a>
       </div>
 
       <!-- 5a1) Project Schedule (moved from top-level "Projects Schedule"; field-ops see Crew Schedule) -->
@@ -2434,10 +2441,6 @@ window.progress = (function () {
         <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Vendors</div>
         <a class="nav-item" data-module="subs" onclick="showModule('subs')" style="color:#d64545">Vendors</a>
       </div>
-      <div class="nav-sub collapsed">
-        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Equipment</div>
-        <a class="nav-item" data-module="equipment" onclick="showModule('equipment')" style="color:#d64545">Equipment</a>
-      </div>
 
       <!-- TimeSheets (moved here from Field Operations). Hours-only, no financials.
            field-safe so the crew keeps access even though PM is otherwise hidden. -->
@@ -2462,6 +2465,14 @@ window.progress = (function () {
       <a class="nav-item" data-module="maintenance" onclick="showModule('maintenance')" style="color:#d64545">
         <span class="nav-icon">&#128295;</span> Maintenance
       </a>
+
+      <!-- Equipment (moved from Project Management). data-fo-hide: the equipment
+           view exposes daily rates + service costs ($), so it stays office/admin-only
+           and is HIDDEN from field_ops even though it lives under Field Operations. -->
+      <div class="nav-sub collapsed" data-fo-hide="1">
+        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Equipment</div>
+        <a class="nav-item" data-fo-hide="1" data-module="equipment" onclick="showModule('equipment')" style="color:#d64545">Equipment</a>
+      </div>
 
       <!-- Daily Reports -->
       <div class="nav-sub collapsed">
@@ -3109,6 +3120,12 @@ document.addEventListener('click', function(e) {
     <div id="awardedRoot" class="pf-index-root"></div>
   </div>
 
+  <!-- Dead Projects index - lost/cancelled bids from the Project Bid Log (LIVE_BIDS, bid_status). -->
+  <!-- Rendered client-side into #deadRoot by the DEAD PROJECTS INDEX script. -->
+  <div class="module-view" id="mod-dead-projects">
+    <div id="deadRoot" class="pf-index-root"></div>
+  </div>
+
   <!-- Field Operations: TimeSheets - populated client-side by initTimesheets() from window.PF_TIMESHEETS (data/timesheets.js). -->
   <!-- Week selector + allocation summary (by Cost Code + Job #) + per-employee breakdown for the selected week. -->
   <div class="module-view" id="mod-fo-timesheets">
@@ -3714,6 +3731,7 @@ const moduleTitles = {
   'precon-historical': 'Historical Bid Log',
   'precon-actions': 'Action Items & Calendar',
   'awarded-projects': 'Active Projects',
+  'dead-projects': 'Dead Projects',
   'project-record': 'Project Record',
   'fo-timesheets': 'TimeSheets - Weekly',
   'ts-summary': 'TimeSheets - Summary',
@@ -12154,6 +12172,105 @@ try {
     if (document.readyState !== 'loading') render();
   } catch(e) {
     console.error("Awarded projects index failed to load:", e);
+  }
+})();
+</script>
+
+<!-- ============================================================ -->
+<!-- DEAD PROJECTS INDEX - renders lost/cancelled bids from LIVE_BIDS  -->
+<!-- (Project Bid Log) into #deadRoot. "Dead" = bid_status starting    -->
+<!-- with "Not Awarded" (lost/canceled). # and name link to a project  -->
+<!-- record ONLY when a project number exists AND a built record is    -->
+<!-- available; otherwise plain text (most dead bids never got a #).   -->
+<!-- ALL data-derived strings rendered via window.esc.                 -->
+<!-- ============================================================ -->
+<script>
+(function(){
+  try {
+    var E = window.esc;
+    function money(v){
+      if (v == null || v === '') return '';
+      var n = +v; if (!isFinite(n)) return '';
+      return '$' + Math.round(n).toLocaleString();
+    }
+    // A bid is "dead" when it was lost or the project was canceled.
+    // bid_status values in the log: "Not Awarded - Low", "Not Awarded - Not Low",
+    // "Not Awarded - Canceled". All start with "Not Awarded".
+    function isDead(status){
+      var s = String(status || '').toLowerCase();
+      return s.indexOf('not awarded') === 0 || /cancel|dead|killed|lost/.test(s);
+    }
+    // A record is openable only if we have a built project record for this number.
+    function hasRecord(num){
+      if (!num) return false;
+      if (window.PF_PROJECT_RECORDS && window.PF_PROJECT_RECORDS[num]) return true;
+      return false;
+    }
+    function render(){
+      var root = document.getElementById('deadRoot');
+      if (!root) return;
+      var bids = (typeof LIVE_BIDS !== 'undefined' && Array.isArray(LIVE_BIDS)) ? LIVE_BIDS : [];
+      if (!bids.length) {
+        root.innerHTML = '<div class="pf-placeholder"><div class="pf-placeholder-icon">&#9760;</div>'
+          + '<h2>Dead Projects</h2><p>Bid log not loaded. This list populates from '
+          + 'lost/cancelled entries in the Project Bid Log.</p></div>';
+        return;
+      }
+      var list = bids.filter(function(b){ return isDead(b.bid_status); });
+      if (!list.length) {
+        root.innerHTML = '<div class="pf-placeholder"><div class="pf-placeholder-icon">&#9760;</div>'
+          + '<h2>Dead Projects</h2><p>No lost or cancelled projects in the current Bid Log.</p></div>';
+        return;
+      }
+      // Sort: numbered first (ascending), then unnumbered by name.
+      list.sort(function(a,b){
+        var an = String(a.number || ''), bn = String(b.number || '');
+        if (an && bn) return an.localeCompare(bn);
+        if (an) return -1;
+        if (bn) return 1;
+        return String(a.name || '').localeCompare(String(b.name || ''));
+      });
+
+      var html = '<div class="pf-index-head">'
+        + '<h2>Dead Projects</h2>'
+        + '<p class="pf-index-sub">Projects marked <strong>Not Awarded</strong> or cancelled in the '
+        + 'Project Bid Log. Most never received a project number; where a built record exists, '
+        + 'the number and name are clickable.</p>'
+        + '<div class="pf-index-meta">' + list.length + ' dead / lost</div>'
+        + '</div>';
+
+      html += '<div class="pf-table-wrap"><table class="pf-table"><thead><tr>'
+        + '<th>#</th><th>Project</th><th>City / State</th><th>General Contractor</th>'
+        + '<th>Value</th><th>Status</th>'
+        + '</tr></thead><tbody>';
+
+      list.forEach(function(p){
+        var num = String(p.number || '');
+        var openJs = hasRecord(num) ? 'openProjectRecord(\'' + E(num) + '\')' : '';
+        var numberCell = openJs
+          ? '<td class="num"><a class="pf-record-link" onclick="' + openJs + '">' + E(p.number) + '</a></td>'
+          : '<td class="num">' + E(p.number || '') + '</td>';
+        var nameCell = openJs
+          ? '<td><a class="pf-record-link" onclick="' + openJs + '">' + E(p.name) + '</a></td>'
+          : '<td>' + E(p.name) + '</td>';
+        html += '<tr>'
+          + numberCell
+          + nameCell
+          + '<td>' + E(p.city_state || '') + '</td>'
+          + '<td>' + E(p.gc_name || '') + '</td>'
+          + '<td class="num">' + E(money(p.bid_value)) + '</td>'
+          + '<td>' + E(p.bid_status || '') + '</td>'
+          + '</tr>';
+      });
+
+      html += '</tbody></table></div>';
+      html += '<div class="pf-index-foot">Source: Project Bid Log (lost / cancelled bids).</div>';
+      root.innerHTML = html;
+    }
+    document.addEventListener('DOMContentLoaded', render);
+    if (document.readyState !== 'loading') render();
+  } catch(e) {
+    console.error("Dead projects index failed to load:", e);
   }
 })();
 </script>
