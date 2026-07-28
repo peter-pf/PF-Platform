@@ -1812,6 +1812,39 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 .fin-ph-title { font-size: 0.9rem; font-weight: 700; color: var(--text-2); margin-bottom: 4px; }
 .fin-ph-text { font-size: 0.8rem; color: var(--text-3); line-height: 1.5; max-width: 480px; margin: 0 auto; }
 
+/* ---- PROJECT INVOICING (inside Financials Section 10). Scoped .fin-inv-* so
+   it never bleeds and never collides with the budget editor's .ba-table-wrap. ---- */
+.fin-inv-band { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.fin-inv-stat {
+  flex: 1 1 150px; min-width: 130px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg-0); padding: 10px 12px;
+}
+.fin-inv-stat-label { font-size: 0.72rem; color: var(--text-2); font-weight: 600; margin-bottom: 4px;
+  text-transform: uppercase; letter-spacing: 0.03em; }
+.fin-inv-stat-val { font-size: 1.15rem; font-weight: 700; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.fin-inv-block { margin-bottom: 16px; }
+.fin-inv-block:last-child { margin-bottom: 0; }
+.fin-inv-block-head {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+}
+.fin-inv-block-title { font-size: 0.8rem; font-weight: 700; color: var(--text-1);
+  text-transform: uppercase; letter-spacing: 0.04em; }
+.fin-inv-block-title.fin-inv-clickable { cursor: pointer; user-select: none; }
+.fin-inv-chev { font-size: 0.7rem; color: var(--text-3); transition: transform 0.15s ease; }
+.fin-inv-sov.open .fin-inv-chev { transform: rotate(90deg); }
+.fin-inv-btn {
+  margin-left: auto; font-size: 0.78rem; font-weight: 600;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg-1); color: var(--text-3);
+  padding: 5px 11px; cursor: not-allowed;
+}
+.fin-inv-btn-note { font-size: 0.7rem; color: var(--text-3); margin-left: 8px; font-style: italic; }
+.fin-inv-wrap { overflow-x: auto; }
+.fin-inv-empty td { text-align: center; color: var(--text-3); font-style: italic; padding: 16px 12px; }
+.fin-inv-sov-body { display: none; }
+.fin-inv-sov.open .fin-inv-sov-body { display: block; }
+
 .pr-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -12355,13 +12388,60 @@ try {
           + '</div>';
       }
 
-      var finInvoicingBody =
-        '<div class="fin-placeholder">'
-        +   '<div class="fin-ph-icon">&#9634;</div>'
-        +   '<div class="fin-ph-title">Invoicing is not built yet</div>'
-        +   '<div class="fin-ph-text">This is where a job\'s invoices, retainage and paid vs outstanding will live. '
-        +     'Nothing here is real data yet. It will roll up an Invoicing total to the summary above once built.</div>'
+      // Project Invoicing layout: summary band + Pay Applications table + expandable
+      // Schedule of Values. NO real data exists yet, so every figure is an em-dash and
+      // the tables render honest empty states. Entry/save wiring is a later phase, so the
+      // "+ New Pay App" button is visibly disabled with an "entry coming next" note.
+      // Scoped .fin-inv-* (NOT .ba-table-wrap) so the budget editor's querySelector is untouched.
+      var finDash = '<span class="ba-blank">&mdash;</span>';
+      var finInvStat = function(label, val){
+        return '<div class="fin-inv-stat">'
+          + '<div class="fin-inv-stat-label">' + E(label) + '</div>'
+          + '<div class="fin-inv-stat-val">' + val + '</div>'
+          + '</div>';
+      };
+      var finInvBand =
+        '<div class="fin-inv-band">'
+        + finInvStat('Contract Value', finDash)
+        + finInvStat('Billed to Date', finDash)
+        + finInvStat('Retainage Held', finDash)
+        + finInvStat('Paid to Date', finDash)
+        + finInvStat('Open (A/R)', finDash)
         + '</div>';
+
+      var finPayApps =
+        '<div class="fin-inv-block">'
+        +   '<div class="fin-inv-block-head">'
+        +     '<span class="fin-inv-block-title">Pay Applications</span>'
+        +     '<button type="button" class="fin-inv-btn" disabled title="Data entry is a later phase">+ New Pay App</button>'
+        +     '<span class="fin-inv-btn-note">entry coming next</span>'
+        +   '</div>'
+        +   '<div class="fin-inv-wrap"><table class="ba-table"><thead><tr>'
+        +     '<th>#</th><th>Date</th><th>Billing Period</th>'
+        +     '<th class="num">This Period</th><th class="num">Retainage</th><th class="num">Net Due</th>'
+        +     '<th>Status</th><th>Paid Date</th>'
+        +   '</tr></thead><tbody>'
+        +     '<tr class="fin-inv-empty"><td colspan="8">No pay applications yet</td></tr>'
+        +   '</tbody></table></div>'
+        + '</div>';
+
+      var finSov =
+        '<div class="fin-inv-block fin-inv-sov">'
+        +   '<div class="fin-inv-block-head">'
+        +     '<span class="fin-inv-block-title fin-inv-clickable" onclick="this.closest(\'.fin-inv-sov\').classList.toggle(\'open\')">'
+        +       '<span class="fin-inv-chev">&#9654;</span> Schedule of Values</span>'
+        +   '</div>'
+        +   '<div class="fin-inv-sov-body">'
+        +     '<div class="fin-inv-wrap"><table class="ba-table"><thead><tr>'
+        +       '<th>Line Item</th><th class="num">Scheduled Value</th><th class="num">% Complete</th>'
+        +       '<th class="num">Billed to Date</th><th class="num">Balance</th>'
+        +     '</tr></thead><tbody>'
+        +       '<tr class="fin-inv-empty"><td colspan="5">No schedule of values yet</td></tr>'
+        +     '</tbody></table></div>'
+        +   '</div>'
+        + '</div>';
+
+      var finInvoicingBody = finInvBand + finPayApps + finSov;
 
       var finBody = finRollup
         + finSub('Project Invoicing', finInvoicingBody, false)
