@@ -474,3 +474,26 @@ requirement, but it is not recommended.
 
 **STATUS: KV-queue prototyped + verified. NOT crew-live.** Poller not started;
 UI not swapped; nothing deployed. Awaiting the Peter+Melanie co-verify (§7.7).
+
+---
+
+## 8. ADAPTIVE POLLING — KV free-tier op-budget fix (2026-07-28)
+
+Cloudflare alerted at 50% of the Workers KV FREE-TIER daily op cap. Driver: the
+poller's flat 3s poll = ~28,800 KV list-ops/day just idling. Fixed
+`tools/field_query_poller.py` to ADAPTIVE polling:
+- **IDLE 15s** most of the day; **ACTIVE 3s** during use.
+- On finding OR processing ANY pending item, switch to ACTIVE for a 120s window,
+  then revert to IDLE. Mode transitions are logged (`mode -> IDLE` / `-> ACTIVE`).
+- **Idle ops: 28,800/day -> 5,760/day (5x reduction).** Active bursts add a bounded
+  amount only during real use. First query after idle waits <=15s (covered by the
+  "Checking the project records…" UI state).
+- Everything else identical: KV round-trip, 3-layer financial guardrail,
+  fail-closed, field-safe prompt.
+
+**Verified:** adaptive unit test PASS (idle 15s -> active 3s on activity -> reverts
+to idle after the window). Restarted cleanly (SIGTERM old PID 97096, watchdog
+revived with new code, exactly ONE poller PPID=1). Live round-trip through the new
+poller: real field query answered (~15s at idle), money query refused (no $), and
+the log showed the `IDLE -> ACTIVE` transition. Aiciv-doctor gateway untouched;
+Hermes still private (KV only, no tunnel).
