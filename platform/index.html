@@ -2400,23 +2400,23 @@ window.progress = (function () {
       <!-- 5a) Projects -->
       <div class="nav-sub collapsed">
         <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Projects</div>
-        <a class="nav-item" data-module="projects" onclick="showModule('projects')" style="color:#d64545">Active Projects Summary</a>
-        <a class="nav-item" data-module="projecthistory" onclick="showModule('projecthistory')" style="color:#d64545">Projects Completed</a>
-        <a class="nav-item" data-module="awarded-projects" onclick="showModule('awarded-projects')" style="color:#d64545">Awarded Projects</a>
-        <a class="nav-item" data-module="pm-handoff" onclick="showModule('pm-handoff')" style="color:#d64545">Award to PM Handoff</a>
+        <a class="nav-item" data-module="projects" onclick="showModule('projects')" style="color:#d64545">Project Summary</a>
+        <a class="nav-item" data-module="projecthistory" onclick="showModule('projecthistory')" style="color:#d64545">Completed Projects</a>
+        <a class="nav-item" data-module="awarded-projects" onclick="showModule('awarded-projects')" style="color:#d64545">Active Projects</a>
         <a class="nav-item" data-module="project-poet" onclick="showModule('project-poet')" style="color:#d64545">26-002 POET Biosciences</a>
+      </div>
+
+      <!-- 5a1) Project Schedule (moved from top-level "Projects Schedule"; field-ops see Crew Schedule) -->
+      <div class="nav-sub collapsed" data-fo-safe="1">
+        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Project Schedule</div>
+        <a class="nav-item" data-module="schedule" onclick="showModule('schedule')" style="color:#d64545"><span class="nav-icon">&#128197;</span> Crew Schedule</a>
+        <a class="nav-item" data-fo-hide="1" data-module="schedule-awarded" onclick="showModule('schedule-awarded')" style="color:#d64545"><span class="nav-icon">&#9707;</span> Awarded Projects Schedule</a>
       </div>
 
       <!-- 5a2) Financials (per-project) - INTERNAL job-cost tracking. NOT field-facing. -->
       <div class="nav-sub collapsed">
         <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Financials</div>
         <a class="nav-item" data-module="budget-actual-poet" onclick="showModule('budget-actual-poet')" style="color:#d64545">Budget vs Actual - 26-002 POET</a>
-      </div>
-
-      <!-- 5b) Safety -->
-      <div class="nav-sub collapsed">
-        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Safety</div>
-        <a class="nav-item" data-module="safety" onclick="showModule('safety')" style="color:#d64545">Safety</a>
       </div>
 
       <!-- 5c) Subcontracts -->
@@ -2472,7 +2472,7 @@ window.progress = (function () {
         <a class="nav-item" data-module="dailylogs" onclick="showModule('dailylogs')" style="color:#d64545">Daily Logs</a>
       </div>
 
-      <!-- Safety (also linked under Project Management) -->
+      <!-- Safety -->
       <div class="nav-sub collapsed">
         <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Safety</div>
         <a class="nav-item" data-module="safety" onclick="showModule('safety')" style="color:#d64545">Safety</a>
@@ -2484,17 +2484,6 @@ window.progress = (function () {
         <a class="nav-item" data-module="guhma" onclick="showModule('guhma')" style="color:#d64545">QA/QC - GUHMA</a>
         <a class="nav-item" data-module="modulus" onclick="showModule('modulus')" style="color:#d64545">Modulus Testing</a>
       </div>
-    </div>
-
-    <!-- 6) PROJECTS SCHEDULE -->
-    <div class="nav-section collapsed" data-fo-safe="1">
-      <div class="nav-section-label" onclick="this.parentElement.classList.toggle('collapsed')">Projects Schedule</div>
-      <a class="nav-item" data-module="schedule" onclick="showModule('schedule')" style="color:#d64545">
-        <span class="nav-icon">&#128197;</span> Crew Schedule
-      </a>
-      <a class="nav-item" data-fo-hide="1" data-module="schedule-awarded" onclick="showModule('schedule-awarded')" style="color:#d64545">
-        <span class="nav-icon">&#9707;</span> Awarded Projects Schedule
-      </a>
     </div>
 
     <!-- 7) COMPANY FINANCIALS -->
@@ -2523,12 +2512,6 @@ window.progress = (function () {
       <a class="nav-item" data-fo-safe="1" data-module="manual" onclick="showModule('manual')" style="color:#d64545">
         <span class="nav-icon">&#128214;</span> User Manual
       </a>
-      <a class="nav-item" data-fo-safe="1" data-module="training" onclick="showModule('training')" style="color:#d64545">
-        <span class="nav-icon">&#127891;</span> Training Guides
-      </a>
-      <a class="nav-item" data-fo-safe="1" data-module="onboarding" onclick="showModule('onboarding')" style="color:#d64545">
-        <span class="nav-icon">&#127891;</span> Role Onboarding
-      </a>
       <a class="nav-item" data-module="coochecklist" onclick="showModule('coochecklist')" style="color:#d64545">
         <span class="nav-icon">&#9989;</span> COO Knowledge Checklist
       </a>
@@ -2554,6 +2537,21 @@ window.progress = (function () {
       <a class="nav-item" data-module="hr" onclick="showModule('hr')" title="Human Resources (admin + HR role only)" style="color:#d64545">
         <span class="nav-icon">&#128100;</span> HR
       </a>
+      <!-- Education: training/onboarding grouped UNDER HR (Melanie 2026-07-24).
+           NOTE: nav nesting is VISUAL only. The training pages keep their OWN
+           server-side gating from auth.js (both are 'general' = all roles). The
+           data-fo-safe="1" markers are preserved so the FIELD CREW still see the
+           training links exactly as before — moving them here does NOT change who
+           can open them. -->
+      <div class="nav-sub collapsed" data-fo-safe="1">
+        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Education</div>
+        <a class="nav-item" data-fo-safe="1" data-module="training" onclick="showModule('training')" style="color:#d64545">
+          <span class="nav-icon">&#127891;</span> Training Guides
+        </a>
+        <a class="nav-item" data-fo-safe="1" data-module="onboarding" onclick="showModule('onboarding')" style="color:#d64545">
+          <span class="nav-icon">&#127891;</span> Role Onboarding
+        </a>
+      </div>
       <a class="nav-item" href="/design-studio/" target="_blank" rel="noopener noreferrer" title="Open PF Design Studio in a new tab" style="color:#d64545">
         <span class="nav-icon">&#9998;</span> Design Studio <span style="opacity:.45;font-size:.75em">&#8599;</span>
       </a>
@@ -3110,30 +3108,6 @@ document.addEventListener('click', function(e) {
   <!-- Awarded Projects index - populated client-side by initAwardedProjects() from window.PF_AWARDED (data/awarded-projects.js). -->
   <div class="module-view" id="mod-awarded-projects">
     <div id="awardedRoot" class="pf-index-root"></div>
-  </div>
-
-  <div class="module-view" id="mod-pm-handoff">
-    <!-- AWARD -> PM handoff. Awarded precon bids that do NOT yet have a PM
-         project get a "Create PM project" action that assigns the next project
-         number and carries the bid history (via /api/pm-project). Already-handed
-         off bids show their assigned number. preconstruction area; field_ops
-         server-DENIED. All data via window.esc. -->
-    <style>
-      #mod-pm-handoff .pmh-card { border:1px solid var(--border,#2a2f3a); border-radius:8px; padding:12px 14px; margin-bottom:10px; }
-      #mod-pm-handoff .pmh-row { display:flex; gap:12px; align-items:center; border-top:1px solid var(--border,#2a2f3a); padding:8px 0; flex-wrap:wrap; }
-      #mod-pm-handoff .pmh-row .nm { flex:1 1 240px; font-weight:600; }
-      #mod-pm-handoff .pmh-row .sub { font-size:12px; color:var(--text-3,#8a93a6); }
-      #mod-pm-handoff .pmh-num { font-size:12px; padding:2px 9px; border-radius:10px; background:rgba(63,185,80,.14); color:#3fb950; }
-      #mod-pm-handoff .pmh-muted { color:var(--text-3,#8a93a6); }
-      #mod-pm-handoff .pmh-err { color:#e5534b; font-size:13px; }
-      #mod-pm-handoff .pmh-group-label { font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-3,#8a93a6); margin:14px 0 4px; }
-      #mod-pm-handoff .btn-sm { font-size:12px; padding:3px 10px; }
-    </style>
-    <div id="pmhNoData" class="pmh-muted" style="display:none">Project handoff not available for your role.</div>
-    <div id="pmhWrap">
-      <div class="pmh-card pmh-muted" style="font-size:13px">When a bid is awarded it flows into Project Management here. Creating a PM project assigns the next project number (scheme YY-NNN, v1) and carries the precon history. No email is sent.</div>
-      <div id="pmhContent"></div>
-    </div>
   </div>
 
   <!-- Field Operations: TimeSheets - populated client-side by initTimesheets() from window.PF_TIMESHEETS (data/timesheets.js). -->
@@ -3701,11 +3675,11 @@ const moduleTitles = {
   feasibility: 'Feasibility / No-Go Tool',
   estimating: 'Estimating Tool',
   materials: 'Material Costs',
-  projects: 'Active Projects Summary',
+  projects: 'Project Summary',
   guhma: 'QA/QC - GUHMA',
   modulus: 'Modulus Testing',
   dailyproduction: 'Daily Production',
-  projecthistory: 'Projects Completed',
+  projecthistory: 'Completed Projects',
   schedule: 'Crew Schedule',
   pricing: 'Trucking Costs',
   proposals: 'Proposals',
@@ -3740,8 +3714,7 @@ const moduleTitles = {
   'precon-ap-archive': 'Bidding - Archive',
   'precon-historical': 'Historical Bid Log',
   'precon-actions': 'Action Items & Calendar',
-  'pm-handoff': 'Award to PM Handoff',
-  'awarded-projects': 'Awarded Projects',
+  'awarded-projects': 'Active Projects',
   'project-record': 'Project Record',
   'fo-timesheets': 'TimeSheets - Weekly',
   'ts-summary': 'TimeSheets - Summary',
@@ -12120,7 +12093,7 @@ try {
       var D = window.PF_AWARDED;
       if (!D || !D.projects) {
         root.innerHTML = '<div class="pf-placeholder"><div class="pf-placeholder-icon">&#9635;</div>'
-          + '<h2>Awarded Projects</h2><p>Index data not loaded. Run '
+          + '<h2>Active Projects</h2><p>Index data not loaded. Run '
           + '<code>sync/build-awarded-index.py</code> to generate '
           + '<code>data/awarded-projects.js</code>.</p></div>';
         return;
@@ -12134,7 +12107,7 @@ try {
         : E(D.source || '');
 
       var html = '<div class="pf-index-head">'
-        + '<h2>Awarded Projects</h2>'
+        + '<h2>Active Projects</h2>'
         + '<p class="pf-index-sub">Every project marked <strong>Awarded</strong> in the Project Bid Log '
         + '(Aggregate Piers and Helical Pilings). Open a built record where available.</p>'
         + '<div class="pf-index-meta">Source: ' + srcLink
@@ -19412,11 +19385,14 @@ try {
 
 <script>
 // ============================================================
-// MODULE: pm-handoff - Award -> Project Management handoff
-// Lists awarded precon bids (window.PF_PRECON awarded bucket + pipeline-state
-// overrides) and lets a user create a PM project (assigns next number via
-// /api/pm-project, carries history). Shows already-handed-off bids with their
-// number. preconstruction area; field_ops server-DENIED. Data via window.esc.
+// PM-PROJECT AUTO-HANDOFF PLUMBING (app-wide, no UI page)
+// The "Award -> PM Handoff" *page* was removed; this data layer stays because
+// other views depend on it. On award, pfAutoCreatePmOnAward() (called from the
+// precon pipeline resolve flow) creates the PM project via /api/pm-project,
+// assigning the next number and carrying bid history. window.pfPmRecordFor() /
+// window.pfPmLoad() / window.PF_PM let the Bidding and Active Projects views
+// surface the assigned PM number + status. preconstruction area; field_ops
+// server-DENIED. Data via window.esc.
 // ============================================================
 try {
 (function () {
@@ -19485,66 +19461,6 @@ try {
     return out;
   }
 
-  function load() {
-    var noData = document.getElementById('pmhNoData');
-    var wrap = document.getElementById('pmhWrap');
-    api('/api/pm-project').then(function (res) {
-      if (res.status === 403) { if (noData) noData.style.display = ''; if (wrap) wrap.style.display = 'none'; return; }
-      if (noData) noData.style.display = 'none';
-      if (wrap) wrap.style.display = '';
-      state.pm = (res.ok && res.body && Array.isArray(res.body.projects)) ? res.body.projects : [];
-      state.loaded = true;
-      if (typeof rebuildPmIndex === 'function') rebuildPmIndex();
-      render();
-    }).catch(function () { state.pm = []; render(); });
-  }
-
-  function pmFor(bid) {
-    var id = bidId(bid);
-    return state.pm.find(function (p) { return p.sourceBidId === id; }) || null;
-  }
-
-  function render() {
-    var host = document.getElementById('pmhContent');
-    if (!host) return;
-    var bids = awardedBids();
-    var pending = [], done = [];
-    bids.forEach(function (b) { (pmFor(b) ? done : pending).push(b); });
-
-    function rowHtml(b, handed) {
-      var f = b.fields || {};
-      var name = E(b.name || f['Project Name'] || '(unnamed)');
-      var gc = E(b.gc || f['General Contractor'] || '');
-      var val = E(b.value != null ? b.value : (f['Bid Total Value'] || ''));
-      var sub = [gc, (b.number || f['Project Number'] || '')].filter(Boolean).join(' - ');
-      var right;
-      if (handed) {
-        var pm = pmFor(b);
-        right = '<span class="pmh-num">' + E(pm.projectNumber) + '</span>';
-      } else {
-        right = '<button type="button" class="btn btn-sm" data-bid="' + E(bidId(b)) + '">Create PM project</button>';
-      }
-      return '<div class="pmh-row" data-key="' + E(bidId(b)) + '">'
-        + '<span class="nm">' + name + '<div class="sub">' + E(sub) + (val ? ' - ' + val : '') + '</div></span>'
-        + right + '</div>';
-    }
-
-    host.innerHTML = '<div class="pmh-card">'
-      + '<div class="pmh-group-label">Awaiting handoff (' + pending.length + ')</div>'
-      + (pending.length ? pending.map(function (b) { return rowHtml(b, false); }).join('') : '<div class="pmh-muted" style="font-size:13px">No awarded bids awaiting handoff.</div>')
-      + '<div class="pmh-group-label">Handed to PM (' + done.length + ')</div>'
-      + (done.length ? done.map(function (b) { return rowHtml(b, true); }).join('') : '<div class="pmh-muted" style="font-size:13px">None yet.</div>')
-      + '<div class="pmh-err" id="pmhMsg"></div></div>';
-
-    host.querySelectorAll('button[data-bid]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var key = this.getAttribute('data-bid');
-        var b = bids.find(function (x) { return bidId(x) === key; });
-        if (b) createPM(b);
-      });
-    });
-  }
-
   // createPM(bid, onDone?). Carries the bid info forward (name, GC, value, LF,
   // columns, and a history blob of the key bid fields) so the PM project is
   // populated, not empty. onDone(record) fires after the overlay is updated; the
@@ -19587,18 +19503,13 @@ try {
       existingNumbers: existingNumbers(),
     };
     api('/api/pm-project', { method: 'POST', body: JSON.stringify(payload) }).then(function (res) {
-      var msg = document.getElementById('pmhMsg');
-      if (!res.ok || !res.body || (!res.body.saved && !res.body.alreadyLinked)) {
-        if (msg) msg.textContent = (res.body && res.body.message) || 'Handoff failed.';
-        return;
-      }
-      // refresh overlay then re-render
+      if (!res.ok || !res.body || (!res.body.saved && !res.body.alreadyLinked)) return;
+      // refresh overlay so dependent views pick up the new number
       state.pm = state.pm.filter(function (p) { return p.id !== res.body.record.id; });
       state.pm.push(res.body.record);
-      if (typeof rebuildPmIndex === 'function') rebuildPmIndex();
-      if (document.getElementById('pmhContent')) render();
+      rebuildPmIndex();
       if (typeof onDone === 'function') onDone(res.body.record);
-    }).catch(function () { var msg = document.getElementById('pmhMsg'); if (msg) msg.textContent = 'Network error.'; });
+    }).catch(function () { /* award already saved; handoff hiccup must not block */ });
   }
 
   // ---- App-wide overlay cache + auto-create hook -------------------------
@@ -19668,10 +19579,7 @@ try {
     } catch (e) { /* award already saved; never throw from the hook */ }
   };
 
-  var prev = window.showModule;
-  window.showModule = function (id) { if (typeof prev === 'function') prev(id); if (id === 'pm-handoff') { load(); } };
-
-  // Warm the overlay cache once at startup so the Awarded view has numbers
+  // Warm the overlay cache once at startup so the Active Projects view has numbers
   // without the user opening the handoff module first. 403 (field_ops) -> empty.
   // On completion, re-render the precon view so already-handed-off bids show
   // their assigned number on first paint (the precon IIFE booted before this).
@@ -19680,7 +19588,7 @@ try {
   });
 })();
 } catch (e) {
-  console.error('Module pm-handoff failed to load:', e);
+  console.error('PM auto-handoff plumbing failed to load:', e);
 }
 </script>
 
