@@ -1766,6 +1766,52 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 .pr-card-body { display: none; padding: 16px 18px 18px; }
 .pr-card.open .pr-card-body { display: block; }
 
+/* ---- FINANCIALS (Section 10): roll-up band + two collapsible subcategories.
+   Scoped .fin-* so it never bleeds to other tables/sections. ---- */
+.fin-rollup {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-1);
+  padding: 12px 14px 14px;
+  margin-bottom: 14px;
+}
+.fin-rollup-title {
+  font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-3); font-weight: 700; margin-bottom: 10px;
+}
+.fin-rollup-cards { display: flex; flex-wrap: wrap; gap: 12px; }
+.fin-rc {
+  flex: 1 1 200px; min-width: 180px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg-0); padding: 10px 12px;
+}
+.fin-rc-label { font-size: 0.78rem; color: var(--text-2); font-weight: 600; margin-bottom: 4px; }
+.fin-rc-val { font-size: 1.25rem; font-weight: 700; color: var(--text-1); }
+.fin-rc-val.fin-rc-tbd { font-size: 0.95rem; color: var(--text-3); font-weight: 600; }
+.fin-rc-sub { font-size: 0.72rem; color: var(--text-3); margin-top: 3px; }
+.fin-sub {
+  border: 1px solid var(--border); border-radius: 8px;
+  margin-bottom: 10px; overflow: hidden; background: var(--bg-0);
+}
+.fin-sub-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px; cursor: pointer; user-select: none;
+  background: var(--bg-1); transition: background 0.12s ease;
+}
+.fin-sub-head:hover { background: var(--bg-2); }
+.fin-sub-title { flex: 1 1 auto; font-size: 0.92rem; font-weight: 700; color: var(--text-1); }
+.fin-sub-chev { font-size: 0.75rem; color: var(--text-3); transition: transform 0.15s ease; }
+.fin-sub.open .fin-sub-chev { transform: rotate(90deg); }
+.fin-sub-body { display: none; padding: 12px 14px 14px; }
+.fin-sub.open .fin-sub-body { display: block; }
+.fin-placeholder {
+  border: 1px dashed var(--border); border-radius: 8px;
+  background: var(--bg-1); padding: 22px 16px; text-align: center;
+}
+.fin-ph-icon { font-size: 1.6rem; color: var(--text-3); margin-bottom: 6px; }
+.fin-ph-title { font-size: 0.9rem; font-weight: 700; color: var(--text-2); margin-bottom: 4px; }
+.fin-ph-text { font-size: 0.8rem; color: var(--text-3); line-height: 1.5; max-width: 480px; margin: 0 auto; }
+
 .pr-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -11917,6 +11963,31 @@ try {
         + '</tr></thead><tbody>' + body + foot + '</tbody></table></div>';
     }
 
+    // Grand Budget / Actual for THIS project, using the SAME leaf-summation rule
+    // as baRenderTable (only non-subtotal rows that carry a cost_code count; a
+    // saved budget wins over the template zero, keyed by the stable row_key).
+    // Feeds the Financials roll-up band. Returns { budget, actual, ok }. ok=false
+    // when the template or budget could not be trusted (fail closed -> roll-up
+    // shows an honest em-dash, never a fabricated total).
+    function baGrandTotals(num){
+      var T = window.PF_COST_CODE_TEMPLATE;
+      if (!T || !Array.isArray(T.groups)) return { budget:0, actual:0, ok:false };
+      var bud = _curBudget || { rows:{}, error:'unreachable' };
+      var savedRows = (!bud.error && bud.rows && typeof bud.rows === 'object') ? bud.rows : {};
+      var hadErr = !!bud.error; // saved budgets not trustworthy -> totals reflect template only
+      var gB = 0, gA = 0;
+      T.groups.forEach(function(g, gi){
+        (g.rows || []).forEach(function(r, ri){
+          if (r.is_subtotal || !r.cost_code) return;
+          var rowKey = 'g' + gi + '_r' + ri, budget;
+          if (savedRows[rowKey] && typeof savedRows[rowKey].budget === 'number') budget = savedRows[rowKey].budget;
+          else budget = Number(r.budget) || 0;
+          gB += budget; gA += (Number(r.actual) || 0);
+        });
+      });
+      return { budget:gB, actual:gA, ok:!hadErr };
+    }
+
     // Render a project record object D into the given root element. Reusable for
     // POET (#prRoot) AND every other awarded project (#prGenericRoot via openProjectRecord).
     function renderInto(D, root){
@@ -12246,7 +12317,57 @@ try {
           baMeta = codeCount + ' standard cost codes';
         }
       } catch(e){}
-      html += card(10, 'Financials — Budget vs Actual', baMeta, baHtml, false);
+
+      // ---- Financials roll-up band + two collapsible subcategories ----
+      // Per-job roll-up only (portal-wide aggregate is a later step). Two
+      // subcategories roll up here: Project Invoicing (placeholder, to be built)
+      // and Project Costs (Budget vs Actual, the existing seeded editable grid).
+      // Scoped by .fin-* / #fin-* so nothing bleeds to other tables/sections.
+      var finTot = baGrandTotals(_curNum);
+      var finCostBudget = finTot.ok ? baMoney(finTot.budget) : '';
+      var finCostActual = finTot.ok ? baMoney(finTot.actual) : '';
+      var finRollup =
+        '<div class="fin-rollup">'
+        +   '<div class="fin-rollup-title">Job Financials Roll-Up</div>'
+        +   '<div class="fin-rollup-cards">'
+        +     '<div class="fin-rc">'
+        +       '<div class="fin-rc-label">Project Invoicing</div>'
+        +       '<div class="fin-rc-val fin-rc-tbd">To be built</div>'
+        +       '<div class="fin-rc-sub">Invoiced &middot; retainage &middot; outstanding</div>'
+        +     '</div>'
+        +     '<div class="fin-rc">'
+        +       '<div class="fin-rc-label">Project Costs (Budget)</div>'
+        +       '<div class="fin-rc-val">' + (finCostBudget ? E(finCostBudget) : '<span class="ba-blank">-</span>') + '</div>'
+        +       '<div class="fin-rc-sub">' + (finCostActual ? 'Actual to date ' + E(finCostActual) : 'Actual to date -') + '</div>'
+        +     '</div>'
+        +   '</div>'
+        + '</div>';
+
+      // Collapsible subcategory (same open/toggle mechanic as the section cards,
+      // scoped class so it never collides with .pr-card). open=false by default.
+      function finSub(title, bodyHtml, open){
+        return '<div class="fin-sub' + (open ? ' open' : '') + '">'
+          + '<div class="fin-sub-head" onclick="this.parentElement.classList.toggle(\'open\')">'
+          +   '<span class="fin-sub-title">' + E(title) + '</span>'
+          +   '<span class="fin-sub-chev">&#9654;</span>'
+          + '</div>'
+          + '<div class="fin-sub-body">' + bodyHtml + '</div>'
+          + '</div>';
+      }
+
+      var finInvoicingBody =
+        '<div class="fin-placeholder">'
+        +   '<div class="fin-ph-icon">&#9634;</div>'
+        +   '<div class="fin-ph-title">Invoicing is not built yet</div>'
+        +   '<div class="fin-ph-text">This is where a job\'s invoices, retainage and paid vs outstanding will live. '
+        +     'Nothing here is real data yet. It will roll up an Invoicing total to the summary above once built.</div>'
+        + '</div>';
+
+      var finBody = finRollup
+        + finSub('Project Invoicing', finInvoicingBody, false)
+        + finSub('Project Costs (Budget vs Actual)', baHtml, false);
+
+      html += card(10, 'Financials', baMeta, finBody, false);
 
       // ----- 11. Project Closeout -----
       _curSection = 'closeout';
