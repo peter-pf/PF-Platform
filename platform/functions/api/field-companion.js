@@ -8,6 +8,10 @@
 //   POST /api/field-companion { query, project_hint? }
 //     -> writes  fieldq:<id> = { id, query, project_hint, status:"pending", ts }
 //        to Workers KV (env.PF_SCHEDULE, the same binding daily-report uses)
+//     -> ALSO writes list-free discovery keys so the poller never calls list-keys
+//        (free tier caps list at 1,000/day): fqb:<bucket>="1" (beacon) and
+//        fqx:<bucket>:<slot>=<id> (contention-free pointer). See
+//        ../../field-ops-listfree-design.md.
 //     -> returns { ok:true, id, status:"pending" }
 //
 //   GET /api/field-companion?id=<id>
@@ -49,6 +53,31 @@ const KEY_PREFIX = 'fieldq:';
 const MAX_BODY_BYTES = 4 * 1024;
 const MAX_QUERY_LEN = 1000;
 const QUEUE_ITEM_TTL_SECS = 60 * 60; // KV item self-expires after 1h (cleanup)
+
+// ---------------------------------------------------------------------------
+// LIST-FREE DISCOVERY (Cloudflare free tier: list-keys capped at 1,000/day).
+// The poller must find pending jobs WITHOUT ever listing. So on enqueue we ALSO
+// write two contention-free keys the poller can CONSTRUCT and GET directly:
+//   fqb:<bucket>          = "1"    presence beacon (last-writer-wins is safe; no data)
+//   fqx:<bucket>:<slot>   = <id>   pointer; <slot> is crypto-random so the writer
+//                                  owns its own key -> no read-modify-write race.
+// <bucket> = floor(epoch_seconds / BUCKET_SECS). The poller sweeps recent buckets'
+// beacons (a few GETs/cycle); only when a beacon is present does it probe that
+// bucket's SLOTS pointer keys. See ../../field-ops-listfree-design.md for the full
+// key scheme + collision analysis. THESE MUST STAY IN SYNC WITH THE POLLER.
+const BUCKET_SECS = 10;   // time-bucket width (poller: BUCKET_SECS)
+const SLOTS = 64;         // slots per bucket (poller: SLOTS)
+const BEACON_PREFIX = 'fqb:';
+const SLOT_PREFIX = 'fqx:';
+
+function bucketOf(msEpoch) {
+  return Math.floor(msEpoch / 1000 / BUCKET_SECS);
+}
+function randSlot() {
+  const b = new Uint32Array(1);
+  crypto.getRandomValues(b);
+  return b[0] % SLOTS;
+}
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
@@ -107,8 +136,16 @@ export async function onRequestPost(context) {
     // audit who asked (uid only, no PII beyond the session subject)
     asked_by: (session && session.uid) || null,
   };
+  const bucket = bucketOf(item.ts);
+  const slot = randSlot();
+  const slotKey = `${SLOT_PREFIX}${bucket}:${slot}`;
+  const beaconKey = `${BEACON_PREFIX}${bucket}`;
   try {
+    // Contention-free triple-write, no reads. The job key is the browser's contract;
+    // the pointer + beacon let the poller DISCOVER this job without ever listing.
     await env.PF_SCHEDULE.put(key, JSON.stringify(item), { expirationTtl: QUEUE_ITEM_TTL_SECS });
+    await env.PF_SCHEDULE.put(slotKey, id, { expirationTtl: QUEUE_ITEM_TTL_SECS });
+    await env.PF_SCHEDULE.put(beaconKey, '1', { expirationTtl: QUEUE_ITEM_TTL_SECS });
   } catch {
     return failClosed('The field assistant is temporarily unavailable.', 503);
   }
