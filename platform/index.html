@@ -1845,6 +1845,19 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 .fin-inv-sov-body { display: none; }
 .fin-inv-sov.open .fin-inv-sov-body { display: block; }
 
+/* ---- Project Invoicing labeled info block (11 fields, top of dropdown) ---- */
+.fin-inv-info {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 28px;
+  margin-bottom: 18px;
+}
+@media (max-width: 720px) { .fin-inv-info { grid-template-columns: 1fr; } }
+.fin-inv-row { display: flex; flex-direction: column; gap: 2px; padding: 5px 0; border-bottom: 1px solid var(--border-light); }
+.fin-inv-row-label { font-size: 0.72rem; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.03em; }
+.fin-inv-row-val { font-size: 0.95rem; font-weight: 600; color: var(--text-1); word-break: break-word; font-variant-numeric: tabular-nums; }
+.fin-inv-row-val.empty { color: var(--text-3); font-weight: 400; }
+
 .pr-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -12388,25 +12401,56 @@ try {
           + '</div>';
       }
 
-      // Project Invoicing layout: summary band + Pay Applications table + expandable
-      // Schedule of Values. NO real data exists yet, so every figure is an em-dash and
-      // the tables render honest empty states. Entry/save wiring is a later phase, so the
-      // "+ New Pay App" button is visibly disabled with an "entry coming next" note.
+      // Project Invoicing layout: labeled INFO BLOCK (11 fields) + Pay Applications
+      // table + expandable Schedule of Values. Identity fields (Project #, Name, Address,
+      // % Complete) auto-populate from the project record + the shared window.progress
+      // source. The 7 billing fields have NO data source yet, so they render an em-dash
+      // (fail closed: never a fabricated dollar, percent, or date). Entry/save wiring is
+      // a later phase, so the "+ New Pay App" button is visibly disabled.
       // Scoped .fin-inv-* (NOT .ba-table-wrap) so the budget editor's querySelector is untouched.
       var finDash = '<span class="ba-blank">&mdash;</span>';
-      var finInvStat = function(label, val){
-        return '<div class="fin-inv-stat">'
-          + '<div class="fin-inv-stat-label">' + E(label) + '</div>'
-          + '<div class="fin-inv-stat-val">' + val + '</div>'
+
+      // --- auto-populated identity fields (from the project record already rendering) ---
+      var finPNum  = E(D.project_number || '');
+      var finPName = E(D.project_name || '');
+      // Address: same source General Info uses (Bid Log address, else subcontract). If no
+      // street address is stored, fall back to city/state Project Location, else dash.
+      var finPAddrRaw = bid.address || SF.project_address || D.location || bid.city_state || '';
+      var finPAddr = finPAddrRaw ? E(finPAddrRaw) : '';
+      // % Complete: reuse the shared auto-progress source (window.progress) so this matches
+      // the dashboards (LF-based from GUHMA logs, shipped 6/17). Only show a value when the
+      // shared source actually has one for this project; otherwise dash (never a fake 0%).
+      var finPctVal = '';
+      try {
+        if (window.progress && window.progress.get(D)) {
+          finPctVal = window.progress.label(D); // "78%", "100% (installed 4% over design)", etc.
+        }
+      } catch (e) { finPctVal = ''; }
+
+      var finInvRow = function(label, val){
+        var has = (val != null && String(val) !== '');
+        return '<div class="fin-inv-row">'
+          + '<div class="fin-inv-row-label">' + E(label) + '</div>'
+          + '<div class="fin-inv-row-val' + (has ? '' : ' empty') + '">'
+          + (has ? val : finDash) + '</div>'
           + '</div>';
       };
+
       var finInvBand =
-        '<div class="fin-inv-band">'
-        + finInvStat('Contract Value', finDash)
-        + finInvStat('Billed to Date', finDash)
-        + finInvStat('Retainage Held', finDash)
-        + finInvStat('Paid to Date', finDash)
-        + finInvStat('Open (A/R)', finDash)
+        '<div class="fin-inv-info">'
+        // auto-populated identity fields
+        + finInvRow('Project #', finPNum)
+        + finInvRow('Project Name', finPName)
+        + finInvRow('Project Address', finPAddr)
+        + finInvRow('Project % Complete (work completed)', finPctVal)
+        // billing fields (no data source yet, fail closed to dash)
+        + finInvRow('Subcontract Value', '')
+        + finInvRow('Amount Invoiced to Date', '')
+        + finInvRow('Amount Paid to Date', '')
+        + finInvRow('Invoice Due By Date', '')
+        + finInvRow('Retainage %', '')
+        + finInvRow('Retainage Amount Due', '')
+        + finInvRow('Retainage Paid', '')
         + '</div>';
 
       var finPayApps =
