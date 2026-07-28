@@ -2448,6 +2448,12 @@ window.progress = (function () {
         <a class="nav-item" data-module="proposals" onclick="showModule('proposals')" style="color:#d64545">Proposals</a>
       </div>
 
+      <!-- 4c2) Vendors (moved from Project Management) -->
+      <div class="nav-sub collapsed">
+        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Vendors</div>
+        <a class="nav-item" data-module="subs" onclick="showModule('subs')" style="color:#d64545">Vendors</a>
+      </div>
+
       <!-- 4d) Archive moved into each discipline (Aggregate Piers / Helical Pilings) -->
       <!-- as a per-discipline module, alongside Not Awarded. -->
       <!-- 4e) Historical Bid Log - per-year win/loss archive (read-only). -->
@@ -2469,12 +2475,8 @@ window.progress = (function () {
         <a class="nav-item" data-module="dead-projects" onclick="showModule('dead-projects')" style="color:#d64545">Dead Projects</a>
       </div>
 
-      <!-- 5a1) Project Schedule (moved from top-level "Projects Schedule"; field-ops see Crew Schedule) -->
-      <div class="nav-sub collapsed" data-fo-safe="1">
-        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Project Schedule</div>
-        <a class="nav-item" data-module="schedule" onclick="showModule('schedule')" style="color:#d64545"><span class="nav-icon">&#128197;</span> Crew Schedule</a>
-        <a class="nav-item" data-fo-hide="1" data-module="schedule-awarded" onclick="showModule('schedule-awarded')" style="color:#d64545"><span class="nav-icon">&#9707;</span> Awarded Projects Schedule</a>
-      </div>
+      <!-- 5a1) PF Project Schedule (standalone; field-ops keep access via data-fo-safe) -->
+      <a class="nav-item" data-fo-safe="1" data-module="schedule" onclick="showModule('schedule')" style="color:#d64545"><span class="nav-icon">&#128197;</span> PF Project Schedule</a>
 
       <!-- 5a2) Financials (per-project) - INTERNAL job-cost tracking. NOT field-facing. -->
       <div class="nav-sub collapsed">
@@ -2492,11 +2494,6 @@ window.progress = (function () {
       <div class="nav-sub collapsed">
         <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Insurance</div>
         <a class="nav-item" data-module="pf-coi" onclick="showModule('pf-coi')" style="color:#d64545">PF COI</a>
-      </div>
-
-      <div class="nav-sub collapsed">
-        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Vendors</div>
-        <a class="nav-item" data-module="subs" onclick="showModule('subs')" style="color:#d64545">Vendors</a>
       </div>
 
       <!-- TimeSheets (moved here from Field Operations). Hours-only, no financials.
@@ -2706,7 +2703,7 @@ document.addEventListener('click', function(e) {
     <!-- Live crew-schedule summary (reads /api/schedule - one source of truth) -->
     <div style="margin-top:20px" class="card">
       <div class="card-header">
-        <span class="card-title" style="cursor:pointer" onclick="showModule('schedule')">Crew Schedule &#8599;</span>
+        <span class="card-title" style="cursor:pointer" onclick="showModule('schedule')">PF Project Schedule &#8599;</span>
         <span class="card-subtitle">Live from the scheduler &#8212; click to open</span>
       </div>
       <div id="dashScheduleWidget">
@@ -2848,7 +2845,7 @@ document.addEventListener('click', function(e) {
   <div class="module-view" id="mod-projecthistory"><iframe class="doc-frame" data-src="/project-history.html" title="Project History"></iframe></div>
   <div class="module-view" id="mod-pricing"><iframe class="doc-frame" data-src="/pricing.html" data-interactive="1" title="Trucking Costs"></iframe></div>
   <div class="module-view" id="mod-coochecklist"><iframe class="doc-frame" data-src="/coo-checklist.html" data-interactive="1" title="COO Knowledge Checklist"></iframe></div>
-  <div class="module-view" id="mod-schedule"><iframe class="doc-frame" data-src="/schedule.html" data-interactive="1" title="Crew Schedule"></iframe></div>
+  <div class="module-view" id="mod-schedule"><iframe class="doc-frame" data-src="/schedule.html" data-interactive="1" title="PF Project Schedule"></iframe></div>
   <div class="module-view" id="mod-cheatsheet"><iframe class="doc-frame" data-src="/peter-cheatsheet.html" title="Meet Peter"></iframe></div>
   <div class="module-view" id="mod-onboarding"><iframe class="doc-frame" data-src="/onboarding.html" title="Role Onboarding"></iframe></div>
   <!-- HR module (Meridian-PT, external, Peter-vetted). Interactive same-origin
@@ -3529,10 +3526,6 @@ document.addEventListener('click', function(e) {
     </div>
   </div>
 
-  <div class="module-view" id="mod-schedule-awarded">
-    <div class="pf-placeholder"><div class="pf-placeholder-icon">&#128197;</div><h2>Awarded Projects Schedule</h2><p>Coming in a later release.</p></div>
-  </div>
-
   <div class="module-view" id="mod-financials-wip">
     <div class="pf-placeholder"><div class="pf-placeholder-icon">&#9636;</div><h2>WIP, PF Cost Codes & Cashflow</h2><p>Coming in a later release.</p></div>
   </div>
@@ -3758,7 +3751,7 @@ const moduleTitles = {
   modulus: 'Modulus Testing',
   dailyproduction: 'Daily Production',
   projecthistory: 'Completed Projects',
-  schedule: 'Crew Schedule',
+  schedule: 'PF Project Schedule',
   pricing: 'Trucking Costs',
   proposals: 'Proposals',
   docs: 'Documentation',
@@ -3804,7 +3797,6 @@ const moduleTitles = {
   'pf-coi': 'PF COI - Standard Coverages',
   'project-poet': '26-002 POET Biosciences',
   'budget-actual-poet': 'Budget vs Actual - 26-002 POET',
-  'schedule-awarded': 'Awarded Projects Schedule',
   'financials-wip': 'WIP & Cashflow',
   'pf-dashboard': 'PF Dashboard',
   'precon-overview': 'Preconstruction Overview',
@@ -11183,7 +11175,7 @@ try {
 
   // ===== LIVE CREW SCHEDULE (reads /api/schedule - one source of truth) =====
   html += '<div class="stat-card" style="padding:1rem;margin-bottom:1rem">';
-  html += '<div style="' + STAT_LABEL + ';margin-bottom:0.75rem;cursor:pointer" onclick="showModule(\'schedule\')">Crew Schedule &#8599;</div>';
+  html += '<div style="' + STAT_LABEL + ';margin-bottom:0.75rem;cursor:pointer" onclick="showModule(\'schedule\')">PF Project Schedule &#8599;</div>';
   html += '<div id="ceodashScheduleWidget"><div style="color:#888;font-size:0.8rem">Loading schedule&#8230;</div></div>';
   html += '</div>';
 
@@ -12508,16 +12500,32 @@ try {
       } catch(e) {}
       return DASH;
     }
-    // # of Piers for a project number: window.PF_PROGRESS design_columns only.
-    // No feed fallback exists, so anything else renders DASH (never fabricated).
+    // # of Piers for a project number:
+    //   1) window.PF_PROGRESS.projects[num].design_columns (primary)
+    //   2) window.PF_PROJECT_RECORDS.records[num].bid_log.total_columns (fallback,
+    //      same provenance as the Total LF bid_log.total_lf fallback)
+    //   else DASH. Never fabricated.
     function piersFor(num){
       if (!num) return DASH;
       try {
         var pp = window.PF_PROGRESS && window.PF_PROGRESS.projects;
         if (pp && pp[num] && pp[num].design_columns != null && pp[num].design_columns !== '')
           return intOrDash(pp[num].design_columns);
+        var pr = window.PF_PROJECT_RECORDS && window.PF_PROJECT_RECORDS.records;
+        var rec = pr && pr[num];
+        if (rec && rec.bid_log && rec.bid_log.total_columns != null && rec.bid_log.total_columns !== '')
+          return intOrDash(rec.bid_log.total_columns);
       } catch(e) {}
       return DASH;
+    }
+    // Reformat an ISO date STRING (YYYY-MM-DD) to MM/DD/YYYY by direct string
+    // split — NO new Date() so there is no timezone off-by-one-day shift.
+    // Non-matching strings pass through unchanged (fail-safe, never fabricated).
+    function fmtDate(s){
+      if (!s) return s;
+      var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s));
+      if (m) return m[2] + '/' + m[3] + '/' + m[1];
+      return s;
     }
     // Start date for a project number from the schedule seed (admin/partner feed).
     // Uses the first mobilization's start. Field-safe schedule (PF_SCHEDULE_FIELD)
@@ -12531,7 +12539,7 @@ try {
           for (var i = 0; i < S.length; i++) {
             if (String(S[i].number || S[i].id || '') === String(num)) {
               var mobs = S[i].mobilizations;
-              if (mobs && mobs.length && mobs[0].start) return E(String(mobs[0].start));
+              if (mobs && mobs.length && mobs[0].start) return E(fmtDate(String(mobs[0].start)));
               return DASH;
             }
           }
