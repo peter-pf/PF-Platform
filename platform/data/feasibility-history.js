@@ -2,7 +2,7 @@
 // the completed feasibility records in /home/aiciv/feasibility/. New studies append here.
 // preconstruction area; field_ops denied.
 window.PF_FEASIBILITY_HISTORY = {
-  "generated": "2026-06-27",
+  "generated": "2026-07-28",
   "studies": [
     {
       "id": "feas_eiu_science",
@@ -46,6 +46,69 @@ window.PF_FEASIBILITY_HISTORY = {
       ],
       "recordPath": "feasibility/nestle-anderson/FEASIBILITY-RECORD-nestle-anderson.md",
       "verified": "primary-source extraction, every data point cited"
+    },
+    {
+      "id": "feas_riverside_mcmechen",
+      "project": "Riverside Elementary School",
+      "location": "McMechen, WV (formerly Benwood-McMechen ES)",
+      "discipline": "Aggregate Piers / VSC",
+      "date": "2026-07-28",
+      "verdict": "GO",
+      "verdictNote": "Aggregate piers are the specified ground-improvement solution; PF sweet spot",
+      "summary": "Hillis-Carnes geotech (PIT250088A, 6/30/2025) found uncontrolled fill over very loose to loose alluvium to ~17-20 ft and recommends a ground improvement system naming aggregate piers (12-30 in dia, 3,000-6,000 psf). Structural foundation note locks the basis: 4,000 psf, contractor-designed GI, 1 in total / 0.5 in differential over 40 ft. Geotech titled Benwood-McMechen = same site as Riverside (same address 1 4th St McMechen WV, same architect proj no; Addendum 3 foundation sheet names the Hillis-Carnes report as design basis).",
+      "drivers": [
+        "Ground improvement specified; aggregate piers named in geotech",
+        "4,000 psf / 1 in / 0.5 in over 40 ft performance spec",
+        "Uncontrolled fill over loose alluvium to 17-20 ft",
+        "BID DATE Aug 4, 2026 - tight Garbin prelim window"
+      ],
+      "missing": [
+        "Scope not sized - needs Garbin prelim",
+        "Confirm McMechen WV inside PF mobilization radius",
+        "Jonathan go-ahead to start Garbin prelim (bid ~1 week out)"
+      ],
+      "recordPath": "feasibility/riverside/FEASIBILITY-RECORD-riverside.md",
+      "verified": "pf-intel-verifier PASS - site-identity + citations resolved to primary source"
+    },
+    {
+      "id": "feas_richmond_police_ky",
+      "project": "Richmond Police Station",
+      "location": "Richmond, KY (Madison County)",
+      "discipline": "Aggregate Piers / VSC",
+      "date": "2026-07-28",
+      "verdict": "NO-GO",
+      "verdictNote": "Shallow footings on karst bedrock; no GI scope; also out of core geography",
+      "summary": "Terracon geotech (N3245096, 10/30/2024, sealed Samuel Guy PE KY) specifies shallow spread footings at 2,000 psf with total settlement already under 1 in, on stiff to very stiff soils over shallow limestone bedrock in karst terrain (auger refusal <5 ft in three borings). Cannot install stone columns into shallow rock and no soft-soil problem to solve. Remedy for undocumented fill is undercut-and-replace. No AP/GI item in geotech or bid unit price list.",
+      "drivers": [
+        "Shallow footings 2,000 psf, settlement already <1 in",
+        "Shallow limestone/karst, refusal <5 ft - precludes stone columns",
+        "No ground-improvement item anywhere in the bid set"
+      ],
+      "missing": [
+        "Location is Richmond KENTUCKY - outside PF NE-Indiana core (confirm)"
+      ],
+      "recordPath": "feasibility/richmond/FEASIBILITY-RECORD-richmond.md",
+      "verified": "pf-intel-verifier PASS - all citations vision-read from rendered pages"
+    },
+    {
+      "id": "feas_crawford_door_evv",
+      "project": "Crawford Door Redevelopment",
+      "location": "Evansville, IN (1701 N Heidelbach Ave)",
+      "discipline": "Aggregate Piers / VSC",
+      "date": "2026-07-28",
+      "verdict": "NO-GO",
+      "verdictNote": "Conventional shallow footings; no ground improvement in geotech",
+      "summary": "Patriot Engineering geotech (25-1891-03G, 12/19/2025, Jacob Vieck PE) specifies conventional shallow footings at 1,500 psf square / 1,150 psf strip with undercut-and-replace structural fill. Zero aggregate pier / stone column / vibro / ground improvement references across all 35 pages (full text plus both scanned detail pages). Shallow soft fill, light loads - engineer's economical fix is earthwork.",
+      "drivers": [
+        "Shallow footings 1,500/1,150 psf + undercut-and-replace",
+        "No GI reference anywhere in 35-page geotech",
+        "Shallow fill, light 4-story wood-frame loads"
+      ],
+      "missing": [
+        "Geotech-only review; if structural/civil set elected piers/GI, re-run (flagged to Jonathan)"
+      ],
+      "recordPath": "feasibility/crawford/FEASIBILITY-RECORD-crawford.md",
+      "verified": "pf-intel-verifier PASS - citations reproduced from extracted text + scanned PNGs"
     }
   ]
 };
