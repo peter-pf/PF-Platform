@@ -286,3 +286,67 @@ container and NO public bind of Hermes.
   short-lived, timeboxed `-z` one-shot for the §1 proof (it exits on its own).
 - Only new file committed: `functions/api/field-companion.js` (+ this doc). No
   deploy of a wired-live endpoint; env unset → inert + fail-closed.
+
+---
+
+## 6. STAGE 2 EXECUTION — STOPPED AT AUTH-FIRST GATE (2026-07-28)
+
+Stage 2 was GREEN-LIT (Melanie). I began auth-first and **STOPPED before creating
+any tunnel or starting `hermes serve`** because the approved least-exposure design
+cannot be built securely with the credentials available. No process was disturbed;
+cloudflared was NOT installed; no tunnel, no env, no portal change.
+
+### What the `CLOUDFLARE_API_TOKEN` in `/home/aiciv/.env` CAN do (probed live)
+- Account visible: **`Peter@pierfoundations.com's Account`** (`9eb5ec52...`).
+- **Cloudflare Tunnel:** list/create — OK (`cfd_tunnel` returns success, 0 existing).
+- **Pages:** read/write — OK (sees `pf-platform` + 8 others; can read prod env vars,
+  so setting `PF_FIELD_HERMES_URL` / `PF_FIELD_HERMES_SECRET` later is NOT a blocker).
+
+### What it CANNOT do — the two blockers
+1. **No zone / no custom domain.** `zones` list returns **0**. `pf-platform` has only
+   `pf-platform.pages.dev` — there is no custom zone on this account. Without a zone,
+   `cloudflared tunnel route dns` cannot bind a named hostname
+   (e.g. `field-hermes.pierfoundations.<zone>`). The only public URLs reachable
+   without a zone are a `trycloudflare.com` quick tunnel (DISALLOWED by this design —
+   ephemeral, unauthenticated) or a raw `<uuid>.cfargotunnel.com` that still needs a
+   route we cannot create.
+2. **No Cloudflare Access scope.** `access/apps` returns `Authentication error` — the
+   token has no `Access:Edit`/`Read`. The design's network-layer gate (Cloudflare
+   Access in front of the hostname) **cannot be provisioned** with this token.
+
+Because the mandate is *"never expose Hermes without the auth layer active; if any
+step cannot be done securely or needs a human/browser step, STOP and report,"* I
+stopped. Forcing a public tunnel without the Access gate — or a `trycloudflare`
+quick tunnel — would violate the least-exposure design.
+
+### EXACT human step / credential needed to proceed
+Provide ONE of the following (in order of preference):
+
+**Option A — scope the existing token (or issue a new one) with the missing grants:**
+   - **Cloudflare Tunnel: Edit** (already have)
+   - **Access: Apps and Policies: Edit** (MISSING — for the Access gate)
+   - **DNS: Edit** on a **zone**, AND a **zone must exist** on the account for the
+     tunnel hostname (MISSING — there is currently NO zone).
+   → i.e. a real domain/zone (even a subdomain delegation) must be added to the
+     `Peter@pierfoundations.com` Cloudflare account, plus DNS + Access scopes.
+
+**Option B — a human runs the one-time interactive bind in the Cloudflare dashboard:**
+   1. Add a zone (domain) to the account, or confirm one to use.
+   2. Create the named tunnel `pf-field-hermes` and its `cfargotunnel` route to the
+      chosen hostname (dashboard "Connect an application" flow).
+   3. Create a **Cloudflare Access** application on that hostname (service-token or
+      SSO policy) so unauthenticated hits are blocked at the edge.
+   4. Hand back: the tunnel **credentials file** (or token), the **hostname URL**,
+      and the **Access service-token** — then I finish 2–5 automatically and run the
+      full a–e verification (incl. the financial-leak hard gate).
+
+**Note on the app-layer auth already built:** `functions/api/field-companion.js`
+already signs Bearer + HMAC-SHA256(secret, `ts.body`) with 300s skew. That is the
+APPLICATION gate and is ready. It is complementary to — not a replacement for — the
+Cloudflare Access NETWORK gate the design requires, and it also needs a Hermes-side
+verifying adapter (bare `hermes serve` does not implement the `{question,...}`
+field contract or verify our HMAC). Both the network gate (blocked above) and that
+adapter remain for Stage 2 once a zone + scopes are provided.
+
+**STATUS: Stage 2 BLOCKED on Cloudflare account setup (zone + Access/DNS scope).**
+Nothing exposed. Awaiting the human credential/step above before proceeding.
