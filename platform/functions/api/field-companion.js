@@ -1,41 +1,42 @@
 // Cloudflare Pages Function -- /api/field-companion
 // ===========================================================================
-// FIELD-OPS SMART SEARCH BROKER (Stage 1 -- INERT until stage 2)
+// FIELD-OPS SMART SEARCH -- KV-QUEUE MODEL (Hermes stays fully private)
 // ===========================================================================
-// The server-side broker behind Pier Foundations' field-crew smart-search box.
-// The crew types a plain-language question ("what stone is approved for 26-002?")
-// and this endpoint forwards it to Peter's LOCAL Hermes instance (MiniMax-M2.7),
-// which parses + phrases the answer from field-safe records. It returns the
-// answer to the browser. The AI PHRASES; it never produces a fact from thin air
-// -- and this broker NEVER fabricates: on any failure it fails CLOSED with an
-// honest error + an empty result.
+// The crew types a plain-language question ("what stone is approved for 26-002?").
+// This endpoint does NOT talk to Hermes directly and holds NO secret. Instead:
 //
-// SECURITY MODEL (why the browser never holds a secret):
-//   crew browser
-//     -> POST /api/field-companion   (same-origin; pf_session cookie + RBAC)
-//     -> [this function, server-side] fetch PF_FIELD_HERMES_URL
-//          with Authorization: Bearer <PF_FIELD_HERMES_SECRET>
-//          + X-PF-Timestamp + X-PF-Signature = hex(HMAC_SHA256(secret, ts + "." + body))
-//     -> Hermes answers -> we return { answer, ... } to the browser.
-//   The shared secret lives ONLY in the CF env (PF_FIELD_HERMES_SECRET). It is
-//   NEVER sent to, or reachable by, the browser.
+//   POST /api/field-companion { query, project_hint? }
+//     -> writes  fieldq:<id> = { id, query, project_hint, status:"pending", ts }
+//        to Workers KV (env.PF_SCHEDULE, the same binding daily-report uses)
+//     -> returns { ok:true, id, status:"pending" }
 //
-// RBAC: field_ops area. This is the CREW's operational tool -- NOT financial.
-//   requireArea(session, 'field_ops') => admin/partner/business_dev/field_ops.
-//   The middleware already 401s a session-less request; this is defense-in-depth.
+//   GET /api/field-companion?id=<id>
+//     -> reads fieldq:<id>; returns its status. When the poller has answered:
+//        { ok:true, status:"done", answer, contains_financials:false }
+//
+// A PRIVATE poller daemon in Peter's container (tools/field_query_poller.py,
+// PPID=1) polls the SAME namespace via the Cloudflare API, runs each pending
+// question through the LOCAL Hermes (hermes -p aiciv-doctor -z) with a field-safe
+// + NO-FINANCIALS prompt wrapper, and writes { answer, status:"done" } back to
+// the same key. Hermes is NEVER exposed -- there is no tunnel, no domain, no
+// inbound path. The only channel is KV.
+//
+// WHY THIS IS SAFER THAN A TUNNEL: Hermes has zero public surface. No hostname,
+// no port, no Access gate to misconfigure. The crew browser only ever talks to
+// this same-origin Function behind the portal's own auth gate.
+//
+// RBAC: field_ops area -- the crew's OPERATIONAL tool, NOT financial.
+//   requireArea(session,'field_ops') => admin/partner/business_dev/field_ops.
+//   _middleware.js already 401s a session-less request; this is defense-in-depth.
 //
 // FAIL-CLOSED CONTRACT (load-bearing):
-//   - PF_FIELD_HERMES_URL unset (the stage-1 state) => 503 honest error, empty
-//     result, NO crash, NO fabricated answer.
-//   - Hermes unreachable / non-2xx / bad-shaped body / timeout => 502/504 honest
-//     error, empty result. We NEVER invent an answer to look helpful.
-//   An honest "the assistant is unavailable" beats a convincing fiction. A wrong
-//   answer in the field is worse than "I don't have that".
-//
-// STAGE 1 STATE: PF_FIELD_HERMES_URL / PF_FIELD_HERMES_SECRET are UNSET, so this
-// endpoint is inert -- every call fails closed with a 503. It is committed so the
-// wiring is reviewable, but it does nothing live until stage 2 sets the env +
-// stands up the tunnel. See field-ops-hermes-STAGE1.md.
+//   - env.PF_SCHEDULE (KV) missing  => 503 honest error, no crash.
+//   - The poller writes an honest `error` + empty `answer` when it cannot answer;
+//     this Function relays that verbatim. It NEVER fabricates an answer.
+//   - The FINANCIAL guardrail lives in the poller's prompt wrapper + a dollar
+//     post-filter; this Function additionally refuses to relay any result flagged
+//     contains_financials:true.
+//   An honest "I don't have that" / "unavailable" beats a convincing fiction.
 
 import { requireArea } from '../lib/auth.js';
 
@@ -44,189 +45,121 @@ const JSON_HEADERS = {
   'Cache-Control': 'private, no-store',
 };
 
-// Field-crew questions are short. Cap the inbound body hard.
+const KEY_PREFIX = 'fieldq:';
 const MAX_BODY_BYTES = 4 * 1024;
 const MAX_QUERY_LEN = 1000;
-
-// Hermes can take a while to think; bound it so the crew never hangs.
-const HERMES_TIMEOUT_MS = 90 * 1000;
-
-// Reject a signature/timestamp older than this (replay-window). Mirrors the
-// True Bearing handshake design (see memory: phase2-field-companion).
-const MAX_SKEW_MS = 5 * 60 * 1000; // 300s
+const QUEUE_ITEM_TTL_SECS = 60 * 60; // KV item self-expires after 1h (cleanup)
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
 }
 
-// Honest fail-closed envelope. `answer` is ALWAYS empty on failure -- the caller
-// must never render a fabricated answer. `ok:false` + `answer:''` is the signal.
+// Honest fail-closed envelope. `answer` is ALWAYS empty on failure.
 function failClosed(message, status) {
-  return json({
-    ok: false,
-    answer: '',
-    sources: [],
-    contains_financials: false,
-    error: message,
-  }, status);
+  return json({ ok: false, status: 'error', answer: '', error: message }, status);
 }
 
 function s(v, cap) {
   if (v == null) return '';
   let str = String(v);
   if (str.length > cap) str = str.slice(0, cap);
-  return str.replace(/[<>]/g, ''); // strip angle brackets (UI also escapes)
+  return str.replace(/[<>]/g, '');
 }
 
-// hex(HMAC-SHA256(secret, message)) -- Web Crypto only, no libraries. Same
-// primitive the session signer uses in _middleware.js / lib/auth.js.
-async function hmacHex(secret, message) {
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw', enc.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
-  );
-  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(message));
-  const bytes = new Uint8Array(sig);
+// A crypto-random id for the queue key (no PII, no secret).
+function newId() {
+  const b = new Uint8Array(16);
+  crypto.getRandomValues(b);
   let hex = '';
-  for (let i = 0; i < bytes.length; i++) {
-    hex += bytes[i].toString(16).padStart(2, '0');
-  }
+  for (let i = 0; i < b.length; i++) hex += b[i].toString(16).padStart(2, '0');
   return hex;
 }
 
+// ---- POST: enqueue a question -------------------------------------------------
 export async function onRequestPost(context) {
   const { request, env } = context;
 
-  // ---- RBAC: field crew (+ office). NOT financial. --------------------------
   const session = context.data && context.data.session;
   const denied = requireArea(session, 'field_ops');
   if (denied) return denied;
 
-  // ---- Parse + validate the crew's question ---------------------------------
+  if (!env || !env.PF_SCHEDULE) {
+    return failClosed('The field assistant is not available right now.', 503);
+  }
+
   const raw = await request.text();
-  if (raw.length > MAX_BODY_BYTES) {
-    return failClosed('Question too long.', 413);
-  }
+  if (raw.length > MAX_BODY_BYTES) return failClosed('Question too long.', 413);
   let parsed;
-  try {
-    parsed = JSON.parse(raw || '{}');
-  } catch {
-    return failClosed('Invalid request.', 400);
-  }
+  try { parsed = JSON.parse(raw || '{}'); } catch { return failClosed('Invalid request.', 400); }
+
   const query = s(parsed && parsed.query, MAX_QUERY_LEN).trim();
-  if (!query) {
-    return failClosed('Please enter a question.', 400);
-  }
-  // Optional non-sensitive hint (e.g. a project number the crew is on).
+  if (!query) return failClosed('Please enter a question.', 400);
   const projectHint = s(parsed && parsed.project_hint, 120).trim();
 
-  // ---- FAIL CLOSED if the backend is not configured (the stage-1 state) ------
-  // PF_FIELD_HERMES_URL is UNSET until stage 2 stands up the tunnel. When unset
-  // we return an honest "unavailable" -- NEVER a fabricated answer.
-  const hermesUrl = env && env.PF_FIELD_HERMES_URL && String(env.PF_FIELD_HERMES_URL).trim();
-  const hermesSecret = env && env.PF_FIELD_HERMES_SECRET && String(env.PF_FIELD_HERMES_SECRET).trim();
-  if (!hermesUrl || !hermesSecret) {
-    return failClosed(
-      'The field assistant is not available yet. No answer was generated.',
-      503,
-    );
-  }
-
-  // ---- Build the signed, authenticated request to Hermes --------------------
-  // Field-safe request contract (matches the design in memory phase2-field-companion):
-  //   { question, role:"field_ops", project_hint, context_scope:"field_safe" }
-  const outboundBody = JSON.stringify({
-    question: query,
-    role: 'field_ops',
-    project_hint: projectHint || undefined,
-    context_scope: 'field_safe',
-  });
-  const ts = String(Date.now());
-  let signature;
+  const id = newId();
+  const key = KEY_PREFIX + id;
+  const item = {
+    id,
+    query,
+    project_hint: projectHint || '',
+    status: 'pending',
+    ts: Date.now(),
+    // audit who asked (uid only, no PII beyond the session subject)
+    asked_by: (session && session.uid) || null,
+  };
   try {
-    signature = await hmacHex(hermesSecret, ts + '.' + outboundBody);
+    await env.PF_SCHEDULE.put(key, JSON.stringify(item), { expirationTtl: QUEUE_ITEM_TTL_SECS });
   } catch {
-    // If we cannot sign, we cannot authenticate -- fail closed, never send raw.
-    return failClosed('The field assistant is temporarily unavailable.', 500);
+    return failClosed('The field assistant is temporarily unavailable.', 503);
   }
-
-  // ---- Call Hermes, timeboxed, fail closed on ANY problem -------------------
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), HERMES_TIMEOUT_MS);
-  let upstream;
-  try {
-    upstream = await fetch(hermesUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + hermesSecret,
-        'X-PF-Timestamp': ts,
-        'X-PF-Signature': signature,
-      },
-      body: outboundBody,
-      signal: controller.signal,
-    });
-  } catch (err) {
-    clearTimeout(timer);
-    // Abort (timeout) vs connection error -- either way, honest + empty.
-    const isAbort = err && err.name === 'AbortError';
-    return failClosed(
-      isAbort
-        ? 'The field assistant took too long to respond. No answer was generated.'
-        : 'The field assistant is temporarily unreachable. No answer was generated.',
-      isAbort ? 504 : 502,
-    );
-  }
-  clearTimeout(timer);
-
-  if (!upstream.ok) {
-    return failClosed('The field assistant returned an error. No answer was generated.', 502);
-  }
-
-  // ---- Parse Hermes' response; fail closed on a bad shape -------------------
-  let data;
-  try {
-    data = await upstream.json();
-  } catch {
-    return failClosed('The field assistant returned an unreadable response.', 502);
-  }
-
-  // Expected response contract:
-  //   { answer, confidence?, sources?, contains_financials?:false }
-  const answer = data && typeof data.answer === 'string' ? data.answer : '';
-  if (!answer.trim()) {
-    // No answer text => treat as "I don't have that", NOT a fabricated fill-in.
-    return json({
-      ok: true,
-      answer: '',
-      sources: Array.isArray(data && data.sources) ? data.sources : [],
-      contains_financials: false,
-      note: 'No matching field record was found.',
-    }, 200);
-  }
-
-  // Defense-in-depth: this surface is field-safe by architecture (money is
-  // stripped at ingest). If the backend ever flags financial content, DO NOT
-  // relay it to the crew -- fail closed instead.
-  if (data && data.contains_financials === true) {
-    return failClosed('That request cannot be answered from the field tool.', 403);
-  }
-
-  return json({
-    ok: true,
-    answer,
-    confidence: (data && data.confidence) || null,
-    sources: Array.isArray(data && data.sources) ? data.sources : [],
-    contains_financials: false,
-  }, 200);
+  return json({ ok: true, id, status: 'pending' }, 202);
 }
 
-// Only POST is supported. A GET (e.g. someone hitting the URL directly) fails
-// closed with a clear message rather than doing anything.
+// ---- GET: poll for the answer -------------------------------------------------
 export async function onRequestGet(context) {
+  const { request, env } = context;
+
   const session = context.data && context.data.session;
   const denied = requireArea(session, 'field_ops');
   if (denied) return denied;
-  return failClosed('Use POST with a { query } body.', 405);
+
+  if (!env || !env.PF_SCHEDULE) {
+    return failClosed('The field assistant is not available right now.', 503);
+  }
+
+  const url = new URL(request.url);
+  const id = s(url.searchParams.get('id'), 64).trim();
+  if (!id || !/^[a-f0-9]{8,64}$/.test(id)) return failClosed('Missing or invalid id.', 400);
+
+  let item;
+  try {
+    const rawItem = await env.PF_SCHEDULE.get(KEY_PREFIX + id);
+    if (!rawItem) {
+      // Expired or never existed. Honest, not fabricated.
+      return json({ ok: false, status: 'not_found', answer: '', error: 'That question is no longer available. Please ask again.' }, 404);
+    }
+    item = JSON.parse(rawItem);
+  } catch {
+    return failClosed('The field assistant is temporarily unavailable.', 503);
+  }
+
+  const status = item && item.status;
+  if (status !== 'done') {
+    // still pending/processing -- tell the browser to keep polling
+    return json({ ok: true, status: status || 'pending', answer: '' }, 200);
+  }
+
+  // Done. Defense-in-depth financial gate: never relay flagged content.
+  if (item.contains_financials === true) {
+    return failClosed('That request cannot be answered from the field tool.', 403);
+  }
+  const answer = typeof item.answer === 'string' ? item.answer : '';
+  return json({
+    ok: true,
+    status: 'done',
+    answer,
+    contains_financials: false,
+    // On a fail-closed poller result, answer is '' and error carries the honest reason.
+    error: answer ? undefined : (item.error || 'No answer was generated.'),
+  }, 200);
 }

@@ -350,3 +350,127 @@ adapter remain for Stage 2 once a zone + scopes are provided.
 
 **STATUS: Stage 2 BLOCKED on Cloudflare account setup (zone + Access/DNS scope).**
 Nothing exposed. Awaiting the human credential/step above before proceeding.
+
+---
+
+## 7. STAGE 2 REDESIGN — KV-QUEUE (no tunnel, no domain) — PROTOTYPED 2026-07-28
+
+Melanie is wary of adding a domain; the tunnel path is blocked anyway (§6). This
+KV-queue architecture keeps Hermes **fully private** — no tunnel, no domain, no
+inbound port, no Access gate to misconfigure. **Prototyped and proven.**
+
+### 7.1 Feasibility verdict — GREEN (no extra token scope needed)
+Probed the live Cloudflare API with the token in `/home/aiciv/.env`:
+- **List KV namespaces:** OK — found `PF_SCHEDULE` (id `6c8bd3b9bf3a464ca8d1a5d939231858`),
+  the SAME binding the portal already uses (daily-report/override/budget).
+- **Scratch-key round-trip:** PUT ✓ / GET ✓ (value matched) / DELETE ✓ / GET-after-delete 404.
+- **List keys by prefix** (`fieldq:`): OK — the poller can find pending items.
+- **Verdict:** the token ALREADY has **Workers KV Storage: Edit**. **No additional
+  scope required.** (The DNS/Access grant from the tunnel attempt is irrelevant here.)
+
+### 7.2 Architecture
+```
+crew browser
+  │  POST /api/field-companion { query, project_hint? }
+  ▼
+functions/api/field-companion.js  (same-origin, pf_session cookie + field_ops RBAC)
+  │  env.PF_SCHEDULE.put("fieldq:<id>", {query,status:"pending",...}, ttl 1h)
+  │  -> 202 { id, status:"pending" }
+  ▼
+Cloudflare Workers KV  (PF_SCHEDULE)          [Hermes is NOT here — KV is the only channel]
+  ▲                                   │
+  │ write {answer,status:"done"}      │ read pending fieldq:*
+  │                                   ▼
+tools/field_query_poller.py  (PPID=1 daemon in Peter's container, PRIVATE)
+  │  hermes -p aiciv-doctor --safe-mode -z "<field-safe + no-financials prompt>"
+  ▼  (local, timeboxed; Hermes never exposed)
+
+crew browser  GET /api/field-companion?id=<id>  (polls until status:"done")
+  ▼  { status:"done", answer, contains_financials:false }
+```
+- **No secret in the browser, and no secret at all** — the poller runs privately
+  in-container and authenticates to KV with the CF token that never leaves the box.
+- **Hermes has ZERO public surface.** This is strictly safer than the tunnel.
+
+### 7.3 The Function (built + verified) — `functions/api/field-companion.js`
+Rewritten from the tunnel-broker to the KV-queue model:
+- **POST** `{query, project_hint?}` → writes `fieldq:<id>` pending (1h TTL) → `202 {id}`.
+- **GET** `?id=<id>` → returns `{status}`; when done, `{status:"done", answer, contains_financials:false}`.
+- **RBAC** field_ops; **fail-closed** on no-KV (503), bad input (400/413), expired id
+  (404 honest), and refuses to relay any `contains_financials:true` result (403).
+- `node --check`: PASS. Behavior harness **9/9 PASS** (enqueue 202, poll-pending,
+  poll-done, financial-flag not relayed, fail-closed relay, no-KV 503, no-session
+  403, empty-query 400, expired-id 404).
+
+### 7.4 The poller (built + prototyped) — `tools/field_query_poller.py`
+- PPID=1 daemon, mirrors the existing daemon pattern; registered in
+  `tools/daemon-manifest.json` (health_check `pattern` — it's mostly idle so
+  log-freshness would false-alarm). Watchdog will keep it alive once started.
+- Each cycle (3s): list `fieldq:*`, claim `pending` → `processing`, run Hermes with
+  the field-safe prompt, write `done`+answer back. Stale `processing` (>180s) retried.
+- **NO-FINANCIALS guardrail (two layers):**
+  1. **Question pre-check:** a regex over money words (cost/price/budget/margin/
+     pay/wage/rate/quote/dollar/...) returns the exact REFUSAL *before* spending
+     inference.
+  2. **Prompt wrapper:** instructs Hermes it has ZERO financial data and must reply
+     with the exact refusal token to any money question; never output a `$` figure;
+     never invent a fact ("I don't have that" when the record lacks it).
+  3. **Output post-filter:** if a dollar figure regex still matches the model output,
+     the whole answer is REPLACED with the refusal before it is written to KV.
+- **Fail-closed:** on Hermes timeout/nonzero/error the poller writes an honest
+  `error` + empty `answer` — never fabricates.
+
+### 7.5 Prototype results (scratch keys, cleaned up)
+Ran the real poller logic against live KV scratch keys (all deleted after):
+- **Real field question** ("stone + diameter + supplier for 26-002"): grounded
+  answer in **~10s** — "IN #8 Limestone (#8 washed, no fines) at 30\" diameter,
+  supplied by Rush County Stone Company." Correct, no fabrication.
+- **FINANCIAL question** ("what did we pay ... budget margin"): refused in **0.8s**
+  with the exact refusal token — **NO dollar figure. Leak gate PASS.**
+- **Unknown project** ("stone for 99-999"): "I don't have that." — no fabrication.
+- KV cleanup verified (all scratch keys 404 after).
+
+### 7.6 Latency
+Poll interval 3s + Hermes inference ~8–11s (MiniMax-M2.7, one-shot) ⇒ typical crew
+round trip **~10–14s**; financial refusals are instant (~1s, pre-checked). The
+browser shows a "thinking…" state and polls the GET every ~2s. Realistic for a
+field lookup. (Tighten poll to 2s and/or warm the model to shave a couple seconds.)
+
+### 7.7 STAGE 2 GO-LIVE STEPS (remaining — do at the Peter+Melanie co-verify)
+1. **Start the poller** (additive, does not touch any running process):
+   `nohup setsid /usr/bin/python3 /home/aiciv/tools/field_query_poller.py >/dev/null 2>&1 &`
+   (or `relaunch_daemons.sh`, which now includes it via the manifest).
+2. **Swap the UI** in `field-sample.html`: `runAsk()` (line ~534) currently calls
+   the local stub `answerFor(q)`. Replace with: POST `/api/field-companion` → get
+   `{id}` → poll GET `?id=` every ~2s until `status:"done"` → render `answer` (or the
+   honest `error`). No other page change; same-origin, behind the portal auth gate.
+3. **Deploy** the branch to `pf-platform` prod (wrangler pages deploy); confirm the
+   auth gate still returns 401 unauthenticated.
+4. **Co-verify (a–e), human-witnessed:**
+   - (a) *No public Hermes:* there is NO tunnel/hostname — confirm Hermes has no
+     inbound path (only the private poller). (Replaces the tunnel "unauth blocked" test.)
+   - (b) crew query returns a grounded answer (POET stone → IN #8 Limestone).
+   - (c) **FINANCIAL-LEAK HARD GATE:** "what did we pay/cost/budget/margin" → refusal,
+     never a dollar figure. (Proven in prototype; re-witness live.)
+   - (d) view-source + network tab: NO secret in served JS or any payload (there is
+     no secret in this model — confirm).
+   - (e) field_ops role can use it; unauthenticated → 401 (middleware) / 403 (RBAC).
+5. Only after a–e pass do Peter + Melanie declare it **crew-live**.
+
+### 7.8 Recommendation — KV-QUEUE over the tunnel
+| | KV-queue | Cloudflare tunnel |
+|---|---|---|
+| Hermes exposure | **none** (fully private) | public hostname (even if Access-gated) |
+| New infra needed | none (reuses PF_SCHEDULE KV + token) | domain/zone + DNS + Access + cloudflared |
+| Token scope | already sufficient | needs zone + Access (BLOCKED, §6) |
+| Attack surface | one same-origin Function behind auth | tunnel + Access config to get right |
+| Latency | ~10–14s (poll + inference) | ~8–11s (direct) — marginally faster |
+| Failure mode | honest error, fully contained | misconfig ⇒ exposed Hermes |
+**RECOMMEND KV-QUEUE.** It removes the entire class of "accidentally exposed Hermes"
+risk, needs no domain (Melanie's concern) and no extra credentials, and the only
+cost is a few seconds of added latency — a fine trade for a field lookup. The tunnel
+path stays documented (§4/§6) as a fallback if sub-10s latency ever becomes a hard
+requirement, but it is not recommended.
+
+**STATUS: KV-queue prototyped + verified. NOT crew-live.** Poller not started;
+UI not swapped; nothing deployed. Awaiting the Peter+Melanie co-verify (§7.7).
