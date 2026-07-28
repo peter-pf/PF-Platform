@@ -2084,7 +2084,8 @@ body.role-field-ops .nav-sub[data-fo-hide] {
   feeds.push('/data/progress-data.js');
   if (isPrivileged) {
     feeds.push('/data/project-record-poet.js', '/data/project-records.js',
-               '/data/budget-actual-poet.js', '/data/awarded-projects.js',
+               '/data/budget-actual-poet.js', '/data/cost-code-template.js',
+               '/data/awarded-projects.js',
                '/data/precon-pipeline.js', '/data/feasibility-history.js',
                '/data/project-master.js', '/data/pf-coi.js',
                '/data/pf-dashboard.js');
@@ -2100,6 +2101,11 @@ body.role-field-ops .nav-sub[data-fo-hide] {
     feeds.push('/data/precon-dashboard.js', '/data/bd-dashboard.js', '/data/bd-records.js', '/data/opportunities.js',
                '/data/gc-targets.js', '/data/bd-templates.js', '/data/precon-historical.js',
                '/data/project-dashboard.js');
+    // Standard cost-code template (ZEROED money) seeds the per-project Budget vs
+    // Actual table in a project record's Financials section. financials-area
+    // (admin/partner/business_dev); field_ops BLOCKED server-side. Loaded here for
+    // BD (business_dev) since the privileged block above only runs for admin/partner.
+    if (!isPrivileged) feeds.push('/data/cost-code-template.js');
     // BD also needs the precon pipeline + feasibility history feeds
     // (preconstruction area) - previously only injected for admin/partner; BD is
     // allowed them server-side.
@@ -11579,6 +11585,17 @@ try {
     var _curOverrides = {};  // sections map for the current project ({} if none)
     var _curMeta = null;     // _meta of the current project's overrides
 
+    // ---- PER-PROJECT BUDGET state (Financials Phase 1) --------------------
+    // window.PF_PROJECT_BUDGETS = { num: { rows:{ cost_code:{budget} }, _meta, loaded, error } }
+    // Loaded synchronously per project in openProjectRecord()/renderPoet() (like
+    // the overrides above). The Budget vs Actual table SEEDS from the zeroed
+    // standard template (window.PF_COST_CODE_TEMPLATE) and MERGES these saved
+    // budgets on top (a saved budget wins over the template zero). FAIL CLOSED:
+    // if the budget GET fails, the table renders an honest error and does NOT
+    // fabricate budgets.
+    window.PF_PROJECT_BUDGETS = window.PF_PROJECT_BUDGETS || {};
+    var _curBudget = null;   // { rows, _meta, loaded, error } for the current project
+
     // Can the current user edit? Office roles only (mirrors the SERVER gate:
     // financials area = admin/partner/business_dev). field_ops sees NO Edit
     // buttons; the server is the real boundary (a field_ops POST -> 403).
@@ -11734,6 +11751,146 @@ try {
         + '</div>';
     }
 
+    // ---- BUDGET vs ACTUAL (Financials Phase 1) --------------------------------
+    // Money formatter local to this renderer (blank stays blank; never "$0.00").
+    function baMoney(v){
+      if (v === null || v === undefined || v === '') return '';
+      var n = Number(v);
+      if (isNaN(n)) return '';
+      return '$' + n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+    }
+    function baMoneyCell(v){ var m = baMoney(v); return m ? E(m) : '<span class="ba-blank">-</span>'; }
+    // Variance = budget - actual. favorable (>=0, under/at budget) green; over amber.
+    function baVarCell(v){
+      if (v === null || v === undefined || v === '') return '<span class="ba-blank">-</span>';
+      var n = Number(v); if (isNaN(n)) return '<span class="ba-blank">-</span>';
+      var cls = n < 0 ? 'over' : (n > 0 ? 'fav' : '');
+      var m = baMoney(Math.abs(n));
+      var sign = n < 0 ? '(' + E(m) + ')' : E(m);
+      return '<span class="ba-var ' + cls + '">' + sign + '</span>';
+    }
+
+    // Build a per-project Budget vs Actual table from the ZEROED standard template
+    // (window.PF_COST_CODE_TEMPLATE) MERGED with this project's saved budgets
+    // (_curBudget.rows, keyed by cost_code). Actual stays 0/blank in Phase 1;
+    // variance = budget - actual. Preserves the template's category grouping,
+    // per-category subtotals, and grand total. FAIL CLOSED: if the budget failed
+    // to load, render an honest error (never fabricate budgets).
+    // Returns { html, editable } where editable indicates the office may edit.
+    function budgetVsActualTable(num){
+      var T = window.PF_COST_CODE_TEMPLATE;
+      if (!T || !Array.isArray(T.groups)) {
+        return '<div class="pr-note">Standard cost-code template not loaded '
+          + '(data/cost-code-template.js). The Budget vs Actual table cannot render.</div>';
+      }
+      var bud = _curBudget || { rows:{}, loaded:false, error:'unreachable' };
+      // FAIL CLOSED on a real load error (not merely "empty"): show honest error.
+      if (bud.error) {
+        var emsg = bud.error === 'not-permitted'
+          ? 'You do not have permission to view this project’s budget.'
+          : 'Budget data could not be loaded (' + E(String(bud.error))
+            + '). Showing the standard cost codes with NO saved budgets. Reload to retry.';
+        // We still render the zeroed template so the codes are visible, but with a
+        // clear banner that saved budgets are NOT reflected (no fabrication).
+        var banner = '<div class="pr-note" style="border-left:3px solid #d98a00">'
+          + '<strong>Budget unavailable:</strong> ' + emsg + '</div>';
+        return banner + baRenderTable(T, {}, num, false);
+      }
+      var savedRows = (bud.rows && typeof bud.rows === 'object') ? bud.rows : {};
+      return baRenderTable(T, savedRows, num, canEdit());
+    }
+
+    // Render the grouped Budget vs Actual table. savedRows = { row_key:{budget,cost_code} }.
+    // row_key = "g<groupIdx>_r<rowIdx>" is a STABLE per-template-row identity. It is
+    // NOT the cost_code, because the standard code list REUSES some codes across
+    // categories (e.g. 5405 in Material/Labor/Equipment) -- keying by code would
+    // double-count a saved budget across every row sharing that code.
+    function baRenderTable(T, savedRows, num, editable){
+      var grandB = 0, grandA = 0;
+      var body = '';
+      T.groups.forEach(function(g, gi){
+        var gB = 0, gA = 0;
+        var rowsHtml = '';
+        (g.rows || []).forEach(function(r, ri){
+          var isSub = !!r.is_subtotal;
+          var code = r.cost_code || '';
+          var rowKey = 'g' + gi + '_r' + ri;
+          // Merge saved budget (wins over the template zero) by the STABLE row_key.
+          // Subtotal marker rows (no code) never carry a budget; visual sub-heads.
+          var budget = 0;
+          if (savedRows[rowKey] && typeof savedRows[rowKey].budget === 'number') {
+            budget = savedRows[rowKey].budget;
+          } else {
+            budget = Number(r.budget) || 0;
+          }
+          var actual = Number(r.actual) || 0; // Phase 1: always 0
+          var variance = budget - actual;
+          if (!isSub && code) { gB += budget; gA += actual; }
+          var rowCls = isSub ? 'ba-sub-row' : 'ba-leaf-row';
+          var budCell;
+          if (editable && !isSub && code) {
+            budCell = '<input class="ba-budget-input" type="number" step="0.01" min="0" '
+              + 'data-ba-rowkey="' + E(rowKey) + '" data-ba-code="' + E(code) + '" '
+              + 'value="' + (budget ? E(String(budget)) : '') + '" '
+              + 'style="display:none">'
+              + '<span class="ba-budget-view">' + baMoneyCell(budget) + '</span>';
+          } else {
+            budCell = baMoneyCell(budget);
+          }
+          rowsHtml += '<tr class="' + rowCls + '">'
+            + '<td class="ba-code">' + E(code) + '</td>'
+            + '<td class="ba-desc">' + E(r.description || '') + '</td>'
+            + '<td class="num">' + budCell + '</td>'
+            + '<td class="num">' + baMoneyCell(actual) + '</td>'
+            + '<td class="num">' + baVarCell(variance) + '</td>'
+            + '<td>' + E(r.vendor || '') + '</td>'
+            + '<td>' + E(r.notes || '') + '</td>'
+            + '</tr>';
+        });
+        grandB += gB; grandA += gA;
+        // category header row carrying the category subtotal
+        body += '<tr class="ba-grp-row">'
+          + '<td class="ba-code"></td>'
+          + '<td class="ba-desc">' + E(g.title || '') + '</td>'
+          + '<td class="num">' + baMoneyCell(gB) + '</td>'
+          + '<td class="num">' + baMoneyCell(gA) + '</td>'
+          + '<td class="num">' + baVarCell(gB - gA) + '</td>'
+          + '<td></td><td></td>'
+          + '</tr>';
+        body += rowsHtml;
+      });
+      var grandV = grandB - grandA;
+      var foot = '<tr class="ba-grand-row" style="font-weight:700;border-top:2px solid var(--border)">'
+        + '<td></td><td>Total Construction Contract</td>'
+        + '<td class="num">' + baMoneyCell(grandB) + '</td>'
+        + '<td class="num">' + baMoneyCell(grandA) + '</td>'
+        + '<td class="num">' + baVarCell(grandV) + '</td>'
+        + '<td></td><td></td>'
+        + '</tr>';
+      var editControls = editable
+        ? '<div class="ba-edit-actions" data-ba-num="' + E(String(num)) + '">'
+          + '<button type="button" class="pr-edit-btn" onclick="window.pfBudgetEdit(this)">Edit Budget</button>'
+          + '<button type="button" class="pr-save-btn" style="display:none" onclick="window.pfBudgetSave(this)">Save Budget</button>'
+          + '<button type="button" class="pr-cancel-btn" style="display:none" onclick="window.pfBudgetCancel(this)">Cancel</button>'
+          + '<span class="ba-edit-err" style="display:none;color:var(--red);margin-left:8px"></span>'
+          + '</div>'
+        : '';
+      var metaNote = '';
+      if (_curBudget && _curBudget._meta && _curBudget._meta.updatedBy) {
+        var when = '';
+        try { when = _curBudget._meta.updatedAt ? new Date(_curBudget._meta.updatedAt).toLocaleDateString() : ''; } catch(e){}
+        metaNote = '<div class="pr-card-meta" style="margin-bottom:6px">Budget last edited by '
+          + E(_curBudget._meta.updatedBy) + (when ? ' · ' + E(when) : '') + '</div>';
+      }
+      return metaNote + editControls
+        + '<div class="ba-table-wrap" data-ba-project="' + E(String(num)) + '">'
+        + '<table class="ba-table"><thead><tr>'
+        + '<th>Cost Code</th><th>Description</th>'
+        + '<th class="num">Budget</th><th class="num">Actual</th><th class="num">Variance</th>'
+        + '<th>Vendor / Supplier</th><th>Notes</th>'
+        + '</tr></thead><tbody>' + body + foot + '</tbody></table></div>';
+    }
+
     // Render a project record object D into the given root element. Reusable for
     // POET (#prRoot) AND every other awarded project (#prGenericRoot via openProjectRecord).
     function renderInto(D, root){
@@ -11759,6 +11916,11 @@ try {
       _curOverrides = (_ovStore && _ovStore.sections) ? _ovStore.sections : {};
       _curMeta = (_ovStore && _ovStore._meta) || null;
       _curSection = '';
+      // Activate the per-project BUDGET overlay for the Financials Budget vs Actual
+      // table. If not loaded yet (e.g. a code path that renders before openProject),
+      // load it now (fail closed). _curBudget = { rows, _meta, loaded, error }.
+      if (!window.PF_PROJECT_BUDGETS[_curNum]) { try { loadBudgetSync(_curNum); } catch(e){} }
+      _curBudget = window.PF_PROJECT_BUDGETS[_curNum] || { rows: {}, _meta: null, loaded: false, error: 'unreachable' };
 
       // ----- header -----
       var status = bid.bid_status || '';
@@ -12038,24 +12200,27 @@ try {
       html += card(9, 'QA / QC', qaMeta, qaNote + fields(qaRows) + linkRow(L.qaqc), false, 'qaqc');
 
       // ----- 10. Financials -----
+      // Phase 1: a per-project BUDGET vs ACTUAL table seeded from the standard
+      // ~69 cost-code template (window.PF_COST_CODE_TEMPLATE, ZEROED) with saved
+      // budgets merged on top (_curBudget). Office roles get an inline Edit Budget
+      // control (POST /api/project-budget); field_ops never reaches this renderer
+      // (its project view strips financials) and the server 403s them anyway.
+      // NOTE: this card intentionally has NO per-section `sectionKey` override
+      // Edit button -- its editing is the Budget vs Actual editor, not the generic
+      // field-override editor (they would conflict on the same card).
       _curSection = 'financials';
-      var jobCostLink = (window.PF_BUDGET_ACTUAL_POET)
-        ? '<div class="pr-links"><a class="pr-link" href="#" '
-          + 'onclick="showModule(\'budget-actual-poet\');return false;">'
-          + 'Budget vs Actual - Job Cost Report &rarr;</a></div>'
-        : '';
-      html += card(10, 'Financials', null,
-        fields([
-          field('Subcontract / Bid Value', bid.bid_total_value ? ('$'+bid.bid_total_value) : '', 'Bid Log'),
-          field('Change Orders', ''),
-          field('Pay Applications (G702/G703)', ''),
-          field('Lien Waivers', ''),
-          field('Invoice Due by Date of Month', ''),
-          field('Retainage Billing Invoiced', ''),
-          field('Retainage Paid', ''),
-          field('Vendor Invoices', ''),
-          field('Job Cost Report', '')
-        ]) + jobCostLink + linkRow(L.financials), false, 'financials');
+      var baHtml = budgetVsActualTable(_curNum);
+      var baMeta = null;
+      try {
+        if (window.PF_COST_CODE_TEMPLATE && Array.isArray(window.PF_COST_CODE_TEMPLATE.groups)) {
+          var codeCount = 0;
+          window.PF_COST_CODE_TEMPLATE.groups.forEach(function(g){
+            (g.rows||[]).forEach(function(r){ if (r.cost_code) codeCount++; });
+          });
+          baMeta = codeCount + ' standard cost codes';
+        }
+      } catch(e){}
+      html += card(10, 'Financials — Budget vs Actual', baMeta, baHtml, false);
 
       // ----- 11. Project Closeout -----
       _curSection = 'closeout';
@@ -12169,6 +12334,39 @@ try {
       }
     }
 
+    // ---- per-project BUDGET loader (synchronous, FAIL CLOSED) ---------------
+    // Load THIS project's saved per-cost-code budgets BEFORE rendering so the
+    // Budget vs Actual table merge is in place on first paint. FAIL CLOSED: unlike
+    // the overrides loader (which treats a miss as "no overrides"), this is
+    // FINANCIAL data -- a failed/denied/unreachable load records an ERROR so the
+    // table shows an honest error state instead of a misleading all-zero budget.
+    // A 403 (field_ops) also records the error; field_ops never reaches this
+    // office renderer anyway (its project view strips financials).
+    function loadBudgetSync(num){
+      num = String(num || '').trim();
+      if (!num) return;
+      var entry = { rows: {}, _meta: null, loaded: false, error: null };
+      try {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/project-budget?num=' + encodeURIComponent(num), false);
+        xhr.withCredentials = true;
+        xhr.send(null);
+        if (xhr.status === 200) {
+          var d = JSON.parse(xhr.responseText);
+          entry.rows = (d && d.rows) || {};
+          entry._meta = (d && d._meta) || null;
+          entry.loaded = true;
+        } else if (xhr.status === 403) {
+          entry.error = 'not-permitted';
+        } else {
+          entry.error = 'load-failed-' + xhr.status;
+        }
+      } catch (e) {
+        entry.error = 'unreachable';
+      }
+      window.PF_PROJECT_BUDGETS[num] = entry;
+    }
+
     window.renderProjectRecord = function(num, root){
       renderInto(resolveRecord(num), root || document.getElementById('prGenericRoot'));
     };
@@ -12178,6 +12376,7 @@ try {
     window.openProjectRecord = function(num){
       num = String(num || '').trim();
       loadOverridesSync(num);                 // pull overrides before first render
+      loadBudgetSync(num);                    // pull saved per-cost-code budgets (fail closed)
       var root = document.getElementById('prGenericRoot');
       window.renderProjectRecord(num, root);
       var rec = resolveRecord(num);
@@ -12337,12 +12536,101 @@ try {
       });
     };
 
+    // =======================================================================
+    // BUDGET vs ACTUAL editor (Financials Phase 1) — office only
+    // =======================================================================
+    // Edit Budget: reveal the per-cost-code budget inputs. Save: POST every code's
+    // budget to /api/project-budget, then re-render from server truth. FAIL CLOSED:
+    // any non-ok response keeps the editor open + shows an honest inline error;
+    // NEVER shows "saved" on failure. field_ops never sees these controls, and the
+    // server 403s a field_ops POST regardless.
+    function baScope(btn){
+      var card = btn.closest ? btn.closest('.pr-card') : null;
+      if (!card) return null;
+      var actions = card.querySelector('.ba-edit-actions');
+      var wrap = card.querySelector('.ba-table-wrap');
+      return { card: card, actions: actions, wrap: wrap };
+    }
+    window.pfBudgetEdit = function(btn){
+      var s = baScope(btn); if (!s || !s.actions || !s.wrap) return;
+      s.card.classList.add('open');
+      // Show inputs, hide the money view spans.
+      s.wrap.querySelectorAll('.ba-budget-input').forEach(function(i){ i.style.display=''; });
+      s.wrap.querySelectorAll('.ba-budget-view').forEach(function(v){ v.style.display='none'; });
+      s.actions.querySelector('.pr-edit-btn').style.display='none';
+      s.actions.querySelector('.pr-save-btn').style.display='';
+      s.actions.querySelector('.pr-cancel-btn').style.display='';
+      var err = s.actions.querySelector('.ba-edit-err'); if (err) err.style.display='none';
+    };
+    window.pfBudgetCancel = function(btn){
+      // Re-render the whole record from current (unchanged) server truth.
+      var s = baScope(btn); if (!s) return;
+      var num = _curNum || (s.actions && s.actions.getAttribute('data-ba-num')) || '';
+      var root = s.card.closest('.pr-root') || s.card.parentElement || document.getElementById('prGenericRoot');
+      window.renderProjectRecord(num, root);
+    };
+    window.pfBudgetSave = function(btn){
+      var s = baScope(btn); if (!s || !s.actions || !s.wrap) return;
+      var num = _curNum || s.actions.getAttribute('data-ba-num') || '';
+      if (!num) return;
+      var errEl = s.actions.querySelector('.ba-edit-err');
+      function showErr(m){ if (errEl){ errEl.textContent=m; errEl.style.display=''; } }
+      function busy(b){ btn.disabled=b; btn.textContent = b ? 'Saving…' : 'Save Budget'; }
+
+      // Gather every budget input keyed by its STABLE row_key. Validate numbers
+      // client-side (server re-validates + is the real boundary). Blank -> 0
+      // (clears that row's budget).
+      var rows = [];
+      var bad = null;
+      s.wrap.querySelectorAll('.ba-budget-input[data-ba-rowkey]').forEach(function(inp){
+        var rowKey = inp.getAttribute('data-ba-rowkey');
+        var code = inp.getAttribute('data-ba-code') || '';
+        var raw = (inp.value == null ? '' : String(inp.value)).trim();
+        var val = 0;
+        if (raw !== '') {
+          var n = Number(raw);
+          if (!isFinite(n) || n < 0) { if (!bad) bad = (code || rowKey); return; }
+          val = n;
+        }
+        rows.push({ row_key: rowKey, cost_code: code, budget: val });
+      });
+      if (bad) { showErr('Budget for "' + bad + '" must be a non-negative number.'); return; }
+
+      if (errEl) errEl.style.display='none';
+      busy(true);
+      fetch('/api/project-budget', {
+        method:'POST', credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ num: num, rows: rows })
+      }).then(function(res){
+        return res.json().then(function(b){ return {ok:res.ok,status:res.status,body:b}; })
+          .catch(function(){ return {ok:res.ok,status:res.status,body:null}; });
+      }).then(function(r){
+        // FAIL CLOSED: anything not a clean {ok:true,saved:true} stays in edit mode.
+        if (!r.ok || !r.body || r.body.ok !== true || r.body.saved !== true) {
+          var msg = (r.body && r.body.message) ? r.body.message
+            : (r.status === 403 ? 'You do not have permission to edit this budget.'
+              : 'Save failed (' + r.status + '). Your budget was NOT saved — please retry.');
+          busy(false); showErr(msg); return;
+        }
+        // Success: adopt server truth + re-render the whole record.
+        window.PF_PROJECT_BUDGETS[num] = {
+          rows: (r.body.rows) || {}, _meta: (r.body._meta) || null, loaded: true, error: null
+        };
+        var root = s.card.closest('.pr-root') || s.card.parentElement || document.getElementById('prGenericRoot');
+        window.renderProjectRecord(num, root);
+      }).catch(function(){
+        busy(false);
+        showErr('Save failed: could not reach the server. Your budget was NOT saved — please retry.');
+      });
+    };
+
     // POET keeps auto-rendering into its dedicated #prRoot module (deep record).
     // Load POET's overrides first so its per-section Edit buttons + override merge
     // work in the dedicated module too (same fail-soft sync loader).
     function renderPoet(){
       var P = window.PF_PROJECT_POET;
-      if (P && P.project_number) loadOverridesSync(String(P.project_number));
+      if (P && P.project_number) { loadOverridesSync(String(P.project_number)); loadBudgetSync(String(P.project_number)); }
       renderInto(P, document.getElementById('prRoot'));
     }
     document.addEventListener('DOMContentLoaded', renderPoet);

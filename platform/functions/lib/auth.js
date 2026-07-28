@@ -358,6 +358,7 @@ const DATA_FILE_AREAS = {
   '/data/project-records.js':      'financials',      // PROJECT: per-job $ values, cost
   '/data/project-record-poet.js':  'financials',      // PROJECT: per-job contract_value (POET)
   '/data/budget-actual-poet.js':   'financials',      // PROJECT: per-job budget/cost/invoice/profit
+  '/data/cost-code-template.js':   'financials',      // PROJECT: standard cost-code template (ZEROED money) — seeds per-project Budget vs Actual; office only, field_ops BLOCKED
   '/data/awarded-projects.js':     'financials',      // PROJECT: awarded-project contract values + GC
   '/data/project-master.json':     'financials',      // PROJECT: per-job contract_value/margin/profit
   '/data/project-dashboard.js':    'financials',      // PROJECT: per-project tracked items (Financials section OMITTED) - admin/partner/business_dev, field_ops BLOCKED
@@ -520,6 +521,14 @@ export function areaForPath(pathname) {
     // classified 'financials'). Without this line it would fall through to the
     // default 'user_admin' (admin-only) and the office (partner/BD) could not edit.
     if (pathname.startsWith('/api/project-override')) return 'financials';
+    // Per-project Budget vs Actual budgets (Financials Phase 1): the office
+    // hand-enters a per-cost-code BUDGET for a project; stored in KV, merged on
+    // top of the ZEROED standard cost-code template at render. PROJECT-level
+    // financials area: admin + partner + business_dev (the office); field_ops
+    // BLOCKED by direct URL too. The handler ALSO calls requireArea(session,
+    // 'financials') on GET + POST. Without this line it would fall through to the
+    // default 'user_admin' (admin-only) and the office (partner/BD) could not save.
+    if (pathname.startsWith('/api/project-budget')) return 'financials';
     // BD CRM write-back (companies/contacts overlay + interactions log). BD's
     // own tool: admin + partner + business_dev allowed; field_ops BLOCKED by
     // direct URL too. Each endpoint ALSO calls requireArea('business_dev').
