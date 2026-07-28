@@ -11975,7 +11975,7 @@ try {
           field('Estimated Project Completion', ''),
           field('Subcontract / Bid Value', bid.bid_total_value ? ('$'+bid.bid_total_value) : SF.subcontract_value, bid.bid_total_value ? 'Bid Log' : SS),
           field('Award Status', bid.bid_status, 'Bid Log')
-        ]) + linkRow(L.general), true, 'general');
+        ]) + linkRow(L.general), false, 'general');
 
       // ----- 2. PF Team -----
       _curSection = 'pfTeam';
@@ -12090,7 +12090,7 @@ try {
                 + ' Business-level summary, not legal advice.')
             + '</div>';
 
-        html += card('3b', 'Subcontract Analysis', riskMeta, ab, true);
+        html += card('3b', 'Subcontract Analysis', riskMeta, ab, false);
       }
 
       // ----- 4. Engineering & Design -----
@@ -12258,6 +12258,89 @@ try {
           subhead('Engineering & Design Comments')
           + '<div class="pr-note">No submittal review comments yet — pending Dr. Garbin\'s submittal review.</div>');
       }
+
+      // ----- MERGE tracked items from the Project Dashboard INTO their section cards -----
+      // Brad's request (2026-07-28): the standalone "Tracked items to complete" panel was
+      // redundant with these drop-down sections, so it is removed and its data folded in
+      // here. For each PF_PROJECT_DASHBOARD section (matched by project number), find the
+      // matching section card and append any tracked items whose label is NOT already
+      // displayed in that card (case/space-insensitive dedupe). Rendered as READ-ONLY rows
+      // WITHOUT data-pr-label — same idiom as the Owner / E&D-Comments injections above —
+      // so the per-section Edit editor (which scans .pr-field[data-pr-label]) ignores them
+      // and no phantom editable fields are created. Financials is omitted at ingest, so no
+      // Financials section flows through here (and if a dashboard section has no matching
+      // card, it is skipped — the standalone panel is never resurrected). Projects with no
+      // dashboard entry render exactly as before.
+      try {
+        var _dash = window.PF_PROJECT_DASHBOARD;
+        if (_dash && Array.isArray(_dash.projects)) {
+          var _pnum = String(D.project_number || '').trim().toLowerCase();
+          var _dproj = _dash.projects.find(function(p){
+            return String(p.projectNumber || '').trim().toLowerCase() === _pnum;
+          });
+          if (_dproj && Array.isArray(_dproj.sections)) {
+            // dashboard section NAME -> the card body that owns it. General Info has no
+            // data-pr-section (it is the first .pr-card), so it is selected positionally.
+            var _norm = function(s){ return String(s == null ? '' : s).replace(/\s+/g,' ').trim().toLowerCase(); };
+            var _sectionCardBody = function(name){
+              var keyByName = {
+                'general info'         : null, // first card, no section attr
+                'pf team'              : 'pfTeam',
+                'contract info'        : 'contract',
+                'engineering & design' : 'engineering',
+                'project safety'       : 'safety',
+                'site readiness'       : 'siteReadiness',
+                'equipment'            : 'equipment',
+                'material'             : 'material',
+                'qa / qc'              : 'qaqc',
+                'project closeout'     : 'closeout'
+              };
+              var n = _norm(name);
+              if (!(n in keyByName)) return null;
+              var key = keyByName[n];
+              if (key === null) {
+                var first = root.querySelector('.pr-card');
+                return first ? first.querySelector('.pr-card-body') : null;
+              }
+              return root.querySelector('.pr-card[data-pr-section="' + key + '"] .pr-card-body');
+            };
+            _dproj.sections.forEach(function(sec){
+              if (!sec || !Array.isArray(sec.items) || !sec.items.length) return;
+              var body = _sectionCardBody(sec.name);
+              if (!body) return; // no matching card (e.g. an unexpected/Financials name) -> skip
+              // labels already shown in this card (synced fields + any prior injected rows)
+              var shown = {};
+              body.querySelectorAll('.pr-field[data-pr-label]').forEach(function(f){
+                shown[_norm(f.getAttribute('data-pr-label'))] = true;
+              });
+              body.querySelectorAll('.pd-merge-item[data-pd-label]').forEach(function(f){
+                shown[_norm(f.getAttribute('data-pd-label'))] = true;
+              });
+              var extras = sec.items.filter(function(it){
+                var lbl = _norm(it && it.label);
+                if (!lbl || shown[lbl]) return false;
+                shown[lbl] = true; // guard against duplicate labels within the feed itself
+                return true;
+              });
+              if (!extras.length) return;
+              var rows = extras.map(function(it){
+                var v = (it.value === undefined || it.value === null || String(it.value).trim() === '') ? '' : String(it.value);
+                var cls = v ? 'pr-field-value' : 'pr-field-value empty';
+                var shownV = v ? E(v) : '-';
+                // READ-ONLY: .pr-field WITHOUT data-pr-label (editor scan skips it);
+                // data-pd-label marks it as a merged tracked item for dedupe re-runs.
+                return '<div class="pr-field pd-merge-item" data-pd-label="' + E(it.label) + '">'
+                     + '<span class="pr-field-label">' + E(it.label) + '</span>'
+                     + '<span class="' + cls + '">' + shownV + '</span>'
+                     + '<span class="pr-field-src">Project Dashboard</span></div>';
+              }).join('');
+              body.insertAdjacentHTML('beforeend',
+                subhead('Tracked Items') + '<div class="pr-fields">' + rows + '</div>');
+            });
+          }
+        }
+      } catch (e) { /* fail soft: cards still render without the merged tracked items */ }
+
       _curSection = ''; // done rendering this record
     }
 
@@ -20464,67 +20547,12 @@ try {
 }
 </script>
 
-<script>
-// ============================================================
-// PROJECT DASHBOARD tracked-items checklist appended to the project record view.
-// Wraps window.openProjectRecord: after the record renders, append a per-project
-// "Tracked items to complete" panel from window.PF_PROJECT_DASHBOARD (matched by
-// project number). The Financials section is omitted at ingest. Data via esc.
-// ============================================================
-try {
-(function () {
-  'use strict';
-  var E = window.esc || function (s) { return s == null ? '' : String(s); };
-
-  function trackedFor(num) {
-    var D = window.PF_PROJECT_DASHBOARD;
-    if (!D || !Array.isArray(D.projects)) return null;
-    var key = String(num || '').trim().toLowerCase();
-    return D.projects.find(function (p) { return String(p.projectNumber || '').trim().toLowerCase() === key; }) || null;
-  }
-
-  function renderChecklist(num, root) {
-    if (!root) return;
-    var p = trackedFor(num);
-    var old = root.querySelector('.pd-checklist');
-    if (old) old.parentNode.removeChild(old);
-    if (!p || !p.sections || !p.sections.length) return;
-    var wrap = document.createElement('div');
-    wrap.className = 'pd-checklist';
-    wrap.style.marginTop = '16px';
-    var html = '<h3 style="margin:0 0 8px">Tracked items to complete</h3>'
-      + '<div style="font-size:12px;color:var(--text-3,#8a93a6);margin-bottom:8px">From the Project Dashboard. Financials section omitted.</div>';
-    p.sections.forEach(function (sec) {
-      html += '<div style="border:1px solid var(--border,#2a2f3a);border-radius:8px;padding:10px 12px;margin-bottom:8px">'
-        + '<div style="font-weight:600;margin-bottom:4px">' + E(sec.name) + ' <span style="font-size:11px;color:var(--text-3,#8a93a6)">(' + sec.items.length + ')</span></div>'
-        + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:4px 16px">'
-        + sec.items.map(function (it) {
-            return '<div style="font-size:13px"><span style="color:var(--text-3,#8a93a6)">' + E(it.label) + ':</span> ' + E(it.value) + '</div>';
-          }).join('')
-        + '</div></div>';
-    });
-    wrap.innerHTML = html;
-    root.appendChild(wrap);
-  }
-
-  var prevOpen = window.openProjectRecord;
-  if (typeof prevOpen === 'function') {
-    window.openProjectRecord = function (num) {
-      prevOpen(num);
-      try { renderChecklist(num, document.getElementById('prGenericRoot')); } catch (e) {}
-    };
-  }
-  // POET (26-002) renders into its own #prRoot on load - append there too.
-  function poetChecklist() {
-    try { renderChecklist('26-002', document.getElementById('prRoot')); } catch (e) {}
-  }
-  document.addEventListener('DOMContentLoaded', poetChecklist);
-  if (document.readyState !== 'loading') poetChecklist();
-})();
-} catch (e) {
-  console.error('Project Dashboard checklist failed to load:', e);
-}
-</script>
+<!-- REMOVED 2026-07-28 (Brad): the standalone "Tracked items to complete" panel
+     was redundant with the drop-down section cards. Its PF_PROJECT_DASHBOARD data
+     is now merged INTO the matching section cards inside the office renderInto()
+     (see "MERGE tracked items from the Project Dashboard INTO their section cards"),
+     deduped so nothing is shown twice. No .pd-checklist / openProjectRecord wrapper
+     / #prRoot append remains. -->
 
 <script>
 // ============================================================
