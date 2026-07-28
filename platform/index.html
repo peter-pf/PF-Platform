@@ -2523,14 +2523,6 @@ window.progress = (function () {
         <span class="nav-icon">&#128295;</span> Maintenance
       </a>
 
-      <!-- Equipment (moved from Project Management). data-fo-hide: the equipment
-           view exposes daily rates + service costs ($), so it stays office/admin-only
-           and is HIDDEN from field_ops even though it lives under Field Operations. -->
-      <div class="nav-sub collapsed" data-fo-hide="1">
-        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Equipment</div>
-        <a class="nav-item" data-fo-hide="1" data-module="equipment" onclick="showModule('equipment')" style="color:#d64545">Equipment</a>
-      </div>
-
       <!-- Daily Reports -->
       <div class="nav-sub collapsed">
         <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Daily Reports</div>
@@ -2551,6 +2543,19 @@ window.progress = (function () {
         <a class="nav-item" data-module="guhma" onclick="showModule('guhma')" style="color:#d64545">QA/QC - GUHMA</a>
         <a class="nav-item" data-module="modulus" onclick="showModule('modulus')" style="color:#d64545">Modulus Testing</a>
       </div>
+    </div>
+
+    <!-- EQUIPMENT (own top-level section, directly beneath Field Operations).
+         OFFICE-ONLY: the equipment view exposes daily rates + service costs ($),
+         so the section carries data-fo-hide + is NOT data-fo-safe/-mixed. It is
+         therefore hidden from field_ops by the top-level nav-section rule; the
+         data-fo-hide on the section + item documents the intent and the item rule
+         (body.role-field-ops .nav-item[data-fo-hide]) is belt-and-suspenders. -->
+    <div class="nav-section collapsed" data-fo-hide="1">
+      <div class="nav-section-label" onclick="this.parentElement.classList.toggle('collapsed')">Equipment</div>
+      <a class="nav-item" data-fo-hide="1" data-module="equipment" onclick="showModule('equipment')" style="color:#d64545">
+        <span class="nav-icon">&#9881;</span> Equipment
+      </a>
     </div>
 
     <!-- 7) COMPANY FINANCIALS -->
@@ -12472,10 +12477,67 @@ try {
 (function(){
   try {
     var E = window.esc;
+    // Em-dash placeholder for any value we cannot source. We NEVER fabricate a
+    // number here: an honest "—" beats an invented figure (fail-closed).
+    var DASH = '—';
     function money(v){
       if (v == null || v === '') return '';
       var n = +v; if (!isFinite(n)) return '';
       return '$' + Math.round(n).toLocaleString();
+    }
+    // Integer with thousands separators, or DASH when the value is missing/bad.
+    function intOrDash(v){
+      if (v == null || v === '') return DASH;
+      var n = +v; if (!isFinite(n)) return DASH;
+      return Math.round(n).toLocaleString();
+    }
+    // Total LF for a project number:
+    //   1) window.PF_PROGRESS.projects[num].design_lf (primary)
+    //   2) window.PF_PROJECT_RECORDS.records[num].bid_log.total_lf (fallback)
+    //   else DASH. Never fabricated.
+    function totalLfFor(num){
+      if (!num) return DASH;
+      try {
+        var pp = window.PF_PROGRESS && window.PF_PROGRESS.projects;
+        if (pp && pp[num] && pp[num].design_lf != null && pp[num].design_lf !== '')
+          return intOrDash(pp[num].design_lf);
+        var pr = window.PF_PROJECT_RECORDS && window.PF_PROJECT_RECORDS.records;
+        var rec = pr && pr[num];
+        if (rec && rec.bid_log && rec.bid_log.total_lf != null && rec.bid_log.total_lf !== '')
+          return intOrDash(rec.bid_log.total_lf);
+      } catch(e) {}
+      return DASH;
+    }
+    // # of Piers for a project number: window.PF_PROGRESS design_columns only.
+    // No feed fallback exists, so anything else renders DASH (never fabricated).
+    function piersFor(num){
+      if (!num) return DASH;
+      try {
+        var pp = window.PF_PROGRESS && window.PF_PROGRESS.projects;
+        if (pp && pp[num] && pp[num].design_columns != null && pp[num].design_columns !== '')
+          return intOrDash(pp[num].design_columns);
+      } catch(e) {}
+      return DASH;
+    }
+    // Start date for a project number from the schedule seed (admin/partner feed).
+    // Uses the first mobilization's start. Field-safe schedule (PF_SCHEDULE_FIELD)
+    // is not consulted because this office-only sheet already loads SCHEDULE_SEED;
+    // when SCHEDULE_SEED is absent (e.g. field_ops role) every start renders DASH.
+    function startDateFor(num){
+      if (!num) return DASH;
+      try {
+        var S = window.SCHEDULE_SEED && window.SCHEDULE_SEED.jobs;
+        if (S && S.length) {
+          for (var i = 0; i < S.length; i++) {
+            if (String(S[i].number || S[i].id || '') === String(num)) {
+              var mobs = S[i].mobilizations;
+              if (mobs && mobs.length && mobs[0].start) return E(String(mobs[0].start));
+              return DASH;
+            }
+          }
+        }
+      } catch(e) {}
+      return DASH;
     }
     function render(){
       var root = document.getElementById('awardedRoot');
@@ -12505,8 +12567,9 @@ try {
         + '</div>';
 
       html += '<div class="pf-table-wrap"><table class="pf-table"><thead><tr>'
-        + '<th>#</th><th>Project</th><th>City / State</th><th>General Contractor</th>'
-        + '<th>Value</th><th>Discipline</th>'
+        + '<th>#</th><th>Project</th><th>PF Scope</th><th>Project Location</th>'
+        + '<th>General Contractor</th><th>Value</th>'
+        + '<th>Total LF</th><th># of Piers</th><th>Start Date</th>'
         + '</tr></thead><tbody>';
 
       list.forEach(function(p){
@@ -12526,13 +12589,21 @@ try {
         var nameCell = openJs
           ? '<td><a class="pf-record-link" onclick="' + openJs + '">' + E(p.name) + '</a></td>'
           : '<td>' + E(p.name) + '</td>';
+        // A) Total LF, # of Piers, Start Date sourced BY PROJECT NUMBER.
+        //    Missing data renders "—" (never fabricated).
+        var totalLf = totalLfFor(num);
+        var piers   = piersFor(num);
+        var startDt = startDateFor(num);
         html += '<tr>'
           + numberCell
           + nameCell
-          + '<td>' + E(p.city_state) + '</td>'
+          + '<td>' + pill + '</td>'          // B) PF Scope (was Discipline), now after Project
+          + '<td>' + E(p.city_state) + '</td>' // C) Project Location (was City / State)
           + '<td>' + E(p.gc) + '</td>'
           + '<td class="num">' + E(money(p.value)) + '</td>'
-          + '<td>' + pill + '</td>'
+          + '<td class="num">' + totalLf + '</td>'
+          + '<td class="num">' + piers + '</td>'
+          + '<td>' + startDt + '</td>'
           + '</tr>';
       });
 
@@ -12566,12 +12637,13 @@ try {
       var n = +v; if (!isFinite(n)) return '';
       return '$' + Math.round(n).toLocaleString();
     }
-    // A bid is "dead" when it was lost or the project was canceled.
-    // bid_status values in the log: "Not Awarded - Low", "Not Awarded - Not Low",
-    // "Not Awarded - Canceled". All start with "Not Awarded".
+    // A bid is "dead" ONLY when the project was CANCELED (not merely lost on price).
+    // bid_status values in the log include "Not Awarded - Low", "Not Awarded - Not
+    // Low", "Not Awarded - Canceled". We show only the canceled variant (~6 rows),
+    // NOT the lost-on-price bids. Match "cancel(l)ed" (or explicit dead/killed).
     function isDead(status){
       var s = String(status || '').toLowerCase();
-      return s.indexOf('not awarded') === 0 || /cancel|dead|killed|lost/.test(s);
+      return /cancel|dead|killed/.test(s);
     }
     // A record is openable only if we have a built project record for this number.
     function hasRecord(num){
