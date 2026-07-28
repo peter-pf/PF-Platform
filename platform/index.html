@@ -12116,32 +12116,33 @@ try {
 
       html += '<div class="pf-table-wrap"><table class="pf-table"><thead><tr>'
         + '<th>#</th><th>Project</th><th>City / State</th><th>General Contractor</th>'
-        + '<th>Value</th><th>Discipline</th><th>Record</th>'
+        + '<th>Value</th><th>Discipline</th>'
         + '</tr></thead><tbody>';
 
       list.forEach(function(p){
         var isHp = /helical/i.test(p.discipline || '');
         var pill = '<span class="pf-pill' + (isHp ? ' hp' : '') + '">' + E(p.discipline || '') + '</span>';
-        // Every awarded project now opens its own record. POET (p.record === 'project-poet')
-        // keeps its dedicated deep module; everything else opens the generic record view
-        // keyed by project number. num is escaped + only digits/hyphen by construction.
-        var rec;
+        // Every awarded project opens its own record by clicking the # or Project name.
+        // POET (p.record === 'project-poet') keeps its dedicated deep module; everything
+        // else opens the generic record view keyed by project number. num is escaped +
+        // only digits/hyphen by construction. Rows with no project number stay plain.
         var num = String(p.number || '');
-        if (p.record === 'project-poet') {
-          rec = '<a class="pf-record-link" onclick="showModule(\'project-poet\')">Open record</a>';
-        } else if (num) {
-          rec = '<a class="pf-record-link" onclick="openProjectRecord(\'' + E(num) + '\')">Open record</a>';
-        } else {
-          rec = '<span class="pf-record-muted">no project number</span>';
-        }
+        var openJs = (p.record === 'project-poet')
+          ? 'showModule(\'project-poet\')'
+          : (num ? 'openProjectRecord(\'' + E(num) + '\')' : '');
+        var numberCell = openJs
+          ? '<td class="num"><a class="pf-record-link" onclick="' + openJs + '">' + E(p.number) + '</a></td>'
+          : '<td class="num">' + E(p.number) + '</td>';
+        var nameCell = openJs
+          ? '<td><a class="pf-record-link" onclick="' + openJs + '">' + E(p.name) + '</a></td>'
+          : '<td>' + E(p.name) + '</td>';
         html += '<tr>'
-          + '<td class="num">' + E(p.number) + '</td>'
-          + '<td>' + E(p.name) + '</td>'
+          + numberCell
+          + nameCell
           + '<td>' + E(p.city_state) + '</td>'
           + '<td>' + E(p.gc) + '</td>'
           + '<td class="num">' + E(money(p.value)) + '</td>'
           + '<td>' + pill + '</td>'
-          + '<td>' + rec + '</td>'
           + '</tr>';
       });
 
