@@ -338,53 +338,56 @@
       .catch(function() { return null; });
   }
 
-  /* -- Init: self-start on DOMContentLoaded -- */
+  /* -- Init: self-start on DOMContentLoaded --
+     FAIL-CLOSED CONTRACT: the directory renders REAL employees ONLY when an
+     authenticated, authorized session returns a real roster from /api/hr. Under
+     EVERY other path (no session, fetch failure, non-ok, empty) it renders an
+     explicit empty state. There is NO fabricated fallback roster — STATE.employees
+     starts empty and stays empty unless /api/hr hands us real records. */
   document.addEventListener('DOMContentLoaded', function() {
     fetchMe().then(function(me) {
       if (me && me.status === 'ok' && me.role) {
-        /* Production: authenticated via same-origin session. Load the REAL roster. */
+        /* Authenticated via same-origin session. Attempt to load the REAL roster. */
         fetchRoster().then(function(data) {
-          if (data && data.ok && Array.isArray(data.employees)) {
-            STATE.employees = data.employees;   /* REAL data replaces demo array */
+          if (data && data.ok && Array.isArray(data.employees) && data.employees.length) {
+            STATE.employees = data.employees;   /* REAL data — the only path that populates the table */
             STATE.rosterMeta = data.meta || null;
             STATE.liveData = true;
+            STATE.loadError = false;
+          } else {
+            /* Authed but /api/hr failed / non-ok / empty -> FAIL CLOSED to an error
+               state with an EMPTY table. Never fabricated data, never a stale roster. */
+            STATE.employees = [];
+            STATE.liveData = false;
+            STATE.loadError = true;
           }
           initModule({ name: me.name || 'Authenticated User', email: '' }, me.role);
         });
       } else {
-        /* Standalone / no session: keep the built-in demo data. */
+        /* No session / standalone local preview -> clear "no active session" empty
+           state. NOT a fabricated admin, NOT demo employees. Empty is fine; fiction is not. */
+        STATE.employees = [];
         STATE.liveData = false;
-        initModule({ name: 'Brad Thompson', email: 'brad@pierfoundations.ca' }, 'admin');
+        STATE.loadError = false;
+        STATE.noSession = true;
+        initModule({ name: 'No active session', email: '' }, 'guest');
       }
     });
   });
 
   var STATE = {
     currentTab: 'records',
-    employees: [
-      { id: 'PF-0001', name: 'Brad Thompson', title: 'President', department: 'Executive', location: 'Fort Wayne, IN', startDate: '2018-01-15', status: 'active', email: 'brad@pierfoundations.com', phone: '(260) 555-0101', emergencyContact: 'Sarah Thompson / (260) 555-0102' },
-      { id: 'PF-0002', name: 'Peter Novak', title: 'VP Operations', department: 'Operations', location: 'Fort Wayne, IN', startDate: '2019-06-01', status: 'active', email: 'peter@pierfoundations.com', phone: '(260) 555-0103', emergencyContact: 'Maria Novak / (260) 555-0104' },
-      { id: 'PF-0003', name: 'Jamie Reeves', title: 'Project Manager', department: 'Operations', location: 'Fort Wayne, IN', startDate: '2021-03-15', status: 'active', email: 'jamie@pierfoundations.com', phone: '(260) 555-0201', emergencyContact: 'Dana Reeves / (260) 555-0202' },
-      { id: 'PF-0004', name: 'Tina Marchetti', title: 'Office Manager', department: 'Admin', location: 'Fort Wayne, IN', startDate: '2020-09-01', status: 'active', email: 'tina@pierfoundations.com', phone: '(260) 555-0105', emergencyContact: 'Marco Marchetti / (260) 555-0106' },
-      { id: 'PF-0005', name: 'Dylan Osei', title: 'Crew Lead', department: 'Field Ops', location: 'Fort Wayne, IN', startDate: '2022-01-10', status: 'active', email: 'dylan@pierfoundations.com', phone: '(260) 555-0301', emergencyContact: 'Ama Osei / (260) 555-0302' },
-      { id: 'PF-0006', name: 'Priya Shah', title: 'Bookkeeper', department: 'Finance', location: 'Fort Wayne, IN', startDate: '2023-04-01', status: 'active', email: 'priya@pierfoundations.com', phone: '(260) 555-0107', emergencyContact: 'Raj Shah / (260) 555-0108' },
-      { id: 'PF-0007', name: 'Marcus Chen', title: 'Pier Installer', department: 'Field Ops', location: 'Fort Wayne, IN', startDate: '2024-02-12', status: 'active', email: 'marcus@pierfoundations.com', phone: '(260) 555-0401', emergencyContact: 'Lin Chen / (260) 555-0402' },
-      { id: 'PF-0008', name: 'Sarah Okafor', title: 'Estimator', department: 'Operations', location: 'Fort Wayne, IN', startDate: '2024-08-19', status: 'onboarding', email: 'sarah@pierfoundations.com', phone: '(260) 555-0109', emergencyContact: 'Emeka Okafor / (260) 555-0110' }
-    ],
-    onboardingTasks: [
-      { id: 1, employee: 'Sarah Okafor', task: 'Welcome email sent', status: 'done', dueDay: 'Pre-start' },
-      { id: 2, employee: 'Sarah Okafor', task: 'IT equipment ordered', status: 'done', dueDay: 'Pre-start' },
-      { id: 3, employee: 'Sarah Okafor', task: 'Office tour and introductions', status: 'done', dueDay: 'Day 1' },
-      { id: 4, employee: 'Sarah Okafor', task: 'OSHA safety orientation and site hazard briefing', status: 'in-progress', dueDay: 'Day 1' },
-      { id: 5, employee: 'Sarah Okafor', task: 'HR paperwork (W-4, I-9, direct deposit, benefits enrollment)', status: 'in-progress', dueDay: 'Day 1-2' },
-      { id: 6, employee: 'Sarah Okafor', task: 'Role-specific training plan review', status: 'pending', dueDay: 'Week 1' },
-      { id: 7, employee: 'Sarah Okafor', task: 'Meet with direct manager (goals and expectations)', status: 'pending', dueDay: 'Week 1' },
-      { id: 8, employee: 'Sarah Okafor', task: 'System access setup (estimating software, email, SharePoint)', status: 'pending', dueDay: 'Week 1' },
-      { id: 9, employee: 'Sarah Okafor', task: 'First project shadow assignment', status: 'pending', dueDay: 'Week 2' },
-      { id: 10, employee: 'Sarah Okafor', task: '30-day check-in scheduled', status: 'pending', dueDay: 'Day 5' },
-      { id: 11, employee: 'Sarah Okafor', task: '60-day check-in scheduled', status: 'pending', dueDay: 'Day 5' },
-      { id: 12, employee: 'Sarah Okafor', task: '90-day probation review', status: 'pending', dueDay: 'Day 5' }
-    ],
+    /* FAIL-CLOSED: no fabricated employees. Real roster only ever comes from /api/hr
+       via the DOMContentLoaded init above. Empty until then. */
+    employees: [],
+    liveData: false,
+    loadError: false,
+    noSession: false,
+    rosterMeta: null,
+    /* Onboarding checklist tasks are generic role-agnostic steps — no fabricated
+       employee names. The "employee" field is intentionally blank so nothing
+       fictional can render. */
+    onboardingTasks: [],
     policies: [
       { id: 1, name: 'OSHA Injury & Illness Prevention Program', jurisdiction: 'Federal', status: 'acknowledged', version: '1.0', category: 'Safety' },
       { id: 2, name: 'Anti-Harassment & Anti-Discrimination Policy', jurisdiction: 'Federal/IN', status: 'acknowledged', version: '1.0', category: 'Compliance' },
@@ -405,31 +408,14 @@
       { type: 'Bereavement', total: 3, used: 0, pending: 0 },
       { type: 'FMLA (eligible)', total: 60, used: 0, pending: 0 }
     ],
-    ptoRequests: [
-      { id: 1, employee: 'Jamie Reeves', type: 'PTO', start: '2026-07-21', end: '2026-07-25', days: 5, status: 'pending', reason: 'Family vacation' },
-      { id: 2, employee: 'Dylan Osei', type: 'Sick Day', start: '2026-07-07', end: '2026-07-07', days: 1, status: 'approved', reason: '' },
-      { id: 3, employee: 'Tina Marchetti', type: 'PTO', start: '2026-08-11', end: '2026-08-15', days: 5, status: 'approved', reason: 'Summer vacation' },
-      { id: 4, employee: 'Marcus Chen', type: 'PTO', start: '2026-07-14', end: '2026-07-14', days: 1, status: 'pending', reason: 'Moving day' },
-      { id: 5, employee: 'Priya Shah', type: 'PTO', start: '2026-07-28', end: '2026-07-30', days: 3, status: 'pending', reason: 'Trip to Chicago' }
-    ],
-    /* Phase 2 data */
-    reviews: [
-      { empId: 'PF-0001', name: 'Brad Thompson', title: 'President', selfDone: true, mgrDone: true, rating: 4.5, goalsMetStr: '5/5', status: 'completed' },
-      { empId: 'PF-0002', name: 'Peter Novak', title: 'VP Operations', selfDone: true, mgrDone: true, rating: 4.2, goalsMetStr: '4/5', status: 'completed' },
-      { empId: 'PF-0003', name: 'Jamie Reeves', title: 'Project Manager', selfDone: true, mgrDone: false, rating: null, goalsMetStr: '3/4', status: 'in-progress' },
-      { empId: 'PF-0004', name: 'Tina Marchetti', title: 'Office Manager', selfDone: true, mgrDone: false, rating: null, goalsMetStr: '4/4', status: 'in-progress' },
-      { empId: 'PF-0005', name: 'Dylan Osei', title: 'Crew Lead', selfDone: false, mgrDone: false, rating: null, goalsMetStr: '2/4', status: 'pending' },
-      { empId: 'PF-0006', name: 'Priya Shah', title: 'Bookkeeper', selfDone: false, mgrDone: false, rating: null, goalsMetStr: '3/3', status: 'pending' },
-      { empId: 'PF-0007', name: 'Marcus Chen', title: 'Pier Installer', selfDone: false, mgrDone: false, rating: null, goalsMetStr: '2/3', status: 'pending' }
-    ],
+    /* No fabricated PTO requests — real requests would be tied to real employees. */
+    ptoRequests: [],
+    /* No fabricated performance reviews — real reviews would be tied to real employees. */
+    reviews: [],
+    /* No fabricated org-chart department heads. Department cards derive their
+       roster live from STATE.employees; heads are shown only when real. */
     orgChart: {
-      departments: [
-        { name: 'Executive', head: 'Brad Thompson', count: 1, roles: ['President'] },
-        { name: 'Operations', head: 'Peter Novak', count: 3, roles: ['VP Operations', 'Project Manager', 'Estimator'] },
-        { name: 'Field Ops', head: 'Dylan Osei', count: 2, roles: ['Crew Lead', 'Pier Installer'] },
-        { name: 'Admin', head: 'Tina Marchetti', count: 1, roles: ['Office Manager'] },
-        { name: 'Finance', head: 'Priya Shah', count: 1, roles: ['Bookkeeper'] }
-      ]
+      departments: []
     },
     compliance: [
       { item: 'OSHA 10-Hour Construction Safety', category: 'Safety', dueDate: '2026-08-01', completed: 6, total: 8, status: 'in-progress' },
@@ -451,7 +437,7 @@
         sections: [
           { title: 'Purpose', content: 'This procedure establishes requirements for the lockout/tagout of energy sources to prevent unexpected energization, startup, or release of stored energy during servicing and maintenance of machines and equipment at Pier Foundations job sites.' },
           { title: 'Scope', content: 'Applies to all Pier Foundations employees who operate, maintain, or service machines and equipment where unexpected energization or release of stored energy could cause injury. Covers electrical, mechanical, hydraulic, pneumatic, and gravitational energy sources encountered in aggregate pier installation.' },
-          { title: 'Responsibilities', content: 'Authorized employees: Apply and remove locks/tags. Crew Leads: Ensure compliance on site, conduct pre-shift LOTO briefings. Brad Thompson (President): Maintain program, authorize changes. All field employees must carry personal padlocks.' },
+          { title: 'Responsibilities', content: 'Authorized employees: Apply and remove locks/tags. Crew Leads: Ensure compliance on site, conduct pre-shift LOTO briefings. Company management: Maintain program, authorize changes. All field employees must carry personal padlocks.' },
           { title: 'Procedure Steps', content: '1. Notify all crew members on site.\n2. Identify all energy sources using the Equipment Energy Source Card.\n3. Shut down equipment using normal stopping procedure.\n4. Isolate all energy sources (disconnect switches, close hydraulic valves, block suspended loads).\n5. Apply personal padlock and tag to each energy isolation point.\n6. Release or restrain all stored/residual energy (bleed hydraulic lines, lower suspended equipment, discharge capacitors).\n7. Verify isolation: attempt to restart equipment using normal controls. Confirm zero energy state.' },
           { title: 'Restoring Equipment', content: '1. Inspect work area: all tools removed, guards replaced, crew clear of equipment.\n2. Notify all crew members.\n3. Remove lockout/tagout devices (only by the employee who applied them).\n4. Re-energize equipment following normal startup procedure.\n5. Confirm safe operation before resuming aggregate pier installation.' },
           { title: 'Violations', content: 'First offense: Verbal warning and mandatory retraining.\nSecond offense: Written warning, 1-day suspension without pay.\nThird offense: Termination. LOTO violations are the #1 cause of preventable fatalities in construction. This is non-negotiable.' }
@@ -480,16 +466,8 @@
         ]
       }
     ],
-    trainingCompletions: [
-      { employee: 'Brad Thompson', sop: 'Lockout/Tagout (LOTO)', date: '2026-06-15', score: 100, passed: true },
-      { employee: 'Peter Novak', sop: 'Lockout/Tagout (LOTO)', date: '2026-06-15', score: 83, passed: true },
-      { employee: 'Dylan Osei', sop: 'Lockout/Tagout (LOTO)', date: '2026-06-16', score: 100, passed: true },
-      { employee: 'Marcus Chen', sop: 'Lockout/Tagout (LOTO)', date: '2026-06-16', score: 67, passed: false },
-      { employee: 'Marcus Chen', sop: 'Lockout/Tagout (LOTO)', date: '2026-06-18', score: 83, passed: true },
-      { employee: 'Dylan Osei', sop: 'Fall Protection Plan', date: '2026-06-20', score: 100, passed: true },
-      { employee: 'Marcus Chen', sop: 'Fall Protection Plan', date: '2026-06-20', score: 83, passed: true },
-      { employee: 'Jamie Reeves', sop: 'Excavation & Trenching Safety', date: '2026-07-01', score: 100, passed: true }
-    ],
+    /* No fabricated training completions — real completions would be tied to real employees. */
+    trainingCompletions: [],
     studioState: { selectedSop: null, activeOutput: null, quizAnswers: {}, slideIndex: 0, flashcardIndex: 0, flashcardFlipped: false }
   };
 
@@ -571,9 +549,13 @@
         dataBanner = '<div class="pf-card" style="border-left:3px solid var(--pf-green);margin-bottom:1rem;padding:.7rem 1rem;font-size:.85rem;color:var(--pf-muted);">' +
           'Employee Records show <strong>live directory data</strong> from the platform. This is a directory and org view only — compensation, tax, and benefits data are not shown here. Fields marked <strong>TBD</strong> await confirmation from Brad or Derek.' +
           '</div>';
+      } else if (STATE.loadError) {
+        dataBanner = '<div class="pf-card" style="border-left:3px solid var(--pf-red);margin-bottom:1rem;padding:.7rem 1rem;font-size:.85rem;color:var(--pf-muted);">' +
+          '<strong>Unable to load the directory right now.</strong> Please retry. No employee data is shown until the live directory loads successfully.' +
+          '</div>';
       } else {
         dataBanner = '<div class="pf-card" style="border-left:3px solid var(--pf-orange);margin-bottom:1rem;padding:.7rem 1rem;font-size:.85rem;color:var(--pf-muted);">' +
-          'Standalone preview — showing <strong>demo data</strong> (no active session).' +
+          'No active session. Sign in to view the employee directory.' +
           '</div>';
       }
     }
@@ -597,16 +579,28 @@
       return '<span class="pf-chip muted">' + esc(String(s || '').toUpperCase()) + '</span>';
     };
 
-    var rows = STATE.employees.map(function(e) {
-      return '<tr onclick="showEmployee(\'' + e.id + '\')" style="cursor:pointer;">' +
-        '<td><strong>' + esc(e.name) + '</strong></td>' +
-        '<td>' + esc(e.title) + '</td>' +
-        '<td>' + esc(e.department) + '</td>' +
-        '<td>' + esc(e.location) + '</td>' +
-        '<td>' + esc(e.startDate) + '</td>' +
-        '<td>' + statusChip(e.status) + '</td>' +
-      '</tr>';
-    }).join('');
+    /* FAIL-CLOSED empty state: when there are no real employees loaded, render an
+       explicit message and an EMPTY table body. Never fabricated rows. */
+    var rows;
+    if (!STATE.employees.length) {
+      var emptyMsg = STATE.loadError
+        ? 'Unable to load the directory right now. <button class="pf-btn outline sm" onclick="location.reload()" style="margin-left:.5rem;">Retry</button>'
+        : (STATE.noSession
+            ? 'No active session. Sign in to view the employee directory.'
+            : 'No employees to display.');
+      rows = '<tr><td colspan="6" style="text-align:center;padding:1.6rem;color:var(--pf-muted-light);">' + emptyMsg + '</td></tr>';
+    } else {
+      rows = STATE.employees.map(function(e) {
+        return '<tr onclick="showEmployee(\'' + e.id + '\')" style="cursor:pointer;">' +
+          '<td><strong>' + esc(e.name) + '</strong></td>' +
+          '<td>' + esc(e.title) + '</td>' +
+          '<td>' + esc(e.department) + '</td>' +
+          '<td>' + esc(e.location) + '</td>' +
+          '<td>' + esc(e.startDate) + '</td>' +
+          '<td>' + statusChip(e.status) + '</td>' +
+        '</tr>';
+      }).join('');
+    }
 
     return '' +
       '<div class="pf-card">' +
@@ -663,8 +657,11 @@
      ================================================================ */
 
   function renderOnboarding() {
-    var done = STATE.onboardingTasks.filter(function(t){return t.status==='done'}).length;
     var total = STATE.onboardingTasks.length;
+    if (!total) {
+      return '<div class="pf-card"><div style="text-align:center;padding:2rem;color:var(--pf-muted-light);">No active onboarding.</div></div>';
+    }
+    var done = STATE.onboardingTasks.filter(function(t){return t.status==='done'}).length;
     var pct = Math.round((done/total)*100);
 
     var pillHtml = function(s) {
@@ -682,7 +679,7 @@
 
     return '' +
       '<div class="pf-card accent-orange">' +
-        '<div class="card-title">Onboarding: Sarah Okafor (Estimator)</div>' +
+        '<div class="card-title">Active Onboarding</div>' +
         '<div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem;">' +
           '<div style="flex:1;"><div class="pf-progress"><div class="pf-progress-bar" style="width:' + pct + '%;background:var(--pf-orange);"></div></div></div>' +
           '<div style="font-weight:700;color:var(--pf-orange);">' + pct + '% (' + done + '/' + total + ')</div>' +
@@ -831,7 +828,7 @@
     var inProg = STATE.reviews.filter(function(r){return r.status==='in-progress'}).length;
     var pending = STATE.reviews.filter(function(r){return r.status==='pending'}).length;
     var total = STATE.reviews.length;
-    var pct = Math.round((done/total)*100);
+    var pct = total > 0 ? Math.round((done/total)*100) : 0;
 
     var check = function(v) { return v ? '<span style="color:var(--pf-green);">&#x2714;</span>' : '<span style="color:var(--pf-muted-light);">&#x2014;</span>'; };
     var statusChip = function(s) {
@@ -1240,7 +1237,7 @@
       var mins = Math.ceil(sec.content.length / 150);
       var intro = i === 0 ? 'Welcome to this safety training module on ' + sop.name + '. This module covers critical procedures that every Pier Foundations employee must understand before working on a job site.\n\n' : '';
       var transition = i > 0 ? '[Transition]\n\nNext, let us cover ' + sec.title.toLowerCase() + '.\n\n' : '';
-      var closing = i === sop.sections.length - 1 ? '\n\n[Closing]\n\nThat concludes this training on ' + sop.name + '. If you have questions, speak with your Crew Lead or Brad Thompson directly. Your completion has been recorded in the compliance system. Stay safe on site.' : '';
+      var closing = i === sop.sections.length - 1 ? '\n\n[Closing]\n\nThat concludes this training on ' + sop.name + '. If you have questions, speak with your Crew Lead or company management directly. Your completion has been recorded in the compliance system. Stay safe on site.' : '';
 
       return '<div class="pf-card">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">' +
