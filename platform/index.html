@@ -12079,6 +12079,20 @@ try {
       if (genCard && g.owner && g.owner.length) {
         genCard.insertAdjacentHTML('beforeend', subhead('Owner') + contactList(g.owner) + subhead('General Contractor Contacts') + contactList(g.gc));
       }
+
+      // Inject "Engineering & Design Comments" subsection into the Engineering & Design
+      // card body (section-key "engineering"), after its fields — same append idiom as
+      // the Owner block above, so the per-section Edit button / override structure is
+      // untouched. Renders for EVERY project through this shared renderer (existing +
+      // synthesized new estimating/award projects). For now it is a labeled container
+      // with an HONEST EMPTY STATE only — no comment content is fabricated.
+      // <!-- FUTURE: populate from Garbin submittal-review Excel, matched by project number -->
+      var engCard = root.querySelector('.pr-card[data-pr-section="engineering"] .pr-card-body');
+      if (engCard) {
+        engCard.insertAdjacentHTML('beforeend',
+          subhead('Engineering & Design Comments')
+          + '<div class="pr-note">No submittal review comments yet — pending Dr. Garbin\'s submittal review.</div>');
+      }
       _curSection = ''; // done rendering this record
     }
 
