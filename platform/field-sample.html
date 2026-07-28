@@ -531,6 +531,55 @@ function answerFor(rawQ){
   return "I will pull that from the project records once we connect the live data.";
 }
 
+// LIVE KV-QUEUE PATH (Stage 2). runAsk() now asks the field assistant through
+// the /api/field-companion endpoint: POST {query} -> 202 {id}, then poll
+// GET ?id= until status:"done". A private in-container poller runs the question
+// through the local Hermes and writes the answer back to KV; Hermes is NEVER
+// exposed. The old local answerFor() stub is kept above only as a reference /
+// offline fallback and is no longer called on submit.
+var FC_POLL_MS = 2000;      // poll cadence
+var FC_MAX_MS  = 60000;     // give up after 60s (poller timeboxes Hermes at 90s,
+                            // but the crew should not wait longer than this)
+
+async function askCompanion(query){
+  // 1) enqueue
+  var postRes = await fetch("/api/field-companion", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify({ query: query })
+  });
+  var posted = await postRes.json().catch(function(){ return {}; });
+  if (!postRes.ok || !posted.id){
+    // honest fail-closed message (never fabricate)
+    return posted.error || "The field assistant is not available right now. No answer was generated.";
+  }
+  var id = posted.id;
+  // 2) poll until done or timeout
+  var started = Date.now();
+  while (Date.now() - started < FC_MAX_MS){
+    await new Promise(function(r){ setTimeout(r, FC_POLL_MS); });
+    var getRes = await fetch("/api/field-companion?id=" + encodeURIComponent(id), {
+      credentials: "same-origin"
+    });
+    var data = await getRes.json().catch(function(){ return {}; });
+    if (getRes.status === 403){
+      return "That request cannot be answered from the field tool.";
+    }
+    if (getRes.status === 404){
+      return data.error || "That question expired. Please ask again.";
+    }
+    if (data && data.status === "done"){
+      // answer present -> show it; empty answer -> show the honest error/refusal
+      return (data.answer && data.answer.trim())
+        ? data.answer
+        : (data.error || "I don't have that.");
+    }
+    // else still pending/processing -> keep polling
+  }
+  return "The field assistant is taking longer than expected. Please try again.";
+}
+
 function runAsk(rawQ){
   var q = (rawQ || "").trim();
   if (!q) return;
@@ -538,8 +587,14 @@ function runAsk(rawQ){
   var qEl  = document.getElementById("ansQ");
   var bEl  = document.getElementById("ansBody");
   qEl.textContent = "You asked: " + q;
-  bEl.textContent = answerFor(q);
+  bEl.textContent = "Checking the project records…";
   box.classList.add("show");
+  askCompanion(q).then(function(answer){
+    bEl.textContent = answer;
+  }).catch(function(){
+    // network / unexpected error -> honest, never fabricated
+    bEl.textContent = "The field assistant is temporarily unavailable. No answer was generated.";
+  });
 }
 
 document.getElementById("askForm").addEventListener("submit", function(e){
