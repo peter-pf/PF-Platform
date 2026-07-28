@@ -12940,6 +12940,26 @@ try {
       } catch(e) {}
       return DASH;
     }
+    // Raw anticipated-start seed date (YYYY-MM-DD) for SORTING only.
+    // Mirrors startDateFor's lookup but returns the underlying comparable
+    // string (NOT the MM/DD/YYYY display) so ascending sort is chronological.
+    // Returns '' when there's no dated mobilization -> undated rows sort last.
+    function startSeedFor(num){
+      if (!num) return '';
+      try {
+        var S = window.SCHEDULE_SEED && window.SCHEDULE_SEED.jobs;
+        if (S && S.length) {
+          for (var i = 0; i < S.length; i++) {
+            if (String(S[i].number || S[i].id || '') === String(num)) {
+              var mobs = S[i].mobilizations;
+              if (mobs && mobs.length && mobs[0].start) return String(mobs[0].start);
+              return '';
+            }
+          }
+        }
+      } catch(e) {}
+      return '';
+    }
     function render(){
       var root = document.getElementById('awardedRoot');
       if (!root) return;
@@ -12952,8 +12972,22 @@ try {
         return;
       }
       var list = D.projects.slice();
-      // Sort by project number ascending (stable, string compare works for NN-NNN form).
-      list.sort(function(a,b){ return String(a.number).localeCompare(String(b.number)); });
+      // Sort by ANTICIPATED START DATE ascending (soonest at top). Compare on the
+      // raw SCHEDULE_SEED YYYY-MM-DD value (startSeedFor), which string-sorts
+      // chronologically. Undated projects ('') sink to the BOTTOM, after all
+      // dated rows; ties broken by project number for stable ordering.
+      list.sort(function(a,b){
+        var da = startSeedFor(String(a.number || ''));
+        var db = startSeedFor(String(b.number || ''));
+        if (da && db) {
+          if (da < db) return -1;
+          if (da > db) return 1;
+          return String(a.number).localeCompare(String(b.number));
+        }
+        if (da) return -1;   // a dated, b undated -> a first
+        if (db) return 1;    // b dated, a undated -> b first
+        return String(a.number).localeCompare(String(b.number)); // both undated
+      });
 
       var srcLink = D.source_url
         ? '<a href="' + E(D.source_url) + '" target="_blank" rel="noopener noreferrer">Project Bid Log</a>'
