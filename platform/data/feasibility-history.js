@@ -96,19 +96,23 @@ window.PF_FEASIBILITY_HISTORY = {
       "location": "Evansville, IN (1701 N Heidelbach Ave)",
       "discipline": "Aggregate Piers / VSC",
       "date": "2026-07-28",
-      "verdict": "NO-GO",
-      "verdictNote": "Conventional shallow footings; no ground improvement in geotech",
-      "summary": "Patriot Engineering geotech (25-1891-03G, 12/19/2025, Jacob Vieck PE) specifies conventional shallow footings at 1,500 psf square / 1,150 psf strip with undercut-and-replace structural fill. Zero aggregate pier / stone column / vibro / ground improvement references across all 35 pages (full text plus both scanned detail pages). Shallow soft fill, light loads - engineer's economical fix is earthwork.",
+      "verdict": "CONDITIONAL GO",
+      "verdictNote": "Structural EOR specifies Rammed Aggregate Piers (flip from geotech NO-GO); DD/assumed basis",
+      "summary": "FLIP on structural re-run (Jonathan requested). Geotech (Patriot, 12/19/2025) called shallow footings 1,500/1,150 psf, no GI = NO-GO. But the STRUCTURAL EOR (Structural Engineering Services LLC, Huntertown) overrode it: sheet S-001 general notes specify Rammed Aggregate Piers - improve soil to 3,000 psf (flagged 'assumed'), 90 kips max/pier, 1.0 in total / 0.5 in differential settlement, >=4 ft o.c., continuous independent testing; S-101a foundation plan shows the pier grid. That is PF's product. NOTE: all structural sheets fully rasterized (0 text) - only surfaced via render+vision-read.",
       "drivers": [
-        "Shallow footings 1,500/1,150 psf + undercut-and-replace",
-        "No GI reference anywhere in 35-page geotech",
-        "Shallow fill, light 4-story wood-frame loads"
+        "S-001 structural notes MANDATE Rammed Aggregate Piers (3,000 psf, 90 kip/pier)",
+        "Structural EOR engineered up from geotech's 1,500 psf via ground improvement",
+        "S-101a foundation plan shows RAP pier grid",
+        "PF product regardless of RAP label"
       ],
       "missing": [
-        "Geotech-only review; if structural/civil set elected piers/GI, re-run (flagged to Jonathan)"
+        "Set is DESIGN DEVELOPMENT / NOT FOR CONSTRUCTION; 3,000 psf marked 'assumed' - scope could evaporate on CD set",
+        "Real per-footing loads not confirmed (90 kips is design cap, not validated demand)",
+        "No standalone Section 31 63 00 spec - drawing general notes govern",
+        "Scope needs Garbin prelim; awaiting Jonathan go + bid date"
       ],
       "recordPath": "feasibility/crawford/FEASIBILITY-RECORD-crawford.md",
-      "verified": "pf-intel-verifier PASS - citations reproduced from extracted text + scanned PNGs"
+      "verified": "pf-intel-verifier PASS x2 (geotech NO-GO + structural flip) - S-001 RAP note vision-read from rasterized render"
     },
     {
       "id": "feas_intl_school_ph2",
