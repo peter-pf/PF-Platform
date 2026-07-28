@@ -734,6 +734,14 @@ body.role-field-ops .nav-sub[data-fo-hide] {
    .startcol class in #awardedRoot only — no other column or table affected. */
 #awardedRoot .pf-table th.startcol,
 #awardedRoot .pf-table td.startcol { white-space: nowrap; }
+/* Completed Projects sheet ONLY (#completedRoot). Mirror the Active Projects
+   look: center every header + cell horizontally and middle them vertically.
+   Scoped by ID so it never bleeds to other .pf-table tables. The .yearcol
+   Completed column stays on one line (header + value). */
+#completedRoot .pf-table th,
+#completedRoot .pf-table td { text-align: center; vertical-align: middle; }
+#completedRoot .pf-table th.yearcol,
+#completedRoot .pf-table td.yearcol { white-space: nowrap; }
 .pf-pill {
   display: inline-block; padding: 2px 9px; border-radius: 20px;
   font-size: 0.72rem; font-weight: 600; background: var(--accent-light);
@@ -2098,7 +2106,7 @@ body.role-field-ops .nav-sub[data-fo-hide] {
   if (isPrivileged) {
     feeds.push('/data/project-record-poet.js', '/data/project-records.js',
                '/data/budget-actual-poet.js', '/data/cost-code-template.js',
-               '/data/awarded-projects.js',
+               '/data/awarded-projects.js', '/data/project-history.js',
                '/data/precon-pipeline.js', '/data/feasibility-history.js',
                '/data/project-master.js', '/data/pf-coi.js',
                '/data/pf-dashboard.js');
@@ -2861,7 +2869,12 @@ document.addEventListener('click', function(e) {
   <div class="module-view" id="mod-sprintreports"><iframe class="doc-frame" data-src="https://pf-sprint-reports.pages.dev" title="Sprint Reports"></iframe></div>
   <div class="module-view" id="mod-subcontracts"><iframe class="doc-frame" data-src="/subcontracts.html" title="Subcontracts"></iframe></div>
   <div class="module-view" id="mod-dailyproduction"><iframe class="doc-frame" data-src="/daily-production.html" title="Daily Production"></iframe></div>
-  <div class="module-view" id="mod-projecthistory"><iframe class="doc-frame" data-src="/project-history.html" title="Project History"></iframe></div>
+  <!-- Completed Projects index - populated client-side by the COMPLETED PROJECTS INDEX -->
+  <!-- script from window.PF_PROJECT_HISTORY (data/project-history.js). Mirrors the      -->
+  <!-- Active Projects (#awardedRoot) table format + a dynamic year-filter bar.          -->
+  <div class="module-view" id="mod-projecthistory">
+    <div id="completedRoot" class="pf-index-root"></div>
+  </div>
   <div class="module-view" id="mod-pricing"><iframe class="doc-frame" data-src="/pricing.html" data-interactive="1" title="Trucking Costs"></iframe></div>
   <div class="module-view" id="mod-coochecklist"><iframe class="doc-frame" data-src="/coo-checklist.html" data-interactive="1" title="COO Knowledge Checklist"></iframe></div>
   <div class="module-view" id="mod-schedule"><iframe class="doc-frame" data-src="/schedule.html" data-interactive="1" title="PF Project Schedule"></iframe></div>
@@ -13056,6 +13069,202 @@ try {
     if (document.readyState !== 'loading') render();
   } catch(e) {
     console.error("Awarded projects index failed to load:", e);
+  }
+})();
+</script>
+
+<!-- ============================================================ -->
+<!-- COMPLETED PROJECTS INDEX - renders window.PF_PROJECT_HISTORY   -->
+<!-- into #completedRoot as a clean table that MIRRORS the Active   -->
+<!-- Projects (#awardedRoot) format. A dynamic year-filter bar      -->
+<!-- (one button per distinct completion year + "All") filters the  -->
+<!-- table client-side. # and Project Name link to a built project  -->
+<!-- record ONLY when one exists; otherwise plain text.             -->
+<!-- ALL data-derived strings rendered via window.esc.              -->
+<!-- ============================================================ -->
+<script>
+(function(){
+  try {
+    var E = window.esc;
+    // Em-dash placeholder for any value we cannot source. NEVER fabricate.
+    var DASH = '—';
+    var CUR_YEAR = 'all';   // active year filter; default "All" for safety.
+
+    // Integer with thousands separators, or DASH when missing/bad.
+    function intOrDash(v){
+      if (v == null || v === '') return DASH;
+      var n = +v; if (!isFinite(n)) return DASH;
+      return Math.round(n).toLocaleString();
+    }
+    // Actual installed linear feet for a completed project (actualProduction.totalLF).
+    // 14 of 25 projects have it; the rest honestly render "—".
+    function actualLfFor(p){
+      try {
+        if (p && p.actualProduction && p.actualProduction.totalLF != null
+            && p.actualProduction.totalLF !== '') return intOrDash(p.actualProduction.totalLF);
+      } catch(e) {}
+      return DASH;
+    }
+    // Completion date string (commercial.completedDate, YYYY-MM-DD). '' if absent.
+    function completedDateOf(p){
+      try {
+        if (p && p.commercial && p.commercial.completedDate) return String(p.commercial.completedDate);
+      } catch(e) {}
+      return '';
+    }
+    // Reformat ISO date (YYYY-MM-DD) to MM/DD/YYYY by direct string split (no
+    // new Date() -> no timezone off-by-one). Non-matching passes through.
+    function fmtDate(s){
+      if (!s) return s;
+      var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s));
+      if (m) return m[2] + '/' + m[3] + '/' + m[1];
+      return s;
+    }
+    // A record is openable only when a real built record exists for this number.
+    // Mirrors the Dead Projects gate (records[num]) plus the POET deep record;
+    // completed history projects are mostly historical and have no built record,
+    // so most rows render plain text (spec: clickable only if a record exists).
+    function hasBuiltRecord(num){
+      if (!num) return false;
+      try {
+        var recs = window.PF_PROJECT_RECORDS && window.PF_PROJECT_RECORDS.records;
+        if (recs && recs[num]) return true;
+        if (window.PF_PROJECT_POET && String(window.PF_PROJECT_POET.project_number) === String(num)) return true;
+      } catch(e) {}
+      return false;
+    }
+    // Distinct completion years present in the data, sorted DESCENDING (newest
+    // first) so the filter bar auto-grows as new years are added.
+    function distinctYears(list){
+      var seen = {}, out = [];
+      list.forEach(function(p){
+        var y = (p && p.year != null && p.year !== '') ? String(p.year) : '';
+        if (y && !seen[y]) { seen[y] = 1; out.push(y); }
+      });
+      out.sort();          // string years sort chronologically
+      out.reverse();       // newest first
+      return out;
+    }
+
+    function render(){
+      var root = document.getElementById('completedRoot');
+      if (!root) return;
+      var D = window.PF_PROJECT_HISTORY;
+      if (!D || !D.projects) {
+        root.innerHTML = '<div class="pf-placeholder"><div class="pf-placeholder-icon">&#9635;</div>'
+          + '<h2>Completed Projects</h2><p>History data not loaded. Ensure '
+          + '<code>data/project-history.js</code> is present.</p></div>';
+        return;
+      }
+      var all = D.projects.slice();
+      // Sort by completion date DESCENDING (most recent first); undated sink to
+      // the bottom; ties broken by project number for stable ordering.
+      all.sort(function(a,b){
+        var da = completedDateOf(a), db = completedDateOf(b);
+        if (da && db) {
+          if (da > db) return -1;
+          if (da < db) return 1;
+          return String(b.projectNo || '').localeCompare(String(a.projectNo || ''));
+        }
+        if (da) return -1;   // a dated, b undated -> a first
+        if (db) return 1;
+        return String(b.projectNo || '').localeCompare(String(a.projectNo || ''));
+      });
+
+      var years = distinctYears(all);
+      // Guard the active filter: if a stale year no longer exists, fall back to All.
+      if (CUR_YEAR !== 'all' && years.indexOf(CUR_YEAR) === -1) CUR_YEAR = 'all';
+
+      // Apply the year filter for the visible list.
+      var list = (CUR_YEAR === 'all')
+        ? all
+        : all.filter(function(p){ return String(p.year || '') === CUR_YEAR; });
+
+      var srcLink = D.source_url
+        ? '<a href="' + E(D.source_url) + '" target="_blank" rel="noopener noreferrer">Completed Projects</a>'
+        : E(D.source || 'Project History');
+
+      var html = '<div class="pf-index-head">'
+        + '<h2>Completed Projects</h2>'
+        + '<p class="pf-index-sub">Projects Pier Foundations has finished installing. '
+        + 'Filter by completion year; open a built record where available.</p>'
+        + '<div class="pf-index-meta">Source: ' + srcLink
+        + ' &middot; ' + E(D.generated || '') + ' &middot; ' + list.length
+        + (CUR_YEAR === 'all' ? ' completed' : ' completed in ' + E(CUR_YEAR)) + '</div>'
+        + '</div>';
+
+      // ----- YEAR filter bar (dynamic: one button per distinct year + All) -----
+      // Reuses the .pf-type-btn styling used by the precon project-type filter for
+      // visual consistency. Static markup (years are numeric); clicks re-render.
+      html += '<div class="pf-type-filter" style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">'
+        + '<button class="pf-type-btn' + (CUR_YEAR === 'all' ? ' active' : '') + '" '
+        + 'onclick="pfCompletedYearFilter(\'all\')">All</button>';
+      years.forEach(function(y){
+        html += '<button class="pf-type-btn' + (CUR_YEAR === y ? ' active' : '') + '" '
+          + 'onclick="pfCompletedYearFilter(\'' + E(y) + '\')">' + E(y) + '</button>';
+      });
+      html += '</div>';
+
+      if (!list.length) {
+        html += '<div class="pf-placeholder"><div class="pf-placeholder-icon">&#9635;</div>'
+          + '<h2>No completed projects for ' + E(CUR_YEAR) + '</h2>'
+          + '<p>Choose a different year or "All".</p></div>';
+        root.innerHTML = html;
+        return;
+      }
+
+      html += '<div class="pf-table-wrap"><table class="pf-table"><thead><tr>'
+        + '<th>PF Project #</th><th>Project Name</th><th>Project Location</th>'
+        + '<th>General Contractor</th><th>Building Type</th>'
+        + '<th>Actual LF</th><th class="yearcol">Completed</th>'
+        + '</tr></thead><tbody>';
+
+      list.forEach(function(p){
+        var num = String(p.projectNo || '');
+        // Clickable ONLY when a real built record exists; else plain text.
+        var openJs = '';
+        if (num && hasBuiltRecord(num)) {
+          openJs = (window.PF_PROJECT_POET && String(window.PF_PROJECT_POET.project_number) === num)
+            ? 'showModule(\'project-poet\')'
+            : 'openProjectRecord(\'' + E(num) + '\')';
+        }
+        var numberCell = openJs
+          ? '<td class="num"><a class="pf-record-link" onclick="' + openJs + '">' + E(num) + '</a></td>'
+          : '<td class="num">' + (num ? E(num) : DASH) + '</td>';
+        var nameCell = openJs
+          ? '<td><a class="pf-record-link" onclick="' + openJs + '">' + E(p.name) + '</a></td>'
+          : '<td>' + (p.name ? E(p.name) : DASH) + '</td>';
+
+        var cd = completedDateOf(p);
+        var completedDisp = cd ? E(fmtDate(cd)) : (p.year ? E(String(p.year)) : DASH);
+
+        html += '<tr>'
+          + numberCell
+          + nameCell
+          + '<td>' + (p.cityState ? E(p.cityState) : DASH) + '</td>'
+          + '<td>' + (p.gc ? E(p.gc) : DASH) + '</td>'
+          + '<td>' + (p.buildingType ? E(p.buildingType) : DASH) + '</td>'
+          + '<td class="num">' + actualLfFor(p) + '</td>'
+          + '<td class="yearcol">' + completedDisp + '</td>'
+          + '</tr>';
+      });
+
+      html += '</tbody></table></div>';
+      html += '<div class="pf-index-foot">Completed installations from the project history. '
+        + 'Records that have been built open on the # or Project name.</div>';
+      root.innerHTML = html;
+    }
+
+    // Global handler for the year filter buttons: set the active year + re-render.
+    window.pfCompletedYearFilter = function(y){
+      CUR_YEAR = String(y);
+      render();
+    };
+
+    document.addEventListener('DOMContentLoaded', render);
+    if (document.readyState !== 'loading') render();
+  } catch(e) {
+    console.error("Completed projects index failed to load:", e);
   }
 })();
 </script>
