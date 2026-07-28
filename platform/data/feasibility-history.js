@@ -109,6 +109,30 @@ window.PF_FEASIBILITY_HISTORY = {
       ],
       "recordPath": "feasibility/crawford/FEASIBILITY-RECORD-crawford.md",
       "verified": "pf-intel-verifier PASS - citations reproduced from extracted text + scanned PNGs"
+    },
+    {
+      "id": "feas_intl_school_ph2",
+      "project": "International School of Indiana - Phase 2",
+      "location": "Indianapolis, IN",
+      "discipline": "Aggregate Piers / VSC",
+      "date": "2026-07-28",
+      "verdict": "CONDITIONAL GO",
+      "verdictNote": "AP specified + VSC method-eligible (Lower School); gated on installer qual + scope isolation",
+      "summary": "Spec Section 316613 defines aggregate piers by 'either ramming or vibratory methods' (down-hole vibrator procedure, Priebe ref, No.57 stone, no Geopier sole-source) - VSC eligible on the spec's own words. Basis 4,000 psf, 1 in total / 0.5 in differential, native 2,000 psf. S001 note 054000 mandates Rammed Aggregate Piers. Phase 1 (26-009) is an awarded PF job at same site. TWO-BUILDING SPLIT: Lower School (L-S100) = aggregate piers = PF scope; Middle School (M-S100) = helical piles into existing building w/ uplift = NOT PF. Geotech of record = Alt & Witzig 26IN0084 (4/17/2026), referenced not in set.",
+      "drivers": [
+        "Section 316613 method-neutral - VSC/vibratory expressly permitted",
+        "S001 mandates Rammed Aggregate Piers (2,000 psf native)",
+        "Phase 1 (26-009) awarded PF precedent, same site",
+        "Lower School is a discrete aggregate-pier building"
+      ],
+      "missing": [
+        "GATE 1: PF/Garbin must clear 316613 s1.3 - 5 yrs + 50 AP projects + designer E&O >=$3M",
+        "GATE 2: confirm bid scope isolated to Lower School AP (Middle School helical excluded)",
+        "Alt & Witzig geotech 26IN0084 not in set - needed for Garbin prelim; confirm stray Patriot template line w/ EOR",
+        "Bid date + Jonathan go-ahead; scope needs Garbin prelim"
+      ],
+      "recordPath": "feasibility/intlschool-ph2/FEASIBILITY-RECORD-intlschool-ph2.md",
+      "verified": "pf-intel-verifier PASS - method-neutral spec + building split confirmed via text + rendered plans"
     }
   ]
 };
