@@ -452,6 +452,13 @@ export function areaForPath(pathname) {
   if (pathname.startsWith('/api/')) {
     if (pathname.startsWith('/api/doc'))           return 'documents';
     if (pathname.startsWith('/api/schedule'))      return 'schedule';
+    // Field Companion (AI field-search): the crew-facing tool. field_ops area =
+    // admin/partner/business_dev/field_ops so actual crew members (role field_ops)
+    // can use it — WITHOUT this mapping the path fell through to DEFAULT-DENY
+    // (admin-only), silently 403-blocking every crew member (admins like Brad still
+    // worked, which masked the bug). The endpoint ALSO calls requireArea(session,
+    // 'field_ops') on GET+POST and enforces the money firewall. ZERO financials.
+    if (pathname.startsWith('/api/field-companion')) return 'field_ops';
     // Field daily reports: the FIRST field_ops WRITE surface. field_ops area =
     // admin/partner/business_dev/field_ops, so the crew can read+write their
     // daily reports. This area exposes ZERO financials. The approve / send-to-hr
