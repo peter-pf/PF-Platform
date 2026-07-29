@@ -1943,6 +1943,55 @@ body.role-field-ops .nav-sub[data-fo-hide] {
   cursor:pointer; font-size:1rem; line-height:1; padding:2px 8px; }
 .sove-remove:hover { background:#b00020; color:#fff; }
 
+/* ---- Pay App per-line entry (Phase A2) ---- */
+.fin-inv-pa-meta { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px 20px; margin-bottom:10px; }
+@media (max-width: 720px) { .fin-inv-pa-meta { grid-template-columns:1fr; } }
+.fin-inv-pa-retnote { font-size:0.78rem; color:var(--text-2); background:var(--bg-1);
+  border:1px solid var(--border); border-radius:6px; padding:8px 10px; margin-bottom:8px; }
+.fin-inv-pa-table { width:100%; min-width:980px; table-layout:auto; }
+.fin-inv-pa-table th, .fin-inv-pa-table td {
+  white-space:normal; overflow-wrap:normal; word-break:keep-all; hyphens:none; vertical-align:middle; }
+.fin-inv-pa-table th.pa-l-desc, .fin-inv-pa-table td.pa-l-desc { min-width:220px; text-align:left; }
+.fin-inv-pa-table td.num, .fin-inv-pa-table th.num { text-align:right; font-variant-numeric:tabular-nums; }
+.fin-inv-pa-table input { width:100%; min-width:74px; font-size:0.85rem; padding:4px 6px; text-align:right;
+  border:1px solid var(--border); border-radius:5px; background:var(--bg-1); color:var(--text-1);
+  box-sizing:border-box; font-variant-numeric:tabular-nums; }
+.fin-inv-pa-table td .pa-l-pctsign { margin-left:3px; color:var(--text-3); font-size:0.8rem; }
+.fin-inv-pa-table td.pa-l-total, .fin-inv-pa-table td.pa-l-balance, .fin-inv-pa-table td.pa-l-retheld {
+  color:var(--text-2); font-weight:600; }
+.fin-inv-pa-table tfoot td { font-weight:700; background:var(--bg-1); border-top:2px solid var(--border); }
+.fin-inv-pa-table.pa-disabled input { opacity:0.4; }
+.fin-inv-pa-calc { margin-top:10px; font-size:0.85rem; color:var(--text-1); font-weight:600; }
+.fin-inv-pa-calc span { font-variant-numeric:tabular-nums; }
+
+/* ---- clickable Pay Applications rows ---- */
+.fin-inv-payapp-row { cursor:pointer; }
+.fin-inv-payapp-row:hover { background:var(--bg-1); }
+.fin-inv-payapp-row.selected { background:rgba(212,160,23,0.12); outline:1px solid var(--accent); }
+
+/* ---- G702 cover certificate ---- */
+.fin-inv-g702 { margin-top:14px; }
+.fin-inv-g702:empty { display:none; }
+.fin-inv-g702-head { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:8px; }
+.fin-inv-g702-title { font-size:0.82rem; font-weight:700; color:var(--text-1); }
+.fin-inv-g702-type { font-size:0.72rem; font-weight:600; color:var(--accent);
+  border:1px solid var(--accent); border-radius:5px; padding:1px 8px; }
+.fin-inv-g702-period { font-size:0.74rem; color:var(--text-3); }
+.fin-inv-g702-cols { display:flex; align-items:flex-start; gap:20px; flex-wrap:wrap; margin-bottom:12px; }
+.fin-inv-g702-table { border-collapse:collapse; min-width:420px; }
+.fin-inv-g702-table td { padding:5px 10px; border-bottom:1px solid var(--border-light); font-size:0.82rem; }
+.fin-inv-g702-table td.fin-inv-g702-no { color:var(--text-3); width:24px; text-align:right; }
+.fin-inv-g702-table td.fin-inv-g702-lbl { color:var(--text-2); }
+.fin-inv-g702-table td.fin-inv-g702-amt { text-align:right; font-variant-numeric:tabular-nums; color:var(--text-1); font-weight:600; }
+.fin-inv-g702-table tr.fin-inv-g702-due td { background:rgba(212,160,23,0.10); font-weight:700; }
+.fin-inv-g702-amtcert { align-self:center; font-size:0.9rem; color:var(--text-1); }
+.fin-inv-g702-amtcert b { font-size:1.05rem; color:var(--accent); margin-left:6px; }
+.fin-inv-g702-contlabel { font-size:0.76rem; font-weight:700; color:var(--text-2); margin-bottom:6px; }
+.fin-inv-g703cont { width:100%; min-width:900px; table-layout:auto; }
+.fin-inv-g703cont th, .fin-inv-g703cont td { white-space:normal; word-break:keep-all; vertical-align:top; }
+.fin-inv-g703cont td.num, .fin-inv-g703cont th.num { text-align:right; font-variant-numeric:tabular-nums; }
+.fin-inv-g703cont td.sov-desc { min-width:200px; }
+
 .pr-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -12141,24 +12190,41 @@ try {
     // pay apps) record yields ok:true with 0s -- but the info block shows a dash for
     // a 0 total via the null-guard at the call site (0 invoiced = nothing billed).
     function invRollup(inv){
-      if (!inv || inv.error) return { ok:false, invoiced:null, paid:null, retainageHeld:null };
+      if (!inv || inv.error) return { ok:false, invoiced:null, paid:null, retainageHeld:null, retainageDue:null, retainagePaid:null };
       var apps = Array.isArray(inv.payApps) ? inv.payApps : [];
-      var invoiced = 0, paid = 0, held = 0, anyBilled = false, anyPaid = false;
+      // Amount Invoiced to Date = SUM of ALL pay apps' this-period totals (Brad's rule).
+      // Amount Paid to Date     = SUM of netDue for apps marked Paid.
+      // Retainage Held (total)  = SUM of retainage across all apps.
+      // Retainage Released      = SUM of amount for retainage-release (type='retainage') apps.
+      // Retainage Amount Due    = Retainage Held - Retainage Released.
+      var invoiced = 0, paid = 0, held = 0, released = 0;
+      var anyApp = false, anyPaid = false, anyRelease = false;
       apps.forEach(function(a){
-        var st = a && a.status;
         var amt = Number(a && a.amount) || 0;
         var ret = Number(a && a.retainage) || 0;
         var net = Number(a && a.netDue) || 0;
-        if (st === 'Sent' || st === 'Paid') { invoiced += amt; held += ret; anyBilled = true; }
-        if (st === 'Paid') { paid += net; anyPaid = true; }
+        anyApp = true;
+        if (a && a.type === 'retainage') {
+          // A retainage-release app releases held retainage; it does NOT bill new work,
+          // so it does not add to Amount Invoiced. Its Paid netDue = the released amount.
+          released += amt; anyRelease = true;
+          if (a.status === 'Paid') { paid += amt; anyPaid = true; }
+        } else {
+          invoiced += amt;                // progress billing = this-period work
+          held += ret;                    // normal apps accrue retainage
+          if (a.status === 'Paid') { paid += net; anyPaid = true; }
+        }
       });
+      var retDue = Math.round((held - released) * 100) / 100;
       // Only surface a figure when at least one app contributes; otherwise null ->
       // the info block / roll-up band shows an em-dash (never a fabricated $0.00).
       return {
         ok: true,
-        invoiced: anyBilled ? Math.round(invoiced * 100) / 100 : null,
-        paid:     anyPaid   ? Math.round(paid * 100) / 100     : null,
-        retainageHeld: anyBilled ? Math.round(held * 100) / 100 : null,
+        invoiced:      anyApp     ? Math.round(invoiced * 100) / 100 : null,
+        paid:          anyPaid    ? Math.round(paid * 100) / 100     : null,
+        retainageHeld: anyApp     ? retDue                           : null,   // net still-held (info block "Retainage Amount Due")
+        retainageDue:  anyApp     ? retDue                           : null,
+        retainagePaid: anyRelease ? Math.round(released * 100) / 100 : null,
       };
     }
 
@@ -12215,6 +12281,37 @@ try {
     // Whether the project has a SAVED (persisted) SOV yet (vs the unsaved template).
     function sovIsSaved(inv){
       return !!(inv && Array.isArray(inv.sov) && inv.sov.length);
+    }
+    // Enrich SOV lines with pay-app-derived From Previous + This Period for the
+    // EMBEDDED SOV view. From Previous = SUM of every pay app's thisPeriod for the line;
+    // This Period = the MOST RECENT (highest-num) pay app's thisPeriod for the line.
+    // The standalone/pre-contract SOV does NOT call this (keeps 0s). Returns NEW line
+    // objects (never mutates the stored SOV).
+    function sovLinesWithPayApps(inv){
+      var lines = sovLinesFor(inv);
+      var apps = (inv && Array.isArray(inv.payApps)) ? inv.payApps : [];
+      if (!apps.length) return lines;
+      var latestNum = 0;
+      apps.forEach(function(a){ if (Number(a.num) > latestNum) latestNum = Number(a.num); });
+      return lines.map(function(line, idx){
+        var key = payAppLineKey(line, idx);
+        var fromPrev = 0, thisP = 0, matNow = 0;
+        apps.forEach(function(a){
+          var e = payAppLineEntry(a, key);
+          fromPrev += e.thisPeriod;                                   // sum ALL apps
+          if (Number(a.num) === latestNum) { thisP = e.thisPeriod; matNow = e.materialsStored; }
+        });
+        // "From Previous" in the embedded SOV = billed BEFORE the latest app; This Period
+        // = the latest app's line amount. So From Previous excludes the latest app.
+        var fromPrevExLatest = Math.round((fromPrev - thisP) * 100) / 100;
+        var out = {};
+        for (var k in line) { if (Object.prototype.hasOwnProperty.call(line, k)) out[k] = line[k]; }
+        out.fromPrevious = fromPrevExLatest;
+        out.thisPeriod = thisP;
+        // Materials: show the SOV line's own materialsStored plus any billed materials.
+        out.materialsStored = (Number(line.materialsStored) || 0) + matNow;
+        return out;
+      });
     }
     // Derive the G703 computed columns for one SOV line, given the project retainage
     // frac. Mirrors the tab formulas exactly (see block comment above). % is guarded
@@ -12357,6 +12454,195 @@ try {
           + '</tr>';
       }
       return '<div class="fin-inv-wrap fin-inv-sov-wrap"><table class="ba-table fin-inv-sov-table">' + head + '<tbody>' + body + '</tbody></table></div>';
+    }
+
+    // ---- AIA pay-application math (Phase A2) -------------------------------------
+    // A pay app bills the SOV LINE BY LINE. Each app stores per-line { thisPeriod,
+    // materialsStored } keyed by the SOV line's item # (or its array index fallback).
+    // From all of a project's saved pay apps we derive, per SOV line and per app:
+    //   From Previous Application = SUM of this line's thisPeriod across EARLIER apps
+    //   Current Scheduled Value   = line Original + Approved CO (from the SOV)
+    //   Total Completed & Stored  = From Previous + This Period + Materials Stored
+    //   % Complete                = Total / Current (guarded /0 -> null)
+    //   Balance To Finish         = Current - Total
+    //   Retainage Held            = retainageFrac * Total
+    // Then the G702 cover totals roll up from that G703 (see g702CoverForApp).
+
+    // The billing key for one SOV line: its item # if set, else its array index.
+    function payAppLineKey(line, idx){
+      var it = line && line.item;
+      if (it != null && String(it).trim() !== '') return String(it).trim();
+      return String(idx);
+    }
+    // Read one app's stored entry for a line key: { thisPeriod, materialsStored }.
+    function payAppLineEntry(app, key){
+      if (!app || !app.lines || typeof app.lines !== 'object') return { thisPeriod: 0, materialsStored: 0 };
+      var e = app.lines[key];
+      if (!e || typeof e !== 'object') return { thisPeriod: 0, materialsStored: 0 };
+      return { thisPeriod: Number(e.thisPeriod) || 0, materialsStored: Number(e.materialsStored) || 0 };
+    }
+    // Sum a line's thisPeriod across all apps with num < beforeNum (From Previous).
+    function fromPreviousForLine(apps, key, beforeNum){
+      var sum = 0;
+      (apps || []).forEach(function(a){
+        if (Number(a.num) < beforeNum) sum += payAppLineEntry(a, key).thisPeriod;
+      });
+      return Math.round(sum * 100) / 100;
+    }
+    // Build the G703 continuation rows for ONE pay app (num=appNum) against the SOV.
+    // Returns { rows:[{item,costCode,description,current,fromPrev,thisPeriod,materials,
+    //   total,pct,balance,retHeld}], totals:{...} }.
+    function g703ForApp(sovLines, apps, appNum, retFrac){
+      var rows = [];
+      var T = { orig:0, co:0, current:0, fromPrev:0, thisPeriod:0, materials:0, total:0, balance:0, retHeld:0 };
+      (sovLines || []).forEach(function(line, idx){
+        var key = payAppLineKey(line, idx);
+        var orig = Number(line.originalScheduledValue) || 0;
+        var co = Number(line.approvedCO) || 0;
+        var current = Math.round((orig + co) * 100) / 100;             // F = D + E
+        var fromPrev = fromPreviousForLine(apps, key, appNum);          // G
+        var e = payAppLineEntry(appById(apps, appNum), key);
+        var thisP = e.thisPeriod;                                       // H
+        var materials = e.materialsStored;                             // I
+        var total = Math.round((fromPrev + thisP + materials) * 100) / 100;  // J = G+H+I
+        var pct = (current > 0) ? (total / current) : null;            // K = J/F
+        var balance = Math.round((current - total) * 100) / 100;       // L = F-J
+        var retHeld = Math.round(total * retFrac * 100) / 100;         // M = ret*J
+        rows.push({ item:line.item||'', costCode:line.costCode||'', description:line.description||'',
+          orig:orig, co:co, current:current, fromPrev:fromPrev, thisPeriod:thisP, materials:materials,
+          total:total, pct:pct, balance:balance, retHeld:retHeld });
+        T.orig+=orig; T.co+=co; T.current+=current; T.fromPrev+=fromPrev; T.thisPeriod+=thisP;
+        T.materials+=materials; T.total+=total; T.balance+=balance; T.retHeld+=retHeld;
+      });
+      Object.keys(T).forEach(function(k){ T[k] = Math.round(T[k]*100)/100; });
+      T.pct = (T.current > 0) ? (T.total / T.current) : null;
+      return { rows: rows, totals: T };
+    }
+    function appById(apps, num){
+      var found = null;
+      (apps || []).forEach(function(a){ if (Number(a.num) === num) found = a; });
+      return found;
+    }
+    // G702 cover for one pay app. Uses the app's G703 totals + prior earned-less-retainage.
+    //   1 Original Contract Sum        = SUM SOV Original (or subcontractValue if larger set)
+    //   2 Net change by Change Orders  = SUM SOV Approved CO
+    //   3 Contract Sum To Date         = 1 + 2 (= SUM Current)
+    //   4 Total Completed & Stored     = G703 total J
+    //   5 Retainage                    = G703 total M
+    //   6 Total Earned Less Retainage  = 4 - 5
+    //   7 Less Previous Certificates   = SUM of earlier apps' (their earned-less-retainage)
+    //   8 Current Payment Due          = 6 - 7  (retainage app: = line 9 = outstanding retainage)
+    //   9 Balance To Finish incl ret   = 3 - 6
+    function earnedLessRetainageThrough(sovLines, apps, throughNum, retFrac){
+      // Cumulative earned-less-retainage as of the app numbered throughNum (inclusive):
+      // = (sum over lines of Total Completed & Stored through throughNum) * (1 - retFrac).
+      // Total through an app = From Previous(before that app) is not needed; simplest is
+      // cumulative thisPeriod+materials through throughNum per line.
+      var totalCompleted = 0;
+      (sovLines || []).forEach(function(line, idx){
+        var key = payAppLineKey(line, idx);
+        var cum = 0;
+        (apps || []).forEach(function(a){
+          if (Number(a.num) <= throughNum) {
+            var e = payAppLineEntry(a, key);
+            cum += e.thisPeriod + e.materialsStored;
+          }
+        });
+        totalCompleted += cum;
+      });
+      totalCompleted = Math.round(totalCompleted * 100) / 100;
+      return Math.round(totalCompleted * (1 - retFrac) * 100) / 100;
+    }
+    function g702CoverForApp(sovLines, apps, app, subcontractValue, retFrac){
+      var appNum = Number(app.num);
+      var g = g703ForApp(sovLines, apps, appNum, retFrac);
+      var line1 = g.totals.orig;                                      // Original Contract Sum
+      var line2 = g.totals.co;                                        // Net change by COs
+      var line3 = Math.round((line1 + line2) * 100) / 100;           // Contract Sum To Date
+      var line4 = g.totals.total;                                     // Total Completed & Stored
+      var line5 = g.totals.retHeld;                                   // Retainage
+      var line6 = Math.round((line4 - line5) * 100) / 100;           // Earned less retainage
+      var line7 = (appNum > 1) ? earnedLessRetainageThrough(sovLines, apps, appNum - 1, retFrac) : 0; // prior certs
+      var line9 = Math.round((line3 - line6) * 100) / 100;          // Balance to finish incl retainage
+      var line8;
+      if (app.type === 'retainage') {
+        // Retainage-release app: current due = outstanding held retainage = line 9.
+        line8 = line9;
+      } else {
+        line8 = Math.round((line6 - line7) * 100) / 100;             // Current Payment Due
+      }
+      return { line1:line1, line2:line2, line3:line3, line4:line4, line5:line5,
+               line6:line6, line7:line7, line8:line8, line9:line9, g703:g };
+    }
+
+    // Render the G702 cover (the 9-line certificate) + the app's G703 continuation for
+    // one pay app as HTML. Money via baMoney; fail-closed (never fabricates when the SOV
+    // has no dollars -- the lines then legitimately read $0.00 as real sums of zero).
+    function g702CoverHtml(sovLines, apps, app, subcontractValue, retFrac){
+      if (!app) return '';
+      var c = g702CoverForApp(sovLines, apps, app, subcontractValue, retFrac);
+      var typeLabel = (app.type === 'retainage') ? 'Retainage Release' : 'Progress Payment';
+      function m(n){ return E(baMoney(n)); }
+      var rows = [
+        ['1', 'Original Contract Sum', c.line1],
+        ['2', 'Net Change By Change Orders', c.line2],
+        ['3', 'Contract Sum To Date (1 + 2)', c.line3],
+        ['4', 'Total Completed & Stored To Date', c.line4],
+        ['5', 'Retainage', c.line5],
+        ['6', 'Total Earned Less Retainage (4 &minus; 5)', c.line6],
+        ['7', 'Less Previous Certificates For Payment', c.line7],
+        ['8', 'Current Payment Due', c.line8, true],
+        ['9', 'Balance To Finish, Including Retainage (3 &minus; 6)', c.line9]
+      ];
+      var rowHtml = rows.map(function(r){
+        var cls = r[3] ? ' class="fin-inv-g702-due"' : '';
+        return '<tr' + cls + '><td class="fin-inv-g702-no">' + r[0] + '</td>'
+          + '<td class="fin-inv-g702-lbl">' + r[1] + '</td>'
+          + '<td class="num fin-inv-g702-amt">' + m(r[2]) + '</td></tr>';
+      }).join('');
+      // G703 continuation for this app (per-line, using the app's From Previous / This Period).
+      var g = c.g703;
+      var contBody = g.rows.map(function(row){
+        var pctTxt = (row.pct == null) ? '<span class="ba-blank">&mdash;</span>' : E(Math.round(row.pct*100) + '%');
+        return '<tr>'
+          + '<td class="sov-item">' + (row.item ? E(String(row.item)) : '<span class="ba-blank">&mdash;</span>') + '</td>'
+          + '<td class="sov-desc">' + (row.description ? E(row.description) : '<span class="ba-blank">&mdash;</span>') + '</td>'
+          + '<td class="num">' + E(baMoney(row.current)) + '</td>'
+          + '<td class="num">' + E(baMoney(row.fromPrev)) + '</td>'
+          + '<td class="num">' + E(baMoney(row.thisPeriod)) + '</td>'
+          + '<td class="num">' + E(baMoney(row.materials)) + '</td>'
+          + '<td class="num">' + E(baMoney(row.total)) + '</td>'
+          + '<td class="num">' + pctTxt + '</td>'
+          + '<td class="num">' + E(baMoney(row.balance)) + '</td>'
+          + '<td class="num">' + E(baMoney(row.retHeld)) + '</td>'
+          + '</tr>';
+      }).join('');
+      var t = g.totals;
+      var tPct = (t.pct == null) ? '<span class="ba-blank">&mdash;</span>' : E(Math.round(t.pct*100) + '%');
+      contBody += '<tr class="fin-inv-sov-totals"><td colspan="2">Total</td>'
+        + '<td class="num">' + E(baMoney(t.current)) + '</td>'
+        + '<td class="num">' + E(baMoney(t.fromPrev)) + '</td>'
+        + '<td class="num">' + E(baMoney(t.thisPeriod)) + '</td>'
+        + '<td class="num">' + E(baMoney(t.materials)) + '</td>'
+        + '<td class="num">' + E(baMoney(t.total)) + '</td>'
+        + '<td class="num">' + tPct + '</td>'
+        + '<td class="num">' + E(baMoney(t.balance)) + '</td>'
+        + '<td class="num">' + E(baMoney(t.retHeld)) + '</td></tr>';
+      return '<div class="fin-inv-g702-head">'
+        +   '<span class="fin-inv-g702-title">Application No. ' + E(String(app.num)) + ' &mdash; G702 Certificate</span>'
+        +   '<span class="fin-inv-g702-type">' + E(typeLabel) + '</span>'
+        +   (app.period ? '<span class="fin-inv-g702-period">' + E(app.period) + '</span>' : '')
+        + '</div>'
+        + '<div class="fin-inv-g702-cols">'
+        +   '<table class="fin-inv-g702-table"><tbody>' + rowHtml + '</tbody></table>'
+        +   '<div class="fin-inv-g702-amtcert">Amount Certified <b>' + m(c.line8) + '</b></div>'
+        + '</div>'
+        + '<div class="fin-inv-g702-contlabel">G703 Continuation &mdash; Application No. ' + E(String(app.num)) + '</div>'
+        + '<div class="fin-inv-wrap"><table class="ba-table fin-inv-g703cont"><thead><tr>'
+        +   '<th>Item</th><th>Description</th><th class="num">Current<br>Scheduled Value</th>'
+        +   '<th class="num">From Previous</th><th class="num">This Period</th><th class="num">Materials</th>'
+        +   '<th class="num">Total Completed<br>& Stored</th><th class="num">%</th><th class="num">Balance</th><th class="num">Retainage</th>'
+        + '</tr></thead><tbody>' + contBody + '</tbody></table></div>';
     }
 
     // Render a project record object D into the given root element. Reusable for
@@ -12769,6 +13055,7 @@ try {
       var finInvoicedVal = (finInvRoll.ok && finInvRoll.invoiced != null) ? E(baMoney(finInvRoll.invoiced)) : '';
       var finPaidVal     = (finInvRoll.ok && finInvRoll.paid != null) ? E(baMoney(finInvRoll.paid)) : '';
       var finRetDueVal   = (finInvRoll.ok && finInvRoll.retainageHeld != null) ? E(baMoney(finInvRoll.retainageHeld)) : '';
+      var finRetPaidVal  = (finInvRoll.ok && finInvRoll.retainagePaid != null) ? E(baMoney(finInvRoll.retainagePaid)) : '';
 
       var finInvRow = function(label, val){
         var has = (val != null && String(val) !== '');
@@ -12807,7 +13094,7 @@ try {
         + finInvRow('Invoice Due By Date', '')
         + finEditableRow('Retainage %', finPctInput, 'pct')
         + finInvRow('Retainage Amount Due', finRetDueVal)
-        + finInvRow('Retainage Paid', '')
+        + finInvRow('Retainage Paid', finRetPaidVal)
         + '</div>'
         // Inline project-input editor (Subcontract Value + Retainage %), hidden until
         // the office clicks a pencil. Office-only (canEdit); the server re-gates.
@@ -12829,17 +13116,24 @@ try {
       // record; the "+ New Pay App" button opens an inline entry form.
       var payApps = (_curInvoicing && Array.isArray(_curInvoicing.payApps)) ? _curInvoicing.payApps : [];
       var retFrac = (finPct != null) ? (finPct / 100) : 0;
+      // Latest app number: clicking a row shows that app's G702 cover; the newest is
+      // shown by default when the block first renders.
+      var latestAppNum = 0;
+      payApps.forEach(function(a){ if (Number(a.num) > latestAppNum) latestAppNum = Number(a.num); });
       var payRowsHtml = '';
       if (invErr) {
-        payRowsHtml = '<tr class="fin-inv-empty"><td colspan="8">Could not load invoicing data. Please retry.</td></tr>';
+        payRowsHtml = '<tr class="fin-inv-empty"><td colspan="9">Could not load invoicing data. Please retry.</td></tr>';
       } else if (!payApps.length) {
-        payRowsHtml = '<tr class="fin-inv-empty"><td colspan="8">No pay applications yet</td></tr>';
+        payRowsHtml = '<tr class="fin-inv-empty"><td colspan="9">No pay applications yet</td></tr>';
       } else {
         payRowsHtml = payApps.map(function(a){
-          return '<tr>'
+          var typeLabel = (a.type === 'retainage') ? 'Retainage Release' : 'Progress';
+          var isSel = (Number(a.num) === latestAppNum);
+          return '<tr class="fin-inv-payapp-row' + (isSel ? ' selected' : '') + '" data-payapp-num="' + E(String(a.num)) + '" onclick="window.pfInvShowG702(this)" title="Show G702 cover">'
             + '<td>' + E(String(a.num)) + '</td>'
             + '<td>' + (a.date ? E(a.date) : finDash) + '</td>'
             + '<td>' + (a.period ? E(a.period) : finDash) + '</td>'
+            + '<td>' + E(typeLabel) + '</td>'
             + '<td class="num">' + E(baMoney(a.amount)) + '</td>'
             + '<td class="num">' + E(baMoney(a.retainage)) + '</td>'
             + '<td class="num">' + E(baMoney(a.netDue)) + '</td>'
@@ -12856,20 +13150,28 @@ try {
       } else {
         newBtn = '';
       }
+      // The newest pay app's G702 cover, rendered by default (fail-closed empty when none).
+      var g702DefaultHtml = '';
+      if (!invErr && payApps.length) {
+        var newestApp = null;
+        payApps.forEach(function(a){ if (Number(a.num) === latestAppNum) newestApp = a; });
+        if (newestApp) g702DefaultHtml = g702CoverHtml(sovLinesFor(_curInvoicing), payApps, newestApp, finScv, retFrac);
+      }
       var finPayApps =
-        '<div class="fin-inv-block" data-fin-inv-payapps="1" data-fin-inv-pct="' + (finPct != null ? E(String(finPct)) : '') + '">'
+        '<div class="fin-inv-block" data-fin-inv-payapps="1" data-fin-inv-pct="' + (finPct != null ? E(String(finPct)) : '') + '" data-fin-inv-scv="' + (finScv != null ? E(String(finScv)) : '') + '" data-fin-inv-retfrac="' + retFrac + '">'
         +   '<div class="fin-inv-block-head">'
         +     '<span class="fin-inv-block-title">Pay Applications</span>'
         +     newBtn
         +   '</div>'
         +   '<div class="fin-inv-payapp-form" style="display:none"></div>'
         +   '<div class="fin-inv-wrap"><table class="ba-table"><thead><tr>'
-        +     '<th>#</th><th>Date</th><th>Billing Period</th>'
+        +     '<th>#</th><th>Date</th><th>Billing Period</th><th>Type</th>'
         +     '<th class="num">This Period</th><th class="num">Retainage</th><th class="num">Net Due</th>'
         +     '<th>Status</th><th>Paid Date</th>'
         +   '</tr></thead><tbody>'
         +     payRowsHtml
         +   '</tbody></table></div>'
+        +   '<div class="fin-inv-g702" data-fin-inv-g702="1">' + g702DefaultHtml + '</div>'
         + '</div>';
 
       // --- AIA G703 Schedule of Values (SOV) ---
@@ -12879,7 +13181,7 @@ try {
       // Scheduled Value, Approved CO, Materials and the project Retainage %. A new
       // project is pre-seeded with the four standard template lines (labels only, no
       // fabricated dollars) until saved.
-      var sovLines = sovLinesFor(_curInvoicing);
+      var sovLines = sovLinesWithPayApps(_curInvoicing);
       var sovSaved = sovIsSaved(_curInvoicing);
       var sovHtmlRO = sovTableHtml(sovLines, retFrac, { editable:false });
       var sovSeedNote = (!sovSaved && !invErr)
@@ -13457,9 +13759,18 @@ try {
         if ('appendPayApp' in over) apps = apps.concat([over.appendPayApp]);
         if ('sov' in over) sov = Array.isArray(over.sov) ? over.sov : [];
       }
-      // Only the input fields matter to the server for pay apps (it re-derives the rest).
+      // Only the input fields matter to the server for pay apps (it re-derives amount,
+      // retainage, netDue). Per-line billing (`lines`) + `type` pass through; a legacy
+      // app with no `lines` keeps its lump `amount`.
       var outApps = apps.map(function(a){
-        return { date:a.date||'', period:a.period||'', amount:a.amount, status:a.status||'Draft', paidDate:a.paidDate||'' };
+        var o = { date:a.date||'', period:a.period||'', type:(a.type==='retainage'?'retainage':'normal'),
+                  status:a.status||'Draft', paidDate:a.paidDate||'' };
+        if (a.lines && typeof a.lines === 'object' && !Array.isArray(a.lines)) {
+          o.lines = a.lines;            // per-SOV-line { thisPeriod, materialsStored }
+        } else {
+          o.amount = a.amount;          // legacy unallocated pay app
+        }
+        return o;
       });
       // G703 entry fields only (server re-derives Current/Total/%/Balance/Retainage).
       // From Previous / This Period are pay-app driven (Phase A2) and NOT stored here.
@@ -13551,26 +13862,104 @@ try {
         function(){ invRerender(btn); });
     };
 
+    // ---- Show a pay app's G702 cover (click a Pay Applications row) ----
+    window.pfInvShowG702 = function(row){
+      if (!row) return;
+      var block = row.closest('[data-fin-inv-payapps]'); if (!block) return;
+      var num = Number(row.getAttribute('data-payapp-num'));
+      var inv = _curInvoicing || { sov:[], payApps:[] };
+      var apps = Array.isArray(inv.payApps) ? inv.payApps : [];
+      var app = null;
+      apps.forEach(function(a){ if (Number(a.num) === num) app = a; });
+      if (!app) return;
+      var retFrac = Number(block.getAttribute('data-fin-inv-retfrac')) || 0;
+      var scvAttr = block.getAttribute('data-fin-inv-scv');
+      var scv = (scvAttr !== '' && scvAttr != null) ? Number(scvAttr) : null;
+      var panel = block.querySelector('[data-fin-inv-g702]');
+      if (panel) panel.innerHTML = g702CoverHtml(sovLinesFor(inv), apps, app, scv, retFrac);
+      // Highlight the selected row.
+      var rows = block.querySelectorAll('.fin-inv-payapp-row');
+      for (var i=0;i<rows.length;i++) rows[i].classList.remove('selected');
+      row.classList.add('selected');
+    };
+
     // ---- New Pay App inline form ----
+    // ---- New Pay App: per-line entry against the SOV ----
+    // Brad: invoice the SOV LINE BY LINE. Each SOV line is editable EITHER by entering
+    // the % complete (computes the $ for that line) OR by hard-keying the $ to invoice
+    // on that line -- the two stay linked. From Previous accumulates from earlier apps.
+    // Columns: Description | Current | From Previous | This Period ($) | % Complete (input)
+    //          | Total | Balance | Retainage. Live totals + G702 preview.
+    function payAppMoney(n){ return '$' + Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+    function payAppNum(raw){ raw = String(raw==null?'':raw).trim().replace(/[$,%]/g,''); if (raw==='') return null; var n = Number(raw); return (isFinite(n) && n >= 0) ? n : NaN; }
+
     window.pfInvNewPayApp = function(btn){
       var block = btn.closest('[data-fin-inv-payapps]'); if (!block) return;
       var form = block.querySelector('.fin-inv-payapp-form'); if (!form) return;
       var pctSet = block.getAttribute('data-fin-inv-pct');
-      var pctNote = (pctSet === '' )
-        ? '<div class="fin-inv-ie-err" style="display:block">Set a Retainage % (edit it above) first so retainage and net due can compute. You can still save at 0% retainage.</div>'
+      var retFrac = Number(block.getAttribute('data-fin-inv-retfrac')) || 0;
+      var inv = _curInvoicing || { sov:[], payApps:[] };
+      var sovLines = sovLinesFor(inv);
+      var apps = Array.isArray(inv.payApps) ? inv.payApps : [];
+      // The new app's number = one past the current highest.
+      var nextNum = 1;
+      apps.forEach(function(a){ if (Number(a.num) >= nextNum) nextNum = Number(a.num) + 1; });
+
+      if (!sovLines.length) {
+        form.innerHTML = '<div class="fin-inv-ie-err" style="display:block">Create the Schedule of Values first (add SOV lines and Save), then bill against it here.</div>'
+          + '<div class="fin-inv-ie-actions"><button type="button" class="pr-cancel-btn" onclick="window.pfInvCancelPayApp(this)">Close</button></div>';
+        form.style.display = 'block'; btn.style.display = 'none'; return;
+      }
+
+      var pctNote = (pctSet === '')
+        ? '<div class="fin-inv-ie-err" style="display:block">No Retainage % is set (edit it above). Retainage will compute at 0% until you set one.</div>'
         : '';
+
+      // Build one entry row per SOV line. Each carries Current + From Previous (fixed,
+      // from earlier apps) and two linked inputs: This Period $ and % Complete.
+      var rowsHtml = sovLines.map(function(line, idx){
+        var key = payAppLineKey(line, idx);
+        var orig = Number(line.originalScheduledValue) || 0;
+        var co = Number(line.approvedCO) || 0;
+        var current = Math.round((orig + co) * 100) / 100;
+        var fromPrev = fromPreviousForLine(apps, key, nextNum);
+        return '<tr class="fin-inv-pa-row" data-pa-key="' + E(key) + '" data-pa-current="' + current + '" data-pa-fromprev="' + fromPrev + '">'
+          + '<td class="pa-l-desc">' + (line.description ? E(line.description) : '<span class="ba-blank">&mdash;</span>') + '</td>'
+          + '<td class="num pa-l-current">' + E(payAppMoney(current)) + '</td>'
+          + '<td class="num pa-l-fromprev">' + E(payAppMoney(fromPrev)) + '</td>'
+          + '<td><input type="text" class="pa-l-this num" inputmode="decimal" placeholder="0.00"></td>'
+          + '<td><input type="text" class="pa-l-pct num" inputmode="decimal" placeholder="0"><span class="pa-l-pctsign">%</span></td>'
+          + '<td class="num pa-l-total">' + E(payAppMoney(fromPrev)) + '</td>'
+          + '<td class="num pa-l-balance">' + E(payAppMoney(Math.round((current - fromPrev)*100)/100)) + '</td>'
+          + '<td class="num pa-l-retheld">' + E(payAppMoney(Math.round(fromPrev * retFrac * 100)/100)) + '</td>'
+          + '</tr>';
+      }).join('');
+
       form.innerHTML =
-          '<div class="fin-inv-pa-grid">'
+          '<div class="fin-inv-pa-meta">'
+        +   '<div class="fin-inv-ie-row"><label>Application No.</label><input type="text" class="pa-num" value="' + E(String(nextNum)) + '" readonly></div>'
         +   '<div class="fin-inv-ie-row"><label>Date</label><input type="text" class="pa-date" placeholder="e.g. 07/28/26"></div>'
         +   '<div class="fin-inv-ie-row"><label>Billing Period</label><input type="text" class="pa-period" placeholder="e.g. July 2026"></div>'
-        +   '<div class="fin-inv-ie-row"><label>Amount This Period</label><input type="text" class="pa-amount" inputmode="decimal" placeholder="0.00"></div>'
+        +   '<div class="fin-inv-ie-row"><label>Type</label><select class="pa-type">'
+        +     '<option value="normal">Progress Payment</option><option value="retainage">Retainage Release (final)</option>'
+        +   '</select></div>'
         +   '<div class="fin-inv-ie-row"><label>Status</label><select class="pa-status">'
         +     '<option value="Draft">Draft</option><option value="Sent">Sent</option><option value="Paid">Paid</option>'
         +   '</select></div>'
         +   '<div class="fin-inv-ie-row pa-paiddate-row" style="display:none"><label>Paid Date</label><input type="text" class="pa-paiddate" placeholder="e.g. 08/15/26"></div>'
         + '</div>'
-        + '<div class="fin-inv-pa-calc">Retainage: <span class="pa-calc-ret">&mdash;</span> &nbsp;|&nbsp; Net Due: <span class="pa-calc-net">&mdash;</span></div>'
         + pctNote
+        + '<div class="fin-inv-pa-retnote" style="display:none">Retainage Release: this application bills the outstanding held retainage. Per-line entry is disabled; the amount due equals the retainage still held.</div>'
+        + '<div class="fin-inv-wrap"><table class="ba-table fin-inv-pa-table"><thead><tr>'
+        +   '<th class="pa-l-desc">Description</th><th class="num">Current<br>Scheduled Value</th><th class="num">From Previous</th>'
+        +   '<th class="num">This Period ($)</th><th class="num">% Complete</th><th class="num">Total<br>Completed</th><th class="num">Balance</th><th class="num">Retainage</th>'
+        + '</tr></thead><tbody>' + rowsHtml + '</tbody>'
+        + '<tfoot><tr class="fin-inv-pa-totrow"><td>Total</td>'
+        +   '<td class="num pa-t-current">&mdash;</td><td class="num pa-t-fromprev">&mdash;</td>'
+        +   '<td class="num pa-t-this">&mdash;</td><td class="num pa-t-pct">&mdash;</td>'
+        +   '<td class="num pa-t-total">&mdash;</td><td class="num pa-t-balance">&mdash;</td><td class="num pa-t-retheld">&mdash;</td>'
+        + '</tr></tfoot></table></div>'
+        + '<div class="fin-inv-pa-calc">Application Total (This Period): <span class="pa-calc-amt">$0.00</span> &nbsp;|&nbsp; Retainage: <span class="pa-calc-ret">$0.00</span> &nbsp;|&nbsp; Net Due: <span class="pa-calc-net">$0.00</span></div>'
         + '<div class="fin-inv-ie-err pa-err" style="display:none"></div>'
         + '<div class="fin-inv-ie-actions">'
         +   '<button type="button" class="pr-save-btn" onclick="window.pfInvSavePayApp(this)">Save Pay App</button>'
@@ -13578,26 +13967,150 @@ try {
         + '</div>';
       form.style.display = 'block';
       btn.style.display = 'none';
+      form.setAttribute('data-pa-retfrac', String(retFrac));
 
-      var pct = (pctSet === '') ? 0 : Number(pctSet);
-      var amtInput = form.querySelector('.pa-amount');
-      var retSpan = form.querySelector('.pa-calc-ret');
-      var netSpan = form.querySelector('.pa-calc-net');
-      function money(n){ return '$' + n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-      function recalc(){
-        var raw = (amtInput.value||'').trim().replace(/[$,]/g,'');
-        if (raw === '' || isNaN(Number(raw)) || Number(raw) < 0) { retSpan.textContent='—'; netSpan.textContent='—'; return; }
-        var amt = Number(raw);
-        var ret = Math.round(amt * (pct/100) * 100) / 100;
-        var net = Math.round((amt - ret) * 100) / 100;
-        retSpan.textContent = money(ret); netSpan.textContent = money(net);
-      }
-      amtInput.addEventListener('input', recalc);
       var statusSel = form.querySelector('.pa-status');
       var paidRow = form.querySelector('.pa-paiddate-row');
       statusSel.addEventListener('change', function(){ paidRow.style.display = (statusSel.value === 'Paid') ? '' : 'none'; });
-      amtInput.focus();
+      var typeSel = form.querySelector('.pa-type');
+      var retNote = form.querySelector('.fin-inv-pa-retnote');
+      var payTable = form.querySelector('.fin-inv-pa-table');
+      typeSel.addEventListener('change', function(){
+        var isRet = (typeSel.value === 'retainage');
+        if (retNote) retNote.style.display = isRet ? 'block' : 'none';
+        // Disable line inputs on a retainage-release app (amount = outstanding retainage).
+        var inputs = form.querySelectorAll('.pa-l-this, .pa-l-pct');
+        for (var i=0;i<inputs.length;i++){ inputs[i].disabled = isRet; if (isRet) inputs[i].value=''; }
+        if (payTable) payTable.classList.toggle('pa-disabled', isRet);
+        payAppRecalcAll(form, retFrac);
+      });
+
+      // Wire the linked This Period $ <-> % Complete inputs.
+      form.addEventListener('input', function(e){
+        var t = e.target;
+        if (!t) return;
+        var row = t.closest && t.closest('.fin-inv-pa-row');
+        if (!row) return;
+        if (t.classList.contains('pa-l-this')) { payAppRowFromThis(row, retFrac); payAppRecalcTotals(form, retFrac); }
+        else if (t.classList.contains('pa-l-pct')) { payAppRowFromPct(row, retFrac); payAppRecalcTotals(form, retFrac); }
+      });
+      payAppRecalcAll(form, retFrac);
     };
+
+    // Given "This Period $" typed on a row, derive Total, %, Balance, Retainage.
+    // Total = From Previous + This Period; % = Total / Current; clamp Total <= Current.
+    function payAppRowFromThis(row, retFrac){
+      var current = Number(row.getAttribute('data-pa-current')) || 0;
+      var fromPrev = Number(row.getAttribute('data-pa-fromprev')) || 0;
+      var thisIn = row.querySelector('.pa-l-this');
+      var pctIn = row.querySelector('.pa-l-pct');
+      var v = payAppNum(thisIn.value);
+      if (v === null) { payAppRowRender(row, fromPrev, 0, current, retFrac); if (pctIn) pctIn.value=''; return; }
+      if (isNaN(v)) { payAppRowBad(row); return; }
+      var thisP = v;
+      var total = Math.round((fromPrev + thisP) * 100) / 100;
+      var pct = (current > 0) ? (total / current) : null;
+      if (pctIn) pctIn.value = (pct == null) ? '' : String(Math.round(pct * 10000) / 100); // 2-dp %
+      payAppRowRender(row, fromPrev, thisP, current, retFrac);
+    }
+    // Given "% Complete" typed on a row, derive Total = (%/100)*Current, then
+    // This Period = Total - From Previous (clamp >= 0, Total <= Current).
+    function payAppRowFromPct(row, retFrac){
+      var current = Number(row.getAttribute('data-pa-current')) || 0;
+      var fromPrev = Number(row.getAttribute('data-pa-fromprev')) || 0;
+      var thisIn = row.querySelector('.pa-l-this');
+      var pctIn = row.querySelector('.pa-l-pct');
+      var raw = String(pctIn.value == null ? '' : pctIn.value).trim().replace(/%/g,'');
+      if (raw === '') { if (thisIn) thisIn.value=''; payAppRowRender(row, fromPrev, 0, current, retFrac); return; }
+      var p = Number(raw);
+      if (!isFinite(p) || p < 0) { payAppRowBad(row); return; }
+      var total = Math.round((p/100) * current * 100) / 100;
+      if (total > current) total = current;
+      var thisP = Math.round((total - fromPrev) * 100) / 100;
+      if (thisP < 0) thisP = 0;
+      if (thisIn) thisIn.value = (thisP === 0 ? '' : String(thisP));
+      payAppRowRender(row, fromPrev, thisP, current, retFrac);
+    }
+    function payAppRowRender(row, fromPrev, thisP, current, retFrac){
+      var total = Math.round((fromPrev + thisP) * 100) / 100;
+      if (total > current) total = current;
+      var balance = Math.round((current - total) * 100) / 100;
+      var retHeld = Math.round(total * retFrac * 100) / 100;
+      var tot = row.querySelector('.pa-l-total'); if (tot) tot.textContent = payAppMoney(total);
+      var bal = row.querySelector('.pa-l-balance'); if (bal) bal.textContent = payAppMoney(balance);
+      var ret = row.querySelector('.pa-l-retheld'); if (ret) ret.textContent = payAppMoney(retHeld);
+    }
+    function payAppRowBad(row){
+      ['.pa-l-total','.pa-l-balance','.pa-l-retheld'].forEach(function(sel){
+        var el = row.querySelector(sel); if (el) el.textContent = '!';
+      });
+    }
+    // Recompute every row's derived cells (used after a type toggle / initial render).
+    function payAppRecalcAll(form, retFrac){
+      var rows = form.querySelectorAll('.fin-inv-pa-row');
+      for (var i=0;i<rows.length;i++){
+        var row = rows[i];
+        var current = Number(row.getAttribute('data-pa-current')) || 0;
+        var fromPrev = Number(row.getAttribute('data-pa-fromprev')) || 0;
+        var thisIn = row.querySelector('.pa-l-this');
+        var v = payAppNum(thisIn ? thisIn.value : '');
+        var thisP = (v === null || isNaN(v)) ? 0 : v;
+        payAppRowRender(row, fromPrev, thisP, current, retFrac);
+      }
+      payAppRecalcTotals(form, retFrac);
+    }
+    // Recompute the footer totals + the Application Total / Retainage / Net Due summary.
+    function payAppRecalcTotals(form, retFrac){
+      var rows = form.querySelectorAll('.fin-inv-pa-row');
+      var tCur=0, tPrev=0, tThis=0, tTotal=0, tBal=0, tRet=0;
+      for (var i=0;i<rows.length;i++){
+        var row = rows[i];
+        var current = Number(row.getAttribute('data-pa-current')) || 0;
+        var fromPrev = Number(row.getAttribute('data-pa-fromprev')) || 0;
+        var v = payAppNum(row.querySelector('.pa-l-this') ? row.querySelector('.pa-l-this').value : '');
+        var thisP = (v === null || isNaN(v)) ? 0 : v;
+        var total = Math.round((fromPrev + thisP) * 100) / 100; if (total > current) total = current;
+        tCur += current; tPrev += fromPrev; tThis += thisP; tTotal += total;
+        tBal += Math.round((current - total)*100)/100; tRet += Math.round(total * retFrac * 100)/100;
+      }
+      function set(sel, n){ var el = form.querySelector(sel); if (el) el.textContent = payAppMoney(Math.round(n*100)/100); }
+      set('.pa-t-current', tCur); set('.pa-t-fromprev', tPrev); set('.pa-t-this', tThis);
+      set('.pa-t-total', tTotal); set('.pa-t-balance', tBal); set('.pa-t-retheld', tRet);
+      var pctEl = form.querySelector('.pa-t-pct');
+      if (pctEl) pctEl.textContent = (tCur > 0) ? (Math.round((tTotal/tCur)*100) + '%') : '—';
+      // Application summary. For a retainage-release app the amount = outstanding held.
+      var typeSel = form.querySelector('.pa-type');
+      var isRet = typeSel && typeSel.value === 'retainage';
+      var appAmt, appRet, appNet;
+      if (isRet) {
+        var outstanding = payAppOutstandingRetainage(retFrac);
+        appAmt = 0; appRet = 0; appNet = outstanding; // net due = the released retainage
+        setTxt(form, '.pa-calc-amt', payAppMoney(0));
+        setTxt(form, '.pa-calc-ret', payAppMoney(0));
+        setTxt(form, '.pa-calc-net', payAppMoney(outstanding) + ' (retainage released)');
+      } else {
+        appAmt = Math.round(tThis*100)/100;
+        appRet = Math.round(appAmt * retFrac * 100)/100;
+        appNet = Math.round((appAmt - appRet)*100)/100;
+        setTxt(form, '.pa-calc-amt', payAppMoney(appAmt));
+        setTxt(form, '.pa-calc-ret', payAppMoney(appRet));
+        setTxt(form, '.pa-calc-net', payAppMoney(appNet));
+      }
+    }
+    function setTxt(form, sel, txt){ var el = form.querySelector(sel); if (el) el.textContent = txt; }
+    // Outstanding held retainage = SUM over existing apps of retainage accrued minus
+    // already released (matches the info-block roll-up logic).
+    function payAppOutstandingRetainage(retFrac){
+      var inv = _curInvoicing || { payApps:[] };
+      var apps = Array.isArray(inv.payApps) ? inv.payApps : [];
+      var held = 0, released = 0;
+      apps.forEach(function(a){
+        if (a && a.type === 'retainage') released += (Number(a.amount)||0);
+        else held += (Number(a.retainage)||0);
+      });
+      return Math.round((held - released) * 100) / 100;
+    }
+
     window.pfInvCancelPayApp = function(btn){
       var form = btn.closest('.fin-inv-payapp-form'); if (!form) return;
       form.style.display='none'; form.innerHTML='';
@@ -13611,16 +14124,45 @@ try {
       function showErr(m){ if (errEl){ errEl.textContent=m; errEl.style.display='block'; } }
       var date = (form.querySelector('.pa-date').value||'').trim();
       var period = (form.querySelector('.pa-period').value||'').trim();
-      var amtRaw = (form.querySelector('.pa-amount').value||'').trim().replace(/[$,]/g,'');
+      var type = (form.querySelector('.pa-type') && form.querySelector('.pa-type').value === 'retainage') ? 'retainage' : 'normal';
       var status = form.querySelector('.pa-status').value || 'Draft';
       var paidDate = (form.querySelector('.pa-paiddate').value||'').trim();
-      if (amtRaw === '' || isNaN(Number(amtRaw)) || Number(amtRaw) < 0) {
-        showErr('Amount This Period must be a non-negative number.'); return;
+
+      // Collect per-line billing. A retainage-release app carries NO lines (the server
+      // computes its due from the outstanding retainage via the G702 cover).
+      var lines = {};
+      var anyBilled = false;
+      if (type !== 'retainage') {
+        var rows = form.querySelectorAll('.fin-inv-pa-row');
+        for (var i=0;i<rows.length;i++){
+          var row = rows[i];
+          var key = row.getAttribute('data-pa-key');
+          var v = payAppNum(row.querySelector('.pa-l-this').value);
+          if (v === null) continue;                 // blank line = not billed
+          if (isNaN(v)) { showErr('Line ' + (i+1) + ': This Period must be a non-negative number.'); return; }
+          // Guard: This Period cannot exceed the line's remaining balance.
+          var current = Number(row.getAttribute('data-pa-current')) || 0;
+          var fromPrev = Number(row.getAttribute('data-pa-fromprev')) || 0;
+          if (Math.round((fromPrev + v) * 100)/100 > current + 0.005) {
+            showErr('Line ' + (i+1) + ': This Period exceeds the remaining balance for that line.'); return;
+          }
+          if (v > 0) { lines[key] = { thisPeriod: v, materialsStored: 0 }; anyBilled = true; }
+        }
+        if (!anyBilled) { showErr('Enter at least one line amount (This Period or % Complete) before saving.'); return; }
       }
-      var amt = Number(amtRaw);
       if (errEl) errEl.style.display='none';
       btn.disabled = true; btn.textContent = 'Saving...';
-      invPost(invPayload({ appendPayApp: { date:date, period:period, amount:amt, status:status, paidDate:(status==='Paid'?paidDate:'') } }),
+      var appObj = { date:date, period:period, type:type, status:status, paidDate:(status==='Paid'?paidDate:'') };
+      if (type === 'retainage') {
+        // Retainage release: the app's amount = the outstanding held retainage (no lines).
+        // Sent as a lump amount so the roll-ups (Retainage Paid / Amount Invoiced) reflect it.
+        var block = form.closest('[data-fin-inv-payapps]');
+        var retFrac = block ? (Number(block.getAttribute('data-fin-inv-retfrac')) || 0) : 0;
+        appObj.amount = payAppOutstandingRetainage(retFrac);
+      } else {
+        appObj.lines = lines;
+      }
+      invPost(invPayload({ appendPayApp: appObj }),
         function(msg){ btn.disabled=false; btn.textContent='Save Pay App'; showErr(msg); },
         function(){ invRerender(btn); });
     };
@@ -13790,7 +14332,7 @@ try {
         if (srv) { _curInvoicing = srv; }
       } catch(e){}
       var retFrac = Number(block.getAttribute('data-fin-inv-retfrac')) || 0;
-      var lines = sovLinesFor(_curInvoicing);
+      var lines = sovLinesWithPayApps(_curInvoicing);
       // Rebuild the read-only table HTML with the saved lines + current retainage.
       var newRO = sovTableHtml(lines, retFrac, { editable:false });
       var body = block.querySelector('.fin-inv-sov-body');

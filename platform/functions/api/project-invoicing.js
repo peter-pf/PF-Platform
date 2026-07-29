@@ -31,11 +31,20 @@
 //       num: <int>,                         // auto-increment per project (1,2,3...)
 //       date: <string>,                     // application date (free text, capped)
 //       period: <string>,                   // billing period label (free text, capped)
-//       amount: <number>,                   // Amount This Period (dollars)
-//       retainage: <number>,                // = amount * retainagePct (client-computed, re-derived + stored)
-//       netDue: <number>,                   // = amount - retainage (client-computed, re-derived + stored)
+//       type: 'normal'|'retainage',         // 'retainage' = the final retainage-release app
+//       lines: {                            // PER-SOV-LINE billing (Phase A2). Keyed by the
+//         <lineKey>: {                      //   SOV line's item # (or its array index as fallback).
+//           thisPeriod: <number>,           //   "This Period" $ billed on this line in THIS app
+//           materialsStored: <number>       //   materials stored $ on this line in THIS app (optional)
+//         }, ...
+//       },
+//       amount: <number>,                   // = SUM of this app's line thisPeriod (server re-derived from lines)
+//       retainage: <number>,                // = amount * retainagePct (server re-derived)
+//       netDue: <number>,                   // = amount - retainage (server re-derived)
 //       status: 'Draft'|'Sent'|'Paid',
 //       paidDate: <string>                  // set when status=Paid (free text, capped)
+//       // LEGACY pay apps (pre-A2) have a lump `amount` and NO `lines`; those are
+//       // preserved as-is (treated as an unallocated pay app -- no per-line breakdown).
 //     }, ... ],
 //     _meta: { updatedBy, updatedAt }       // last writer + when (server-set)
 //   }
@@ -72,7 +81,9 @@ const MAX_STR = 80;                  // date / period / paidDate labels
 const MAX_SOV_STR = 200;             // SOV description can be longer than a date label
 const MAX_PAY_APPS = 200;            // generous cap; a job has a handful
 const MAX_SOV_LINES = 300;           // generous cap; a job has a handful of SOV lines
+const MAX_PAYAPP_LINES = 400;        // per-app line entries cap (>= MAX_SOV_LINES headroom)
 const STATUSES = { Draft: 1, Sent: 1, Paid: 1 };
+const PAYAPP_TYPES = { normal: 1, retainage: 1 };
 
 const JSON_HEADERS = {
   'Content-Type': 'application/json',
@@ -228,44 +239,15 @@ export async function onRequestPost(context) {
     const pct = cleanPct(parsed && parsed.retainagePct);
     if (!pct.ok) return json({ status: 'error', message: 'Retainage % must be a number between 0 and 100.' }, 400);
 
-    const inApps = (parsed && Array.isArray(parsed.payApps)) ? parsed.payApps : [];
-    if (inApps.length > MAX_PAY_APPS) return json({ status: 'error', message: 'Too many pay applications.' }, 413);
-
-    // Re-derive each pay app from the authoritative amount + project retainagePct.
-    // A pay app with a non-numeric amount is REJECTED (fail closed on bad money --
-    // never silently drop or coerce garbage to 0).
     const pctFrac = (pct.value == null ? 0 : pct.value) / 100;
-    const payApps = [];
-    for (let i = 0; i < inApps.length; i++) {
-      const a = inApps[i] || {};
-      const amt = cleanMoney(a.amount, false);
-      if (!amt.ok) {
-        return json({ status: 'error', message: 'Pay app #' + (i + 1) + ' amount must be a non-negative number.' }, 400);
-      }
-      let status = String(a.status == null ? 'Draft' : a.status).trim();
-      if (!STATUSES[status]) status = 'Draft';
-      const retainage = round2(amt.value * pctFrac);
-      const netDue = round2(amt.value - retainage);
-      const paidDate = (status === 'Paid') ? cleanStr(a.paidDate) : '';
-      payApps.push({
-        num: i + 1,                        // server owns numbering (1..N, submit order)
-        date: cleanStr(a.date),
-        period: cleanStr(a.period),
-        amount: amt.value,
-        retainage: retainage,
-        netDue: netDue,
-        status: status,
-        paidDate: paidDate,
-      });
-    }
 
-    // Sanitize the AIA G703 SOV lines. Store ONLY the entry fields; never store the
-    // derived columns (client re-derives Current Scheduled Value / Total Completed &
-    // Stored / % / Balance To Finish / Retainage Held). From Previous Application and
-    // This Period are pay-app driven (Phase A2) and NOT stored here. A line with a
-    // non-numeric Original Scheduled Value, Approved CO or Materials is REJECTED
-    // (fail closed). Legacy fields (division->costCode, originalSov->
-    // originalScheduledValue) are accepted so previously-saved records keep working.
+    // Sanitize the AIA G703 SOV lines FIRST (pay-app per-line billing references them,
+    // and the retainage-release computation needs each line's Current Scheduled Value).
+    // Store ONLY the entry fields; never store the derived columns (client re-derives
+    // Current Scheduled Value / Total Completed & Stored / % / Balance To Finish /
+    // Retainage Held). A line with a non-numeric Original Scheduled Value, Approved CO
+    // or Materials is REJECTED (fail closed). Legacy fields (division->costCode,
+    // originalSov->originalScheduledValue) are accepted so previously-saved records keep working.
     const inSov = (parsed && Array.isArray(parsed.sov)) ? parsed.sov : [];
     if (inSov.length > MAX_SOV_LINES) return json({ status: 'error', message: 'Too many schedule of values lines.' }, 413);
     const sov = [];
@@ -295,6 +277,93 @@ export async function onRequestPost(context) {
         approvedCO: co.value,
         materialsStored: mat.value,
       });
+    }
+
+    // The valid per-line billing keys for this SOV: each line's item # (if set), plus
+    // its array index as a stable fallback. Only lines keyed to a real SOV line count.
+    const sovKeySet = {};
+    for (let i = 0; i < sov.length; i++) {
+      sovKeySet[String(i)] = true;                       // index fallback key
+      const it = sov[i] && sov[i].item;
+      if (it != null && String(it).trim() !== '') sovKeySet[String(it).trim()] = true;
+    }
+
+    const inApps = (parsed && Array.isArray(parsed.payApps)) ? parsed.payApps : [];
+    if (inApps.length > MAX_PAY_APPS) return json({ status: 'error', message: 'Too many pay applications.' }, 413);
+
+    // Re-derive each pay app. Phase A2 model: a pay app carries per-SOV-line billing in
+    // `lines` { <lineKey>: { thisPeriod, materialsStored } }. The app's `amount` (Amount
+    // This Period) is the SUM of its line thisPeriod values -- the SERVER re-derives it
+    // (a tampered client cannot claim an amount that disagrees with its lines). Retainage
+    // and netDue derive from amount * project retainagePct. LEGACY apps (a lump `amount`
+    // and NO `lines`) are preserved as unallocated: their amount is used directly.
+    // Any bad money (line or lump) is REJECTED (fail closed -- never coerce garbage to 0).
+    const payApps = [];
+    for (let i = 0; i < inApps.length; i++) {
+      const a = inApps[i] || {};
+      let type = String(a.type == null ? 'normal' : a.type).trim();
+      if (!PAYAPP_TYPES[type]) type = 'normal';
+      let status = String(a.status == null ? 'Draft' : a.status).trim();
+      if (!STATUSES[status]) status = 'Draft';
+      const paidDate = (status === 'Paid') ? cleanStr(a.paidDate) : '';
+
+      // Per-line billing (the A2 path). Sanitize into a clean keyed map; sum thisPeriod.
+      let lines = null;
+      let amountFromLines = 0;
+      const rawLines = (a && a.lines && typeof a.lines === 'object' && !Array.isArray(a.lines)) ? a.lines : null;
+      if (rawLines) {
+        lines = {};
+        const keys = Object.keys(rawLines);
+        if (keys.length > MAX_PAYAPP_LINES) {
+          return json({ status: 'error', message: 'Pay app #' + (i + 1) + ' has too many line entries.' }, 413);
+        }
+        for (let k = 0; k < keys.length; k++) {
+          const key = String(keys[k]);
+          if (!sovKeySet[key]) continue;                 // drop lines not tied to a real SOV line
+          const le = rawLines[key] || {};
+          const tp = cleanMoney(le.thisPeriod, false);
+          if (!tp.ok) {
+            return json({ status: 'error', message: 'Pay app #' + (i + 1) + ' line "' + key.slice(0, 20) + '" This Period must be a non-negative number.' }, 400);
+          }
+          const ms = cleanMoney(le.materialsStored, false);
+          if (!ms.ok) {
+            return json({ status: 'error', message: 'Pay app #' + (i + 1) + ' line "' + key.slice(0, 20) + '" Materials Stored must be a non-negative number.' }, 400);
+          }
+          // Only persist a line if it actually bills something (keeps the map lean).
+          if (tp.value > 0 || ms.value > 0) {
+            lines[key] = { thisPeriod: tp.value, materialsStored: ms.value };
+            amountFromLines = round2(amountFromLines + tp.value);
+          }
+        }
+      }
+
+      let amount;
+      if (lines) {
+        amount = amountFromLines;                        // server-derived from the line entries
+      } else {
+        // LEGACY unallocated pay app: use the lump amount as-is.
+        const amt = cleanMoney(a.amount, false);
+        if (!amt.ok) {
+          return json({ status: 'error', message: 'Pay app #' + (i + 1) + ' amount must be a non-negative number.' }, 400);
+        }
+        amount = amt.value;
+      }
+      const retainage = round2(amount * pctFrac);
+      const netDue = round2(amount - retainage);
+
+      const app = {
+        num: i + 1,                        // server owns numbering (1..N, submit order)
+        date: cleanStr(a.date),
+        period: cleanStr(a.period),
+        type: type,
+        amount: amount,
+        retainage: retainage,
+        netDue: netDue,
+        status: status,
+        paidDate: paidDate,
+      };
+      if (lines) app.lines = lines;        // omit `lines` entirely for legacy unallocated apps
+      payApps.push(app);
     }
 
     // FAIL CLOSED: no KV -> we cannot persist. Do NOT report success.
