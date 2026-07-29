@@ -82,7 +82,7 @@ const MAX_SOV_STR = 200;             // SOV description can be longer than a dat
 const MAX_PAY_APPS = 200;            // generous cap; a job has a handful
 const MAX_SOV_LINES = 300;           // generous cap; a job has a handful of SOV lines
 const MAX_PAYAPP_LINES = 400;        // per-app line entries cap (>= MAX_SOV_LINES headroom)
-const STATUSES = { Draft: 1, Sent: 1, Paid: 1 };
+const STATUSES = { Draft: 1, Sent: 1, Approved: 1, Paid: 1 };
 const PAYAPP_TYPES = { normal: 1, retainage: 1 };
 
 const JSON_HEADERS = {
@@ -363,6 +363,16 @@ export async function onRequestPost(context) {
         paidDate: paidDate,
       };
       if (lines) app.lines = lines;        // omit `lines` entirely for legacy unallocated apps
+      // APPROVAL STAMP: an Approved (or Paid) pay app is FINAL/LOCKED. Record who/when.
+      // Preserve a pre-existing approvedAt (re-saving the record must not reset the stamp);
+      // stamp fresh the first time it crosses into an approved/final state.
+      if (status === 'Approved' || status === 'Paid') {
+        const priorAt = cleanStr(a.approvedAt);
+        const priorBy = cleanStr(a.approvedBy);
+        app.approvedAt = priorAt || null;   // set below if newly approving
+        app.approvedBy = priorBy || null;
+        app._pendingApprovalStamp = !priorAt; // marker: needs a fresh stamp
+      }
       payApps.push(app);
     }
 
@@ -375,6 +385,16 @@ export async function onRequestPost(context) {
     const who = (session && (session.name || session.uid))
       ? String(session.name || session.uid).slice(0, 200).replace(/[<>]/g, '') : 'unknown';
     const nowIso = new Date().toISOString();
+
+    // Finalize approval stamps: any newly-approved app gets this user + now; drop the marker.
+    for (let i = 0; i < payApps.length; i++) {
+      const app = payApps[i];
+      if (app._pendingApprovalStamp) {
+        app.approvedAt = nowIso;
+        app.approvedBy = who;
+      }
+      delete app._pendingApprovalStamp;
+    }
 
     const toStore = {
       version: 1,

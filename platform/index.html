@@ -1991,6 +1991,19 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 .fin-inv-g703cont th, .fin-inv-g703cont td { white-space:normal; word-break:keep-all; vertical-align:top; }
 .fin-inv-g703cont td.num, .fin-inv-g703cont th.num { text-align:right; font-variant-numeric:tabular-nums; }
 .fin-inv-g703cont td.sov-desc { min-width:200px; }
+/* Pay-app status pills + locked indicator + per-row action buttons */
+.fin-inv-st { display:inline-block; font-size:0.72rem; font-weight:600; padding:2px 8px; border-radius:10px;
+  border:1px solid var(--border); color:var(--text-2); background:var(--bg-1); white-space:nowrap; }
+.fin-inv-st-approved { color:var(--accent); border-color:var(--accent); background:rgba(212,160,23,0.10); }
+.fin-inv-st-paid { color:#2e7d32; border-color:#2e7d32; background:rgba(46,125,50,0.10); }
+.fin-inv-lock { font-size:0.72rem; }
+.fin-inv-payapp-row.locked td { background:rgba(212,160,23,0.04); }
+.fin-inv-acts { white-space:nowrap; }
+.fin-inv-rowbtn { font-size:0.72rem; font-weight:600; padding:3px 9px; margin:0 3px 0 0; border-radius:5px;
+  border:1px solid var(--border); background:var(--bg-1); color:var(--text-1); cursor:pointer; }
+.fin-inv-rowbtn:hover { border-color:var(--accent); }
+.fin-inv-rowbtn-approve { border-color:var(--accent); color:var(--accent); }
+.fin-inv-rowbtn-print.primary { border-color:var(--accent); background:var(--accent); color:#1a1a1a; }
 
 .pr-fields {
   display: grid;
@@ -13140,16 +13153,38 @@ try {
       // shown by default when the block first renders.
       var latestAppNum = 0;
       payApps.forEach(function(a){ if (Number(a.num) > latestAppNum) latestAppNum = Number(a.num); });
+      // A pay app is LOCKED (final, uneditable) once Approved or Paid. An approved app
+      // is the "completed" version whose PDF export is the finalized pay application.
+      function payAppIsLocked(a){ return a && (a.status === 'Approved' || a.status === 'Paid'); }
       var payRowsHtml = '';
       if (invErr) {
-        payRowsHtml = '<tr class="fin-inv-empty"><td colspan="9">Could not load invoicing data. Please retry.</td></tr>';
+        payRowsHtml = '<tr class="fin-inv-empty"><td colspan="10">Could not load invoicing data. Please retry.</td></tr>';
       } else if (!payApps.length) {
-        payRowsHtml = '<tr class="fin-inv-empty"><td colspan="9">No pay applications yet</td></tr>';
+        payRowsHtml = '<tr class="fin-inv-empty"><td colspan="10">No pay applications yet</td></tr>';
       } else {
         payRowsHtml = payApps.map(function(a){
           var typeLabel = (a.type === 'retainage') ? 'Retainage Release' : 'Progress';
           var isSel = (Number(a.num) === latestAppNum);
-          return '<tr class="fin-inv-payapp-row' + (isSel ? ' selected' : '') + '" data-payapp-num="' + E(String(a.num)) + '" onclick="window.pfInvShowG702(this)" title="Show G702 cover">'
+          var locked = payAppIsLocked(a);
+          var st = a.status || 'Draft';
+          // Status cell: pill with a locked padlock for Approved/Paid.
+          var stCls = 'fin-inv-st fin-inv-st-' + st.toLowerCase();
+          var stHtml = '<span class="' + stCls + '">'
+            + (locked ? '<span class="fin-inv-lock" title="Locked (final)">&#128274;</span> ' : '')
+            + E(st) + '</span>';
+          // Actions cell (office only): Approve (draft/sent only) + Print/Export PDF.
+          // Buttons stopPropagation so clicking them does not toggle the G702 preview.
+          var acts = '';
+          if (canEdit() && !locked) {
+            acts += '<button type="button" class="fin-inv-rowbtn fin-inv-rowbtn-approve" '
+              + 'onclick="event.stopPropagation();window.pfInvApprovePayApp(' + E(String(a.num)) + ')" '
+              + 'title="Approve &amp; lock this pay application">Approve</button>';
+          }
+          acts += '<button type="button" class="fin-inv-rowbtn fin-inv-rowbtn-print' + (locked ? ' primary' : '') + '" '
+            + 'onclick="event.stopPropagation();window.pfInvPrintPayApp(' + E(String(a.num)) + ')" '
+            + 'title="' + (locked ? 'Export the completed pay application PDF' : 'Print / export this pay application (DRAFT)') + '">'
+            + (locked ? 'Export PDF' : 'Print (Draft)') + '</button>';
+          return '<tr class="fin-inv-payapp-row' + (isSel ? ' selected' : '') + (locked ? ' locked' : '') + '" data-payapp-num="' + E(String(a.num)) + '" onclick="window.pfInvShowG702(this)" title="Show G702 cover">'
             + '<td>' + E(String(a.num)) + '</td>'
             + '<td>' + (a.date ? E(a.date) : finDash) + '</td>'
             + '<td>' + (a.period ? E(a.period) : finDash) + '</td>'
@@ -13157,8 +13192,9 @@ try {
             + '<td class="num">' + E(baMoney(a.amount)) + '</td>'
             + '<td class="num">' + E(baMoney(a.retainage)) + '</td>'
             + '<td class="num">' + E(baMoney(a.netDue)) + '</td>'
-            + '<td>' + E(a.status || 'Draft') + '</td>'
+            + '<td>' + stHtml + '</td>'
             + '<td>' + (a.paidDate ? E(a.paidDate) : finDash) + '</td>'
+            + '<td class="fin-inv-acts">' + acts + '</td>'
             + '</tr>';
         }).join('');
       }
@@ -13187,7 +13223,7 @@ try {
         +   '<div class="fin-inv-wrap"><table class="ba-table"><thead><tr>'
         +     '<th>#</th><th>Date</th><th>Billing Period</th><th>Type</th>'
         +     '<th class="num">This Period</th><th class="num">Retainage</th><th class="num">Net Due</th>'
-        +     '<th>Status</th><th>Paid Date</th>'
+        +     '<th>Status</th><th>Paid Date</th><th>Actions</th>'
         +   '</tr></thead><tbody>'
         +     payRowsHtml
         +   '</tbody></table></div>'
@@ -13778,6 +13814,21 @@ try {
         if ('retainagePct' in over) pct = over.retainagePct;
         if ('appendPayApp' in over) apps = apps.concat([over.appendPayApp]);
         if ('sov' in over) sov = Array.isArray(over.sov) ? over.sov : [];
+        // setAppStatus: { num, status } -- change ONE existing pay app's status in place
+        // (e.g. Approve). All other apps + their line data are sent unchanged, so the
+        // From-Previous accumulation for later apps is preserved bit-for-bit.
+        if (over.setAppStatus && over.setAppStatus.num != null) {
+          var tgtNum = Number(over.setAppStatus.num);
+          var newStatus = String(over.setAppStatus.status || '');
+          apps = apps.map(function(a){
+            if (Number(a.num) === tgtNum) {
+              var c = {}; for (var k in a) { if (a.hasOwnProperty(k)) c[k] = a[k]; }
+              c.status = newStatus;
+              return c;
+            }
+            return a;
+          });
+        }
       }
       // Only the input fields matter to the server for pay apps (it re-derives amount,
       // retainage, netDue). Per-line billing (`lines`) + `type` pass through; a legacy
@@ -13790,6 +13841,9 @@ try {
         } else {
           o.amount = a.amount;          // legacy unallocated pay app
         }
+        // Preserve an existing approval stamp so re-saving the record never resets it.
+        if (a.approvedAt) o.approvedAt = a.approvedAt;
+        if (a.approvedBy) o.approvedBy = a.approvedBy;
         return o;
       });
       // G703 entry fields only (server re-derives Current/Total/%/Balance/Retainage).
@@ -13903,6 +13957,331 @@ try {
       row.classList.add('selected');
     };
 
+    // ---- Approve (lock) a pay app ----
+    // Flips ONE existing pay app to status "Approved". The server stamps approvedBy/At
+    // and the app becomes final: it can no longer be edited (there is no edit path for a
+    // submitted app; new apps only append), so the From-Previous accumulation for later
+    // apps stays correct. Office-only; the server re-gates.
+    window.pfInvApprovePayApp = function(num){
+      num = Number(num);
+      var inv = _curInvoicing || { payApps:[] };
+      var apps = Array.isArray(inv.payApps) ? inv.payApps : [];
+      var app = null; apps.forEach(function(a){ if (Number(a.num) === num) app = a; });
+      if (!app) return;
+      if (app.status === 'Approved' || app.status === 'Paid') return; // already locked
+      if (!window.confirm('Approve Pay Application No. ' + num + '?\n\nAn approved pay app is FINAL and cannot be edited. Its export becomes the completed pay application.')) return;
+      invPost(invPayload({ setAppStatus: { num: num, status: 'Approved' } }),
+        function(msg){ alert('Approve failed: ' + msg); },
+        function(){ invRerenderFromDoc(); });
+    };
+    // Re-render the record from a global anchor (row buttons have no `this` element to
+    // hand to invRerender). Falls back to reloading if the anchor is not found.
+    function invRerenderFromDoc(){
+      var anchor = document.querySelector('[data-fin-inv-payapps]');
+      if (anchor) { invRerender(anchor); }
+      else { location.reload(); }
+    }
+
+    // ---- Print / Export the full pay application PDF (G702 page 1 + G703 page 2) ----
+    // Opens a print-optimized, letter-size, 2-page standalone window that matches PF's
+    // AIA G702/G703 template. PAGE 1 = the G702 Application & Certificate for Payment,
+    // PAGE 2 = the G703 continuation (the SOV line table). The user prints / saves to PDF
+    // (mirrors PF's Excel -> PDF workflow). An APPROVED app is the COMPLETED pay app;
+    // a draft is watermarked DRAFT. FAIL CLOSED: fields the portal does not hold render
+    // BLANK -- nothing is fabricated.
+    window.pfInvPrintPayApp = function(num){
+      num = Number(num);
+      var inv = _curInvoicing || { sov:[], payApps:[], retainagePct:null, subcontractValue:null };
+      var apps = Array.isArray(inv.payApps) ? inv.payApps : [];
+      var app = null; apps.forEach(function(a){ if (Number(a.num) === num) app = a; });
+      if (!app) { alert('Pay application not found.'); return; }
+      var retFrac = (typeof inv.retainagePct === 'number') ? (inv.retainagePct/100) : 0;
+      var scv = (typeof inv.subcontractValue === 'number') ? inv.subcontractValue : null;
+      var sovLines = sovLinesFor(inv);
+      var cover = g702CoverForApp(sovLines, apps, app, scv, retFrac);
+      var g703 = cover.g703;
+
+      // ---- header fields from the project record (fail closed to blank) ----
+      var D = null; try { D = resolveRecord(_curNum); } catch(e) { D = null; }
+      var bid = (D && D.bid_log) || {};
+      var SF = (D && D.subcontract && D.subcontract.fields) || {};
+      var pnum = (D && D.project_number) ? D.project_number : (_curNum || '');
+      var pname = (D && D.project_name) ? D.project_name : '';
+      var gcName = bid.gc_name || SF.gc_party || '';
+      var projAddr = bid.address || SF.project_address || '';
+      var projCityState = bid.city_state || (D && D.location) || '';
+      var retPctLabel = (typeof inv.retainagePct === 'number') ? (inv.retainagePct + '%') : '';
+      var isLocked = (app.status === 'Approved' || app.status === 'Paid');
+      var typeLabel = (app.type === 'retainage') ? 'Retainage Release' : 'Progress Payment';
+
+      // Change Order Summary: the portal holds only a single Approved CO total per SOV
+      // line (summed into Net Change). We cannot split it into prior-months vs this-month,
+      // so ADDITIONS = the net CO total, DEDUCTIONS = blank (not fabricated), TOTALS = net.
+      var coTotal = cover.line2;
+
+      var win = window.open('', '_blank');
+      if (!win) { alert('Please allow pop-ups to export the pay application PDF.'); return; }
+      win.document.open();
+      win.document.write(payAppPrintHtml({
+        num: num, app: app, cover: cover, g703: g703,
+        pnum: pnum, pname: pname, gcName: gcName, projAddr: projAddr,
+        projCityState: projCityState, retPctLabel: retPctLabel, retFrac: retFrac,
+        isLocked: isLocked, typeLabel: typeLabel, coTotal: coTotal
+      }));
+      win.document.close();
+    };
+
+    // Build the standalone 2-page print document (G702 + G703) as an HTML string.
+    // baMoney is the portal money formatter (thouscommas + 2 dec). Blank helper renders
+    // a light-gray underline placeholder for fields we do not hold (no fabrication).
+    function payAppPrintHtml(o){
+      var app = o.app, c = o.cover, g = o.g703;
+      function m(n){ return E(baMoney(n)); }                 // $ always (real computed sums)
+      function blank(v){ return (v != null && String(v).trim() !== '') ? E(String(v)) : '<span class="pp-blank"></span>'; }
+      var appDate = app.date || '';
+      var period = app.period || '';
+      // -------- PAGE 1: G702 Application and Certificate for Payment --------
+      var g702Lines = [
+        ['1.', 'ORIGINAL CONTRACT SUM', c.line1],
+        ['2.', 'Net change by Change Orders', c.line2],
+        ['3.', 'CONTRACT SUM TO DATE (Line 1 &plusmn; 2)', c.line3],
+        ['4.', 'TOTAL COMPLETED &amp; STORED TO DATE (Column G on G703)', c.line4],
+        ['5.', 'RETAINAGE (Total in Column I of G703)', c.line5],
+        ['6.', 'TOTAL EARNED LESS RETAINAGE (Line 4 less Line 5)', c.line6],
+        ['7.', 'LESS PREVIOUS CERTIFICATES FOR PAYMENT (Line 6 from prior Certificate)', c.line7],
+        ['8.', 'CURRENT PAYMENT DUE', c.line8, true],
+        ['9.', 'BALANCE TO FINISH, INCLUDING RETAINAGE (Line 3 less Line 6)', c.line9]
+      ];
+      var lineRows = g702Lines.map(function(r){
+        return '<tr' + (r[3] ? ' class="pp-due"' : '') + '>'
+          + '<td class="pp-lno">' + r[0] + '</td>'
+          + '<td class="pp-llbl">' + r[1] + '</td>'
+          + '<td class="pp-lamt">' + m(r[2]) + '</td></tr>';
+      }).join('');
+
+      // 5a / 5b retainage detail (a = % of completed work, b = % of stored material).
+      var retCompleted = Math.round(g.totals.total * 100)/100;      // Column G total (completed+stored)
+      var retStored = Math.round(g.totals.materials * 100)/100;     // Column F total (materials)
+      var retPct = o.retPctLabel || '';
+
+      var draftWatermark = o.isLocked ? '' : '<div class="pp-watermark">DRAFT</div>';
+
+      var page1 =
+        '<div class="pp-page">' + draftWatermark
+        + '<div class="pp-title">APPLICATION AND CERTIFICATE FOR PAYMENT</div>'
+        + '<div class="pp-subtitle">AIA TYPE DOCUMENT G702' + (o.isLocked ? '' : ' &mdash; DRAFT') + '</div>'
+        // top identity grid: TO / PROJECT / app meta
+        + '<table class="pp-hdr"><tbody>'
+        +   '<tr>'
+        +     '<td class="pp-hlbl">TO:</td><td class="pp-hval">' + blank(o.gcName) + '</td>'
+        +     '<td class="pp-hlbl">PROJECT:</td><td class="pp-hval">' + blank(o.pname) + '</td>'
+        +     '<td class="pp-hlbl">Application No.</td><td class="pp-hval">' + E(String(o.num)) + '</td>'
+        +   '</tr>'
+        +   '<tr>'
+        +     '<td class="pp-hlbl"></td><td class="pp-hval">' + blank(o.projAddr) + '</td>'
+        +     '<td class="pp-hlbl"></td><td class="pp-hval">' + blank(o.projAddr) + '</td>'
+        +     '<td class="pp-hlbl">Application Date</td><td class="pp-hval">' + blank(appDate) + '</td>'
+        +   '</tr>'
+        +   '<tr>'
+        +     '<td class="pp-hlbl"></td><td class="pp-hval"></td>'
+        +     '<td class="pp-hlbl"></td><td class="pp-hval">' + blank(o.projCityState) + '</td>'
+        +     '<td class="pp-hlbl">Period To</td><td class="pp-hval">' + blank(period) + '</td>'
+        +   '</tr>'
+        +   '<tr>'
+        +     '<td class="pp-hlbl">FROM CONTRACTOR:</td><td class="pp-hval">Pier Foundations, LLC</td>'
+        +     '<td class="pp-hlbl">Architect:</td><td class="pp-hval"><span class="pp-blank"></span></td>'
+        +     '<td class="pp-hlbl">Contract No.</td><td class="pp-hval"><span class="pp-blank"></span></td>'
+        +   '</tr>'
+        +   '<tr>'
+        +     '<td class="pp-hlbl"></td><td class="pp-hval">429 E Dupont Rd #84</td>'
+        +     '<td class="pp-hlbl">Scope of Work:</td><td class="pp-hval">Vibratory Stone Columns</td>'
+        +     '<td class="pp-hlbl">Contract Date</td><td class="pp-hval"><span class="pp-blank"></span></td>'
+        +   '</tr>'
+        +   '<tr>'
+        +     '<td class="pp-hlbl"></td><td class="pp-hval">Fort Wayne, IN 46825</td>'
+        +     '<td class="pp-hlbl"></td><td class="pp-hval"></td>'
+        +     '<td class="pp-hlbl"></td><td class="pp-hval"></td>'
+        +   '</tr>'
+        + '</tbody></table>'
+        // two-column body: left = application (9 lines + CO summary), right = certification
+        + '<div class="pp-body">'
+        +   '<div class="pp-col-left">'
+        +     '<div class="pp-secttl">CONTRACTOR\'S APPLICATION FOR PAYMENT</div>'
+        +     '<div class="pp-note">Application is made for payment, as shown below, in connection with the Contract. '
+        +       'Continuation Sheet, AIA Document G703, is attached.</div>'
+        +     '<table class="pp-lines"><tbody>' + lineRows + '</tbody></table>'
+        +     '<div class="pp-retdetail">'
+        +       '<div><span class="pp-rd-lbl">5a. ' + (retPct ? E(retPct) : '') + ' % of Completed Work (Column D + E on G703)</span>'
+        +         '<span class="pp-rd-val">' + m(Math.round(retCompleted * o.retFrac * 100)/100) + '</span></div>'
+        +       '<div><span class="pp-rd-lbl">5b. % of Stored Material (Column F on G703)</span>'
+        +         '<span class="pp-rd-val">' + m(Math.round(retStored * o.retFrac * 100)/100) + '</span></div>'
+        +     '</div>'
+        +     '<div class="pp-costbl">'
+        +       '<div class="pp-secttl">CHANGE ORDER SUMMARY</div>'
+        +       '<table class="pp-co"><thead><tr><th></th><th class="pp-r">ADDITIONS</th><th class="pp-r">DEDUCTIONS</th></tr></thead>'
+        +       '<tbody>'
+        +         '<tr><td>Total Change Orders Approved in Previous Months by Owner</td><td class="pp-r"><span class="pp-blank"></span></td><td class="pp-r"><span class="pp-blank"></span></td></tr>'
+        +         '<tr><td>Total Change Orders Approved This Month</td><td class="pp-r"><span class="pp-blank"></span></td><td class="pp-r"><span class="pp-blank"></span></td></tr>'
+        +         '<tr class="pp-co-tot"><td>TOTALS</td><td class="pp-r">' + m(o.coTotal >= 0 ? o.coTotal : 0) + '</td><td class="pp-r">' + m(o.coTotal < 0 ? Math.abs(o.coTotal) : 0) + '</td></tr>'
+        +         '<tr class="pp-co-net"><td>NET CHANGES by Change Order</td><td class="pp-r" colspan="2">' + m(o.coTotal) + '</td></tr>'
+        +       '</tbody></table>'
+        +     '</div>'
+        +   '</div>'
+        +   '<div class="pp-col-right">'
+        +     '<div class="pp-note">The undersigned Subcontractor certifies that to the best of the Subcontractor\'s knowledge, '
+        +       'information and belief the Work covered by this Application for Payment has been completed in accordance with the '
+        +       'Contract Documents, that all amounts have been paid by the Contractor for Work for which previous Certificates for '
+        +       'Payment were issued and payments received from the Contractor, and that current payment shown herein is now due.</div>'
+        +     '<div class="pp-sig">CONTRACTOR: Pier Foundations, LLC</div>'
+        +     '<div class="pp-sigline">By: <span class="pp-underline"></span> Date: <span class="pp-underline pp-short"></span></div>'
+        +     '<div class="pp-sigrow"><span>State of: <span class="pp-underline pp-short"></span></span><span>County of: <span class="pp-underline pp-short"></span></span></div>'
+        +     '<div class="pp-sigline">Subscribed and sworn to before me this <span class="pp-underline pp-short"></span> day of <span class="pp-underline pp-short"></span></div>'
+        +     '<div class="pp-sigline">Notary Public: <span class="pp-underline"></span></div>'
+        +     '<div class="pp-sigline">My Commission expires: <span class="pp-underline"></span></div>'
+        +     '<div class="pp-secttl">CONTRACTOR\'S CERTIFICATE FOR PAYMENT</div>'
+        +     '<div class="pp-note">In accordance with the Contract Documents, based on on-site observations and the data comprising '
+        +       'this application, the Subcontractor certifies to the General Contractor that to the best of their knowledge, information '
+        +       'and belief the Work has progressed as indicated, the quality of the Work is in accordance with the Contract Documents, '
+        +       'and the Subcontractor is entitled to payment of the AMOUNT CERTIFIED.</div>'
+        +     '<div class="pp-amtcert"><span>AMOUNT CERTIFIED:</span><b>' + m(c.line8) + '</b></div>'
+        +     '<div class="pp-note pp-small">(Attach explanation if amount certified differs from the amount applied for.)</div>'
+        +     '<div class="pp-sig">General Contractor:</div>'
+        +     '<div class="pp-sigline">By: <span class="pp-underline"></span> Date: <span class="pp-underline pp-short"></span></div>'
+        +     '<div class="pp-note pp-small">This Certificate is not negotiable. The AMOUNT CERTIFIED is payable only to the Contractor named herein. '
+        +       'Issuance, payment and acceptance of payment are without prejudice to any rights of the Owner or Contractor under this contract.</div>'
+        +   '</div>'
+        + '</div>'
+        + '</div>';
+
+      // -------- PAGE 2: G703 Continuation Sheet --------
+      var contRows = g.rows.map(function(row, i){
+        var pctTxt = (row.pct == null) ? '' : (Math.round(row.pct*100) + '%');
+        return '<tr>'
+          + '<td class="pp-g-a">' + (row.item ? E(String(row.item)) : '') + '</td>'
+          + '<td class="pp-g-b">' + (row.costCode ? E(String(row.costCode)) : '') + '</td>'
+          + '<td class="pp-g-c">' + (row.description ? E(row.description) : '') + '</td>'
+          + '<td class="pp-r">' + m(row.orig) + '</td>'
+          + '<td class="pp-r">' + m(row.co) + '</td>'
+          + '<td class="pp-r">' + m(row.current) + '</td>'
+          + '<td class="pp-r">' + m(row.fromPrev) + '</td>'
+          + '<td class="pp-r">' + m(row.thisPeriod) + '</td>'
+          + '<td class="pp-r">' + m(row.materials) + '</td>'
+          + '<td class="pp-r">' + m(row.total) + '</td>'
+          + '<td class="pp-r">' + E(pctTxt) + '</td>'
+          + '<td class="pp-r">' + m(row.balance) + '</td>'
+          + '<td class="pp-r">' + m(row.retHeld) + '</td>'
+          + '</tr>';
+      }).join('');
+      var t = g.totals;
+      var tPct = (t.pct == null) ? '' : (Math.round(t.pct*100) + '%');
+      var totRow = '<tr class="pp-g-tot">'
+        + '<td class="pp-g-a"></td><td class="pp-g-b"></td><td class="pp-g-c">GRAND TOTALS</td>'
+        + '<td class="pp-r">' + m(t.orig) + '</td>'
+        + '<td class="pp-r">' + m(t.co) + '</td>'
+        + '<td class="pp-r">' + m(t.current) + '</td>'
+        + '<td class="pp-r">' + m(t.fromPrev) + '</td>'
+        + '<td class="pp-r">' + m(t.thisPeriod) + '</td>'
+        + '<td class="pp-r">' + m(t.materials) + '</td>'
+        + '<td class="pp-r">' + m(t.total) + '</td>'
+        + '<td class="pp-r">' + E(tPct) + '</td>'
+        + '<td class="pp-r">' + m(t.balance) + '</td>'
+        + '<td class="pp-r">' + m(t.retHeld) + '</td>'
+        + '</tr>';
+
+      var page2 =
+        '<div class="pp-page pp-page2">' + (o.isLocked ? '' : '<div class="pp-watermark">DRAFT</div>')
+        + '<div class="pp-title">CONTINUATION SHEET</div>'
+        + '<div class="pp-subtitle">AIA TYPE DOCUMENT G703' + (o.isLocked ? '' : ' &mdash; DRAFT') + '</div>'
+        + '<div class="pp-g-meta">'
+        +   '<span><b>Project:</b> ' + blank(o.pname) + '</span>'
+        +   '<span><b>Application No.:</b> ' + E(String(o.num)) + '</span>'
+        +   '<span><b>Application Date:</b> ' + blank(appDate) + '</span>'
+        +   '<span><b>Period To:</b> ' + blank(period) + '</span>'
+        +   '<span><b>Contractor:</b> Pier Foundations, LLC</span>'
+        + '</div>'
+        + '<table class="pp-g703">'
+        +   '<thead>'
+        +     '<tr class="pp-g-letters"><th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>F</th>'
+        +       '<th colspan="2">D&nbsp;&nbsp;&nbsp;WORK COMPLETED&nbsp;&nbsp;&nbsp;E</th><th>F</th><th>G</th><th>%</th><th>H</th><th>I</th></tr>'
+        +     '<tr><th>Item<br>No.</th><th>Cost<br>Code</th><th>Description<br>of Work</th>'
+        +       '<th>Original<br>Scheduled Value</th><th>Approved<br>Change Order</th><th>Current<br>Scheduled Value<br>(D+E)</th>'
+        +       '<th>From Previous<br>Application</th><th>This<br>Period</th><th>Materials<br>Presently Stored<br>(NOT in D or E)</th>'
+        +       '<th>Completed<br>and Stored<br>To Date</th><th>%<br>(G&divide;C)</th><th>Balance<br>To Finish<br>(C&minus;G)</th><th>Retainage<br>Held</th></tr>'
+        +   '</thead>'
+        +   '<tbody>' + contRows + totRow + '</tbody>'
+        + '</table>'
+        + '<div class="pp-foot">Pier Foundations &middot; AIA G703 Continuation Sheet &middot; Application No. ' + E(String(o.num)) + ' (' + E(o.typeLabel) + '). '
+        +   'Current Scheduled Value = Original + Approved CO. Completed &amp; Stored = From Previous + This Period + Materials. '
+        +   (o.isLocked ? 'APPROVED / FINAL.' : 'DRAFT &mdash; not yet approved.') + '</div>'
+        + '</div>';
+
+      var docTitle = 'Pay Application No. ' + o.num + (o.pnum ? ' - ' + o.pnum : '');
+      return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + E(docTitle) + '</title>'
+        + '<style>' + payAppPrintCss() + '</style></head><body>'
+        + '<div class="pp-toolbar"><button onclick="window.print()">Print / Save as PDF</button>'
+        +   '<span class="pp-hint">Prints as 2 pages: G702 (page 1) then G703 (page 2).</span></div>'
+        + page1 + page2
+        + '</body></html>';
+    }
+
+    // Print CSS for the standalone pay-app document. Letter portrait, page break between
+    // the two forms, AIA-style borders. Own light theme (not the app's dark theme).
+    function payAppPrintCss(){
+      return ''
+        + '@page { size: letter portrait; margin: 0.5in; }'
+        + 'body { font-family: Arial, Helvetica, sans-serif; color:#111; margin:0; font-size:10px; }'
+        + '.pp-toolbar { padding:10px 16px; background:#f2f2f2; border-bottom:1px solid #ccc; position:sticky; top:0; }'
+        + '.pp-toolbar button { padding:8px 16px; font-size:13px; cursor:pointer; }'
+        + '.pp-toolbar .pp-hint { margin-left:12px; color:#666; font-size:12px; }'
+        + '.pp-page { position:relative; width:7.5in; margin:16px auto; padding:0; background:#fff; }'
+        + '.pp-page2 { page-break-before: always; }'
+        + '.pp-title { text-align:center; font-size:15px; font-weight:700; letter-spacing:0.02em; }'
+        + '.pp-subtitle { text-align:center; font-size:9px; color:#555; margin-bottom:8px; }'
+        + '.pp-hdr { width:100%; border-collapse:collapse; border:1px solid #333; margin-bottom:8px; }'
+        + '.pp-hdr td { border:1px solid #bbb; padding:3px 5px; vertical-align:top; font-size:9px; }'
+        + '.pp-hlbl { font-weight:700; white-space:nowrap; width:1%; background:#f7f7f7; }'
+        + '.pp-hval { min-width:70px; }'
+        + '.pp-body { display:flex; gap:10px; }'
+        + '.pp-col-left { flex:1 1 55%; border:1px solid #333; padding:6px; }'
+        + '.pp-col-right { flex:1 1 45%; border:1px solid #333; padding:6px; }'
+        + '.pp-secttl { font-weight:700; font-size:10px; margin:4px 0 3px; text-transform:uppercase; }'
+        + '.pp-note { font-size:8px; color:#333; line-height:1.35; margin-bottom:5px; }'
+        + '.pp-note.pp-small { font-size:7.5px; color:#555; }'
+        + '.pp-lines { width:100%; border-collapse:collapse; margin:4px 0; }'
+        + '.pp-lines td { border-bottom:1px solid #ddd; padding:3px 4px; font-size:9px; vertical-align:top; }'
+        + '.pp-lno { width:16px; color:#555; }'
+        + '.pp-lamt { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; width:80px; font-weight:600; }'
+        + '.pp-due td { background:#fbf3d8; font-weight:700; }'
+        + '.pp-retdetail { margin:5px 0; font-size:8.5px; }'
+        + '.pp-retdetail > div { display:flex; justify-content:space-between; border-bottom:1px dotted #ccc; padding:2px 4px; }'
+        + '.pp-rd-val { font-variant-numeric:tabular-nums; }'
+        + '.pp-co { width:100%; border-collapse:collapse; margin-top:3px; }'
+        + '.pp-co th, .pp-co td { border:1px solid #ccc; padding:3px 5px; font-size:8.5px; }'
+        + '.pp-co .pp-r { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }'
+        + '.pp-co-tot td, .pp-co-net td { font-weight:700; background:#f7f7f7; }'
+        + '.pp-sig { font-weight:700; font-size:9px; margin:6px 0 3px; }'
+        + '.pp-sigline { font-size:9px; margin:5px 0; }'
+        + '.pp-sigrow { display:flex; justify-content:space-between; font-size:9px; margin:5px 0; }'
+        + '.pp-underline { display:inline-block; border-bottom:1px solid #333; min-width:120px; height:11px; vertical-align:bottom; }'
+        + '.pp-underline.pp-short { min-width:55px; }'
+        + '.pp-amtcert { display:flex; justify-content:space-between; align-items:center; border:2px solid #333; padding:5px 8px; margin:6px 0; }'
+        + '.pp-amtcert b { font-size:14px; }'
+        + '.pp-blank { display:inline-block; border-bottom:1px solid #bbb; min-width:70px; height:10px; vertical-align:bottom; }'
+        // G703
+        + '.pp-g-meta { display:flex; flex-wrap:wrap; gap:4px 16px; font-size:9px; margin-bottom:6px; }'
+        + '.pp-g703 { width:100%; border-collapse:collapse; }'
+        + '.pp-g703 th, .pp-g703 td { border:1px solid #999; padding:2px 3px; font-size:7.5px; vertical-align:top; }'
+        + '.pp-g703 thead th { background:#f2f2f2; text-align:center; line-height:1.15; }'
+        + '.pp-g-letters th { font-size:7px; color:#777; background:#eaeaea; }'
+        + '.pp-g703 .pp-r { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }'
+        + '.pp-g-a { width:26px; } .pp-g-b { width:44px; } .pp-g-c { min-width:120px; }'
+        + '.pp-g-tot td { font-weight:700; background:#f7f7f7; }'
+        + '.pp-foot { margin-top:8px; font-size:8px; color:#666; }'
+        + '.pp-watermark { position:absolute; top:40%; left:50%; transform:translate(-50%,-50%) rotate(-30deg);'
+        +   ' font-size:90px; color:rgba(200,0,0,0.10); font-weight:800; letter-spacing:0.1em; pointer-events:none; z-index:0; }'
+        + '@media print { .pp-toolbar { display:none; } .pp-page { margin:0; width:auto; } body { font-size:10px; } }';
+    }
+
     // ---- New Pay App inline form ----
     // ---- New Pay App: per-line entry against the SOV ----
     // Brad: invoice the SOV LINE BY LINE. Each SOV line is editable EITHER by entering
@@ -13964,7 +14343,7 @@ try {
         +     '<option value="normal">Progress Payment</option><option value="retainage">Retainage Release (final)</option>'
         +   '</select></div>'
         +   '<div class="fin-inv-ie-row"><label>Status</label><select class="pa-status">'
-        +     '<option value="Draft">Draft</option><option value="Sent">Sent</option><option value="Paid">Paid</option>'
+        +     '<option value="Draft">Draft</option><option value="Sent">Sent</option><option value="Approved">Approved (final / locked)</option><option value="Paid">Paid</option>'
         +   '</select></div>'
         +   '<div class="fin-inv-ie-row pa-paiddate-row" style="display:none"><label>Paid Date</label><input type="text" class="pa-paiddate" placeholder="e.g. 08/15/26"></div>'
         + '</div>'
