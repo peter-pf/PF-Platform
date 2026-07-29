@@ -1880,7 +1880,12 @@ body.role-field-ops .nav-sub[data-fo-hide] {
   font-variant-numeric:tabular-nums; }
 
 /* ---- Billing Schedule of Values (SOV) table + editor ---- */
-.fin-inv-sov-table th, .fin-inv-sov-table td { white-space:nowrap; }
+/* Whole words on one line for every header + cell; wrapper scrolls horizontally
+   instead of wrapping when the 12 columns exceed the container width. */
+.fin-inv-sov-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-inv-sov-table { width: auto; min-width: 100%; }
+.fin-inv-sov-table th, .fin-inv-sov-table td { white-space: nowrap !important; }
+.fin-inv-sov-table td.sov-desc, .fin-inv-sov-table th.sov-desc { min-width: 220px; }
 .fin-inv-sov-totals td { font-weight:700; color:var(--text-1); border-top:2px solid var(--border);
   background:var(--bg-1); }
 .fin-inv-sov-editor { border:1px solid var(--border); border-radius:8px; background:var(--bg-0);
@@ -12188,7 +12193,7 @@ try {
       opts = opts || {};
       var head =
           '<thead><tr>'
-        +   '<th>Item #</th><th>Division / Cost Code</th><th>Description</th><th>Subcontractor</th>'
+        +   '<th>Item #</th><th>Division / Cost Code</th><th class="sov-desc">Description</th><th>Subcontractor</th>'
         +   '<th class="num">Original SOV</th><th class="num">Approved CO</th><th class="num">Current Contract Amt</th>'
         +   '<th class="num">Billed to Date</th><th class="num">% Complete</th><th class="num">Balance to Complete</th>'
         +   '<th class="num">Retainage Held</th><th class="num">Invoiced to Date</th>'
@@ -12203,7 +12208,7 @@ try {
           return '<tr>'
             + '<td>' + (l.item ? E(l.item) : '<span class="ba-blank">&mdash;</span>') + '</td>'
             + '<td>' + (l.division ? E(l.division) : '<span class="ba-blank">&mdash;</span>') + '</td>'
-            + '<td>' + (l.description ? E(l.description) : '<span class="ba-blank">&mdash;</span>') + '</td>'
+            + '<td class="sov-desc">' + (l.description ? E(l.description) : '<span class="ba-blank">&mdash;</span>') + '</td>'
             + '<td>' + (l.sub ? E(l.sub) : '<span class="ba-blank">&mdash;</span>') + '</td>'
             + '<td class="num">' + sovMoneyCell(d.orig, d.hasOrig) + '</td>'
             + '<td class="num">' + sovMoneyCell(d.co, d.hasCO) + '</td>'
@@ -12228,7 +12233,7 @@ try {
           + '<td class="num">' + sovMoneyCell(t.invoiced, true) + '</td>'
           + '</tr>';
       }
-      return '<div class="fin-inv-wrap"><table class="ba-table fin-inv-sov-table">' + head + '<tbody>' + body + '</tbody></table></div>';
+      return '<div class="fin-inv-wrap fin-inv-sov-wrap"><table class="ba-table fin-inv-sov-table">' + head + '<tbody>' + body + '</tbody></table></div>';
     }
 
     // Render a project record object D into the given root element. Reusable for
@@ -13653,9 +13658,10 @@ try {
         + '<style>'
         + 'body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:28px;font-size:13px;}'
         + 'h1{font-size:18px;margin:0 0 4px;} .meta{color:#555;font-size:12px;margin-bottom:16px;}'
-        + '.meta b{color:#111;} table{border-collapse:collapse;width:100%;}'
-        + 'th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:12px;}'
+        + '.meta b{color:#111;} .fin-inv-sov-wrap{overflow-x:auto;} table{border-collapse:collapse;width:auto;min-width:100%;}'
+        + 'th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:12px;white-space:nowrap;}'
         + 'th{background:#f2f2f2;} td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}'
+        + 'td.sov-desc,th.sov-desc{min-width:220px;white-space:normal;}'
         + 'tr.fin-inv-sov-totals td{font-weight:700;background:#fafafa;}'
         + '.ba-blank{color:#999;} .foot{margin-top:14px;color:#777;font-size:11px;}'
         + '@media print{ button{display:none;} }'
