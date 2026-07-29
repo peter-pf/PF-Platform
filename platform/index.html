@@ -1880,20 +1880,38 @@ body.role-field-ops .nav-sub[data-fo-hide] {
   font-variant-numeric:tabular-nums; }
 
 /* ---- Billing Schedule of Values (SOV) table + editor ---- */
-/* Whole words on one line for every header + cell; wrapper scrolls horizontally
-   instead of wrapping when the 12 columns exceed the container width. */
+/* SOV sheet reads fully horizontally: headers/cells WRAP at spaces to a 2nd line
+   when needed but a WORD is never split mid-word (keep-all + overflow-wrap:normal).
+   Each column gets a min-width so all 12 columns read left-to-right; the wrapper
+   keeps overflow-x:auto only as a safety so nothing clips past the container. */
 .fin-inv-sov-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.fin-inv-sov-table { width: auto; min-width: 100%; }
-.fin-inv-sov-table th, .fin-inv-sov-table td { white-space: nowrap !important; }
-/* Description column reads its full label on one line (e.g. the longest template
-   line "Design, Engineering, & Shop Drawing Submittal") with no cutoff. */
-.fin-inv-sov-table td.sov-desc, .fin-inv-sov-table th.sov-desc { min-width: 360px; }
+.fin-inv-sov-table { width: 100%; min-width: 1180px; table-layout: auto; }
+.fin-inv-sov-table th, .fin-inv-sov-table td {
+  white-space: normal; overflow-wrap: normal; word-break: keep-all; hyphens: none;
+  vertical-align: top; }
+/* Per-column min-widths so every header (which may wrap to 2 lines of whole words)
+   and its values read left-to-right, never as a vertical stack. */
+.fin-inv-sov-table th.sov-item, .fin-inv-sov-table td.sov-item { min-width: 54px; }
+.fin-inv-sov-table th.sov-div, .fin-inv-sov-table td.sov-div { min-width: 120px; }
+.fin-inv-sov-table td.sov-desc, .fin-inv-sov-table th.sov-desc { min-width: 300px; }
+.fin-inv-sov-table th.sov-sub, .fin-inv-sov-table td.sov-sub { min-width: 100px; }
+.fin-inv-sov-table th.sov-orig, .fin-inv-sov-table td.sov-orig,
+.fin-inv-sov-table th.sov-co, .fin-inv-sov-table td.sov-co { min-width: 96px; }
+.fin-inv-sov-table th.sov-current, .fin-inv-sov-table td.sov-current { min-width: 118px; }
+.fin-inv-sov-table th.sov-billed, .fin-inv-sov-table td.sov-billed { min-width: 96px; }
+.fin-inv-sov-table th.sov-pct, .fin-inv-sov-table td.sov-pct { min-width: 84px; }
+.fin-inv-sov-table th.sov-balance, .fin-inv-sov-table td.sov-balance { min-width: 108px; }
+.fin-inv-sov-table th.sov-retheld, .fin-inv-sov-table td.sov-retheld { min-width: 104px; }
+.fin-inv-sov-table th.sov-invoiced, .fin-inv-sov-table td.sov-invoiced { min-width: 104px; }
 .fin-inv-sov-totals td { font-weight:700; color:var(--text-1); border-top:2px solid var(--border);
   background:var(--bg-1); }
 .fin-inv-sov-editor { border:1px solid var(--border); border-radius:8px; background:var(--bg-0);
   padding:12px 14px; margin-top:12px; }
 .fin-inv-sove-note { font-size:0.78rem; color:var(--text-3); margin-bottom:10px; line-height:1.4; }
-.fin-inv-sove-table th, .fin-inv-sove-table td { white-space:nowrap; vertical-align:middle; }
+.fin-inv-sove-table { width:100%; min-width:1080px; }
+.fin-inv-sove-table th, .fin-inv-sove-table td {
+  white-space:normal; overflow-wrap:normal; word-break:keep-all; hyphens:none; vertical-align:middle; }
+.fin-inv-sove-table th.sove-desc-cell { min-width:300px; }
 .fin-inv-sove-table input { width:100%; min-width:70px; font-size:0.85rem; padding:4px 6px;
   border:1px solid var(--border); border-radius:5px; background:var(--bg-1); color:var(--text-1); box-sizing:border-box; }
 /* Description input fills a generous width so the full label
@@ -1903,6 +1921,8 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 .fin-inv-sove-table input.num { text-align:right; min-width:90px; font-variant-numeric:tabular-nums; }
 .fin-inv-sove-table td.sove-current, .fin-inv-sove-table td.sove-balance, .fin-inv-sove-table td.sove-retheld {
   color:var(--text-2); font-variant-numeric:tabular-nums; font-weight:600; }
+.fin-inv-saved-flash { margin-left:10px; font-size:0.78rem; font-weight:600; color:#0a7d33;
+  background:#e6f4ea; border:1px solid #b7e0c4; border-radius:5px; padding:2px 8px; }
 .sove-remove { background:none; border:1px solid var(--border); border-radius:5px; color:#b00020;
   cursor:pointer; font-size:1rem; line-height:1; padding:2px 8px; }
 .sove-remove:hover { background:#b00020; color:#fff; }
@@ -12198,10 +12218,10 @@ try {
       opts = opts || {};
       var head =
           '<thead><tr>'
-        +   '<th>Item #</th><th>Division / Cost Code</th><th class="sov-desc">Description</th><th>Subcontractor</th>'
-        +   '<th class="num">Original SOV</th><th class="num">Approved CO</th><th class="num">Current Contract Amt</th>'
-        +   '<th class="num">Billed to Date</th><th class="num">% Complete</th><th class="num">Balance to Complete</th>'
-        +   '<th class="num">Retainage Held</th><th class="num">Invoiced to Date</th>'
+        +   '<th class="sov-item">Item #</th><th class="sov-div">Division / Cost Code</th><th class="sov-desc">Description</th><th class="sov-sub">Subcontractor</th>'
+        +   '<th class="num sov-orig">Original SOV</th><th class="num sov-co">Approved CO</th><th class="num sov-current">Current Contract Amt</th>'
+        +   '<th class="num sov-billed">Billed to Date</th><th class="num sov-pct">% Complete</th><th class="num sov-balance">Balance to Complete</th>'
+        +   '<th class="num sov-retheld">Retainage Held</th><th class="num sov-invoiced">Invoiced to Date</th>'
         + '</tr></thead>';
       var body = '';
       if (!lines || !lines.length) {
@@ -12211,18 +12231,18 @@ try {
           var d = sovDerive(l, retFrac);
           var anyAmt = d.hasOrig || d.hasCO;
           return '<tr>'
-            + '<td>' + (l.item ? E(l.item) : '<span class="ba-blank">&mdash;</span>') + '</td>'
-            + '<td>' + (l.division ? E(l.division) : '<span class="ba-blank">&mdash;</span>') + '</td>'
+            + '<td class="sov-item">' + (l.item ? E(l.item) : '<span class="ba-blank">&mdash;</span>') + '</td>'
+            + '<td class="sov-div">' + (l.division ? E(l.division) : '<span class="ba-blank">&mdash;</span>') + '</td>'
             + '<td class="sov-desc">' + (l.description ? E(l.description) : '<span class="ba-blank">&mdash;</span>') + '</td>'
-            + '<td>' + (l.sub ? E(l.sub) : '<span class="ba-blank">&mdash;</span>') + '</td>'
-            + '<td class="num">' + sovMoneyCell(d.orig, d.hasOrig) + '</td>'
-            + '<td class="num">' + sovMoneyCell(d.co, d.hasCO) + '</td>'
-            + '<td class="num">' + sovMoneyCell(d.current, anyAmt) + '</td>'
-            + '<td class="num">' + sovMoneyCell(d.billed, anyAmt) + '</td>'
-            + '<td class="num">' + (anyAmt ? sovPctCell(d.pct) : '<span class="ba-blank">&mdash;</span>') + '</td>'
-            + '<td class="num">' + sovMoneyCell(d.balance, anyAmt) + '</td>'
-            + '<td class="num">' + sovMoneyCell(d.retHeld, anyAmt) + '</td>'
-            + '<td class="num">' + sovMoneyCell(d.invoiced, anyAmt) + '</td>'
+            + '<td class="sov-sub">' + (l.sub ? E(l.sub) : '<span class="ba-blank">&mdash;</span>') + '</td>'
+            + '<td class="num sov-orig">' + sovMoneyCell(d.orig, d.hasOrig) + '</td>'
+            + '<td class="num sov-co">' + sovMoneyCell(d.co, d.hasCO) + '</td>'
+            + '<td class="num sov-current">' + sovMoneyCell(d.current, anyAmt) + '</td>'
+            + '<td class="num sov-billed">' + sovMoneyCell(d.billed, anyAmt) + '</td>'
+            + '<td class="num sov-pct">' + (anyAmt ? sovPctCell(d.pct) : '<span class="ba-blank">&mdash;</span>') + '</td>'
+            + '<td class="num sov-balance">' + sovMoneyCell(d.balance, anyAmt) + '</td>'
+            + '<td class="num sov-retheld">' + sovMoneyCell(d.retHeld, anyAmt) + '</td>'
+            + '<td class="num sov-invoiced">' + sovMoneyCell(d.invoiced, anyAmt) + '</td>'
             + '</tr>';
         }).join('');
         var t = sovTotals(lines, retFrac);
@@ -13638,8 +13658,58 @@ try {
       btn.disabled = true; btn.textContent='Saving...';
       invPost(invPayload({ sov: lines }),
         function(msg){ btn.disabled=false; btn.textContent='Save SOV'; showErr(msg); },
-        function(){ invRerender(btn); });
+        function(){ sovSaveInPlace(block); });
     };
+
+    // Re-render ONLY the SOV read-only table in place after a successful save.
+    // Brad: saving must NOT navigate back to the main projects page or collapse the
+    // record. We keep the project record open, the Financials + Project Invoicing
+    // dropdown + Schedule of Values exactly where they are, swap the editor back to
+    // the read-only table (now showing the saved data), and flash a brief "Saved".
+    function sovSaveInPlace(block){
+      if (!block) { return; }
+      // invPost already adopted server truth into PF_PROJECT_INVOICING[_curNum];
+      // refresh the in-memory copy sovLinesFor() reads from.
+      try {
+        var srv = window.PF_PROJECT_INVOICING ? window.PF_PROJECT_INVOICING[_curNum] : null;
+        if (srv) { _curInvoicing = srv; }
+      } catch(e){}
+      var retFrac = Number(block.getAttribute('data-fin-inv-retfrac')) || 0;
+      var lines = sovLinesFor(_curInvoicing);
+      // Rebuild the read-only table HTML with the saved lines + current retainage.
+      var newRO = sovTableHtml(lines, retFrac, { editable:false });
+      var body = block.querySelector('.fin-inv-sov-body');
+      if (!body) { invRerender(); return; }
+      var roWrap = body.querySelector('.fin-inv-wrap');           // the read-only table wrapper
+      var editor = body.querySelector('.fin-inv-sov-editor');
+      if (roWrap) {
+        // Replace the old read-only wrapper with the freshly rendered one.
+        var tmp = document.createElement('div');
+        tmp.innerHTML = newRO;
+        var fresh = tmp.firstChild;
+        if (fresh) { roWrap.parentNode.replaceChild(fresh, roWrap); roWrap = fresh; }
+        roWrap.style.display = '';
+      }
+      // A saved SOV no longer shows the "starting template" seed note.
+      var seedNote = body.querySelector('.fin-inv-btn-note');
+      if (seedNote) { seedNote.parentNode.removeChild(seedNote); }
+      // Tear down the editor + restore its placeholder for the next Edit.
+      if (editor) { editor.innerHTML = ''; editor.style.display = 'none'; }
+      block.setAttribute('data-fin-inv-saved', '1');
+      // Make sure the SOV dropdown stays expanded.
+      block.classList.add('open');
+      // Flash a brief saved confirmation inside the SOV body (non-destructive).
+      var head = block.querySelector('.fin-inv-block-head');
+      if (head) {
+        var old = head.querySelector('.fin-inv-saved-flash');
+        if (old) { old.parentNode.removeChild(old); }
+        var flash = document.createElement('span');
+        flash.className = 'fin-inv-saved-flash';
+        flash.textContent = 'Saved';
+        head.appendChild(flash);
+        setTimeout(function(){ if (flash && flash.parentNode) flash.parentNode.removeChild(flash); }, 2600);
+      }
+    }
 
     // ---- Standalone SOV view (print-friendly, SOV-only) ----
     // Brad sends a GC the SOV before a contract exists. This opens a clean SOV-only
@@ -13663,10 +13733,16 @@ try {
         + '<style>'
         + 'body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:28px;font-size:13px;}'
         + 'h1{font-size:18px;margin:0 0 4px;} .meta{color:#555;font-size:12px;margin-bottom:16px;}'
-        + '.meta b{color:#111;} .fin-inv-sov-wrap{overflow-x:auto;} table{border-collapse:collapse;width:auto;min-width:100%;}'
-        + 'th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:12px;white-space:nowrap;}'
+        + '.meta b{color:#111;} .fin-inv-sov-wrap{overflow-x:auto;} table{border-collapse:collapse;width:100%;min-width:1180px;table-layout:auto;}'
+        + 'th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:12px;'
+        +   'white-space:normal;overflow-wrap:normal;word-break:keep-all;hyphens:none;vertical-align:top;}'
         + 'th{background:#f2f2f2;} td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}'
-        + 'td.sov-desc,th.sov-desc{min-width:360px;}'
+        + 'td.sov-item,th.sov-item{min-width:54px;} td.sov-div,th.sov-div{min-width:120px;}'
+        + 'td.sov-desc,th.sov-desc{min-width:300px;} td.sov-sub,th.sov-sub{min-width:100px;}'
+        + 'td.sov-orig,th.sov-orig,td.sov-co,th.sov-co{min-width:96px;} td.sov-current,th.sov-current{min-width:118px;}'
+        + 'td.sov-billed,th.sov-billed{min-width:96px;} td.sov-pct,th.sov-pct{min-width:84px;}'
+        + 'td.sov-balance,th.sov-balance{min-width:108px;} td.sov-retheld,th.sov-retheld{min-width:104px;}'
+        + 'td.sov-invoiced,th.sov-invoiced{min-width:104px;}'
         + 'tr.fin-inv-sov-totals td{font-weight:700;background:#fafafa;}'
         + '.ba-blank{color:#999;} .foot{margin-top:14px;color:#777;font-size:11px;}'
         + '@media print{ button{display:none;} }'
