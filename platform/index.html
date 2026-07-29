@@ -1879,36 +1879,52 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 .fin-inv-pa-calc { margin-top:10px; font-size:0.85rem; font-weight:600; color:var(--text-2);
   font-variant-numeric:tabular-nums; }
 
-/* ---- Billing Schedule of Values (SOV) table + editor ---- */
-/* SOV sheet reads fully horizontally: headers/cells WRAP at spaces to a 2nd line
-   when needed but a WORD is never split mid-word (keep-all + overflow-wrap:normal).
-   Each column gets a min-width so all 12 columns read left-to-right; the wrapper
-   keeps overflow-x:auto only as a safety so nothing clips past the container. */
+/* ---- AIA G703 Schedule of Values table + editor ---- */
+/* The SOV mirrors the "G703 - Schedule of Values" Excel tab cell-for-cell:
+   a stacked multi-line header (AIA column-letter row + wrapped title rows + a
+   "WORK COMPLETED" group header spanning From-Previous + This-Period) over 13
+   columns. Headers/cells WRAP at spaces to extra lines when needed but a WORD is
+   never split mid-word (keep-all + overflow-wrap:normal). Each column gets a
+   min-width so all 13 columns read left-to-right; the wrapper keeps overflow-x:auto
+   only as a safety so nothing clips past the container. */
 .fin-inv-sov-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.fin-inv-sov-table { width: 100%; min-width: 1180px; table-layout: auto; }
+.fin-inv-sov-table { width: 100%; min-width: 1420px; table-layout: auto; }
 .fin-inv-sov-table th, .fin-inv-sov-table td {
   white-space: normal; overflow-wrap: normal; word-break: keep-all; hyphens: none;
   vertical-align: top; }
-/* Per-column min-widths so every header (which may wrap to 2 lines of whole words)
-   and its values read left-to-right, never as a vertical stack. */
-.fin-inv-sov-table th.sov-item, .fin-inv-sov-table td.sov-item { min-width: 54px; }
-.fin-inv-sov-table th.sov-div, .fin-inv-sov-table td.sov-div { min-width: 120px; }
-.fin-inv-sov-table td.sov-desc, .fin-inv-sov-table th.sov-desc { min-width: 300px; }
-.fin-inv-sov-table th.sov-sub, .fin-inv-sov-table td.sov-sub { min-width: 100px; }
+/* Stacked-header rows: the AIA-letter row is small + muted, the group header
+   ("WORK COMPLETED") is centered over its two columns, title rows are centered. */
+.fin-inv-sov-table thead th { text-align: center; line-height: 1.25; }
+.fin-inv-sov-table thead tr.sov-hdr-letters th { font-size: 0.68rem; color: var(--text-3);
+  font-weight: 600; padding-top: 4px; padding-bottom: 4px; }
+.fin-inv-sov-table thead tr.sov-hdr-group th { font-size: 0.72rem; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--text-2); }
+.fin-inv-sov-table thead tr.sov-hdr-group th.sov-hdr-workcompleted {
+  border-bottom: 1px solid var(--border); }
+.fin-inv-sov-table thead tr.sov-hdr-titles th { font-size: 0.74rem; }
+.fin-inv-sov-table thead .sov-hdr-formula { display:block; font-weight:400; font-size:0.66rem;
+  color: var(--text-3); }
+/* Per-column min-widths so every stacked header and its values read left-to-right,
+   never as a vertical stack. */
+.fin-inv-sov-table th.sov-item, .fin-inv-sov-table td.sov-item { min-width: 50px; }
+.fin-inv-sov-table th.sov-cc, .fin-inv-sov-table td.sov-cc { min-width: 84px; }
+.fin-inv-sov-table td.sov-desc, .fin-inv-sov-table th.sov-desc { min-width: 260px; }
 .fin-inv-sov-table th.sov-orig, .fin-inv-sov-table td.sov-orig,
-.fin-inv-sov-table th.sov-co, .fin-inv-sov-table td.sov-co { min-width: 96px; }
-.fin-inv-sov-table th.sov-current, .fin-inv-sov-table td.sov-current { min-width: 118px; }
-.fin-inv-sov-table th.sov-billed, .fin-inv-sov-table td.sov-billed { min-width: 96px; }
-.fin-inv-sov-table th.sov-pct, .fin-inv-sov-table td.sov-pct { min-width: 84px; }
-.fin-inv-sov-table th.sov-balance, .fin-inv-sov-table td.sov-balance { min-width: 108px; }
-.fin-inv-sov-table th.sov-retheld, .fin-inv-sov-table td.sov-retheld { min-width: 104px; }
-.fin-inv-sov-table th.sov-invoiced, .fin-inv-sov-table td.sov-invoiced { min-width: 104px; }
+.fin-inv-sov-table th.sov-co, .fin-inv-sov-table td.sov-co { min-width: 100px; }
+.fin-inv-sov-table th.sov-current, .fin-inv-sov-table td.sov-current { min-width: 108px; }
+.fin-inv-sov-table th.sov-prev, .fin-inv-sov-table td.sov-prev { min-width: 104px; }
+.fin-inv-sov-table th.sov-this, .fin-inv-sov-table td.sov-this { min-width: 96px; }
+.fin-inv-sov-table th.sov-mat, .fin-inv-sov-table td.sov-mat { min-width: 108px; }
+.fin-inv-sov-table th.sov-total, .fin-inv-sov-table td.sov-total { min-width: 108px; }
+.fin-inv-sov-table th.sov-pct, .fin-inv-sov-table td.sov-pct { min-width: 72px; }
+.fin-inv-sov-table th.sov-balance, .fin-inv-sov-table td.sov-balance { min-width: 106px; }
+.fin-inv-sov-table th.sov-retheld, .fin-inv-sov-table td.sov-retheld { min-width: 100px; }
 .fin-inv-sov-totals td { font-weight:700; color:var(--text-1); border-top:2px solid var(--border);
   background:var(--bg-1); }
 .fin-inv-sov-editor { border:1px solid var(--border); border-radius:8px; background:var(--bg-0);
   padding:12px 14px; margin-top:12px; }
 .fin-inv-sove-note { font-size:0.78rem; color:var(--text-3); margin-bottom:10px; line-height:1.4; }
-.fin-inv-sove-table { width:100%; min-width:1080px; }
+.fin-inv-sove-table { width:100%; min-width:1200px; }
 .fin-inv-sove-table th, .fin-inv-sove-table td {
   white-space:normal; overflow-wrap:normal; word-break:keep-all; hyphens:none; vertical-align:middle; }
 .fin-inv-sove-table th.sove-desc-cell { min-width:300px; }
@@ -12146,56 +12162,93 @@ try {
       };
     }
 
-    // ---- Billing Schedule of Values (SOV) helpers -------------------------------
-    // The four standard starting lines (all Division 31 60 00, Subcontractor PF).
-    // Amounts are 0/blank -- NO fabricated dollar values; these are LABELS only.
+    // ---- AIA G703 Schedule of Values helpers ------------------------------------
+    // The portal SOV mirrors the "G703 - Schedule of Values" Excel tab cell-for-cell
+    // and inherits its exact formulas:
+    //   Current Scheduled Value (F)     = Original (D) + Approved CO (E)
+    //   Total Completed & Stored (J)    = From Previous (G) + This Period (H) + Materials (I)
+    //   % (K)                           = Total (J) / Current (F)          [guarded /0]
+    //   Balance To Finish (L)           = Current (F) - Total (J)
+    //   Retainage Held (M)              = retainageFrac * Total (J)
+    // On the standalone / pre-contract SOV, From Previous + This Period are 0 (pay
+    // apps drive them in Phase A2).
+    //
+    // The four standard starting lines (all Cost Code 31 60 00). Amounts are
+    // null/blank -- NO fabricated dollar values; these are LABELS only.
     function sovTemplateLines(){
       return [
-        { item:'1', division:'31 60 00', description:'Design, Engineering, & Shop Drawing Submittal', sub:'PF', originalSov:null, approvedCO:null },
-        { item:'2', division:'31 60 00', description:'Mobilization', sub:'PF', originalSov:null, approvedCO:null },
-        { item:'3', division:'31 60 00', description:'Aggregate Pier Ground Improvement', sub:'PF', originalSov:null, approvedCO:null },
-        { item:'4', division:'31 60 00', description:'Surveying, Staking, Layout', sub:'PF', originalSov:null, approvedCO:null }
+        { item:'1', costCode:'31 60 00', description:'Design, Engineering, & Shop Drawing Submittal', originalScheduledValue:null, approvedCO:null, materialsStored:null },
+        { item:'2', costCode:'31 60 00', description:'Mobilization', originalScheduledValue:null, approvedCO:null, materialsStored:null },
+        { item:'3', costCode:'31 60 00', description:'Aggregate Pier Ground Improvement', originalScheduledValue:null, approvedCO:null, materialsStored:null },
+        { item:'4', costCode:'31 60 00', description:'Surveying, Staking, Layout', originalScheduledValue:null, approvedCO:null, materialsStored:null }
       ];
     }
-    // The SOV lines to show for a project: the saved lines if any, otherwise the
-    // template (so a brand-new project is pre-seeded but nothing is persisted until Save).
+    // Migrate one stored line from any prior shape to the G703 entry shape. The old
+    // A1 SOV stored {item, division, description, sub, originalSov, approvedCO};
+    // map division->costCode and originalSov->originalScheduledValue so no saved data
+    // breaks. Unknown/extra fields (sub) are dropped.
+    function sovMigrateLine(l){
+      l = l || {};
+      var origSV = (l.originalScheduledValue != null) ? l.originalScheduledValue
+                 : (l.originalSov != null ? l.originalSov : null);
+      var cc = (l.costCode != null && l.costCode !== '') ? l.costCode
+             : (l.division != null ? l.division : '');
+      return {
+        item: (l.item != null ? l.item : ''),
+        costCode: cc,
+        description: (l.description != null ? l.description : ''),
+        originalScheduledValue: origSV,
+        approvedCO: (l.approvedCO != null ? l.approvedCO : null),
+        materialsStored: (l.materialsStored != null ? l.materialsStored : null),
+        // From Previous / This Period are pay-app driven (0 on the standalone SOV).
+        fromPrevious: Number(l.fromPrevious) || 0,
+        thisPeriod: Number(l.thisPeriod) || 0
+      };
+    }
+    // The SOV lines to show for a project: the saved lines (migrated to G703 shape)
+    // if any, otherwise the template (pre-seeded, nothing persisted until Save).
     function sovLinesFor(inv){
       var lines = (inv && Array.isArray(inv.sov)) ? inv.sov : [];
-      return lines.length ? lines : sovTemplateLines();
+      if (!lines.length) return sovTemplateLines();
+      return lines.map(sovMigrateLine);
     }
     // Whether the project has a SAVED (persisted) SOV yet (vs the unsaved template).
     function sovIsSaved(inv){
       return !!(inv && Array.isArray(inv.sov) && inv.sov.length);
     }
-    // Derive the computed columns for one SOV line, given the project retainage frac.
-    //   Current = Original + Approved CO
-    //   % Complete = Billed / Current  (Billed = 0 this phase; pay apps drive it in A2)
-    //   Balance = Current - Billed
-    //   Retainage Held = Billed * retainageFrac
-    //   Invoiced to Date = Billed - Retainage Held
+    // Derive the G703 computed columns for one SOV line, given the project retainage
+    // frac. Mirrors the tab formulas exactly (see block comment above). % is guarded
+    // against divide-by-zero (null -> rendered as a dash, never #DIV/0! or a
+    // fabricated number).
     function sovDerive(line, retFrac){
-      var orig = Number(line && line.originalSov) || 0;
+      var orig = Number(line && line.originalScheduledValue) || 0;
       var co   = Number(line && line.approvedCO) || 0;
-      var current = Math.round((orig + co) * 100) / 100;
-      var billed = Number(line && line.billed) || 0; // A1: no per-line billed yet -> 0
-      var pct = (current > 0) ? (billed / current) : null;
-      var balance = Math.round((current - billed) * 100) / 100;
-      var retHeld = Math.round(billed * retFrac * 100) / 100;
-      var invoiced = Math.round((billed - retHeld) * 100) / 100;
-      return { orig:orig, co:co, current:current, billed:billed, pct:pct, balance:balance, retHeld:retHeld, invoiced:invoiced,
-               hasOrig:(line && line.originalSov != null && line.originalSov !== ''),
-               hasCO:(line && line.approvedCO != null && line.approvedCO !== '') };
+      var current = Math.round((orig + co) * 100) / 100;                 // F = D + E
+      var prev = Number(line && line.fromPrevious) || 0;                 // G (pay apps)
+      var thisP = Number(line && line.thisPeriod) || 0;                  // H (pay apps)
+      var mat = Number(line && line.materialsStored) || 0;               // I
+      var total = Math.round((prev + thisP + mat) * 100) / 100;          // J = G + H + I
+      var pct = (current > 0) ? (total / current) : null;                // K = J / F (guarded)
+      var balance = Math.round((current - total) * 100) / 100;           // L = F - J
+      var retHeld = Math.round(total * retFrac * 100) / 100;             // M = retfrac * J
+      return { orig:orig, co:co, current:current, prev:prev, thisP:thisP, mat:mat,
+               total:total, pct:pct, balance:balance, retHeld:retHeld,
+               hasOrig:(line && line.originalScheduledValue != null && line.originalScheduledValue !== ''),
+               hasCO:(line && line.approvedCO != null && line.approvedCO !== ''),
+               hasMat:(line && line.materialsStored != null && line.materialsStored !== '') };
     }
-    // Sum the derived columns across all lines for the totals row.
+    // Sum the G703 columns across all lines for the totals row. % total = J_total /
+    // F_total (guarded). Columns summed: D,E,F,G,H,I,J and L,M.
     function sovTotals(lines, retFrac){
-      var t = { orig:0, co:0, current:0, billed:0, balance:0, retHeld:0, invoiced:0 };
+      var t = { orig:0, co:0, current:0, prev:0, thisP:0, mat:0, total:0, balance:0, retHeld:0 };
       (lines||[]).forEach(function(l){
         var d = sovDerive(l, retFrac);
-        t.orig += d.orig; t.co += d.co; t.current += d.current; t.billed += d.billed;
-        t.balance += d.balance; t.retHeld += d.retHeld; t.invoiced += d.invoiced;
+        t.orig += d.orig; t.co += d.co; t.current += d.current;
+        t.prev += d.prev; t.thisP += d.thisP; t.mat += d.mat;
+        t.total += d.total; t.balance += d.balance; t.retHeld += d.retHeld;
       });
       Object.keys(t).forEach(function(k){ t[k] = Math.round(t[k]*100)/100; });
-      t.pct = (t.current > 0) ? (t.billed / t.current) : null;
+      t.pct = (t.current > 0) ? (t.total / t.current) : null;
       return t;
     }
     // Money for SOV cells: dash when the source field is blank (fail closed -- no
@@ -12210,52 +12263,97 @@ try {
       if (frac == null) return '<span class="ba-blank">&mdash;</span>';
       return E(Math.round(frac * 100) + '%');
     }
-    // Read-only SOV table (used both embedded and in the standalone print view).
-    // 12 columns: Item | Division/Cost Code | Description | Subcontractor | Original SOV
-    //  | Approved CO | Current Contract Amt | Billed to Date | % Complete
-    //  | Balance to Complete | Retainage Held | Invoiced to Date. Plus a totals row.
+    // Read-only G703 SOV table (used both embedded and in the standalone print view).
+    // Matches the "G703 - Schedule of Values" tab cell-for-cell: a stacked header
+    // (an AIA column-letter row A,B,C,D,E,F,G,H,I; a "WORK COMPLETED" group header
+    // spanning From-Previous + This-Period; then the wrapped title rows), an
+    // AIA-letter row, and 13 columns left to right:
+    //   1 Item No. (A) | 2 Cost Code | 3 Description Of Work (B)
+    //   | 4 Original Scheduled Value (C) | 5 Approved Change Order
+    //   | 6 Current Scheduled Value (=D+E) | 7 From Previous Application (D)
+    //   | 8 This Period (E) | 9 Materials Presently Stored (F)
+    //   | 10 Total Completed and Stored To Date (G, =7+8+9)
+    //   | 11 % (=10/6, guarded) | 12 Balance To Finish (H, =6-10)
+    //   | 13 Retainage Held (I, =retfrac*10). Plus a totals row.
+    function sovG703Head(){
+      // AIA column-letter row: letters sit over Item(A), Description(B),
+      // Original(C), From-Previous(D), This-Period(E), Materials(F), Total(G),
+      // Balance(H), Retainage(I). Cost Code, Current, and % have no AIA letter.
+      var letters =
+          '<tr class="sov-hdr-letters">'
+        +   '<th class="sov-item">A</th><th class="sov-cc"></th><th class="sov-desc">B</th>'
+        +   '<th class="sov-orig">C</th><th class="sov-co"></th><th class="sov-current"></th>'
+        +   '<th class="sov-prev">D</th><th class="sov-this">E</th><th class="sov-mat">F</th>'
+        +   '<th class="sov-total">G</th><th class="sov-pct"></th><th class="sov-balance">H</th>'
+        +   '<th class="sov-retheld">I</th>'
+        + '</tr>';
+      // Group header: "WORK COMPLETED" spans From-Previous + This-Period (2 cols).
+      var group =
+          '<tr class="sov-hdr-group">'
+        +   '<th class="sov-item"></th><th class="sov-cc"></th><th class="sov-desc"></th>'
+        +   '<th class="sov-orig"></th><th class="sov-co"></th><th class="sov-current"></th>'
+        +   '<th class="sov-hdr-workcompleted" colspan="2">Work Completed</th>'
+        +   '<th class="sov-mat"></th><th class="sov-total"></th><th class="sov-pct"></th>'
+        +   '<th class="sov-balance"></th><th class="sov-retheld"></th>'
+        + '</tr>';
+      // Title row (wrapped whole-word labels + parenthetical formula hints as on the tab).
+      var titles =
+          '<tr class="sov-hdr-titles">'
+        +   '<th class="sov-item">Item No.</th>'
+        +   '<th class="sov-cc">Cost Code</th>'
+        +   '<th class="sov-desc">Description Of Work</th>'
+        +   '<th class="num sov-orig">Original Scheduled Value</th>'
+        +   '<th class="num sov-co">Approved Change Order</th>'
+        +   '<th class="num sov-current">Current Scheduled Value<span class="sov-hdr-formula">(C + Approved CO)</span></th>'
+        +   '<th class="num sov-prev">From Previous Application<span class="sov-hdr-formula">(D + E)</span></th>'
+        +   '<th class="num sov-this">This Period</th>'
+        +   '<th class="num sov-mat">Materials Presently Stored<span class="sov-hdr-formula">(NOT in D or E)</span></th>'
+        +   '<th class="num sov-total">Total Completed and Stored To Date<span class="sov-hdr-formula">(G = D + E + F)</span></th>'
+        +   '<th class="num sov-pct">%<span class="sov-hdr-formula">(G &divide; C)</span></th>'
+        +   '<th class="num sov-balance">Balance To Finish<span class="sov-hdr-formula">(C &minus; G)</span></th>'
+        +   '<th class="num sov-retheld">Retainage Held</th>'
+        + '</tr>';
+      return '<thead>' + letters + group + titles + '</thead>';
+    }
     function sovTableHtml(lines, retFrac, opts){
       opts = opts || {};
-      var head =
-          '<thead><tr>'
-        +   '<th class="sov-item">Item #</th><th class="sov-div">Division / Cost Code</th><th class="sov-desc">Description</th><th class="sov-sub">Subcontractor</th>'
-        +   '<th class="num sov-orig">Original SOV</th><th class="num sov-co">Approved CO</th><th class="num sov-current">Current Contract Amt</th>'
-        +   '<th class="num sov-billed">Billed to Date</th><th class="num sov-pct">% Complete</th><th class="num sov-balance">Balance to Complete</th>'
-        +   '<th class="num sov-retheld">Retainage Held</th><th class="num sov-invoiced">Invoiced to Date</th>'
-        + '</tr></thead>';
+      var head = sovG703Head();
       var body = '';
       if (!lines || !lines.length) {
-        body = '<tr class="fin-inv-empty"><td colspan="12">No schedule of values yet</td></tr>';
+        body = '<tr class="fin-inv-empty"><td colspan="13">No schedule of values yet</td></tr>';
       } else {
         body = lines.map(function(l){
           var d = sovDerive(l, retFrac);
-          var anyAmt = d.hasOrig || d.hasCO;
+          var anyAmt = d.hasOrig || d.hasCO;                 // a real line once any $ is entered
           return '<tr>'
             + '<td class="sov-item">' + (l.item ? E(l.item) : '<span class="ba-blank">&mdash;</span>') + '</td>'
-            + '<td class="sov-div">' + (l.division ? E(l.division) : '<span class="ba-blank">&mdash;</span>') + '</td>'
+            + '<td class="sov-cc">' + (l.costCode ? E(l.costCode) : '<span class="ba-blank">&mdash;</span>') + '</td>'
             + '<td class="sov-desc">' + (l.description ? E(l.description) : '<span class="ba-blank">&mdash;</span>') + '</td>'
-            + '<td class="sov-sub">' + (l.sub ? E(l.sub) : '<span class="ba-blank">&mdash;</span>') + '</td>'
             + '<td class="num sov-orig">' + sovMoneyCell(d.orig, d.hasOrig) + '</td>'
             + '<td class="num sov-co">' + sovMoneyCell(d.co, d.hasCO) + '</td>'
             + '<td class="num sov-current">' + sovMoneyCell(d.current, anyAmt) + '</td>'
-            + '<td class="num sov-billed">' + sovMoneyCell(d.billed, anyAmt) + '</td>'
+            + '<td class="num sov-prev">' + sovMoneyCell(d.prev, anyAmt) + '</td>'
+            + '<td class="num sov-this">' + sovMoneyCell(d.thisP, anyAmt) + '</td>'
+            + '<td class="num sov-mat">' + sovMoneyCell(d.mat, anyAmt) + '</td>'
+            + '<td class="num sov-total">' + sovMoneyCell(d.total, anyAmt) + '</td>'
             + '<td class="num sov-pct">' + (anyAmt ? sovPctCell(d.pct) : '<span class="ba-blank">&mdash;</span>') + '</td>'
             + '<td class="num sov-balance">' + sovMoneyCell(d.balance, anyAmt) + '</td>'
             + '<td class="num sov-retheld">' + sovMoneyCell(d.retHeld, anyAmt) + '</td>'
-            + '<td class="num sov-invoiced">' + sovMoneyCell(d.invoiced, anyAmt) + '</td>'
             + '</tr>';
         }).join('');
         var t = sovTotals(lines, retFrac);
         body += '<tr class="fin-inv-sov-totals">'
-          + '<td colspan="4">Total</td>'
+          + '<td colspan="3">Total</td>'
           + '<td class="num">' + sovMoneyCell(t.orig, true) + '</td>'
           + '<td class="num">' + sovMoneyCell(t.co, true) + '</td>'
           + '<td class="num">' + sovMoneyCell(t.current, true) + '</td>'
-          + '<td class="num">' + sovMoneyCell(t.billed, true) + '</td>'
+          + '<td class="num">' + sovMoneyCell(t.prev, true) + '</td>'
+          + '<td class="num">' + sovMoneyCell(t.thisP, true) + '</td>'
+          + '<td class="num">' + sovMoneyCell(t.mat, true) + '</td>'
+          + '<td class="num">' + sovMoneyCell(t.total, true) + '</td>'
           + '<td class="num">' + sovPctCell(t.pct) + '</td>'
           + '<td class="num">' + sovMoneyCell(t.balance, true) + '</td>'
           + '<td class="num">' + sovMoneyCell(t.retHeld, true) + '</td>'
-          + '<td class="num">' + sovMoneyCell(t.invoiced, true) + '</td>'
           + '</tr>';
       }
       return '<div class="fin-inv-wrap fin-inv-sov-wrap"><table class="ba-table fin-inv-sov-table">' + head + '<tbody>' + body + '</tbody></table></div>';
@@ -12774,11 +12872,13 @@ try {
         +   '</tbody></table></div>'
         + '</div>';
 
-      // --- Billing Schedule of Values (SOV) ---
-      // Full 12-column billing SOV per project. Derived columns (Current, % Complete,
-      // Balance, Retainage Held, Invoiced to Date) recompute live from Original SOV,
-      // Approved CO and the project Retainage %. A new project is pre-seeded with the
-      // four standard template lines (labels only, no fabricated dollars) until saved.
+      // --- AIA G703 Schedule of Values (SOV) ---
+      // Full 13-column G703 SOV per project (matches the "G703 - Schedule of Values"
+      // tab cell-for-cell). Derived columns (Current Scheduled Value, Total Completed
+      // & Stored, %, Balance To Finish, Retainage Held) recompute live from Original
+      // Scheduled Value, Approved CO, Materials and the project Retainage %. A new
+      // project is pre-seeded with the four standard template lines (labels only, no
+      // fabricated dollars) until saved.
       var sovLines = sovLinesFor(_curInvoicing);
       var sovSaved = sovIsSaved(_curInvoicing);
       var sovHtmlRO = sovTableHtml(sovLines, retFrac, { editable:false });
@@ -13361,10 +13461,16 @@ try {
       var outApps = apps.map(function(a){
         return { date:a.date||'', period:a.period||'', amount:a.amount, status:a.status||'Draft', paidDate:a.paidDate||'' };
       });
+      // G703 entry fields only (server re-derives Current/Total/%/Balance/Retainage).
+      // From Previous / This Period are pay-app driven (Phase A2) and NOT stored here.
       var outSov = sov.map(function(s){
-        return { item:s.item||'', division:s.division||'', description:s.description||'', sub:s.sub||'',
-                 originalSov:(s.originalSov==null||s.originalSov==='')?0:s.originalSov,
-                 approvedCO:(s.approvedCO==null||s.approvedCO==='')?0:s.approvedCO };
+        var origSV = (s.originalScheduledValue != null) ? s.originalScheduledValue
+                   : (s.originalSov != null ? s.originalSov : null);
+        var cc = (s.costCode != null && s.costCode !== '') ? s.costCode : (s.division || '');
+        return { item:s.item||'', costCode:cc||'', description:s.description||'',
+                 originalScheduledValue:(origSV==null||origSV==='')?0:origSV,
+                 approvedCO:(s.approvedCO==null||s.approvedCO==='')?0:s.approvedCO,
+                 materialsStored:(s.materialsStored==null||s.materialsStored==='')?0:s.materialsStored };
       });
       return { num: _curNum || '', subcontractValue: scv, retainagePct: pct, sov: outSov, payApps: outApps };
     }
@@ -13531,35 +13637,42 @@ try {
       var v = function(x){ return (x==null)?'':String(x); };
       return '<tr class="fin-inv-sove-row">'
         + '<td><input type="text" class="sove-item" value="' + E(v(line.item)) + '" placeholder="#"></td>'
-        + '<td><input type="text" class="sove-div" value="' + E(v(line.division)) + '" placeholder="31 60 00"></td>'
+        + '<td><input type="text" class="sove-cc" value="' + E(v(line.costCode)) + '" placeholder="31 60 00"></td>'
         + '<td class="sove-desc-cell"><input type="text" class="sove-desc" value="' + E(v(line.description)) + '" placeholder="Description of work"></td>'
-        + '<td><input type="text" class="sove-sub" value="' + E(v(line.sub)) + '" placeholder="PF"></td>'
-        + '<td><input type="text" class="sove-orig num" inputmode="decimal" value="' + E(v(line.originalSov)) + '" placeholder="0.00"></td>'
+        + '<td><input type="text" class="sove-orig num" inputmode="decimal" value="' + E(v(line.originalScheduledValue)) + '" placeholder="0.00"></td>'
         + '<td><input type="text" class="sove-co num" inputmode="decimal" value="' + E(v(line.approvedCO)) + '" placeholder="0.00"></td>'
+        + '<td><input type="text" class="sove-mat num" inputmode="decimal" value="' + E(v(line.materialsStored)) + '" placeholder="0.00"></td>'
         + '<td class="num sove-current">&mdash;</td>'
+        + '<td class="num sove-total">&mdash;</td>'
         + '<td class="num sove-balance">&mdash;</td>'
         + '<td class="num sove-retheld">&mdash;</td>'
         + '<td><button type="button" class="sove-remove" title="Remove line" onclick="window.pfSovRemoveLine(this)">&times;</button></td>'
         + '</tr>';
     }
 
-    // Recompute the derived preview cells for one editor row from its inputs.
+    // Recompute the G703 derived preview cells for one editor row from its inputs.
+    // From Previous / This Period are 0 in the standalone SOV editor, so
+    //   Current = Original + Approved CO;  Total = Materials (0 + 0 + Materials);
+    //   Balance = Current - Total;  Retainage Held = retfrac * Total.
     function sovEditorRecalc(row, retFrac){
       if (!row) return;
       var orig = sovNum(row.querySelector('.sove-orig') ? row.querySelector('.sove-orig').value : '');
       var co = sovNum(row.querySelector('.sove-co') ? row.querySelector('.sove-co').value : '');
+      var mat = sovNum(row.querySelector('.sove-mat') ? row.querySelector('.sove-mat').value : '');
       var curCell = row.querySelector('.sove-current');
+      var totCell = row.querySelector('.sove-total');
       var balCell = row.querySelector('.sove-balance');
       var retCell = row.querySelector('.sove-retheld');
-      var bad = (orig !== null && isNaN(orig)) || (co !== null && isNaN(co));
-      if (bad) { if(curCell)curCell.textContent='!'; if(balCell)balCell.textContent='!'; if(retCell)retCell.textContent='!'; return; }
-      var hasAny = (orig !== null) || (co !== null);
-      if (!hasAny) { if(curCell)curCell.textContent='—'; if(balCell)balCell.textContent='—'; if(retCell)retCell.textContent='—'; return; }
-      var current = Math.round(((orig||0) + (co||0)) * 100) / 100;
-      var billed = 0; // A1: no per-line billed yet
-      var balance = Math.round((current - billed) * 100) / 100;
-      var retHeld = Math.round(billed * retFrac * 100) / 100;
+      var bad = (orig !== null && isNaN(orig)) || (co !== null && isNaN(co)) || (mat !== null && isNaN(mat));
+      if (bad) { if(curCell)curCell.textContent='!'; if(totCell)totCell.textContent='!'; if(balCell)balCell.textContent='!'; if(retCell)retCell.textContent='!'; return; }
+      var hasAny = (orig !== null) || (co !== null) || (mat !== null);
+      if (!hasAny) { if(curCell)curCell.textContent='—'; if(totCell)totCell.textContent='—'; if(balCell)balCell.textContent='—'; if(retCell)retCell.textContent='—'; return; }
+      var current = Math.round(((orig||0) + (co||0)) * 100) / 100;   // F = D + E
+      var total = Math.round((mat||0) * 100) / 100;                  // G = 0 + 0 + Materials
+      var balance = Math.round((current - total) * 100) / 100;       // L = F - G
+      var retHeld = Math.round(total * retFrac * 100) / 100;         // M = retfrac * G
       if (curCell) curCell.textContent = sovFmtMoney(current);
+      if (totCell) totCell.textContent = sovFmtMoney(total);
       if (balCell) balCell.textContent = sovFmtMoney(balance);
       if (retCell) retCell.textContent = sovFmtMoney(retHeld);
     }
@@ -13572,7 +13685,7 @@ try {
       if (!editor) return;
       editor.addEventListener('input', function(e){
         var t = e.target;
-        if (t && (t.classList.contains('sove-orig') || t.classList.contains('sove-co'))) {
+        if (t && (t.classList.contains('sove-orig') || t.classList.contains('sove-co') || t.classList.contains('sove-mat'))) {
           var row = t.closest('.fin-inv-sove-row');
           sovEditorRecalc(row, retFrac);
         }
@@ -13588,11 +13701,11 @@ try {
       var lines = sovLinesFor(_curInvoicing);
       var rowsHtml = lines.map(sovEditorRowHtml).join('');
       editor.innerHTML =
-          '<div class="fin-inv-sove-note">Enter the Billing SOV lines. Current Contract Amt, Balance and Retainage Held compute automatically. Retainage % comes from the invoicing info block above.</div>'
+          '<div class="fin-inv-sove-note">Enter the G703 Schedule of Values lines. Current Scheduled Value (Original + Approved CO), Total Completed &amp; Stored, Balance To Finish and Retainage Held compute automatically. From Previous Application and This Period are driven by pay applications and are 0 on the standalone SOV. Retainage % comes from the invoicing info block above.</div>'
         + '<div class="fin-inv-wrap fin-inv-sov-wrap"><table class="ba-table fin-inv-sove-table"><thead><tr>'
-        +   '<th>Item #</th><th>Division / Cost Code</th><th class="sove-desc-cell">Description</th><th>Subcontractor</th>'
-        +   '<th class="num">Original SOV</th><th class="num">Approved CO</th><th class="num">Current Amt</th>'
-        +   '<th class="num">Balance</th><th class="num">Retainage Held</th><th></th>'
+        +   '<th>Item No.</th><th>Cost Code</th><th class="sove-desc-cell">Description Of Work</th>'
+        +   '<th class="num">Original Scheduled Value</th><th class="num">Approved Change Order</th><th class="num">Materials Presently Stored</th>'
+        +   '<th class="num">Current Scheduled Value</th><th class="num">Total Completed &amp; Stored</th><th class="num">Balance To Finish</th><th class="num">Retainage Held</th><th></th>'
         + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>'
         + '<div class="fin-inv-ie-err sove-err" style="display:none"></div>'
         + '<div class="fin-inv-ie-actions">'
@@ -13643,15 +13756,17 @@ try {
         var r = rows[i];
         var orig = sovNum(r.querySelector('.sove-orig').value);
         var co = sovNum(r.querySelector('.sove-co').value);
-        if (orig !== null && isNaN(orig)) { showErr('Line ' + (i+1) + ': Original SOV must be a non-negative number.'); return; }
-        if (co !== null && isNaN(co)) { showErr('Line ' + (i+1) + ': Approved CO must be a non-negative number.'); return; }
+        var mat = sovNum(r.querySelector('.sove-mat').value);
+        if (orig !== null && isNaN(orig)) { showErr('Line ' + (i+1) + ': Original Scheduled Value must be a non-negative number.'); return; }
+        if (co !== null && isNaN(co)) { showErr('Line ' + (i+1) + ': Approved Change Order must be a non-negative number.'); return; }
+        if (mat !== null && isNaN(mat)) { showErr('Line ' + (i+1) + ': Materials Presently Stored must be a non-negative number.'); return; }
         lines.push({
           item: (r.querySelector('.sove-item').value||'').trim(),
-          division: (r.querySelector('.sove-div').value||'').trim(),
+          costCode: (r.querySelector('.sove-cc').value||'').trim(),
           description: (r.querySelector('.sove-desc').value||'').trim(),
-          sub: (r.querySelector('.sove-sub').value||'').trim(),
-          originalSov: (orig===null?0:orig),
-          approvedCO: (co===null?0:co)
+          originalScheduledValue: (orig===null?0:orig),
+          approvedCO: (co===null?0:co),
+          materialsStored: (mat===null?0:mat)
         });
       }
       if (errEl) errEl.style.display='none';
@@ -13733,26 +13848,30 @@ try {
         + '<style>'
         + 'body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:28px;font-size:13px;}'
         + 'h1{font-size:18px;margin:0 0 4px;} .meta{color:#555;font-size:12px;margin-bottom:16px;}'
-        + '.meta b{color:#111;} .fin-inv-sov-wrap{overflow-x:auto;} table{border-collapse:collapse;width:100%;min-width:1180px;table-layout:auto;}'
+        + '.meta b{color:#111;} .fin-inv-sov-wrap{overflow-x:auto;} table{border-collapse:collapse;width:100%;min-width:1420px;table-layout:auto;}'
         + 'th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:12px;'
         +   'white-space:normal;overflow-wrap:normal;word-break:keep-all;hyphens:none;vertical-align:top;}'
-        + 'th{background:#f2f2f2;} td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}'
-        + 'td.sov-item,th.sov-item{min-width:54px;} td.sov-div,th.sov-div{min-width:120px;}'
-        + 'td.sov-desc,th.sov-desc{min-width:300px;} td.sov-sub,th.sov-sub{min-width:100px;}'
-        + 'td.sov-orig,th.sov-orig,td.sov-co,th.sov-co{min-width:96px;} td.sov-current,th.sov-current{min-width:118px;}'
-        + 'td.sov-billed,th.sov-billed{min-width:96px;} td.sov-pct,th.sov-pct{min-width:84px;}'
-        + 'td.sov-balance,th.sov-balance{min-width:108px;} td.sov-retheld,th.sov-retheld{min-width:104px;}'
-        + 'td.sov-invoiced,th.sov-invoiced{min-width:104px;}'
+        + 'thead th{text-align:center;line-height:1.25;} th{background:#f2f2f2;} td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}'
+        + 'thead tr.sov-hdr-letters th{font-size:10px;color:#777;font-weight:600;}'
+        + 'thead tr.sov-hdr-group th{font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:#444;}'
+        + 'thead tr.sov-hdr-group th.sov-hdr-workcompleted{border-bottom:1px solid #ccc;}'
+        + 'thead .sov-hdr-formula{display:block;font-weight:400;font-size:9px;color:#888;}'
+        + 'td.sov-item,th.sov-item{min-width:50px;} td.sov-cc,th.sov-cc{min-width:84px;}'
+        + 'td.sov-desc,th.sov-desc{min-width:260px;}'
+        + 'td.sov-orig,th.sov-orig,td.sov-co,th.sov-co{min-width:100px;} td.sov-current,th.sov-current{min-width:108px;}'
+        + 'td.sov-prev,th.sov-prev{min-width:104px;} td.sov-this,th.sov-this{min-width:96px;} td.sov-mat,th.sov-mat{min-width:108px;}'
+        + 'td.sov-total,th.sov-total{min-width:108px;} td.sov-pct,th.sov-pct{min-width:72px;}'
+        + 'td.sov-balance,th.sov-balance{min-width:106px;} td.sov-retheld,th.sov-retheld{min-width:100px;}'
         + 'tr.fin-inv-sov-totals td{font-weight:700;background:#fafafa;}'
         + '.ba-blank{color:#999;} .foot{margin-top:14px;color:#777;font-size:11px;}'
         + '@media print{ button{display:none;} }'
         + '</style></head><body>'
-        + '<h1>Schedule of Values</h1>'
+        + '<h1>Schedule of Values (AIA G703)</h1>'
         + '<div class="meta"><b>Project #:</b> ' + (pnum?E(pnum):'—')
         +   ' &nbsp;&nbsp; <b>Project:</b> ' + (pname?E(pname):'—')
         +   ' &nbsp;&nbsp; <b>Retainage:</b> ' + E(retLabel) + '</div>'
         + table
-        + '<div class="foot">Pier Foundations &middot; Billing Schedule of Values. Amounts shown are the Original SOV plus approved change orders. Blank cells indicate amounts not yet entered.</div>'
+        + '<div class="foot">Pier Foundations &middot; AIA G703 Schedule of Values. Current Scheduled Value = Original + Approved Change Order. Total Completed &amp; Stored = From Previous + This Period + Materials. Blank cells indicate amounts not yet entered.</div>'
         + '<button onclick="window.print()" style="margin-top:16px;padding:8px 16px;">Print</button>'
         + '</body></html>';
       win.document.open(); win.document.write(html); win.document.close();

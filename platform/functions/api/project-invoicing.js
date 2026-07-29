@@ -15,15 +15,17 @@
 //     num,                                  // the project number this belongs to
 //     subcontractValue: <number|null>,      // project-level input (dollars) or null
 //     retainagePct: <number|null>,          // ONE retainage % per project or null
-//     sov: [ {                              // the Billing Schedule of Values (line items)
-//       item: <string>,                     // line item # / label (free text, capped)
-//       division: <string>,                 // division / cost code (free text, capped)
-//       description: <string>,              // description of work (free text, capped)
-//       sub: <string>,                      // subcontractor (free text, capped)
-//       originalSov: <number>,              // Original SOV dollars (>=0)
-//       approvedCO: <number>                // Approved change orders dollars (may be 0)
-//       // NOTE: Current Contract Amt (=original+CO), % Complete, Balance, Retainage
-//       // Held and Invoiced to Date are DERIVED CLIENT-SIDE and are NOT stored here.
+//     sov: [ {                              // the AIA G703 Schedule of Values (line items)
+//       item: <string>,                     // Item No. (free text, capped)
+//       costCode: <string>,                 // Cost Code (free text, capped)
+//       description: <string>,              // Description Of Work (free text, capped)
+//       originalScheduledValue: <number>,   // Original Scheduled Value dollars (>=0)
+//       approvedCO: <number>,               // Approved Change Order dollars (may be 0)
+//       materialsStored: <number>           // Materials Presently Stored dollars (may be 0)
+//       // NOTE: Current Scheduled Value (=orig+CO), Total Completed & Stored, %,
+//       // Balance To Finish and Retainage Held are DERIVED CLIENT-SIDE and NOT stored.
+//       // From Previous Application + This Period are pay-app driven (Phase A2).
+//       // Legacy fields division/originalSov are accepted on write and migrated.
 //     }, ... ],
 //     payApps: [ {                          // ordered list of pay applications
 //       num: <int>,                         // auto-increment per project (1,2,3...)
@@ -190,11 +192,12 @@ export async function onRequestGet(context) {
 
 // ---- POST: save the whole invoicing record for a project --------------------
 //   body: { num, subcontractValue, retainagePct,
-//           sov: [ {item, division, description, sub, originalSov, approvedCO}, ... ],
+//           sov: [ {item, costCode, description, originalScheduledValue, approvedCO, materialsStored}, ... ],
 //           payApps: [ {num?, date, period, amount, status, paidDate}, ... ] }
-// The SOV stores ONLY the entry fields (item/division/description/sub/originalSov/
-// approvedCO). The derived columns (Current Contract Amt, % Complete, Balance,
-// Retainage Held, Invoiced to Date) are NOT stored -- the client re-derives them.
+// The SOV stores ONLY the entry fields (item/costCode/description/
+// originalScheduledValue/approvedCO/materialsStored). The derived G703 columns
+// (Current Scheduled Value, Total Completed & Stored, %, Balance To Finish,
+// Retainage Held) are NOT stored -- the client re-derives them.
 // The whole record is replaced (client sends the full current state). Server
 // re-numbers pay apps sequentially (1..N in submitted order), re-derives retainage
 // (= amount * retainagePct) and netDue (= amount - retainage) from the
@@ -256,29 +259,41 @@ export async function onRequestPost(context) {
       });
     }
 
-    // Sanitize the Billing SOV lines. Store ONLY the entry fields; never store the
-    // derived columns (client re-derives Current/%/Balance/Retainage/Invoiced). A
-    // line with a non-numeric Original SOV or Approved CO is REJECTED (fail closed).
+    // Sanitize the AIA G703 SOV lines. Store ONLY the entry fields; never store the
+    // derived columns (client re-derives Current Scheduled Value / Total Completed &
+    // Stored / % / Balance To Finish / Retainage Held). From Previous Application and
+    // This Period are pay-app driven (Phase A2) and NOT stored here. A line with a
+    // non-numeric Original Scheduled Value, Approved CO or Materials is REJECTED
+    // (fail closed). Legacy fields (division->costCode, originalSov->
+    // originalScheduledValue) are accepted so previously-saved records keep working.
     const inSov = (parsed && Array.isArray(parsed.sov)) ? parsed.sov : [];
     if (inSov.length > MAX_SOV_LINES) return json({ status: 'error', message: 'Too many schedule of values lines.' }, 413);
     const sov = [];
     for (let i = 0; i < inSov.length; i++) {
       const s = inSov[i] || {};
-      const orig = cleanMoney(s.originalSov, false);
+      const origRaw = (s.originalScheduledValue !== undefined && s.originalScheduledValue !== null && s.originalScheduledValue !== '')
+        ? s.originalScheduledValue : s.originalSov;
+      const orig = cleanMoney(origRaw, false);
       if (!orig.ok) {
-        return json({ status: 'error', message: 'SOV line #' + (i + 1) + ' Original SOV must be a non-negative number.' }, 400);
+        return json({ status: 'error', message: 'SOV line #' + (i + 1) + ' Original Scheduled Value must be a non-negative number.' }, 400);
       }
       const co = cleanMoney(s.approvedCO, false);
       if (!co.ok) {
-        return json({ status: 'error', message: 'SOV line #' + (i + 1) + ' Approved CO must be a non-negative number.' }, 400);
+        return json({ status: 'error', message: 'SOV line #' + (i + 1) + ' Approved Change Order must be a non-negative number.' }, 400);
       }
+      const mat = cleanMoney(s.materialsStored, false);
+      if (!mat.ok) {
+        return json({ status: 'error', message: 'SOV line #' + (i + 1) + ' Materials Presently Stored must be a non-negative number.' }, 400);
+      }
+      const cc = (s.costCode !== undefined && s.costCode !== null && s.costCode !== '')
+        ? s.costCode : s.division;
       sov.push({
         item: cleanStr(s.item),
-        division: cleanStr(s.division),
+        costCode: cleanStr(cc),
         description: cleanSovStr(s.description),
-        sub: cleanStr(s.sub),
-        originalSov: orig.value,
+        originalScheduledValue: orig.value,
         approvedCO: co.value,
+        materialsStored: mat.value,
       });
     }
 
