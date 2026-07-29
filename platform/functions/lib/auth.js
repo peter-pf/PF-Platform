@@ -448,6 +448,11 @@ const FIELD_PAGES = {
   // the money firewall; this only governs loading the HTML shell.
   '/field-sample.html':      'field_ops',
   '/field-sample':           'field_ops',          // CF Pages clean-URL form (308 from .html)
+  // NEW canonical filename for the tool (cache-bust: browsers that cached the old
+  // /field-sample.html with the pre-echo-key polling never requested this URL, so
+  // they cannot serve it from cache). Same field_ops gate. Old URLs kept working.
+  '/field-companion.html':   'field_ops',
+  '/field-companion':        'field_ops',          // CF Pages clean-URL form
 };
 
 // Filename keywords that mark a page as financial/contract/precon even if it is

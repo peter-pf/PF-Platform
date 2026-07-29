@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Field Crew - Pier Foundations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* ---- PF brand tokens (matched to platform/index.html) ---- */
+  :root{
+    --bg-1:#F9FAFD;
+    --bg-2:#F3F5F8;
+    --card:#ffffff;
+    --border:#C8D5DC;
+    --border-light:#E2EAF0;
+    --text-0:#0B1722;
+    --text-1:#2B2F36;
+    --text-2:#5A6370;
+    --text-3:#8A9AAB;
+    --accent:#006DB0;
+    --accent-light:#E0F0FF;
+    --accent-dark:#005A91;
+    --green:#16a34a;
+    --green-light:#dcfce7;
+    --amber:#d97706;
+    --amber-light:#fef3c7;
+    --radius:12px;
+    --shadow-sm:0 1px 2px rgba(0,0,0,0.05);
+    --shadow-md:0 4px 10px -2px rgba(0,40,80,0.10);
+    --shadow-lg:0 14px 40px rgba(0,40,80,0.12);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+    color:var(--text-1);
+    background:var(--bg-1);
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+    font-size:16px;
+    line-height:1.45;
+  }
+  .screen{display:none;}
+  .screen.active{display:block;}
+
+  /* ================= SCREEN 1: LOGIN ================= */
+  #login.active{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    min-height:100vh;
+    padding:24px;
+    background:linear-gradient(135deg,#E9F1F8 0%,#F2F5F9 55%,#FFFFFF 100%);
+  }
+  .login-box{
+    width:100%;max-width:400px;
+    background:var(--card);
+    border:1px solid var(--border-light);
+    border-radius:16px;
+    box-shadow:var(--shadow-lg);
+    padding:34px 28px 26px;
+  }
+  .brand{text-align:center;margin-bottom:24px;}
+  .mark{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:60px;height:60px;border-radius:15px;
+    background:var(--accent);color:#fff;
+    font-weight:800;font-size:1.5rem;letter-spacing:0.5px;
+    margin-bottom:14px;box-shadow:var(--shadow-md);
+  }
+  .brand .wordmark{font-size:1.18rem;font-weight:700;color:var(--text-0);margin:0;}
+  .brand .sub{font-size:0.9rem;color:var(--text-2);margin:5px 0 0;font-weight:500;}
+  .field-tag{
+    display:inline-block;margin-top:12px;
+    background:var(--accent-light);color:var(--accent-dark);
+    font-size:0.72rem;font-weight:700;letter-spacing:0.6px;
+    text-transform:uppercase;padding:4px 11px;border-radius:999px;
+  }
+  .login-box h2{
+    font-size:1.05rem;font-weight:700;color:var(--text-0);
+    text-align:center;margin:6px 0 18px;
+  }
+  label{
+    display:block;font-size:0.78rem;font-weight:600;color:var(--text-2);
+    margin:14px 0 6px;letter-spacing:0.2px;
+  }
+  input[type=text],input[type=password]{
+    width:100%;padding:13px 14px;
+    border:1px solid var(--border);border-radius:10px;
+    font-size:1rem;font-family:inherit;color:var(--text-1);
+    background:#FBFCFE;transition:border-color .15s, box-shadow .15s;
+  }
+  input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-light);}
+  .btn-primary{
+    width:100%;margin-top:24px;padding:14px;
+    background:var(--accent);color:#fff;border:none;border-radius:10px;
+    font-size:1rem;font-weight:700;font-family:inherit;cursor:pointer;
+    transition:background .15s, transform .05s;
+  }
+  .btn-primary:hover{background:var(--accent-dark);}
+  .btn-primary:active{transform:translateY(1px);}
+  .login-caption{
+    text-align:center;margin-top:20px;
+    font-size:0.76rem;color:var(--text-3);line-height:1.5;
+  }
+
+  /* ================= SCREEN 2: FIELD HOME ================= */
+  .topbar{
+    position:sticky;top:0;z-index:50;
+    background:#1E2A38;color:#fff;
+    display:flex;align-items:center;gap:12px;
+    padding:12px 16px;
+    padding-top:max(12px, env(safe-area-inset-top));
+  }
+  .topbar .tb-mark{
+    width:34px;height:34px;border-radius:9px;flex:0 0 auto;
+    background:var(--accent);display:flex;align-items:center;justify-content:center;
+    font-weight:800;font-size:0.92rem;letter-spacing:0.4px;color:#fff;
+  }
+  .topbar .tb-meta{display:flex;flex-direction:column;line-height:1.2;min-width:0;}
+  .topbar .tb-role{font-size:0.72rem;color:#9FB3C4;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;}
+  .topbar .tb-user{font-size:0.98rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .topbar .tb-signout{
+    margin-left:auto;flex:0 0 auto;
+    background:rgba(255,255,255,0.10);color:#fff;border:1px solid rgba(255,255,255,0.16);
+    font-size:0.82rem;font-weight:600;padding:8px 13px;border-radius:8px;cursor:pointer;
+    transition:background .15s;
+  }
+  .topbar .tb-signout:hover{background:rgba(255,255,255,0.20);}
+
+  .home-wrap{max-width:680px;margin:0 auto;padding:18px 16px 48px;}
+
+  /* Companion search */
+  .companion{
+    background:var(--card);
+    border:1px solid var(--border-light);
+    border-radius:16px;
+    box-shadow:var(--shadow-md);
+    padding:20px 18px 18px;
+    margin-bottom:20px;
+  }
+  .companion-head{display:flex;align-items:center;gap:10px;margin-bottom:4px;}
+  .companion-head .ci{
+    width:36px;height:36px;border-radius:10px;flex:0 0 auto;
+    background:var(--accent-light);color:var(--accent-dark);
+    display:flex;align-items:center;justify-content:center;font-size:1.15rem;
+  }
+  .companion-head h2{font-size:1.08rem;font-weight:700;color:var(--text-0);margin:0;}
+  .preview-tag{
+    margin-left:auto;background:var(--amber-light);color:var(--amber);
+    font-size:0.66rem;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;
+    padding:3px 9px;border-radius:999px;white-space:nowrap;
+  }
+  .companion .hint{font-size:0.84rem;color:var(--text-2);margin:6px 0 14px;}
+  .ask-row{display:flex;gap:8px;}
+  .ask-row input{
+    flex:1 1 auto;min-width:0;padding:13px 14px;
+    border:1px solid var(--border);border-radius:10px;
+    font-size:1rem;font-family:inherit;color:var(--text-1);background:#FBFCFE;
+  }
+  .ask-row input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-light);}
+  .ask-row button{
+    flex:0 0 auto;padding:0 18px;border:none;border-radius:10px;
+    background:var(--accent);color:#fff;font-weight:700;font-size:0.95rem;cursor:pointer;
+    transition:background .15s;
+  }
+  .ask-row button:hover{background:var(--accent-dark);}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+  .chip{
+    background:var(--bg-2);border:1px solid var(--border-light);
+    color:var(--text-2);font-size:0.8rem;font-weight:500;
+    padding:7px 12px;border-radius:999px;cursor:pointer;transition:all .12s;
+  }
+  .chip:hover{background:var(--accent-light);border-color:var(--accent);color:var(--accent-dark);}
+  .answer{
+    display:none;margin-top:16px;
+    background:var(--bg-2);border:1px solid var(--border-light);
+    border-left:3px solid var(--accent);
+    border-radius:10px;padding:14px 16px;
+  }
+  .answer.show{display:block;}
+  .answer .a-q{font-size:0.8rem;font-weight:600;color:var(--text-3);margin:0 0 6px;}
+  .answer .a-body{font-size:0.98rem;color:var(--text-0);line-height:1.55;}
+  .answer .a-foot{font-size:0.74rem;color:var(--text-3);margin-top:10px;}
+
+  /* Today strip */
+  .today{
+    background:linear-gradient(135deg,#10324F 0%,#1E2A38 100%);
+    color:#fff;border-radius:16px;padding:18px;margin-bottom:20px;
+  }
+  .today .t-label{font-size:0.72rem;font-weight:700;letter-spacing:0.7px;text-transform:uppercase;color:#9FB3C4;}
+  .today .t-proj{font-size:1.22rem;font-weight:800;margin:4px 0 2px;}
+  .today .t-sub{font-size:0.88rem;color:#C7D6E2;}
+  .today .t-actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;}
+  .today .t-btn{
+    flex:1 1 auto;text-align:center;
+    background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.18);
+    color:#fff;font-weight:600;font-size:0.9rem;padding:11px 12px;border-radius:10px;
+    cursor:pointer;transition:background .15s;
+  }
+  .today .t-btn:hover{background:rgba(255,255,255,0.22);}
+
+  /* Quick-action cards */
+  .section-label{font-size:0.78rem;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;color:var(--text-3);margin:6px 2px 12px;}
+  .cards{display:grid;grid-template-columns:1fr;gap:12px;}
+  .qcard{
+    background:var(--card);border:1px solid var(--border-light);
+    border-radius:14px;padding:16px 16px;cursor:pointer;
+    box-shadow:var(--shadow-sm);transition:box-shadow .15s, transform .05s, border-color .15s;
+    display:flex;align-items:center;gap:14px;
+  }
+  .qcard:hover{box-shadow:var(--shadow-md);border-color:var(--border);}
+  .qcard:active{transform:translateY(1px);}
+  .qcard .q-icon{
+    width:48px;height:48px;border-radius:12px;flex:0 0 auto;
+    display:flex;align-items:center;justify-content:center;font-size:1.4rem;
+    background:var(--accent-light);color:var(--accent-dark);
+  }
+  .qcard .q-text{flex:1 1 auto;min-width:0;}
+  .qcard .q-title{font-size:1.04rem;font-weight:700;color:var(--text-0);}
+  .qcard .q-sum{font-size:0.86rem;color:var(--text-2);margin-top:2px;}
+  .qcard .q-arrow{flex:0 0 auto;color:var(--text-3);font-size:1.2rem;}
+  .badge{
+    display:inline-block;font-size:0.72rem;font-weight:700;
+    padding:2px 9px;border-radius:999px;margin-left:6px;vertical-align:middle;
+  }
+  .badge.green{background:var(--green-light);color:var(--green);}
+  .badge.amber{background:var(--amber-light);color:var(--amber);}
+
+  /* progress bar */
+  .pbar{margin-top:8px;height:7px;border-radius:999px;background:var(--bg-2);overflow:hidden;}
+  .pbar > span{display:block;height:100%;border-radius:999px;background:var(--accent);}
+  .pbar-label{font-size:0.76rem;color:var(--text-3);margin-top:4px;}
+
+  .home-foot{text-align:center;margin-top:28px;font-size:0.78rem;color:var(--text-3);line-height:1.5;}
+
+  @media (min-width:560px){
+    .cards{grid-template-columns:1fr 1fr;}
+    .qcard.span2{grid-column:1 / -1;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ SCREEN 1: FIELD CREW LOGIN ============ -->
+<section id="login" class="screen active">
+  <form class="login-box" id="loginForm" autocomplete="on" novalidate>
+    <div class="brand">
+      <div class="mark">PF</div>
+      <p class="wordmark">Pier Foundations</p>
+      <p class="sub">Field Operations</p>
+      <span class="field-tag">Field Crew Access</span>
+    </div>
+
+    <h2>Field Crew Sign In</h2>
+
+    <label for="fc-user">Username</label>
+    <input type="text" id="fc-user" name="username" autocomplete="username"
+           placeholder="Your crew username" autofocus>
+
+    <label for="fc-pass">Password</label>
+    <input type="password" id="fc-pass" name="password"
+           autocomplete="current-password" placeholder="Your password">
+
+    <button type="submit" class="btn-primary">Sign In</button>
+
+    <p class="login-caption">
+      Sample preview of the Pier Foundations field portal.<br>
+      No real account is needed to explore this demo.
+    </p>
+  </form>
+</section>
+
+<!-- ============ SCREEN 2: FIELD HOME ============ -->
+<section id="home" class="screen">
+  <div class="topbar">
+    <div class="tb-mark">PF</div>
+    <div class="tb-meta">
+      <span class="tb-role">Field Crew</span>
+      <span class="tb-user">Seth M.</span>
+    </div>
+    <button type="button" class="tb-signout" id="signoutBtn">Sign out</button>
+  </div>
+
+  <main class="home-wrap">
+
+    <!-- AI Companion (centerpiece) -->
+    <div class="companion">
+      <div class="companion-head">
+        <div class="ci" aria-hidden="true">&#128172;</div>
+        <h2>Ask the Field Companion</h2>
+      </div>
+      <p class="hint">Ask a plain question about your job and get a straight answer. No digging through folders.</p>
+      <form class="ask-row" id="askForm">
+        <input type="text" id="askInput" autocomplete="off"
+               placeholder="Ask about your job... e.g. who is my stone vendor for POET?">
+        <button type="submit">Ask</button>
+      </form>
+      <div class="chips" id="chips">
+        <span class="chip" data-q="who is my stone vendor for POET?">Stone vendor for POET</span>
+        <span class="chip" data-q="who do I call for fuel?">Fuel vendor</span>
+        <span class="chip" data-q="who is hauling my stone?">Trucking contact</span>
+        <span class="chip" data-q="any open maintenance?">Open maintenance</span>
+        <span class="chip" data-q="what is my next project?">My next project</span>
+        <span class="chip" data-q="who is our engineer?">Our engineer</span>
+      </div>
+      <div class="answer" id="answer" role="status" aria-live="polite">
+        <p class="a-q" id="ansQ"></p>
+        <div class="a-body" id="ansBody"></div>
+        <p class="a-foot">Field Companion - operational answers only. No cost, price, or contract information.</p>
+      </div>
+    </div>
+
+    <!-- Today strip -->
+    <div class="today">
+      <div class="t-label">Today</div>
+      <div class="t-proj">POET - Shelbyville</div>
+      <div class="t-sub">Foreman: Seth M. &nbsp;&bull;&nbsp; Crew of 4 &nbsp;&bull;&nbsp; Day shift</div>
+      <div class="t-actions">
+        <div class="t-btn" data-go="report">Start daily report</div>
+        <div class="t-btn" data-go="maint">Log maintenance</div>
+      </div>
+    </div>
+
+    <!-- Quick actions -->
+    <div class="section-label">Field Tools</div>
+    <div class="cards">
+      <div class="qcard span2" data-go="projects" tabindex="0" role="button">
+        <div class="q-icon" aria-hidden="true">&#128511;</div>
+        <div class="q-text">
+          <div class="q-title">My Projects</div>
+          <div class="q-sum">POET - Shelbyville, in progress</div>
+          <div class="pbar"><span style="width:62%"></span></div>
+          <div class="pbar-label">62% complete by linear feet</div>
+        </div>
+        <div class="q-arrow" aria-hidden="true">&rsaquo;</div>
+      </div>
+
+      <div class="qcard" data-go="report" tabindex="0" role="button">
+        <div class="q-icon" aria-hidden="true">&#128221;</div>
+        <div class="q-text">
+          <div class="q-title">Submit Daily Report</div>
+          <div class="q-sum">Not started for today</div>
+        </div>
+        <div class="q-arrow" aria-hidden="true">&rsaquo;</div>
+      </div>
+
+      <div class="qcard" data-go="maint" tabindex="0" role="button">
+        <div class="q-icon" aria-hidden="true">&#128295;</div>
+        <div class="q-text">
+          <div class="q-title">Maintenance
+            <span class="badge amber">2 open</span>
+          </div>
+          <div class="q-sum">2 open items on the rig</div>
+        </div>
+        <div class="q-arrow" aria-hidden="true">&rsaquo;</div>
+      </div>
+    </div>
+
+    <p class="home-foot">
+      Field view - operational only, no financial data.
+    </p>
+  </main>
+</section>
+
+<script>
+"use strict";
+
+// ---- Safe HTML escaping for any dynamic text ----
+function esc(s){
+  return String(s == null ? "" : s)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#39;");
+}
+
+var loginScreen = document.getElementById("login");
+var homeScreen  = document.getElementById("home");
+
+function showHome(){
+  loginScreen.classList.remove("active");
+  homeScreen.classList.add("active");
+  window.scrollTo(0,0);
+}
+function showLogin(){
+  homeScreen.classList.remove("active");
+  loginScreen.classList.add("active");
+  // reset companion answer for a clean re-entry
+  var a = document.getElementById("answer");
+  if (a) a.classList.remove("show");
+  window.scrollTo(0,0);
+}
+
+// ---- Login (no real auth, demo only) ----
+document.getElementById("loginForm").addEventListener("submit", function(e){
+  e.preventDefault();
+  showHome();
+});
+
+// ---- Sign out ----
+document.getElementById("signoutBtn").addEventListener("click", showLogin);
+
+// ---- Field Companion demo Q&A ----
+// Front-end sample. Answers are grounded in field-safe project records
+// (vendors, contacts, schedule). No financial data anywhere by design.
+//
+// Each entry has:
+//   any    : keyword/synonym list. A match on ANY single keyword scores the entry.
+//   all    : optional list of groups; EACH group must have a hit (helps disambiguate).
+//   weight : optional bump so more specific intents win ties.
+//   text   : the answer shown to the crew.
+var ANSWERS = [
+  {
+    // Stone / aggregate vendor
+    any: ["stone", "rock", "aggregate", "gravel", "57s", "number 8", "#8", "material vendor", "stone vendor", "stone supplier", "more stone", "order stone"],
+    text: "Your stone and aggregate vendor for POET is Rush County Stone Company. Contact Carleigh at 765-629-2211 or Mike.Malinoff@jrjnet.com. They handle the stone and the delivery to the site."
+  },
+  {
+    // Fuel
+    any: ["fuel", "diesel", "def", "gas", "fill up", "fuel up", "out of fuel", "low on fuel", "fuel truck", "fuel vendor", "fuel delivery"],
+    text: "For fuel, call Jackson Oil. Your contact is Avin Kazmierzak at 800-221-4603, cell 317-502-7800. They run fuel delivery to the POET site."
+  },
+  {
+    // Trucking / hauling
+    any: ["truck", "trucking", "hauler", "hauling", "haul", "transport", "lowboy", "move the rig", "moving the rig", "float", "who hauls", "who is hauling", "rig transport", "move equipment"],
+    text: "Trucking and rig transport is handled by Paddacks Trucking. Contact Craig Hogwood at 317-896-3206, cell 317-690-6923, or chogwood@paddacks.com."
+  },
+  {
+    // Equipment rental
+    any: ["rental", "rent", "equipment rental", "skid steer", "skid", "rented", "macallister", "cat rental", "loaner", "extra machine", "need a machine"],
+    text: "For equipment rentals, call Bryson Moore at Caterpillar / MacAllister Rentals, cell 512-897-7353, Bryson.Moore@cat.com. The current rental on POET is a skid steer."
+  },
+  {
+    // Next project / schedule
+    any: ["next project", "next job", "next site", "whats next", "what is next", "coming up", "after poet", "where am i going", "where do i go next", "upcoming", "on the schedule", "schedule", "future jobs", "what's next"],
+    text: "Your next project after POET is the Madison Style District Parking Garage in South Bend, IN. The crew stays together and Seth M. remains foreman. The Field Companion will show the exact start date once the schedule is live."
+  },
+  {
+    // Project status / percent complete
+    any: ["status", "percent", "percent complete", "how far along", "how much is done", "progress", "are we done", "how close", "complete", "completion", "where are we at"],
+    text: "POET in Shelbyville is in progress and most of the piers are installed. Open My Projects on the home screen for the live completion bar, which is driven by linear feet from the QA/QC logs."
+  },
+  {
+    // Open maintenance / wear parts -> route to Maintenance tab
+    any: ["maintenance", "open maintenance", "maintenance due", "wear part", "wear parts", "service due", "open items", "rig down", "breakdown", "flat tire", "repair", "mechanic", "fix the rig", "broke down", "down equipment", "pm due", "grease", "oil change", "track", "teeth", "what needs fixed"],
+    text: "Open the Maintenance tab on the home screen to see open items by category. There are 2 open items on the rig right now. For an urgent breakdown, call the yard shop line first, then log the item so it stays on record."
+  },
+  {
+    // Site contact / foreman on POET
+    any: ["foreman", "site contact", "who is the foreman", "who is in charge", "crew lead", "site lead", "who runs the site", "superintendent on site", "my foreman"],
+    text: "The PF foreman on POET is Seth M. with a crew of 4. John Willis is the lead aggregate pier contractor for PF. On the GC side, the superintendent on site is Larry and the project manager is Tanner Schweer at POET Design & Construction."
+  },
+  {
+    // GC contact
+    any: ["gc", "general contractor", "gc contact", "gc pm", "owner contact", "who is the gc", "poet contact", "project manager", "pm contact"],
+    text: "The general contractor on POET is POET Design & Construction. The project manager is Tanner Schweer at tanner.schweer@poet.com, 605-965-4955. The on-site superintendent is Larry."
+  },
+  {
+    // Engineer
+    any: ["engineer", "our engineer", "design engineer", "garbin", "ggg", "geostructural", "pier design", "design contact", "eor", "engineer of record"],
+    text: "Our pier design engineer is Ed Garbin at Garbin Geostructural (GGG). Reach him at 904-299-3482 or ed@garbingeostructural.com. Jake Campbell at GGG is the backup design contact."
+  },
+  {
+    // Geotech
+    any: ["geotech", "geotechnical", "soils", "soil report", "boring", "borings", "patriot", "soil engineer"],
+    text: "The geotech engineer on POET is Salim Ilmudeen, P.E. at Patriot Engineering in Indianapolis. Use the Field Companion or the project folder for the soils report and borings."
+  },
+  {
+    // Surveying / staking / layout
+    any: ["survey", "surveyor", "staking", "stake", "layout", "stakes", "miller land", "control points", "where are the columns", "column layout"],
+    text: "Surveying and staking on POET is by Miller Land Surveying. Contact Rob Mariucci at 260-489-8571, cell 260-701-7176, rob@mlswebsite.us, for layout and stakes."
+  },
+  {
+    // Daily report / log production
+    any: ["daily report", "submit report", "log production", "log my day", "where do i submit", "how do i log", "report production", "end of day report", "turn in", "daily log", "log columns", "log piers", "log footage"],
+    text: "Tap Submit Daily Report on the home screen to log your production for the day. Enter your columns and linear feet there. It is not started yet for today. You can also start it from the Today card at the top."
+  },
+  {
+    // Safety
+    any: ["safety", "safety contact", "safety question", "incident", "near miss", "injury", "hurt", "ppe", "jha", "toolbox talk", "osha", "who do i call for safety", "report an incident"],
+    text: "For a safety question or to report an incident or near miss, contact George Austin at Progressive Safety, 704-288-0644, gaustin@progressivesafety.com. Report anything urgent to your foreman Seth M. first, then log it."
+  }
+];
+
+// Question words and filler stripped before matching so phrasing does not block a hit.
+var STOP = /\b(who|what|whats|whos|where|when|how|do|does|did|is|are|am|the|a|an|my|our|for|on|at|to|of|i|we|me|call|need|should|can|please|about|with|get|find|tell|know|here|this|that)\b/g;
+
+function normalize(s){
+  return String(s || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9# ]+/g, " ") // keep # for "#8" style references
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function answerFor(rawQ){
+  var raw = normalize(rawQ);
+  if (!raw){
+    return "Ask a question about your job and I will pull the answer from the project records.";
+  }
+  // Stripped version for looser keyword hits.
+  var stripped = (" " + raw + " ").replace(STOP, " ").replace(/\s+/g, " ").trim();
+  var hay = raw + " " + stripped;
+
+  var best = null;
+  var bestScore = 0;
+  for (var i = 0; i < ANSWERS.length; i++){
+    var a = ANSWERS[i];
+    var score = 0;
+    for (var j = 0; j < a.any.length; j++){
+      var kw = a.any[j];
+      if (hay.indexOf(kw) !== -1){
+        // Longer keyword phrases score higher (more specific).
+        score += kw.indexOf(" ") !== -1 ? 3 : 1;
+      }
+    }
+    if (a.weight) score += (score > 0 ? a.weight : 0);
+    if (score > bestScore){
+      bestScore = score;
+      best = a;
+    }
+  }
+  if (best && bestScore > 0){
+    return best.text;
+  }
+  return "I will pull that from the project records once we connect the live data.";
+}
+
+// LIVE KV-QUEUE PATH (Stage 2). runAsk() now asks the field assistant through
+// the /api/field-companion endpoint: POST {query} -> 202 {id}, then poll
+// GET ?id= until status:"done". A private in-container poller runs the question
+// through the local Hermes and writes the answer back to KV; Hermes is NEVER
+// exposed. The old local answerFor() stub is kept above only as a reference /
+// offline fallback and is no longer called on submit.
+// Poll SCHEDULE (ms between GETs). A regex refusal is ready ~1s after the poller
+// picks the job up, so the front of the schedule is aggressive to SHOW ready
+// answers within ~1s; it then relaxes to ~1s steady for the ~10-12s Hermes answers
+// so we never hammer the endpoint. Any index past the end reuses the last value.
+var FC_POLL_SCHEDULE = [400, 500, 600, 800, 1000]; // then 1000 steady
+var FC_MAX_MS  = 60000;     // give up after 60s (poller timeboxes Hermes at 90s,
+                            // but the crew should not wait longer than this)
+
+async function askCompanion(query){
+  // 1) enqueue
+  var postRes = await fetch("/api/field-companion", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify({ query: query })
+  });
+  var posted = await postRes.json().catch(function(){ return {}; });
+  if (!postRes.ok || !posted.id){
+    // honest fail-closed message (never fabricate)
+    return posted.error || "The field assistant is not available right now. No answer was generated.";
+  }
+  var id = posted.id;
+  // 2) poll until done or timeout. Aggressive at the front, then relaxes.
+  var started = Date.now();
+  var pollIx = 0;
+  var notFound = 0;
+  while (Date.now() - started < FC_MAX_MS){
+    var wait = FC_POLL_SCHEDULE[Math.min(pollIx, FC_POLL_SCHEDULE.length - 1)];
+    pollIx++;
+    await new Promise(function(r){ setTimeout(r, wait); });
+    // Send the attempt index (n): the endpoint reads a FRESH answer-echo key per
+    // attempt so a Workers-KV edge cache can't pin a stale "pending" for ~60s.
+    var getRes = await fetch("/api/field-companion?id=" + encodeURIComponent(id) + "&n=" + (pollIx - 1), {
+      credentials: "same-origin"
+    });
+    var data = await getRes.json().catch(function(){ return {}; });
+    if (getRes.status === 403){
+      return "That request cannot be answered from the field tool.";
+    }
+    if (getRes.status === 404){
+      // KV is eventually consistent: right after enqueue the just-written job key
+      // may not yet be visible at THIS edge, so an early 404 is transient, NOT
+      // "expired". Only treat 404 as terminal if it persists (the item truly
+      // expired/never landed), and never in the first few seconds.
+      notFound++;
+      if (notFound >= 4 && (Date.now() - started) > 5000){
+        return (data && data.error) || "That question expired. Please ask again.";
+      }
+      continue; // keep polling through transient propagation lag
+    }
+    notFound = 0;
+    if (data && data.status === "done"){
+      // answer present -> show it; empty answer -> show the honest error/refusal
+      return (data.answer && data.answer.trim())
+        ? data.answer
+        : (data.error || "I don't have that.");
+    }
+    // else still pending/processing -> keep polling
+  }
+  return "The field assistant is taking longer than expected. Please try again.";
+}
+
+function runAsk(rawQ){
+  var q = (rawQ || "").trim();
+  if (!q) return;
+  var box  = document.getElementById("answer");
+  var qEl  = document.getElementById("ansQ");
+  var bEl  = document.getElementById("ansBody");
+  qEl.textContent = "You asked: " + q;
+  bEl.textContent = "Checking the project records…";
+  box.classList.add("show");
+  askCompanion(q).then(function(answer){
+    bEl.textContent = answer;
+  }).catch(function(){
+    // network / unexpected error -> honest, never fabricated
+    bEl.textContent = "The field assistant is temporarily unavailable. No answer was generated.";
+  });
+}
+
+document.getElementById("askForm").addEventListener("submit", function(e){
+  e.preventDefault();
+  runAsk(document.getElementById("askInput").value);
+});
+
+// ---- Suggestion chips ----
+var chipWrap = document.getElementById("chips");
+chipWrap.addEventListener("click", function(e){
+  var chip = e.target.closest(".chip");
+  if (!chip) return;
+  var q = chip.getAttribute("data-q") || chip.textContent;
+  document.getElementById("askInput").value = q;
+  runAsk(q);
+});
+
+// ---- Quick-action + today demo taps (no destination yet, friendly nudge) ----
+function demoNudge(){
+  var input = document.getElementById("askInput");
+  // For the demo these modules are placeholders; keep it honest and calm.
+  var box = document.getElementById("answer");
+  document.getElementById("ansQ").textContent = "Sample preview";
+  document.getElementById("ansBody").textContent =
+    "This module opens in the full field portal. This page is a front-end sample of the experience.";
+  box.classList.add("show");
+  box.scrollIntoView({behavior:"smooth", block:"center"});
+}
+document.querySelectorAll("[data-go]").forEach(function(el){
+  el.addEventListener("click", demoNudge);
+  el.addEventListener("keydown", function(e){
+    if (e.key === "Enter" || e.key === " "){ e.preventDefault(); demoNudge(); }
+  });
+});
+</script>
+</body>
+</html>
