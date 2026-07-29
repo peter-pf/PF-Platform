@@ -19644,8 +19644,9 @@ try {
     // poll for the grounded answer, render it inline. Same private KV-queue path as
     // field-sample.html: Hermes stays private, the 3-layer money guard + fail-closed
     // contract are enforced server-side. field_ops-gated by the endpoint + middleware.
-    var FO_FC_FIRST_POLL_MS = 500;   // first poll fires fast (regex-refusal is near-instant)
-    var FO_FC_POLL_MS = 1200;        // steady poll cadence
+    // Aggressive at the front (ready refusals show within ~1s), then relaxes to
+    // ~1s steady for the ~10-12s Hermes answers so we never hammer the endpoint.
+    var FO_FC_POLL_SCHEDULE = [400, 500, 600, 800, 1000]; // then 1000 steady
     var FO_FC_MAX_MS  = 60000;
     function foRenderLive(html, cls){
       var el = document.getElementById('foLiveAnswer');
@@ -19680,14 +19681,25 @@ try {
       }
       var id = posted.id;
       var started = Date.now();
-      var first = true;
+      var pollIx = 0;
+      var notFound = 0;
       while (Date.now() - started < FO_FC_MAX_MS){
-        await new Promise(function(r){ setTimeout(r, first ? FO_FC_FIRST_POLL_MS : FO_FC_POLL_MS); });
-        first = false;
+        var wait = FO_FC_POLL_SCHEDULE[Math.min(pollIx, FO_FC_POLL_SCHEDULE.length - 1)];
+        pollIx++;
+        await new Promise(function(r){ setTimeout(r, wait); });
         var getRes = await fetch('/api/field-companion?id=' + encodeURIComponent(id), { credentials: 'same-origin' });
         var data = await getRes.json().catch(function(){ return {}; });
         if (getRes.status === 403) return 'That request cannot be answered from the field tool.';
-        if (getRes.status === 404) return (data && data.error) || 'That question expired. Please ask again.';
+        if (getRes.status === 404){
+          // Eventually-consistent KV: an early 404 is transient propagation lag,
+          // not "expired". Only give up if it persists past the first few seconds.
+          notFound++;
+          if (notFound >= 4 && (Date.now() - started) > 5000){
+            return (data && data.error) || 'That question expired. Please ask again.';
+          }
+          continue;
+        }
+        notFound = 0;
         if (data && data.status === 'done'){
           return (data.answer && data.answer.trim()) ? data.answer : ((data && data.error) || "I don't have that.");
         }

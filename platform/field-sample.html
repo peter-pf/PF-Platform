@@ -536,9 +536,11 @@ function answerFor(rawQ){
 // through the local Hermes and writes the answer back to KV; Hermes is NEVER
 // exposed. The old local answerFor() stub is kept above only as a reference /
 // offline fallback and is no longer called on submit.
-var FC_FIRST_POLL_MS = 500; // first poll fires fast (a regex-refusal is ready almost
-                            // immediately once the poller picks the job up)
-var FC_POLL_MS = 1200;      // steady poll cadence (answer-fetch; snappy)
+// Poll SCHEDULE (ms between GETs). A regex refusal is ready ~1s after the poller
+// picks the job up, so the front of the schedule is aggressive to SHOW ready
+// answers within ~1s; it then relaxes to ~1s steady for the ~10-12s Hermes answers
+// so we never hammer the endpoint. Any index past the end reuses the last value.
+var FC_POLL_SCHEDULE = [400, 500, 600, 800, 1000]; // then 1000 steady
 var FC_MAX_MS  = 60000;     // give up after 60s (poller timeboxes Hermes at 90s,
                             // but the crew should not wait longer than this)
 
@@ -556,12 +558,14 @@ async function askCompanion(query){
     return posted.error || "The field assistant is not available right now. No answer was generated.";
   }
   var id = posted.id;
-  // 2) poll until done or timeout. First poll fires quickly, then steady cadence.
+  // 2) poll until done or timeout. Aggressive at the front, then relaxes.
   var started = Date.now();
-  var first = true;
+  var pollIx = 0;
+  var notFound = 0;
   while (Date.now() - started < FC_MAX_MS){
-    await new Promise(function(r){ setTimeout(r, first ? FC_FIRST_POLL_MS : FC_POLL_MS); });
-    first = false;
+    var wait = FC_POLL_SCHEDULE[Math.min(pollIx, FC_POLL_SCHEDULE.length - 1)];
+    pollIx++;
+    await new Promise(function(r){ setTimeout(r, wait); });
     var getRes = await fetch("/api/field-companion?id=" + encodeURIComponent(id), {
       credentials: "same-origin"
     });
@@ -570,8 +574,17 @@ async function askCompanion(query){
       return "That request cannot be answered from the field tool.";
     }
     if (getRes.status === 404){
-      return data.error || "That question expired. Please ask again.";
+      // KV is eventually consistent: right after enqueue the just-written job key
+      // may not yet be visible at THIS edge, so an early 404 is transient, NOT
+      // "expired". Only treat 404 as terminal if it persists (the item truly
+      // expired/never landed), and never in the first few seconds.
+      notFound++;
+      if (notFound >= 4 && (Date.now() - started) > 5000){
+        return (data && data.error) || "That question expired. Please ask again.";
+      }
+      continue; // keep polling through transient propagation lag
     }
+    notFound = 0;
     if (data && data.status === "done"){
       // answer present -> show it; empty answer -> show the honest error/refusal
       return (data.answer && data.answer.trim())
