@@ -193,9 +193,18 @@ export async function onRequest(context) {
   // the legacy fallback still works for anyone mid-cutover).
   const accept = request.headers.get('Accept') || '';
   if (request.method === 'GET' && accept.includes('text/html')) {
+    // Preserve the requested page so login can return the user to it (deep links
+    // like /field-sample.html no longer dead-end on the portal home after login).
+    // Only pass a SAME-ORIGIN path (leading single slash, no scheme/backslash) to
+    // avoid an open-redirect; login.html re-validates with the same rule.
+    let loginUrl = '/login.html';
+    const wanted = path + (url.search || '');
+    if (/^\/[^/\\]/.test(wanted) && !wanted.startsWith('/login')) {
+      loginUrl += '?next=' + encodeURIComponent(wanted);
+    }
     return new Response(null, {
       status: 302,
-      headers: { 'Location': '/login.html', 'Cache-Control': 'private, no-store' },
+      headers: { 'Location': loginUrl, 'Cache-Control': 'private, no-store' },
     });
   }
   return new Response('Authentication required', {

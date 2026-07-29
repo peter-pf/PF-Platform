@@ -439,6 +439,15 @@ const PAGE_AREAS = {
 const FIELD_PAGES = {
   '/daily-production.html':  'field_ops',         // daily logs / production
   '/schedule.html':          'schedule',          // crew schedule (operational)
+  // Field Companion (AI field-search) standalone page. field_ops area =
+  // admin/partner/business_dev/field_ops so crew, BD, partners AND admins can
+  // deep-link straight to the tool. WITHOUT this it fell to the default
+  // 'user_admin' (admin-only) -> partners/crew were bounced to /denied.html and
+  // never reached the tool (only admins like Brad worked, masking the gap).
+  // The /api/field-companion endpoint is separately gated to field_ops + carries
+  // the money firewall; this only governs loading the HTML shell.
+  '/field-sample.html':      'field_ops',
+  '/field-sample':           'field_ops',          // CF Pages clean-URL form (308 from .html)
 };
 
 // Filename keywords that mark a page as financial/contract/precon even if it is
