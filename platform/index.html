@@ -19687,7 +19687,9 @@ try {
         var wait = FO_FC_POLL_SCHEDULE[Math.min(pollIx, FO_FC_POLL_SCHEDULE.length - 1)];
         pollIx++;
         await new Promise(function(r){ setTimeout(r, wait); });
-        var getRes = await fetch('/api/field-companion?id=' + encodeURIComponent(id), { credentials: 'same-origin' });
+        // &n=attempt -> endpoint reads a fresh answer-echo key each poll so a
+        // Workers-KV edge cache can't hide a ready answer for ~60s.
+        var getRes = await fetch('/api/field-companion?id=' + encodeURIComponent(id) + '&n=' + (pollIx - 1), { credentials: 'same-origin' });
         var data = await getRes.json().catch(function(){ return {}; });
         if (getRes.status === 403) return 'That request cannot be answered from the field tool.';
         if (getRes.status === 404){

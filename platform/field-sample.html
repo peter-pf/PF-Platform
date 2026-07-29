@@ -566,7 +566,9 @@ async function askCompanion(query){
     var wait = FC_POLL_SCHEDULE[Math.min(pollIx, FC_POLL_SCHEDULE.length - 1)];
     pollIx++;
     await new Promise(function(r){ setTimeout(r, wait); });
-    var getRes = await fetch("/api/field-companion?id=" + encodeURIComponent(id), {
+    // Send the attempt index (n): the endpoint reads a FRESH answer-echo key per
+    // attempt so a Workers-KV edge cache can't pin a stale "pending" for ~60s.
+    var getRes = await fetch("/api/field-companion?id=" + encodeURIComponent(id) + "&n=" + (pollIx - 1), {
       credentials: "same-origin"
     });
     var data = await getRes.json().catch(function(){ return {}; });

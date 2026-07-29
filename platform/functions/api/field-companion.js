@@ -50,6 +50,16 @@ const JSON_HEADERS = {
 };
 
 const KEY_PREFIX = 'fieldq:';
+// ANSWER-ECHO keys: fieldr:<id>:<n>. When the poller finishes it writes the SAME
+// result to several echo keys (n = 0..READY_ECHO_SLOTS-1). The browser polls with a
+// monotonically increasing attempt index n and reads fieldr:<id>:<n> -- a DIFFERENT
+// key every poll -- so it can never get stuck on a Workers-KV edge cache that pinned
+// an earlier "still pending" / negative-miss read of the base key for up to 60s.
+// (Workers KV get() caches reads at the edge for >=60s and caches misses too; a
+// fixed-key poll therefore keeps seeing the stale "pending" until the TTL expires --
+// this was the ~60s field-tool latency. A fresh key per attempt defeats that.)
+const READY_PREFIX = 'fieldr:';
+const READY_ECHO_SLOTS = 90; // covers ~60s of polling at the front-end cadence
 const MAX_BODY_BYTES = 4 * 1024;
 const MAX_QUERY_LEN = 1000;
 const QUEUE_ITEM_TTL_SECS = 60 * 60; // KV item self-expires after 1h (cleanup)
@@ -168,16 +178,38 @@ export async function onRequestGet(context) {
   const id = s(url.searchParams.get('id'), 64).trim();
   if (!id || !/^[a-f0-9]{8,64}$/.test(id)) return failClosed('Missing or invalid id.', 400);
 
-  let item;
+  // Poll attempt index (browser sends &n=<attempt>). Used to read a FRESH echo key
+  // each poll so a cached "pending" read of the base key can't hide a ready answer.
+  let n = parseInt(url.searchParams.get('n') || '0', 10);
+  if (!Number.isFinite(n) || n < 0) n = 0;
+  if (n >= READY_ECHO_SLOTS) n = READY_ECHO_SLOTS - 1;
+
+  let item = null;
+
+  // (1) FAST PATH: read the per-attempt answer-echo key. This key was never read by
+  // this browser before, so it is NOT served from a previously cached miss -- once
+  // the poller has written it, the browser sees it on the very next poll.
   try {
-    const rawItem = await env.PF_SCHEDULE.get(KEY_PREFIX + id);
+    const rawEcho = await env.PF_SCHEDULE.get(`${READY_PREFIX}${id}:${n}`);
+    if (rawEcho) item = JSON.parse(rawEcho);
+  } catch { /* fall through to base key */ }
+
+  // (2) No echo yet -> read the base key for pending/expired status. This read MAY be
+  // edge-cached-stale, but it is only used to signal "keep polling" vs "expired"; the
+  // authoritative "done" signal is the echo key above.
+  if (!item) {
+    let rawItem;
+    try {
+      rawItem = await env.PF_SCHEDULE.get(KEY_PREFIX + id);
+    } catch {
+      return failClosed('The field assistant is temporarily unavailable.', 503);
+    }
     if (!rawItem) {
       // Expired or never existed. Honest, not fabricated.
       return json({ ok: false, status: 'not_found', answer: '', error: 'That question is no longer available. Please ask again.' }, 404);
     }
-    item = JSON.parse(rawItem);
-  } catch {
-    return failClosed('The field assistant is temporarily unavailable.', 503);
+    try { item = JSON.parse(rawItem); }
+    catch { return failClosed('The field assistant is temporarily unavailable.', 503); }
   }
 
   const status = item && item.status;
