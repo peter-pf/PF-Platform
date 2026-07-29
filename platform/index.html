@@ -19554,9 +19554,15 @@ try {
         + '<h2>Projects - Field</h2>'
         + '<p class="pf-index-sub">Operational view for the field team. Scope, schedule, safety, '
         + 'site readiness, equipment, material and QA/QC - <strong>no financials</strong>.</p>'
+        + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;max-width:600px">'
         + '<input type="text" id="foProjSearch" placeholder="Ask anything: who is my stone vendor for POET?" '
         + 'autocomplete="off" value="' + E(rawQ) + '" '
-        + 'style="width:100%;max-width:480px;padding:7px 10px;margin:6px 0">'
+        + 'style="flex:1;min-width:240px;padding:7px 10px;margin:6px 0">'
+        + '<button type="button" id="foAskBtn" '
+        + 'style="padding:7px 16px;margin:6px 0;cursor:pointer" '
+        + 'title="Ask the Field Companion for a grounded answer">Ask</button>'
+        + '</div>'
+        + '<div id="foLiveAnswer" class="fo-live-answer" style="display:none;margin:6px 0;padding:10px 12px;border:1px solid var(--line,#334);border-radius:6px;max-width:600px"></div>'
         + '<div class="pf-index-meta">' + shown.length + ' of ' + list.length + ' active / awarded projects</div>'
         + '</div>';
       // Answers section sits ABOVE the filtered list.
@@ -19620,7 +19626,70 @@ try {
           var nb = document.getElementById('foProjSearch');
           if (nb) { nb.focus(); nb.setSelectionRange(nb.value.length, nb.value.length); }
         });
+        // Enter in the box = live Ask (grounded answer via the Field Companion).
+        sb.addEventListener('keydown', function(e){
+          if (e.key === 'Enter'){ e.preventDefault(); foAskLive(this.value); }
+        });
       }
+      var ab = document.getElementById('foAskBtn');
+      if (ab) {
+        ab.addEventListener('click', function(){
+          var box = document.getElementById('foProjSearch');
+          foAskLive(box ? box.value : '');
+        });
+      }
+    }
+
+    // ---- LIVE Field Companion: POST the crew's question to /api/field-companion,
+    // poll for the grounded answer, render it inline. Same private KV-queue path as
+    // field-sample.html: Hermes stays private, the 3-layer money guard + fail-closed
+    // contract are enforced server-side. field_ops-gated by the endpoint + middleware.
+    var FO_FC_POLL_MS = 1500;
+    var FO_FC_MAX_MS  = 60000;
+    function foRenderLive(html, cls){
+      var el = document.getElementById('foLiveAnswer');
+      if (!el) return;
+      el.style.display = 'block';
+      el.className = 'fo-live-answer' + (cls ? ' ' + cls : '');
+      el.innerHTML = html;
+    }
+    function foAskLive(rawQ){
+      var q = (rawQ || '').trim();
+      if (!q) { foRenderLive('<span style="opacity:.75">Type a field question, then Ask.</span>'); return; }
+      foRenderLive('<strong>You asked:</strong> ' + E(q)
+        + '<br><span style="opacity:.75">Checking the project records&hellip;</span>');
+      foAskCompanion(q).then(function(answer){
+        foRenderLive('<strong>You asked:</strong> ' + E(q)
+          + '<br><div style="margin-top:6px;white-space:pre-wrap">' + E(answer) + '</div>');
+      }).catch(function(){
+        foRenderLive('<span style="opacity:.85">The field assistant is temporarily unavailable. '
+          + 'No answer was generated.</span>');
+      });
+    }
+    async function foAskCompanion(query){
+      var postRes = await fetch('/api/field-companion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ query: query })
+      });
+      var posted = await postRes.json().catch(function(){ return {}; });
+      if (!postRes.ok || !posted.id){
+        return posted.error || 'The field assistant is not available right now. No answer was generated.';
+      }
+      var id = posted.id;
+      var started = Date.now();
+      while (Date.now() - started < FO_FC_MAX_MS){
+        await new Promise(function(r){ setTimeout(r, FO_FC_POLL_MS); });
+        var getRes = await fetch('/api/field-companion?id=' + encodeURIComponent(id), { credentials: 'same-origin' });
+        var data = await getRes.json().catch(function(){ return {}; });
+        if (getRes.status === 403) return 'That request cannot be answered from the field tool.';
+        if (getRes.status === 404) return (data && data.error) || 'That question expired. Please ask again.';
+        if (data && data.status === 'done'){
+          return (data.answer && data.answer.trim()) ? data.answer : ((data && data.error) || "I don't have that.");
+        }
+      }
+      return 'The field assistant is taking longer than expected. Please try again.';
     }
 
     // ===================== DETAIL VIEW (POET, FINANCIALS STRIPPED) =====================
