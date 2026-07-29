@@ -13957,12 +13957,13 @@ try {
         + '</div>';
 
       html += '<div class="pf-table-wrap"><table class="pf-table"><thead><tr>'
+        + '<th>#</th>'
         + '<th>PF Project #</th><th>Project Name</th><th>PF Scope</th><th>Project Location</th>'
         + '<th>General Contractor</th><th>Contract Value</th>'
         + '<th>Total LF</th><th># of Piers</th><th class="startcol">Anticipated Start Date</th>'
         + '</tr></thead><tbody>';
 
-      list.forEach(function(p){
+      list.forEach(function(p, i){
         var isHp = /helical/i.test(p.discipline || '');
         var pill = '<span class="pf-pill' + (isHp ? ' hp' : '') + '">' + E(p.discipline || '') + '</span>';
         // Every awarded project opens its own record by clicking the # or Project name.
@@ -13985,6 +13986,7 @@ try {
         var piers   = piersFor(num);
         var startDt = startDateFor(num);
         html += '<tr>'
+          + '<td class="num">' + (i + 1) + '</td>'  // positional row counter (index+1 of sorted list); auto-renumbers on re-sort/add/remove, never stored
           + numberCell
           + nameCell
           + '<td>' + pill + '</td>'          // B) PF Scope (was Discipline), now after Project
