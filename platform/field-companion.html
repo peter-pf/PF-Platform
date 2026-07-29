@@ -536,11 +536,12 @@ function answerFor(rawQ){
 // through the local Hermes and writes the answer back to KV; Hermes is NEVER
 // exposed. The old local answerFor() stub is kept above only as a reference /
 // offline fallback and is no longer called on submit.
-// Poll SCHEDULE (ms between GETs). A regex refusal is ready ~1s after the poller
-// picks the job up, so the front of the schedule is aggressive to SHOW ready
-// answers within ~1s; it then relaxes to ~1s steady for the ~10-12s Hermes answers
-// so we never hammer the endpoint. Any index past the end reuses the last value.
-var FC_POLL_SCHEDULE = [400, 500, 600, 800, 1000]; // then 1000 steady
+// Poll SCHEDULE (ms between GETs). The first ~12 polls are aggressive so a ready
+// answer (refusal ~1s, Hermes ~10-12s) is caught within the 12 answer-echo slots the
+// poller writes (fieldr:<id>:0..11 -- lean on KV writes: free tier = 1,000 writes/day).
+// After the slots are exhausted the cadence relaxes to ~4s and reads fall back to the
+// base key (its earlier cached miss has expired). Any index past the end reuses 4000.
+var FC_POLL_SCHEDULE = [500, 700, 900, 1200, 1500, 2000, 2500, 3000, 3500, 4000]; // then 4000 steady
 var FC_MAX_MS  = 60000;     // give up after 60s (poller timeboxes Hermes at 90s,
                             // but the crew should not wait longer than this)
 

@@ -59,7 +59,13 @@ const KEY_PREFIX = 'fieldq:';
 // fixed-key poll therefore keeps seeing the stale "pending" until the TTL expires --
 // this was the ~60s field-tool latency. A fresh key per attempt defeats that.)
 const READY_PREFIX = 'fieldr:';
-const READY_ECHO_SLOTS = 90; // covers ~60s of polling at the front-end cadence
+// Number of answer-echo keys the poller writes per answer. Kept LEAN because each is a
+// KV WRITE and free-tier caps writes at 1,000/day (90 slots => ~92 writes/answer blew
+// the cap in ~11 answers). At 12 => ~14 writes/answer. The browser reads slots 0..11
+// on its first polls (fast, catches ready answers) then FALLS BACK to the base key,
+// whose earlier cached miss has expired by then (KV min cacheTtl 30s) so it reads fresh.
+// MUST match READY_ECHO_SLOTS in tools/field_query_poller.py.
+const READY_ECHO_SLOTS = 12;
 const MAX_BODY_BYTES = 4 * 1024;
 const MAX_QUERY_LEN = 1000;
 const QUEUE_ITEM_TTL_SECS = 60 * 60; // KV item self-expires after 1h (cleanup)
@@ -182,17 +188,21 @@ export async function onRequestGet(context) {
   // each poll so a cached "pending" read of the base key can't hide a ready answer.
   let n = parseInt(url.searchParams.get('n') || '0', 10);
   if (!Number.isFinite(n) || n < 0) n = 0;
-  if (n >= READY_ECHO_SLOTS) n = READY_ECHO_SLOTS - 1;
 
   let item = null;
 
-  // (1) FAST PATH: read the per-attempt answer-echo key. This key was never read by
-  // this browser before, so it is NOT served from a previously cached miss -- once
-  // the poller has written it, the browser sees it on the very next poll.
-  try {
-    const rawEcho = await env.PF_SCHEDULE.get(`${READY_PREFIX}${id}:${n}`);
-    if (rawEcho) item = JSON.parse(rawEcho);
-  } catch { /* fall through to base key */ }
+  // (1) FAST PATH (only for the first READY_ECHO_SLOTS polls): read the per-attempt
+  // answer-echo key fieldr:<id>:<n>. This key was never read by this browser before,
+  // so it is NOT served from a previously cached miss -- once the poller has written
+  // it, the browser sees it on the very next poll. Past that slot count we DON'T read
+  // an echo key (there are none) and fall through to the base key below, whose earlier
+  // cached "pending" miss has since expired (KV min cacheTtl 30s) so it reads fresh.
+  if (n < READY_ECHO_SLOTS) {
+    try {
+      const rawEcho = await env.PF_SCHEDULE.get(`${READY_PREFIX}${id}:${n}`);
+      if (rawEcho) item = JSON.parse(rawEcho);
+    } catch { /* fall through to base key */ }
+  }
 
   // (2) No echo yet -> read the base key for pending/expired status. This read MAY be
   // edge-cached-stale, but it is only used to signal "keep polling" vs "expired"; the
