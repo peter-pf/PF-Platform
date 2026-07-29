@@ -529,6 +529,14 @@ export function areaForPath(pathname) {
     // 'financials') on GET + POST. Without this line it would fall through to the
     // default 'user_admin' (admin-only) and the office (partner/BD) could not save.
     if (pathname.startsWith('/api/project-budget')) return 'financials';
+    // Per-project INVOICING record (Financials Phase 1b): the office enters a
+    // subcontract value + ONE retainage % + a list of pay applications; stored in
+    // KV, roll-ups computed client-side at render. PROJECT-level financials area:
+    // admin + partner + business_dev (the office); field_ops BLOCKED by direct URL
+    // too. The handler ALSO calls requireArea(session, 'financials') on GET + POST.
+    // Without this line it would fall through to the default 'user_admin'
+    // (admin-only) and the office (partner/BD) could not save.
+    if (pathname.startsWith('/api/project-invoicing')) return 'financials';
     // BD CRM write-back (companies/contacts overlay + interactions log). BD's
     // own tool: admin + partner + business_dev allowed; field_ops BLOCKED by
     // direct URL too. Each endpoint ALSO calls requireArea('business_dev').

@@ -1857,6 +1857,27 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 .fin-inv-row-label { font-size: 0.72rem; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.03em; }
 .fin-inv-row-val { font-size: 0.95rem; font-weight: 600; color: var(--text-1); word-break: break-word; font-variant-numeric: tabular-nums; }
 .fin-inv-row-val.empty { color: var(--text-3); font-weight: 400; }
+/* ---- Project Invoicing editors (data entry) ---- */
+.fin-inv-edit-pencil { background:none; border:none; color:var(--text-3); cursor:pointer;
+  font-size:0.85rem; margin-left:6px; padding:0 2px; line-height:1; }
+.fin-inv-edit-pencil:hover { color:var(--accent, #0a6); }
+.fin-inv-inputs-editor { border:1px solid var(--border); border-radius:8px; background:var(--bg-0);
+  padding:12px 14px; margin-bottom:16px; }
+.fin-inv-ie-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.fin-inv-ie-row label { font-size:0.75rem; font-weight:600; color:var(--text-2); min-width:150px;
+  text-transform:uppercase; letter-spacing:0.02em; }
+.fin-inv-ie-row input, .fin-inv-ie-row select { flex:1 1 auto; max-width:220px; font-size:0.9rem;
+  padding:5px 8px; border:1px solid var(--border); border-radius:6px; background:var(--bg-1); color:var(--text-1); }
+.fin-inv-ie-err { font-size:0.78rem; color:#b00020; margin:6px 0; }
+.fin-inv-ie-actions { display:flex; gap:8px; margin-top:6px; }
+.fin-inv-btn-live { cursor:pointer; color:var(--text-1); background:var(--bg-1); }
+.fin-inv-btn-live:hover { border-color:var(--accent, #0a6); }
+.fin-inv-payapp-form { border:1px solid var(--border); border-radius:8px; background:var(--bg-0);
+  padding:12px 14px; margin-bottom:14px; }
+.fin-inv-pa-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px 20px; }
+@media (max-width: 720px) { .fin-inv-pa-grid { grid-template-columns:1fr; } }
+.fin-inv-pa-calc { margin-top:10px; font-size:0.85rem; font-weight:600; color:var(--text-2);
+  font-variant-numeric:tabular-nums; }
 
 .pr-fields {
   display: grid;
@@ -11714,6 +11735,16 @@ try {
     window.PF_PROJECT_BUDGETS = window.PF_PROJECT_BUDGETS || {};
     var _curBudget = null;   // { rows, _meta, loaded, error } for the current project
 
+    // ---- PER-PROJECT INVOICING state (Financials Phase 1b) ----------------
+    // window.PF_PROJECT_INVOICING = { num: { subcontractValue, retainagePct,
+    //   payApps:[...], _meta, loaded, error } }. Loaded synchronously per project
+    // in openProjectRecord()/renderPoet() (fail closed, like the budget above).
+    // The Project Invoicing dropdown renders the saved pay apps + rolls up the
+    // info-block summary from them. FAIL CLOSED: a failed GET records an error so
+    // the block shows an honest error, never a fabricated pay app or dollar.
+    window.PF_PROJECT_INVOICING = window.PF_PROJECT_INVOICING || {};
+    var _curInvoicing = null; // { subcontractValue, retainagePct, payApps, _meta, loaded, error }
+
     // Can the current user edit? Office roles only (mirrors the SERVER gate:
     // financials area = admin/partner/business_dev). field_ops sees NO Edit
     // buttons; the server is the real boundary (a field_ops POST -> 403).
@@ -12034,6 +12065,39 @@ try {
       return { budget:gB, actual:gA, ok:!hadErr };
     }
 
+    // Invoicing roll-up for THIS project, computed CLIENT-SIDE from the loaded
+    // invoicing record's saved pay apps. Definitions (Brad-approved):
+    //   invoiced       = sum of amount   for pay apps with status Sent or Paid
+    //   paid           = sum of netDue   for pay apps with status Paid
+    //   retainageHeld  = sum of retainage for pay apps with status Sent or Paid
+    //                    (ACTUAL retainage held from billed apps -- NOT subcontractValue*pct)
+    // Returns { ok, invoiced, paid, retainageHeld }. FAIL CLOSED: a record that
+    // errored on load (or is missing) yields ok:false with null figures so every
+    // consumer renders an em-dash, never a fabricated total. An empty (loaded, no
+    // pay apps) record yields ok:true with 0s -- but the info block shows a dash for
+    // a 0 total via the null-guard at the call site (0 invoiced = nothing billed).
+    function invRollup(inv){
+      if (!inv || inv.error) return { ok:false, invoiced:null, paid:null, retainageHeld:null };
+      var apps = Array.isArray(inv.payApps) ? inv.payApps : [];
+      var invoiced = 0, paid = 0, held = 0, anyBilled = false, anyPaid = false;
+      apps.forEach(function(a){
+        var st = a && a.status;
+        var amt = Number(a && a.amount) || 0;
+        var ret = Number(a && a.retainage) || 0;
+        var net = Number(a && a.netDue) || 0;
+        if (st === 'Sent' || st === 'Paid') { invoiced += amt; held += ret; anyBilled = true; }
+        if (st === 'Paid') { paid += net; anyPaid = true; }
+      });
+      // Only surface a figure when at least one app contributes; otherwise null ->
+      // the info block / roll-up band shows an em-dash (never a fabricated $0.00).
+      return {
+        ok: true,
+        invoiced: anyBilled ? Math.round(invoiced * 100) / 100 : null,
+        paid:     anyPaid   ? Math.round(paid * 100) / 100     : null,
+        retainageHeld: anyBilled ? Math.round(held * 100) / 100 : null,
+      };
+    }
+
     // Render a project record object D into the given root element. Reusable for
     // POET (#prRoot) AND every other awarded project (#prGenericRoot via openProjectRecord).
     function renderInto(D, root){
@@ -12064,6 +12128,9 @@ try {
       // load it now (fail closed). _curBudget = { rows, _meta, loaded, error }.
       if (!window.PF_PROJECT_BUDGETS[_curNum]) { try { loadBudgetSync(_curNum); } catch(e){} }
       _curBudget = window.PF_PROJECT_BUDGETS[_curNum] || { rows: {}, _meta: null, loaded: false, error: 'unreachable' };
+      // Activate the per-project INVOICING overlay for the Project Invoicing dropdown.
+      if (!window.PF_PROJECT_INVOICING[_curNum]) { try { loadInvoicingSync(_curNum); } catch(e){} }
+      _curInvoicing = window.PF_PROJECT_INVOICING[_curNum] || { subcontractValue: null, retainagePct: null, payApps: [], _meta: null, loaded: false, error: 'unreachable' };
 
       // ----- header -----
       var status = bid.bid_status || '';
@@ -12372,14 +12439,18 @@ try {
       var finTot = baGrandTotals(_curNum);
       var finCostBudget = finTot.ok ? baMoney(finTot.budget) : '';
       var finCostActual = finTot.ok ? baMoney(finTot.actual) : '';
+      // Invoicing roll-up: sums computed CLIENT-SIDE from the loaded invoicing
+      // record (fail closed: an errored/unloaded record yields ok:false so the
+      // band shows an em-dash, never a fabricated total).
+      var finInvRoll = invRollup(_curInvoicing);
       var finRollup =
         '<div class="fin-rollup">'
         +   '<div class="fin-rollup-title">Job Financials Roll-Up</div>'
         +   '<div class="fin-rollup-cards">'
         +     '<div class="fin-rc">'
         +       '<div class="fin-rc-label">Project Invoicing</div>'
-        +       '<div class="fin-rc-val fin-rc-tbd">To be built</div>'
-        +       '<div class="fin-rc-sub">Invoiced &middot; retainage &middot; outstanding</div>'
+        +       '<div class="fin-rc-val">' + ((finInvRoll.ok && finInvRoll.invoiced != null) ? E(baMoney(finInvRoll.invoiced)) : '<span class="ba-blank">-</span>') + '</div>'
+        +       '<div class="fin-rc-sub">Invoiced to date</div>'
         +     '</div>'
         +     '<div class="fin-rc">'
         +       '<div class="fin-rc-label">Project Costs (Budget)</div>'
@@ -12404,11 +12475,12 @@ try {
       // Project Invoicing layout: labeled INFO BLOCK (11 fields) + Pay Applications
       // table + expandable Schedule of Values. Identity fields (Project #, Name, Address,
       // % Complete) auto-populate from the project record + the shared window.progress
-      // source. The 7 billing fields have NO data source yet, so they render an em-dash
-      // (fail closed: never a fabricated dollar, percent, or date). Entry/save wiring is
-      // a later phase, so the "+ New Pay App" button is visibly disabled.
+      // source. Subcontract Value + Retainage % are EDITABLE office inputs (saved to
+      // the invoicing record). The other billing fields are ROLL-UPS computed from the
+      // saved pay apps (fail closed: em-dash when no data, never a fabricated number).
       // Scoped .fin-inv-* (NOT .ba-table-wrap) so the budget editor's querySelector is untouched.
       var finDash = '<span class="ba-blank">&mdash;</span>';
+      var invErr = _curInvoicing && _curInvoicing.error;
 
       // --- auto-populated identity fields (from the project record already rendering) ---
       var finPNum  = E(D.project_number || '');
@@ -12427,10 +12499,33 @@ try {
         }
       } catch (e) { finPctVal = ''; }
 
+      // Project-level editable inputs + roll-ups from the loaded invoicing record.
+      var finScv = (_curInvoicing && typeof _curInvoicing.subcontractValue === 'number') ? _curInvoicing.subcontractValue : null;
+      var finPct = (_curInvoicing && typeof _curInvoicing.retainagePct === 'number') ? _curInvoicing.retainagePct : null;
+      var finScvVal = (finScv != null) ? E(baMoney(finScv)) : '';
+      var finPctInput = (finPct != null) ? (E(String(finPct)) + '%') : '';
+      // Roll-ups (from saved pay apps; fail closed to dash on error/empty).
+      var finInvoicedVal = (finInvRoll.ok && finInvRoll.invoiced != null) ? E(baMoney(finInvRoll.invoiced)) : '';
+      var finPaidVal     = (finInvRoll.ok && finInvRoll.paid != null) ? E(baMoney(finInvRoll.paid)) : '';
+      var finRetDueVal   = (finInvRoll.ok && finInvRoll.retainageHeld != null) ? E(baMoney(finInvRoll.retainageHeld)) : '';
+
       var finInvRow = function(label, val){
         var has = (val != null && String(val) !== '');
         return '<div class="fin-inv-row">'
           + '<div class="fin-inv-row-label">' + E(label) + '</div>'
+          + '<div class="fin-inv-row-val' + (has ? '' : ' empty') + '">'
+          + (has ? val : finDash) + '</div>'
+          + '</div>';
+      };
+      // Editable info-block row: shows the value + a per-field edit pencil (office only).
+      // Editing subcontract value / retainage % opens the project-input editor.
+      var finEditableRow = function(label, val, key){
+        var has = (val != null && String(val) !== '');
+        var pencil = canEdit()
+          ? '<button type="button" class="fin-inv-edit-pencil" title="Edit" onclick="window.pfInvEditInputs()">&#9998;</button>'
+          : '';
+        return '<div class="fin-inv-row">'
+          + '<div class="fin-inv-row-label">' + E(label) + pencil + '</div>'
           + '<div class="fin-inv-row-val' + (has ? '' : ' empty') + '">'
           + (has ? val : finDash) + '</div>'
           + '</div>';
@@ -12443,29 +12538,76 @@ try {
         + finInvRow('Project Name', finPName)
         + finInvRow('Project Address', finPAddr)
         + finInvRow('Project % Complete (work completed)', finPctVal)
-        // billing fields (no data source yet, fail closed to dash)
-        + finInvRow('Subcontract Value', '')
-        + finInvRow('Amount Invoiced to Date', '')
-        + finInvRow('Amount Paid to Date', '')
+        // editable project inputs
+        + finEditableRow('Subcontract Value', finScvVal, 'scv')
+        // roll-ups from saved pay apps
+        + finInvRow('Amount Invoiced to Date', finInvoicedVal)
+        + finInvRow('Amount Paid to Date', finPaidVal)
         + finInvRow('Invoice Due By Date', '')
-        + finInvRow('Retainage %', '')
-        + finInvRow('Retainage Amount Due', '')
+        + finEditableRow('Retainage %', finPctInput, 'pct')
+        + finInvRow('Retainage Amount Due', finRetDueVal)
         + finInvRow('Retainage Paid', '')
-        + '</div>';
+        + '</div>'
+        // Inline project-input editor (Subcontract Value + Retainage %), hidden until
+        // the office clicks a pencil. Office-only (canEdit); the server re-gates.
+        + (canEdit()
+          ? '<div class="fin-inv-inputs-editor" style="display:none">'
+            + '<div class="fin-inv-ie-row"><label>Subcontract Value</label>'
+            +   '<input type="text" class="fin-inv-ie-scv" inputmode="decimal" placeholder="0.00" value="' + (finScv != null ? E(String(finScv)) : '') + '"></div>'
+            + '<div class="fin-inv-ie-row"><label>Retainage %</label>'
+            +   '<input type="text" class="fin-inv-ie-pct" inputmode="decimal" placeholder="e.g. 10" value="' + (finPct != null ? E(String(finPct)) : '') + '"></div>'
+            + '<div class="fin-inv-ie-err" style="display:none"></div>'
+            + '<div class="fin-inv-ie-actions">'
+            +   '<button type="button" class="pr-save-btn" onclick="window.pfInvSaveInputs(this)">Save</button>'
+            +   '<button type="button" class="pr-cancel-btn" onclick="window.pfInvCancelInputs(this)">Cancel</button>'
+            + '</div>'
+            + '</div>'
+          : '');
 
+      // Pay Applications table (editable): rows render from the saved invoicing
+      // record; the "+ New Pay App" button opens an inline entry form.
+      var payApps = (_curInvoicing && Array.isArray(_curInvoicing.payApps)) ? _curInvoicing.payApps : [];
+      var retFrac = (finPct != null) ? (finPct / 100) : 0;
+      var payRowsHtml = '';
+      if (invErr) {
+        payRowsHtml = '<tr class="fin-inv-empty"><td colspan="8">Could not load invoicing data. Please retry.</td></tr>';
+      } else if (!payApps.length) {
+        payRowsHtml = '<tr class="fin-inv-empty"><td colspan="8">No pay applications yet</td></tr>';
+      } else {
+        payRowsHtml = payApps.map(function(a){
+          return '<tr>'
+            + '<td>' + E(String(a.num)) + '</td>'
+            + '<td>' + (a.date ? E(a.date) : finDash) + '</td>'
+            + '<td>' + (a.period ? E(a.period) : finDash) + '</td>'
+            + '<td class="num">' + E(baMoney(a.amount)) + '</td>'
+            + '<td class="num">' + E(baMoney(a.retainage)) + '</td>'
+            + '<td class="num">' + E(baMoney(a.netDue)) + '</td>'
+            + '<td>' + E(a.status || 'Draft') + '</td>'
+            + '<td>' + (a.paidDate ? E(a.paidDate) : finDash) + '</td>'
+            + '</tr>';
+        }).join('');
+      }
+      // New Pay App button: enabled for the office (canEdit). retainagePct must be
+      // set first so retainage/net-due can compute; otherwise the button prompts to set it.
+      var newBtn;
+      if (canEdit()) {
+        newBtn = '<button type="button" class="fin-inv-btn fin-inv-btn-live" onclick="window.pfInvNewPayApp(this)">+ New Pay App</button>';
+      } else {
+        newBtn = '';
+      }
       var finPayApps =
-        '<div class="fin-inv-block">'
+        '<div class="fin-inv-block" data-fin-inv-payapps="1" data-fin-inv-pct="' + (finPct != null ? E(String(finPct)) : '') + '">'
         +   '<div class="fin-inv-block-head">'
         +     '<span class="fin-inv-block-title">Pay Applications</span>'
-        +     '<button type="button" class="fin-inv-btn" disabled title="Data entry is a later phase">+ New Pay App</button>'
-        +     '<span class="fin-inv-btn-note">entry coming next</span>'
+        +     newBtn
         +   '</div>'
+        +   '<div class="fin-inv-payapp-form" style="display:none"></div>'
         +   '<div class="fin-inv-wrap"><table class="ba-table"><thead><tr>'
         +     '<th>#</th><th>Date</th><th>Billing Period</th>'
         +     '<th class="num">This Period</th><th class="num">Retainage</th><th class="num">Net Due</th>'
         +     '<th>Status</th><th>Paid Date</th>'
         +   '</tr></thead><tbody>'
-        +     '<tr class="fin-inv-empty"><td colspan="8">No pay applications yet</td></tr>'
+        +     payRowsHtml
         +   '</tbody></table></div>'
         + '</div>';
 
@@ -12721,6 +12863,39 @@ try {
       window.PF_PROJECT_BUDGETS[num] = entry;
     }
 
+    // ---- per-project INVOICING loader (synchronous, FAIL CLOSED) ------------
+    // Load THIS project's saved invoicing record (subcontract value + retainage %
+    // + pay apps) BEFORE rendering so the Project Invoicing dropdown + roll-ups are
+    // in place on first paint. FAIL CLOSED like the budget loader: a failed/denied/
+    // unreachable load records an ERROR so the block shows an honest error state
+    // instead of a misleading empty record.
+    function loadInvoicingSync(num){
+      num = String(num || '').trim();
+      if (!num) return;
+      var entry = { subcontractValue: null, retainagePct: null, payApps: [], _meta: null, loaded: false, error: null };
+      try {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/project-invoicing?num=' + encodeURIComponent(num), false);
+        xhr.withCredentials = true;
+        xhr.send(null);
+        if (xhr.status === 200) {
+          var d = JSON.parse(xhr.responseText);
+          entry.subcontractValue = (d && typeof d.subcontractValue === 'number') ? d.subcontractValue : null;
+          entry.retainagePct = (d && typeof d.retainagePct === 'number') ? d.retainagePct : null;
+          entry.payApps = (d && Array.isArray(d.payApps)) ? d.payApps : [];
+          entry._meta = (d && d._meta) || null;
+          entry.loaded = true;
+        } else if (xhr.status === 403) {
+          entry.error = 'not-permitted';
+        } else {
+          entry.error = 'load-failed-' + xhr.status;
+        }
+      } catch (e) {
+        entry.error = 'unreachable';
+      }
+      window.PF_PROJECT_INVOICING[num] = entry;
+    }
+
     window.renderProjectRecord = function(num, root){
       renderInto(resolveRecord(num), root || document.getElementById('prGenericRoot'));
     };
@@ -12731,6 +12906,7 @@ try {
       num = String(num || '').trim();
       loadOverridesSync(num);                 // pull overrides before first render
       loadBudgetSync(num);                    // pull saved per-cost-code budgets (fail closed)
+      loadInvoicingSync(num);                 // pull saved invoicing record (fail closed)
       var root = document.getElementById('prGenericRoot');
       window.renderProjectRecord(num, root);
       var rec = resolveRecord(num);
@@ -12979,12 +13155,187 @@ try {
       });
     };
 
+    // =======================================================================
+    // PROJECT INVOICING editors (Financials Phase 1b)
+    // =======================================================================
+    // All POST to /api/project-invoicing with the FULL current record (server
+    // re-numbers pay apps + re-derives retainage/net-due + re-gates office-only).
+    // FAIL CLOSED: anything not a clean {ok:true,saved:true} keeps the editor open
+    // + shows an honest error -- never "saved", never a re-render that hides the loss.
+
+    // Build the full record payload from the in-memory _curInvoicing plus overrides.
+    function invPayload(over){
+      var inv = _curInvoicing || { subcontractValue:null, retainagePct:null, payApps:[] };
+      var scv = (inv.subcontractValue != null) ? inv.subcontractValue : null;
+      var pct = (inv.retainagePct != null) ? inv.retainagePct : null;
+      var apps = Array.isArray(inv.payApps) ? inv.payApps.slice() : [];
+      if (over) {
+        if ('subcontractValue' in over) scv = over.subcontractValue;
+        if ('retainagePct' in over) pct = over.retainagePct;
+        if ('appendPayApp' in over) apps = apps.concat([over.appendPayApp]);
+      }
+      // Only the input fields matter to the server for pay apps (it re-derives the rest).
+      var outApps = apps.map(function(a){
+        return { date:a.date||'', period:a.period||'', amount:a.amount, status:a.status||'Draft', paidDate:a.paidDate||'' };
+      });
+      return { num: _curNum || '', subcontractValue: scv, retainagePct: pct, payApps: outApps };
+    }
+
+    function invPost(payload, onErr, onOk){
+      fetch('/api/project-invoicing', {
+        method:'POST', credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      }).then(function(res){
+        return res.json().then(function(b){ return {ok:res.ok,status:res.status,body:b}; })
+          .catch(function(){ return {ok:res.ok,status:res.status,body:null}; });
+      }).then(function(r){
+        if (!r.ok || !r.body || r.body.ok !== true || r.body.saved !== true) {
+          var msg = (r.body && r.body.message) ? r.body.message
+            : (r.status === 403 ? 'You do not have permission to edit invoicing.'
+              : 'Save failed (' + r.status + '). Nothing was saved -- please retry.');
+          onErr(msg); return;
+        }
+        // Adopt server truth, then re-render the whole record.
+        window.PF_PROJECT_INVOICING[_curNum] = {
+          subcontractValue: (typeof r.body.subcontractValue === 'number') ? r.body.subcontractValue : null,
+          retainagePct: (typeof r.body.retainagePct === 'number') ? r.body.retainagePct : null,
+          payApps: Array.isArray(r.body.payApps) ? r.body.payApps : [],
+          _meta: r.body._meta || null, loaded:true, error:null
+        };
+        onOk();
+      }).catch(function(){
+        onErr('Save failed: could not reach the server. Nothing was saved -- please retry.');
+      });
+    }
+
+    function invRerender(anchorBtn){
+      var num = _curNum || '';
+      var root = document.getElementById('prGenericRoot');
+      if (anchorBtn && anchorBtn.closest) {
+        var pr = anchorBtn.closest('.pr-root') || anchorBtn.closest('#prRoot') || anchorBtn.closest('#prGenericRoot');
+        if (pr) root = pr;
+      }
+      if (!root) root = document.getElementById('prGenericRoot');
+      window.renderProjectRecord(num, root);
+    }
+
+    // ---- Subcontract Value + Retainage % editor (project-level inputs) ----
+    window.pfInvEditInputs = function(){
+      var ed = document.querySelector('.fin-inv-inputs-editor');
+      if (!ed) return;
+      ed.style.display = 'block';
+      var err = ed.querySelector('.fin-inv-ie-err'); if (err) err.style.display='none';
+      var f = ed.querySelector('.fin-inv-ie-scv'); if (f) f.focus();
+    };
+    window.pfInvCancelInputs = function(btn){
+      var ed = btn.closest('.fin-inv-inputs-editor');
+      if (ed) ed.style.display = 'none';
+    };
+    window.pfInvSaveInputs = function(btn){
+      var ed = btn.closest('.fin-inv-inputs-editor'); if (!ed) return;
+      var errEl = ed.querySelector('.fin-inv-ie-err');
+      function showErr(m){ if (errEl){ errEl.textContent=m; errEl.style.display='block'; } }
+      var scvRaw = (ed.querySelector('.fin-inv-ie-scv').value || '').trim();
+      var pctRaw = (ed.querySelector('.fin-inv-ie-pct').value || '').trim();
+      var scv = null, pct = null;
+      if (scvRaw !== '') {
+        var sn = Number(scvRaw.replace(/[$,]/g,''));
+        if (!isFinite(sn) || sn < 0) { showErr('Subcontract Value must be a non-negative number.'); return; }
+        scv = sn;
+      }
+      if (pctRaw !== '') {
+        var pn = Number(pctRaw.replace(/%/g,''));
+        if (!isFinite(pn) || pn < 0 || pn > 100) { showErr('Retainage % must be between 0 and 100.'); return; }
+        pct = pn;
+      }
+      if (errEl) errEl.style.display='none';
+      btn.disabled = true; btn.textContent = 'Saving...';
+      invPost(invPayload({ subcontractValue: scv, retainagePct: pct }),
+        function(msg){ btn.disabled=false; btn.textContent='Save'; showErr(msg); },
+        function(){ invRerender(btn); });
+    };
+
+    // ---- New Pay App inline form ----
+    window.pfInvNewPayApp = function(btn){
+      var block = btn.closest('[data-fin-inv-payapps]'); if (!block) return;
+      var form = block.querySelector('.fin-inv-payapp-form'); if (!form) return;
+      var pctSet = block.getAttribute('data-fin-inv-pct');
+      var pctNote = (pctSet === '' )
+        ? '<div class="fin-inv-ie-err" style="display:block">Set a Retainage % (edit it above) first so retainage and net due can compute. You can still save at 0% retainage.</div>'
+        : '';
+      form.innerHTML =
+          '<div class="fin-inv-pa-grid">'
+        +   '<div class="fin-inv-ie-row"><label>Date</label><input type="text" class="pa-date" placeholder="e.g. 07/28/26"></div>'
+        +   '<div class="fin-inv-ie-row"><label>Billing Period</label><input type="text" class="pa-period" placeholder="e.g. July 2026"></div>'
+        +   '<div class="fin-inv-ie-row"><label>Amount This Period</label><input type="text" class="pa-amount" inputmode="decimal" placeholder="0.00"></div>'
+        +   '<div class="fin-inv-ie-row"><label>Status</label><select class="pa-status">'
+        +     '<option value="Draft">Draft</option><option value="Sent">Sent</option><option value="Paid">Paid</option>'
+        +   '</select></div>'
+        +   '<div class="fin-inv-ie-row pa-paiddate-row" style="display:none"><label>Paid Date</label><input type="text" class="pa-paiddate" placeholder="e.g. 08/15/26"></div>'
+        + '</div>'
+        + '<div class="fin-inv-pa-calc">Retainage: <span class="pa-calc-ret">&mdash;</span> &nbsp;|&nbsp; Net Due: <span class="pa-calc-net">&mdash;</span></div>'
+        + pctNote
+        + '<div class="fin-inv-ie-err pa-err" style="display:none"></div>'
+        + '<div class="fin-inv-ie-actions">'
+        +   '<button type="button" class="pr-save-btn" onclick="window.pfInvSavePayApp(this)">Save Pay App</button>'
+        +   '<button type="button" class="pr-cancel-btn" onclick="window.pfInvCancelPayApp(this)">Cancel</button>'
+        + '</div>';
+      form.style.display = 'block';
+      btn.style.display = 'none';
+
+      var pct = (pctSet === '') ? 0 : Number(pctSet);
+      var amtInput = form.querySelector('.pa-amount');
+      var retSpan = form.querySelector('.pa-calc-ret');
+      var netSpan = form.querySelector('.pa-calc-net');
+      function money(n){ return '$' + n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+      function recalc(){
+        var raw = (amtInput.value||'').trim().replace(/[$,]/g,'');
+        if (raw === '' || isNaN(Number(raw)) || Number(raw) < 0) { retSpan.textContent='—'; netSpan.textContent='—'; return; }
+        var amt = Number(raw);
+        var ret = Math.round(amt * (pct/100) * 100) / 100;
+        var net = Math.round((amt - ret) * 100) / 100;
+        retSpan.textContent = money(ret); netSpan.textContent = money(net);
+      }
+      amtInput.addEventListener('input', recalc);
+      var statusSel = form.querySelector('.pa-status');
+      var paidRow = form.querySelector('.pa-paiddate-row');
+      statusSel.addEventListener('change', function(){ paidRow.style.display = (statusSel.value === 'Paid') ? '' : 'none'; });
+      amtInput.focus();
+    };
+    window.pfInvCancelPayApp = function(btn){
+      var form = btn.closest('.fin-inv-payapp-form'); if (!form) return;
+      form.style.display='none'; form.innerHTML='';
+      var block = form.closest('[data-fin-inv-payapps]');
+      var addBtn = block ? block.querySelector('.fin-inv-btn-live') : null;
+      if (addBtn) addBtn.style.display='';
+    };
+    window.pfInvSavePayApp = function(btn){
+      var form = btn.closest('.fin-inv-payapp-form'); if (!form) return;
+      var errEl = form.querySelector('.pa-err');
+      function showErr(m){ if (errEl){ errEl.textContent=m; errEl.style.display='block'; } }
+      var date = (form.querySelector('.pa-date').value||'').trim();
+      var period = (form.querySelector('.pa-period').value||'').trim();
+      var amtRaw = (form.querySelector('.pa-amount').value||'').trim().replace(/[$,]/g,'');
+      var status = form.querySelector('.pa-status').value || 'Draft';
+      var paidDate = (form.querySelector('.pa-paiddate').value||'').trim();
+      if (amtRaw === '' || isNaN(Number(amtRaw)) || Number(amtRaw) < 0) {
+        showErr('Amount This Period must be a non-negative number.'); return;
+      }
+      var amt = Number(amtRaw);
+      if (errEl) errEl.style.display='none';
+      btn.disabled = true; btn.textContent = 'Saving...';
+      invPost(invPayload({ appendPayApp: { date:date, period:period, amount:amt, status:status, paidDate:(status==='Paid'?paidDate:'') } }),
+        function(msg){ btn.disabled=false; btn.textContent='Save Pay App'; showErr(msg); },
+        function(){ invRerender(btn); });
+    };
+
     // POET keeps auto-rendering into its dedicated #prRoot module (deep record).
     // Load POET's overrides first so its per-section Edit buttons + override merge
     // work in the dedicated module too (same fail-soft sync loader).
     function renderPoet(){
       var P = window.PF_PROJECT_POET;
-      if (P && P.project_number) { loadOverridesSync(String(P.project_number)); loadBudgetSync(String(P.project_number)); }
+      if (P && P.project_number) { loadOverridesSync(String(P.project_number)); loadBudgetSync(String(P.project_number)); loadInvoicingSync(String(P.project_number)); }
       renderInto(P, document.getElementById('prRoot'));
     }
     document.addEventListener('DOMContentLoaded', renderPoet);
