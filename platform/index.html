@@ -1879,6 +1879,24 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 .fin-inv-pa-calc { margin-top:10px; font-size:0.85rem; font-weight:600; color:var(--text-2);
   font-variant-numeric:tabular-nums; }
 
+/* ---- Billing Schedule of Values (SOV) table + editor ---- */
+.fin-inv-sov-table th, .fin-inv-sov-table td { white-space:nowrap; }
+.fin-inv-sov-totals td { font-weight:700; color:var(--text-1); border-top:2px solid var(--border);
+  background:var(--bg-1); }
+.fin-inv-sov-editor { border:1px solid var(--border); border-radius:8px; background:var(--bg-0);
+  padding:12px 14px; margin-top:12px; }
+.fin-inv-sove-note { font-size:0.78rem; color:var(--text-3); margin-bottom:10px; line-height:1.4; }
+.fin-inv-sove-table th, .fin-inv-sove-table td { white-space:nowrap; vertical-align:middle; }
+.fin-inv-sove-table input { width:100%; min-width:70px; font-size:0.85rem; padding:4px 6px;
+  border:1px solid var(--border); border-radius:5px; background:var(--bg-1); color:var(--text-1); box-sizing:border-box; }
+.fin-inv-sove-table input.sove-desc { min-width:180px; }
+.fin-inv-sove-table input.num { text-align:right; min-width:90px; font-variant-numeric:tabular-nums; }
+.fin-inv-sove-table td.sove-current, .fin-inv-sove-table td.sove-balance, .fin-inv-sove-table td.sove-retheld {
+  color:var(--text-2); font-variant-numeric:tabular-nums; font-weight:600; }
+.sove-remove { background:none; border:1px solid var(--border); border-radius:5px; color:#b00020;
+  cursor:pointer; font-size:1rem; line-height:1; padding:2px 8px; }
+.sove-remove:hover { background:#b00020; color:#fff; }
+
 .pr-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -12098,6 +12116,121 @@ try {
       };
     }
 
+    // ---- Billing Schedule of Values (SOV) helpers -------------------------------
+    // The four standard starting lines (all Division 31 60 00, Subcontractor PF).
+    // Amounts are 0/blank -- NO fabricated dollar values; these are LABELS only.
+    function sovTemplateLines(){
+      return [
+        { item:'1', division:'31 60 00', description:'Design, Engineering, & Shop Drawing Submittal', sub:'PF', originalSov:null, approvedCO:null },
+        { item:'2', division:'31 60 00', description:'Mobilization', sub:'PF', originalSov:null, approvedCO:null },
+        { item:'3', division:'31 60 00', description:'Aggregate Pier Ground Improvement', sub:'PF', originalSov:null, approvedCO:null },
+        { item:'4', division:'31 60 00', description:'Surveying, Staking, Layout', sub:'PF', originalSov:null, approvedCO:null }
+      ];
+    }
+    // The SOV lines to show for a project: the saved lines if any, otherwise the
+    // template (so a brand-new project is pre-seeded but nothing is persisted until Save).
+    function sovLinesFor(inv){
+      var lines = (inv && Array.isArray(inv.sov)) ? inv.sov : [];
+      return lines.length ? lines : sovTemplateLines();
+    }
+    // Whether the project has a SAVED (persisted) SOV yet (vs the unsaved template).
+    function sovIsSaved(inv){
+      return !!(inv && Array.isArray(inv.sov) && inv.sov.length);
+    }
+    // Derive the computed columns for one SOV line, given the project retainage frac.
+    //   Current = Original + Approved CO
+    //   % Complete = Billed / Current  (Billed = 0 this phase; pay apps drive it in A2)
+    //   Balance = Current - Billed
+    //   Retainage Held = Billed * retainageFrac
+    //   Invoiced to Date = Billed - Retainage Held
+    function sovDerive(line, retFrac){
+      var orig = Number(line && line.originalSov) || 0;
+      var co   = Number(line && line.approvedCO) || 0;
+      var current = Math.round((orig + co) * 100) / 100;
+      var billed = Number(line && line.billed) || 0; // A1: no per-line billed yet -> 0
+      var pct = (current > 0) ? (billed / current) : null;
+      var balance = Math.round((current - billed) * 100) / 100;
+      var retHeld = Math.round(billed * retFrac * 100) / 100;
+      var invoiced = Math.round((billed - retHeld) * 100) / 100;
+      return { orig:orig, co:co, current:current, billed:billed, pct:pct, balance:balance, retHeld:retHeld, invoiced:invoiced,
+               hasOrig:(line && line.originalSov != null && line.originalSov !== ''),
+               hasCO:(line && line.approvedCO != null && line.approvedCO !== '') };
+    }
+    // Sum the derived columns across all lines for the totals row.
+    function sovTotals(lines, retFrac){
+      var t = { orig:0, co:0, current:0, billed:0, balance:0, retHeld:0, invoiced:0 };
+      (lines||[]).forEach(function(l){
+        var d = sovDerive(l, retFrac);
+        t.orig += d.orig; t.co += d.co; t.current += d.current; t.billed += d.billed;
+        t.balance += d.balance; t.retHeld += d.retHeld; t.invoiced += d.invoiced;
+      });
+      Object.keys(t).forEach(function(k){ t[k] = Math.round(t[k]*100)/100; });
+      t.pct = (t.current > 0) ? (t.billed / t.current) : null;
+      return t;
+    }
+    // Money for SOV cells: dash when the source field is blank (fail closed -- no
+    // fabricated $0.00). "always" forces a number (used for derived Current/Balance
+    // which are real 0 once any amount exists, and for the totals row).
+    function sovMoneyCell(n, show){
+      if (!show) return '<span class="ba-blank">&mdash;</span>';
+      var m = baMoney(n);
+      return m ? E(m) : '<span class="ba-blank">&mdash;</span>';
+    }
+    function sovPctCell(frac){
+      if (frac == null) return '<span class="ba-blank">&mdash;</span>';
+      return E(Math.round(frac * 100) + '%');
+    }
+    // Read-only SOV table (used both embedded and in the standalone print view).
+    // 12 columns: Item | Division/Cost Code | Description | Subcontractor | Original SOV
+    //  | Approved CO | Current Contract Amt | Billed to Date | % Complete
+    //  | Balance to Complete | Retainage Held | Invoiced to Date. Plus a totals row.
+    function sovTableHtml(lines, retFrac, opts){
+      opts = opts || {};
+      var head =
+          '<thead><tr>'
+        +   '<th>Item #</th><th>Division / Cost Code</th><th>Description</th><th>Subcontractor</th>'
+        +   '<th class="num">Original SOV</th><th class="num">Approved CO</th><th class="num">Current Contract Amt</th>'
+        +   '<th class="num">Billed to Date</th><th class="num">% Complete</th><th class="num">Balance to Complete</th>'
+        +   '<th class="num">Retainage Held</th><th class="num">Invoiced to Date</th>'
+        + '</tr></thead>';
+      var body = '';
+      if (!lines || !lines.length) {
+        body = '<tr class="fin-inv-empty"><td colspan="12">No schedule of values yet</td></tr>';
+      } else {
+        body = lines.map(function(l){
+          var d = sovDerive(l, retFrac);
+          var anyAmt = d.hasOrig || d.hasCO;
+          return '<tr>'
+            + '<td>' + (l.item ? E(l.item) : '<span class="ba-blank">&mdash;</span>') + '</td>'
+            + '<td>' + (l.division ? E(l.division) : '<span class="ba-blank">&mdash;</span>') + '</td>'
+            + '<td>' + (l.description ? E(l.description) : '<span class="ba-blank">&mdash;</span>') + '</td>'
+            + '<td>' + (l.sub ? E(l.sub) : '<span class="ba-blank">&mdash;</span>') + '</td>'
+            + '<td class="num">' + sovMoneyCell(d.orig, d.hasOrig) + '</td>'
+            + '<td class="num">' + sovMoneyCell(d.co, d.hasCO) + '</td>'
+            + '<td class="num">' + sovMoneyCell(d.current, anyAmt) + '</td>'
+            + '<td class="num">' + sovMoneyCell(d.billed, anyAmt) + '</td>'
+            + '<td class="num">' + (anyAmt ? sovPctCell(d.pct) : '<span class="ba-blank">&mdash;</span>') + '</td>'
+            + '<td class="num">' + sovMoneyCell(d.balance, anyAmt) + '</td>'
+            + '<td class="num">' + sovMoneyCell(d.retHeld, anyAmt) + '</td>'
+            + '<td class="num">' + sovMoneyCell(d.invoiced, anyAmt) + '</td>'
+            + '</tr>';
+        }).join('');
+        var t = sovTotals(lines, retFrac);
+        body += '<tr class="fin-inv-sov-totals">'
+          + '<td colspan="4">Total</td>'
+          + '<td class="num">' + sovMoneyCell(t.orig, true) + '</td>'
+          + '<td class="num">' + sovMoneyCell(t.co, true) + '</td>'
+          + '<td class="num">' + sovMoneyCell(t.current, true) + '</td>'
+          + '<td class="num">' + sovMoneyCell(t.billed, true) + '</td>'
+          + '<td class="num">' + sovPctCell(t.pct) + '</td>'
+          + '<td class="num">' + sovMoneyCell(t.balance, true) + '</td>'
+          + '<td class="num">' + sovMoneyCell(t.retHeld, true) + '</td>'
+          + '<td class="num">' + sovMoneyCell(t.invoiced, true) + '</td>'
+          + '</tr>';
+      }
+      return '<div class="fin-inv-wrap"><table class="ba-table fin-inv-sov-table">' + head + '<tbody>' + body + '</tbody></table></div>';
+    }
+
     // Render a project record object D into the given root element. Reusable for
     // POET (#prRoot) AND every other awarded project (#prGenericRoot via openProjectRecord).
     function renderInto(D, root){
@@ -12130,7 +12263,7 @@ try {
       _curBudget = window.PF_PROJECT_BUDGETS[_curNum] || { rows: {}, _meta: null, loaded: false, error: 'unreachable' };
       // Activate the per-project INVOICING overlay for the Project Invoicing dropdown.
       if (!window.PF_PROJECT_INVOICING[_curNum]) { try { loadInvoicingSync(_curNum); } catch(e){} }
-      _curInvoicing = window.PF_PROJECT_INVOICING[_curNum] || { subcontractValue: null, retainagePct: null, payApps: [], _meta: null, loaded: false, error: 'unreachable' };
+      _curInvoicing = window.PF_PROJECT_INVOICING[_curNum] || { subcontractValue: null, retainagePct: null, sov: [], payApps: [], _meta: null, loaded: false, error: 'unreachable' };
 
       // ----- header -----
       var status = bid.bid_status || '';
@@ -12611,19 +12744,34 @@ try {
         +   '</tbody></table></div>'
         + '</div>';
 
+      // --- Billing Schedule of Values (SOV) ---
+      // Full 12-column billing SOV per project. Derived columns (Current, % Complete,
+      // Balance, Retainage Held, Invoiced to Date) recompute live from Original SOV,
+      // Approved CO and the project Retainage %. A new project is pre-seeded with the
+      // four standard template lines (labels only, no fabricated dollars) until saved.
+      var sovLines = sovLinesFor(_curInvoicing);
+      var sovSaved = sovIsSaved(_curInvoicing);
+      var sovHtmlRO = sovTableHtml(sovLines, retFrac, { editable:false });
+      var sovSeedNote = (!sovSaved && !invErr)
+        ? '<div class="fin-inv-btn-note">Starting template shown. Enter amounts and Save to create this project SOV.</div>'
+        : '';
+      var sovEditBtn = canEdit()
+        ? '<button type="button" class="fin-inv-btn fin-inv-btn-live" onclick="window.pfSovEdit(this)">Edit SOV</button>'
+        : '';
+      var sovViewBtn = '<button type="button" class="fin-inv-btn fin-inv-btn-live" onclick="window.pfSovStandalone()">View / Print SOV</button>';
       var finSov =
-        '<div class="fin-inv-block fin-inv-sov">'
+        '<div class="fin-inv-block fin-inv-sov open" data-fin-inv-sov="1" data-fin-inv-retfrac="' + retFrac + '" data-fin-inv-saved="' + (sovSaved?'1':'0') + '">'
         +   '<div class="fin-inv-block-head">'
         +     '<span class="fin-inv-block-title fin-inv-clickable" onclick="this.closest(\'.fin-inv-sov\').classList.toggle(\'open\')">'
         +       '<span class="fin-inv-chev">&#9654;</span> Schedule of Values</span>'
+        +     sovViewBtn + sovEditBtn
         +   '</div>'
         +   '<div class="fin-inv-sov-body">'
-        +     '<div class="fin-inv-wrap"><table class="ba-table"><thead><tr>'
-        +       '<th>Line Item</th><th class="num">Scheduled Value</th><th class="num">% Complete</th>'
-        +       '<th class="num">Billed to Date</th><th class="num">Balance</th>'
-        +     '</tr></thead><tbody>'
-        +       '<tr class="fin-inv-empty"><td colspan="5">No schedule of values yet</td></tr>'
-        +     '</tbody></table></div>'
+        +     (invErr
+              ? '<div class="fin-inv-wrap"><table class="ba-table"><tbody><tr class="fin-inv-empty"><td>Could not load schedule of values. Please retry.</td></tr></tbody></table></div>'
+              : sovHtmlRO)
+        +     sovSeedNote
+        +     '<div class="fin-inv-sov-editor" style="display:none"></div>'
         +   '</div>'
         + '</div>';
 
@@ -12872,7 +13020,7 @@ try {
     function loadInvoicingSync(num){
       num = String(num || '').trim();
       if (!num) return;
-      var entry = { subcontractValue: null, retainagePct: null, payApps: [], _meta: null, loaded: false, error: null };
+      var entry = { subcontractValue: null, retainagePct: null, sov: [], payApps: [], _meta: null, loaded: false, error: null };
       try {
         var xhr = new XMLHttpRequest();
         xhr.open('GET', '/api/project-invoicing?num=' + encodeURIComponent(num), false);
@@ -12882,6 +13030,7 @@ try {
           var d = JSON.parse(xhr.responseText);
           entry.subcontractValue = (d && typeof d.subcontractValue === 'number') ? d.subcontractValue : null;
           entry.retainagePct = (d && typeof d.retainagePct === 'number') ? d.retainagePct : null;
+          entry.sov = (d && Array.isArray(d.sov)) ? d.sov : [];
           entry.payApps = (d && Array.isArray(d.payApps)) ? d.payApps : [];
           entry._meta = (d && d._meta) || null;
           entry.loaded = true;
@@ -13165,20 +13314,29 @@ try {
 
     // Build the full record payload from the in-memory _curInvoicing plus overrides.
     function invPayload(over){
-      var inv = _curInvoicing || { subcontractValue:null, retainagePct:null, payApps:[] };
+      var inv = _curInvoicing || { subcontractValue:null, retainagePct:null, sov:[], payApps:[] };
       var scv = (inv.subcontractValue != null) ? inv.subcontractValue : null;
       var pct = (inv.retainagePct != null) ? inv.retainagePct : null;
       var apps = Array.isArray(inv.payApps) ? inv.payApps.slice() : [];
+      // SOV: send the persisted lines by default. A caller replacing the SOV passes
+      // over.sov (the full edited line list). Only the entry fields are sent.
+      var sov = Array.isArray(inv.sov) ? inv.sov.slice() : [];
       if (over) {
         if ('subcontractValue' in over) scv = over.subcontractValue;
         if ('retainagePct' in over) pct = over.retainagePct;
         if ('appendPayApp' in over) apps = apps.concat([over.appendPayApp]);
+        if ('sov' in over) sov = Array.isArray(over.sov) ? over.sov : [];
       }
       // Only the input fields matter to the server for pay apps (it re-derives the rest).
       var outApps = apps.map(function(a){
         return { date:a.date||'', period:a.period||'', amount:a.amount, status:a.status||'Draft', paidDate:a.paidDate||'' };
       });
-      return { num: _curNum || '', subcontractValue: scv, retainagePct: pct, payApps: outApps };
+      var outSov = sov.map(function(s){
+        return { item:s.item||'', division:s.division||'', description:s.description||'', sub:s.sub||'',
+                 originalSov:(s.originalSov==null||s.originalSov==='')?0:s.originalSov,
+                 approvedCO:(s.approvedCO==null||s.approvedCO==='')?0:s.approvedCO };
+      });
+      return { num: _curNum || '', subcontractValue: scv, retainagePct: pct, sov: outSov, payApps: outApps };
     }
 
     function invPost(payload, onErr, onOk){
@@ -13200,6 +13358,7 @@ try {
         window.PF_PROJECT_INVOICING[_curNum] = {
           subcontractValue: (typeof r.body.subcontractValue === 'number') ? r.body.subcontractValue : null,
           retainagePct: (typeof r.body.retainagePct === 'number') ? r.body.retainagePct : null,
+          sov: Array.isArray(r.body.sov) ? r.body.sov : [],
           payApps: Array.isArray(r.body.payApps) ? r.body.payApps : [],
           _meta: r.body._meta || null, loaded:true, error:null
         };
@@ -13328,6 +13487,188 @@ try {
       invPost(invPayload({ appendPayApp: { date:date, period:period, amount:amt, status:status, paidDate:(status==='Paid'?paidDate:'') } }),
         function(msg){ btn.disabled=false; btn.textContent='Save Pay App'; showErr(msg); },
         function(){ invRerender(btn); });
+    };
+
+    // ---- Billing SOV editor (add / edit / remove lines) ----
+    // The editor keeps its working state in the DOM (one row of inputs per line).
+    // Original SOV, Approved CO and the project retainage % drive a LIVE derived
+    // preview (Current, %, Balance, Retainage Held, Invoiced) as the user types.
+    function sovNum(raw){ raw = String(raw==null?'':raw).trim().replace(/[$,]/g,''); if (raw==='') return null; var n=Number(raw); return (isFinite(n)&&n>=0)?n:NaN; }
+    function sovFmtMoney(n){ return '$' + Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+    function sovEditorRowHtml(line){
+      line = line || {};
+      var v = function(x){ return (x==null)?'':String(x); };
+      return '<tr class="fin-inv-sove-row">'
+        + '<td><input type="text" class="sove-item" value="' + E(v(line.item)) + '" placeholder="#"></td>'
+        + '<td><input type="text" class="sove-div" value="' + E(v(line.division)) + '" placeholder="31 60 00"></td>'
+        + '<td><input type="text" class="sove-desc" value="' + E(v(line.description)) + '" placeholder="Description of work"></td>'
+        + '<td><input type="text" class="sove-sub" value="' + E(v(line.sub)) + '" placeholder="PF"></td>'
+        + '<td><input type="text" class="sove-orig num" inputmode="decimal" value="' + E(v(line.originalSov)) + '" placeholder="0.00"></td>'
+        + '<td><input type="text" class="sove-co num" inputmode="decimal" value="' + E(v(line.approvedCO)) + '" placeholder="0.00"></td>'
+        + '<td class="num sove-current">&mdash;</td>'
+        + '<td class="num sove-balance">&mdash;</td>'
+        + '<td class="num sove-retheld">&mdash;</td>'
+        + '<td><button type="button" class="sove-remove" title="Remove line" onclick="window.pfSovRemoveLine(this)">&times;</button></td>'
+        + '</tr>';
+    }
+
+    // Recompute the derived preview cells for one editor row from its inputs.
+    function sovEditorRecalc(row, retFrac){
+      if (!row) return;
+      var orig = sovNum(row.querySelector('.sove-orig') ? row.querySelector('.sove-orig').value : '');
+      var co = sovNum(row.querySelector('.sove-co') ? row.querySelector('.sove-co').value : '');
+      var curCell = row.querySelector('.sove-current');
+      var balCell = row.querySelector('.sove-balance');
+      var retCell = row.querySelector('.sove-retheld');
+      var bad = (orig !== null && isNaN(orig)) || (co !== null && isNaN(co));
+      if (bad) { if(curCell)curCell.textContent='!'; if(balCell)balCell.textContent='!'; if(retCell)retCell.textContent='!'; return; }
+      var hasAny = (orig !== null) || (co !== null);
+      if (!hasAny) { if(curCell)curCell.textContent='—'; if(balCell)balCell.textContent='—'; if(retCell)retCell.textContent='—'; return; }
+      var current = Math.round(((orig||0) + (co||0)) * 100) / 100;
+      var billed = 0; // A1: no per-line billed yet
+      var balance = Math.round((current - billed) * 100) / 100;
+      var retHeld = Math.round(billed * retFrac * 100) / 100;
+      if (curCell) curCell.textContent = sovFmtMoney(current);
+      if (balCell) balCell.textContent = sovFmtMoney(balance);
+      if (retCell) retCell.textContent = sovFmtMoney(retHeld);
+    }
+    function sovEditorRecalcAll(editor, retFrac){
+      if (!editor) return;
+      var rows = editor.querySelectorAll('.fin-inv-sove-row');
+      for (var i=0;i<rows.length;i++) sovEditorRecalc(rows[i], retFrac);
+    }
+    function sovEditorWire(editor, retFrac){
+      if (!editor) return;
+      editor.addEventListener('input', function(e){
+        var t = e.target;
+        if (t && (t.classList.contains('sove-orig') || t.classList.contains('sove-co'))) {
+          var row = t.closest('.fin-inv-sove-row');
+          sovEditorRecalc(row, retFrac);
+        }
+      });
+    }
+
+    window.pfSovEdit = function(btn){
+      var block = btn.closest('[data-fin-inv-sov]'); if (!block) return;
+      var editor = block.querySelector('.fin-inv-sov-editor'); if (!editor) return;
+      var roBody = block.querySelector('.fin-inv-sov-table'); // read-only table wrapper's table
+      var retFrac = Number(block.getAttribute('data-fin-inv-retfrac')) || 0;
+      // Seed the editor with the current lines (saved SOV, else the template).
+      var lines = sovLinesFor(_curInvoicing);
+      var rowsHtml = lines.map(sovEditorRowHtml).join('');
+      editor.innerHTML =
+          '<div class="fin-inv-sove-note">Enter the Billing SOV lines. Current Contract Amt, Balance and Retainage Held compute automatically. Retainage % comes from the invoicing info block above.</div>'
+        + '<div class="fin-inv-wrap"><table class="ba-table fin-inv-sove-table"><thead><tr>'
+        +   '<th>Item #</th><th>Division / Cost Code</th><th>Description</th><th>Subcontractor</th>'
+        +   '<th class="num">Original SOV</th><th class="num">Approved CO</th><th class="num">Current Amt</th>'
+        +   '<th class="num">Balance</th><th class="num">Retainage Held</th><th></th>'
+        + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>'
+        + '<div class="fin-inv-ie-err sove-err" style="display:none"></div>'
+        + '<div class="fin-inv-ie-actions">'
+        +   '<button type="button" class="fin-inv-btn fin-inv-btn-live" onclick="window.pfSovAddLine(this)">+ Add Line</button>'
+        +   '<span style="flex:1"></span>'
+        +   '<button type="button" class="pr-save-btn" onclick="window.pfSovSave(this)">Save SOV</button>'
+        +   '<button type="button" class="pr-cancel-btn" onclick="window.pfSovCancel(this)">Cancel</button>'
+        + '</div>';
+      editor.style.display = 'block';
+      // Hide the read-only table + seed note while editing.
+      var roWrap = block.querySelector('.fin-inv-sov-body > .fin-inv-wrap');
+      if (roWrap) roWrap.style.display = 'none';
+      var note = block.querySelector('.fin-inv-sov-body > .fin-inv-btn-note');
+      if (note) note.style.display = 'none';
+      btn.style.display = 'none';
+      sovEditorWire(editor, retFrac);
+      sovEditorRecalcAll(editor, retFrac);
+    };
+    window.pfSovAddLine = function(btn){
+      var editor = btn.closest('.fin-inv-sov-editor'); if (!editor) return;
+      var tbody = editor.querySelector('.fin-inv-sove-table tbody'); if (!tbody) return;
+      var block = editor.closest('[data-fin-inv-sov]');
+      var retFrac = block ? (Number(block.getAttribute('data-fin-inv-retfrac')) || 0) : 0;
+      var tmp = document.createElement('tbody');
+      tmp.innerHTML = sovEditorRowHtml({});
+      var row = tmp.firstChild;
+      tbody.appendChild(row);
+      sovEditorRecalc(row, retFrac);
+    };
+    window.pfSovRemoveLine = function(btn){
+      var row = btn.closest('.fin-inv-sove-row'); if (!row) return;
+      row.parentNode.removeChild(row);
+    };
+    window.pfSovCancel = function(btn){
+      var block = btn.closest('[data-fin-inv-sov]');
+      // Simplest safe path: re-render the whole record to restore the read-only view.
+      invRerender(btn);
+    };
+    window.pfSovSave = function(btn){
+      var editor = btn.closest('.fin-inv-sov-editor'); if (!editor) return;
+      var block = editor.closest('[data-fin-inv-sov]');
+      var retFrac = block ? (Number(block.getAttribute('data-fin-inv-retfrac')) || 0) : 0;
+      var errEl = editor.querySelector('.sove-err');
+      function showErr(m){ if (errEl){ errEl.textContent=m; errEl.style.display='block'; } }
+      var rows = editor.querySelectorAll('.fin-inv-sove-row');
+      var lines = [];
+      for (var i=0;i<rows.length;i++){
+        var r = rows[i];
+        var orig = sovNum(r.querySelector('.sove-orig').value);
+        var co = sovNum(r.querySelector('.sove-co').value);
+        if (orig !== null && isNaN(orig)) { showErr('Line ' + (i+1) + ': Original SOV must be a non-negative number.'); return; }
+        if (co !== null && isNaN(co)) { showErr('Line ' + (i+1) + ': Approved CO must be a non-negative number.'); return; }
+        lines.push({
+          item: (r.querySelector('.sove-item').value||'').trim(),
+          division: (r.querySelector('.sove-div').value||'').trim(),
+          description: (r.querySelector('.sove-desc').value||'').trim(),
+          sub: (r.querySelector('.sove-sub').value||'').trim(),
+          originalSov: (orig===null?0:orig),
+          approvedCO: (co===null?0:co)
+        });
+      }
+      if (errEl) errEl.style.display='none';
+      btn.disabled = true; btn.textContent='Saving...';
+      invPost(invPayload({ sov: lines }),
+        function(msg){ btn.disabled=false; btn.textContent='Save SOV'; showErr(msg); },
+        function(){ invRerender(btn); });
+    };
+
+    // ---- Standalone SOV view (print-friendly, SOV-only) ----
+    // Brad sends a GC the SOV before a contract exists. This opens a clean SOV-only
+    // window built from the same data + the same derived math, structured so it can
+    // be exported/printed on its own (PDF/email export is a later phase).
+    window.pfSovStandalone = function(){
+      var inv = _curInvoicing || { sov:[], retainagePct:null };
+      var retFrac = (inv && typeof inv.retainagePct === 'number') ? (inv.retainagePct/100) : 0;
+      var lines = sovLinesFor(inv);
+      var D = null;
+      try { D = resolveRecord(_curNum); } catch(e) { D = null; }
+      var pnum = (D && D.project_number) ? D.project_number : (_curNum || '');
+      var pname = (D && D.project_name) ? D.project_name : '';
+      var retLabel = (inv && typeof inv.retainagePct === 'number') ? (inv.retainagePct + '%') : '—';
+      var table = sovTableHtml(lines, retFrac, { editable:false });
+      var win = window.open('', '_blank');
+      if (!win) { alert('Please allow pop-ups to view the standalone SOV.'); return; }
+      var html =
+          '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Schedule of Values'
+        +   (pnum ? ' - ' + E(pnum) : '') + '</title>'
+        + '<style>'
+        + 'body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:28px;font-size:13px;}'
+        + 'h1{font-size:18px;margin:0 0 4px;} .meta{color:#555;font-size:12px;margin-bottom:16px;}'
+        + '.meta b{color:#111;} table{border-collapse:collapse;width:100%;}'
+        + 'th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:12px;}'
+        + 'th{background:#f2f2f2;} td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}'
+        + 'tr.fin-inv-sov-totals td{font-weight:700;background:#fafafa;}'
+        + '.ba-blank{color:#999;} .foot{margin-top:14px;color:#777;font-size:11px;}'
+        + '@media print{ button{display:none;} }'
+        + '</style></head><body>'
+        + '<h1>Schedule of Values</h1>'
+        + '<div class="meta"><b>Project #:</b> ' + (pnum?E(pnum):'—')
+        +   ' &nbsp;&nbsp; <b>Project:</b> ' + (pname?E(pname):'—')
+        +   ' &nbsp;&nbsp; <b>Retainage:</b> ' + E(retLabel) + '</div>'
+        + table
+        + '<div class="foot">Pier Foundations &middot; Billing Schedule of Values. Amounts shown are the Original SOV plus approved change orders. Blank cells indicate amounts not yet entered.</div>'
+        + '<button onclick="window.print()" style="margin-top:16px;padding:8px 16px;">Print</button>'
+        + '</body></html>';
+      win.document.open(); win.document.write(html); win.document.close();
     };
 
     // POET keeps auto-rendering into its dedicated #prRoot module (deep record).

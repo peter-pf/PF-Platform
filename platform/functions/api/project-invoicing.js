@@ -15,6 +15,16 @@
 //     num,                                  // the project number this belongs to
 //     subcontractValue: <number|null>,      // project-level input (dollars) or null
 //     retainagePct: <number|null>,          // ONE retainage % per project or null
+//     sov: [ {                              // the Billing Schedule of Values (line items)
+//       item: <string>,                     // line item # / label (free text, capped)
+//       division: <string>,                 // division / cost code (free text, capped)
+//       description: <string>,              // description of work (free text, capped)
+//       sub: <string>,                      // subcontractor (free text, capped)
+//       originalSov: <number>,              // Original SOV dollars (>=0)
+//       approvedCO: <number>                // Approved change orders dollars (may be 0)
+//       // NOTE: Current Contract Amt (=original+CO), % Complete, Balance, Retainage
+//       // Held and Invoiced to Date are DERIVED CLIENT-SIDE and are NOT stored here.
+//     }, ... ],
 //     payApps: [ {                          // ordered list of pay applications
 //       num: <int>,                         // auto-increment per project (1,2,3...)
 //       date: <string>,                     // application date (free text, capped)
@@ -57,7 +67,9 @@ import { requireArea } from '../lib/auth.js';
 const KV_PREFIX = 'project_invoicing_v1:';
 const MAX_BODY_BYTES = 128 * 1024;   // a project's pay-app list fits easily
 const MAX_STR = 80;                  // date / period / paidDate labels
+const MAX_SOV_STR = 200;             // SOV description can be longer than a date label
 const MAX_PAY_APPS = 200;            // generous cap; a job has a handful
+const MAX_SOV_LINES = 300;           // generous cap; a job has a handful of SOV lines
 const STATUSES = { Draft: 1, Sent: 1, Paid: 1 };
 
 const JSON_HEADERS = {
@@ -83,6 +95,14 @@ function cleanStr(v) {
   if (v == null) return '';
   let str = String(v).trim().replace(/[<>]/g, '');
   if (str.length > MAX_STR) str = str.slice(0, MAX_STR);
+  return str;
+}
+
+// A longer free-text label for SOV fields (description can be a sentence).
+function cleanSovStr(v) {
+  if (v == null) return '';
+  let str = String(v).trim().replace(/[<>]/g, '');
+  if (str.length > MAX_SOV_STR) str = str.slice(0, MAX_SOV_STR);
   return str;
 }
 
@@ -115,7 +135,7 @@ function kvKey(num) { return KV_PREFIX + num; }
 // Load the stored invoicing object for one project, or an empty shell.
 async function loadRecord(env, num) {
   const empty = {
-    num, subcontractValue: null, retainagePct: null, payApps: [],
+    num, subcontractValue: null, retainagePct: null, sov: [], payApps: [],
     _meta: { updatedBy: null, updatedAt: null },
   };
   const raw = await env.PF_SCHEDULE.get(kvKey(num));
@@ -126,6 +146,7 @@ async function loadRecord(env, num) {
       num,
       subcontractValue: (typeof p.subcontractValue === 'number') ? p.subcontractValue : null,
       retainagePct: (typeof p.retainagePct === 'number') ? p.retainagePct : null,
+      sov: Array.isArray(p.sov) ? p.sov : [],
       payApps: Array.isArray(p.payApps) ? p.payApps : [],
       _meta: (p && p._meta && typeof p._meta === 'object')
         ? p._meta : { updatedBy: null, updatedAt: null },
@@ -157,6 +178,7 @@ export async function onRequestGet(context) {
       ok: true, num,
       subcontractValue: rec.subcontractValue,
       retainagePct: rec.retainagePct,
+      sov: rec.sov,
       payApps: rec.payApps,
       _meta: rec._meta,
     });
@@ -167,8 +189,12 @@ export async function onRequestGet(context) {
 }
 
 // ---- POST: save the whole invoicing record for a project --------------------
-//   body: { num, subcontractValue, retainagePct, payApps: [ {num?, date, period,
-//           amount, status, paidDate}, ... ] }
+//   body: { num, subcontractValue, retainagePct,
+//           sov: [ {item, division, description, sub, originalSov, approvedCO}, ... ],
+//           payApps: [ {num?, date, period, amount, status, paidDate}, ... ] }
+// The SOV stores ONLY the entry fields (item/division/description/sub/originalSov/
+// approvedCO). The derived columns (Current Contract Amt, % Complete, Balance,
+// Retainage Held, Invoiced to Date) are NOT stored -- the client re-derives them.
 // The whole record is replaced (client sends the full current state). Server
 // re-numbers pay apps sequentially (1..N in submitted order), re-derives retainage
 // (= amount * retainagePct) and netDue (= amount - retainage) from the
@@ -230,6 +256,32 @@ export async function onRequestPost(context) {
       });
     }
 
+    // Sanitize the Billing SOV lines. Store ONLY the entry fields; never store the
+    // derived columns (client re-derives Current/%/Balance/Retainage/Invoiced). A
+    // line with a non-numeric Original SOV or Approved CO is REJECTED (fail closed).
+    const inSov = (parsed && Array.isArray(parsed.sov)) ? parsed.sov : [];
+    if (inSov.length > MAX_SOV_LINES) return json({ status: 'error', message: 'Too many schedule of values lines.' }, 413);
+    const sov = [];
+    for (let i = 0; i < inSov.length; i++) {
+      const s = inSov[i] || {};
+      const orig = cleanMoney(s.originalSov, false);
+      if (!orig.ok) {
+        return json({ status: 'error', message: 'SOV line #' + (i + 1) + ' Original SOV must be a non-negative number.' }, 400);
+      }
+      const co = cleanMoney(s.approvedCO, false);
+      if (!co.ok) {
+        return json({ status: 'error', message: 'SOV line #' + (i + 1) + ' Approved CO must be a non-negative number.' }, 400);
+      }
+      sov.push({
+        item: cleanStr(s.item),
+        division: cleanStr(s.division),
+        description: cleanSovStr(s.description),
+        sub: cleanStr(s.sub),
+        originalSov: orig.value,
+        approvedCO: co.value,
+      });
+    }
+
     // FAIL CLOSED: no KV -> we cannot persist. Do NOT report success.
     if (!env.PF_SCHEDULE) {
       return json({ status: 'error',
@@ -245,6 +297,7 @@ export async function onRequestPost(context) {
       num,
       subcontractValue: scv.value,
       retainagePct: pct.value,
+      sov,
       payApps,
       _meta: { updatedBy: who, updatedAt: nowIso },
     };
@@ -254,6 +307,7 @@ export async function onRequestPost(context) {
       ok: true, saved: true, num,
       subcontractValue: toStore.subcontractValue,
       retainagePct: toStore.retainagePct,
+      sov: toStore.sov,
       payApps: toStore.payApps,
       _meta: toStore._meta,
     });
