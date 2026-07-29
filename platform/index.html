@@ -12984,8 +12984,18 @@ try {
       // and Project Costs (Budget vs Actual, the existing seeded editable grid).
       // Scoped by .fin-* / #fin-* so nothing bleeds to other tables/sections.
       var finTot = baGrandTotals(_curNum);
+      var finBudgetNum = finTot.ok ? Number(finTot.budget) : null;
+      var finActualNum = finTot.ok ? Number(finTot.actual) : null;
       var finCostBudget = finTot.ok ? baMoney(finTot.budget) : '';
       var finCostActual = finTot.ok ? baMoney(finTot.actual) : '';
+      // Project Profit = Project Budget - Actual Cost to Date.
+      // Profit % = Profit / Budget * 100, guarded: a null/0 budget yields a dash
+      // (never NaN/Infinity/#DIV/0). Fail closed: dashes whenever the budget roll-up
+      // errored (finTot.ok false), never a fabricated profit figure.
+      var finProfitNum = (finBudgetNum != null && finActualNum != null) ? (finBudgetNum - finActualNum) : null;
+      var finProfitMoney = (finProfitNum != null) ? baMoney(finProfitNum) : '';
+      var finProfitPct = (finProfitNum != null && finBudgetNum) ? (finProfitNum / finBudgetNum * 100) : null;
+      var finProfitPctStr = (finProfitPct != null && isFinite(finProfitPct)) ? (finProfitPct.toFixed(1) + '%') : '';
       // Invoicing roll-up: sums computed CLIENT-SIDE from the loaded invoicing
       // record (fail closed: an errored/unloaded record yields ok:false so the
       // band shows an em-dash, never a fabricated total).
@@ -13000,9 +13010,19 @@ try {
         +       '<div class="fin-rc-sub">Invoiced to date</div>'
         +     '</div>'
         +     '<div class="fin-rc">'
-        +       '<div class="fin-rc-label">Project Costs (Budget)</div>'
+        +       '<div class="fin-rc-label">Project Budget</div>'
         +       '<div class="fin-rc-val">' + (finCostBudget ? E(finCostBudget) : '<span class="ba-blank">-</span>') + '</div>'
-        +       '<div class="fin-rc-sub">' + (finCostActual ? 'Actual to date ' + E(finCostActual) : 'Actual to date -') + '</div>'
+        +       '<div class="fin-rc-sub">Budgeted cost</div>'
+        +     '</div>'
+        +     '<div class="fin-rc">'
+        +       '<div class="fin-rc-label">Actual Cost to Date</div>'
+        +       '<div class="fin-rc-val">' + (finCostActual ? E(finCostActual) : '<span class="ba-blank">-</span>') + '</div>'
+        +       '<div class="fin-rc-sub">Actual cost incurred</div>'
+        +     '</div>'
+        +     '<div class="fin-rc">'
+        +       '<div class="fin-rc-label">Project Profit</div>'
+        +       '<div class="fin-rc-val">' + (finProfitMoney ? E(finProfitMoney) : '<span class="ba-blank">-</span>') + '</div>'
+        +       '<div class="fin-rc-sub">Profit %' + (finProfitPctStr ? ' ' + E(finProfitPctStr) : ' -') + '</div>'
         +     '</div>'
         +   '</div>'
         + '</div>';
