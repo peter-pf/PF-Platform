@@ -536,7 +536,9 @@ function answerFor(rawQ){
 // through the local Hermes and writes the answer back to KV; Hermes is NEVER
 // exposed. The old local answerFor() stub is kept above only as a reference /
 // offline fallback and is no longer called on submit.
-var FC_POLL_MS = 1500;      // poll cadence (answer-fetch; snappier once poller answers)
+var FC_FIRST_POLL_MS = 500; // first poll fires fast (a regex-refusal is ready almost
+                            // immediately once the poller picks the job up)
+var FC_POLL_MS = 1200;      // steady poll cadence (answer-fetch; snappy)
 var FC_MAX_MS  = 60000;     // give up after 60s (poller timeboxes Hermes at 90s,
                             // but the crew should not wait longer than this)
 
@@ -554,10 +556,12 @@ async function askCompanion(query){
     return posted.error || "The field assistant is not available right now. No answer was generated.";
   }
   var id = posted.id;
-  // 2) poll until done or timeout
+  // 2) poll until done or timeout. First poll fires quickly, then steady cadence.
   var started = Date.now();
+  var first = true;
   while (Date.now() - started < FC_MAX_MS){
-    await new Promise(function(r){ setTimeout(r, FC_POLL_MS); });
+    await new Promise(function(r){ setTimeout(r, first ? FC_FIRST_POLL_MS : FC_POLL_MS); });
+    first = false;
     var getRes = await fetch("/api/field-companion?id=" + encodeURIComponent(id), {
       credentials: "same-origin"
     });
