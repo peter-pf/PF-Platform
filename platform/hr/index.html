@@ -320,9 +320,9 @@
      The real PF session cookie is `pf_session` (HttpOnly) — JS CANNOT read it,
      so we do NOT sniff a cookie. Instead, same-origin fetches automatically
      carry the HttpOnly session cookie. We ask the server who we are via
-     /api/me, then load the real directory via /api/hr. If either fetch fails
-     (true standalone / no session), we fall back to the built-in demo data so
-     the page still renders for local preview. -------------------------------- */
+     /api/me, then load the real directory via /api/hr. FAIL CLOSED: if either
+     fetch fails (no session, non-ok, error, or empty), we show an honest error
+     and an empty table — never a fabricated roster. ------------------------- */
 
   /* Fetch the REAL identity from the platform (server reads the HttpOnly cookie). */
   function fetchMe() {
