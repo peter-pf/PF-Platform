@@ -1885,7 +1885,9 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 .fin-inv-sov-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .fin-inv-sov-table { width: auto; min-width: 100%; }
 .fin-inv-sov-table th, .fin-inv-sov-table td { white-space: nowrap !important; }
-.fin-inv-sov-table td.sov-desc, .fin-inv-sov-table th.sov-desc { min-width: 220px; }
+/* Description column reads its full label on one line (e.g. the longest template
+   line "Design, Engineering, & Shop Drawing Submittal") with no cutoff. */
+.fin-inv-sov-table td.sov-desc, .fin-inv-sov-table th.sov-desc { min-width: 360px; }
 .fin-inv-sov-totals td { font-weight:700; color:var(--text-1); border-top:2px solid var(--border);
   background:var(--bg-1); }
 .fin-inv-sov-editor { border:1px solid var(--border); border-radius:8px; background:var(--bg-0);
@@ -1894,7 +1896,10 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 .fin-inv-sove-table th, .fin-inv-sove-table td { white-space:nowrap; vertical-align:middle; }
 .fin-inv-sove-table input { width:100%; min-width:70px; font-size:0.85rem; padding:4px 6px;
   border:1px solid var(--border); border-radius:5px; background:var(--bg-1); color:var(--text-1); box-sizing:border-box; }
-.fin-inv-sove-table input.sove-desc { min-width:180px; }
+/* Description input fills a generous width so the full label
+   (e.g. "Design, Engineering, & Shop Drawing Submittal") shows without clipping. */
+.fin-inv-sove-table td.sove-desc-cell, .fin-inv-sove-table th.sove-desc-cell { min-width:360px; }
+.fin-inv-sove-table input.sove-desc { min-width:340px; }
 .fin-inv-sove-table input.num { text-align:right; min-width:90px; font-variant-numeric:tabular-nums; }
 .fin-inv-sove-table td.sove-current, .fin-inv-sove-table td.sove-balance, .fin-inv-sove-table td.sove-retheld {
   color:var(--text-2); font-variant-numeric:tabular-nums; font-weight:600; }
@@ -13507,7 +13512,7 @@ try {
       return '<tr class="fin-inv-sove-row">'
         + '<td><input type="text" class="sove-item" value="' + E(v(line.item)) + '" placeholder="#"></td>'
         + '<td><input type="text" class="sove-div" value="' + E(v(line.division)) + '" placeholder="31 60 00"></td>'
-        + '<td><input type="text" class="sove-desc" value="' + E(v(line.description)) + '" placeholder="Description of work"></td>'
+        + '<td class="sove-desc-cell"><input type="text" class="sove-desc" value="' + E(v(line.description)) + '" placeholder="Description of work"></td>'
         + '<td><input type="text" class="sove-sub" value="' + E(v(line.sub)) + '" placeholder="PF"></td>'
         + '<td><input type="text" class="sove-orig num" inputmode="decimal" value="' + E(v(line.originalSov)) + '" placeholder="0.00"></td>'
         + '<td><input type="text" class="sove-co num" inputmode="decimal" value="' + E(v(line.approvedCO)) + '" placeholder="0.00"></td>'
@@ -13564,8 +13569,8 @@ try {
       var rowsHtml = lines.map(sovEditorRowHtml).join('');
       editor.innerHTML =
           '<div class="fin-inv-sove-note">Enter the Billing SOV lines. Current Contract Amt, Balance and Retainage Held compute automatically. Retainage % comes from the invoicing info block above.</div>'
-        + '<div class="fin-inv-wrap"><table class="ba-table fin-inv-sove-table"><thead><tr>'
-        +   '<th>Item #</th><th>Division / Cost Code</th><th>Description</th><th>Subcontractor</th>'
+        + '<div class="fin-inv-wrap fin-inv-sov-wrap"><table class="ba-table fin-inv-sove-table"><thead><tr>'
+        +   '<th>Item #</th><th>Division / Cost Code</th><th class="sove-desc-cell">Description</th><th>Subcontractor</th>'
         +   '<th class="num">Original SOV</th><th class="num">Approved CO</th><th class="num">Current Amt</th>'
         +   '<th class="num">Balance</th><th class="num">Retainage Held</th><th></th>'
         + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>'
@@ -13661,7 +13666,7 @@ try {
         + '.meta b{color:#111;} .fin-inv-sov-wrap{overflow-x:auto;} table{border-collapse:collapse;width:auto;min-width:100%;}'
         + 'th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:12px;white-space:nowrap;}'
         + 'th{background:#f2f2f2;} td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}'
-        + 'td.sov-desc,th.sov-desc{min-width:220px;white-space:normal;}'
+        + 'td.sov-desc,th.sov-desc{min-width:360px;}'
         + 'tr.fin-inv-sov-totals td{font-weight:700;background:#fafafa;}'
         + '.ba-blank{color:#999;} .foot{margin-top:14px;color:#777;font-size:11px;}'
         + '@media print{ button{display:none;} }'
