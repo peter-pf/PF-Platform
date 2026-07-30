@@ -2345,6 +2345,7 @@ body.role-field-ops .nav-sub[data-fo-hide] {
   if (isPrivileged) {
     feeds.push('/data/project-record-poet.js', '/data/project-records.js',
                '/data/budget-actual-poet.js', '/data/cost-code-template.js',
+               '/data/budget-actuals.js',
                '/data/awarded-projects.js', '/data/project-history.js',
                '/data/precon-pipeline.js', '/data/feasibility-history.js',
                '/data/project-master.js', '/data/pf-coi.js',
@@ -12048,6 +12049,55 @@ try {
       return '$' + n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
     }
     function baMoneyCell(v){ var m = baMoney(v); return m ? E(m) : '<span class="ba-blank">-</span>'; }
+
+    // ---- ACTUAL overlay (all projects, QuickBooks-independent) ---------------
+    // Real per-cost-code ACTUALS come from each project's Turnover Budget workbook
+    // (data/budget-actuals.js -> window.PF_BUDGET_ACTUALS[num].actuals_by_group,
+    // keyed { normalizedGroupTitle: { costCode: actual } }). The generic table is
+    // rendered from the ZEROED template, whose group/row order need NOT match a
+    // given project's workbook, so we overlay by (GROUP TITLE + COST CODE), summing
+    // the workbook's actual for that (group,code). To keep the per-code and grand
+    // totals EXACT even when the template repeats a code within a group (e.g. 5405
+    // appears 3x under Equipment), we place the FULL (group,code) actual on the
+    // FIRST template row of that (group,code) and 0 on the rest. FAIL CLOSED: a
+    // project with no feed / errored feed yields NULL (dash), never a fabricated 0.
+    function baNormTitle(s){
+      return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim();
+    }
+    // Returns the feed record for a project, or null (fail-closed) when actuals
+    // are not synced/parseable for it.
+    function baActualsRec(num){
+      var A = window.PF_BUDGET_ACTUALS;
+      if (!A || typeof A !== 'object') return null;
+      var rec = A[String(num)];
+      if (!rec || typeof rec !== 'object') return null;
+      if (rec.status !== 'ok') return null;           // fail closed on any non-ok status
+      var bg = rec.actuals_by_group;
+      if (!bg || typeof bg !== 'object') return null;
+      return rec;
+    }
+    // Per-(group,code) consumption tracker so a repeated code in a group is applied
+    // once. Caller resets it per render via baActualsCtx().
+    function baActualsCtx(num){
+      var rec = baActualsRec(num);
+      return { rec: rec, used: {} };   // used["<gtitle>|<code>"] = true once placed
+    }
+    // Actual for one template row. gtitle = the template GROUP title; code = row code.
+    // Returns a NUMBER (the workbook actual, placed on the first matching row) or
+    // null when this project has no synced actuals (-> dash, fail closed).
+    function baActualForRow(ctx, gtitle, code){
+      if (!ctx || !ctx.rec) return null;              // no feed -> dash (fail closed)
+      code = String(code || '').trim();
+      if (!code) return 0;                            // uncoded template row -> 0 (not a cost line)
+      var g = ctx.rec.actuals_by_group[baNormTitle(gtitle)];
+      if (!g || !(code in g)) return 0;               // coded line, no workbook actual -> real 0
+      var key = baNormTitle(gtitle) + '|' + code;
+      if (ctx.used[key]) return 0;                    // already placed on the first row
+      ctx.used[key] = true;
+      var n = Number(g[code]);
+      return isFinite(n) ? n : 0;
+    }
+
     // Variance = budget - actual. favorable (>=0, under/at budget) green; over amber.
     function baVarCell(v){
       if (v === null || v === undefined || v === '') return '<span class="ba-blank">-</span>';
@@ -12096,6 +12146,11 @@ try {
     function baRenderTable(T, savedRows, num, editable){
       var grandB = 0, grandA = 0;
       var body = '';
+      // Real ACTUALS overlay for THIS project (from the Turnover Budget workbook,
+      // via data/budget-actuals.js). ctx.rec === null -> no synced actuals for this
+      // project: render Actual/Variance as a DASH (fail closed, never a fake 0).
+      var actCtx = baActualsCtx(num);
+      var hasActuals = !!(actCtx && actCtx.rec);
       T.groups.forEach(function(g, gi){
         var gB = 0, gA = 0;
         var rowsHtml = '';
@@ -12111,9 +12166,12 @@ try {
           } else {
             budget = Number(r.budget) || 0;
           }
-          var actual = Number(r.actual) || 0; // Phase 1: always 0
-          var variance = budget - actual;
-          if (!isSub && code) { gB += budget; gA += actual; }
+          // Overlay the workbook actual for this (group,code); null when unsynced.
+          var actualRaw = (!isSub) ? baActualForRow(actCtx, g.title, code) : (hasActuals ? 0 : null);
+          var actual = (actualRaw === null) ? null : (Number(actualRaw) || 0);
+          // Variance is a dash when actual is unknown (fail closed), else budget-actual.
+          var variance = (actual === null) ? null : (budget - actual);
+          if (!isSub && code) { gB += budget; if (actual !== null) gA += actual; }
           var rowCls = isSub ? 'ba-sub-row' : 'ba-leaf-row';
           var budCell;
           if (editable && !isSub && code) {
@@ -12136,23 +12194,28 @@ try {
             + '</tr>';
         });
         grandB += gB; grandA += gA;
-        // category header row carrying the category subtotal
+        // category header row carrying the category subtotal. Actual/Variance are a
+        // dash when this project has no synced actuals (fail closed).
+        var gACell = hasActuals ? baMoneyCell(gA) : '<span class="ba-blank">-</span>';
+        var gVCell = hasActuals ? baVarCell(gB - gA) : '<span class="ba-blank">-</span>';
         body += '<tr class="ba-grp-row">'
           + '<td class="ba-code"></td>'
           + '<td class="ba-desc">' + E(g.title || '') + '</td>'
           + '<td class="num">' + baMoneyCell(gB) + '</td>'
-          + '<td class="num">' + baMoneyCell(gA) + '</td>'
-          + '<td class="num">' + baVarCell(gB - gA) + '</td>'
+          + '<td class="num">' + gACell + '</td>'
+          + '<td class="num">' + gVCell + '</td>'
           + '<td></td><td></td>'
           + '</tr>';
         body += rowsHtml;
       });
       var grandV = grandB - grandA;
+      var grandACell = hasActuals ? baMoneyCell(grandA) : '<span class="ba-blank">-</span>';
+      var grandVCell = hasActuals ? baVarCell(grandV) : '<span class="ba-blank">-</span>';
       var foot = '<tr class="ba-grand-row" style="font-weight:700;border-top:2px solid var(--border)">'
         + '<td></td><td>Total Construction Contract</td>'
         + '<td class="num">' + baMoneyCell(grandB) + '</td>'
-        + '<td class="num">' + baMoneyCell(grandA) + '</td>'
-        + '<td class="num">' + baVarCell(grandV) + '</td>'
+        + '<td class="num">' + grandACell + '</td>'
+        + '<td class="num">' + grandVCell + '</td>'
         + '<td></td><td></td>'
         + '</tr>';
       var editControls = editable
@@ -12160,14 +12223,33 @@ try {
           + '<button type="button" class="pr-edit-btn" onclick="window.pfBudgetEdit(this)">Edit Budget</button>'
           + '<button type="button" class="pr-save-btn" style="display:none" onclick="window.pfBudgetSave(this)">Save Budget</button>'
           + '<button type="button" class="pr-cancel-btn" style="display:none" onclick="window.pfBudgetCancel(this)">Cancel</button>'
+          + '<button type="button" class="pr-edit-btn" style="margin-left:8px" '
+          +   'data-ba-refresh-num="' + E(String(num)) + '" onclick="window.pfRefreshActuals(this)" '
+          +   'title="Pull the latest invoice actuals from this project’s Turnover Budget workbook">Refresh actuals</button>'
+          + '<span class="ba-refresh-msg" style="display:none;margin-left:8px;color:var(--muted)"></span>'
           + '<span class="ba-edit-err" style="display:none;color:var(--red);margin-left:8px"></span>'
           + '</div>'
         : '';
-      var metaNote = '';
+      // Actuals-synced note (from the feed's _meta.generated). Honest freshness.
+      var actNote = '';
+      try {
+        var A = window.PF_BUDGET_ACTUALS, arec = A && A[String(num)], gen = A && A._meta && A._meta.generated;
+        if (arec && arec.status === 'ok' && gen) {
+          var g = new Date(gen);
+          actNote = '<div class="pr-card-meta" style="margin-bottom:6px">Actuals synced from the Turnover Budget workbook · '
+            + E(isNaN(g.getTime()) ? String(gen) : g.toLocaleString()) + '</div>';
+        } else if (arec && arec.status && arec.status !== 'ok') {
+          actNote = '<div class="pr-card-meta" style="margin-bottom:6px;color:var(--muted)">Actuals not yet synced for this project ('
+            + E(String(arec.status)) + ') — Actual/Variance show a dash.</div>';
+        } else if (!arec) {
+          actNote = '<div class="pr-card-meta" style="margin-bottom:6px;color:var(--muted)">Actuals not yet synced for this project — Actual/Variance show a dash.</div>';
+        }
+      } catch(e){}
+      var metaNote = actNote;
       if (_curBudget && _curBudget._meta && _curBudget._meta.updatedBy) {
         var when = '';
         try { when = _curBudget._meta.updatedAt ? new Date(_curBudget._meta.updatedAt).toLocaleDateString() : ''; } catch(e){}
-        metaNote = '<div class="pr-card-meta" style="margin-bottom:6px">Budget last edited by '
+        metaNote += '<div class="pr-card-meta" style="margin-bottom:6px">Budget last edited by '
           + E(_curBudget._meta.updatedBy) + (when ? ' · ' + E(when) : '') + '</div>';
       }
       return metaNote + editControls
@@ -12187,10 +12269,13 @@ try {
     // shows an honest em-dash, never a fabricated total).
     function baGrandTotals(num){
       var T = window.PF_COST_CODE_TEMPLATE;
-      if (!T || !Array.isArray(T.groups)) return { budget:0, actual:0, ok:false };
+      if (!T || !Array.isArray(T.groups)) return { budget:0, actual:0, ok:false, actualsOk:false };
       var bud = _curBudget || { rows:{}, error:'unreachable' };
       var savedRows = (!bud.error && bud.rows && typeof bud.rows === 'object') ? bud.rows : {};
       var hadErr = !!bud.error; // saved budgets not trustworthy -> totals reflect template only
+      // Overlay real workbook actuals (same (group,code) rule as baRenderTable).
+      var actCtx = baActualsCtx(num);
+      var actualsOk = !!(actCtx && actCtx.rec);
       var gB = 0, gA = 0;
       T.groups.forEach(function(g, gi){
         (g.rows || []).forEach(function(r, ri){
@@ -12198,10 +12283,12 @@ try {
           var rowKey = 'g' + gi + '_r' + ri, budget;
           if (savedRows[rowKey] && typeof savedRows[rowKey].budget === 'number') budget = savedRows[rowKey].budget;
           else budget = Number(r.budget) || 0;
-          gB += budget; gA += (Number(r.actual) || 0);
+          gB += budget;
+          if (actualsOk) { var av = baActualForRow(actCtx, g.title, r.cost_code); gA += (Number(av) || 0); }
         });
       });
-      return { budget:gB, actual:gA, ok:!hadErr };
+      // actual is null when no synced actuals -> roll-up shows a dash (fail closed).
+      return { budget:gB, actual: (actualsOk ? gA : null), ok:!hadErr, actualsOk:actualsOk };
     }
 
     // Invoicing roll-up for THIS project, computed CLIENT-SIDE from the loaded
@@ -13803,6 +13890,64 @@ try {
         busy(false);
         showErr('Save failed: could not reach the server. Your budget was NOT saved — please retry.');
       });
+    };
+
+    // ---- INSTANT "Refresh actuals" -----------------------------------------
+    // Queues a rebuild of the per-project actuals feed (POST /api/refresh-actuals).
+    // The container's budget_actuals_daemon polls the queued request (KV) and
+    // rebuilds+redeploys data/budget-actuals.js within ~a minute; we then reload
+    // the feed and re-render. FAIL CLOSED: any error surfaces an honest message and
+    // NEVER fabricates fresher numbers.
+    window.pfRefreshActuals = function(btn){
+      var num = btn.getAttribute('data-ba-refresh-num') || _curNum || '';
+      var wrap = btn.closest('.ba-edit-actions');
+      var msg = wrap && wrap.querySelector('.ba-refresh-msg');
+      function say(t, isErr){ if (msg){ msg.textContent=t; msg.style.color = isErr ? 'var(--red)' : 'var(--muted)'; msg.style.display=''; } }
+      btn.disabled = true; var orig = btn.textContent; btn.textContent = 'Refreshing…';
+      say('Queued — pulling the latest actuals from the workbook…', false);
+      fetch('/api/refresh-actuals?job=' + encodeURIComponent(num), {
+        method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'
+      }).then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+        .then(function(res){
+          if (!res.ok || !res.j || !res.j.queued) {
+            btn.disabled=false; btn.textContent=orig;
+            say((res.j && res.j.message) || 'Refresh unavailable right now — please retry.', true);
+            return;
+          }
+          // Poll the (re-fetched, cache-busted) feed for a newer _meta.generated,
+          // up to ~90s, then reload the feed script and re-render the record.
+          var before = (window.PF_BUDGET_ACTUALS && window.PF_BUDGET_ACTUALS._meta && window.PF_BUDGET_ACTUALS._meta.generated) || '';
+          var tries = 0;
+          (function poll(){
+            tries++;
+            fetch('/data/budget-actuals.js?ts=' + Date.now(), {cache:'no-store'})
+              .then(function(r){ return r.text(); })
+              .then(function(txt){
+                var gen = (txt.match(/"generated":\s*"([^"]+)"/) || [])[1] || '';
+                if (gen && gen !== before) {
+                  // Feed advanced — evaluate it (trusted same-origin static asset,
+                  // same as the initial <script> load) and re-render.
+                  try { (0, eval)(txt); } catch(e){}
+                  btn.disabled=false; btn.textContent=orig;
+                  say('Updated · ' + new Date(gen).toLocaleTimeString(), false);
+                  var root = document.getElementById('prGenericRoot') ||
+                             (btn.closest('.pr-root'));
+                  if (root && window.renderProjectRecord) window.renderProjectRecord(num, root);
+                } else if (tries < 30) {
+                  setTimeout(poll, 3000);
+                } else {
+                  btn.disabled=false; btn.textContent=orig;
+                  say('Still refreshing — reopen this project in a minute to see the update.', false);
+                }
+              }).catch(function(){
+                if (tries < 30) setTimeout(poll, 3000);
+                else { btn.disabled=false; btn.textContent=orig; say('Could not confirm the refresh — please reload.', true); }
+              });
+          })();
+        }).catch(function(){
+          btn.disabled=false; btn.textContent=orig;
+          say('Refresh failed: could not reach the server — please retry.', true);
+        });
     };
 
     // =======================================================================

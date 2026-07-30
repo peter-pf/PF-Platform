@@ -67,6 +67,10 @@ from datetime import datetime, timezone
 sys.path.insert(0, "/home/aiciv/tools")
 from pf_email import _token, _env  # noqa: E402
 
+# --- shared, project-agnostic parser (extracted 2026-07-30) ---
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from budget_actual_parser import parse_budget_actual as _shared_parse  # noqa: E402
+
 GRAPH = "https://graph.microsoft.com/v1.0"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -178,177 +182,16 @@ def _norm_code(a):
 
 
 def parse_budget_actual(token):
-    """Parse the Budget vs Actual sheet faithfully, using the cell FORMULAS to
-    distinguish category / sub-rollup / leaf rows so we never double-count.
-    Two workbook loads: data_only (values) + formulas (structure)."""
-    import openpyxl
+    """Parse POET's Budget vs Actual sheet via the SHARED project-agnostic parser
+    (sync/budget_actual_parser.py). Kept as a thin wrapper so the rest of this
+    POET builder (invoice-link resolution, summary, writer) is unchanged and the
+    emitted data/budget-actual-poet.js stays byte-compatible."""
     raw = download_path(token, BUDGET_FILE)
-    wb = openpyxl.load_workbook(io.BytesIO(raw), data_only=True, keep_vba=False)
-    wbf = openpyxl.load_workbook(io.BytesIO(raw), data_only=False, keep_vba=False)
-    if BUDGET_SHEET not in wb.sheetnames:
-        raise SystemExit(f"ERROR: sheet '{BUDGET_SHEET}' not found in {BUDGET_FILE}")
-    ws = wb[BUDGET_SHEET]
-    wsf = wbf[BUDGET_SHEET]
-
-    def cell(r, c):
-        return ws.cell(row=r, column=c).value
-
-    def fmla(r, c):
-        v = wsf.cell(row=r, column=c).value
-        return str(v) if v is not None else ""
-
-    # ---- header (Name / Job # / Location) ----
-    job = _txt(cell(1, 4)) or PROJECT_NUMBER
-    name = _txt(cell(1, 2)) or PROJECT_NAME
-    location = _txt(cell(2, 2))
-    if location.lower() in ("project location", ""):
-        location = ""  # placeholder text -> blank, never fabricated
-
-    # ---- find the detail header row + the summary band ----
-    header_row = None
-    for r in range(1, min(ws.max_row, 12) + 1):
-        if _txt(cell(r, 1)).lower() == "cost code":
-            header_row = r
-            break
-    if header_row is None:
-        header_row = 4
-
-    summary_row = None
-    for r in range(header_row + 1, ws.max_row + 1):
-        if _txt(cell(r, 3)).lower().startswith("estimating budget"):
-            summary_row = r
-            break
-    detail_end = (summary_row - 1) if summary_row else ws.max_row
-
-    # ---- two-pass classification via the FORMULA GRAPH (deterministic) ----
-    # Pass 1: for every detail row, record formula + whether it's a same-sheet rollup,
-    #         and which same-sheet C-rows its formula references.
-    rows_meta = {}
-    for r in range(header_row + 1, detail_end + 1):
-        cf = fmla(r, 3).replace(" ", "")
-        is_rollup = bool(ROLLUP_RX.match(cf))
-        refs = [int(x) for x in CREF_RX.findall(cf)] if cf.startswith("=") else []
-        # only same-sheet refs that fall in the detail band
-        refs = [x for x in refs if header_row < x <= detail_end]
-        rows_meta[r] = {"cf": cf, "is_rollup": is_rollup, "refs": refs}
-
-    rollup_rows = {r for r, m in rows_meta.items() if m["is_rollup"]}
-
-    # A MAJOR CATEGORY = a rollup row that references OTHER ROLLUP rows (rollup-of-
-    # rollups), i.e. its children are themselves subtotals. These are exactly the 7
-    # top categories (rows 5,54,62,81,102,123,131) that tie to the summary band.
-    # (Row 54 "=C55" and row 131 "=C132" reference a single sub-rollup -> still major.)
-    major_rows = set()
-    for r in rollup_rows:
-        child_refs = rows_meta[r]["refs"]
-        if child_refs and all(c in rollup_rows for c in child_refs):
-            major_rows.add(r)
-
-    # Pass 2: walk rows, opening a group on each MAJOR row; everything else is either
-    # a SUB-ROLLUP (rollup, not major -> shown as sub-header, value NOT summed) or a
-    # LEAF cost line (counted).
-    groups = []
-    cur = None
-
-    def flush():
-        nonlocal cur
-        if cur is not None:
-            groups.append(cur)
-        cur = None
-
-    for r in range(header_row + 1, detail_end + 1):
-        a_raw = _txt(cell(r, 1))
-        a = _norm_code(a_raw)
-        b = _txt(cell(r, 2))
-        budget = _num(cell(r, 3))
-        actual = _num(cell(r, 4))
-        vendor = _txt(cell(r, 6))
-        notes = _txt(cell(r, 7))
-        is_code = bool(CODE_RX.match(a_raw))
-        m = rows_meta[r]
-
-        # spacer / fully empty row
-        if not a and not b and budget is None and actual is None:
-            continue
-
-        if r in major_rows:
-            flush()
-            title = b or a or "(Category)"
-            cur = {
-                "title": title,
-                "rows": [],
-                "subtotal": {
-                    "budget": _round2(budget),
-                    "actual": _round2(actual),
-                    "variance": _round2((budget or 0.0) - (actual or 0.0)),
-                },
-            }
-            continue
-
-        if cur is None:
-            cur = {"title": "(Uncategorized)", "rows": [],
-                   "subtotal": {"budget": None, "actual": None, "variance": None}}
-
-        # SUB-ROLLUP (rollup but not major): sub-header inside category. Not summed.
-        if m["is_rollup"]:
-            cur["rows"].append({
-                "cost_code": a if is_code else "",
-                "description": b or a,
-                "budget": _round2(budget),
-                "actual": _round2(actual),
-                "variance": _round2((budget or 0.0) - (actual or 0.0)),
-                "vendor": vendor,
-                "notes": notes,
-                "is_subtotal": True,
-            })
-            continue
-
-        # LEAF cost line. Skip pure-noise (no money, no description, no code).
-        if (budget in (None, 0)) and (actual in (None, 0)) and not b:
-            continue
-        variance = None
-        if budget is not None or actual is not None:
-            variance = _round2((budget or 0.0) - (actual or 0.0))
-        cur["rows"].append({
-            "cost_code": a if is_code else "",
-            "description": b,
-            "budget": _round2(budget),
-            "actual": _round2(actual),
-            "variance": variance,
-            "vendor": vendor,
-            "notes": notes,
-            "is_subtotal": False,
-        })
-    flush()
-
-    groups = [g for g in groups
-              if g["rows"] or any(v not in (None, 0) for v in g["subtotal"].values())]
-
-    # ---- grand total from the summary band ("Total Construction Contract") ----
-    grand = {"budget": None, "actual": None, "variance": None, "label": ""}
-    if summary_row:
-        for r in range(summary_row, ws.max_row + 1):
-            lbl = _txt(cell(r, 2))
-            if lbl.lower().startswith("total construction contract"):
-                gb = _num(cell(r, 3))
-                ga = _num(cell(r, 4))
-                grand = {
-                    "label": lbl,
-                    "budget": _round2(gb),
-                    "actual": _round2(ga),
-                    "variance": _round2((gb or 0.0) - (ga or 0.0)),
-                }
-                break
-
-    return {
-        "job": job,
-        "name": name,
-        "location": location,
-        "groups": groups,
-        "grand_total": grand,
-        "source_file": "26-0330 POET Turnover Budget.xlsm",
-        "source_sheet": BUDGET_SHEET,
-    }
+    rec = _shared_parse(raw, sheet_name=BUDGET_SHEET,
+                        default_job=PROJECT_NUMBER, default_name=PROJECT_NAME)
+    # Preserve the original file label this builder always emitted.
+    rec["source_file"] = "26-0330 POET Turnover Budget.xlsm"
+    return rec
 
 
 # ---------------- invoice links ----------------
