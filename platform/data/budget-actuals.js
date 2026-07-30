@@ -159,7 +159,7 @@ window.PF_BUDGET_ACTUALS = {
         "5053": 0.0
       },
       "project material costs": {
-        "5110": 0.0,
+        "5110": 15774.91,
         "5120": 0.0,
         "5130": 0.0,
         "5190": 0.0
@@ -176,7 +176,7 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 450.0
       },
       "project equipment costs": {
-        "5405": 0.0,
+        "5405": 10240.0,
         "5410": 2418.44,
         "5420": 0.0,
         "5430": 1766.21,
@@ -247,7 +247,7 @@ window.PF_BUDGET_ACTUALS = {
         "5053": 0.0
       },
       "project material costs": {
-        "5110": 10756.87,
+        "5110": 34617.14,
         "5120": 0.0,
         "5130": 0.0,
         "5190": 0.0
@@ -264,7 +264,7 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 600.0
       },
       "project equipment costs": {
-        "5405": 11908.0,
+        "5405": 24803.0,
         "5410": 6081.23,
         "5420": 2474.72,
         "5430": 2924.47,
@@ -337,7 +337,7 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 1050.0
       },
       "project equipment costs": {
-        "5405": 0.0,
+        "5405": 7420.0,
         "5410": 3987.82,
         "5420": 324.47,
         "5430": 2356.06,
@@ -394,7 +394,7 @@ window.PF_BUDGET_ACTUALS = {
         "5053": 0.0
       },
       "project material costs": {
-        "5110": 0.0,
+        "5110": 8557.57,
         "5120": 0.0,
         "5130": 0.0,
         "5190": 0.0
@@ -410,7 +410,7 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 550.0
       },
       "project equipment costs": {
-        "5405": 0.0,
+        "5405": 14005.0,
         "5410": 1894.2,
         "5420": 141.41,
         "5430": 483.99,
@@ -467,7 +467,7 @@ window.PF_BUDGET_ACTUALS = {
         "5053": 4700.0
       },
       "project material costs": {
-        "5110": 4885.57,
+        "5110": 17278.75,
         "5120": 5045.25,
         "5130": 0.0,
         "5190": 0.0
@@ -483,7 +483,7 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 900.0
       },
       "project equipment costs": {
-        "5405": 2875.0,
+        "5405": 10250.0,
         "5410": 6118.12,
         "5420": 397.88,
         "5430": 1355.79,
@@ -540,7 +540,7 @@ window.PF_BUDGET_ACTUALS = {
         "5053": 5500.0
       },
       "project material costs": {
-        "5110": 0.0,
+        "5110": 14016.89,
         "5120": 0.0,
         "5130": 0.0,
         "5190": 0.0
@@ -556,7 +556,7 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 650.0
       },
       "project equipment costs": {
-        "5405": 4400.0,
+        "5405": 12040.0,
         "5410": 4699.87,
         "5420": 298.76,
         "5430": 1332.87,
@@ -613,7 +613,7 @@ window.PF_BUDGET_ACTUALS = {
         "5053": 5320.0
       },
       "project material costs": {
-        "5110": 0.0,
+        "5110": 15724.76,
         "5120": 0.0,
         "5130": 0.0,
         "5190": 0.0
@@ -630,7 +630,7 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 200.0
       },
       "project equipment costs": {
-        "5405": 0.0,
+        "5405": 2940.0,
         "5410": 1108.84,
         "5420": 0.0,
         "5430": 1130.09,
@@ -687,7 +687,7 @@ window.PF_BUDGET_ACTUALS = {
         "5053": 885.0
       },
       "project material costs": {
-        "5110": 0.0,
+        "5110": 4401.32,
         "5120": 0.0,
         "5130": 0.0,
         "5190": 0.0
@@ -704,7 +704,7 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 150.0
       },
       "project equipment costs": {
-        "5405": 0.0,
+        "5405": 6200.0,
         "5410": 1909.71,
         "5420": 0.0,
         "5430": 137.31,
@@ -761,7 +761,7 @@ window.PF_BUDGET_ACTUALS = {
         "5053": 5323.0
       },
       "project material costs": {
-        "5110": 9675.14,
+        "5110": 25676.3,
         "5120": 0.0,
         "5130": 0.0,
         "5190": 0.0
@@ -778,7 +778,7 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 750.0
       },
       "project equipment costs": {
-        "5405": 0.0,
+        "5405": 7215.0,
         "5410": 6852.59,
         "5420": 1017.24,
         "5430": 2909.64,
@@ -835,7 +835,7 @@ window.PF_BUDGET_ACTUALS = {
         "5053": 0.0
       },
       "project material costs": {
-        "5110": 0.0,
+        "5110": 10134.09,
         "5120": 0.0,
         "5130": 0.0,
         "5190": 0.0
@@ -852,7 +852,7 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 150.0
       },
       "project equipment costs": {
-        "5405": 0.0,
+        "5405": 11200.0,
         "5410": 4158.72,
         "5420": 0.0,
         "5500": 0.0
@@ -982,7 +982,7 @@ window.PF_BUDGET_ACTUALS = {
         "5053": 4518.0
       },
       "project material costs": {
-        "5110": 0.0,
+        "5110": 31727.2,
         "5120": 0.0,
         "5130": 0.0,
         "5190": 0.0
@@ -999,7 +999,7 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 1020.0
       },
       "project equipment costs": {
-        "5405": 1305.0,
+        "5405": 5580.0,
         "5410": 8507.96,
         "5420": 4800.0,
         "5430": 3944.69,
@@ -1042,7 +1042,7 @@ window.PF_BUDGET_ACTUALS = {
     },
     "actuals_by_group": {
       "general conditions oh": {
-        "5600": 0.0,
+        "5600": 525.33,
         "5710": 30.16,
         "5720": 0.0,
         "5730": 0.0,
@@ -1072,7 +1072,7 @@ window.PF_BUDGET_ACTUALS = {
       "project material costs": {
         "5110": 0.0,
         "5120": 0.0,
-        "5130": 0.0,
+        "5130": 28403.0,
         "5190": 0.0
       },
       "project labor costs": {
@@ -1141,7 +1141,7 @@ window.PF_BUDGET_ACTUALS = {
         "5053": 0.0
       },
       "project material costs": {
-        "5110": 365.99,
+        "5110": 41203.82,
         "5120": 0.0,
         "5130": 0.0,
         "5190": 0.0
@@ -1156,7 +1156,7 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 219.26
       },
       "project equipment costs": {
-        "5405": 2765.0,
+        "5405": 8565.0,
         "5410": 3496.0,
         "5430": 2232.35,
         "5500": 0.0
@@ -1229,7 +1229,7 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 600.0
       },
       "project equipment costs": {
-        "5405": 500.0,
+        "5405": 10630.0,
         "5410": 8699.94,
         "5420": 0.0,
         "5430": 4847.35,
@@ -1286,7 +1286,7 @@ window.PF_BUDGET_ACTUALS = {
         "5053": 5122.5
       },
       "project material costs": {
-        "5110": 0.0,
+        "5110": 27090.07,
         "5120": 0.0,
         "5130": 0.0,
         "5190": 0.0
@@ -1303,7 +1303,7 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 900.0
       },
       "project equipment costs": {
-        "5405": 1950.0,
+        "5405": 11860.0,
         "5410": 3390.94,
         "5420": 0.0,
         "5430": 4324.62,
@@ -1360,7 +1360,7 @@ window.PF_BUDGET_ACTUALS = {
         "5053": 0.0
       },
       "project material costs": {
-        "5110": 0.0,
+        "5110": 6469.44,
         "5120": 0.0,
         "5130": 0.0,
         "5190": 0.0
@@ -1377,7 +1377,7 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 150.0
       },
       "project equipment costs": {
-        "5405": 0.0,
+        "5405": 8925.0,
         "5410": 2480.1,
         "5420": 0.0,
         "5430": 0.0,
@@ -1434,7 +1434,7 @@ window.PF_BUDGET_ACTUALS = {
         "5053": 8602.0
       },
       "project material costs": {
-        "5110": 0.0,
+        "5110": 53914.21,
         "5120": 0.0,
         "5130": 0.0,
         "5190": 0.0
@@ -1451,7 +1451,7 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 1200.0
       },
       "project equipment costs": {
-        "5405": 4000.0,
+        "5405": 28930.0,
         "5410": 0.0,
         "5420": 2607.84,
         "5430": 5196.81,
@@ -1508,7 +1508,7 @@ window.PF_BUDGET_ACTUALS = {
         "5053": 3300.0
       },
       "project material costs": {
-        "5110": 2820.12,
+        "5110": 11088.58,
         "5120": 0.0,
         "5130": 0.0,
         "5190": 0.0
@@ -1525,7 +1525,7 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 0.0
       },
       "project equipment costs": {
-        "5405": 0.0,
+        "5405": 7395.0,
         "5410": 1880.43,
         "5420": 0.0,
         "5430": 0.0,
@@ -1582,7 +1582,7 @@ window.PF_BUDGET_ACTUALS = {
         "5053": 6098.0
       },
       "project material costs": {
-        "5110": 8603.32,
+        "5110": 37886.16,
         "5120": 0.0,
         "5130": 0.0,
         "5190": 0.0
@@ -1599,7 +1599,7 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 0.0
       },
       "project equipment costs": {
-        "5405": 2100.0,
+        "5405": 7660.0,
         "5410": 9241.38,
         "5420": 0.0,
         "5430": 5822.71,
@@ -1730,9 +1730,9 @@ window.PF_BUDGET_ACTUALS = {
         "5053": 0.0
       },
       "project material costs": {
-        "5110": 0.0,
+        "5110": 5149.58,
         "5120": 0.0,
-        "5130": 0.0,
+        "5130": 20287.8,
         "5190": 0.0
       },
       "project labor costs": {
@@ -1747,7 +1747,7 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 0.0
       },
       "project equipment costs": {
-        "5405": 0.0,
+        "5405": 20135.0,
         "5410": 2192.89,
         "5420": 0.0,
         "5430": 0.0,
@@ -1804,7 +1804,7 @@ window.PF_BUDGET_ACTUALS = {
         "5053": 2850.0
       },
       "project material costs": {
-        "5110": 0.0,
+        "5110": 3690.59,
         "5120": 0.0,
         "5130": 0.0,
         "5190": 0.0
@@ -1821,7 +1821,7 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 0.0
       },
       "project equipment costs": {
-        "5405": 850.0,
+        "5405": 8665.0,
         "5410": 2219.94,
         "5420": 0.0,
         "5430": 0.0,
@@ -1952,7 +1952,7 @@ window.PF_BUDGET_ACTUALS = {
         "5053": 0.0
       },
       "project material costs": {
-        "5110": 0.0,
+        "5110": 12519.8,
         "5120": 0.0,
         "5130": 0.0,
         "5190": 0.0
@@ -1969,7 +1969,7 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 0.0
       },
       "project equipment costs": {
-        "5405": 2440.0,
+        "5405": 9315.0,
         "5410": 2736.29,
         "5420": 0.0,
         "5430": 693.67,
@@ -2141,8 +2141,8 @@ window.PF_BUDGET_ACTUALS = {
     "grand_total": {
       "label": "Total Construction Contract",
       "budget": 68200.0,
-      "actual": 19242.0,
-      "variance": 48958.0
+      "actual": 19680.43,
+      "variance": 48519.57
     },
     "actuals_by_group": {
       "general conditions oh": {
@@ -2191,10 +2191,10 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 0.0
       },
       "project equipment costs": {
-        "5405": 0.0,
+        "5405": 7020.0,
         "5410": 0.0,
         "5420": 0.0,
-        "5430": 0.0,
+        "5430": 438.43,
         "5500": 0.0
       },
       "project incentives contingencies": {
@@ -2322,7 +2322,7 @@ window.PF_BUDGET_ACTUALS = {
         "5053": 0.0
       },
       "project material costs": {
-        "5110": 11374.56,
+        "5110": 45534.34,
         "5120": 0.0,
         "5130": 0.0,
         "5190": 0.0
@@ -2339,7 +2339,7 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 0.0
       },
       "project equipment costs": {
-        "5405": 1470.0,
+        "5405": 6815.0,
         "5410": 4064.29,
         "5420": 0.0,
         "5430": 900.0,
@@ -2413,7 +2413,7 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 0.0
       },
       "project equipment costs": {
-        "5405": 250.0,
+        "5405": 12950.0,
         "5410": 2250.0,
         "5420": 0.0,
         "5430": 900.0,
@@ -2441,7 +2441,7 @@ window.PF_BUDGET_ACTUALS = {
     }
   },
   "_meta": {
-    "generated": "2026-07-30T13:57:42.500504Z",
+    "generated": "2026-07-30T14:08:02.617992Z",
     "source": "Turnover Budget workbooks (sheet 'Budget vs Actual') via MS Graph. QuickBooks-independent.",
     "jobs": 42,
     "ok_count": 31,

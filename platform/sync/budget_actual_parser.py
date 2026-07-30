@@ -265,9 +265,15 @@ def leaf_actuals_by_code(record):
     """Flatten a parsed record into { normalized_group_title: { cost_code: actual } }
     for the LEAF rows only (is_subtotal False, has a cost_code, actual not None).
     Used by the portal overlay to place each workbook Actual onto the matching
-    template row (match on group-title + cost_code). Also returns a flat
-    { cost_code: actual } and the list of leaves with a code but NO actual match
-    would be handled by the caller; here we only emit what the workbook HAS."""
+    template row (match on group-title + cost_code).
+
+    CRITICAL: a cost code can REPEAT within a group (e.g. 5405 appears 3x under
+    Equipment: VSC Rig / Predrill / Fall-Off). We SUM all rows sharing a
+    (group,code) so the overlaid per-code total equals the workbook — an earlier
+    overwrite dropped all but the last row and undercounted the grand Actual.
+    Returns (by_group, flat) where flat is { cost_code: summed_actual } across all
+    groups. The portal places this per-(group,code) SUM on the first matching
+    template row for that (group,code) so the grand total reconciles exactly."""
     by_group = {}
     flat = {}
     for g in record.get("groups", []):
@@ -279,9 +285,9 @@ def leaf_actuals_by_code(record):
             actual = row.get("actual")
             if not code or actual is None:
                 continue
-            by_group.setdefault(gt, {})[code] = actual
-            # flat map: if a code repeats across groups, sum (portal matches by group anyway)
-            flat[code] = round((flat.get(code, 0.0) + actual), 2)
+            grp = by_group.setdefault(gt, {})
+            grp[code] = round(grp.get(code, 0.0) + actual, 2)   # SUM repeats, don't overwrite
+            flat[code] = round(flat.get(code, 0.0) + actual, 2)
     return by_group, flat
 
 
