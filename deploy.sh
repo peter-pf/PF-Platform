@@ -39,6 +39,22 @@ done
 
 cd "$REPO"
 
+# SAFETY GUARD (2026-07-30): the budget_actuals_daemon was accidentally auto-started
+# by the watchdog and deployed STAGED code to production, because deploy.sh silently
+# maps any non-'main|website-build-*' --branch to main. The (still-running, cannot-be-
+# killed) daemon invokes deploy.sh with '--branch budget-actuals-sync-20260730'. We
+# block ONLY that invocation while the STOP sentinel exists, so the daemon can no
+# longer publish, while normal deploys to main are unaffected.
+for _a in "$@"; do
+  case "$_a" in
+    budget-actuals-*)
+      if [ -f "/home/aiciv/tools/.budget-actuals-daemon-STOP" ]; then
+        echo "  X DEPLOY BLOCKED: budget-actuals staging hold (STOP sentinel present)." >&2
+        exit 3
+      fi ;;
+  esac
+done
+
 echo "============================================================"
 echo " PF DEPLOY GATE"
 echo "============================================================"
