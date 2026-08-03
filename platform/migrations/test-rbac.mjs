@@ -1090,16 +1090,21 @@ ok('requireArea(field_ops, daily-report area) => null (CREW READ+WRITE allowed)'
 ok('requireArea(null, daily-report area) => 403 (fail closed)',
    requireArea(null, areaForPath('/api/daily-report'))?.status === 403);
 
-section('Field daily reports: source-level guards + approval tier + NO mail/money');
+section('Field daily reports: source-level guards + approval tier REMOVED + NO mail/money');
 {
   const src = readFileSync(join(__dir, '../functions/api/daily-report.js'), 'utf8');
   ok('daily-report imports requireArea', /import\s*\{[^}]*requireArea[^}]*\}\s*from/.test(src));
   ok('daily-report GET+POST guard field_ops', (src.match(/requireArea\([^)]*['"]field_ops['"]\)/g) || []).length >= 2);
-  ok('daily-report restricts approve/send-to-hr to privileged', /PRIVILEGED_ACTIONS\s*=\s*\{\s*approve/.test(src) && /isPrivileged\(session\)/.test(src));
+  // The OLD in-platform approval queue (approve/send-to-hr STATUS transitions +
+  // a privileged approval tier) was REMOVED per Derek's 2026-07 submit-flow spec.
+  // These assertions guard that the removed tier stays removed: there must be NO
+  // approval-role gate left in the handler (field_ops write access is gated by
+  // requireArea above, which is the real live access control).
+  ok('daily-report has NO privileged approval tier (approve action removed)', !/PRIVILEGED_ACTIONS\s*=\s*\{\s*approve/.test(src) && !/\bisPrivileged\s*\(/.test(src));
   ok('daily-report uses env.PF_SCHEDULE', /env\.PF_SCHEDULE/.test(src));
   ok('daily-report sets submittedBy from session', /submittedBy\s*=\s*who/.test(src));
   ok('daily-report documents the KV read-modify-write race', /read-modify-write/.test(src));
-  ok('daily-report send-to-hr is status only (no email noted)', /STATUS ONLY|no email/i.test(src));
+  ok('daily-report has NO send-to-hr approval-status action (removed)', !/['"]send-to-hr['"]/.test(src.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n')));
   const noComments = src.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
   ok('daily-report makes NO fetch / outbound call', !/\bfetch\s*\(/.test(noComments) && !/https?:\/\//.test(noComments));
   ok('daily-report calls NO mail API', !/sendMail|\/messages|smtp|nodemailer|mailgun|sendgrid/i.test(noComments));
