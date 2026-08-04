@@ -2127,10 +2127,20 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 .ba-kpi-value { font-size: 1.15rem; font-weight: 700; color: var(--text-1); margin-top: 3px; }
 /* The Budget vs Actual table now carries 7 columns (added Vendor/Supplier + Notes).
    Let the wrapper scroll horizontally on narrow viewports rather than reflowing the
-   whole project record, and give the table a min-width so the columns don't crush.
-   (A wider .pr-root record page is a separate visual call — see note for Brad.) */
+   whole project record, and give the table a min-width so the columns don't crush. */
 .ba-table-wrap { width: 100%; overflow-x: auto; }
-.ba-table { width: 100%; min-width: 880px; border-collapse: collapse; background: var(--bg-0);
+/* WIDEN FINANCIALS ONLY: inside a project record (.pr-root, max-width 1100px) let the
+   Budget vs Actual table break OUT of the narrow record column so the Notes column can
+   breathe, WITHOUT touching the narrower cards above it. Centered breakout, clamped to
+   the viewport so it never overflows the page; overflow-x still scrolls on small screens.
+   The standalone .ba-wrap view (#baRoot) is intentionally NOT widened (stays in .ba-wrap). */
+.pr-root .ba-table-wrap {
+  width: min(1440px, 94vw);
+  max-width: 94vw;
+  margin-left: 50%;
+  transform: translateX(-50%);
+}
+.ba-table { width: 100%; min-width: 1040px; border-collapse: collapse; background: var(--bg-0);
   border: 1px solid var(--border-light); border-radius: var(--radius); overflow: hidden;
   font-size: 0.85rem; }
 .ba-table th { text-align: left; font-size: 0.7rem; font-weight: 600; color: var(--text-3);
@@ -2156,8 +2166,8 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 /* Vendor/Supplier + Notes mirror Excel col F/G. Long notes WRAP (never truncate);
    vendor wraps too but is narrower. vertical-align:top (inherited from .ba-table td)
    keeps wrapped multi-line cells aligned with the row. */
-.ba-table td.ba-vendor { color: var(--text-2); white-space: normal; word-break: break-word; max-width: 200px; }
-.ba-table td.ba-rownotes { color: var(--text-3); font-size: 0.78rem; white-space: normal; word-break: break-word; max-width: 320px; }
+.ba-table td.ba-vendor { color: var(--text-2); white-space: normal; word-break: break-word; max-width: 260px; }
+.ba-table td.ba-rownotes { color: var(--text-3); font-size: 0.78rem; white-space: normal; word-break: break-word; max-width: 520px; }
 .ba-grand td { background: var(--bg-2); font-weight: 800; color: var(--text-0);
   border-top: 2px solid var(--border); font-size: 0.92rem; }
 
