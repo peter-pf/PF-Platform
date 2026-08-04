@@ -2127,19 +2127,20 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 .ba-kpi-value { font-size: 1.15rem; font-weight: 700; color: var(--text-1); margin-top: 3px; }
 /* The Budget vs Actual table now carries 7 columns (added Vendor/Supplier + Notes).
    Let the wrapper scroll horizontally on narrow viewports rather than reflowing the
-   whole project record, and give the table a min-width so the columns don't crush. */
+   whole project record, and give the table a min-width so the columns don't crush.
+   (A wider .pr-root record page is a separate visual call — see note for Brad.) */
 .ba-table-wrap { width: 100%; overflow-x: auto; }
-/* WIDEN FINANCIALS ONLY: inside a project record (.pr-root, max-width 1100px) let the
-   Budget vs Actual table break OUT of the narrow record column so the Notes column can
-   breathe, WITHOUT touching the narrower cards above it. Centered breakout, clamped to
-   the viewport so it never overflows the page; overflow-x still scrolls on small screens.
-   The standalone .ba-wrap view (#baRoot) is intentionally NOT widened (stays in .ba-wrap). */
-.pr-root .ba-table-wrap {
-  width: min(1440px, 94vw);
-  max-width: 94vw;
-  margin-left: 50%;
-  transform: translateX(-50%);
-}
+/* Financials widen (Option B, left-anchored, un-clippable). ONLY the project-record
+   Budget vs Actual wrapper grows — scoped to .pr-root so the standalone budget editor
+   view keeps width:100%. The wrap's LEFT edge stays at the record column's normal left
+   edge (after the 240px sidebar + 24px main padding); it grows ONLY rightward.
+   width = viewport minus sidebar minus (24 left + 24 right main padding), so the right
+   edge lands at exactly viewport-24px and can NEVER pass the window. NO transform, NO
+   negative margin, NO centered breakout (that was the earlier clipping bug). Clamped to
+   1560px so it does not get absurdly wide on ultrawide screens. If the table is still
+   wider than this space, overflow-x:auto gives a SCROLLBAR — it never clips a column.
+   Tune width via the 1560px cap. */
+.pr-root .ba-table-wrap { width: calc(100vw - var(--sidebar-w) - 48px); max-width: 1560px; }
 .ba-table { width: 100%; min-width: 1040px; border-collapse: collapse; background: var(--bg-0);
   border: 1px solid var(--border-light); border-radius: var(--radius); overflow: hidden;
   font-size: 0.85rem; }
@@ -2166,8 +2167,12 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 /* Vendor/Supplier + Notes mirror Excel col F/G. Long notes WRAP (never truncate);
    vendor wraps too but is narrower. vertical-align:top (inherited from .ba-table td)
    keeps wrapped multi-line cells aligned with the row. */
-.ba-table td.ba-vendor { color: var(--text-2); white-space: normal; word-break: break-word; max-width: 260px; }
-.ba-table td.ba-rownotes { color: var(--text-3); font-size: 0.78rem; white-space: normal; word-break: break-word; max-width: 520px; }
+.ba-table td.ba-vendor { color: var(--text-2); white-space: normal; word-break: break-word; overflow: visible; max-width: 260px; }
+/* Notes: generous width so most notes read on 1-2 lines, but white-space:normal +
+   word-break:break-word means they ALWAYS wrap fully and show EVERY character — no
+   truncation, no ellipsis, no fixed height. min-width lets short-ish notes claim the
+   room instead of collapsing. Tune readability via max-width here. */
+.ba-table td.ba-rownotes { color: var(--text-3); font-size: 0.78rem; white-space: normal; word-break: break-word; overflow: visible; min-width: 260px; max-width: 600px; }
 .ba-grand td { background: var(--bg-2); font-weight: 800; color: var(--text-0);
   border-top: 2px solid var(--border); font-size: 0.92rem; }
 
