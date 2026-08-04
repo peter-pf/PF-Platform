@@ -202,10 +202,23 @@ export async function onRequestPost(context) {
 
     const rec = await loadBudget(env, num);
 
-    // Per-code merge (KV read-modify-write; single-writer acceptable for a project
+    // Per-ROW merge (KV read-modify-write; single-writer acceptable for a project
     // budget edited by one office user at a time -- same known limitation as
     // daily-report/project-override; a D1 migration is the durable fix).
-    const merged = Object.assign({}, rec.rows, delta);
+    //
+    // PRESERVE vendor/notes: those fields (Excel col F/G) are populated by the
+    // budget SYNC (write_budget_column.py), NOT by this office edit form. A naive
+    // whole-row replace (Object.assign row objects) would DROP them on every budget
+    // save. We merge field-by-field: the incoming delta sets budget + cost_code,
+    // but any existing vendor/notes on that row are carried forward untouched.
+    const merged = Object.assign({}, rec.rows);
+    for (const rowKey of Object.keys(delta)) {
+      const prev = (merged[rowKey] && typeof merged[rowKey] === 'object') ? merged[rowKey] : {};
+      const next = Object.assign({}, prev, delta[rowKey]); // budget + cost_code win
+      if (typeof prev.vendor === 'string') next.vendor = prev.vendor; // never dropped by a budget save
+      if (typeof prev.notes === 'string') next.notes = prev.notes;
+      merged[rowKey] = next;
+    }
     rec.rows = merged;
 
     if (Object.keys(rec.rows).length > MAX_ROWS) {

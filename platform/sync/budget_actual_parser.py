@@ -82,6 +82,91 @@ def _norm_code(a):
     return a
 
 
+# A leaf Actual cell (col D) is frequently a PLAIN ARITHMETIC sum entered by the
+# invoice-coding workflow, e.g. "=1050+3230", "=2466.44+2062.21+4171.29", "=500".
+# These are the running total of that line's coded invoices. openpyxl can only read
+# the CACHED result, which goes stale after any openpyxl write (same trap as the
+# Budget col). But because the formula is pure arithmetic over numeric literals, we
+# can EVALUATE it directly from the formula string — no Excel, no stale cache. This
+# regex admits ONLY digits, dot, and + - * / ( ) and whitespace (NO cell refs, NO
+# names, NO functions) so it is safe to eval. A formula with a cell ref (=D6+D9),
+# a SUM(), or anything else returns None here (we then fall back to the cached value,
+# or leave it blank — never fabricate).
+_ARITH_ACTUAL_RX = re.compile(r"^=[0-9.+\-*/() ]+$")
+
+
+def _eval_arith_formula(f):
+    """Return the float value of a pure-arithmetic Excel formula string (e.g.
+    '=1050+3230'), or None if the formula is not a safe literal-only arithmetic
+    expression. Used to recover a leaf Actual that Excel has not cached (stale)."""
+    if not isinstance(f, str):
+        return None
+    s = f.strip()
+    if not s.startswith("=") or not _ARITH_ACTUAL_RX.match(s.replace(" ", "")):
+        return None
+    expr = s[1:].strip()
+    if expr == "":
+        return None
+    try:
+        # literal-only arithmetic; the regex has already excluded names/refs/calls.
+        val = eval(expr, {"__builtins__": {}}, {})  # noqa: S307 - constrained input
+        if isinstance(val, (int, float)):
+            return float(val)
+    except (SyntaxError, ZeroDivisionError, TypeError, ValueError):
+        return None
+    return None
+
+
+# ---- BOOKED-ACTUAL (GREEN) fill gate ----------------------------------------
+# Brad's rule (feedback-portal-actuals-green-only): a col-D Actual is a REAL cost
+# ONLY when its cell carries the GREEN booked-actual fill (a real invoice was
+# received + coded). YELLOW (FFFF00) is a placeholder Peter has not yet replaced
+# with a real invoice — it must NEVER be pulled as an actual. Any other fill /
+# no-fill is likewise NOT a booked actual. Fail-safe: only confirmed green pulls;
+# ambiguous -> EXCLUDE. A row can thus have a budget but a blank actual (invoice
+# not yet received) — that is correct.
+#
+# The green on the coded cells (verified on 26-002 5405 D104/D106/D108) is the
+# Excel theme color theme=9 tint≈0.8 (light green), which resolves to ~E2EFDA.
+# We match BOTH the theme+tint signature AND the resolved-RGB E2EFDA family so the
+# gate survives a workbook that stores the same green as an explicit RGB.
+_GREEN_THEME = 9
+_GREEN_TINT = 0.8
+_GREEN_TINT_TOL = 0.08
+# E2EFDA and close neighbors (light green booked-actual). Compared loosely so a
+# minor palette drift still matches, while YELLOW (FFFF00) and greys never do.
+_GREEN_RGB_PREFIXES = ("E2EFDA", "C6E0B4", "D9EAD3", "E2F0D9")
+
+
+def _is_booked_green(cell):
+    """Return True IFF this cell's fill is the GREEN booked-actual fill. Yellow
+    (FFFF00), grey/blue theme bands, and no-fill all return False (fail-safe)."""
+    try:
+        fill = cell.fill
+        if fill is None or fill.patternType != "solid":
+            return False
+        fg = fill.fgColor
+        # theme-based green (the observed booked-actual style): theme 9 + tint ~0.8
+        if getattr(fg, "type", None) == "theme":
+            if getattr(fg, "theme", None) == _GREEN_THEME:
+                tint = getattr(fg, "tint", 0.0) or 0.0
+                if abs(tint - _GREEN_TINT) <= _GREEN_TINT_TOL:
+                    return True
+            return False  # any other theme (grey/blue bands) is NOT booked-actual
+        # explicit-RGB green (some workbooks store the fill as RGB, not theme)
+        rgb = getattr(fg, "rgb", None)
+        if isinstance(rgb, str) and len(rgb) >= 6:
+            hex6 = rgb[-6:].upper()
+            if hex6 in ("FFFF00", "FFFFFF00"[-6:]):  # explicit yellow -> never
+                return False
+            for pre in _GREEN_RGB_PREFIXES:
+                if hex6 == pre:
+                    return True
+        return False
+    except Exception:  # noqa: BLE001 - any fill-read oddity -> fail-safe exclude
+        return False
+
+
 def parse_budget_actual(raw_bytes, sheet_name="Budget vs Actual",
                         default_job="", default_name=""):
     """Parse a Turnover Budget workbook's Budget-vs-Actual sheet from raw bytes.
@@ -213,17 +298,38 @@ def parse_budget_actual(raw_bytes, sheet_name="Budget vs Actual",
             })
             continue
 
-        # LEAF cost line. Skip pure-noise.
-        if (budget in (None, 0)) and (actual in (None, 0)) and not b:
+        # LEAF cost line. Recover a STALE Actual (col D) from its arithmetic formula
+        # when Excel has not cached the value. The invoice-coding workflow enters
+        # per-line actuals as pure sums ("=1050+3230"); these are safe to evaluate
+        # from the formula string, so the per-row Actual survives an openpyxl re-stale
+        # (same defense the budget col needs but can't have — budget refs other
+        # sheets). Only fill from the formula when the cached value is missing; a
+        # cached value always wins (it IS Excel's own result).
+        actual_leaf = actual
+        if actual_leaf is None:
+            actual_leaf = _round2(_eval_arith_formula(fmla(r, 4)))
+
+        # GREEN-ONLY GATE (Brad, feedback-portal-actuals-green-only): a col-D value is
+        # a REAL booked actual ONLY when the cell has the green booked-actual fill.
+        # YELLOW (FFFF00) placeholders and any non-green/no-fill are NOT confirmed
+        # costs -> the row's actual is BLANK (None). Fail-safe: ambiguous excludes.
+        # The gate applies to BOTH the cached value and the formula-recovered value
+        # (a yellow cell can still hold a cached/typed number — never pull it).
+        if actual_leaf is not None and not _is_booked_green(wsf.cell(row=r, column=4)):
+            actual_leaf = None  # not booked-green -> no confirmed actual for this row
+        if actual_leaf is not None:
+            had_cached = True   # we have a real, GREEN-confirmed per-row actual
+        # Skip pure-noise.
+        if (budget in (None, 0)) and (actual_leaf in (None, 0)) and not b:
             continue
         variance = None
-        if budget is not None or actual is not None:
-            variance = _round2((budget or 0.0) - (actual or 0.0))
+        if budget is not None or actual_leaf is not None:
+            variance = _round2((budget or 0.0) - (actual_leaf or 0.0))
         cur["rows"].append({
             "cost_code": a if is_code else "",
             "description": b,
             "budget": _round2(budget),
-            "actual": _round2(actual),
+            "actual": _round2(actual_leaf),
             "variance": variance,
             "vendor": vendor,
             "notes": notes,

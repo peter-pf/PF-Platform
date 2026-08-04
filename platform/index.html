@@ -2125,7 +2125,12 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 .ba-kpi-label { font-size: 0.7rem; font-weight: 600; color: var(--text-3);
   text-transform: uppercase; letter-spacing: 0.03em; }
 .ba-kpi-value { font-size: 1.15rem; font-weight: 700; color: var(--text-1); margin-top: 3px; }
-.ba-table { width: 100%; border-collapse: collapse; background: var(--bg-0);
+/* The Budget vs Actual table now carries 7 columns (added Vendor/Supplier + Notes).
+   Let the wrapper scroll horizontally on narrow viewports rather than reflowing the
+   whole project record, and give the table a min-width so the columns don't crush.
+   (A wider .pr-root record page is a separate visual call — see note for Brad.) */
+.ba-table-wrap { width: 100%; overflow-x: auto; }
+.ba-table { width: 100%; min-width: 880px; border-collapse: collapse; background: var(--bg-0);
   border: 1px solid var(--border-light); border-radius: var(--radius); overflow: hidden;
   font-size: 0.85rem; }
 .ba-table th { text-align: left; font-size: 0.7rem; font-weight: 600; color: var(--text-3);
@@ -2148,8 +2153,11 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 .ba-inv a:hover { text-decoration: underline; }
 .ba-inv .ba-inv-file::before { content: "\1F4C4"; margin-right: 3px; }
 .ba-inv .ba-inv-folder::before { content: "\1F4C1"; margin-right: 3px; }
-.ba-vendor { color: var(--text-2); }
-.ba-rownotes { color: var(--text-3); font-size: 0.78rem; }
+/* Vendor/Supplier + Notes mirror Excel col F/G. Long notes WRAP (never truncate);
+   vendor wraps too but is narrower. vertical-align:top (inherited from .ba-table td)
+   keeps wrapped multi-line cells aligned with the row. */
+.ba-table td.ba-vendor { color: var(--text-2); white-space: normal; word-break: break-word; max-width: 200px; }
+.ba-table td.ba-rownotes { color: var(--text-3); font-size: 0.78rem; white-space: normal; word-break: break-word; max-width: 320px; }
 .ba-grand td { background: var(--bg-2); font-weight: 800; color: var(--text-0);
   border-top: 2px solid var(--border); font-size: 0.92rem; }
 
@@ -12237,7 +12245,12 @@ try {
       // via data/budget-actuals.js). ctx.rec === null -> no synced actuals for this
       // project: render Actual/Variance as a DASH (fail closed, never a fake 0).
       var actCtx = baActualsCtx(num);
-      var hasActuals = !!(actCtx && actCtx.rec);
+      // Actuals are available when EITHER the daemon feed has this project OR any
+      // per-row KV actual exists (a budget-stale job can have per-row col D actuals
+      // recovered by the sync with no daemon feed). Drives group/grand dash vs total.
+      var hasPerRowActual = false;
+      for (var _rk in savedRows){ if (savedRows[_rk] && typeof savedRows[_rk].actual === 'number'){ hasPerRowActual = true; break; } }
+      var hasActuals = !!(actCtx && actCtx.rec) || hasPerRowActual;
       T.groups.forEach(function(g, gi){
         var gB = 0, gA = 0;
         var rowsHtml = '';
@@ -12253,9 +12266,33 @@ try {
           } else {
             budget = Number(r.budget) || 0;
           }
-          // Overlay the workbook actual for this (group,code); null when unsynced.
-          var actualRaw = (!isSub) ? baActualForRow(actCtx, g.title, code) : (hasActuals ? 0 : null);
-          var actual = (actualRaw === null) ? null : (Number(actualRaw) || 0);
+          // Vendor / Supplier (Excel col F) and Notes (col G) mirror the workbook per
+          // row. They live on the PER-PROJECT saved KV row (savedRows[rowKey]); the
+          // shared template row (r) is always blank, so prefer the saved value and
+          // fall back to the template only if a value is ever present there. Shown
+          // verbatim, HTML-escaped via E(). Blank when neither carries a value.
+          var sv = savedRows[rowKey] || {};
+          var vendorVal = (typeof sv.vendor === 'string' && sv.vendor) ? sv.vendor : (r.vendor || '');
+          var notesVal  = (typeof sv.notes  === 'string' && sv.notes ) ? sv.notes  : (r.notes  || '');
+          // ACTUAL for this row. PER-ROW KV actual (savedRows[rowKey].actual, from
+          // the Turnover Budget col D captured per row_key) WINS when present — this
+          // breaks out a cost code that repeats across rows (e.g. 5405 VSC Rig /
+          // Predrill / Fall Off), so each sub-line shows its OWN actual aligned with
+          // its OWN budget. When a row has no per-row KV actual we FALL BACK to the
+          // daemon feed's (group,code) sum via baActualForRow (single-row codes are
+          // unchanged; the fallback still covers rows the per-row sync hasn't filled).
+          // Fail closed: null (dash) when neither source has a value.
+          var perRowActual = (!isSub && typeof sv.actual === 'number' && isFinite(sv.actual)) ? sv.actual : null;
+          var actual;
+          if (perRowActual !== null) {
+            actual = perRowActual;
+            // Consume the daemon (group,code) slot too so a same-code fallback row
+            // below doesn't then receive the daemon LUMP for this code.
+            if (actCtx) baActualForRow(actCtx, g.title, code);
+          } else {
+            var actualRaw = (!isSub) ? baActualForRow(actCtx, g.title, code) : (hasActuals ? 0 : null);
+            actual = (actualRaw === null) ? null : (Number(actualRaw) || 0);
+          }
           // Variance is a dash when actual is unknown (fail closed), else budget-actual.
           var variance = (actual === null) ? null : (budget - actual);
           if (!isSub && code) { gB += budget; if (actual !== null) gA += actual; }
@@ -12276,8 +12313,8 @@ try {
             + '<td class="num">' + budCell + '</td>'
             + '<td class="num">' + baActualCell(actual, num, g.title, code) + '</td>'
             + '<td class="num">' + baVarCell(variance) + '</td>'
-            + '<td>' + E(r.vendor || '') + '</td>'
-            + '<td>' + E(r.notes || '') + '</td>'
+            + '<td class="ba-vendor">' + E(vendorVal) + '</td>'
+            + '<td class="ba-rownotes">' + E(notesVal) + '</td>'
             + '</tr>';
         });
         grandB += gB; grandA += gA;
@@ -12360,9 +12397,16 @@ try {
       var bud = _curBudget || { rows:{}, error:'unreachable' };
       var savedRows = (!bud.error && bud.rows && typeof bud.rows === 'object') ? bud.rows : {};
       var hadErr = !!bud.error; // saved budgets not trustworthy -> totals reflect template only
-      // Overlay real workbook actuals (same (group,code) rule as baRenderTable).
+      // Overlay real workbook actuals with the SAME per-row-wins rule as
+      // baRenderTable so the roll-up total equals the table total: a per-row KV
+      // actual (savedRows[rowKey].actual) wins; else the daemon (group,code) sum.
       var actCtx = baActualsCtx(num);
-      var actualsOk = !!(actCtx && actCtx.rec);
+      var daemonOk = !!(actCtx && actCtx.rec);
+      // Per-row KV actuals are themselves a valid actuals source (e.g. a budget-stale
+      // job whose col D was arithmetic-recovered per row but has no daemon feed).
+      var hasPerRowActual = false;
+      for (var _k in savedRows){ if (savedRows[_k] && typeof savedRows[_k].actual === 'number'){ hasPerRowActual = true; break; } }
+      var actualsOk = daemonOk || hasPerRowActual;
       var gB = 0, gA = 0;
       T.groups.forEach(function(g, gi){
         (g.rows || []).forEach(function(r, ri){
@@ -12371,7 +12415,13 @@ try {
           if (savedRows[rowKey] && typeof savedRows[rowKey].budget === 'number') budget = savedRows[rowKey].budget;
           else budget = Number(r.budget) || 0;
           gB += budget;
-          if (actualsOk) { var av = baActualForRow(actCtx, g.title, r.cost_code); gA += (Number(av) || 0); }
+          var sv = savedRows[rowKey] || {};
+          if (typeof sv.actual === 'number' && isFinite(sv.actual)) {
+            gA += sv.actual;
+            if (daemonOk) baActualForRow(actCtx, g.title, r.cost_code); // consume the daemon slot
+          } else if (daemonOk) {
+            gA += (Number(baActualForRow(actCtx, g.title, r.cost_code)) || 0);
+          }
         });
       });
       // actual is null when no synced actuals -> roll-up shows a dash (fail closed).
