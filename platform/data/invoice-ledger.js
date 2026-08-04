@@ -98,7 +98,7 @@ window.PF_INVOICE_LEDGER = {
           "invoice_no": "11309",
           "amount": 2045.0,
           "item_id": "016ISVH632PDCXVLNFLJFL6BHDBMZS73S6",
-          "note": "VSC Rig Mob",
+          "note": "VSC Rig Mob - JD 350G #PF350, Schaaf CPA Westfield IN. Coded D104, Brad approved 8/3",
           "webUrl": "https://pierfoundations.sharepoint.com/sites/pf/Shared%20Documents/04%20-%20Project%20Management/02%20-%20Projects/26-002%20-%20POET%20Projects%20-%20POET/02%20-%20Project%20Management/Expenses/Stephan%20Trucking%20INV%2011309%20-%202026-07-31%20-%2026-002-5405%20VSC%20Rig%20Mob.pdf",
           "file": "Stephan Trucking INV 11309 - 2026-07-31 - 26-002-5405 VSC Rig Mob.pdf"
         },
@@ -108,22 +108,12 @@ window.PF_INVOICE_LEDGER = {
           "invoice_no": "11310",
           "amount": 1315.0,
           "item_id": "016ISVH62Q4QRFWRN6D5FJ5VLBW56L5XTS",
-          "note": "Predrill Sany Mob",
+          "note": "Predrill Sany SY365 - rig move Schaaf Westfield IN. Coded D106, Brad approved 8/3",
           "webUrl": "https://pierfoundations.sharepoint.com/sites/pf/Shared%20Documents/04%20-%20Project%20Management/02%20-%20Projects/26-002%20-%20POET%20Projects%20-%20POET/02%20-%20Project%20Management/Expenses/Stephan%20Trucking%20INV%2011310%20-%202026-07-31%20-%2026-002-5405%20Predrill%20Sany%20Mob.pdf",
           "file": "Stephan Trucking INV 11310 - 2026-07-31 - 26-002-5405 Predrill Sany Mob.pdf"
-        },
-        {
-          "vendor": "Stephan Trucking Group Inc.",
-          "date": "2026-07-31",
-          "invoice_no": "11320",
-          "amount": 1195.0,
-          "item_id": "016ISVH664BP52LV4MPJFJEMP5WOXPITN4",
-          "note": "Gooseneck-Hotshot (PENDING sub-row confirm; not yet posted to workbook)",
-          "webUrl": "https://pierfoundations.sharepoint.com/sites/pf/Shared%20Documents/04%20-%20Project%20Management/02%20-%20Projects/26-002%20-%20POET%20Projects%20-%20POET/02%20-%20Project%20Management/Expenses/Stephan%20Trucking%20INV%2011320%20-%202026-07-31%20-%2026-002-5405%20Gooseneck-Hotshot%20(PENDING%20sub-row%20confirm).pdf",
-          "file": "Stephan Trucking INV 11320 - 2026-07-31 - 26-002-5405 Gooseneck-Hotshot (PENDING sub-row confirm).pdf"
         }
       ],
-      "total": 4555.0
+      "total": 3360.0
     }
   },
   "26-015": {
@@ -220,7 +210,7 @@ window.PF_INVOICE_LEDGER = {
   },
   "_meta": {
     "version": 1,
-    "generated": "2026-08-04T11:50:32.225330Z",
+    "generated": "2026-08-04T11:58:55.052878Z",
     "source": "Backfilled from each project's Turnover Budget workbook (col D Actual formula + col F vendor + col G notes) and the SharePoint '02 - Project Management/Expenses' PDFs. Key = '<normalized group title>|<cost_code>' \u2014 matches the portal's actuals overlay so a Budget-vs-Actual row maps 1:1 to its invoices. Amounts are the CODED amounts (system of record), not raw PDF line totals.",
     "note": "Per (job, group, cost_code): the invoices coded there + their summed total; total reconciles to the workbook Actual for that (group,code). No fabrication.",
     "jobs": [

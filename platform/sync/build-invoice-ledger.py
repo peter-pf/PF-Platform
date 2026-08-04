@@ -122,17 +122,21 @@ BACKFILL = {
         ],
     },
     "26-002": {
-        # NOTE: these 3 Stephan PDFs are FILED in the Expenses folder but the
-        # 26-002 workbook 5405 rows still hold POET's prior mob values — surfaced
-        # here (with the PENDING note) so they are visible; NOT yet workbook-posted.
+        # VERIFIED against the LIVE workbook "26-0709 POET Turnover Budget w add'l
+        # Bin CO.xlsm" (item 016ISVH63T2ELN334XDNGKO5KDU45ZB777, lastModified
+        # 8/3 18:28Z): 11309 IS coded at D104 (=1050+3230+2045, VSC Rig Mob) and
+        # 11310 IS coded at D106 (=825+2560+1315, Predrill) — both roll up under
+        # 5405. (An earlier build read the older 26-0330 base file and mis-flagged
+        # these as un-posted.) 11320 ($1,195 gooseneck) is NOT coded anywhere
+        # (pending Brad's decision) and is intentionally EXCLUDED. Ledger 5405
+        # total = $2,045 + $1,315 = $3,360 (the two coded Stephan loads).
         f"{GRP_EQ}|5405": [
             _inv("Stephan Trucking Group Inc.", "2026-07-31", "11309", 2045.00,
-                 "016ISVH632PDCXVLNFLJFL6BHDBMZS73S6", "VSC Rig Mob"),
+                 "016ISVH632PDCXVLNFLJFL6BHDBMZS73S6",
+                 "VSC Rig Mob - JD 350G #PF350, Schaaf CPA Westfield IN. Coded D104, Brad approved 8/3"),
             _inv("Stephan Trucking Group Inc.", "2026-07-31", "11310", 1315.00,
-                 "016ISVH62Q4QRFWRN6D5FJ5VLBW56L5XTS", "Predrill Sany Mob"),
-            _inv("Stephan Trucking Group Inc.", "2026-07-31", "11320", 1195.00,
-                 "016ISVH664BP52LV4MPJFJEMP5WOXPITN4",
-                 "Gooseneck-Hotshot (PENDING sub-row confirm; not yet posted to workbook)"),
+                 "016ISVH62Q4QRFWRN6D5FJ5VLBW56L5XTS",
+                 "Predrill Sany SY365 - rig move Schaaf Westfield IN. Coded D106, Brad approved 8/3"),
         ],
     },
     "26-015": {
