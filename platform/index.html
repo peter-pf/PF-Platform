@@ -2153,6 +2153,47 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 .ba-grand td { background: var(--bg-2); font-weight: 800; color: var(--text-0);
   border-top: 2px solid var(--border); font-size: 0.92rem; }
 
+/* ---- Invoice drill-down: clickable Actual cell + modal ------------------- */
+.ba-drill { cursor: pointer; border-bottom: 1px dotted var(--accent);
+  transition: color 0.12s ease; outline: none; }
+.ba-drill:hover, .ba-drill:focus { color: var(--accent-dark);
+  border-bottom-style: solid; }
+.ba-drill:focus { box-shadow: 0 0 0 2px rgba(30,107,51,0.25); border-radius: 2px; }
+.bid-overlay { position: fixed; inset: 0; z-index: 10050;
+  background: rgba(15,23,32,0.55); display: flex; align-items: flex-start;
+  justify-content: center; padding: 48px 16px; overflow-y: auto; }
+.bid-overlay.hidden { display: none; }
+.bid-modal { background: var(--bg-0); color: var(--text-0);
+  width: 100%; max-width: 760px; border-radius: 10px;
+  box-shadow: 0 18px 60px rgba(0,0,0,0.35); border: 1px solid var(--border);
+  overflow: hidden; }
+.bid-head { display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border-light);
+  background: var(--bg-1); }
+.bid-title { font-size: 0.98rem; font-weight: 700; color: var(--text-0); }
+.bid-sub { font-size: 0.76rem; color: var(--text-3); margin-top: 2px; }
+.bid-close { background: none; border: none; font-size: 1.35rem; line-height: 1;
+  color: var(--text-3); cursor: pointer; padding: 0 4px; }
+.bid-close:hover { color: var(--text-0); }
+.bid-body { padding: 4px 0 0; max-height: 62vh; overflow-y: auto; }
+.bid-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.bid-table th { text-align: left; font-size: 0.68rem; font-weight: 600;
+  color: var(--text-3); text-transform: uppercase; letter-spacing: 0.03em;
+  padding: 8px 20px; border-bottom: 1px solid var(--border-light); }
+.bid-table th.num, .bid-table td.num { text-align: right;
+  font-variant-numeric: tabular-nums; }
+.bid-table td { padding: 8px 20px; border-bottom: 1px solid var(--border-light);
+  color: var(--text-1); vertical-align: top; }
+.bid-table tr:last-child td { border-bottom: none; }
+.bid-note { color: var(--text-3); font-size: 0.75rem; margin-top: 2px; }
+.bid-table a { color: var(--accent); text-decoration: none; white-space: nowrap; }
+.bid-table a:hover { text-decoration: underline; }
+.bid-foot { display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 20px; border-top: 1px solid var(--border);
+  background: var(--bg-1); font-weight: 700; }
+.bid-empty { padding: 28px 20px; text-align: center; color: var(--text-3);
+  font-size: 0.85rem; }
+
 .pr-subhead {
   font-size: 0.8rem; font-weight: 700; color: var(--accent-dark);
   text-transform: uppercase; letter-spacing: 0.04em;
@@ -2345,7 +2386,7 @@ body.role-field-ops .nav-sub[data-fo-hide] {
   if (isPrivileged) {
     feeds.push('/data/project-record-poet.js', '/data/project-records.js',
                '/data/budget-actual-poet.js', '/data/cost-code-template.js',
-               '/data/budget-actuals.js',
+               '/data/budget-actuals.js', '/data/invoice-ledger.js',
                '/data/awarded-projects.js', '/data/project-history.js',
                '/data/precon-pipeline.js', '/data/feasibility-history.js',
                '/data/project-master.js', '/data/pf-coi.js',
@@ -12049,6 +12090,52 @@ try {
       return '$' + n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
     }
     function baMoneyCell(v){ var m = baMoney(v); return m ? E(m) : '<span class="ba-blank">-</span>'; }
+    // ---- Invoice drill-down affordance -------------------------------------
+    // Does the invoice ledger have any coded invoices for this (job, group, code)?
+    // BYTE-IDENTICAL key to sync/build-invoice-ledger.py: baNormTitle(title)+'|'+code.
+    function baLedgerHas(num, gtitle, code){
+      var L = window.PF_INVOICE_LEDGER;
+      if (!L || typeof L !== 'object') return false;
+      var job = L[String(num)]; if (!job || typeof job !== 'object') return false;
+      var key = baNormTitle(gtitle) + '|' + String(code || '').trim();
+      var e = job[key];
+      return !!(e && e.invoices && e.invoices.length);
+    }
+    // Does the ledger have ANY coded invoices under this group title (any code)?
+    function baLedgerGroupHas(num, gtitle){
+      var L = window.PF_INVOICE_LEDGER;
+      if (!L || typeof L !== 'object') return false;
+      var job = L[String(num)]; if (!job || typeof job !== 'object') return false;
+      var pre = baNormTitle(gtitle) + '|';
+      for (var k in job){ if (k.indexOf(pre) === 0){ var e = job[k]; if (e && e.invoices && e.invoices.length) return true; } }
+      return false;
+    }
+    // Leaf Actual cell. Clickable (opens the invoice drill modal) only when the
+    // actual is a real non-zero number AND the ledger actually has invoices for
+    // this (group,code). Otherwise a plain money cell (never a fake affordance).
+    function baActualCell(actual, num, gtitle, code){
+      var cell = baMoneyCell(actual);
+      if (actual === null || actual === 0) return cell;
+      if (!baLedgerHas(num, gtitle, code)) return cell;
+      var key = baNormTitle(gtitle) + '|' + String(code || '').trim();
+      return '<span class="ba-drill" tabindex="0" role="button" title="View coded invoices"'
+        + ' data-ba-drill-num="' + E(String(num)) + '"'
+        + ' data-ba-drill-key="' + E(key) + '"'
+        + ' data-ba-drill-label="' + E((code ? code + ' ' : '') + (gtitle || '')) + '">'
+        + cell + '</span>';
+    }
+    // Group-subtotal Actual cell. Group-level drill (all codes under this group)
+    // when the ledger has any invoices under the group title.
+    function baGroupActualCell(gA, num, gtitle){
+      var cell = baMoneyCell(gA);
+      if (gA === null || gA === 0) return cell;
+      if (!baLedgerGroupHas(num, gtitle)) return cell;
+      return '<span class="ba-drill" tabindex="0" role="button" title="View coded invoices"'
+        + ' data-ba-drill-num="' + E(String(num)) + '"'
+        + ' data-ba-drill-group="' + E(baNormTitle(gtitle)) + '"'
+        + ' data-ba-drill-label="' + E(gtitle || '') + '">'
+        + cell + '</span>';
+    }
 
     // ---- ACTUAL overlay (all projects, QuickBooks-independent) ---------------
     // Real per-cost-code ACTUALS come from each project's Turnover Budget workbook
@@ -12187,7 +12274,7 @@ try {
             + '<td class="ba-code">' + E(code) + '</td>'
             + '<td class="ba-desc">' + E(r.description || '') + '</td>'
             + '<td class="num">' + budCell + '</td>'
-            + '<td class="num">' + baMoneyCell(actual) + '</td>'
+            + '<td class="num">' + baActualCell(actual, num, g.title, code) + '</td>'
             + '<td class="num">' + baVarCell(variance) + '</td>'
             + '<td>' + E(r.vendor || '') + '</td>'
             + '<td>' + E(r.notes || '') + '</td>'
@@ -12196,7 +12283,7 @@ try {
         grandB += gB; grandA += gA;
         // category header row carrying the category subtotal. Actual/Variance are a
         // dash when this project has no synced actuals (fail closed).
-        var gACell = hasActuals ? baMoneyCell(gA) : '<span class="ba-blank">-</span>';
+        var gACell = hasActuals ? baGroupActualCell(gA, num, g.title) : '<span class="ba-blank">-</span>';
         var gVCell = hasActuals ? baVarCell(gB - gA) : '<span class="ba-blank">-</span>';
         body += '<tr class="ba-grp-row">'
           + '<td class="ba-code"></td>'
@@ -13949,6 +14036,115 @@ try {
           say('Refresh failed: could not reach the server — please retry.', true);
         });
     };
+
+    // =======================================================================
+    // INVOICE DRILL-DOWN (Actual cell -> coded-invoice list -> PDF)
+    // =======================================================================
+    // Click any clickable Actual cell to see the coded invoices behind that
+    // (group,code) line -- or the group subtotal for all codes in the group.
+    // Reads window.PF_INVOICE_LEDGER (the SAME feed that rendered the clickable
+    // affordance, so the list is always consistent with the cell). FAIL CLOSED:
+    // if the ledger key is absent we show an honest empty state, NEVER a fake row.
+    var _bidOverlay = null;
+    function bidBuildOverlay(){
+      if (_bidOverlay) return _bidOverlay;
+      var ov = document.createElement('div');
+      ov.className = 'bid-overlay hidden';
+      ov.setAttribute('role','dialog');
+      ov.setAttribute('aria-modal','true');
+      ov.addEventListener('click', function(e){ if (e.target === ov) bidClose(); });
+      document.body.appendChild(ov);
+      _bidOverlay = ov;
+      return ov;
+    }
+    function bidClose(){
+      if (_bidOverlay){ _bidOverlay.classList.add('hidden'); _bidOverlay.innerHTML=''; }
+      document.removeEventListener('keydown', bidOnKey);
+    }
+    function bidOnKey(e){ if (e.key === 'Escape' || e.keyCode === 27) bidClose(); }
+    // Gather the invoice rows + total for a (num, key) leaf OR a (num, groupNorm)
+    // group-level drill. Returns { invoices:[...], total:Number } or null when the
+    // ledger has nothing (-> honest empty state). Never fabricates.
+    function bidGather(num, key, groupNorm){
+      var L = window.PF_INVOICE_LEDGER;
+      if (!L || typeof L !== 'object') return null;
+      var job = L[String(num)];
+      if (!job || typeof job !== 'object') return null;
+      if (key){
+        var e = job[key];
+        if (!e || !e.invoices || !e.invoices.length) return null;
+        var t = (typeof e.total === 'number') ? e.total : null;
+        return { invoices: e.invoices.slice(), total: t };
+      }
+      if (groupNorm){
+        var pre = groupNorm + '|', all = [], sum = 0, sawTotal = false;
+        for (var k in job){
+          if (k.indexOf(pre) !== 0) continue;
+          var g = job[k];
+          if (!g || !g.invoices || !g.invoices.length) continue;
+          all = all.concat(g.invoices);
+          if (typeof g.total === 'number'){ sum += g.total; sawTotal = true; }
+        }
+        if (!all.length) return null;
+        return { invoices: all, total: sawTotal ? sum : null };
+      }
+      return null;
+    }
+    function bidMoney(v){ var m = baMoney(v); return m ? E(m) : '<span class="ba-blank">-</span>'; }
+    // Open the drill modal for a clicked Actual cell (the span carries the data-*).
+    function bidOpen(span){
+      var num   = span.getAttribute('data-ba-drill-num') || '';
+      var key   = span.getAttribute('data-ba-drill-key') || '';
+      var group = span.getAttribute('data-ba-drill-group') || '';
+      var label = span.getAttribute('data-ba-drill-label') || '';
+      var data  = bidGather(num, key, group);
+      var ov = bidBuildOverlay();
+      var head = '<div class="bid-head"><div>'
+        + '<div class="bid-title">Invoices &mdash; ' + E(label || 'Cost line') + '</div>'
+        + '<div class="bid-sub">Project ' + E(String(num)) + (key ? ' &middot; ' + E(key) : '') + '</div>'
+        + '</div><button type="button" class="bid-close" aria-label="Close" title="Close">&times;</button></div>';
+      var bodyHtml;
+      if (!data || !data.invoices.length){
+        bodyHtml = '<div class="bid-body"><div class="bid-empty">No coded invoices for this line.</div></div>';
+      } else {
+        var rows = '';
+        for (var i = 0; i < data.invoices.length; i++){
+          var iv = data.invoices[i] || {};
+          var link = iv.webUrl
+            ? '<a href="' + E(String(iv.webUrl)) + '" target="_blank" rel="noopener">Open PDF</a>'
+            : '<span class="ba-blank">-</span>';
+          rows += '<tr>'
+            + '<td>' + E(iv.vendor || '') + (iv.note ? '<div class="bid-note">' + E(iv.note) + '</div>' : '') + '</td>'
+            + '<td>' + E(iv.date || '') + '</td>'
+            + '<td>' + E(iv.invoice_no || '') + '</td>'
+            + '<td class="num">' + bidMoney(iv.amount) + '</td>'
+            + '<td class="num">' + link + '</td>'
+            + '</tr>';
+        }
+        var totalCell = (data.total === null) ? '<span class="ba-blank">-</span>' : E(baMoney(data.total));
+        bodyHtml = '<div class="bid-body"><table class="bid-table"><thead><tr>'
+          + '<th>Vendor</th><th>Date</th><th>Invoice #</th>'
+          + '<th class="num">Amount</th><th class="num">PDF</th>'
+          + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+          + '<div class="bid-foot"><span>' + data.invoices.length + ' invoice'
+          + (data.invoices.length === 1 ? '' : 's') + '</span><span>Total ' + totalCell + '</span></div>';
+      }
+      ov.innerHTML = '<div class="bid-modal">' + head + bodyHtml + '</div>';
+      ov.querySelector('.bid-close').addEventListener('click', bidClose);
+      ov.classList.remove('hidden');
+      document.addEventListener('keydown', bidOnKey);
+      var c = ov.querySelector('.bid-close'); if (c) c.focus();
+    }
+    // Delegated open on the whole document (survives every project re-render).
+    document.addEventListener('click', function(e){
+      var span = e.target && e.target.closest ? e.target.closest('.ba-drill') : null;
+      if (span){ e.preventDefault(); bidOpen(span); }
+    });
+    document.addEventListener('keydown', function(e){
+      if (e.key !== 'Enter' && e.keyCode !== 13) return;
+      var el = document.activeElement;
+      if (el && el.classList && el.classList.contains('ba-drill')){ e.preventDefault(); bidOpen(el); }
+    });
 
     // =======================================================================
     // PROJECT INVOICING editors (Financials Phase 1b)
