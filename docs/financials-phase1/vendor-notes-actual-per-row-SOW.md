@@ -71,3 +71,54 @@ refresh per-row actuals after new invoice coding.
 `python3 sync/write_budget_column.py --execute` (MERGE, per-project backups). Portal
 reads KV live — vendor/notes/actual appear WITHOUT deploy; only the index.html UI
 columns/CSS need the deploy.
+
+## Amendment — POET wrong-file resolver fix + all-jobs yellow audit (2026-08-04, HOLD-deploy)
+
+**Trigger (Brad):** POET 26-002 5405 actuals reported as $4,280/$3,385/$2,465 were the
+PRE-INVOICE values from the STALE base file `26-0330 POET Turnover Budget.xlsm`. The
+resolver's `_is_base` heuristic preferred the base filename over the change-order
+variant `26-0709 POET Turnover Budget w add'l Bin CO.xlsm` (the CURRENT file the
+invoice-coding writes to). Same class as the drill-down ledger base-name bug.
+
+### Resolver fix (`build-budget-actuals.py resolve_workbook`)
+Multi-workbook branch now picks **MOST-RECENTLY-MODIFIED** (mtime desc, then created,
+then name desc), returning status `ok`. Added `audit_multi_workbook()` to surface every
+job with >1 Turnover Budget file and which variant is chosen.
+
+### Multi-workbook audit (all 42 jobs)
+ONLY 26-002 POET has >1 file (count=2). Now resolves to `26-0709 ... w add'l Bin CO.xlsm`
+(mod 2026-08-04) over `26-0330` (mod 2026-06-18). No other job affected.
+
+### POET actuals — CORRECTED
+From the right file, 5405 = **$6,325 / $4,700 / $3,660** (green cells) with Stephan
+Trucking vendor + INV 11309/11310/11320 notes per line. Written to KV via PASS 2
+(vendor/notes/actual only; budget preserved). 26-015/26-017 budgets unchanged.
+
+### POET BUDGET — FLAGGED, NOT corrected (needs Brad)
+The current `26-0709` file's col C budget is a STALE formula cache (84 formula cells,
+0 cached) — openpyxl cannot read its budget. So the live KV budget **$314,457.68 is
+from the OLD 26-0330 file** and is likely WRONG (the "w add'l Bin CO" adds scope). We
+did NOT overwrite it (fail-closed, never fabricate). **Action for Brad:** open+save
+`26-0709` in Excel to recalc the cache, then re-run the sync to write the correct POET
+budget. Until then the $314,457.68 is a KNOWN-SUSPECT carryover.
+
+### GREEN-only gate now covers the DAEMON SUMMED FEED too
+`build-budget-actuals.py` imports the SAME green-gated `parse_budget_actual` +
+`leaf_actuals_by_code` (which skips `actual is None`), so `PF_BUDGET_ACTUALS`
+(data/budget-actuals.js) now EXCLUDES yellow. Both the per-row pull AND the summed
+fallback exclude yellow — no leak path.
+
+### All-jobs YELLOW audit (26 cells across 14 jobs — ALL now excluded)
+Material (non-zero) placeholders that previously could leak as fake actuals, now gated
+out: 25-015 Stadium $7,700/$450/$655.76; 26-001 WPAFB $12,000; 26-002 POET $5,000;
+26-015 Schaff $10,000/$2,222; 26-014 TPS $9,050; 26-007 Madison $6,098; 26-017 Molto
+$2,000/$1,320; 25-2002 Habitat $1,500; 26-003 Canopy $800.54; 26-004 ONB $286.33 (rest
+$0). Rebuilt feed verified: every one reads None/0 in data/budget-actuals.js.
+
+### What's needed to make clean actuals LIVE
+`PF_BUDGET_ACTUALS` is served from the DEPLOYED static `platform/data/budget-actuals.js`
+→ **needs a deploy**. Rebuilt (green-gated) + staged, NOT deployed. The
+budget_actuals_daemon has a STOP sentinel (`.budget-actuals-daemon-STOP`, since 7/30)
+so it will NOT auto-deploy/race; when unblocked it uses the same fixed parser so it
+keeps producing green-gated output. Combine with the POET fix = one corrected-actuals
+deploy (devops routes it). Per-row vendor/notes/actual in KV are already LIVE (no deploy).

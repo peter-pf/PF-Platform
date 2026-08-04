@@ -164,20 +164,66 @@ def resolve_workbook(token, job, manifest):
         return folder, None, src, "no-workbook"
     if len(matches) == 1:
         return folder, f"{folder}/{matches[0]['name']}", src, "ok"
-    # >1 workbooks: a project can carry the BASE Turnover Budget plus change-order
-    # variants (e.g. "... Turnover Budget w add'l Bin CO.xlsm"). Prefer the BASE
-    # file whose name ENDS with "Turnover Budget.<ext>" (no trailing modifier) —
-    # this is the canonical live budget and matches the POET builder's choice. If
-    # exactly one base file exists, use it (status ok). Otherwise flag ambiguous.
-    def _is_base(nm):
-        stem = re.sub(r"\.(xlsm|xlsx)$", "", nm, flags=re.I)
-        return bool(re.search(r"turnover\s*budget\s*$", stem, re.I))
-    base = [c for c in matches if _is_base(c["name"])]
-    if len(base) == 1:
-        return folder, f"{folder}/{base[0]['name']}", src, "ok"
-    # fall back: prefer .xlsm then shortest name; flag ambiguous for a human check
-    matches.sort(key=lambda c: (not c["name"].lower().endswith(".xlsm"), len(c["name"])))
-    return folder, f"{folder}/{matches[0]['name']}", src, "ambiguous"
+    # >1 workbooks: a project can carry the BASE Turnover Budget PLUS a change-order
+    # variant (e.g. "26-0709 POET Turnover Budget w add'l Bin CO.xlsm" — an ADDITIONAL
+    # BIN CHANGE ORDER that added scope/budget). The CURRENT live budget is the variant
+    # the invoice-coding workflow WRITES TO, which is the MOST-RECENTLY-MODIFIED file —
+    # NOT the base file (the earlier base name-fix read the STALE 26-0330 for POET and
+    # showed pre-invoice actuals + a possibly-wrong budget). MOST-RECENT WINS (same
+    # class of fix as the drill-down ledger resolver). We tie-break deterministically
+    # (mtime desc, then created desc, then name desc so a later date prefix like 26-0709
+    # beats 26-0330) and mark 'ok-multi' so the audit surfaces every multi-file job.
+    def _mtime(c):
+        return c.get("lastModifiedDateTime") or ""
+    def _ctime(c):
+        fsi = c.get("fileSystemInfo") or {}
+        return fsi.get("createdDateTime") or c.get("createdDateTime") or ""
+    ranked = sorted(matches, key=lambda c: (_mtime(c), _ctime(c), c.get("name", "")),
+                    reverse=True)
+    chosen = ranked[0]
+    # Return "ok" (all downstream budget/actual gates accept it) — the chosen file IS
+    # a valid current workbook. Multi-file jobs are surfaced separately by
+    # audit_multi_workbook() so a human can eyeball which variant was picked.
+    return folder, f"{folder}/{chosen['name']}", src, "ok"
+
+
+def audit_multi_workbook(token, job, manifest):
+    """Return None if the job has 0 or 1 Turnover Budget workbook, else a dict
+    {job, folder, count, chosen, chosen_mtime, others:[{name,mtime}...]} showing every
+    candidate and which one resolve_workbook() picks (most-recently-modified). Used to
+    audit the POET-class multi-file risk without changing the resolver's status."""
+    if job in manifest:
+        return None  # explicit manifest override — not a heuristic-resolved multi case
+    folder = None
+    for child in list_children(token, ACTIVE_PARENT):
+        if child.get("folder") and _folder_matches(child.get("name", ""), job):
+            folder = f"{ACTIVE_PARENT}/{child['name']}"
+            break
+    if not folder:
+        for yr in _year_candidates(job):
+            yr_parent = f"{COMPLETED_PARENT}/{yr}"
+            for child in list_children(token, yr_parent):
+                if child.get("folder") and _folder_matches(child.get("name", ""), job):
+                    folder = f"{yr_parent}/{child['name']}"
+                    break
+            if folder:
+                break
+    if not folder:
+        return None
+    matches = [c for c in list_children(token, folder)
+               if c.get("file") and TURNOVER_RX.search(c.get("name", ""))
+               and c.get("name", "").lower().endswith((".xlsm", ".xlsx"))]
+    if len(matches) <= 1:
+        return None
+    def _mt(c):
+        return c.get("lastModifiedDateTime") or ""
+    ranked = sorted(matches, key=lambda c: (_mt(c), c.get("name", "")), reverse=True)
+    chosen = ranked[0]
+    return {
+        "job": job, "folder": folder, "count": len(matches),
+        "chosen": chosen.get("name", ""), "chosen_mtime": _mt(chosen),
+        "others": [{"name": c.get("name", ""), "mtime": _mt(c)} for c in ranked[1:]],
+    }
 
 
 # ---------------- per-job build ----------------

@@ -160,20 +160,16 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project material costs": {
         "5110": 15774.91,
-        "5120": 0.0,
-        "5130": 0.0,
         "5190": 0.0
       },
       "project labor costs": {
         "5210": 0.0,
-        "5220": 7700.0,
         "5230": 0.0,
         "5310": 0.0,
         "5320": 0.0,
         "5330": 0.0,
         "5340": 1627.69,
-        "5350": 0.0,
-        "5360": 450.0
+        "5350": 0.0
       },
       "project equipment costs": {
         "5405": 10240.0,
@@ -184,7 +180,6 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project incentives contingencies": {
         "5910": 0.0,
-        "5920": 655.76,
         "5950": 0.0
       }
     }
@@ -248,8 +243,6 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project material costs": {
         "5110": 34617.14,
-        "5120": 0.0,
-        "5130": 0.0,
         "5190": 0.0
       },
       "project labor costs": {
@@ -321,10 +314,7 @@ window.PF_BUDGET_ACTUALS = {
         "5053": 7105.0
       },
       "project material costs": {
-        "5110": 26990.36,
-        "5120": 0.0,
-        "5130": 0.0,
-        "5190": 0.0
+        "5110": 26990.36
       },
       "project labor costs": {
         "5210": 2500.0,
@@ -395,8 +385,6 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project material costs": {
         "5110": 8557.57,
-        "5120": 0.0,
-        "5130": 0.0,
         "5190": 0.0
       },
       "project labor costs": {
@@ -469,7 +457,6 @@ window.PF_BUDGET_ACTUALS = {
       "project material costs": {
         "5110": 17278.75,
         "5120": 5045.25,
-        "5130": 0.0,
         "5190": 0.0
       },
       "project labor costs": {
@@ -541,8 +528,6 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project material costs": {
         "5110": 14016.89,
-        "5120": 0.0,
-        "5130": 0.0,
         "5190": 0.0
       },
       "project labor costs": {
@@ -614,8 +599,6 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project material costs": {
         "5110": 15724.76,
-        "5120": 0.0,
-        "5130": 0.0,
         "5190": 0.0
       },
       "project labor costs": {
@@ -688,8 +671,6 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project material costs": {
         "5110": 4401.32,
-        "5120": 0.0,
-        "5130": 0.0,
         "5190": 0.0
       },
       "project labor costs": {
@@ -762,8 +743,6 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project material costs": {
         "5110": 25676.3,
-        "5120": 0.0,
-        "5130": 0.0,
         "5190": 0.0
       },
       "project labor costs": {
@@ -836,8 +815,6 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project material costs": {
         "5110": 10134.09,
-        "5120": 0.0,
-        "5130": 0.0,
         "5190": 0.0
       },
       "project labor costs": {
@@ -909,8 +886,6 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project material costs": {
         "5110": 0.0,
-        "5120": 0.0,
-        "5130": 0.0,
         "5190": 0.0
       },
       "project labor costs": {
@@ -919,16 +894,11 @@ window.PF_BUDGET_ACTUALS = {
         "5230": 0.0,
         "5310": 0.0,
         "5320": 0.0,
-        "5330": 0.0,
-        "5340": 0.0,
         "5350": 0.0,
         "5360": 0.0
       },
       "project equipment costs": {
-        "5405": 0.0,
-        "5410": 0.0,
         "5420": 0.0,
-        "5430": 0.0,
         "5500": 0.0
       },
       "project incentives contingencies": {
@@ -983,8 +953,6 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project material costs": {
         "5110": 31727.2,
-        "5120": 0.0,
-        "5130": 0.0,
         "5190": 0.0
       },
       "project labor costs": {
@@ -1071,7 +1039,6 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project material costs": {
         "5110": 0.0,
-        "5120": 0.0,
         "5130": 28403.0,
         "5190": 0.0
       },
@@ -1086,8 +1053,6 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project equipment costs": {
         "5405": 2795.0,
-        "5410": 1500.0,
-        "5430": 0.0,
         "5500": 0.0
       },
       "project incentives contingencies": {
@@ -1142,13 +1107,10 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project material costs": {
         "5110": 41203.82,
-        "5120": 0.0,
-        "5130": 0.0,
         "5190": 0.0
       },
       "project labor costs": {
         "5210": 0.0,
-        "5220": 12000.0,
         "5230": 0.0,
         "5310": 0.0,
         "5320": 0.0,
@@ -1170,22 +1132,22 @@ window.PF_BUDGET_ACTUALS = {
   },
   "26-002": {
     "job": "26-002",
-    "name": "POET Bioprocessing",
+    "name": "POET Projects",
     "status": "ok",
     "source_folder": "04 - Project Management/02 - Projects/26-002 - POET Projects - POET",
-    "source_file": "26-0330 POET Turnover Budget.xlsm",
+    "source_file": "26-0709 POET Turnover Budget w add'l Bin CO.xlsm",
     "source_kind": "active",
     "location": "",
     "grand_total": {
       "label": "Total Construction Contract",
-      "budget": 342911.15,
-      "actual": 105494.94,
-      "variance": 237416.21
+      "budget": null,
+      "actual": null,
+      "variance": 0.0
     },
     "actuals_by_group": {
       "general conditions oh": {
         "5600": 0.0,
-        "5710": 271.46,
+        "5710": 353.17,
         "5720": 0.0,
         "5730": 2337.07,
         "6100": 0.0,
@@ -1207,14 +1169,11 @@ window.PF_BUDGET_ACTUALS = {
         "6920": 0.0
       },
       "project professional services fees": {
-        "5051": 28000.0,
+        "5051": 38000.0,
         "5052": 0.0,
         "5053": 10534.0
       },
       "project material costs": {
-        "5110": 24406.12,
-        "5120": 0.0,
-        "5130": 0.0,
         "5190": 0.0
       },
       "project labor costs": {
@@ -1224,12 +1183,11 @@ window.PF_BUDGET_ACTUALS = {
         "5310": 0.0,
         "5320": 1082.85,
         "5330": 0.0,
-        "5340": 5000.0,
         "5350": 0.0,
         "5360": 600.0
       },
       "project equipment costs": {
-        "5405": 10630.0,
+        "5405": 15185.0,
         "5410": 8699.94,
         "5420": 0.0,
         "5430": 4847.35,
@@ -1287,8 +1245,6 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project material costs": {
         "5110": 27090.07,
-        "5120": 0.0,
-        "5130": 0.0,
         "5190": 0.0
       },
       "project labor costs": {
@@ -1311,7 +1267,6 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project incentives contingencies": {
         "5910": 0.0,
-        "5920": 800.54,
         "5950": 0.0
       }
     }
@@ -1361,8 +1316,6 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project material costs": {
         "5110": 6469.44,
-        "5120": 0.0,
-        "5130": 0.0,
         "5190": 0.0
       },
       "project labor costs": {
@@ -1385,7 +1338,6 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project incentives contingencies": {
         "5910": 0.0,
-        "5920": 286.33,
         "5950": 0.0
       }
     }
@@ -1401,8 +1353,8 @@ window.PF_BUDGET_ACTUALS = {
     "grand_total": {
       "label": "Total Construction Contract",
       "budget": 291775.54,
-      "actual": 122396.7,
-      "variance": 169378.84
+      "actual": 132940.05,
+      "variance": 158835.49
     },
     "actuals_by_group": {
       "general conditions oh": {
@@ -1435,8 +1387,6 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project material costs": {
         "5110": 53914.21,
-        "5120": 0.0,
-        "5130": 0.0,
         "5190": 0.0
       },
       "project labor costs": {
@@ -1452,7 +1402,7 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project equipment costs": {
         "5405": 28930.0,
-        "5410": 0.0,
+        "5410": 10543.35,
         "5420": 2607.84,
         "5430": 5196.81,
         "5500": 0.0
@@ -1509,8 +1459,6 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project material costs": {
         "5110": 11088.58,
-        "5120": 0.0,
-        "5130": 0.0,
         "5190": 0.0
       },
       "project labor costs": {
@@ -1578,13 +1526,10 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project professional services fees": {
         "5051": 14250.0,
-        "5052": 0.0,
-        "5053": 6098.0
+        "5052": 0.0
       },
       "project material costs": {
         "5110": 37886.16,
-        "5120": 0.0,
-        "5130": 0.0,
         "5190": 0.0
       },
       "project labor costs": {
@@ -1657,8 +1602,6 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project material costs": {
         "5110": 0.0,
-        "5120": 0.0,
-        "5130": 0.0,
         "5190": 0.0
       },
       "project labor costs": {
@@ -1731,8 +1674,6 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project material costs": {
         "5110": 5149.58,
-        "5120": 0.0,
-        "5130": 20287.8,
         "5190": 0.0
       },
       "project labor costs": {
@@ -1805,8 +1746,6 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project material costs": {
         "5110": 3690.59,
-        "5120": 0.0,
-        "5130": 0.0,
         "5190": 0.0
       },
       "project labor costs": {
@@ -1879,8 +1818,6 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project material costs": {
         "5110": 0.0,
-        "5120": 0.0,
-        "5130": 0.0,
         "5190": 0.0
       },
       "project labor costs": {
@@ -1953,8 +1890,6 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project material costs": {
         "5110": 12519.8,
-        "5120": 0.0,
-        "5130": 0.0,
         "5190": 0.0
       },
       "project labor costs": {
@@ -2027,8 +1962,6 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project material costs": {
         "5110": 0.0,
-        "5120": 0.0,
-        "5130": 0.0,
         "5190": 0.0
       },
       "project labor costs": {
@@ -2095,14 +2028,11 @@ window.PF_BUDGET_ACTUALS = {
         "6920": 0.0
       },
       "project professional services fees": {
-        "5051": 9050.0,
         "5052": 0.0,
         "5053": 0.0
       },
       "project material costs": {
         "5110": 0.0,
-        "5120": 0.0,
-        "5130": 0.0,
         "5190": 0.0
       },
       "project labor costs": {
@@ -2141,8 +2071,8 @@ window.PF_BUDGET_ACTUALS = {
     "grand_total": {
       "label": "Total Construction Contract",
       "budget": 68200.0,
-      "actual": 19680.43,
-      "variance": 48519.57
+      "actual": 28384.0,
+      "variance": 39816.0
     },
     "actuals_by_group": {
       "general conditions oh": {
@@ -2169,14 +2099,10 @@ window.PF_BUDGET_ACTUALS = {
         "6920": 0.0
       },
       "project professional services fees": {
-        "5051": 10000.0,
-        "5052": 0.0,
-        "5053": 2222.0
+        "5052": 0.0
       },
       "project material costs": {
-        "5110": 0.0,
-        "5120": 0.0,
-        "5130": 0.0,
+        "5110": 6704.12,
         "5190": 0.0
       },
       "project labor costs": {
@@ -2192,9 +2118,9 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project equipment costs": {
         "5405": 7020.0,
-        "5410": 0.0,
+        "5410": 1986.29,
         "5420": 0.0,
-        "5430": 438.43,
+        "5430": 451.59,
         "5500": 0.0
       },
       "project incentives contingencies": {
@@ -2249,8 +2175,6 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project material costs": {
         "5110": 0.0,
-        "5120": 0.0,
-        "5130": 0.0,
         "5190": 0.0
       },
       "project labor costs": {
@@ -2289,8 +2213,8 @@ window.PF_BUDGET_ACTUALS = {
     "grand_total": {
       "label": "Total Construction Contract",
       "budget": 218700.0,
-      "actual": 77414.54,
-      "variance": 141285.46
+      "actual": 80717.19,
+      "variance": 137982.81
     },
     "actuals_by_group": {
       "general conditions oh": {
@@ -2323,8 +2247,6 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project material costs": {
         "5110": 45534.34,
-        "5120": 0.0,
-        "5130": 0.0,
         "5190": 0.0
       },
       "project labor costs": {
@@ -2333,16 +2255,13 @@ window.PF_BUDGET_ACTUALS = {
         "5230": 0.0,
         "5310": 0.0,
         "5320": 0.0,
-        "5330": 2000.0,
-        "5340": 1320.0,
         "5350": 0.0,
         "5360": 0.0
       },
       "project equipment costs": {
         "5405": 6815.0,
         "5410": 4064.29,
-        "5420": 0.0,
-        "5430": 900.0,
+        "5430": 4202.65,
         "5500": 0.0
       },
       "project incentives contingencies": {
@@ -2397,8 +2316,6 @@ window.PF_BUDGET_ACTUALS = {
       },
       "project material costs": {
         "5110": 0.0,
-        "5120": 0.0,
-        "5130": 0.0,
         "5190": 0.0
       },
       "project labor costs": {
@@ -2441,7 +2358,7 @@ window.PF_BUDGET_ACTUALS = {
     }
   },
   "_meta": {
-    "generated": "2026-07-30T14:08:02.617992Z",
+    "generated": "2026-08-04T13:35:08.146845Z",
     "source": "Turnover Budget workbooks (sheet 'Budget vs Actual') via MS Graph. QuickBooks-independent.",
     "jobs": 42,
     "ok_count": 31,
@@ -2513,7 +2430,14 @@ window.PF_BUDGET_ACTUALS = {
         "file": ""
       }
     ],
-    "unmatched_actuals": [],
+    "unmatched_actuals": [
+      {
+        "job": "26-002",
+        "group": "Project Material Costs",
+        "description": "Vibratory Stone Columns - Stone",
+        "actual": 24406.12
+      }
+    ],
     "note": "Per-project ACTUAL costs parsed from each Turnover Budget workbook. Overlaid onto the standard cost-code template by (group title + cost code). Variance recomputed = Budget - Actual. Blanks stay blank; a job with no resolvable workbook shows a dash (never a fabricated 0)."
   }
 };
