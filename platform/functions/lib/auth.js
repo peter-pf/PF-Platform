@@ -558,6 +558,11 @@ export function areaForPath(pathname) {
     // Without this line it would fall through to the default 'user_admin'
     // (admin-only) and the office (partner/BD) could not save.
     if (pathname.startsWith('/api/project-invoicing')) return 'financials';
+    // Per-(job, group, cost_code) INVOICE LEDGER for the Budget-vs-Actual Actual
+    // drill-down: the list of invoices coded to a cost code + PDF links. FINANCIAL
+    // data -> financials area (admin + partner + business_dev; field_ops BLOCKED by
+    // direct URL too). The handler ALSO calls requireArea(session, 'financials').
+    if (pathname.startsWith('/api/invoice-ledger')) return 'financials';
     // BD CRM write-back (companies/contacts overlay + interactions log). BD's
     // own tool: admin + partner + business_dev allowed; field_ops BLOCKED by
     // direct URL too. Each endpoint ALSO calls requireArea('business_dev').
