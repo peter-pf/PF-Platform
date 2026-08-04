@@ -631,10 +631,21 @@ chipWrap.addEventListener("click", function(e){
   runAsk(q);
 });
 
-// ---- Quick-action + today demo taps (no destination yet, friendly nudge) ----
+// ---- Daily Reports: open the REAL daily-report tool in the field portal ----
+// The daily-report form lives in the main portal (index.html) as the
+// "daily-reports" module (field_ops read+write, zero financials). The portal
+// deep-links via URL hash: applyHashRoute() calls showModule('daily-reports')
+// on load when the hash is #daily-reports and a matching [data-module] nav +
+// #mod-daily-reports container exist (both do). Same-origin, session-authed;
+// no bypass. We navigate the tab to /#daily-reports so a crew member lands
+// directly on the working form.
+function goDaily(){
+  window.location.assign("/#daily-reports");
+}
+
+// ---- Other quick-action taps (module not wired yet): honest nudge ----
 function demoNudge(){
-  var input = document.getElementById("askInput");
-  // For the demo these modules are placeholders; keep it honest and calm.
+  // These modules are not wired yet; keep it honest and calm.
   var box = document.getElementById("answer");
   document.getElementById("ansQ").textContent = "Sample preview";
   document.getElementById("ansBody").textContent =
@@ -642,10 +653,17 @@ function demoNudge(){
   box.classList.add("show");
   box.scrollIntoView({behavior:"smooth", block:"center"});
 }
+
+// Route by target: "report" opens the real daily-report tool; the rest nudge.
+function handleGo(el){
+  var target = el.getAttribute("data-go");
+  if (target === "report") { goDaily(); return; }
+  demoNudge();
+}
 document.querySelectorAll("[data-go]").forEach(function(el){
-  el.addEventListener("click", demoNudge);
+  el.addEventListener("click", function(){ handleGo(el); });
   el.addEventListener("keydown", function(e){
-    if (e.key === "Enter" || e.key === " "){ e.preventDefault(); demoNudge(); }
+    if (e.key === "Enter" || e.key === " "){ e.preventDefault(); handleGo(el); }
   });
 });
 </script>
