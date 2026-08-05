@@ -3221,6 +3221,10 @@ document.addEventListener('click', function(e) {
       #mod-daily-reports .dr-up-row.err .dr-up-stat { color:#e5534b; }
       #mod-daily-reports .dr-up-msg { font-size:12px; margin-top:6px; }
       #mod-daily-reports input[type=file]:disabled { opacity:.55; cursor:not-allowed; }
+      #mod-daily-reports .dr-photo-strip { display:flex; flex-wrap:wrap; gap:8px; margin:2px 0 4px; }
+      #mod-daily-reports .dr-photo-strip .dr-photo { display:block; width:96px; height:96px; border-radius:6px; overflow:hidden; border:1px solid var(--border,#2a2f3a); background:#0d1117; }
+      #mod-daily-reports .dr-photo-strip .dr-photo img { width:100%; height:100%; object-fit:cover; display:block; }
+      #mod-daily-reports .dr-photo-strip .dr-photo-noimg { display:flex; align-items:center; justify-content:center; width:96px; height:96px; font-size:11px; color:var(--text-3,#8a93a6); text-align:center; padding:4px; border-radius:6px; border:1px solid var(--border,#2a2f3a); }
     </style>
     <div id="drNoData" class="dr-muted" style="display:none">Daily reports not available for your role.</div>
     <div id="drWrap">
@@ -3266,6 +3270,16 @@ document.addEventListener('click', function(e) {
         <textarea id="drDelays"></textarea>
         <div class="dr-section-h">Safety observations / incidents</div>
         <textarea id="drSafety"></textarea>
+
+        <div class="dr-section-h">Site Photos <span class="dr-flag">(opens the camera on phone/tablet; saves to the project's Project Photos folder)</span></div>
+        <div class="dr-upload" id="drUpPhotos">
+          <input type="file" id="drFilePhotos" accept="image/*" capture="environment" multiple disabled>
+          <div class="dr-up-hint" data-up-hint>Select a project first to enable photos.</div>
+          <div class="dr-up-list" data-up-list></div>
+          <div class="dr-up-msg" data-up-msg></div>
+        </div>
+        <div class="dr-section-h">Today's Photos <span class="dr-flag">(pictures taken for this project on the report date)</span></div>
+        <div id="drPhotoStrip" class="dr-photo-strip"><div class="dr-muted" style="font-size:12px">Select a project and date to see the day's photos.</div></div>
 
         <div class="dr-section-h">Upload Hand Logs <span class="dr-flag">(paper QA/QC logs, photos, PDFs)</span></div>
         <div class="dr-upload" id="drUpHandlogs">
@@ -19660,11 +19674,12 @@ try {
     future: [{ equipment: '', description: '' }],
     // SharePoint file refs returned by /api/field-upload, kept per bucket so they
     // ride along when the daily report is saved. {name,itemId,webUrl,bucket}.
-    attachments: { handlogs: [], guhma: [] },
+    attachments: { handlogs: [], guhma: [], photos: [] },
   };
 
   // Map a bucket key to its file input id + container id.
   var UP_BUCKETS = {
+    photos:   { input: 'drFilePhotos',   wrap: 'drUpPhotos',   label: 'Site Photos' },
     handlogs: { input: 'drFileHandlogs', wrap: 'drUpHandlogs', label: 'Hand Logs' },
     guhma:    { input: 'drFileGuhma',    wrap: 'drUpGuhma',    label: 'GUHM Data' },
   };
@@ -19982,6 +19997,13 @@ try {
         updateUploadEnabled();
       });
     }
+    // Report date change -> refresh the day's photo strip (the QAQC upload path
+    // reads the date at upload time, so no re-wiring needed there).
+    var di = document.getElementById('drDate');
+    if (di && !di.dataset.wiredPhotos) {
+      di.dataset.wiredPhotos = '1';
+      di.addEventListener('change', function () { loadPhotoStrip(); });
+    }
     // Wire each upload file input once. On change, upload the chosen files to the
     // matching bucket then clear the picker so the same file can be re-picked.
     Object.keys(UP_BUCKETS).forEach(function (bk) {
@@ -20043,11 +20065,70 @@ try {
       if (inp) inp.disabled = !num;
       if (wrap) {
         var hint = wrap.querySelector('[data-up-hint]');
-        if (hint) hint.textContent = num
-          ? 'Files upload to this project QA/QC folder for the report date. Allowed: .guh .jpg .jpeg .png .heic .pdf .zip .xlsx, up to 50MB each.'
-          : 'Select a project first to enable uploads.';
+        if (hint) {
+          if (!num) {
+            hint.textContent = (bk === 'photos')
+              ? 'Select a project first to enable photos.'
+              : 'Select a project first to enable uploads.';
+          } else if (bk === 'photos') {
+            hint.textContent = 'Photos save to this project\'s Project Photos folder. Tap to open the camera or pick from your library (.jpg .jpeg .png .heic, up to 50MB each).';
+          } else {
+            hint.textContent = 'Files upload to this project QA/QC folder for the report date. Allowed: .guh .jpg .jpeg .png .heic .pdf .zip .xlsx, up to 50MB each.';
+          }
+        }
       }
     });
+    // Refresh the day's photo strip whenever project/date changes.
+    loadPhotoStrip();
+  }
+
+  // ---- Today's Photos strip (pull that day's pictures from SharePoint) -------
+  var _photoStripKey = '';   // last "num|date" loaded, avoids redundant fetches
+  function renderPhotoStrip(html) {
+    var host = document.getElementById('drPhotoStrip');
+    if (host) host.innerHTML = html;
+  }
+  function loadPhotoStrip() {
+    var num = selectedProjectNumber();
+    var date = reportDateValue();
+    if (!num || !date) {
+      _photoStripKey = '';
+      renderPhotoStrip('<div class="dr-muted" style="font-size:12px">Select a project and date to see the day\'s photos.</div>');
+      return;
+    }
+    var key = num + '|' + date;
+    _photoStripKey = key;
+    renderPhotoStrip('<div class="dr-muted" style="font-size:12px">Loading photos...</div>');
+    api('/api/project-photos?projectNumber=' + encodeURIComponent(num) + '&date=' + encodeURIComponent(date))
+      .then(function (r) {
+        if (key !== _photoStripKey) return;   // a newer request superseded this one
+        if (!r.ok || !r.body || !r.body.ok) {
+          renderPhotoStrip('<div class="dr-muted" style="font-size:12px">Could not load photos for this day.</div>');
+          return;
+        }
+        var photos = r.body.photos || [];
+        if (!photos.length) {
+          renderPhotoStrip('<div class="dr-muted" style="font-size:12px">No photos for this project on ' + E(date) + ' yet.</div>');
+          return;
+        }
+        var html = '';
+        photos.forEach(function (p) {
+          var thumb = (p.thumbnailUrl && /^https:\/\//i.test(p.thumbnailUrl))
+            ? '<img src="' + E(p.thumbnailUrl) + '" alt="' + E(p.name) + '" loading="lazy">'
+            : '<span class="dr-photo-noimg">' + E(p.name) + '</span>';
+          // Link to the full photo in SharePoint only when the url is https.
+          if (p.webUrl && /^https:\/\//i.test(p.webUrl)) {
+            html += '<a class="dr-photo" href="' + E(p.webUrl) + '" target="_blank" rel="noopener" title="' + E(p.name) + '">' + thumb + '</a>';
+          } else {
+            html += '<span class="dr-photo" title="' + E(p.name) + '">' + thumb + '</span>';
+          }
+        });
+        renderPhotoStrip(html);
+      })
+      .catch(function () {
+        if (key !== _photoStripKey) return;
+        renderPhotoStrip('<div class="dr-muted" style="font-size:12px">Could not load photos for this day.</div>');
+      });
   }
 
   function extOk(name) {
@@ -20154,6 +20235,9 @@ try {
         } else {
           upMsg(bk, body.refs.length + ' uploaded.', true);
         }
+        // Site photos just landed in SharePoint -> refresh the day's photo strip
+        // so the crew sees the shots they just took appear in the report.
+        if (bk === 'photos') { _photoStripKey = ''; loadPhotoStrip(); }
       } else {
         // Total failure (e.g. 502 with errors[]). Show each file's reason.
         renderUpList(bk, errs);
@@ -20241,11 +20325,11 @@ try {
     state.owned = [{ machine: '', hours: '' }, { machine: '', hours: '' }];
     state.rental = [{ category: '', hours: '' }, { category: '', hours: '' }];
     state.future = [{ equipment: '', description: '' }];
-    state.attachments = { handlogs: [], guhma: [] };
+    state.attachments = { handlogs: [], guhma: [], photos: [] };
     buildMaintenanceRows();
     renderProject(); renderForeman(); renderCrew(); renderOwned(); renderRental(); renderMaint(); renderFuture();
-    renderUpList('handlogs', []); renderUpList('guhma', []);
-    upMsg('handlogs', '', null); upMsg('guhma', '', null);
+    renderUpList('handlogs', []); renderUpList('guhma', []); renderUpList('photos', []);
+    upMsg('handlogs', '', null); upMsg('guhma', '', null); upMsg('photos', '', null);
     updateUploadEnabled();
   }
 

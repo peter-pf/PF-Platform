@@ -54,7 +54,12 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const ALLOWED_EXT = new Set(['.guh', '.jpg', '.jpeg', '.png', '.heic', '.pdf', '.zip', '.xlsx']);
 
 // bucket key -> the human folder name created under the dated QAQC folder.
+// handlogs/guhma route to the PM-tree QAQC dated path. `photos` is handled
+// SEPARATELY (Field-Ops tree, loose in the project's "Project Photos" folder,
+// NO dated subfolder) -- it is NOT in this map because it does not use the
+// QAQC ensureDestination() path.
 const BUCKETS = { handlogs: 'Hand Logs', guhma: 'GUHMA Data' };
+const PHOTO_BUCKET = 'photos';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' };
 function json(body, status = 200) {
@@ -94,8 +99,29 @@ function extOf(name) {
 }
 
 // The fixed SharePoint Projects folder (the parent of every project root).
+// Used by handlogs/guhma (the QAQC path, unchanged).
 const PROJECTS_PATH = '04 - Project Management/02 - Projects';
 const COMPLETED_FOLDER_NAME = '001 - Completed Projects';
+
+// --- FIELD OPERATIONS tree (the SITE PHOTOS path) --------------------------
+// Camera "Site Photos" uploads land in a DIFFERENT tree than handlogs/guhma:
+// the top-level Field Operations area, where the crew already keeps jobsite
+// photos and daily reports. Verified live: project folders here are named
+// e.g. "26-002 - POET - Shelbyville, IN" (a DIFFERENT name than the PM tree's
+// "26-002 - POET Projects - POET") but still lead with the NN-NNN number, so
+// the same prefix-match works. The completed fallback here is named
+// "001 - Completed Jobs" (not "...Projects"). The per-project photo folder is
+// resolved by NAME ending in "Project Photos" (real projects use
+// "02 - Project Photos", the template uses "01 - Project Photos") -- NEVER a
+// hardcoded number.
+const FIELD_OPS_PROJECTS_PATH = '05 - Field Operations/01 - Projects';
+const FIELD_OPS_COMPLETED_FOLDER_NAME = '001 - Completed Jobs';
+// A child folder is the photo folder if its name ends in "project photos"
+// (case-insensitive), covering "02 - Project Photos" and "01 - Project Photos".
+function isPhotoFolderName(name) {
+  return typeof name === 'string'
+    && /project photos\s*$/i.test(name.trim());
+}
 
 // Does this folder name belong to the requested project number?
 //   name === "26-002"  OR  "26-002 - ..."  OR  "26-002-..."
@@ -184,6 +210,43 @@ async function resolveProjectFolder(env, token, projectNumber) {
 
   // ---- 3. not found ----
   return null;
+}
+
+// Resolve the FIELD OPERATIONS project folder by prefix-matching the NN-NNN
+// number under "05 - Field Operations/01 - Projects", with a completed fallback
+// under "001 - Completed Jobs" (year folders -> project folders). This is the
+// Field-Ops-tree twin of resolveProjectFolder() and is used ONLY for the
+// `photos` bucket. Returns { id, name } or null.
+async function resolveFieldOpsProjectFolder(env, token, projectNumber) {
+  // ---- 1. ACTIVE field-ops project tree ----
+  const active = await listFolderChildrenByPath(env, token, FIELD_OPS_PROJECTS_PATH);
+  const activeMatch = active.find((f) => nameMatchesProject(f.name, projectNumber));
+  if (activeMatch) return { id: activeMatch.id, name: activeMatch.name };
+
+  // ---- 2. COMPLETED jobs fallback (year folders -> project folders) ----
+  const completedPath = `${FIELD_OPS_PROJECTS_PATH}/${FIELD_OPS_COMPLETED_FOLDER_NAME}`;
+  const yearFolders = await listFolderChildrenByPath(env, token, completedPath);
+  for (const year of yearFolders) {
+    const inYear = await listFolderChildrenById(env, token, year.id);
+    const match = inYear.find((f) => nameMatchesProject(f.name, projectNumber));
+    if (match) return { id: match.id, name: match.name };
+    // Some completed trees may hold project folders directly (no year layer).
+    if (nameMatchesProject(year.name, projectNumber)) return { id: year.id, name: year.name };
+  }
+
+  // ---- 3. not found ----
+  return null;
+}
+
+// Under a resolved Field-Ops project folder, find the child folder whose name
+// ends in "Project Photos" (case-insensitive). Returns { id, name } or null --
+// null means the crew photo folder is missing for this project (caller 404s;
+// we do NOT auto-create it, to avoid forking a competing folder next to the
+// established one).
+async function resolvePhotoFolder(env, token, projectFolderId) {
+  const kids = await listFolderChildrenById(env, token, projectFolderId);
+  const match = kids.find((f) => isPhotoFolderName(f.name));
+  return match ? { id: match.id, name: match.name } : null;
 }
 
 // Find an existing child FOLDER with this exact name under `parentId`, or null.
@@ -319,19 +382,27 @@ export async function onRequestPost(context) {
     const bucketKey = String(form.get('bucket') || '').trim().toLowerCase();
     const reportDate = String(form.get('reportDate') || '').trim();
 
+    const isPhotos = bucketKey === PHOTO_BUCKET;
+
     if (!PROJ_NUM_RE.test(projectNumber)) {
       return json({ status: 'error', message: 'A valid project number is required.' }, 400);
     }
-    if (!Object.prototype.hasOwnProperty.call(BUCKETS, bucketKey)) {
-      return json({ status: 'error', message: "bucket must be 'handlogs' or 'guhma'." }, 400);
+    // handlogs/guhma must be in BUCKETS; photos is the separate site-photo bucket.
+    if (!isPhotos && !Object.prototype.hasOwnProperty.call(BUCKETS, bucketKey)) {
+      return json({ status: 'error', message: "bucket must be 'handlogs', 'guhma' or 'photos'." }, 400);
     }
-    if (!DATE_RE.test(reportDate)) {
-      return json({ status: 'error', message: 'A valid report date (YYYY-MM-DD) is required.' }, 400);
-    }
-    // Defense in depth: confirm the date actually parses to that same calendar day.
-    const d = new Date(reportDate + 'T00:00:00Z');
-    if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== reportDate) {
-      return json({ status: 'error', message: 'Invalid report date.' }, 400);
+    // The report date drives the QAQC dated path for handlogs/guhma. Site photos
+    // land LOOSE in the project photo folder (no dated subfolder, matching the
+    // crew's current habit), so the date is not required for the photos bucket.
+    if (!isPhotos) {
+      if (!DATE_RE.test(reportDate)) {
+        return json({ status: 'error', message: 'A valid report date (YYYY-MM-DD) is required.' }, 400);
+      }
+      // Defense in depth: confirm the date actually parses to that same calendar day.
+      const d = new Date(reportDate + 'T00:00:00Z');
+      if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== reportDate) {
+        return json({ status: 'error', message: 'Invalid report date.' }, 400);
+      }
     }
 
     // Gather file parts. The client repeats the field name "file".
@@ -345,13 +416,28 @@ export async function onRequestPost(context) {
 
     const token = await getGraphToken(env);
 
-    // Resolve the project folder ONCE, then ensure the dated bucket path.
-    const proj = await resolveProjectFolder(env, token, projectNumber);
-    if (!proj) {
-      return json({ status: 'error', message: 'Could not find that project folder in SharePoint.' }, 404);
+    // Resolve the destination folder id. TWO paths:
+    //  - photos  : Field-Ops tree -> project folder -> "Project Photos" (loose).
+    //  - hl/guhma: PM tree -> project folder -> QAQC/<reportDate>/<bucket>.
+    let proj, destFolderId;
+    if (isPhotos) {
+      proj = await resolveFieldOpsProjectFolder(env, token, projectNumber);
+      if (!proj) {
+        return json({ status: 'error', message: 'Could not find that project in the Field Operations area in SharePoint.' }, 404);
+      }
+      const photoFolder = await resolvePhotoFolder(env, token, proj.id);
+      if (!photoFolder) {
+        return json({ status: 'error', message: 'Could not find the Project Photos folder for that project.' }, 404);
+      }
+      destFolderId = photoFolder.id;
+    } else {
+      proj = await resolveProjectFolder(env, token, projectNumber);
+      if (!proj) {
+        return json({ status: 'error', message: 'Could not find that project folder in SharePoint.' }, 404);
+      }
+      const bucketFolderName = BUCKETS[bucketKey];
+      destFolderId = await ensureDestination(env, token, proj.id, reportDate, bucketFolderName);
     }
-    const bucketFolderName = BUCKETS[bucketKey];
-    const destFolderId = await ensureDestination(env, token, proj.id, reportDate, bucketFolderName);
 
     const refs = [];
     const errors = [];

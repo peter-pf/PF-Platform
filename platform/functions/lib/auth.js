@@ -458,6 +458,12 @@ export function areaForPath(pathname) {
     // requireArea(session, 'field_ops'). ZERO financials (files only). Without
     // this line the default-deny posture would block the crew (admin-only).
     if (pathname.startsWith('/api/field-upload'))  return 'field_ops';
+    // Site-photo pull for the daily report: lists a project's "Project Photos"
+    // folder (Field Operations tree) and returns the photos taken THAT DAY so the
+    // daily-report form can show a thumbnail strip. field_ops so the crew can
+    // read; the handler also calls requireArea(session, 'field_ops'). READ-ONLY,
+    // ZERO financials (photo file refs + thumbnails only).
+    if (pathname.startsWith('/api/project-photos')) return 'field_ops';
     // Maintenance completion overlay for the compiled Maintenance checklist. Same
     // readership as the daily reports it overlays (field_ops area = admin/partner/
     // business_dev/field_ops). The handler also calls requireArea(session,
