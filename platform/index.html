@@ -694,7 +694,7 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 }
 
 /* ---- DATA-DRIVEN INDEX VIEWS (Awarded Projects, PF COI) ---- */
-.pf-index-root { max-width: 1100px; }
+.pf-index-root { max-width: none; }
 .pf-index-head { margin-bottom: 14px; }
 .pf-index-head h2 {
   font-size: 1.35rem; font-weight: 700; margin: 0 0 6px; color: var(--text-1);
@@ -1335,7 +1335,7 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 .pf-hl-flag.due-soon { background: rgba(210,153,34,.18); color: #d29922; }
 
 /* ---- TIMESHEETS (Field Operations) ---- */
-.ts-root { max-width: 1180px; }
+.ts-root { max-width: none; }
 .ts-toolbar {
   display: flex; flex-wrap: wrap; align-items: center; gap: 14px;
   margin: 14px 0 18px; padding: 12px 14px;
@@ -1679,7 +1679,7 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 .score-ring.red { background: var(--red-light); color: var(--red); border: 3px solid var(--red); }
 
 /* ===== PROJECT RECORD DETAIL VIEW (Phase 2 v1, read-only) ===== */
-.pr-root { max-width: 1100px; }
+.pr-root { max-width: none; }
 .pr-header {
   background: var(--bg-0);
   border: 1px solid var(--border);
@@ -2117,7 +2117,7 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 .pr-an-foot { font-size: 0.72rem; color: var(--text-3); margin-top: 10px; font-style: italic; }
 
 /* ---- BUDGET vs ACTUAL (job-cost tracker) ---- */
-.ba-wrap { max-width: 1100px; }
+.ba-wrap { max-width: none; }
 .ba-note { font-size: 0.78rem; color: var(--text-3); margin: 0 0 14px; line-height: 1.5; }
 .ba-summary { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
 .ba-kpi { flex: 1 1 150px; background: var(--bg-0); border: 1px solid var(--border-light);
@@ -2130,17 +2130,15 @@ body.role-field-ops .nav-sub[data-fo-hide] {
    whole project record, and give the table a min-width so the columns don't crush.
    (A wider .pr-root record page is a separate visual call — see note for Brad.) */
 .ba-table-wrap { width: 100%; overflow-x: auto; }
-/* Financials widen (Option B, left-anchored, un-clippable). ONLY the project-record
-   Budget vs Actual wrapper grows — scoped to .pr-root so the standalone budget editor
-   view keeps width:100%. The wrap's LEFT edge stays at the record column's normal left
-   edge (after the 240px sidebar + 24px main padding); it grows ONLY rightward.
-   width = viewport minus sidebar minus (24 left + 24 right main padding), so the right
-   edge lands at exactly viewport-24px and can NEVER pass the window. NO transform, NO
-   negative margin, NO centered breakout (that was the earlier clipping bug). Clamped to
-   1560px so it does not get absurdly wide on ultrawide screens. If the table is still
-   wider than this space, overflow-x:auto gives a SCROLLBAR — it never clips a column.
-   Tune width via the 1560px cap. */
-.pr-root .ba-table-wrap { width: calc(100vw - var(--sidebar-w) - 48px); max-width: 1560px; }
+/* Full-width PM: .pr-root itself is now max-width:none, so it fills .main
+   (= viewport - sidebar - main padding). The earlier v2 "breakout" used
+   width:calc(100vw - sidebar - 48px) with a 1560px cap to escape a 1100px record;
+   that is now REDUNDANT and would leave the budget table capped at 1560px while the
+   rest of the full-width record went edge-to-edge (inconsistent). With a full-width
+   .pr-root, the wrapper simply fills the record at 100%. Column-crush is still guarded:
+   .ba-table keeps min-width:1040px and .ba-table-wrap keeps overflow-x:auto, so if the
+   table ever exceeds the record width a horizontal SCROLLBAR appears — it never clips. */
+.pr-root .ba-table-wrap { width: 100%; }
 .ba-table { width: 100%; min-width: 1040px; border-collapse: collapse; background: var(--bg-0);
   border: 1px solid var(--border-light); border-radius: var(--radius); overflow: hidden;
   font-size: 0.85rem; }
