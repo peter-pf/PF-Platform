@@ -13008,13 +13008,24 @@ try {
       }
 
       // ----- 1. General Info -----
+      // Brad batch-2 (2026-08-06): General Info is reorganized into blue-headered
+      // subsections. IMPORTANT for the override/edit path: ALL of these fields still
+      // live as DIRECT children of the ONE General Info card body (data-pr-section
+      // "general"). The subsections are just subhead() dividers WITHIN that body —
+      // they are NOT nested .pr-cards. So the section editor's scan
+      // (body.querySelectorAll('.pr-field[data-pr-label]') scoped to closest('.pr-card')
+      // === the general card) still sees every Project-Info + GC-Info field and the
+      // "general" override key round-trips unchanged. Only PF Team (a separate override
+      // key) is a nested card, injected after render below.
+      //
+      // Project Info = project-level, non-GC-specific fields.
+      // General Contractor Info = GC-specific fields; the GC Contacts personnel list
+      //   is folded in (injected after render, right after these fields).
+      // Documents (linkRow) is moved to the BOTTOM of the card, injected after render.
       _curSection = 'general';
       html += card(1, 'General Info', null,
-        fields([
-          field('General Contractor', bid.gc_name || SF.gc_party, bid.gc_name ? 'Bid Log' : SS),
-          field('GC Project Number / Contract No.', SF.subcontract_number, SS),
-          field('GC Project Manager', (g.gc&&g.gc[0]?g.gc[0].name:''), 'Contacts'),
-          field('Site Superintendent', (function(){var s=(g.gc||[]).find(function(c){return /super/i.test(c.scope||'');});return s?s.name:'';})(), 'Contacts'),
+        subhead('Project Info')
+        + fields([
           field('Project Address', bid.address || SF.project_address, bid.address ? 'Bid Log' : SS),
           field('City / State', bid.city_state, 'Bid Log'),
           field('County', ''),
@@ -13035,7 +13046,14 @@ try {
           field('Estimated Project Completion', ''),
           field('Subcontract / Bid Value', bid.bid_total_value ? ('$'+bid.bid_total_value) : SF.subcontract_value, bid.bid_total_value ? 'Bid Log' : SS),
           field('Award Status', bid.bid_status, 'Bid Log')
-        ]) + linkRow(L.general), false, 'general');
+        ])
+        + subhead('General Contractor Info')
+        + fields([
+          field('General Contractor', bid.gc_name || SF.gc_party, bid.gc_name ? 'Bid Log' : SS),
+          field('GC Project Number / Contract No.', SF.subcontract_number, SS),
+          field('GC Project Manager', (g.gc&&g.gc[0]?g.gc[0].name:''), 'Contacts'),
+          field('Site Superintendent', (function(){var s=(g.gc||[]).find(function(c){return /super/i.test(c.scope||'');});return s?s.name:'';})(), 'Contacts')
+        ]), false, 'general');
 
       // ----- (PF Team merged into General Info) -----
       // Brad (2026-08-06): the standalone "PF Team" card was removed and its full
@@ -13579,14 +13597,31 @@ try {
           field('Final As Built Dwgs Sent to GC', '')
         ]), false, 'closeout');
 
-      // ----- Owner (general info supplement) appended into General? Render owner under General as a sub. -----
-      // (Owner contacts surfaced inside General Info card for completeness.)
+      // ----- Owner / GC Contacts / PF Team / Documents appended into General Info -----
+      // Brad batch-2 (2026-08-06): everything below is injected into the ONE General
+      // Info card body (data-pr-section "general") in this ORDER so the served card
+      // reads: Project Info -> General Contractor Info (+ GC contacts) -> Owner ->
+      // PF Team -> Documents (bottom). All are appended with beforeend, so the source
+      // order here IS the on-screen order. NONE of these injected blocks carry
+      // data-pr-label editable fields (contact lists + linkRow are read-only), except
+      // the PF Team NESTED card which owns its own data-pr-section="pfTeam" -> the
+      // "general" editor scan (scoped to closest('.pr-card') === the general card)
+      // never touches them, so the general/pfTeam override keys stay clean.
       root.innerHTML = html;
 
-      // Inject Owner contacts into the General Info card body (after fields) once rendered.
-      var genCard = root.querySelector('.pr-card .pr-card-body');
+      var genCard = root.querySelector('.pr-card[data-pr-section="general"] .pr-card-body');
+
+      // (a) GC Contacts fold in under "General Contractor Info". The GC-Info fields are
+      // the LAST fields in the body, so appending the GC contacts here places them
+      // directly under that blue subhead. Uses the same .pr-subhead blue-header class.
+      if (genCard) {
+        genCard.insertAdjacentHTML('beforeend',
+          subhead('General Contractor Contacts') + contactList(g.gc));
+      }
+
+      // (b) Owner subsection (its own blue header), below General Contractor Info.
       if (genCard && g.owner && g.owner.length) {
-        genCard.insertAdjacentHTML('beforeend', subhead('Owner') + contactList(g.owner) + subhead('General Contractor Contacts') + contactList(g.gc));
+        genCard.insertAdjacentHTML('beforeend', subhead('Owner') + contactList(g.owner));
       }
 
       // ----- PF Team (merged into General Info) -----
@@ -13610,6 +13645,15 @@ try {
           '<div class="pr-nested-card-wrap">'
           + card('', 'PF Team', pfTeamMeta, pfTeamBody, true, 'pfTeam')
           + '</div>');
+      }
+
+      // (c) Documents — moved to the BOTTOM of the General Info card (Brad batch-2).
+      // linkRow() already emits a "Documents" blue subhead (.pr-subhead) + the folder
+      // links, so it matches the other subsection headers. Appended LAST so it sits
+      // below Project Info / General Contractor Info / Owner / PF Team. It carries no
+      // editable pr-field rows, so the "general" override editor ignores it.
+      if (genCard) {
+        genCard.insertAdjacentHTML('beforeend', linkRow(L.general));
       }
 
       // Inject "Engineering & Design Comments" subsection into the Engineering & Design
