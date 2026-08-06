@@ -15,6 +15,9 @@ with a release-stage suffix (see `docs/PLATFORM-RELEASE-STAGES.md` and `docs/dev
 ### Added
 - DevOps function: team charter, release protocol, logging/monitoring runbook, and maintenance/support runbook under `docs/devops/`, plus this changelog. Formalizes how changes ship, get logged, and stay recoverable.
 
+### Changed
+- PM pages full-width redone on the correct base after regression rollback. The 4 PM wrapper classes (`.pf-index-root`, `.ts-root`, `.pr-root`, `.ba-wrap`) set to `max-width: none` and `.pr-root .ba-table-wrap` breakout set to `width: 100%`, shipped from `pm-fullwidth-v2-20260806` (base `financials-widen-v2-20260804`, which carries the current section structure). CSS-only; Brad approved v2 preview.
+
 ### Notes
 - Recommended (pending Brad's approval to schedule): weekly D1 backup, weekly health check, monthly security review. See `docs/devops/MAINTENANCE-SUPPORT.md`.
 
