@@ -2018,6 +2018,46 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 .pr-field-src { font-size: 0.66rem; color: var(--text-3); font-style: italic; }
 .pr-field-edited { margin-left: 5px; color: var(--accent); font-size: 0.7rem; }
 
+/* ---- General Info rework (Brad 2026-08-06) ------------------------------- */
+/* CONDENSE: General Info's own fields use a tighter, responsive multi-column   */
+/* grid (up to 3 cols on the now-full-width PM pages, reflowing down on narrow   */
+/* screens) with tighter row spacing. SCOPED to General Info's OWN body via the  */
+/* direct-child ">" combinator so the nested PF Team card (which lives under     */
+/* .pr-nested-card-wrap) and every other section keep the default 2-col layout.  */
+.pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px 28px;
+}
+@media (max-width: 1100px) {
+  .pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields {
+    grid-template-columns: 1fr;
+  }
+}
+.pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields .pr-field {
+  padding: 2px 0;
+}
+/* LABELS: General Info's own field labels -> black + bold (was gray). Scoped to  */
+/* the General body's direct .pr-fields so ONLY General Info labels change this   */
+/* round (the .pr-field-label class is SHARED across all sections + the nested    */
+/* PF Team card, which stay gray). */
+.pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields .pr-field-label {
+  color: #111;
+  font-weight: 700;
+}
+
+/* Nested PF Team card living inside the General Info body: slightly inset + a    */
+/* lighter surface so it reads as a sub-section, not a peer of the top cards.     */
+.pr-nested-card-wrap { margin-top: 6px; }
+.pr-nested-card-wrap > .pr-card { margin-bottom: 0; background: var(--bg-1); }
+.pr-nested-card-wrap > .pr-card > .pr-card-head { background: var(--bg-2); padding: 10px 14px; }
+.pr-nested-card-wrap > .pr-card > .pr-card-head .pr-card-num { display: none; }
+.pr-nested-card-wrap > .pr-card > .pr-card-head .pr-card-title { font-size: 0.9rem; }
+
 /* ---- per-section manual-override editor ---- */
 .pr-edit-btn {
   margin-right: 10px;
@@ -12997,10 +13037,15 @@ try {
           field('Award Status', bid.bid_status, 'Bid Log')
         ]) + linkRow(L.general), false, 'general');
 
-      // ----- 2. PF Team -----
-      _curSection = 'pfTeam';
-      html += card(2, 'PF Team', (g.pf_team?g.pf_team.length+' members':null),
-        contactList(g.pf_team) + ovExtras('pfTeam'), false, 'pfTeam');
+      // ----- (PF Team merged into General Info) -----
+      // Brad (2026-08-06): the standalone "PF Team" card was removed and its full
+      // contents (contact list + any pfTeam manual overrides) are now rendered as a
+      // labeled subsection INSIDE the General Info card body, injected after render
+      // below (same beforeend idiom as the Owner / GC contact blocks). It is injected
+      // as its OWN nested .pr-card[data-pr-section="pfTeam"] so it keeps its own Edit
+      // button and its manual overrides STILL save under the "pfTeam" key -> zero data
+      // loss. The two General/dashboard field scans are scoped to skip nested-card
+      // fields so PF Team rows never leak into a "general" override.
 
       // ----- 3. Contract Info -----
       _curSection = 'contract';
@@ -13544,6 +13589,29 @@ try {
         genCard.insertAdjacentHTML('beforeend', subhead('Owner') + contactList(g.owner) + subhead('General Contractor Contacts') + contactList(g.gc));
       }
 
+      // ----- PF Team (merged into General Info) -----
+      // Renders the former standalone "PF Team" card as a nested collapsible card
+      // INSIDE the General Info body. It carries its own data-pr-section="pfTeam", so:
+      //   - the PF Team contact list (contacts.groups.pf_team) still renders,
+      //   - any pfTeam manual overrides (KV PF_PROJECT_OVERRIDES[num].sections.pfTeam)
+      //     still render via ovExtras('pfTeam') AND still SAVE under the "pfTeam" key
+      //     (pfEditSection/pfSaveSection resolve the card via closest('.pr-card') ->
+      //     the nested card, so add/edit-manual-field keeps working in its new home).
+      // No pfTeam data is orphaned or migrated; the same read/write key is reused.
+      if (genCard) {
+        var _prevSec = _curSection;
+        _curSection = 'pfTeam';
+        var pfTeamBody = contactList(g.pf_team) + ovExtras('pfTeam');
+        _curSection = _prevSec;
+        var pfTeamMeta = (g.pf_team ? g.pf_team.length + ' members' : null);
+        // Nested card; open by default so the PF Team roster is visible without a
+        // second click now that it lives inside General Info.
+        genCard.insertAdjacentHTML('beforeend',
+          '<div class="pr-nested-card-wrap">'
+          + card('', 'PF Team', pfTeamMeta, pfTeamBody, true, 'pfTeam')
+          + '</div>');
+      }
+
       // Inject "Engineering & Design Comments" subsection into the Engineering & Design
       // card body (section-key "engineering"), after its fields — same append idiom as
       // the Owner block above, so the per-section Edit button / override structure is
@@ -13608,8 +13676,13 @@ try {
               var body = _sectionCardBody(sec.name);
               if (!body) return; // no matching card (e.g. an unexpected/Financials name) -> skip
               // labels already shown in this card (synced fields + any prior injected rows)
+              // Skip fields inside a NESTED card (e.g. the PF Team card now living inside
+              // General Info) so a merge into General never dedupes against / mixes with
+              // PF Team's own fields. _ownCard = the card body's own .pr-card.
+              var _ownCard = body.closest ? body.closest('.pr-card') : null;
               var shown = {};
               body.querySelectorAll('.pr-field[data-pr-label]').forEach(function(f){
+                if (_ownCard && f.closest('.pr-card') !== _ownCard) return;
                 shown[_norm(f.getAttribute('data-pr-label'))] = true;
               });
               body.querySelectorAll('.pd-merge-item[data-pd-label]').forEach(function(f){
@@ -13827,8 +13900,14 @@ try {
       card.classList.add('open');
 
       // Collect current (label -> displayed value) from the rendered fields.
+      // Scope to THIS card only: skip any field that belongs to a NESTED card (e.g.
+      // the PF Team card now lives inside General Info). Without this, editing
+      // General Info would slurp PF Team's rows into the "general" override key and
+      // orphan the "pfTeam" data. Editing the nested PF Team card scans only its own
+      // fields (its closest .pr-card IS the pfTeam card).
       var rows = [];
       body.querySelectorAll('.pr-field[data-pr-label]').forEach(function(f){
+        if (f.closest('.pr-card') !== card) return;
         var label = f.getAttribute('data-pr-label') || '';
         var valEl = f.querySelector('.pr-field-value');
         var raw = valEl ? valEl.textContent : '';
