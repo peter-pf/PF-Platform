@@ -12156,10 +12156,21 @@ try {
     // Override lookup for (section, label). Returns { has, value } where has=true
     // means an override exists for this field (value may be an empty string, which
     // is a legitimate manual "blank this" override).
+    // Backward-compat: fields that were RENAMED keep reading any override stored
+    // under their OLD label so existing data still renders. new label -> old label.
+    var PF_OVERRIDE_LABEL_ALIASES = {
+      // "Taxes/Sales Tax Notes" -> "Sales Tax Notes" (Brad 2026-08-07, display rename).
+      'Sales Tax Notes': 'Taxes/Sales Tax Notes'
+    };
     function ovLookup(sectionKey, label){
       var sec = _curOverrides && _curOverrides[sectionKey];
       if (sec && Object.prototype.hasOwnProperty.call(sec, label)) {
         return { has: true, value: sec[label] };
+      }
+      // Fall back to a legacy alias key (renamed field) if present.
+      var alias = PF_OVERRIDE_LABEL_ALIASES[label];
+      if (alias && sec && Object.prototype.hasOwnProperty.call(sec, alias)) {
+        return { has: true, value: sec[alias] };
       }
       return { has: false, value: null };
     }
@@ -13494,17 +13505,9 @@ try {
           // pfIsDateLabel (\bstart\b) so field() routes it through pfFmtDate, and the
           // editor renders it as <input type="date"> via PF_FIELD_DATE_LABELS. Saves
           // + round-trips under the SAME `contract` override key as its siblings.
-          field('Released to Start Submittals', ''),
-          // Bid Sent to GC (Brad 2026-08-07): a LINK to the proposal PF sent the GC,
-          // stored in SharePoint. fieldLinked(...,'website') renders the pasted URL
-          // as a clickable link (linkWebsite -> new tab, rel=noopener, auto-prefix
-          // https://) -- the SAME clickable pattern as the GC/Owner website fields.
-          // Blank until set (empty -> em-dash, no link). Editable: the user pastes /
-          // updates the SharePoint URL in the section editor; the value is the URL
-          // text so it round-trips through the SAME `contract` override key as its
-          // siblings. NOT docEmbed (that needs a synced drive-item id); this is a
-          // per-project editable link, never a hard-coded URL.
-          fieldLinked('Bid Sent to GC', '', '', 'website')
+          // Released to Start Submittals is now the LAST field in Bid Recap.
+          // ("Bid Sent to GC" link field removed per Brad 2026-08-07.)
+          field('Released to Start Submittals', '')
         ])
         + subhead('Contract Recap')
         // RESTRUCTURED (Brad 2026-08-07) from a single twoCol grouping into FOUR
@@ -13534,10 +13537,17 @@ try {
           // native date picker via PF_FIELD_DATE_LABELS + MM/DD/YYYY display.
           field('Fully Executed Contract Date', SF.fully_executed_date, SS),
           field('Project Substantial Completion Date', SF.completion_dates, SS),
-          // NEW consolidated tax field (Exempt, else state % + local add-ons). The 3
-          // legacy tax fields are PARKED in "To Be Placed" pending Brad's confirm.
+          // Sales Tax (Brad 2026-08-07): a Yes / No-Exempt selector (dropdown via
+          // PF_FIELD_DROPDOWNS) with an ADJACENT "Sales Tax %" field for the state/
+          // city rate captured when "Yes" is selected. Both always visible; the % is
+          // filled only when Yes (No-Exempt -> leave % blank). Each saves as a plain
+          // string through the SAME `contract` override key. The 3 legacy tax fields
+          // remain PARKED in "To Be Placed" pending Brad's confirm.
           field('Sales Tax', ''),
-          field('Taxes/Sales Tax Notes', '')
+          field('Sales Tax %', ''),
+          // Renamed from "Taxes/Sales Tax Notes" -> "Sales Tax Notes" (display label).
+          // ovLookup() aliases the old label so any stored override still renders.
+          field('Sales Tax Notes', '')
         ], [
           field('Prevailing Wage? Rate?', SF.prevailing_wage || bid.wage_req, SF.prevailing_wage ? SS : 'Bid Log'),
           field('Certified Payroll?', SF.certified_payroll, SS),
@@ -13609,17 +13619,18 @@ try {
           // "Taxes/Sales Tax Notes" above; kept until Brad confirms the merge.
           field('Tax Exempt? / Tax', bid.tax, 'Bid Log'),
           field('Tax Status (per subcontract)', SF.tax_note, SS),
-          field('If not Tax Exempt, Sales Tax Rate', ''),
-          // Existing survey field — parked, NOT assumed equal to the new
-          // "Staking & Layout Included?" inclusion field.
-          field('Surveying & Staking (who performs)', SF.surveying_staking, SS)
+          field('If not Tax Exempt, Sales Tax Rate', '')
+          // ("Surveying & Staking (who performs)" removed per Brad 2026-08-07 —
+          // redundant with the new "Staking & Layout Included? (Yes/No)" field in
+          // the Scope of Work subsection.)
         ], [
-          field('Surveyor', (function(){var s=(g.engineering||[]).find(function(c){return /survey/i.test(c.scope||'');});return s?s.company:'';})(), 'Contacts'),
-          field('Anticipated Spoils (CY)', ''),
-          // Legacy COI/W9 "sent" fields — superseded by the expanded COI/W9 date
-          // tracking in "Needed for Contract Completion" above; kept for any stored value.
-          field('Date COI Sent to GC', ''),
-          field('Date W9 Sent to GC', '')
+          field('Surveyor', (function(){var s=(g.engineering||[]).find(function(c){return /survey/i.test(c.scope||'');});return s?s.company:'';})(),  'Contacts')
+          // Removed per Brad 2026-08-07:
+          //  - "Anticipated Spoils (CY)" -> now in Section 1 General Info ("Estimated Spoils (CY)").
+          //  - "Date COI Sent to GC" -> superseded by the COI tracking block in
+          //    "Needed for Contract Completion" (Requested/Received/Sent to GC).
+          //  - "Date W9 Sent to GC" -> superseded by "W9 Date Sent to GC" in
+          //    "Needed for Contract Completion".
         ])
 
         // --- Executed subcontract: SharePoint FOLDER link (replaces the removed
@@ -14769,6 +14780,10 @@ try {
       'Column Diameter': ['24"', '30"'],
       // Contract Recap > Contract Info (Brad 2026-08-07): execution state of the subcontract.
       'Contract Status': ['Draft', 'Revisions Needed', 'Fully Executed'],
+      // Contract Recap > Contract Info (Brad 2026-08-07): sales-tax posture. "Yes" =
+      // taxable (capture the rate in the adjacent "Sales Tax %" field); "No-Exempt" =
+      // tax-exempt (leave % blank).
+      'Sales Tax': ['Yes', 'No-Exempt'],
       // Engineering & Design > Prelim Design (Brad 2026-08-07, batch-12): SOW reuses the
       // SAME value list as the General Info "Project Scope of Work (SOW)" dropdown so the
       // two stay in lock-step (one source of truth for the scope options).
