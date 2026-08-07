@@ -2018,33 +2018,34 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 .pr-field-src { font-size: 0.66rem; color: var(--text-3); font-style: italic; }
 .pr-field-edited { margin-left: 5px; color: var(--accent); font-size: 0.7rem; }
 
-/* ---- General Info rework (Brad 2026-08-06) ------------------------------- */
-/* CONDENSE: General Info's own fields use a tighter, responsive multi-column   */
-/* grid (up to 3 cols on the now-full-width PM pages, reflowing down on narrow   */
-/* screens) with tighter row spacing. SCOPED to General Info's OWN body via the  */
-/* direct-child ">" combinator so the nested PF Team card (which lives under     */
-/* .pr-nested-card-wrap) and every other section keep the default 2-col layout.  */
-.pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px 28px;
+/* ---- General Info rework (Brad 2026-08-06 / PDF-grouping 2026-08-07) ------ */
+/* FIXED 2-column grouping that matches Brad's spec PDFs: fields are grouped    */
+/* LEFT vs RIGHT (see twoCol() in the renderer) so fields that belong together  */
+/* read together, instead of a flowing auto-fill grid that reorders them. Each  */
+/* .pr-2col holds two .pr-2col-col columns; each column is a single stacked     */
+/* .pr-fields (grid-template-columns:1fr) so the group's order is preserved.    */
+.pr-2col {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 32px;
+  align-items: start;
 }
-@media (max-width: 1100px) {
-  .pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+.pr-2col > .pr-2col-col.pr-fields {
+  grid-template-columns: 1fr;   /* single stacked column, keeps PDF order */
+  gap: 0;
 }
-@media (max-width: 640px) {
-  .pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields {
-    grid-template-columns: 1fr;
-  }
+@media (max-width: 720px) {
+  /* Narrow screens: stack the two groups (left group then right group). */
+  .pr-2col { grid-template-columns: 1fr; gap: 0 32px; }
 }
-.pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields .pr-field {
-  padding: 2px 0;
-}
-/* LABELS: General Info's own field labels -> black + bold (was gray). Scoped to  */
-/* the General body's direct .pr-fields so ONLY General Info labels change this   */
-/* round (the .pr-field-label class is SHARED across all sections + the nested    */
-/* PF Team card, which stay gray). */
+/* Row density for General Info's grouped fields (tighter than the default). */
+.pr-card[data-pr-section="general"] .pr-2col .pr-field { padding: 2px 0; }
+/* LABELS: General Info's own field labels -> black + bold (was gray). Scoped to */
+/* the General card so ONLY General Info labels change (the .pr-field-label class */
+/* is SHARED across all sections; the nested PF Team card stays gray via the      */
+/* :not() guard so it still reads as a sub-section). Covers both the grouped      */
+/* .pr-2col fields and any remaining direct .pr-fields in this card body.         */
+.pr-card[data-pr-section="general"] > .pr-card-body > .pr-2col .pr-field-label,
 .pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields .pr-field-label {
   color: #111;
   font-weight: 700;
@@ -12085,6 +12086,25 @@ try {
     }
     function subhead(t){ return '<div class="pr-subhead">'+E(t)+'</div>'; }
 
+    // twoCol(left, right, leftGroup?, rightGroup?): render a FIXED two-column
+    // grouping that mirrors Brad's spec PDFs (specific fields grouped left vs
+    // right, NOT a flowing auto-fill grid that reorders them). Each side is its
+    // OWN single-stack .pr-fields column so the fields stay grouped exactly as
+    // the PDF shows. Both columns keep the data-pr-contact-group attr option so
+    // "Add contact" still discovers repeatable groups (the editor scans
+    // .pr-fields[data-pr-contact-group]). All rows remain .pr-field[data-pr-label]
+    // descendants of the same card, so pfEditSection/pfSaveSection capture every
+    // field unchanged (their scan is closest('.pr-card')===card, wrapper-agnostic).
+    // Either side may hold subhead() dividers (passed inside the rows array).
+    function twoCol(left, right, leftGroup, rightGroup){
+      var la = leftGroup ? ' data-pr-contact-group="'+E(leftGroup)+'"' : '';
+      var ra = rightGroup ? ' data-pr-contact-group="'+E(rightGroup)+'"' : '';
+      return '<div class="pr-2col">'
+        +   '<div class="pr-fields pr-2col-col"'+la+'>'+left.join('')+'</div>'
+        +   '<div class="pr-fields pr-2col-col"'+ra+'>'+right.join('')+'</div>'
+        + '</div>';
+    }
+
     // ---- override "extras" for LIST-type sections (PF Team, Equipment) --------
     // These sections render CONTACT lists, not a flat pr-fields grid, so a manual
     // override added to them has no synced pr-field row to attach to. ovExtras
@@ -13099,8 +13119,14 @@ try {
       var _gcPE = _gcRole(/project eng|proj eng|\bpe\b/i);
       _curSection = 'general';
       html += card(1, 'General Info', null,
+        // ---- Project Info: FIXED 2-column grouping matching Brad's ProjectInfo
+        // PDF (portal_20260807_022742_ProjectInfo.pdf). LEFT = identity/site/
+        // schedule fields (PF Project # -> Project Completion); RIGHT = scope +
+        // quantities (SOW -> Estimated Spoils). twoCol keeps each group stacked so
+        // fields that belong together read together, instead of a grid that flows
+        // them left-to-right in the wrong order.
         subhead('Project Info')
-        + fields([
+        + twoCol([
           field('PF Project #', D.project_number, 'Record'),
           field('Project Name', D.project_name, 'Record'),
           field('Project Address', bid.address || SF.project_address, bid.address ? 'Bid Log' : SS),
@@ -13110,7 +13136,8 @@ try {
           field('Site Size (Acres)', bid.site_acres, 'Bid Log'),
           field('Anticipated Project Start', bid.projected_start, 'Bid Log'),
           field('Projected Duration (Days)', bid.duration_days, 'Bid Log'),
-          field('Project Completion', ''),
+          field('Project Completion', '')
+        ], [
           // DROPDOWN (SOW). Value seeds from the confirmed subcontract scope where present.
           field('Project Scope of Work (SOW)', SF.confirmed_scope, SF.confirmed_scope ? SS : ''),
           field('SOW Notes', ''),
@@ -13123,15 +13150,17 @@ try {
           field('Estimated Stone (TN)', bid.total_stone_tn, 'Bid Log'),
           field('Estimated Spoils (CY)', '')
         ])
+        // ---- General Contractor Info: FIXED 2-column grouping matching the
+        // GeneralContractorInfo PDF. LEFT = GC company/address/office phone/
+        // website; RIGHT = GC Project Team (PM / Superintendent / Project Engineer).
         + subhead('General Contractor Info')
-        + fields([
+        + twoCol([
           field('General Contractor', bid.gc_name || SF.gc_party || (g.gc&&g.gc[0]?g.gc[0].company:''), bid.gc_name ? 'Bid Log' : SS),
           field('GC Address', (g.gc&&g.gc[0]?g.gc[0].address:''), 'Contacts'),
           field('GC Office Phone', (g.gc&&g.gc[0]?g.gc[0].phone:''), 'Contacts'),
           field('GC Website', (g.gc&&g.gc[0]?g.gc[0].website:''), 'Contacts')
-        ])
-        + subhead('GC Project Team')
-        + fields([
+        ], [
+          subhead('GC Project Team'),
           field('GC Project Manager - Name', _gcPM.name || '', 'Contacts'),
           field('GC Project Manager - Office Phone', _gcPM.phone || '', 'Contacts'),
           field('GC Project Manager - Cell Phone', _gcPM.cell || '', 'Contacts'),
@@ -13297,55 +13326,65 @@ try {
       // Seed the Ground Improvement Engineering company + contact 1 from the synced
       // AP-design contact (g.engineering[0]) / Bid Log firm.
       var _gie = (g.engineering && g.engineering[0]) ? g.engineering[0] : {};
+      // Each engineer block = FIXED 2-column grouping matching the
+      // EngineeringDesignInfo PDF: LEFT = company (Company/Address/Office Phone/
+      // Website); RIGHT = that firm's contacts (min 1, add-more). The RIGHT column
+      // carries the firm's contact-group token so "Add contact" appends numbered
+      // contact blocks. Company fields keep the same "<firm> - <field>" labels so
+      // the "engineering" override key round-trips unchanged (zero data loss).
       var dpBody =
           subhead('Ground Improvement Engineering')
-        + fields([
+        + twoCol([
             field('Ground Improvement - Company', _gie.company || bid.engineer_firm || '', _gie.company ? 'Contacts' : 'Bid Log'),
             field('Ground Improvement - Address', _gie.address || '', 'Contacts'),
             field('Ground Improvement - Office Phone', _gie.phone || '', 'Contacts'),
-            field('Ground Improvement - Website', _gie.website || '', 'Contacts'),
+            field('Ground Improvement - Website', _gie.website || '', 'Contacts')
+          ], [
             field('Ground Improvement - Contact 1 - Contact Name', _gie.name || '', 'Contacts'),
             field('Ground Improvement - Contact 1 - Title', _gie.scope || '', 'Contacts'),
             field('Ground Improvement - Contact 1 - Office Phone', _gie.phone || '', 'Contacts'),
             field('Ground Improvement - Contact 1 - Cell Phone', _gie.cell || '', 'Contacts'),
             field('Ground Improvement - Contact 1 - Email', _gie.email || '', 'Contacts')
-          ], 'Ground Improvement')
+          ], null, 'Ground Improvement')
         + subhead('Geotechnical Engineer')
-        + fields([
+        + twoCol([
             field('Geotechnical - Company', ''),
             field('Geotechnical - Address', ''),
             field('Geotechnical - Office Phone', ''),
-            field('Geotechnical - Website', ''),
+            field('Geotechnical - Website', '')
+          ], [
             field('Geotechnical - Contact 1 - Contact Name', ''),
             field('Geotechnical - Contact 1 - Title', ''),
             field('Geotechnical - Contact 1 - Office Phone', ''),
             field('Geotechnical - Contact 1 - Cell Phone', ''),
             field('Geotechnical - Contact 1 - Email', '')
-          ], 'Geotechnical')
+          ], null, 'Geotechnical')
         + subhead('Civil Engineer')
-        + fields([
+        + twoCol([
             field('Civil - Company', ''),
             field('Civil - Address', ''),
             field('Civil - Office Phone', ''),
-            field('Civil - Website', ''),
+            field('Civil - Website', '')
+          ], [
             field('Civil - Contact 1 - Contact Name', ''),
             field('Civil - Contact 1 - Title', ''),
             field('Civil - Contact 1 - Office Phone', ''),
             field('Civil - Contact 1 - Cell Phone', ''),
             field('Civil - Contact 1 - Email', '')
-          ], 'Civil')
+          ], null, 'Civil')
         + subhead('Structural Engineer')
-        + fields([
+        + twoCol([
             field('Structural - Company', ''),
             field('Structural - Address', ''),
             field('Structural - Office Phone', ''),
-            field('Structural - Website', ''),
+            field('Structural - Website', '')
+          ], [
             field('Structural - Contact 1 - Contact Name', ''),
             field('Structural - Contact 1 - Title', ''),
             field('Structural - Contact 1 - Office Phone', ''),
             field('Structural - Contact 1 - Cell Phone', ''),
             field('Structural - Contact 1 - Email', '')
-          ], 'Structural')
+          ], null, 'Structural')
         + subhead('Engineering & Design Tracking')
         + fields([
             field('Prelim Design Fee', bid.prelim_design_fee, 'Bid Log'),
@@ -13812,9 +13851,16 @@ try {
             field('Owner Contact ' + _n + ' - Email', _oc.email || '', _oc.email ? 'Contacts' : '')
           );
         }
+        // FIXED 2-column grouping matching the OwnerInfo PDF: LEFT = owner
+        // company/address/phone/website; RIGHT = Owner Contacts (repeatable,
+        // add-more). The right column carries the "Owner Contact" contact-group
+        // so "Add contact" still discovers + appends numbered contact blocks.
         genCard.insertAdjacentHTML('beforeend',
-          subhead('Owner Info') + fields(ownerRows)
-          + subhead('Owner Contacts') + fields(ownerContactRows, 'Owner Contact'));
+          subhead('Owner Info')
+          + twoCol(
+              ownerRows,
+              [subhead('Owner Contacts')].concat(ownerContactRows),
+              null, 'Owner Contact'));
       }
 
       // (4) Design Professionals — Engineering & Design MOVED INTO General Info as a
@@ -23777,11 +23823,12 @@ try {
 </script>
 
 <!-- REMOVED 2026-07-28 (Brad): the standalone "Tracked items to complete" panel
-     was redundant with the drop-down section cards. Its PF_PROJECT_DASHBOARD data
-     is now merged INTO the matching section cards inside the office renderInto()
-     (see "MERGE tracked items from the Project Dashboard INTO their section cards"),
-     deduped so nothing is shown twice. No .pd-checklist / openProjectRecord wrapper
-     / #prRoot append remains. -->
+     was redundant with the drop-down section cards. UPDATE 2026-08-07 (Brad): the
+     PF_PROJECT_DASHBOARD "Tracked Items" merge that briefly folded those items INTO
+     the section cards (incl. the Subcontract Agreement card) is now REMOVED ENTIRELY
+     from the office renderInto() — no tracked-items content is rendered in any
+     section card. No .pd-checklist / openProjectRecord wrapper / #prRoot append
+     remains, and nothing resurrects the merge. -->
 
 <script>
 // ============================================================
