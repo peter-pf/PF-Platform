@@ -2298,6 +2298,47 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 .pr-contact-lines a { color: var(--accent); text-decoration: none; }
 .pr-contact-lines a:hover { text-decoration: underline; }
 
+/* ---- Contact CARDS (Brad 2026-08-07): each person's info grouped as one    */
+/* self-contained bordered card; cards tile in a responsive wrapping grid.    */
+/* Each card still holds .pr-field[data-pr-label] rows so the section editor's */
+/* scan (body.querySelectorAll('.pr-field[data-pr-label]') scoped to the card) */
+/* captures every field unchanged. The grid element keeps class .pr-fields +  */
+/* data-pr-contact-group so pfEditSection's group discovery + "Add contact"   */
+/* still work exactly as before.                                              */
+.pr-ccards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  /* neutralize the inherited .pr-fields grid so cards flow/wrap as a flexbox */
+  grid-template-columns: none !important;
+}
+.pr-ccard {
+  flex: 1 1 260px;
+  min-width: 240px;
+  max-width: 320px;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  background: var(--bg-1);
+  padding: 10px 12px;
+  box-sizing: border-box;
+}
+.pr-ccard-head {
+  display: flex; flex-direction: column; gap: 1px;
+  margin-bottom: 6px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-light);
+}
+.pr-ccard-name { font-size: 0.92rem; font-weight: 700; color: var(--text-0); }
+.pr-ccard-role { font-size: 0.72rem; font-weight: 600; color: var(--accent-dark);
+  text-transform: uppercase; letter-spacing: 0.03em; }
+/* inside a contact card the field rows are compact + borderless (the card    */
+/* itself is the visual grouping, so drop the per-row divider).               */
+.pr-ccard .pr-field { padding: 3px 0; border-bottom: none; gap: 1px; }
+.pr-ccard .pr-field-label { font-size: 0.66rem; }
+.pr-ccard .pr-field-value { font-size: 0.84rem; }
+.pr-ccard .pr-field-value a { color: var(--accent); text-decoration: none; word-break: break-all; }
+.pr-ccard .pr-field-value a:hover { text-decoration: underline; }
+@media (max-width: 720px) { .pr-ccard { flex: 1 1 100%; max-width: none; } }
+
 .pr-links { display: flex; flex-wrap: wrap; gap: 8px; }
 .pr-link {
   display: inline-flex; align-items: center; gap: 6px;
@@ -12074,6 +12115,54 @@ try {
       return '<div class="pr-field" data-pr-label="'+E(label)+'"><span class="pr-field-label">'+E(label)+editMark+'</span>'
            + '<span class="'+cls+'">'+shown+'</span>'+srcHtml+'</div>';
     }
+
+    // ---- clickable-link helpers (Brad 2026-08-07, portal-wide rule of thumb) --
+    // email -> mailto: (opens a new draft), website/URL -> new tab (target=_blank
+    // rel=noopener, auto-prefix https:// when missing), phone -> tel:. Values are
+    // untrusted data: the TEXT is escaped via E() and the href is built from the
+    // sanitized value, so no unescaped interpolation reaches the DOM (XSS-safe).
+    function linkEmail(v){
+      var s = v == null ? '' : String(v).trim();
+      if (!s) return '';
+      return '<a href="mailto:'+E(s)+'">'+E(s)+'</a>';
+    }
+    function linkWebsite(v){
+      var s = v == null ? '' : String(v).trim();
+      if (!s) return '';
+      // auto-prefix a scheme so the browser treats it as an absolute URL, not a
+      // same-origin path. Keep the ORIGINAL text as the visible label.
+      var href = /^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : ('https://' + s.replace(/^\/+/, ''));
+      return '<a href="'+E(href)+'" target="_blank" rel="noopener noreferrer">'+E(s)+'</a>';
+    }
+    function linkPhone(v){
+      var s = v == null ? '' : String(v).trim();
+      if (!s) return '';
+      var tel = s.replace(/[^0-9+]/g, '');
+      if (!tel) return E(s);
+      return '<a href="tel:'+E(tel)+'">'+E(s)+'</a>';
+    }
+    // fieldLinked(label,val,src,kind): a field() whose VALUE is rendered as a
+    // clickable link ('email'|'website'|'phone'). Keeps the SAME
+    // .pr-field[data-pr-label] + .pr-field-value structure so the section editor
+    // (which reads valEl.textContent -> plain string) is unaffected. Manual
+    // overrides still win + render as the same link kind.
+    function fieldLinked(label, val, src, kind){
+      var ov = ovLookup(_curSection, label);
+      var edited = ov.has;
+      if (edited) { val = ov.value; src = 'Manual override'; }
+      var raw = (val === undefined || val === null || String(val).trim() === "") ? "" : String(val).trim();
+      var cls = raw ? "pr-field-value" : "pr-field-value empty";
+      var inner;
+      if (!raw) inner = '-';
+      else if (kind === 'email') inner = linkEmail(raw);
+      else if (kind === 'website') inner = linkWebsite(raw);
+      else if (kind === 'phone') inner = linkPhone(raw);
+      else inner = E(raw);
+      var srcHtml = (src && raw) ? '<span class="pr-field-src">'+E(src)+'</span>' : '';
+      var editMark = edited ? '<span class="pr-field-edited" title="Manually edited">&#9998;</span>' : '';
+      return '<div class="pr-field" data-pr-label="'+E(label)+'"><span class="pr-field-label">'+E(label)+editMark+'</span>'
+           + '<span class="'+cls+'">'+inner+'</span>'+srcHtml+'</div>';
+    }
     // fields(rows, contactGroup?): renders the flat label/value grid. If a
     // contactGroup token is passed, the grid is tagged data-pr-contact-group so the
     // section editor can offer an "Add contact" button that appends a numbered
@@ -12103,6 +12192,35 @@ try {
         +   '<div class="pr-fields pr-2col-col"'+la+'>'+left.join('')+'</div>'
         +   '<div class="pr-fields pr-2col-col"'+ra+'>'+right.join('')+'</div>'
         + '</div>';
+    }
+
+    // ---- CONTACT CARDS (Brad 2026-08-07) -------------------------------------
+    // Render each person as a compact self-contained bordered card. Each card is
+    // a .pr-ccard holding a header (name + role/title) and the person's field()
+    // rows (Office / Cell / Email). The rows STAY .pr-field[data-pr-label] so the
+    // section editor captures + saves them exactly as before — the card is purely
+    // a display wrapper. Cards tile in a wrapping grid via contactCardGrid().
+    //
+    // contactCard(headName, headRole, rows): one card. Empty rows are simply
+    // omitted by the caller (only pass the lines that have data / should show).
+    function contactCard(headName, headRole, rows){
+      var head = '';
+      if (headName || headRole) {
+        head = '<div class="pr-ccard-head">'
+          + (headName ? '<span class="pr-ccard-name">'+E(headName)+'</span>' : '')
+          + (headRole ? '<span class="pr-ccard-role">'+E(headRole)+'</span>' : '')
+          + '</div>';
+      }
+      return '<div class="pr-ccard">'+head+(rows||[]).join('')+'</div>';
+    }
+    // contactCardGrid(cards, contactGroup?): wrap contact cards in a responsive
+    // wrapping grid. The wrapper KEEPS class .pr-fields + the data-pr-contact-group
+    // token so pfEditSection's group discovery ('.pr-fields[data-pr-contact-group]')
+    // and the "Add contact" button keep working unchanged; .pr-ccards restyles it
+    // into a flex-wrap card grid (grid-template-columns neutralized in CSS).
+    function contactCardGrid(cards, contactGroup){
+      var attr = contactGroup ? ' data-pr-contact-group="'+E(contactGroup)+'"' : '';
+      return '<div class="pr-fields pr-ccards"'+attr+'>'+(cards||[]).join('')+'</div>';
     }
 
     // ---- override "extras" for LIST-type sections (PF Team, Equipment) --------
@@ -13154,22 +13272,34 @@ try {
         // GeneralContractorInfo PDF. LEFT = GC company/address/office phone/
         // website; RIGHT = GC Project Team (PM / Superintendent / Project Engineer).
         + subhead('General Contractor Info')
+        // LEFT = GC company block (clickable phone + website). RIGHT = GC Project
+        // Team as self-contained CONTACT CARDS (PM / Superintendent / Project
+        // Engineer). Each card keeps its .pr-field[data-pr-label] rows so the
+        // "general" editor saves them unchanged; phones/emails are clickable.
         + twoCol([
           field('General Contractor', bid.gc_name || SF.gc_party || (g.gc&&g.gc[0]?g.gc[0].company:''), bid.gc_name ? 'Bid Log' : SS),
           field('GC Address', (g.gc&&g.gc[0]?g.gc[0].address:''), 'Contacts'),
-          field('GC Office Phone', (g.gc&&g.gc[0]?g.gc[0].phone:''), 'Contacts'),
-          field('GC Website', (g.gc&&g.gc[0]?g.gc[0].website:''), 'Contacts')
+          fieldLinked('GC Office Phone', (g.gc&&g.gc[0]?g.gc[0].phone:''), 'Contacts', 'phone'),
+          fieldLinked('GC Website', (g.gc&&g.gc[0]?g.gc[0].website:''), 'Contacts', 'website')
         ], [
           subhead('GC Project Team'),
-          field('GC Project Manager - Name', _gcPM.name || '', 'Contacts'),
-          field('GC Project Manager - Office Phone', _gcPM.phone || '', 'Contacts'),
-          field('GC Project Manager - Cell Phone', _gcPM.cell || '', 'Contacts'),
-          field('GC Project Manager - Email', _gcPM.email || '', 'Contacts'),
-          field('GC Superintendent - Cell Phone', _gcSup.cell || '', 'Contacts'),
-          field('GC Superintendent - Email', _gcSup.email || '', 'Contacts'),
-          field('GC Project Engineer - Office Phone', _gcPE.phone || '', 'Contacts'),
-          field('GC Project Engineer - Cell Phone', _gcPE.cell || '', 'Contacts'),
-          field('GC Project Engineer - Email', _gcPE.email || '', 'Contacts')
+          contactCardGrid([
+            contactCard(_gcPM.name || 'Project Manager', 'Project Manager', [
+              field('GC Project Manager - Name', _gcPM.name || '', 'Contacts'),
+              fieldLinked('GC Project Manager - Office Phone', _gcPM.phone || '', 'Contacts', 'phone'),
+              fieldLinked('GC Project Manager - Cell Phone', _gcPM.cell || '', 'Contacts', 'phone'),
+              fieldLinked('GC Project Manager - Email', _gcPM.email || '', 'Contacts', 'email')
+            ]),
+            contactCard(_gcSup.name || 'Superintendent', 'Superintendent', [
+              fieldLinked('GC Superintendent - Cell Phone', _gcSup.cell || '', 'Contacts', 'phone'),
+              fieldLinked('GC Superintendent - Email', _gcSup.email || '', 'Contacts', 'email')
+            ]),
+            contactCard(_gcPE.name || 'Project Engineer', 'Project Engineer', [
+              fieldLinked('GC Project Engineer - Office Phone', _gcPE.phone || '', 'Contacts', 'phone'),
+              fieldLinked('GC Project Engineer - Cell Phone', _gcPE.cell || '', 'Contacts', 'phone'),
+              fieldLinked('GC Project Engineer - Email', _gcPE.email || '', 'Contacts', 'email')
+            ])
+          ])
         ]), false, 'general');
 
       // ----- (PF Team merged into General Info) -----
@@ -13332,59 +13462,44 @@ try {
       // carries the firm's contact-group token so "Add contact" appends numbered
       // contact blocks. Company fields keep the same "<firm> - <field>" labels so
       // the "engineering" override key round-trips unchanged (zero data loss).
+      // Each firm block = company block (LEFT) + that firm's contacts as
+      // self-contained CONTACT CARDS (RIGHT). The contact card grid carries the
+      // firm's contact-group token so "Add contact" appends a numbered card;
+      // company phone/website + each contact's phones/email are clickable.
+      // firmBlock(head, prefix, co, contacts): builds one firm's subhead+twoCol.
+      // co = {company,address,phone,website,src}; contacts = [{name,title,phone,cell,email,src}]
+      var firmBlock = function(head, prefix, co, contacts){
+        var cards = (contacts || []).map(function(c, i){
+          var n = i + 1;
+          var p = prefix + ' - Contact ' + n + ' - ';
+          return contactCard(c.name || (head + ' Contact ' + n), c.title || '', [
+            field(p + 'Contact Name', c.name || '', c.src || ''),
+            field(p + 'Title', c.title || '', c.src || ''),
+            fieldLinked(p + 'Office Phone', c.phone || '', c.src || '', 'phone'),
+            fieldLinked(p + 'Cell Phone', c.cell || '', c.src || '', 'phone'),
+            fieldLinked(p + 'Email', c.email || '', c.src || '', 'email')
+          ]);
+        });
+        return subhead(head)
+          + twoCol([
+              field(prefix + ' - Company', co.company || '', co.src || ''),
+              field(prefix + ' - Address', co.address || '', co.src || ''),
+              fieldLinked(prefix + ' - Office Phone', co.phone || '', co.src || '', 'phone'),
+              fieldLinked(prefix + ' - Website', co.website || '', co.src || '', 'website')
+            ], [
+              contactCardGrid(cards, prefix)
+            ]);
+      };
       var dpBody =
-          subhead('Ground Improvement Engineering')
-        + twoCol([
-            field('Ground Improvement - Company', _gie.company || bid.engineer_firm || '', _gie.company ? 'Contacts' : 'Bid Log'),
-            field('Ground Improvement - Address', _gie.address || '', 'Contacts'),
-            field('Ground Improvement - Office Phone', _gie.phone || '', 'Contacts'),
-            field('Ground Improvement - Website', _gie.website || '', 'Contacts')
-          ], [
-            field('Ground Improvement - Contact 1 - Contact Name', _gie.name || '', 'Contacts'),
-            field('Ground Improvement - Contact 1 - Title', _gie.scope || '', 'Contacts'),
-            field('Ground Improvement - Contact 1 - Office Phone', _gie.phone || '', 'Contacts'),
-            field('Ground Improvement - Contact 1 - Cell Phone', _gie.cell || '', 'Contacts'),
-            field('Ground Improvement - Contact 1 - Email', _gie.email || '', 'Contacts')
-          ], null, 'Ground Improvement')
-        + subhead('Geotechnical Engineer')
-        + twoCol([
-            field('Geotechnical - Company', ''),
-            field('Geotechnical - Address', ''),
-            field('Geotechnical - Office Phone', ''),
-            field('Geotechnical - Website', '')
-          ], [
-            field('Geotechnical - Contact 1 - Contact Name', ''),
-            field('Geotechnical - Contact 1 - Title', ''),
-            field('Geotechnical - Contact 1 - Office Phone', ''),
-            field('Geotechnical - Contact 1 - Cell Phone', ''),
-            field('Geotechnical - Contact 1 - Email', '')
-          ], null, 'Geotechnical')
-        + subhead('Civil Engineer')
-        + twoCol([
-            field('Civil - Company', ''),
-            field('Civil - Address', ''),
-            field('Civil - Office Phone', ''),
-            field('Civil - Website', '')
-          ], [
-            field('Civil - Contact 1 - Contact Name', ''),
-            field('Civil - Contact 1 - Title', ''),
-            field('Civil - Contact 1 - Office Phone', ''),
-            field('Civil - Contact 1 - Cell Phone', ''),
-            field('Civil - Contact 1 - Email', '')
-          ], null, 'Civil')
-        + subhead('Structural Engineer')
-        + twoCol([
-            field('Structural - Company', ''),
-            field('Structural - Address', ''),
-            field('Structural - Office Phone', ''),
-            field('Structural - Website', '')
-          ], [
-            field('Structural - Contact 1 - Contact Name', ''),
-            field('Structural - Contact 1 - Title', ''),
-            field('Structural - Contact 1 - Office Phone', ''),
-            field('Structural - Contact 1 - Cell Phone', ''),
-            field('Structural - Contact 1 - Email', '')
-          ], null, 'Structural')
+          firmBlock('Ground Improvement Engineering', 'Ground Improvement',
+            { company: _gie.company || bid.engineer_firm || '', address: _gie.address || '',
+              phone: _gie.phone || '', website: _gie.website || '',
+              src: _gie.company ? 'Contacts' : 'Bid Log' },
+            [{ name: _gie.name || '', title: _gie.scope || '', phone: _gie.phone || '',
+               cell: _gie.cell || '', email: _gie.email || '', src: 'Contacts' }])
+        + firmBlock('Geotechnical Engineer', 'Geotechnical', {}, [{}])
+        + firmBlock('Civil Engineer', 'Civil', {}, [{}])
+        + firmBlock('Structural Engineer', 'Structural', {}, [{}])
         + subhead('Engineering & Design Tracking')
         + fields([
             field('Prelim Design Fee', bid.prelim_design_fee, 'Bid Log'),
@@ -13400,7 +13515,14 @@ try {
             field('Shop Drawings Ready for Pickup', ''),
             field('Jack to Be Used for Testing (Big/Small)', '')
           ])
-        + linkRow(L.engineering);
+        // Documents (Brad 2026-08-07): MOVED out of General Info's bottom and INTO
+        // Engineering & Design here. One "Documents" block combining the engineering
+        // folder links + the general project folder links (L.general), so all project
+        // documents live with Engineering & Design. linkRow() emits the blue
+        // "Documents" subhead + folder links; passing the merged array keeps a single
+        // Documents block (no duplicate header). No editable pr-field rows, so the
+        // "engineering" editor ignores it.
+        + linkRow((L.engineering || []).concat(L.general || []));
         // NOTE: unrendered "engineering" overrides (e.g. added engineer contacts) are
         // surfaced post-render by the nested-card override dedupe below, so no inline
         // ovExtras() here (which would DUPLICATE overrides that match a rendered field).
@@ -13834,33 +13956,34 @@ try {
         var ownerRows = [
           field('Owner', _own0.company || '', _own0.company ? 'Contacts' : ''),
           field('Owner Address', _own0.address || '', 'Contacts'),
-          field('Owner Office Phone', _own0.phone || '', 'Contacts'),
-          field('Owner Website', _own0.website || '', 'Contacts')
+          fieldLinked('Owner Office Phone', _own0.phone || '', 'Contacts', 'phone'),
+          fieldLinked('Owner Website', _own0.website || '', 'Contacts', 'website')
         ];
-        // Owner Contacts: at least 2 rows (spec minimum), seeded from synced contacts.
-        var ownerContactRows = [];
+        // Owner Contacts: at least 2 cards (spec minimum), seeded from synced
+        // contacts. Each contact = one self-contained CONTACT CARD; the card grid
+        // carries the "Owner Contact" group token so "Add contact" appends a
+        // numbered card. Phones/email clickable.
+        var ownerCards = [];
         var _ownCount = Math.max(2, _own.length);
         for (var _oi = 0; _oi < _ownCount; _oi++) {
           var _oc = _own[_oi] || {};
           var _n = _oi + 1;
-          ownerContactRows.push(
+          ownerCards.push(contactCard(_oc.name || ('Owner Contact ' + _n), _oc.scope || '', [
             field('Owner Contact ' + _n + ' - Contact Name', _oc.name || '', _oc.name ? 'Contacts' : ''),
             field('Owner Contact ' + _n + ' - Title', _oc.scope || '', _oc.scope ? 'Contacts' : ''),
-            field('Owner Contact ' + _n + ' - Office Phone', _oc.phone || '', _oc.phone ? 'Contacts' : ''),
-            field('Owner Contact ' + _n + ' - Cell Phone', _oc.cell || '', _oc.cell ? 'Contacts' : ''),
-            field('Owner Contact ' + _n + ' - Email', _oc.email || '', _oc.email ? 'Contacts' : '')
-          );
+            fieldLinked('Owner Contact ' + _n + ' - Office Phone', _oc.phone || '', _oc.phone ? 'Contacts' : '', 'phone'),
+            fieldLinked('Owner Contact ' + _n + ' - Cell Phone', _oc.cell || '', _oc.cell ? 'Contacts' : '', 'phone'),
+            fieldLinked('Owner Contact ' + _n + ' - Email', _oc.email || '', _oc.email ? 'Contacts' : '', 'email')
+          ]));
         }
-        // FIXED 2-column grouping matching the OwnerInfo PDF: LEFT = owner
-        // company/address/phone/website; RIGHT = Owner Contacts (repeatable,
-        // add-more). The right column carries the "Owner Contact" contact-group
-        // so "Add contact" still discovers + appends numbered contact blocks.
+        // LEFT = owner company block; RIGHT = Owner Contact cards. The card grid
+        // (not the twoCol column) carries the "Owner Contact" group token so
+        // pfEditSection discovers it exactly once.
         genCard.insertAdjacentHTML('beforeend',
           subhead('Owner Info')
           + twoCol(
               ownerRows,
-              [subhead('Owner Contacts')].concat(ownerContactRows),
-              null, 'Owner Contact'));
+              [subhead('Owner Contacts'), contactCardGrid(ownerCards, 'Owner Contact')]));
       }
 
       // (4) Design Professionals — Engineering & Design MOVED INTO General Info as a
@@ -13900,21 +14023,25 @@ try {
           ['Operator #2',             {}],
           ['Operator #3',             {}]
         ];
-        var pfRows = [];
+        // Each role = one self-contained CONTACT CARD (header = role, plus the
+        // person's name). Cards tile in a wrapping grid tagged "PF Team Member" so
+        // "Add member" appends a numbered card. Phones/email clickable. Field rows
+        // stay .pr-field[data-pr-label] so the pfTeam editor saves them unchanged.
+        var pfCards = [];
         pfRoles.forEach(function(pair){
           var role = pair[0], c = pair[1] || {};
-          pfRows.push(
+          pfCards.push(contactCard(c.name || role, role, [
             field(role + ' - Contact Name', c.name || '', c.name ? 'Contacts' : ''),
             field(role + ' - Title', c.scope || role, ''),
-            field(role + ' - Office Phone', c.phone || '', c.phone ? 'Contacts' : ''),
-            field(role + ' - Cell Phone', c.cell || '', c.cell ? 'Contacts' : ''),
-            field(role + ' - Email', c.email || '', c.email ? 'Contacts' : '')
-          );
+            fieldLinked(role + ' - Office Phone', c.phone || '', c.phone ? 'Contacts' : '', 'phone'),
+            fieldLinked(role + ' - Cell Phone', c.cell || '', c.cell ? 'Contacts' : '', 'phone'),
+            fieldLinked(role + ' - Email', c.email || '', c.email ? 'Contacts' : '', 'email')
+          ]));
         });
         // No inline ovExtras('pfTeam') — unrendered pfTeam overrides (added members)
         // are surfaced post-render by the nested-card dedupe below, avoiding
         // duplicates for overrides that already match a rendered role field.
-        var pfTeamBody = fields(pfRows, 'PF Team Member');
+        var pfTeamBody = contactCardGrid(pfCards, 'PF Team Member');
         _curSection = _prevPf;
         var pfTeamMeta = (g.pf_team ? g.pf_team.length + ' synced' : null);
         genCard.insertAdjacentHTML('beforeend',
@@ -13958,12 +14085,11 @@ try {
       _surfaceExtras(root.querySelector('.pr-card[data-pr-section="pfTeam"] .pr-card-body'),
         'pfTeam', 'Additional Team Members / Fields', 'PF Team Member');
 
-      // Documents — moved to the very BOTTOM of the General Info card. linkRow() emits
-      // a "Documents" blue subhead (.pr-subhead) + folder links; no editable pr-field
-      // rows, so the "general" editor ignores it.
-      if (genCard) {
-        genCard.insertAdjacentHTML('beforeend', linkRow(L.general));
-      }
+      // Documents (Brad 2026-08-07): MOVED OUT of General Info. It now lives inside
+      // the Engineering & Design (Design Professionals) nested card — the general
+      // project folder links (L.general) are merged into that card's Documents block
+      // (see the dpBody linkRow above). Nothing is injected at the bottom of General
+      // Info here anymore.
 
       // NOTE (Brad 2026-08-07): the Project-Dashboard "Tracked Items" merge that used
       // to fold window.PF_PROJECT_DASHBOARD items into each section card was REMOVED
