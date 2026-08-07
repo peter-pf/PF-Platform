@@ -13730,21 +13730,72 @@ try {
       // fields save through it, _surfaceExtras('engineering') resolves to it). No
       // contact data is lost: g.engineering is untouched and still displayed in
       // General Info. (contactList(g.engineering) render removed from engBody.)
+      // Engineering & Design RESTRUCTURE (Brad 2026-08-07, batch-12): the flat
+      // tracking-field list is reorganized into THREE blue sub-headers (subgroup()
+      // dividers, NOT nested cards) inside the single `engineering` card body:
+      //   1. Prelim Design   2. PF Design Submittal   3. As Built Drawings
+      // subgroup()/subgroupNote() are pure display dividers (not wrappers), so every
+      // field stays a direct .pr-field[data-pr-label] child of the ONE
+      // data-pr-section="engineering" card => pfEditSection/pfSaveSection capture
+      // them all and the `engineering` override key round-trips unchanged. NEW fields
+      // are plain field()/fieldLinked() rows => editable + saveable via the same
+      // override mechanism. AUTOMATION (auto-extract from the linked doc, submittal-
+      // approved auto-save, daily as-built compare) is FUTURE — only the UI shells +
+      // subgroupNote descriptions are built here, no automation wired.
       var engBody =
-          fields([
-            field('AP Design Firm', bid.engineer_firm, 'Bid Log'),
-            field('Prelim Design Fee', bid.prelim_design_fee, 'Bid Log'),
-            field('Design Completed Date', bid.design_completed_date, 'Bid Log'),
-            field('Design Fee Paid Date', bid.design_paid_date, 'Bid Log'),
-            field('Release Date to Start Submittals', ''),
-            field('Finish Floor Elevation (FFE)', ''),
-            field('Confirmed Working Grade Elevation', ''),
-            field('Unfactored Service Loads (DL + LL)', ''),
-            field('Submittals Received from Engineering', ''),
-            field('Submittals Sent to GC', ''),
-            field('Submittals Approved & Returned', ''),
-            field('Shop Drawings Ready for Pickup', ''),
-            field('Jack to Be Used for Testing (Big/Small)', '')
+          // --- Subsection 1: Prelim Design ---
+          // The prelim design the bid was based on. LF / Total Columns / Column
+          // Diameter / SOW are ENGINEERING-scoped copies (own labels distinct from the
+          // General Info > Project Info "Total Pier Qty (Prelim)" / "Total LF (Prelim)"
+          // / "Column Diameter" / "Project Scope of Work (SOW)" rows, which stay in
+          // section 1 under the `general` key and are NOT moved — moving them would
+          // touch section 1 + its override key). These new rows seed read-only from the
+          // Bid Log for convenience but save under `engineering`. Auto-extract of these
+          // values from the linked Prelim Design doc is FUTURE (see subgroupNote).
+          subgroup('Prelim Design')
+        + subgroupNote('The prelim design the bid was based on. FUTURE: values auto-extract from the linked Prelim Design document.')
+        + fields([
+            fieldLinked('Link to Prelim Design', '', '', 'website'),
+            field('LF', bid.total_lf, bid.total_lf ? 'Bid Log' : ''),
+            field('Total Columns', bid.total_columns, bid.total_columns ? 'Bid Log' : ''),
+            // DROPDOWN (Column Diameter: 24" / 30" — reuses PF_FIELD_DROPDOWNS).
+            field('Column Diameter', ''),
+            // DROPDOWN (SOW — reuses the existing Project SOW values via a new
+            // PF_FIELD_DROPDOWNS['SOW'] entry pointing at the same value list).
+            field('SOW', '')
+          ])
+          // --- Subsection 2: PF Design Submittal ---
+        + subgroup('PF Design Submittal')
+        + subgroupNote('FUTURE (not yet built): on Approved, the submittal auto-saves to SharePoint, feeds Site Readiness / Project Setup, and becomes the source of truth vs the field as-builts.')
+        + fields([
+            // DROPDOWN (Design Status).
+            field('Design Status', ''),
+            // DROPDOWN (Submittal Stage). Single item-tracking group for now; a
+            // repeatable per-item set is a FUTURE refinement.
+            field('Submittal Stage', ''),
+            // DATE PICKER (PF_FIELD_DATE_LABELS).
+            field('Response Date Due from GC', ''),
+            // DATE PICKER (PF_FIELD_DATE_LABELS).
+            field('Actual Response Date from GC', ''),
+            // DROPDOWN (Submittal Disposition).
+            field('Submittal Disposition', ''),
+            fieldLinked('Approved Submittal Link', '', '', 'website')
+          ])
+          // --- Subsection 3: As Built Drawings (two sub-sub-groups) ---
+        + subgroup('As Built Drawings')
+          // Sub-sub-group A: Field As-Built Drawings (daily field uploads). UI shell
+          // only — an editable link/list field for now. Rendered as its own subgroup()
+          // header so it reads as a distinct group beneath "As Built Drawings".
+        + subgroup('Field As-Built Drawings')
+        + subgroupNote('FUTURE (not yet built): each daily-report upload saves a dated file per day; Peter compares installed vs the Approved Shop Drawing and posts a daily summary (LF, columns, start/end from rig data).')
+        + fields([
+            fieldLinked('Field As-Built Drawings Link', '', '', 'website'),
+            field('Field As-Built Notes', '')
+          ])
+          // Sub-sub-group B: Stamped Final As-Built Drawings.
+        + subgroup('Stamped Final As-Built Drawings')
+        + fields([
+            fieldLinked('Stamped Final As-Built Link', '', '', 'website')
           ])
         + linkRow((L.engineering || []).concat(L.general || []));
       html += card(3, 'Engineering & Design', null, engBody, false, 'engineering');
@@ -13859,8 +13910,23 @@ try {
       // save / add-more vendor contacts keep working with ZERO data migration and
       // zero API change. See the Site-Readiness nested-card injection block below.
 
-      // ----- 6. QA / QC -----
-      _curSection = 'qaqc';
+      // ----- QA / QC (Brad 2026-08-07, batch-12: MOVED INTO Engineering & Design) -----
+      // The standalone top-level QA/QC section (#6) is REMOVED. Its full content —
+      // including the LIVE-COMPUTED installed-quantity display (GUHMA installed columns
+      // / LF / redrill / last-log, sourced from `q` = the record's qaqc auto-progress
+      // object) — is relocated as a NESTED editable card INSIDE the Engineering & Design
+      // section body, under the "As Built Drawings" area (QA/QC = installed pier data).
+      // The nested card KEEPS its own data-pr-section="qaqc" override key (already in the
+      // API VALID_SECTIONS allowlist), so:
+      //   - pfEditSection/pfSaveSection resolve via btn.closest('.pr-card') = the nested
+      //     card => edits still save under the 'qaqc' key => ZERO data migration.
+      //   - _surfaceExtras('qaqc') still surfaces added/overridden qaqc fields.
+      //   - The engineering-section editor scan is scoped to its own card, so nesting
+      //     qaqc does NOT leak its rows into the 'engineering' key (and vice-versa).
+      // qaRows/qaMeta/qaNote are computed here (data unchanged) and the card is INJECTED
+      // post-render into the engineering card body below (same idiom as Equipment/
+      // Material into Site Readiness). PLACEMENT FLAGGED FOR BRAD.
+      var _prevQa = _curSection; _curSection = 'qaqc';
       var qaRows;
       if (q) {
         qaRows = [
@@ -13880,9 +13946,10 @@ try {
       }
       var qaMeta = q ? (q.installed_columns + ' cols / ' + q.installed_lf + ' LF') : null;
       var qaNote = '<div class="pr-empty-note">Baseline pending - approved Garbin design totals not yet confirmed, so % complete is withheld (installed quantities shown).</div>';
-      html += card(6, 'QA / QC', qaMeta, qaNote + fields(qaRows) + linkRow(L.qaqc), false, 'qaqc');
+      var qaBody = qaNote + fields(qaRows) + linkRow(L.qaqc);
+      _curSection = _prevQa;
 
-      // ----- 7. Financials -----
+      // ----- 6. Financials (renumbered from 7 after QA/QC moved into Engineering) -----
       // Phase 1: a per-project BUDGET vs ACTUAL table seeded from the standard
       // ~69 cost-code template (window.PF_COST_CODE_TEMPLATE, ZEROED) with saved
       // budgets merged on top (_curBudget). Office roles get an inline Edit Budget
@@ -14182,11 +14249,11 @@ try {
         + finSub('Project Invoicing', finInvoicingBody, false)
         + finSub('Project Costs (Budget vs Actual)', baHtml, false);
 
-      html += card(7, 'Financials', baMeta, finBody, false);
+      html += card(6, 'Financials', baMeta, finBody, false);
 
       // ----- 8. Project Closeout -----
       _curSection = 'closeout';
-      html += card(8, 'Project Closeout', null,
+      html += card(7, 'Project Closeout', null,
         fields([
           field('Final As Built Dwgs to Garbin Geo', ''),
           field('Column Logs from Rig (PDF) to Garbin', ''),
@@ -14196,10 +14263,12 @@ try {
           field('PF Check Garbin As Builts vs PF', ''),
           field('Final As Built Dwgs Sent to GC', '')
         ]), false, 'closeout');
-      // (office renumber 2026-08-07 batch-11: Equipment + Material MOVED INTO Site
-      // Readiness / Project Setup as nested cards, so top-level list is now gap-free
-      // 1-8: General Info=1, Subcontract Agreement=2, Engineering & Design=3, Project
-      // Safety=4, Site Readiness / Project Setup=5, QA/QC=6, Financials=7, Closeout=8.)
+      // (office renumber 2026-08-07 batch-12: QA/QC MOVED INTO Engineering & Design as
+      // a nested card, so the top-level list is now gap-free 1-7:
+      // 1. General Info  2. Subcontract Agreement  3. Engineering & Design (now holds
+      // Prelim Design / PF Design Submittal / As Built Drawings + a nested QA/QC card)
+      // 4. Project Safety  5. Site Readiness / Project Setup  6. Financials  7. Closeout.
+      // Prior batch-11 had Equipment + Material nested into Site Readiness.)
 
       // ----- General Info subsections injected after render (Brad 2026-08-07) -----
       // Injected into the ONE General Info card body (data-pr-section "general") in
@@ -14440,12 +14509,35 @@ try {
       };
       // General Info (flat "general" key — includes added Owner Contacts).
       _surfaceExtras(genCard, 'general', 'Additional Contacts / Fields', 'Owner Contact');
+
+      // --- QA/QC nested card injected into Engineering & Design (Brad 2026-08-07,
+      // batch-12) --- The former standalone QA/QC section now lives as a NESTED editable
+      // card inside the Engineering & Design card body, appended after the "As Built
+      // Drawings" subgroup. It keeps its own data-pr-section="qaqc" override key, its
+      // Edit button, the live-computed GUHMA installed-quantity display (qaBody, built
+      // above from `q`), and its Documents (L.qaqc). Injected BEFORE the engineering
+      // _surfaceExtras so that dedupe only sees engineering-card fields (the qaqc rows
+      // live in their OWN nested card, skipped by _surfaceExtras' closest('.pr-card')
+      // guard). PLACEMENT FLAGGED FOR BRAD.
+      var engCardBody = root.querySelector('.pr-card[data-pr-section="engineering"] .pr-card-body');
+      if (engCardBody) {
+        engCardBody.insertAdjacentHTML('beforeend',
+          '<div class="pr-nested-card-wrap">'
+          + card('', 'QA / QC', qaMeta, qaBody, true, 'qaqc')
+          + '</div>');
+      }
+
       // Standalone Engineering & Design section (card #3, the single editable
       // "engineering" key). Batch-8: the Design Professionals subsection in General Info
       // is display-only now, so this querySelector resolves to the restored standalone
       // top-level card (the only .pr-card[data-pr-section="engineering"] in the DOM).
       _surfaceExtras(root.querySelector('.pr-card[data-pr-section="engineering"] .pr-card-body'),
         'engineering', 'Additional Engineer Contacts / Fields', 'Engineer');
+      // QA/QC nested card ("qaqc" key — added/overridden QA fields). Nested inside
+      // Engineering & Design; its querySelector resolves to the single
+      // .pr-card[data-pr-section="qaqc"].
+      _surfaceExtras(root.querySelector('.pr-card[data-pr-section="qaqc"] .pr-card-body'),
+        'qaqc', 'Additional QA/QC Fields', null);
       // PF Project Team nested card ("pfTeam" key — added team members).
       _surfaceExtras(root.querySelector('.pr-card[data-pr-section="pfTeam"] .pr-card-body'),
         'pfTeam', 'Additional Team Members / Fields', 'PF Team Member');
@@ -14660,7 +14752,21 @@ try {
       ],
       'Column Diameter': ['24"', '30"'],
       // Contract Recap > Contract Info (Brad 2026-08-07): execution state of the subcontract.
-      'Contract Status': ['Draft', 'Revisions Needed', 'Fully Executed']
+      'Contract Status': ['Draft', 'Revisions Needed', 'Fully Executed'],
+      // Engineering & Design > Prelim Design (Brad 2026-08-07, batch-12): SOW reuses the
+      // SAME value list as the General Info "Project Scope of Work (SOW)" dropdown so the
+      // two stay in lock-step (one source of truth for the scope options).
+      'SOW': [
+        'Aggregate Piers, Top Feed',
+        'Aggregate Piers, Bottom Feed',
+        'Helical Pilings',
+        'Grouted Aggregate Piers',
+        'Rigid Inclusions'
+      ],
+      // Engineering & Design > PF Design Submittal (Brad 2026-08-07, batch-12).
+      'Design Status': ['Released to Start Design', 'Awaiting Docs for Design'],
+      'Submittal Stage': ['In Design', 'Received', 'Submitted', 'Returned'],
+      'Submittal Disposition': ['Approved', 'Approved as Noted', 'For Record', 'Revise & Resubmit']
     };
 
     // Labels whose editor input is a NATIVE DATE PICKER (Brad 2026-08-07: "hard
@@ -14681,7 +14787,11 @@ try {
       'COI Date Requested from MJ': true,
       'COI Date Received from MJ': true,
       'COI Date Sent to GC': true,
-      'W9 Date Sent to GC': true
+      'W9 Date Sent to GC': true,
+      // Engineering & Design > PF Design Submittal (Brad 2026-08-07, batch-12): GC
+      // response-date milestones get the native date picker + MM/DD/YYYY display.
+      'Response Date Due from GC': true,
+      'Actual Response Date from GC': true
     };
     // Coerce a stored/displayed date (MM/DD/YYYY, M/D/YY, YYYY-MM-DD, ...) into the
     // YYYY-MM-DD form a native <input type="date"> requires to pre-fill. Anything
