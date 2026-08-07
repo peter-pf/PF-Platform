@@ -14573,16 +14573,114 @@ try {
       html += card(6, 'Financials', baMeta, finBody, false);
 
       // ----- 7. Project Closeout -----
+      // Brad 2026-08-07 (batch-14): rebuilt the Closeout placeholder into 5 blue
+      // subgroup() subsections. subgroup()/subgroupNote() are DISPLAY dividers (not
+      // wrappers) so every field stays a direct .pr-field[data-pr-label] child of the
+      // ONE data-pr-section="closeout" card body — the `closeout` override key + the
+      // pfEditSection/pfSaveSection scan round-trip UNCHANGED. STRUCTURE-FIRST: all
+      // automation (5-day GGG return reminders, Peter auto-compare, Send-to-GC Outlook
+      // draft, auto-file, auto-save) is FUTURE — captured in subgroupNote()s only; the
+      // UI here is just the field shells + completion-date/responsible tracking.
+      // Every item tracks a completion date + person responsible where the spec calls
+      // for it. New dropdowns/dates all wired through PF_FIELD_DROPDOWNS / DATE_LABELS /
+      // TEXTAREA_LABELS below (one source of truth, editor picks up the control).
+      // The old 7 flat closeout labels are superseded; any stored override under those
+      // labels is re-surfaced by _surfaceExtras('closeout', ...) post-render (below) so
+      // NO existing closeout data is orphaned.
       _curSection = 'closeout';
+
+      // CERTIFIED PAYROLL CROSS-READ (Subsection 4). Brad: this item should reflect
+      // whether the JOB requires certified payroll, sourced from the Contract Recap
+      // "Certified Payroll Required?" value (the `contract` section's "Certified
+      // Payroll?" field). That value is in scope HERE: the synced source is
+      // SF.certified_payroll (SF defined above in this same render fn) and a manual
+      // edit lives under the `contract` override key. Resolve BOTH (override wins),
+      // then classify: a clear "No"/"N/A"/blank => cert payroll NOT required => this
+      // closeout item DEFAULTS to "N/A" (and shows a small "auto-read" source tag);
+      // anything else (e.g. "Yes", a rate, "Required") => leave the field open for the
+      // user to confirm submission. This is a DISPLAY DEFAULT only — a manual override
+      // on THIS closeout field still wins (field()/ovLookup handles that), so the user
+      // can always change it. No data is mutated; no cross-section write occurs.
+      var _certReqOv = ovLookup('contract', 'Certified Payroll?');
+      var _certReqRaw = _certReqOv.has ? _certReqOv.value : (SF.certified_payroll || '');
+      var _certReqNorm = String(_certReqRaw == null ? '' : _certReqRaw).trim().toLowerCase();
+      // "Not required" if blank OR an explicit no/none/n-a/not-required style answer.
+      var _certNotRequired = (_certReqNorm === '' ||
+        /^(no|n\/?a|none|not\s*req|not\s*required|exempt)\b/.test(_certReqNorm));
+      var _certDefault = _certNotRequired ? 'N/A' : '';
+      var _certSrc = _certNotRequired
+        ? 'Auto-read: Contract Recap = not required'
+        : 'Contract Recap: certified payroll required — confirm submission';
+
       html += card(7, 'Project Closeout', null,
         fields([
-          field('Final As Built Dwgs to Garbin Geo', ''),
-          field('Column Logs from Rig (PDF) to Garbin', ''),
-          field('Modulus Load Test - Passed - to Garbin', ''),
-          field('Certified Payroll Submitted', ''),
-          field('Final As Built Dwgs from Garbin Geo', ''),
-          field('PF Check Garbin As Builts vs PF', ''),
-          field('Final As Built Dwgs Sent to GC', '')
+
+          // ===== Subsection 1: Field Closeout Procedure =====
+          subgroup('1. Field Closeout Procedure'),
+          subgroupNote('Standardized closeout & demob checklist the field runs before leaving, so every job gets the same consistent experience.'),
+          fieldLinked('Field Closeout & Demob Checklist Link', '', '', 'website'),
+          field('Field Closeout Complete?', ''),
+          field('Date Completed', ''),
+          field('Completed By', ''),
+
+          // ===== Subsection 2: Send Final As-Builts to Garbin =====
+          subgroup('2. Send Final As-Builts to Garbin'),
+          subgroupNote('FUTURE: Jonathan is responsible for sending final as-builts to Garbin. His exact prep process is being documented (emailed 8/7). 5-business-day SOP: expected GGG return auto-set 5 business days after logs + load test submitted; if exceeded, auto daily reminder to the Garbin primary contact until received.'),
+          field('Responsible', 'Jonathan'),
+          field('Column Logs (Rig PDF) Sent to Garbin?', ''),
+          field('Date Column Logs Sent', ''),
+          fieldLinked('Column Logs Link', '', '', 'website'),
+          field('Modulus Load Test Sent to Garbin?', ''),
+          field('Date Load Test Sent', ''),
+          fieldLinked('Load Test Link', '', '', 'website'),
+          field('Date All Files Sent to GGG', ''),
+          field('Expected GGG Return Date', ''),
+
+          // ===== Subsection 3: GGG Returns Final As-Builts =====
+          subgroup('3. GGG Returns Final As-Builts'),
+          field('Date Final As-Builts Received from Garbin', ''),
+          field('Received By', ''),
+          field('As-Builts Saved to Closeout Folder?', ''),
+          fieldLinked('Closeout Folder Link', '', '', 'website'),
+          subgroupNote('Save to …\\001 - Completed Projects\\[year]\\[project]\\03 - Engineering & Design\\Closeout. FUTURE: Peter auto-saves on receipt.'),
+          // Review checklist — each Yes/No paired with a Date + who where the spec asks.
+          field('Peter Analyzed As-Builts vs Sent Files?', ''),
+          field('Date Analyzed', ''),
+          field('All Notes / Comments / Depths Picked Up?', ''),
+          field('Discrepancy - Sent Back to Garbin (Jake)?', ''),
+          field('Date Sent Back', ''),
+          field('Jonathan Reviewed & Confirmed Match?', ''),
+          field('Date Confirmed', ''),
+          field('Confirmed to PM (Brad)?', ''),
+          subgroupNote('FUTURE: Peter auto-compares the GGG stamped set against the files sent to confirm all notes/depths carried; if not, back to Garbin (Jake) to revise/resubmit, repeat until confirmed.'),
+          field('Ready to Send to GC?', ''),
+          field('Date Sent to GC', ''),
+          field('Sent By', ''),
+          subgroupNote('FUTURE: “Send to GC” button auto-creates an Outlook email with the approved shop drawings attached + verbiage + recipient auto-populated; PM sends, BCCs Peter; Peter documents the send + saves a copy to the project folder.'),
+          fieldLinked('Final GGG As-Built Set Link', '', '', 'website'),
+
+          // ===== Subsection 4: Certified Payroll Reports =====
+          subgroup('4. Certified Payroll Reports'),
+          // Dynamic note reflecting the Contract Recap cross-read so the requirement
+          // state is visible even when the item field is still empty (field() only
+          // shows a source tag when the value is non-blank). This is DISPLAY-ONLY.
+          subgroupNote(_certNotRequired
+            ? 'Auto-read from Contract Recap: this job does NOT require certified payroll — item defaults to N/A.'
+            : 'Auto-read from Contract Recap: this job REQUIRES certified payroll — confirm submission below.'),
+          // Cross-read of Contract Recap "Certified Payroll Required?" (see above). The
+          // default value + source tag reflect whether the job requires certified
+          // payroll; a manual override on this field still wins.
+          field('Certified Payroll Submitted & Confirmed?', _certDefault, _certSrc),
+          field('Date Confirmed - Certified Payroll', ''),
+          field('Certified Payroll - Responsible', 'Accounting'),
+
+          // ===== Subsection 5: Thank-You Email to GC =====
+          subgroup('5. Thank-You Email to GC'),
+          subgroupNote('Send after all closeout items done; include a brief survey of how the PF team did; portal tracks date + sender + files the email. FUTURE: auto-file the sent email to the project folder.'),
+          field('Thank-You Email Sent?', ''),
+          field('Date Thank-You Sent', ''),
+          field('Thank-You Sent By', ''),
+          field('Performance Survey Notes', '')
         ]), false, 'closeout');
       // (office renumber 2026-08-07 batch-13: standalone Project Safety REMOVED and
       // absorbed into Site Readiness > Subsection 4 (Safety). Top-level list is now
@@ -15007,6 +15105,17 @@ try {
       // equipment/material cards, so only true siteReadiness-key rows are considered.
       _surfaceExtras(root.querySelector('.pr-card[data-pr-section="siteReadiness"] .pr-card-body'),
         'siteReadiness', 'To Be Placed (pending Brad\'s direction)', null);
+
+      // Project Closeout top-level card ("closeout" key). Brad 2026-08-07 (batch-14):
+      // the placeholder's 7 flat labels (Final As Built Dwgs to Garbin Geo, Column Logs
+      // from Rig (PDF) to Garbin, Modulus Load Test - Passed - to Garbin, Certified
+      // Payroll Submitted, Final As Built Dwgs from Garbin Geo, PF Check Garbin As Builts
+      // vs PF, Final As Built Dwgs Sent to GC) were superseded by the new 5-subsection
+      // structure. This surfaces any stored closeout override whose OLD label no longer
+      // maps to a new rendered field into a "To Be Placed" group so NO stored closeout
+      // data is orphaned. closest('.pr-card') guard keeps it scoped to the closeout card.
+      _surfaceExtras(root.querySelector('.pr-card[data-pr-section="closeout"] .pr-card-body'),
+        'closeout', 'To Be Placed (pending Brad\'s direction)', null);
 
       // Documents (Brad 2026-08-07): MOVED OUT of General Info. It now lives inside
       // the Engineering & Design (Design Professionals) nested card — the general
@@ -15586,7 +15695,28 @@ try {
       'Checklist Items 100% Confirmed w/ GC?': ['Yes', 'No'],
       // Subsection 6: Mobilization to Site
       'Demob Transport Company': ['Stephan', 'Paddacks', 'Other'],
-      'Stone Approved by Engineer (GGG)?': ['Yes', 'No']
+      'Stone Approved by Engineer (GGG)?': ['Yes', 'No'],
+      // ===== Project Closeout 5-subsection build (Brad 2026-08-07, batch-14) =====
+      // Subsection 1: Field Closeout Procedure
+      'Field Closeout Complete?': ['Yes', 'No'],
+      // Subsection 2: Send Final As-Builts to Garbin
+      'Column Logs (Rig PDF) Sent to Garbin?': ['Yes', 'No'],
+      'Modulus Load Test Sent to Garbin?': ['Yes', 'No'],
+      // Subsection 3: GGG Returns Final As-Builts (review workflow — Yes/No gates)
+      'As-Builts Saved to Closeout Folder?': ['Yes', 'No'],
+      'Peter Analyzed As-Builts vs Sent Files?': ['Yes', 'No'],
+      'All Notes / Comments / Depths Picked Up?': ['Yes', 'No'],
+      'Discrepancy - Sent Back to Garbin (Jake)?': ['Yes', 'No'],
+      'Jonathan Reviewed & Confirmed Match?': ['Yes', 'No'],
+      'Confirmed to PM (Brad)?': ['Yes', 'No'],
+      'Ready to Send to GC?': ['Yes', 'No'],
+      // Subsection 4: Certified Payroll Reports — Yes / No / N/A (auto-defaults to N/A
+      // when the Contract Recap "Certified Payroll Required?" cross-read = not required).
+      'Certified Payroll Submitted & Confirmed?': ['Yes', 'No', 'N/A'],
+      // Subsection 5: Thank-You Email to GC
+      'Thank-You Email Sent?': ['Yes', 'No'],
+      // Who sent the thank-you email (role-based per spec).
+      'Thank-You Sent By': ['Project Manager', 'Business Development', 'Peter']
     };
 
     // Labels whose editor input is a NATIVE DATE PICKER (Brad 2026-08-07: "hard
@@ -15634,7 +15764,26 @@ try {
       'Rental Date Rented/Active': true,
       'Rental Anticipated Return Date': true,
       'Rental Actual Date Called Off Rent': true,
-      'Stone Delivery Start Date': true
+      'Stone Delivery Start Date': true,
+      // ===== Project Closeout 5-subsection build (Brad 2026-08-07, batch-14) =====
+      // Subsection 1: Field Closeout Procedure
+      'Date Completed': true,
+      // Subsection 2: Send Final As-Builts to Garbin
+      'Date Column Logs Sent': true,
+      'Date Load Test Sent': true,
+      'Date All Files Sent to GGG': true,
+      'Expected GGG Return Date': true,
+      // Subsection 3: GGG Returns Final As-Builts
+      'Date Final As-Builts Received from Garbin': true,
+      'Date Analyzed': true,
+      'Date Sent Back': true,
+      'Date Confirmed': true,
+      'Date Sent to GC': true,
+      // Subsection 4: Certified Payroll Reports (disambiguated label to avoid the
+      // Subsection-3 "Date Confirmed" key collision within the same closeout section).
+      'Date Confirmed - Certified Payroll': true,
+      // Subsection 5: Thank-You Email to GC
+      'Date Thank-You Sent': true
     };
 
     // Labels whose editor input is a MULTI-LINE <textarea> (Brad 2026-08-07: free-form
@@ -15656,7 +15805,10 @@ try {
       'Other Safety Items': true,
       // Subsection 5: Mobilization Preparation — site-readiness checklist + FOM visit notes.
       'Checklist Notes': true,
-      'Field Ops Manager Visit - Comments / Recap': true
+      'Field Ops Manager Visit - Comments / Recap': true,
+      // ===== Project Closeout 5-subsection build (Brad 2026-08-07, batch-14) =====
+      // Subsection 5: Thank-You Email to GC — free-form performance-survey notes.
+      'Performance Survey Notes': true
     };
     function pfIsTextareaLabel(label){ return !!PF_FIELD_TEXTAREA_LABELS[label]; }
     // Coerce a stored/displayed date (MM/DD/YYYY, M/D/YY, YYYY-MM-DD, ...) into the
