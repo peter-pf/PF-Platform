@@ -2111,6 +2111,24 @@ body.role-field-ops .nav-sub[data-fo-hide] {
   cursor: pointer;
 }
 .pr-add-contact-btn:hover { background: var(--accent); color: #fff; }
+/* ---- Contact directory typeahead (autocomplete) --------------------------- */
+/* Anchored to a contact-name input; a floating list of directory matches.      */
+.pr-ta-wrap { position: relative; }
+.pr-ta-menu {
+  position: absolute; z-index: 40; left: 0; right: 0; top: 100%;
+  margin-top: 2px; max-height: 220px; overflow-y: auto;
+  background: var(--bg-0, #fff);
+  border: 1px solid var(--accent, #2f6fed);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+}
+.pr-ta-item { padding: 6px 10px; cursor: pointer; font-size: 0.8rem; line-height: 1.25; }
+.pr-ta-item + .pr-ta-item { border-top: 1px solid rgba(0,0,0,0.06); }
+.pr-ta-item:hover, .pr-ta-item.pr-ta-active { background: var(--accent, #2f6fed); color: #fff; }
+.pr-ta-item:hover .pr-ta-sub, .pr-ta-item.pr-ta-active .pr-ta-sub { color: rgba(255,255,255,0.85); }
+.pr-ta-name { font-weight: 700; }
+.pr-ta-sub { font-size: 0.7rem; color: var(--text-1, #667); }
+.pr-ta-empty { padding: 6px 10px; font-size: 0.74rem; color: var(--text-1, #667); font-style: italic; }
 /* Company sub-subhead inside Design Professionals reads lighter than a .pr-subhead. */
 .pr-card[data-pr-section="engineering"] .pr-subhead { font-size: 0.78rem; }
 .pr-edit-err {
@@ -14543,6 +14561,14 @@ try {
           + 'data-pr-next="' + (groups[prefix].max + 1) + '" '
           + 'onclick="window.pfAddContact(this)">+ Add ' + esc2(prefix) + ' contact</button>';
       }).join('');
+      // OPTIONAL: "Save contacts to directory" — writes any filled contact blocks in
+      // this editor back to the PF Master Contact List. Only offered when this
+      // section actually has contact groups. Fully separate from Save (the section
+      // override); this button never affects the project record. Fail-soft.
+      var saveDirBtn = Object.keys(groups).length
+        ? '<button type="button" class="pr-add-contact-btn" title="Add the filled contacts above to the shared PF contact directory" '
+          + 'onclick="window.pfSaveContactsToDirectory(this)">&#128190; Save contact(s) to directory</button>'
+        : '';
 
       var addRow = '<div class="pr-edit-row pr-edit-add">'
         + '<input class="pr-edit-newlabel" type="text" placeholder="New field name (optional)">'
@@ -14552,7 +14578,8 @@ try {
       var form = '<div class="pr-editor" data-pr-section="' + esc2(section) + '">'
         + '<div class="pr-edit-note">Manual override - what you enter here wins over the synced data and is saved for the whole office.</div>'
         + inputs
-        + (addContactBtns ? '<div class="pr-add-contact-bar">' + addContactBtns + '</div>' : '')
+        + ((addContactBtns || saveDirBtn) ? '<div class="pr-add-contact-bar">' + addContactBtns + saveDirBtn + '</div>' : '')
+        + '<div class="pr-dir-msg" style="display:none;font-size:0.76rem;margin:2px 0;"></div>'
         + addRow
         + '<div class="pr-edit-err" style="display:none"></div>'
         + '<div class="pr-edit-actions">'
@@ -14566,6 +14593,10 @@ try {
       body.innerHTML = form;
       // Hide the Edit button while editing.
       btn.style.display = 'none';
+      // Wire the contact-directory typeahead onto any contact-name inputs in this
+      // editor (fail-soft: no backend => no menu, manual entry unaffected).
+      var _editorEl = body.querySelector('.pr-editor');
+      if (_editorEl) pfWireTypeahead(_editorEl);
     };
 
     // Append a fresh numbered contact block (5 inputs) for a repeatable group. The
@@ -14589,6 +14620,221 @@ try {
       var bar = editor.querySelector('.pr-add-contact-bar');
       if (bar) bar.insertAdjacentHTML('beforebegin', rowsHtml);
       else editor.querySelector('.pr-edit-actions').insertAdjacentHTML('beforebegin', rowsHtml);
+      // Wire the typeahead onto the freshly-added contact-name input so a brand-new
+      // block can autofill from the directory too.
+      pfWireTypeahead(editor);
+    };
+
+    // =======================================================================
+    // CONTACT DIRECTORY TYPEAHEAD (autocomplete + autofill)  (Brad 2026-08-07)
+    // =======================================================================
+    // As a user types into a contact-NAME input inside the section editor, offer
+    // matches from the PF Master Contact List (/api/contacts). Selecting a match
+    // autofills the SIBLING inputs (Title / Office Phone / Cell Phone / Email) that
+    // share the same label PREFIX (everything before "- Contact Name"). The list is
+    // fetched ONCE and filtered in-memory. DEGRADES GRACEFULLY: if /api/contacts is
+    // unavailable (e.g. a preview with no backend), the fetch simply yields an empty
+    // list, the menu never appears, and manual typing is completely unaffected. No
+    // console errors block the page.
+    var PF_CONTACTS = null;         // cached array once loaded
+    var _pfContactsPromise = null;  // in-flight fetch (dedupe)
+    function pfLoadContacts(){
+      if (PF_CONTACTS) return Promise.resolve(PF_CONTACTS);
+      if (_pfContactsPromise) return _pfContactsPromise;
+      _pfContactsPromise = fetch('/api/contacts', { credentials: 'same-origin' })
+        .then(function(res){ return res.ok ? res.json() : { contacts: [] }; })
+        .then(function(b){
+          PF_CONTACTS = (b && Array.isArray(b.contacts)) ? b.contacts : [];
+          return PF_CONTACTS;
+        })
+        .catch(function(){ PF_CONTACTS = []; return PF_CONTACTS; }); // fail soft
+      return _pfContactsPromise;
+    }
+
+    // The label prefix of a contact-name field, e.g.
+    //   "Owner Contact 1 - Contact Name"  ->  "Owner Contact 1 "
+    function pfContactPrefix(label){
+      var m = /^(.*?)-\s*Contact Name\s*$/.exec(label || '');
+      return m ? m[1] : null;
+    }
+    // Set the value of a sibling editor input by its label SUFFIX (e.g. "Title").
+    function pfSetSibling(editor, prefix, suffix, value){
+      if (value == null || value === '') return;
+      // Attribute-selector escaping is finicky with spaces/quotes; scan instead.
+      var found = null;
+      editor.querySelectorAll('.pr-edit-input[data-pr-field-label]').forEach(function(el){
+        if (found) return;
+        var l = el.getAttribute('data-pr-field-label') || '';
+        // match "<prefix>- <suffix>" with flexible spaces around the dash
+        if (l.replace(/\s*-\s*/g, ' - ').trim() === (prefix.trim() + ' - ' + suffix)) found = el;
+      });
+      if (found && !found.value) { found.value = value; }
+    }
+
+    // Autofill the whole contact block from a chosen directory entry.
+    function pfApplyContact(editor, prefix, c){
+      var nameInput = null;
+      editor.querySelectorAll('.pr-edit-input[data-pr-field-label]').forEach(function(el){
+        var l = el.getAttribute('data-pr-field-label') || '';
+        if (pfContactPrefix(l) === prefix) nameInput = el;
+      });
+      if (nameInput) nameInput.value = (c.name || ((c.firstName||'') + ' ' + (c.lastName||'')).trim());
+      pfSetSibling(editor, prefix, 'Title', c.title || '');
+      pfSetSibling(editor, prefix, 'Office Phone', c.officePhone || '');
+      pfSetSibling(editor, prefix, 'Cell Phone', c.cellPhone || '');
+      pfSetSibling(editor, prefix, 'Email', c.email || '');
+    }
+
+    // Build + show the suggestion menu for a name input.
+    function pfShowMenu(input, editor, prefix){
+      var q = (input.value || '').trim().toLowerCase();
+      pfCloseMenu(input);
+      if (q.length < 1) return;
+      var list = (PF_CONTACTS || []);
+      var matches = list.filter(function(c){
+        var hay = ((c.name||'') + ' ' + (c.company||'') + ' ' + (c.title||'')).toLowerCase();
+        return hay.indexOf(q) !== -1;
+      }).slice(0, 8);
+      if (!matches.length) return; // nothing to show; manual typing continues
+      var wrap = input.closest('.pr-ta-wrap');
+      if (!wrap) return;
+      var menu = document.createElement('div');
+      menu.className = 'pr-ta-menu';
+      matches.forEach(function(c, i){
+        var item = document.createElement('div');
+        item.className = 'pr-ta-item' + (i === 0 ? ' pr-ta-active' : '');
+        var sub = [c.title, c.company].filter(Boolean).join(' · ');
+        item.innerHTML = '<div class="pr-ta-name"></div><div class="pr-ta-sub"></div>';
+        item.querySelector('.pr-ta-name').textContent = c.name || ((c.firstName||'') + ' ' + (c.lastName||'')).trim();
+        item.querySelector('.pr-ta-sub').textContent = sub;
+        // mousedown (not click) so it fires before the input's blur closes the menu
+        item.addEventListener('mousedown', function(ev){
+          ev.preventDefault();
+          pfApplyContact(editor, prefix, c);
+          pfCloseMenu(input);
+        });
+        menu.appendChild(item);
+      });
+      wrap.appendChild(menu);
+      input._pfMenu = menu;
+    }
+    function pfCloseMenu(input){
+      if (input && input._pfMenu) { try { input._pfMenu.remove(); } catch(e){} input._pfMenu = null; }
+    }
+
+    // Wire the typeahead onto every contact-name input in an editor that is not
+    // already wired. Loads the directory lazily on first focus.
+    function pfWireTypeahead(editor){
+      if (!editor) return;
+      editor.querySelectorAll('.pr-edit-input[data-pr-field-label]').forEach(function(input){
+        var label = input.getAttribute('data-pr-field-label') || '';
+        var prefix = pfContactPrefix(label);
+        if (!prefix) return;                 // only contact-NAME inputs
+        if (input._pfTaWired) return;        // idempotent
+        input._pfTaWired = true;
+        // Wrap the input so the menu can anchor to it.
+        if (!input.closest('.pr-ta-wrap')) {
+          var w = document.createElement('span');
+          w.className = 'pr-ta-wrap';
+          w.style.display = 'block';
+          input.parentNode.insertBefore(w, input);
+          w.appendChild(input);
+        }
+        input.setAttribute('autocomplete', 'off');
+        input.addEventListener('focus', function(){ pfLoadContacts().then(function(){ pfShowMenu(input, editor, prefix); }); });
+        input.addEventListener('input', function(){ pfLoadContacts().then(function(){ pfShowMenu(input, editor, prefix); }); });
+        input.addEventListener('keydown', function(ev){
+          var menu = input._pfMenu; if (!menu) return;
+          var items = Array.prototype.slice.call(menu.querySelectorAll('.pr-ta-item'));
+          var idx = items.findIndex(function(el){ return el.classList.contains('pr-ta-active'); });
+          if (ev.key === 'ArrowDown') { ev.preventDefault(); if (idx < items.length-1){ items[idx] && items[idx].classList.remove('pr-ta-active'); items[idx+1].classList.add('pr-ta-active'); } }
+          else if (ev.key === 'ArrowUp') { ev.preventDefault(); if (idx > 0){ items[idx].classList.remove('pr-ta-active'); items[idx-1].classList.add('pr-ta-active'); } }
+          else if (ev.key === 'Enter') {
+            var active = menu.querySelector('.pr-ta-item.pr-ta-active');
+            if (active) { ev.preventDefault(); active.dispatchEvent(new MouseEvent('mousedown')); }
+          }
+          else if (ev.key === 'Escape') { pfCloseMenu(input); }
+        });
+        input.addEventListener('blur', function(){ setTimeout(function(){ pfCloseMenu(input); }, 150); });
+      });
+    }
+
+    // Part 3: write the editor's filled contact blocks back to the master directory.
+    // Groups editor inputs by contact-name prefix, builds a contact per block, and
+    // POSTs each new one to /api/contacts (action:'add'). FAIL CLOSED + honest: on
+    // any error it reports the failure inline; it NEVER touches the project record
+    // and NEVER claims success it did not get. Entirely independent of pfSaveSection.
+    window.pfSaveContactsToDirectory = function(btn){
+      var editor = btn.closest('.pr-editor'); if (!editor) return;
+      var msgEl = editor.querySelector('.pr-dir-msg');
+      function msg(text, good){
+        if (!msgEl) return;
+        msgEl.textContent = text;
+        msgEl.style.color = good ? '#1e7d34' : '#c0392b';
+        msgEl.style.display = 'block';
+      }
+      // Collect all contact-name prefixes present, then gather each block's fields.
+      var blocks = {}; // prefix -> {name,title,officePhone,cellPhone,email}
+      editor.querySelectorAll('.pr-edit-input[data-pr-field-label]').forEach(function(inp){
+        var label = inp.getAttribute('data-pr-field-label') || '';
+        var pfx = pfContactPrefix(label);
+        var norm = label.replace(/\s*-\s*/g, ' - ').trim();
+        var val = (inp.value || '').trim();
+        // Find which known prefix this input belongs to (name defines the block).
+        if (pfx != null) { blocks[pfx] = blocks[pfx] || {}; blocks[pfx].name = val; return; }
+        // sibling fields: match "<prefix> - <suffix>"
+        var m = /^(.*?) - (Title|Office Phone|Cell Phone|Email)$/.exec(norm);
+        if (m) {
+          var p = m[1] + ' ';
+          blocks[p] = blocks[p] || {};
+          var key = { 'Title':'title', 'Office Phone':'officePhone', 'Cell Phone':'cellPhone', 'Email':'email' }[m[2]];
+          blocks[p][key] = val;
+        }
+      });
+      // Keep only blocks that have a name.
+      var toSave = Object.keys(blocks)
+        .map(function(p){ return blocks[p]; })
+        .filter(function(b){ return b && b.name; });
+      if (!toSave.length) { msg('Enter a contact name first, then save to the directory.', false); return; }
+
+      btn.disabled = true; var orig = btn.innerHTML; btn.textContent = 'Saving…';
+      msg('Saving ' + toSave.length + ' contact' + (toSave.length>1?'s':'') + '…', true);
+
+      // Split each name into first/last for the sheet (last word = last name).
+      function splitName(n){
+        var parts = String(n).trim().split(/\s+/);
+        if (parts.length === 1) return { firstName: parts[0], lastName: '' };
+        return { firstName: parts.slice(0, -1).join(' '), lastName: parts[parts.length-1] };
+      }
+      var results = toSave.map(function(b){
+        var nm = splitName(b.name);
+        return fetch('/api/contacts', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'add', contact: {
+            firstName: nm.firstName, lastName: nm.lastName,
+            title: b.title || '', officePhone: b.officePhone || '',
+            cellPhone: b.cellPhone || '', email: b.email || '',
+          } })
+        }).then(function(res){ return res.json().then(function(j){ return { ok: res.ok && j && j.ok, body: j }; })
+          .catch(function(){ return { ok: false, body: null }; }); })
+          .catch(function(){ return { ok: false, body: null }; });
+      });
+      Promise.all(results).then(function(rs){
+        var okCount = rs.filter(function(r){ return r.ok; }).length;
+        var failCount = rs.length - okCount;
+        btn.disabled = false; btn.innerHTML = orig;
+        if (failCount === 0) {
+          msg('Saved ' + okCount + ' contact' + (okCount>1?'s':'') + ' to the directory.', true);
+          PF_CONTACTS = null; _pfContactsPromise = null; // force a fresh directory pull next focus
+        } else if (okCount > 0) {
+          var firstErr = (rs.find(function(r){ return !r.ok; }) || {}).body;
+          msg('Saved ' + okCount + ', but ' + failCount + ' failed' + (firstErr && firstErr.message ? ' (' + firstErr.message + ')' : '') + '.', false);
+        } else {
+          var e = (rs[0] && rs[0].body) || null;
+          msg((e && e.message) ? e.message : 'Could not save to the directory. Please retry.', false);
+        }
+      });
     };
 
     // Restore the section to its pre-edit rendering (no save).

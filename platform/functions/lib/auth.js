@@ -568,6 +568,14 @@ export function areaForPath(pathname) {
     // direct URL too. Each endpoint ALSO calls requireArea('business_dev').
     if (pathname.startsWith('/api/bd-interaction')) return 'business_dev';
     if (pathname.startsWith('/api/bd-record'))      return 'business_dev';
+    // Master contact directory (read + write-back to PF Master Contact List.xlsx).
+    // The portal's contact typeahead + "save to directory" surface. CRM area =
+    // admin + partner + business_dev; field_ops BLOCKED by direct URL too. The
+    // handler ALSO calls requireArea(session, 'crm') on GET + POST. It carries NO
+    // financials (names / titles / companies / phones / emails only). Without this
+    // line it would fall through to the default 'user_admin' (admin-only) and the
+    // office (partner/BD) could not read or save contacts.
+    if (pathname.startsWith('/api/contacts'))       return 'crm';
     // Opportunities: the MIDDLEWARE gates the path at business_dev (admin +
     // partner + business_dev pass; field_ops BLOCKED). The admin-only email
     // bridge actions (GET ?pending=1, POST mark-emailed) are enforced IN the
