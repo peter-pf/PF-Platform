@@ -13439,19 +13439,51 @@ try {
         html += card('2b', 'Subcontract Analysis', riskMeta, ab, false);
       }
 
-      // ----- Design Professionals (Engineering & Design MOVED INTO General Info) -----
-      // Brad (2026-08-07): the standalone "Engineering & Design" card is REMOVED from
-      // the top-level section list and rebuilt as the "Design Professionals" nested
-      // card injected inside General Info below. It keeps its own data-pr-section
-      // "engineering" override key (zero data loss / zero migration). Built here as a
-      // body string (dpBody); the nested card is emitted in the injection block.
-      // Spec = 4 company sub-blocks: Ground Improvement Engineering, Geotechnical,
-      // Civil, Structural. Each: Company / Address / Office Phone / Website + contacts
-      // (minimum 1, add-more). The existing Bid-Log engineering firm + submittal
-      // tracking fields (previously in the Engineering card) are PRESERVED under the
-      // Ground Improvement Engineering block (mapped: AP design firm = ground
-      // improvement engineer) + an "Engineering & Design Tracking" tail so no data or
-      // in-flight submittal tracking is lost.
+      // ----- 3. Engineering & Design (RESTORED standalone top-level section) -----
+      // Brad (2026-08-07, batch-8 CORRECTION): batch-4 wrongly ELIMINATED this
+      // standalone top-level section when it imported the engineering CONTACTS into
+      // General Info. Brad only wanted the contacts imported, not the section removed.
+      // Restored here EXACTLY as it existed in live prod (commit ef07b02): its original
+      // fields (AP Design Firm, Prelim Design Fee, design dates, submittal tracking,
+      // Engineering & Design Contacts, Documents) under the SAME editable "engineering"
+      // override key. This is the SINGLE editable "engineering" card in the DOM; the
+      // Design Professionals subsection inside General Info (below) is display-only, so
+      // there is no key collision (per-section save + _surfaceExtras both unambiguous).
+      // Documents live here (Brad: move documents to the Engineering & Design Section).
+      _curSection = 'engineering';
+      var engBody = subhead('Engineering & Design Contacts') + contactList(g.engineering)
+        + fields([
+            field('AP Design Firm', bid.engineer_firm, 'Bid Log'),
+            field('Prelim Design Fee', bid.prelim_design_fee, 'Bid Log'),
+            field('Design Completed Date', bid.design_completed_date, 'Bid Log'),
+            field('Design Fee Paid Date', bid.design_paid_date, 'Bid Log'),
+            field('Release Date to Start Submittals', ''),
+            field('Finish Floor Elevation (FFE)', ''),
+            field('Confirmed Working Grade Elevation', ''),
+            field('Unfactored Service Loads (DL + LL)', ''),
+            field('Submittals Received from Engineering', ''),
+            field('Submittals Sent to GC', ''),
+            field('Submittals Approved & Returned', ''),
+            field('Shop Drawings Ready for Pickup', ''),
+            field('Jack to Be Used for Testing (Big/Small)', '')
+          ])
+        + linkRow((L.engineering || []).concat(L.general || []));
+      html += card(3, 'Engineering & Design', null, engBody, false, 'engineering');
+
+      // ----- Design Professionals (CONTACTS import inside General Info) -----
+      // Brad (2026-08-07, batch-8 CORRECTION): the standalone "Engineering & Design"
+      // top-level section is RESTORED (see card #3 below) with its original fields and
+      // its own editable "engineering" override key. The Design Professionals CONTACTS
+      // subsection STAYS here inside General Info per Brad's import request, but it is
+      // now a DISPLAY-ONLY nested card with NO data-pr-section (no Edit button, no POST)
+      // to avoid a second editable card on the same "engineering" key (the API's
+      // per-section save would otherwise let two cards on one key fight over shared
+      // labels, and _surfaceExtras' querySelector only sees one). The single editable
+      // owner of the "engineering" key is the restored standalone section. These firm
+      // contact cards render from the same synced source (g.engineering) so they always
+      // reflect current data; engineering edits are made in the standalone section's
+      // Engineering & Design Contacts editor. The Tracking fields + Documents that used
+      // to live here were MOVED to the restored standalone Engineering & Design section.
       _curSection = 'engineering';
       // Seed the Ground Improvement Engineering company + contact 1 from the synced
       // AP-design contact (g.engineering[0]) / Bid Log firm.
@@ -13499,37 +13531,17 @@ try {
                cell: _gie.cell || '', email: _gie.email || '', src: 'Contacts' }])
         + firmBlock('Geotechnical Engineer', 'Geotechnical', {}, [{}])
         + firmBlock('Civil Engineer', 'Civil', {}, [{}])
-        + firmBlock('Structural Engineer', 'Structural', {}, [{}])
-        + subhead('Engineering & Design Tracking')
-        + fields([
-            field('Prelim Design Fee', bid.prelim_design_fee, 'Bid Log'),
-            field('Design Completed Date', bid.design_completed_date, 'Bid Log'),
-            field('Design Fee Paid Date', bid.design_paid_date, 'Bid Log'),
-            field('Release Date to Start Submittals', ''),
-            field('Finish Floor Elevation (FFE)', ''),
-            field('Confirmed Working Grade Elevation', ''),
-            field('Unfactored Service Loads (DL + LL)', ''),
-            field('Submittals Received from Engineering', ''),
-            field('Submittals Sent to GC', ''),
-            field('Submittals Approved & Returned', ''),
-            field('Shop Drawings Ready for Pickup', ''),
-            field('Jack to Be Used for Testing (Big/Small)', '')
-          ])
-        // Documents (Brad 2026-08-07): MOVED out of General Info's bottom and INTO
-        // Engineering & Design here. One "Documents" block combining the engineering
-        // folder links + the general project folder links (L.general), so all project
-        // documents live with Engineering & Design. linkRow() emits the blue
-        // "Documents" subhead + folder links; passing the merged array keeps a single
-        // Documents block (no duplicate header). No editable pr-field rows, so the
-        // "engineering" editor ignores it.
-        + linkRow((L.engineering || []).concat(L.general || []));
-        // NOTE: unrendered "engineering" overrides (e.g. added engineer contacts) are
-        // surfaced post-render by the nested-card override dedupe below, so no inline
-        // ovExtras() here (which would DUPLICATE overrides that match a rendered field).
+        + firmBlock('Structural Engineer', 'Structural', {}, [{}]);
+        // Batch-8 CORRECTION: the "Engineering & Design Tracking" fields (Prelim Design
+        // Fee, submittal dates, FFE, loads, jack, etc.) and the Documents block were
+        // MOVED OUT of this display-only Design Professionals subsection and back into
+        // the restored standalone Engineering & Design section (card #3), which owns the
+        // editable "engineering" key. Keeping them here would duplicate labels across two
+        // views of the same key. This subsection is now contacts-only (display).
 
       // ----- 4. Project Safety -----
       _curSection = 'safety';
-      html += card(3, 'Project Safety', null,
+      html += card(4, 'Project Safety', null,
         fields([
           field('Site Specific Safety Plan (SSSP)', 'On file (see link)', 'SharePoint'),
           field('Safety Consultant', (function(){var s=(g.vendors||[]).find(function(c){return /safety/i.test(c.scope||'');});return s?(s.company+(s.name?' / '+s.name:'')):'';})(), 'Contacts'),
@@ -13544,9 +13556,11 @@ try {
           field('Date Ticket Expires', '')
         ]) + linkRow(L.safety), false, 'safety');
 
-      // ----- 5. Site Readiness -----
+      // ----- 5. Site Readiness / Project Setup -----
+      // Display title only (Brad 2026-08-07). sectionKey stays 'siteReadiness' so data
+      // + edit/save plumbing are unchanged.
       _curSection = 'siteReadiness';
-      html += card(4, 'Site Readiness', null,
+      html += card(5, 'Site Readiness / Project Setup', null,
         fields([
           field('Mod Load Test Report', ''),
           field('Mod Test Jack Calibration Report', ''),
@@ -13560,7 +13574,7 @@ try {
       // ----- 6. Equipment -----
       _curSection = 'equipment';
       var equipVendors = (g.vendors||[]).filter(function(c){return /equipment|rental|trucking|transport/i.test(c.scope||'');});
-      html += card(5, 'Equipment', null,
+      html += card(6, 'Equipment', null,
         subhead('PF Equipment Mobilization to Site')
         + fields([
             field('Predrill Rig (Sany)', ''),
@@ -13575,7 +13589,7 @@ try {
       // ----- 7. Material -----
       _curSection = 'material';
       var matVendors = (g.vendors||[]).filter(function(c){return /stone|aggregate|fuel/i.test(c.scope||'');});
-      html += card(6, 'Material', null,
+      html += card(7, 'Material', null,
         subhead('Stone / Fuel Vendors')
         + contactList(matVendors)
         + subhead('Material Detail')
@@ -13611,7 +13625,7 @@ try {
       }
       var qaMeta = q ? (q.installed_columns + ' cols / ' + q.installed_lf + ' LF') : null;
       var qaNote = '<div class="pr-empty-note">Baseline pending - approved Garbin design totals not yet confirmed, so % complete is withheld (installed quantities shown).</div>';
-      html += card(7, 'QA / QC', qaMeta, qaNote + fields(qaRows) + linkRow(L.qaqc), false, 'qaqc');
+      html += card(8, 'QA / QC', qaMeta, qaNote + fields(qaRows) + linkRow(L.qaqc), false, 'qaqc');
 
       // ----- 10. Financials -----
       // Phase 1: a per-project BUDGET vs ACTUAL table seeded from the standard
@@ -13913,11 +13927,11 @@ try {
         + finSub('Project Invoicing', finInvoicingBody, false)
         + finSub('Project Costs (Budget vs Actual)', baHtml, false);
 
-      html += card(8, 'Financials', baMeta, finBody, false);
+      html += card(9, 'Financials', baMeta, finBody, false);
 
       // ----- 10. Project Closeout -----
       _curSection = 'closeout';
-      html += card(9, 'Project Closeout', null,
+      html += card(10, 'Project Closeout', null,
         fields([
           field('Final As Built Dwgs to Garbin Geo', ''),
           field('Column Logs from Rig (PDF) to Garbin', ''),
@@ -13927,8 +13941,8 @@ try {
           field('PF Check Garbin As Builts vs PF', ''),
           field('Final As Built Dwgs Sent to GC', '')
         ]), false, 'closeout');
-      // (office renumber 2026-08-07: was 10; Engineering moved into General Info so
-      // the top-level list is now gap-free 1-9, Closeout = 9.)
+      // (office renumber 2026-08-07 batch-8: standalone Engineering & Design RESTORED
+      // as top-level section #3, so the list is gap-free 1-10, Closeout = 10.)
 
       // ----- General Info subsections injected after render (Brad 2026-08-07) -----
       // Injected into the ONE General Info card body (data-pr-section "general") in
@@ -13986,17 +14000,18 @@ try {
               [subhead('Owner Contacts'), contactCardGrid(ownerCards, 'Owner Contact')]));
       }
 
-      // (4) Design Professionals — Engineering & Design MOVED INTO General Info as a
-      // nested card with its OWN data-pr-section="engineering" key (built above as
-      // dpBody). Open by default so the 4 engineer blocks are visible.
+      // (4) Design Professionals — CONTACTS import inside General Info. Batch-8
+      // CORRECTION: this is now a DISPLAY-ONLY nested card (NO sectionKey => no
+      // data-pr-section, no Edit button, no POST). The editable "engineering" key is
+      // owned solely by the restored standalone Engineering & Design section (card #3),
+      // so there is exactly one editable "engineering" card in the DOM (save path +
+      // _surfaceExtras querySelector both stay unambiguous). These firm contact cards
+      // render from the synced g.engineering source. Open by default so the blocks show.
       if (genCard) {
-        var _prevEng = _curSection;
-        _curSection = 'engineering';
         var engMeta = (g.engineering ? g.engineering.length + ' contacts' : null);
-        _curSection = _prevEng;
         genCard.insertAdjacentHTML('beforeend',
           '<div class="pr-nested-card-wrap">'
-          + card('', 'Design Professionals', engMeta, dpBody, true, 'engineering')
+          + card('', 'Design Professionals', engMeta, dpBody, true)
           + '</div>');
       }
 
@@ -14078,7 +14093,10 @@ try {
       };
       // General Info (flat "general" key — includes added Owner Contacts).
       _surfaceExtras(genCard, 'general', 'Additional Contacts / Fields', 'Owner Contact');
-      // Design Professionals nested card ("engineering" key — added engineer contacts).
+      // Standalone Engineering & Design section (card #3, the single editable
+      // "engineering" key). Batch-8: the Design Professionals subsection in General Info
+      // is display-only now, so this querySelector resolves to the restored standalone
+      // top-level card (the only .pr-card[data-pr-section="engineering"] in the DOM).
       _surfaceExtras(root.querySelector('.pr-card[data-pr-section="engineering"] .pr-card-body'),
         'engineering', 'Additional Engineer Contacts / Fields', 'Engineer');
       // PF Project Team nested card ("pfTeam" key — added team members).
