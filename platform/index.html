@@ -2305,39 +2305,51 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 /* captures every field unchanged. The grid element keeps class .pr-fields +  */
 /* data-pr-contact-group so pfEditSection's group discovery + "Add contact"   */
 /* still work exactly as before.                                              */
+/* DENSITY (Brad 2026-08-07 batch-9): pack more cards per row + shrink each  */
+/* card so the General Info contacts occupy far less vertical height. Pure    */
+/* display tuning — field rows stay .pr-field so save/add-more is unchanged.  */
 .pr-ccards {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 6px 8px;
   /* neutralize the inherited .pr-fields grid so cards flow/wrap as a flexbox */
   grid-template-columns: none !important;
 }
 .pr-ccard {
-  flex: 1 1 260px;
-  min-width: 240px;
-  max-width: 320px;
+  flex: 1 1 200px;
+  min-width: 190px;
+  max-width: 260px;
   border: 1px solid var(--border-light);
-  border-radius: 8px;
+  border-radius: 7px;
   background: var(--bg-1);
-  padding: 10px 12px;
+  padding: 6px 9px;
   box-sizing: border-box;
 }
+/* Name + Title on ONE line (name bold, title lighter/accent after it),       */
+/* wrapping only if truly needed. Tight divider below.                        */
 .pr-ccard-head {
-  display: flex; flex-direction: column; gap: 1px;
-  margin-bottom: 6px; padding-bottom: 6px;
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px;
+  margin-bottom: 3px; padding-bottom: 3px;
   border-bottom: 1px solid var(--border-light);
+  line-height: 1.15;
 }
-.pr-ccard-name { font-size: 0.92rem; font-weight: 700; color: var(--text-0); }
-.pr-ccard-role { font-size: 0.72rem; font-weight: 600; color: var(--accent-dark);
-  text-transform: uppercase; letter-spacing: 0.03em; }
+.pr-ccard-name { font-size: 0.86rem; font-weight: 700; color: var(--text-0); }
+.pr-ccard-role { font-size: 0.68rem; font-weight: 600; color: var(--accent-dark);
+  text-transform: uppercase; letter-spacing: 0.02em; }
 /* inside a contact card the field rows are compact + borderless (the card    */
-/* itself is the visual grouping, so drop the per-row divider).               */
-.pr-ccard .pr-field { padding: 3px 0; border-bottom: none; gap: 1px; }
-.pr-ccard .pr-field-label { font-size: 0.66rem; }
-.pr-ccard .pr-field-value { font-size: 0.84rem; }
+/* itself is the visual grouping, so drop the per-row divider). Tight leading.*/
+.pr-ccard .pr-field { padding: 1px 0; border-bottom: none; gap: 0; line-height: 1.2; }
+.pr-ccard .pr-field-label { font-size: 0.62rem; margin-bottom: 0; }
+.pr-ccard .pr-field-value { font-size: 0.8rem; }
 .pr-ccard .pr-field-value a { color: var(--accent); text-decoration: none; word-break: break-all; }
 .pr-ccard .pr-field-value a:hover { text-decoration: underline; }
 @media (max-width: 720px) { .pr-ccard { flex: 1 1 100%; max-width: none; } }
+/* Tighten the gap between a contact-group header and its cards, and between  */
+/* consecutive contact groups. Scoped to headers that directly precede a card */
+/* grid so the Subcontract / other .pr-subhead sections keep their spacing.   */
+.pr-subhead + .pr-ccards { margin-top: 0; }
+.pr-subhead:has(+ .pr-ccards) { margin: 8px 0 4px; }
+.pr-ccards + .pr-subhead { margin-top: 8px; }
 
 .pr-links { display: flex; flex-wrap: wrap; gap: 8px; }
 .pr-link {
