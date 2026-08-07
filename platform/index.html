@@ -2300,6 +2300,20 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 }
 .pr-subhead:first-child { margin-top: 0; }
 
+/* Nested sub-group header UNDER a .pr-subhead (Contract Recap 4-group hierarchy,
+   Brad 2026-08-07). Reads as a clear child of the parent subhead: slightly
+   smaller, indented, lighter rule, no full uppercase weight of the parent. */
+.pr-subgroup {
+  font-size: 0.74rem; font-weight: 700; color: var(--accent);
+  text-transform: uppercase; letter-spacing: 0.03em;
+  margin: 12px 0 6px 10px; padding: 2px 0 3px 8px;
+  border-left: 3px solid var(--accent);
+}
+.pr-subgroup-note {
+  font-size: 0.72rem; color: var(--text-2); font-style: italic;
+  margin: 0 0 6px 18px;
+}
+
 .pr-contact {
   border: 1px solid var(--border-light);
   border-radius: 8px;
@@ -12308,6 +12322,13 @@ try {
       return '<div class="pr-fields"'+attr+'>'+rows.join('')+'</div>';
     }
     function subhead(t){ return '<div class="pr-subhead">'+E(t)+'</div>'; }
+    // subgroup(t): a nested sub-header rendered UNDER a subhead() (Contract Recap
+    // 4-group hierarchy, Brad 2026-08-07). Pure display divider — like subhead it
+    // is NOT a wrapper, so fields under it stay direct .pr-field[data-pr-label]
+    // descendants of the same card and the pfEditSection/pfSaveSection scan is
+    // unaffected. subgroupNote(t): an optional italic helper line under a subgroup.
+    function subgroup(t){ return '<div class="pr-subgroup">'+E(t)+'</div>'; }
+    function subgroupNote(t){ return '<div class="pr-subgroup-note">'+E(t)+'</div>'; }
 
     // twoCol(left, right, leftGroup?, rightGroup?): render a FIXED two-column
     // grouping that mirrors Brad's spec PDFs (specific fields grouped left vs
@@ -13486,47 +13507,133 @@ try {
           fieldLinked('Bid Sent to GC', '', '', 'website')
         ])
         + subhead('Contract Recap')
-        // CONDENSED into a fixed two-column grouping (twoCol) so Contract Recap is
-        // tighter/shorter instead of one long single column. Every field stays a
-        // direct .pr-field[data-pr-label] descendant of the ONE `contract` card
-        // (twoCol is wrapper-agnostic: pfEditSection/pfSaveSection scan
-        // body.querySelectorAll('.pr-field[data-pr-label]') filtered to
-        // closest('.pr-card')===card), so the `contract` override key + edit/save
-        // round-trip are UNCHANGED. LEFT = recap identifiers + the contract dates;
-        // Subcontract Value is anchored top-left directly UNDER GC Project #
-        // (Brad 2026-08-07). RIGHT = the dollar/rate/terms fields grouped together.
-        // ("Agreement Date (face)" field deleted this round; "Substantial / Final
-        // Completion" renamed to "Project Substantial Completion Date" — display
-        // label only, same SF.completion_dates data + override round-trip.)
+        // RESTRUCTURED (Brad 2026-08-07) from a single twoCol grouping into FOUR
+        // nested sub-groups under the Contract Recap subhead: Contract Info,
+        // Invoicing & Payment Terms, Scope of Work, and Needed for Contract
+        // Completion, plus a "To Be Placed" holding group at the BOTTOM for existing
+        // fields with no confirmed home. subgroup() dividers are NOT wrappers, so
+        // every field stays a direct .pr-field[data-pr-label] descendant of the ONE
+        // `contract` card — pfEditSection/pfSaveSection scan
+        // (body.querySelectorAll('.pr-field[data-pr-label]') filtered to
+        // closest('.pr-card')===card) is UNCHANGED, and the `contract` override key
+        // round-trip is preserved. PRESERVATION RULE: existing fields keep their
+        // EXACT labels (the label IS the override key) so stored override data still
+        // renders; only NEW fields use new labels. twoCol() groups fields 2-up where
+        // it reads cleanly. Folder link for the executed subcontract replaces the
+        // removed live-PDF embed (see below).
+
+        // --- Sub-section 1: Contract Info ---
+        + subgroup('Contract Info')
         + twoCol([
           field('GC Project #', SF.gc_project_number, SS),
-          field('Subcontract Value', SF.subcontract_value, SS),
           field('GC Subcontract #', SF.subcontract_number, SS),
+          field('Subcontract Value', SF.subcontract_value, SS),
+          // NEW dropdown: Draft / Revisions Needed / Fully Executed.
+          field('Contract Status', ''),
+          // Existing executed-date field (label unchanged = data preserved); now a
+          // native date picker via PF_FIELD_DATE_LABELS + MM/DD/YYYY display.
           field('Fully Executed Contract Date', SF.fully_executed_date, SS),
           field('Project Substantial Completion Date', SF.completion_dates, SS),
-          field('Retainage % Withheld', SF.retainage_pct, SS),
-          field('Retainage Release', SF.retainage_release, SS),
-          field('Payment Terms', SF.payment_terms, SS),
+          // NEW consolidated tax field (Exempt, else state % + local add-ons). The 3
+          // legacy tax fields are PARKED in "To Be Placed" pending Brad's confirm.
+          field('Sales Tax', ''),
+          field('Taxes/Sales Tax Notes', '')
+        ], [
+          field('Prevailing Wage? Rate?', SF.prevailing_wage || bid.wage_req, SF.prevailing_wage ? SS : 'Bid Log'),
+          field('Certified Payroll?', SF.certified_payroll, SS),
+          // NEW prevailing-wage operator rates (from the Wage Rate Determination Sheet).
+          field('Prevailing Wage Operators — Hourly Rate', ''),
+          field('Prevailing Wage Operators — Fringe Rate', ''),
+          field('Minimum Insurance Requirement', bid.min_insurance_req, 'Bid Log'),
+          field('Insurance Requirements (per subcontract)', SF.insurance_requirements, SS),
           field('Liquidated Damages', SF.liquidated_damages, SS),
           field('Personal / Performance Guaranty', SF.personal_guaranty, SS),
-          field('Date COI Sent to GC', ''),
-          field('Date W9 Sent to GC', '')
+          // NEW bonding requirements field.
+          field('Bonding Requirements', ''),
+          field('Project Working Hours', SF.working_hours, SS)
+        ])
+
+        // --- Sub-section 2: Invoicing & Payment Terms ---
+        + subgroup('Invoicing & Payment Terms')
+        + subgroupNote('Payment terms extracted from the subcontract agreement.')
+        + twoCol([
+          // NEW: Approved SOV — an editable SharePoint LINK (Excel file), same
+          // clickable pattern as "Bid Sent to GC". Blank until set.
+          fieldLinked('Approved SOV', '', '', 'website'),
+          field('Payment Terms', SF.payment_terms, SS),
+          field('Retainage % Withheld', SF.retainage_pct, SS),
+          field('Retainage Release', SF.retainage_release, SS)
         ], [
+          // NEW pay-app timing fields.
+          field('Pay App Due by (Day of Month)', ''),
+          field('Pay App Bill Through Date', '')
+        ])
+
+        // --- Sub-section 3: Scope of Work ---
+        + subgroup('Scope of Work')
+        + fields([
+          // NEW: Staking & Layout inclusion. (The existing "Surveying & Staking
+          // (who performs)" field is PARKED in "To Be Placed" — do not assume it is
+          // the same as this yes/no inclusion field; Brad to confirm mapping.)
+          field('Staking & Layout Included? (Yes/No)', ''),
+          // NEW: extra SOW language. Rendered as a wide text field for now (the
+          // section editor emits a single-line <input type="text">; a multi-line
+          // textarea control is NOT yet supported by pfEditInputRow — FLAGGED).
+          field('Extra Scope of Work Language', '')
+        ])
+
+        // --- Sub-section 4: Needed for Contract Completion ---
+        + subgroup('Needed for Contract Completion')
+        + subgroupNote('Upon NOI issue the following items will be needed.')
+        + twoCol([
+          // COI tracking (expands the concept of the old "Date COI Sent to GC",
+          // which is PARKED in To Be Placed to preserve any stored value). All new,
+          // all native date pickers via PF_FIELD_DATE_LABELS.
+          field('COI Date Requested from MJ', ''),
+          field('COI Date Received from MJ', ''),
+          field('COI Date Sent to GC', ''),
+          field('COI Email History', '')
+        ], [
+          // W9 (expands the old "Date W9 Sent to GC", which is PARKED in To Be Placed).
+          field('W9 Date Sent to GC', '')
+        ])
+
+        // --- Holding group: To Be Placed (pending Brad's direction) ---
+        // PRESERVATION RULE (Brad 2026-08-07): existing Contract Recap fields with no
+        // confirmed home are KEPT here (labels unchanged = stored override data still
+        // renders) rather than deleted. Peter relays this list to Brad for placement.
+        + subgroup('To Be Placed (pending Brad’s direction)')
+        + subgroupNote('Existing fields awaiting Brad’s confirmation on where they belong.')
+        + twoCol([
+          // 3 legacy tax fields — superseded by the new consolidated "Sales Tax" +
+          // "Taxes/Sales Tax Notes" above; kept until Brad confirms the merge.
           field('Tax Exempt? / Tax', bid.tax, 'Bid Log'),
           field('Tax Status (per subcontract)', SF.tax_note, SS),
           field('If not Tax Exempt, Sales Tax Rate', ''),
-          field('Certified Payroll?', SF.certified_payroll, SS),
-          field('Prevailing Wage? Rate?', SF.prevailing_wage || bid.wage_req, SF.prevailing_wage ? SS : 'Bid Log'),
-          field('Minimum Insurance Requirement', bid.min_insurance_req, 'Bid Log'),
-          field('Insurance Requirements (per subcontract)', SF.insurance_requirements, SS),
-          field('Surveying & Staking (who performs)', SF.surveying_staking, SS),
+          // Existing survey field — parked, NOT assumed equal to the new
+          // "Staking & Layout Included?" inclusion field.
+          field('Surveying & Staking (who performs)', SF.surveying_staking, SS)
+        ], [
           field('Surveyor', (function(){var s=(g.engineering||[]).find(function(c){return /survey/i.test(c.scope||'');});return s?s.company:'';})(), 'Contacts'),
           field('Anticipated Spoils (CY)', ''),
-          field('Project Working Hours', SF.working_hours, SS)
+          // Legacy COI/W9 "sent" fields — superseded by the expanded COI/W9 date
+          // tracking in "Needed for Contract Completion" above; kept for any stored value.
+          field('Date COI Sent to GC', ''),
+          field('Date W9 Sent to GC', '')
         ])
-        + docEmbed((D.subcontract && D.subcontract.item_id),
-                   L.contract,
-                   (D.subcontract && D.subcontract.source_file))
+
+        // --- Executed subcontract: SharePoint FOLDER link (replaces the removed
+        // live-PDF embed) --- Brad 2026-08-07 directed REMOVING the "Contract
+        // document (live)" docEmbed iframe and replacing it with an editable link to
+        // the SharePoint Subcontract Agreement FOLDER, so the team can open any
+        // version of the agreement. Same editable clickable pattern as
+        // "Bid Sent to GC" / "Approved SOV" (fieldLinked ... 'website'): stores a
+        // per-project SharePoint folder URL, opens a new tab, blank until set, never
+        // hard-coded. Round-trips through the SAME `contract` override key.
+        + subhead('Subcontract Agreement Folder')
+        + fields([
+          fieldLinked('Subcontract Agreement Folder (SharePoint)', '', '', 'website')
+        ])
         + linkRow(L.contract), false, 'contract');
 
       // ----- 3b. Subcontract Analysis (migrated from the standalone Subcontracts tool) -----
@@ -14543,7 +14650,9 @@ try {
         'Grouted Aggregate Piers',
         'Rigid Inclusions'
       ],
-      'Column Diameter': ['24"', '30"']
+      'Column Diameter': ['24"', '30"'],
+      // Contract Recap > Contract Info (Brad 2026-08-07): execution state of the subcontract.
+      'Contract Status': ['Draft', 'Revisions Needed', 'Fully Executed']
     };
 
     // Labels whose editor input is a NATIVE DATE PICKER (Brad 2026-08-07: "hard
@@ -14554,7 +14663,17 @@ try {
     // and DISPLAYS back as MM/DD/YYYY via pfFmtDate (which normalizes YYYY-MM-DD).
     // Add future date fields here to give them a picker without touching anything else.
     var PF_FIELD_DATE_LABELS = {
-      'Released to Start Submittals': true
+      'Released to Start Submittals': true,
+      // Contract Recap 4-group restructure (Brad 2026-08-07). Each gets the native
+      // date picker in the editor + MM/DD/YYYY display. (The existing "Fully Executed
+      // Contract Date" and "Project Substantial Completion Date" already display as
+      // dates via pfIsDateLabel; adding them here gives them the calendar picker too.)
+      'Fully Executed Contract Date': true,
+      'Project Substantial Completion Date': true,
+      'COI Date Requested from MJ': true,
+      'COI Date Received from MJ': true,
+      'COI Date Sent to GC': true,
+      'W9 Date Sent to GC': true
     };
     // Coerce a stored/displayed date (MM/DD/YYYY, M/D/YY, YYYY-MM-DD, ...) into the
     // YYYY-MM-DD form a native <input type="date"> requires to pre-fill. Anything
