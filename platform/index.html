@@ -13804,17 +13804,20 @@ try {
       // Brad (2026-08-07, batch-8 CORRECTION): the standalone "Engineering & Design"
       // top-level section is RESTORED (see card #3 below) with its original fields and
       // its own editable "engineering" override key. The Design Professionals CONTACTS
-      // subsection STAYS here inside General Info per Brad's import request, but it is
-      // now a DISPLAY-ONLY nested card with NO data-pr-section (no Edit button, no POST)
-      // to avoid a second editable card on the same "engineering" key (the API's
-      // per-section save would otherwise let two cards on one key fight over shared
-      // labels, and _surfaceExtras' querySelector only sees one). The single editable
-      // owner of the "engineering" key is the restored standalone section. These firm
-      // contact cards render from the same synced source (g.engineering) so they always
-      // reflect current data; engineering edits are made in the standalone section's
-      // Engineering & Design Contacts editor. The Tracking fields + Documents that used
-      // to live here were MOVED to the restored standalone Engineering & Design section.
-      _curSection = 'engineering';
+      // subsection STAYS here inside General Info per Brad's import request.
+      //
+      // Brad (2026-08-07, DP-EDITABLE): this Design Professionals block is now EDITABLE
+      // with its OWN override key `design_professionals` (added to the API allowlist).
+      // A separate key — NOT `engineering` — is required so the DP firm/contact edits do
+      // NOT collide with the standalone Engineering & Design section's `engineering`
+      // key (which owns that section's tracking fields; two editable cards on one key
+      // would fight over the shared per-section save + _surfaceExtras querySelector).
+      // The firm blocks still SEED from the synced source (g.engineering[0] / Bid Log)
+      // so a project with no override yet displays exactly as before; once edited, the
+      // `design_professionals` override wins. On Save, the section editor's existing
+      // "Save contact(s) to directory" button also backfeeds these firm contacts to the
+      // PF Master Contact List (category-mapped, duplicate-guarded) via /api/contacts.
+      _curSection = 'design_professionals';
       // Seed the Ground Improvement Engineering company + contact 1 from the synced
       // AP-design contact (g.engineering[0]) / Bid Log firm.
       var _gie = (g.engineering && g.engineering[0]) ? g.engineering[0] : {};
@@ -14326,18 +14329,22 @@ try {
               [subhead('Owner Contacts'), contactCardGrid(ownerCards, 'Owner Contact')]));
       }
 
-      // (4) Design Professionals — CONTACTS import inside General Info. Batch-8
-      // CORRECTION: this is now a DISPLAY-ONLY nested card (NO sectionKey => no
-      // data-pr-section, no Edit button, no POST). The editable "engineering" key is
-      // owned solely by the restored standalone Engineering & Design section (card #3),
-      // so there is exactly one editable "engineering" card in the DOM (save path +
-      // _surfaceExtras querySelector both stay unambiguous). These firm contact cards
-      // render from the synced g.engineering source. Open by default so the blocks show.
+      // (4) Design Professionals — CONTACTS import inside General Info. Brad
+      // (2026-08-07, DP-EDITABLE): now an EDITABLE nested card with its OWN
+      // `design_professionals` sectionKey => it gets an Edit button + data-pr-section,
+      // and its firm/contact edits save under `design_professionals` (NOT `engineering`,
+      // whose single editable owner remains the standalone Engineering & Design section
+      // #3). Because pfEditSection/pfSaveSection scope their field scan to
+      // closest('.pr-card') === this nested card, and the General editor likewise skips
+      // nested cards, the two keys never leak into each other. The firm contact groups
+      // (Ground Improvement / Geotechnical / Civil / Structural) surface the editor's
+      // "Save contact(s) to directory" button, which backfeeds these contacts to the
+      // PF Master Contact List (category-mapped, duplicate-guarded). Open by default.
       if (genCard) {
         var engMeta = (g.engineering ? g.engineering.length + ' contacts' : null);
         genCard.insertAdjacentHTML('beforeend',
           '<div class="pr-nested-card-wrap">'
-          + card('', 'Design Professionals', engMeta, dpBody, true)
+          + card('', 'Design Professionals', engMeta, dpBody, true, 'design_professionals')
           + '</div>');
       }
 
@@ -14509,6 +14516,15 @@ try {
       };
       // General Info (flat "general" key — includes added Owner Contacts).
       _surfaceExtras(genCard, 'general', 'Additional Contacts / Fields', 'Owner Contact');
+
+      // Design Professionals nested card ("design_professionals" key — added firm
+      // contacts / manual fields). Nested inside General Info; its querySelector
+      // resolves to the single .pr-card[data-pr-section="design_professionals"]. The
+      // _surfaceExtras closest('.pr-card') guard keeps General's dedupe from counting
+      // these rows and vice-versa. Group token 'Ground Improvement' lets any surfaced
+      // added contact rejoin the add-contact flow if labeled that way (best-effort).
+      _surfaceExtras(root.querySelector('.pr-card[data-pr-section="design_professionals"] .pr-card-body'),
+        'design_professionals', 'Additional Design Professional Contacts / Fields', null);
 
       // --- QA/QC nested card injected into Engineering & Design (Brad 2026-08-07,
       // batch-12) --- The former standalone QA/QC section now lives as a NESTED editable
@@ -15112,11 +15128,36 @@ try {
       });
     }
 
+    // DESIGN PROFESSIONALS firm -> master-list Category map (Brad 2026-08-07). The DP
+    // block's four firm groups use these root prefixes; each maps to the contact
+    // Category written to the PF Master Contact List so a backfed engineer lands in the
+    // right bucket. Any other section (Owner Contacts / PF Team / Equipment / Material)
+    // has no firm-root match, so category stays '' (unchanged behavior for them).
+    var PF_DP_FIRM_CATEGORY = {
+      'Ground Improvement': 'Ground Improvement Engineer',
+      'Geotechnical': 'Geotechnical Engineer',
+      'Civil': 'Civil Engineer',
+      'Structural': 'Structural Engineer'
+    };
+    // Given a contact-block prefix like "Ground Improvement - Contact 1 " (trailing
+    // space, as pfContactPrefix returns) OR "Ground Improvement 2 " (added-contact
+    // form), return the firm ROOT ("Ground Improvement") if it maps to a DP category,
+    // else null.
+    function pfDpFirmRoot(blockPrefix){
+      var base = String(blockPrefix || '').replace(/\s*-\s*Contact\s*\d+\s*-?\s*$/i, '')
+                                          .replace(/\s+\d+\s*-?\s*$/, '')
+                                          .replace(/\s*-\s*$/, '').trim();
+      return PF_DP_FIRM_CATEGORY[base] ? base : null;
+    }
+
     // Part 3: write the editor's filled contact blocks back to the master directory.
     // Groups editor inputs by contact-name prefix, builds a contact per block, and
-    // POSTs each new one to /api/contacts (action:'add'). FAIL CLOSED + honest: on
-    // any error it reports the failure inline; it NEVER touches the project record
-    // and NEVER claims success it did not get. Entirely independent of pfSaveSection.
+    // POSTs each to /api/contacts (action:'add'; the backend duplicate-guard re-routes
+    // a repeat to an in-place update so no C#### row is duplicated). For Design
+    // Professionals blocks it also attaches the firm Company (from the sibling
+    // "<firm> - Company" input) + the mapped Category. FAIL CLOSED + honest: on any
+    // error it reports the failure inline; it NEVER touches the project record and
+    // NEVER claims success it did not get. Entirely independent of pfSaveSection.
     window.pfSaveContactsToDirectory = function(btn){
       var editor = btn.closest('.pr-editor'); if (!editor) return;
       var msgEl = editor.querySelector('.pr-dir-msg');
@@ -15127,7 +15168,10 @@ try {
         msgEl.style.display = 'block';
       }
       // Collect all contact-name prefixes present, then gather each block's fields.
+      // ALSO collect firm-level Company / Website / Office Phone keyed by firm root, so
+      // a Design Professionals contact can be tagged with its firm + category.
       var blocks = {}; // prefix -> {name,title,officePhone,cellPhone,email}
+      var firms = {};  // firmRoot -> {company,website,officePhone}
       editor.querySelectorAll('.pr-edit-input[data-pr-field-label]').forEach(function(inp){
         var label = inp.getAttribute('data-pr-field-label') || '';
         var pfx = pfContactPrefix(label);
@@ -15135,6 +15179,21 @@ try {
         var val = (inp.value || '').trim();
         // Find which known prefix this input belongs to (name defines the block).
         if (pfx != null) { blocks[pfx] = blocks[pfx] || {}; blocks[pfx].name = val; return; }
+        // Firm-level fields: "<firmRoot> - Company|Website|Office Phone" where firmRoot
+        // is a DP firm (Ground Improvement / Geotechnical / Civil / Structural). Must be
+        // checked BEFORE the generic contact-sibling match (a firm root is a valid
+        // block prefix too, but the firm Company/Website belong to the firm, not a
+        // person). We only treat it as firm-level when the root maps to a DP category.
+        var fm = /^(.*?) - (Company|Website|Address|Office Phone)$/.exec(norm);
+        if (fm && PF_DP_FIRM_CATEGORY[fm[1].trim()]) {
+          var fr = fm[1].trim();
+          firms[fr] = firms[fr] || {};
+          if (fm[2] === 'Company') firms[fr].company = val;
+          else if (fm[2] === 'Website') firms[fr].website = val;
+          else if (fm[2] === 'Address') firms[fr].address = val;
+          else if (fm[2] === 'Office Phone') firms[fr].officePhone = val;
+          return;
+        }
         // sibling fields: match "<prefix> - <suffix>"
         var m = /^(.*?) - (Title|Office Phone|Cell Phone|Email)$/.exec(norm);
         if (m) {
@@ -15144,9 +15203,20 @@ try {
           blocks[p][key] = val;
         }
       });
-      // Keep only blocks that have a name.
+      // Keep only blocks that have a name. Attach firm company + category for DP blocks.
       var toSave = Object.keys(blocks)
-        .map(function(p){ return blocks[p]; })
+        .map(function(p){
+          var b = blocks[p] || {};
+          var root = pfDpFirmRoot(p);
+          if (root) {
+            b.category = PF_DP_FIRM_CATEGORY[root];
+            var f = firms[root] || {};
+            b.company = f.company || '';
+            b.companyWebsite = f.website || '';
+            b.companyAddress = f.address || '';
+          }
+          return b;
+        })
         .filter(function(b){ return b && b.name; });
       if (!toSave.length) { msg('Enter a contact name first, then save to the directory.', false); return; }
 
@@ -15166,8 +15236,10 @@ try {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'add', contact: {
             firstName: nm.firstName, lastName: nm.lastName,
-            title: b.title || '', officePhone: b.officePhone || '',
-            cellPhone: b.cellPhone || '', email: b.email || '',
+            title: b.title || '', company: b.company || '', category: b.category || '',
+            officePhone: b.officePhone || '', cellPhone: b.cellPhone || '',
+            email: b.email || '', companyWebsite: b.companyWebsite || '',
+            companyAddress: b.companyAddress || '',
           } })
         }).then(function(res){ return res.json().then(function(j){ return { ok: res.ok && j && j.ok, body: j }; })
           .catch(function(){ return { ok: false, body: null }; }); })

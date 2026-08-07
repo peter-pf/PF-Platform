@@ -58,6 +58,14 @@ const VALID_SECTIONS = {
   general: 1, pfTeam: 1, contract: 1, engineering: 1, safety: 1,
   siteReadiness: 1, equipment: 1, material: 1, qaqc: 1,
   financials: 1, closeout: 1,
+  // design_professionals (Brad 2026-08-07): the General Info "Design Professionals"
+  // block (the 4 engineering-firm contact cards: Ground Improvement / Geotechnical /
+  // Civil / Structural) is now its OWN editable nested card. It gets its own override
+  // key so its firm/contact edits persist per-project WITHOUT colliding with the
+  // standalone Engineering & Design section's `engineering` key (which owns that
+  // section's tracking fields). Same RBAC (financials area; field_ops blocked), same
+  // string-overlay semantics as every other key here.
+  design_professionals: 1,
 };
 
 const JSON_HEADERS = {

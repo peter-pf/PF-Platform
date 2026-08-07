@@ -275,6 +275,43 @@ export async function onRequestGet(context) {
 // ---- POST: add / update a contact (write-back to the Excel Contacts sheet) --
 const VALID_ACTIONS = { add: 1, update: 1 };
 
+// DUPLICATE GUARD (Brad 2026-08-07, closes the original contact-directory follow-up).
+// Backfeeding the same Design-Professionals contact twice must NOT create a second
+// C#### row. Given a cleaned incoming contact and the current sheet rows, find an
+// EXISTING row that represents the same person so an `add` can be re-routed to an
+// in-place `update`. Matching (case-insensitive, whitespace-collapsed):
+//   1. by EMAIL — the strongest key. If the incoming has a non-empty email and a row
+//      shares it, that's the same person.
+//   2. else by FIRST+LAST NAME + COMPANY together — a person at a firm. Name alone is
+//      too weak (two "John Smith"s); name+company is the practical unique key here.
+// Never matches on company alone or a blank field. Prefers an ACTIVE row; if only an
+// inactive match exists we still update it (revives + refreshes it rather than making
+// a duplicate). Returns the matched row (with _sheetRow) or null.
+function normKey(v) { return String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g, ' '); }
+function findDuplicate(rowsAll, incoming) {
+  const inEmail = normKey(incoming.email);
+  const inFirst = normKey(incoming.firstName);
+  const inLast = normKey(incoming.lastName);
+  const inCompany = normKey(incoming.company);
+  const nameKey = (inFirst || inLast) ? (inFirst + '|' + inLast + '|' + inCompany) : '';
+  let emailMatch = null, nameMatch = null;
+  for (const r of rowsAll) {
+    if (isExample(r)) continue; // never collapse onto a placeholder EXAMPLE row
+    // Email match (only when BOTH sides have an email).
+    if (inEmail && normKey(r.email) === inEmail) {
+      if (!emailMatch || isActive(r)) emailMatch = r; // prefer an active email match
+      continue;
+    }
+    // Name+company match (only when the incoming has a name key AND a company, so a
+    // bare "First Last" with no company never over-matches unrelated rows).
+    if (nameKey && inCompany) {
+      const rKey = normKey(r.firstName) + '|' + normKey(r.lastName) + '|' + normKey(r.company);
+      if (rKey === nameKey) { if (!nameMatch || isActive(r)) nameMatch = r; }
+    }
+  }
+  return emailMatch || nameMatch || null;
+}
+
 export async function onRequestPost(context) {
   const { request, env } = context;
   const session = context.data && context.data.session;
@@ -343,7 +380,39 @@ export async function onRequestPost(context) {
 
     const today = todayMDY();
 
+    // DUPLICATE GUARD: an `add` that matches an existing contact (by email, or by
+    // name+company) is re-routed to an in-place UPDATE of that row so backfeeding the
+    // same Design-Professionals contact twice never creates a second C#### row. The
+    // matched row's id / Date Added / Active are preserved; editable columns are
+    // refreshed with the incoming values; Last Updated is bumped. An explicit
+    // action:'update' (id given) is UNCHANGED and skips this guard.
     if (action === 'add') {
+      const dup = findDuplicate(sheet.contactsAll, clean);
+      if (dup) {
+        const rowVals = [[
+          dup.contactId, clean.firstName, clean.lastName, clean.title, clean.company,
+          clean.category, clean.officePhone, clean.cellPhone, clean.email,
+          clean.companyAddress, clean.companyWebsite, clean.notes,
+          dup.active || 'Yes', dup.dateAdded || today, today,
+        ]];
+        const addr = `${SHEET}!A${dup._sheetRow}:O${dup._sheetRow}`;
+        const url = wbBase(env) + `/worksheets('${SHEET}')/range(address='${encodeURIComponent(addr)}')`;
+        const resp = await graphFetch(url, token, { method: 'PATCH', body: { values: rowVals } });
+        if (!resp.ok) {
+          const txt = await resp.text().catch(() => '');
+          if (isLocked(resp.status, txt)) {
+            return json({ status: 'error',
+              message: 'The contact list is open in Excel. Close it and retry; nothing was changed.' }, 423);
+          }
+          console.error('api/contacts add->dedupe-update: write failed', resp.status, txt.slice(0, 200));
+          return json({ status: 'error', message: 'Could not save the contact. Please retry.' }, 502);
+        }
+        await invalidateCache(env);
+        const savedRow = Object.assign({}, dup, clean, { lastUpdated: today });
+        delete savedRow._sheetRow;
+        return json({ ok: true, saved: true, action: 'update', deduped: true, contact: publicRow(savedRow) });
+      }
+
       const nextNum = sheet.maxIdNum + 1;
       const id = 'C' + String(nextNum).padStart(4, '0');
       // Values row in EXACT column order A:O.
