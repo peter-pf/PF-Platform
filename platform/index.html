@@ -13722,8 +13722,16 @@ try {
       // there is no key collision (per-section save + _surfaceExtras both unambiguous).
       // Documents live here (Brad: move documents to the Engineering & Design Section).
       _curSection = 'engineering';
-      var engBody = subhead('Engineering & Design Contacts') + contactList(g.engineering)
-        + fields([
+      // Brad (2026-08-07): the "Engineering & Design Contacts" list was REMOVED from
+      // this standalone section. Engineering contacts are now viewed ONLY in the
+      // General Info "Design Professionals" block (which renders from the same synced
+      // g.engineering source). This section keeps its engineering tracking fields +
+      // Documents and STILL owns the editable "engineering" override key (tracking
+      // fields save through it, _surfaceExtras('engineering') resolves to it). No
+      // contact data is lost: g.engineering is untouched and still displayed in
+      // General Info. (contactList(g.engineering) render removed from engBody.)
+      var engBody =
+          fields([
             field('AP Design Firm', bid.engineer_firm, 'Bid Log'),
             field('Prelim Design Fee', bid.prelim_design_fee, 'Bid Log'),
             field('Design Completed Date', bid.design_completed_date, 'Bid Log'),
