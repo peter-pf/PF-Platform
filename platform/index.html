@@ -2421,16 +2421,48 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 
   // Determine role (fail closed to a non-privileged role on any error).
   var role = 'field_ops';
+  var gotValidRole = false;
   try {
     var xhr = new XMLHttpRequest();
     xhr.open('GET', '/api/me', false); // sync: preserve load order before modules
     xhr.send(null);
     if (xhr.status === 200) {
-      var me = JSON.parse(xhr.responseText);
-      if (me && me.role) role = me.role;
+      var me = JSON.parse(xhr.responseText);   // throws on preview (SPA HTML fallback)
+      if (me && me.role) { role = me.role; gotValidRole = true; }
       window.PF_ME = { name: (me && me.name) || '', role: role };
     }
   } catch (e) { /* fail closed: role stays field_ops */ }
+
+  // PREVIEW-ONLY nav display fallback. On a Cloudflare Pages *preview* deployment
+  // (branch/hash alias, e.g. general-info-rework-20260806.pf-platform.pages.dev)
+  // the auth Functions/_middleware do NOT run, so /api/me returns the SPA
+  // index.html instead of a JSON role. JSON.parse above then throws and role
+  // fails closed to field_ops, which hides the entire office nav (Projects
+  // subgroup, Financials, Subcontracts, Insurance) — making the preview
+  // impossible to review. When (and ONLY when) we are on a preview host AND no
+  // valid role was returned, default the DISPLAY role to admin so reviewers see
+  // the full office nav.
+  //
+  // WHY THIS IS PROD-SAFE:
+  //  - The host test excludes the production host (bare pf-platform.pages.dev)
+  //    and any custom domain, so on prod isPreviewHost is false and behavior is
+  //    100% unchanged (real /api/me JSON drives the role as before).
+  //  - It only fires when gotValidRole is false; on prod /api/me returns real
+  //    JSON, so this branch is never reached even if the host test passed.
+  //  - This is DISPLAY-ONLY. The real security boundary is server-side
+  //    (_middleware areaForPath/roleCanAccess gates every page, API and /data/*
+  //    file by role). This flag cannot grant access to any gated data; on prod
+  //    those files are still fetched with the caller's real session.
+  try {
+    var host = (window.location && window.location.hostname) || '';
+    var isPreviewHost = /\.pf-platform\.pages\.dev$/i.test(host) &&
+                        host.toLowerCase() !== 'pf-platform.pages.dev';
+    if (!gotValidRole && isPreviewHost) {
+      role = 'admin';
+      window.PF_ME = { name: 'Preview (office view)', role: 'admin', preview: true };
+    }
+  } catch (e) { /* leave role as-is on any error */ }
+
   if (!window.PF_ME) window.PF_ME = { name: '', role: role };
 
   var isPrivileged = (role === 'admin' || role === 'partner');
