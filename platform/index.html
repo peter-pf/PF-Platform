@@ -13153,15 +13153,31 @@ try {
       // loss. The two General/dashboard field scans are scoped to skip nested-card
       // fields so PF Team rows never leak into a "general" override.
 
-      // ----- 3. Contract Info -----
+      // ----- 3. Subcontract Agreement -----
+      // Reorganized into two blue-headered (.pr-subhead) subsections within the ONE
+      // `contract` card body: "Bid Recap" (pre-award dates) then "Contract Recap"
+      // (award/subcontract terms + the live executed-contract embed). These are
+      // subhead() DIVIDERS inside the single card body -- NOT nested cards -- so all
+      // fields stay direct children of the `contract` section and the existing
+      // pfEditSection/pfSaveSection scan (body.querySelectorAll('.pr-field[data-pr-label]'))
+      // still captures every field. The `contract` override key round-trips unchanged.
+      // New fields (LOI/NOI Date, GC Subcontract #) are plain field() rows => editable
+      // + saveable via the same override mechanism. (Fields are intended to be populated
+      // by later extraction from the GC's subcontract; this round is formatting only.)
       _curSection = 'contract';
       html += card(2, 'Subcontract Agreement', null,
-        fields([
+        subhead('Bid Recap')
+        + fields([
           field('Bid Invite Date', bid.invite_date, 'Bid Log'),
           field('Bid Due Date', bid.due_date, 'Bid Log'),
-          field('Date Submitted', bid.date_submitted, 'Bid Log'),
           field('Prelim Completed By', bid.design_completed_date, 'Bid Log'),
-          field('Subcontract / Project Number', SF.subcontract_number, SS),
+          field('Date Bid Submitted', bid.date_submitted, 'Bid Log'),
+          field('LOI/NOI Date', '')
+        ])
+        + subhead('Contract Recap')
+        + fields([
+          field('GC Project #', SF.gc_project_number, SS),
+          field('GC Subcontract #', SF.subcontract_number, SS),
           field('Agreement Date (face)', SF.agreement_date, SS),
           field('Fully Executed Contract Date', SF.fully_executed_date, SS),
           field('Substantial / Final Completion', SF.completion_dates, SS),
