@@ -12110,6 +12110,59 @@ try {
       return { has: false, value: null };
     }
 
+    // ---- shared date-display normalizer (Brad 2026-08-07) --------------------
+    // Every RENDERED date in the Active Projects area (list + project detail) must
+    // read as zero-padded MM/DD/YYYY (e.g. 08/07/2026), uniformly, regardless of
+    // how it is stored (ISO YYYY-MM-DD, existing MM/DD/YYYY, M/D/YY, M/D/YYYY,
+    // YYYY/MM/DD, a numeric epoch ms, or a Date object). This is DISPLAY-ONLY: it
+    // never mutates stored/synced data or what an editor saves. It parses ONLY
+    // recognized date SHAPES (so a plain number like a "24" diameter or arbitrary
+    // text is never mis-parsed) and, on anything it does not confidently recognize
+    // as a date, returns the ORIGINAL value UNCHANGED (never "Invalid Date"/NaN).
+    function pfFmtDate(v){
+      if (v === undefined || v === null) return v;
+      if (v instanceof Date) {
+        if (isNaN(v.getTime())) return '';
+        return _pf2(v.getMonth()+1) + '/' + _pf2(v.getDate()) + '/' + v.getFullYear();
+      }
+      var s = String(v).trim();
+      if (!s) return s;
+      var m;
+      // ISO / YYYY-MM-DD (optionally with a time part) -> take the date portion.
+      if ((m = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[T\s].*)?$/.exec(s))) {
+        return _pfYmd(m[1], m[2], m[3], s);
+      }
+      // M/D/Y or M-D-Y  (Y = 2 or 4 digits). Zero-pad M+D, expand 2-digit year.
+      if ((m = /^(\d{1,2})[/-](\d{1,2})[/-](\d{2}|\d{4})$/.exec(s))) {
+        var yy = m[3].length === 2 ? (Number(m[3]) + 2000) : Number(m[3]);
+        return _pfYmd(yy, m[1], m[2], s);
+      }
+      // Pure epoch-millisecond timestamp (13+ digits) -> a real instant.
+      if (/^\d{13,}$/.test(s)) {
+        var d = new Date(Number(s));
+        if (!isNaN(d.getTime())) return _pf2(d.getMonth()+1) + '/' + _pf2(d.getDate()) + '/' + d.getFullYear();
+      }
+      // Not a recognized date shape -> leave the value exactly as-is.
+      return s;
+    }
+    function _pf2(n){ n = Number(n); return (n < 10 ? '0' : '') + n; }
+    // Build MM/DD/YYYY from Y/M/D parts, validating ranges so an impossible date
+    // (e.g. month 13) falls back to the raw string instead of a bogus display.
+    function _pfYmd(y, mo, da, raw){
+      y = Number(y); mo = Number(mo); da = Number(da);
+      if (!(mo >= 1 && mo <= 12) || !(da >= 1 && da <= 31) || !(y >= 1000 && y <= 9999)) return raw;
+      return _pf2(mo) + '/' + _pf2(da) + '/' + y;
+    }
+    // Should this field's VALUE be rendered as a date? Gated by label so only
+    // genuine date fields normalize (a value that isn't a date shape still passes
+    // through pfFmtDate unchanged, so this is belt-and-suspenders). Matches the
+    // explicit date labels in the office project-detail sections + any label that
+    // reads like a date ("... Date", "Date ...", Start/Completion milestones).
+    var PF_DATE_LABEL_RE = /(^|[^a-z])date([^a-z]|$)|completion\b|\bstart\b|submittals? (received|sent|approved)|shop drawings ready|design (completed|fee paid)|release date|as built dwgs (to|from|sent)|last log|certified payroll submitted|column logs from rig|modulus load test - passed/i;
+    function pfIsDateLabel(label){
+      return PF_DATE_LABEL_RE.test(String(label || ''));
+    }
+
     // ---- field renderers (label always shown; blank -> em-dash) ----
     // If a manual override exists for (_curSection, label), it WINS over the
     // synced value and the field is tagged as edited (subtle indicator).
@@ -12118,6 +12171,9 @@ try {
       var edited = ov.has;
       if (edited) { val = ov.value; src = 'Manual override'; }
       var v = (val === undefined || val === null || String(val).trim() === "") ? "" : String(val);
+      // DISPLAY-ONLY: normalize date fields to MM/DD/YYYY. The underlying data /
+      // override value is untouched; only the shown text changes.
+      if (v && pfIsDateLabel(label)) v = String(pfFmtDate(v));
       var cls = v ? "pr-field-value" : "pr-field-value empty";
       var shown = v ? E(v) : "-";
       var srcHtml = (src && v) ? '<span class="pr-field-src">'+E(src)+'</span>' : '';
@@ -12163,6 +12219,9 @@ try {
       var edited = ov.has;
       if (edited) { val = ov.value; src = 'Manual override'; }
       var raw = (val === undefined || val === null || String(val).trim() === "") ? "" : String(val).trim();
+      // DISPLAY-ONLY date normalization (MM/DD/YYYY) for date-kind / date-labeled
+      // fields, consistent with field(). Never mutates the stored value.
+      if (raw && (kind === 'date' || pfIsDateLabel(label))) raw = String(pfFmtDate(raw));
       var cls = raw ? "pr-field-value" : "pr-field-value empty";
       var inner;
       if (!raw) inner = '-';
@@ -16019,11 +16078,29 @@ try {
     // Reformat an ISO date STRING (YYYY-MM-DD) to MM/DD/YYYY by direct string
     // split — NO new Date() so there is no timezone off-by-one-day shift.
     // Non-matching strings pass through unchanged (fail-safe, never fabricated).
+    // DISPLAY-ONLY: normalize the Active Projects list dates to zero-padded
+    // MM/DD/YYYY (Brad 2026-08-07), matching the project-detail view. Handles ISO
+    // YYYY-MM-DD (+time), M/D/Y(Y), YYYY/MM/DD, epoch-ms, and Date objects. Anything
+    // not a recognized date shape passes through unchanged (never Invalid Date/NaN).
     function fmtDate(s){
-      if (!s) return s;
-      var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s));
-      if (m) return m[2] + '/' + m[3] + '/' + m[1];
-      return s;
+      if (s === undefined || s === null) return s;
+      function p2(n){ n = Number(n); return (n < 10 ? '0' : '') + n; }
+      function ymd(y, mo, da, raw){
+        y = Number(y); mo = Number(mo); da = Number(da);
+        if (!(mo >= 1 && mo <= 12) || !(da >= 1 && da <= 31) || !(y >= 1000 && y <= 9999)) return raw;
+        return p2(mo) + '/' + p2(da) + '/' + y;
+      }
+      if (s instanceof Date) return isNaN(s.getTime()) ? '' : p2(s.getMonth()+1) + '/' + p2(s.getDate()) + '/' + s.getFullYear();
+      var str = String(s).trim();
+      if (!str) return str;
+      var m;
+      if ((m = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[T\s].*)?$/.exec(str))) return ymd(m[1], m[2], m[3], str);
+      if ((m = /^(\d{1,2})[/-](\d{1,2})[/-](\d{2}|\d{4})$/.exec(str))) {
+        var yy = m[3].length === 2 ? (Number(m[3]) + 2000) : Number(m[3]);
+        return ymd(yy, m[1], m[2], str);
+      }
+      if (/^\d{13,}$/.test(str)) { var d = new Date(Number(str)); if (!isNaN(d.getTime())) return p2(d.getMonth()+1) + '/' + p2(d.getDate()) + '/' + d.getFullYear(); }
+      return str;
     }
     // Start date for a project number from the schedule seed (admin/partner feed).
     // Uses the first mobilization's start. Field-safe schedule (PF_SCHEDULE_FIELD)
