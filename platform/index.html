@@ -2336,6 +2336,17 @@ body.role-field-ops .nav-sub[data-fo-hide] {
   padding: 5px 12px; border-radius: 6px; line-height: 1.2;
 }
 .pr-action-link:hover { filter: brightness(1.08); }
+/* Computed automations (phase 2, Brad 2026-08-07): DISPLAY-ONLY computed hint
+   rows layered next to existing manual fields. NOT .pr-field[data-pr-label] so the
+   section editor's save-scan never treats them as editable data. Normal = muted
+   info line; .pr-computed-flag = red warning (e.g. pad elevation diff > 2 ft). */
+.pr-computed-hint {
+  font-size: 0.72rem; color: var(--text-2); font-style: italic;
+  margin: 0 0 6px 18px; line-height: 1.3;
+}
+.pr-computed-hint .pr-computed-val { font-style: normal; font-weight: 600; color: var(--text-1); }
+.pr-computed-hint.pr-computed-flag { color: #c0392b; font-style: normal; font-weight: 600; }
+.pr-computed-hint.pr-computed-flag .pr-computed-val { color: #c0392b; }
 
 .pr-contact {
   border: 1px solid var(--border-light);
@@ -12516,6 +12527,86 @@ try {
     function subgroup(t){ return '<div class="pr-subgroup">'+E(t)+'</div>'; }
     function subgroupNote(t){ return '<div class="pr-subgroup-note">'+E(t)+'</div>'; }
 
+    // ---- computed automations (phase 2, Brad 2026-08-07) ---------------------
+    // DISPLAY-ONLY computed HINTS layered next to existing manual fields. These
+    // read existing field values (synced value or manual override, override wins
+    // to match what field() shows) and render a derived hint. They NEVER write,
+    // never mutate data, never change the manual fields. Rendered as a
+    // .pr-computed-hint div (NOT .pr-field[data-pr-label]) so the section
+    // editor's save-scan ignores them entirely.
+    //
+    // computedHint(html, isFlag): render one hint line. `html` is pre-built,
+    // trusted markup from the callers below (all dynamic values run through E()
+    // before reaching here). isFlag=true => red warning styling.
+    function computedHint(html, isFlag){
+      return '<div class="pr-computed-hint'+(isFlag ? ' pr-computed-flag' : '')+'">'+html+'</div>';
+    }
+    // Effective (override-wins) value of a field, matching field()'s display
+    // resolution — so a computation sees exactly what the user sees.
+    function effVal(sectionKey, label, synced){
+      var ov = ovLookup(sectionKey, label);
+      if (ov.has) return ov.value;
+      return synced;
+    }
+    // Tolerant numeric parse: strip feet/inch marks (' " ft feet), commas,
+    // whitespace; accept a leading sign + decimal. Returns a finite Number or
+    // null (blank / non-numeric -> null, never NaN in output).
+    function pfParseNum(v){
+      if (v === undefined || v === null) return null;
+      var s = String(v).trim();
+      if (!s) return null;
+      // drop unit words/marks and thousands separators, keep digits/sign/dot.
+      s = s.replace(/(feet|ft|in|inches)\b/gi, '').replace(/['"]/g, '').replace(/,/g, '').trim();
+      var m = /^[+-]?\d*\.?\d+/.exec(s);
+      if (!m) return null;
+      var n = Number(m[0]);
+      return isFinite(n) ? n : null;
+    }
+    // Parse a stored date value into a LOCAL Date (midnight) or null. Accepts the
+    // same shapes pfFmtDate recognizes (ISO, M/D/Y, M-D-Y, 2/4-digit year, epoch
+    // ms). Anything else -> null (no compute, no error).
+    function pfParseDate(v){
+      if (v === undefined || v === null) return null;
+      if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+      var s = String(v).trim();
+      if (!s) return null;
+      var m;
+      if ((m = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[T\s].*)?$/.exec(s))) {
+        return _pfMkDate(+m[1], +m[2], +m[3]);
+      }
+      if ((m = /^(\d{1,2})[/-](\d{1,2})[/-](\d{2}|\d{4})$/.exec(s))) {
+        var yy = m[3].length === 2 ? (Number(m[3]) + 2000) : Number(m[3]);
+        return _pfMkDate(yy, +m[1], +m[2]);
+      }
+      if (/^\d{13,}$/.test(s)) { var d = new Date(Number(s)); return isNaN(d.getTime()) ? null : d; }
+      return null;
+    }
+    function _pfMkDate(y, mo, da){
+      if (!(mo >= 1 && mo <= 12) || !(da >= 1 && da <= 31) || !(y >= 1000 && y <= 9999)) return null;
+      var d = new Date(y, mo - 1, da);
+      // reject rollover (e.g. Feb 30 -> Mar 2)
+      if (d.getFullYear() !== y || d.getMonth() !== mo - 1 || d.getDate() !== da) return null;
+      return d;
+    }
+    // Add (or subtract, if n<0) N BUSINESS days (Mon-Fri) to a Date, skipping
+    // weekends. Holidays intentionally NOT handled (per spec). Returns a new Date.
+    function pfAddBusinessDays(date, n){
+      if (!(date instanceof Date) || isNaN(date.getTime())) return null;
+      var d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      var step = n >= 0 ? 1 : -1;
+      var remaining = Math.abs(n);
+      while (remaining > 0){
+        d.setDate(d.getDate() + step);
+        var dow = d.getDay(); // 0=Sun, 6=Sat
+        if (dow !== 0 && dow !== 6) remaining--;
+      }
+      return d;
+    }
+    function pfFmtDateObj(d){
+      if (!(d instanceof Date) || isNaN(d.getTime())) return '';
+      return _pf2(d.getMonth()+1) + '/' + _pf2(d.getDate()) + '/' + d.getFullYear();
+    }
+
     // twoCol(left, right, leftGroup?, rightGroup?): render a FIXED two-column
     // grouping that mirrors Brad's spec PDFs (specific fields grouped left vs
     // right, NOT a flowing auto-fill grid that reorders them). Each side is its
@@ -14145,6 +14236,29 @@ try {
             field('Actual Building Pad Elevation', ''),
             field('Elevation Difference', '')
           ])
+        // COMPUTED (display-only): pad elevation difference + >2 ft red flag.
+        // Reads the effective (override-wins) Expected & Actual elevations, parses
+        // them tolerantly (strips ' " ft), and shows Expected - Actual in feet. If
+        // both parse, render the computed difference; if |diff| > 2 ft, render RED
+        // with a review marker. If either is blank/non-numeric, render nothing.
+        // The manual "Elevation Difference" field above is untouched.
+        + (function(){
+            var _exp = pfParseNum(effVal('siteReadiness', 'Expected Building Pad Elevation', ''));
+            var _act = pfParseNum(effVal('siteReadiness', 'Actual Building Pad Elevation', ''));
+            if (_exp === null || _act === null) return '';
+            var _diff = _exp - _act;
+            // round to 2 decimals for display without float noise
+            var _diffR = Math.round(_diff * 100) / 100;
+            var _abs = Math.abs(_diffR);
+            var _over = _abs > 2;
+            var _val = '<span class="pr-computed-val">' + E(_diffR + ' ft') + '</span>';
+            if (_over) {
+              return computedHint('Computed elevation difference (Expected - Actual): ' + _val
+                + ' &#9888; exceeds 2 ft - review required.', true)
+                + computedHint('When the difference exceeds 2 ft this will notify PM / Field Ops / Owners (FUTURE - not built yet).', false);
+            }
+            return computedHint('Computed elevation difference (Expected - Actual): ' + _val + ' (within 2 ft).', false);
+          })()
         + subgroupNote('Send site readiness checklist >= 3 weeks prior; PM confirms all items with GC/Super; 100% complete = clear to mobilize.')
         + fields([
             field('Site Readiness Checklist Sent?', ''),
@@ -14635,6 +14749,20 @@ try {
           fieldLinked('Load Test Link', '', '', 'website'),
           field('Date All Files Sent to GGG', ''),
           field('Expected GGG Return Date', ''),
+          // COMPUTED (display-only): expected GGG return = files-sent date + 5
+          // BUSINESS days (Mon-Fri, weekends skipped; holidays not handled). Reads
+          // the effective (override-wins) "Date All Files Sent to GGG"; if it is a
+          // valid date, show a computed hint. The manual "Expected GGG Return Date"
+          // field above stays editable and wins for display (this is only a hint).
+          (function(){
+            var _sent = pfParseDate(effVal('closeout', 'Date All Files Sent to GGG', ''));
+            if (!_sent) return '';
+            var _exp = pfAddBusinessDays(_sent, 5);
+            if (!_exp) return '';
+            return computedHint('Computed expected GGG return: '
+              + '<span class="pr-computed-val">' + E(pfFmtDateObj(_exp)) + '</span>'
+              + ' (5 business days after files sent). Manual entry above overrides this.', false);
+          })(),
 
           // ===== Subsection 3: GGG Returns Final As-Builts =====
           subgroup('3. GGG Returns Final As-Builts'),
@@ -14892,6 +15020,21 @@ try {
             // --- Utility Locates ---
           + subgroup('Utility Locates')
           + subgroupNote('FUTURE automation: auto to-do to call locate >= 4 business days before project start; if in Indiana call 811, else the state\'s 811.')
+          // COMPUTED (display-only): "Call Locate By" = project START date - 4
+          // BUSINESS days (Mon-Fri, weekends skipped). Reads the effective
+          // (override-wins) General Info "Anticipated Project Start". If there is
+          // no valid start date, render nothing. This is a hint only; it will
+          // become a PM to-do reminder (FUTURE - not built yet).
+          + (function(){
+              var _start = pfParseDate(effVal('general', 'Anticipated Project Start', bid.projected_start));
+              if (!_start) return '';
+              var _by = pfAddBusinessDays(_start, -4);
+              if (!_by) return '';
+              return computedHint('Call locate by: '
+                + '<span class="pr-computed-val">' + E(pfFmtDateObj(_by)) + '</span>'
+                + ' (4 business days before the ' + E(pfFmtDateObj(_start)) + ' project start).', false)
+                + computedHint('This will become a PM to-do reminder (FUTURE - not built yet).', false);
+            })()
           + fields([
               field('Locate Ticket #', ''),
               field('Locate Ticket # (Excavator ID)', ''),
