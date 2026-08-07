@@ -494,6 +494,14 @@ export function areaForPath(pathname) {
     // requireArea(session, 'field_ops'). ZERO financials (files only). Without
     // this line the default-deny posture would block the crew (admin-only).
     if (pathname.startsWith('/api/field-upload'))  return 'field_ops';
+    // Live, READ-ONLY gallery of a project's SharePoint "02 - Project Photos"
+    // folder (jobsite pictures) for the office Active-Projects detail view.
+    // field_ops area = admin/partner/business_dev/field_ops so the office AND the
+    // crew can view project photos. The handler ALSO calls requireArea(session,
+    // 'field_ops'). ZERO financials (jobsite images only). Read-only (no writes).
+    // Without this line the default-deny posture would fall through to
+    // 'user_admin' (admin-only) and the office (partner/BD) could not view photos.
+    if (pathname.startsWith('/api/project-photos')) return 'field_ops';
     // Maintenance completion overlay for the compiled Maintenance checklist. Same
     // readership as the daily reports it overlays (field_ops area = admin/partner/
     // business_dev/field_ops). The handler also calls requireArea(session,

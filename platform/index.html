@@ -2397,6 +2397,43 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 .pr-link.missing { background: var(--bg-2); color: var(--text-3); border: 1px dashed var(--border); cursor: not-allowed; }
 .pr-empty-note { font-size: 0.84rem; color: var(--text-3); font-style: italic; }
 
+/* ---- PROJECT PHOTOS (live SharePoint gallery, read-only) ---- */
+.pr-photos-status { font-size: 0.88rem; color: var(--text-3); padding: 4px 0; }
+.pr-photos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+  margin-top: 4px;
+}
+.pr-photo {
+  position: relative;
+  display: block;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface-2, #eef1f4);
+  aspect-ratio: 1 / 1;
+  border: 1px solid var(--border, #d8dee6);
+  cursor: pointer;
+  text-decoration: none;
+}
+.pr-photo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.18s ease;
+}
+.pr-photo:hover .pr-photo-img { transform: scale(1.04); }
+.pr-photo-date {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  font-size: 0.68rem;
+  color: #fff;
+  background: linear-gradient(to top, rgba(0,0,0,0.62), rgba(0,0,0,0));
+  padding: 12px 6px 4px;
+  line-height: 1;
+}
+
 /* ---- PF DASHBOARD (company-wide KPI view) ---- */
 .pfdash-wrap { padding: 4px 2px 32px; }
 .pfdash-toolbar {
@@ -13915,6 +13952,19 @@ try {
           field('Field Ops Mgr Jobsite Visit w/ GC', '')
         ]) + linkRow(L.site), false, 'siteReadiness');
 
+      // ----- 6. Project Photos (LIVE, READ-ONLY gallery) -----
+      // A live thumbnail gallery of this project's SharePoint "02 - Project Photos"
+      // folder, fetched on-expand from /api/project-photos?num=<project number>.
+      // NO sectionKey (not field-editable; it mirrors SharePoint), so no Edit button.
+      // Body is a placeholder that the async loader (pfLoadProjectPhotos, fired
+      // post-render below) replaces with the grid / empty state / error state.
+      var _photoNum = _curNum;
+      html += card(6, 'Project Photos', null,
+        '<div class="pr-photos" data-photos-num="' + E(_photoNum) + '">'
+        + '<div class="pr-photos-status">Loading photos&hellip;</div>'
+        + '<div class="pr-photos-grid" style="display:none"></div>'
+        + '</div>', false);
+
       // ----- Equipment + Material MOVED IN (Brad 2026-08-07 batch-11) -----
       // The standalone top-level Equipment (#6) and Material (#7) sections were
       // DELETED and are now rendered as NESTED editable cards INSIDE the Site
@@ -13963,7 +14013,7 @@ try {
       var qaBody = qaNote + fields(qaRows) + linkRow(L.qaqc);
       _curSection = _prevQa;
 
-      // ----- 6. Financials (renumbered from 7 after QA/QC moved into Engineering) -----
+      // ----- 7. Financials (renumbered from 6 after Project Photos inserted at 6) -----
       // Phase 1: a per-project BUDGET vs ACTUAL table seeded from the standard
       // ~69 cost-code template (window.PF_COST_CODE_TEMPLATE, ZEROED) with saved
       // budgets merged on top (_curBudget). Office roles get an inline Edit Budget
@@ -14263,11 +14313,11 @@ try {
         + finSub('Project Invoicing', finInvoicingBody, false)
         + finSub('Project Costs (Budget vs Actual)', baHtml, false);
 
-      html += card(6, 'Financials', baMeta, finBody, false);
+      html += card(7, 'Financials', baMeta, finBody, false);
 
       // ----- 8. Project Closeout -----
       _curSection = 'closeout';
-      html += card(7, 'Project Closeout', null,
+      html += card(8, 'Project Closeout', null,
         fields([
           field('Final As Built Dwgs to Garbin Geo', ''),
           field('Column Logs from Rig (PDF) to Garbin', ''),
@@ -14277,11 +14327,12 @@ try {
           field('PF Check Garbin As Builts vs PF', ''),
           field('Final As Built Dwgs Sent to GC', '')
         ]), false, 'closeout');
-      // (office renumber 2026-08-07 batch-12: QA/QC MOVED INTO Engineering & Design as
-      // a nested card, so the top-level list is now gap-free 1-7:
+      // (office renumber 2026-08-07: Project Photos inserted at #6, so the top-level
+      // list is now gap-free 1-8:
       // 1. General Info  2. Subcontract Agreement  3. Engineering & Design (now holds
       // Prelim Design / PF Design Submittal / As Built Drawings + a nested QA/QC card)
-      // 4. Project Safety  5. Site Readiness / Project Setup  6. Financials  7. Closeout.
+      // 4. Project Safety  5. Site Readiness / Project Setup  6. Project Photos (LIVE
+      // SharePoint gallery)  7. Financials  8. Closeout.
       // Prior batch-11 had Equipment + Material nested into Site Readiness.)
 
       // ----- General Info subsections injected after render (Brad 2026-08-07) -----
@@ -14389,7 +14440,17 @@ try {
         var pfCards = [];
         pfRoles.forEach(function(pair){
           var role = pair[0], c = pair[1] || {};
-          pfCards.push(contactCard(c.name || role, role, [
+          // CARD TITLE = the PERSON'S NAME (black bold top line), role as the small
+          // tag beside it — matching the Seth Willis / Operator #1 card (Brad 2026-08-07).
+          // The effective name is the SAVED OVERRIDE if present (a hand-entered name
+          // lives in _curOverrides.pfTeam), else the synced pf_team name. FALLBACK:
+          // when no name is entered yet (e.g. Operator #2/#3), title falls back to the
+          // ROLE so the empty card still shows something (never blank).
+          var _pfNameOv = ovLookup('pfTeam', role + ' - Contact Name');
+          var _pfName = (_pfNameOv.has && String(_pfNameOv.value || '').trim())
+            ? String(_pfNameOv.value).trim()
+            : (c.name || '');
+          pfCards.push(contactCard(_pfName || role, role, [
             field(role + ' - Contact Name', c.name || '', c.name ? 'Contacts' : ''),
             field(role + ' - Title', c.scope || role, ''),
             fieldLinked(role + ' - Office Phone', c.phone || '', c.phone ? 'Contacts' : '', 'phone'),
@@ -14588,7 +14649,92 @@ try {
       // from General Info (and from the section merge entirely) — no longer needed.
       // The standalone tracked-items panel stays gone; nothing resurrects it here.
 
+      // ----- Project Photos: wire the LAZY loader for the #6 gallery -----
+      // The photos card fetches /api/project-photos on FIRST expand (not on every
+      // project open) so opening a record never blocks on a Graph round-trip. If a
+      // user never opens the card, no request is made.
+      try { wireProjectPhotos(root); } catch (e) {}
+
       _curSection = ''; // done rendering this record
+    }
+
+    // ---- Project Photos: lazy gallery loader ---------------------------------
+    // Fetches /api/project-photos?num=<number> the first time the Project Photos
+    // card is expanded, then renders a responsive thumbnail grid (newest first).
+    // Fails SOFT: an API error / empty folder shows a clean message, never a
+    // console-throwing broken page. Thumbnails lazy-load (loading="lazy"); a
+    // thumbnail click opens the full-size image in a new tab.
+    function wireProjectPhotos(root){
+      if (!root) return;
+      var wrap = root.querySelector('.pr-photos');
+      if (!wrap) return;
+      var card = wrap.closest('.pr-card');
+      if (!card) return;
+      var head = card.querySelector('.pr-card-head');
+      if (!head) return;
+      var num = wrap.getAttribute('data-photos-num') || '';
+      var loaded = false;
+      var trigger = function(){
+        if (loaded) return;
+        // Only load once the card is actually OPEN (expanded).
+        if (!card.classList.contains('open')) return;
+        loaded = true;
+        loadProjectPhotos(wrap, num);
+      };
+      // If it is already open (unlikely; default closed), load now.
+      trigger();
+      head.addEventListener('click', function(){
+        // The head's own onclick toggles .open; defer so we read the NEW state.
+        setTimeout(trigger, 0);
+      });
+    }
+
+    function loadProjectPhotos(wrap, num){
+      var statusEl = wrap.querySelector('.pr-photos-status');
+      var gridEl = wrap.querySelector('.pr-photos-grid');
+      if (!statusEl || !gridEl) return;
+      var setStatus = function(msg){ statusEl.style.display = ''; statusEl.textContent = msg; gridEl.style.display = 'none'; };
+      if (!/^[0-9]{2}-[0-9]{2,4}$/.test(num)) { setStatus('No photos available for this project.'); return; }
+      setStatus('Loading photos…');
+      fetch('/api/project-photos?num=' + encodeURIComponent(num), { credentials: 'same-origin' })
+        .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
+        .then(function(d){
+          var photos = (d && Array.isArray(d.photos)) ? d.photos : [];
+          if (!photos.length) {
+            // found:false OR an empty folder -> clean empty state (not an error).
+            setStatus(d && d.found === false ? 'No photos uploaded yet.' : 'No photos uploaded yet.');
+            return;
+          }
+          var html = '';
+          for (var i = 0; i < photos.length; i++) {
+            var p = photos[i] || {};
+            var thumb = p.thumbnailUrl || p.fullUrl || '';
+            var full = p.fullUrl || p.thumbnailUrl || '';
+            if (!thumb) continue;
+            var when = '';
+            try {
+              var dt = p.takenDateTime || p.lastModified;
+              if (dt) when = new Date(dt).toLocaleDateString();
+            } catch (e) {}
+            var name = p.name || '';
+            var tileInner =
+              '<img class="pr-photo-img" loading="lazy" src="' + E(thumb) + '" alt="' + E(name) + '">' +
+              (when ? '<span class="pr-photo-date">' + E(when) + '</span>' : '');
+            if (full) {
+              html += '<a class="pr-photo" href="' + E(full) + '" target="_blank" rel="noopener" title="' + E(name) + '">' + tileInner + '</a>';
+            } else {
+              html += '<span class="pr-photo" title="' + E(name) + '">' + tileInner + '</span>';
+            }
+          }
+          if (!html) { setStatus('No photos uploaded yet.'); return; }
+          gridEl.innerHTML = html;
+          statusEl.style.display = 'none';
+          gridEl.style.display = '';
+        })
+        .catch(function(){
+          // Fail soft: never a broken page or blocking console error.
+          setStatus('Photos are temporarily unavailable.');
+        });
     }
 
     // ---- expose a reusable renderer + project-aware opener ----
