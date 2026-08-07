@@ -13,6 +13,7 @@ with a release-stage suffix (see `docs/PLATFORM-RELEASE-STAGES.md` and `docs/dev
 ## [Unreleased]
 
 ### Added
+- Master contact directory wiring live: new `functions/api/contacts.js` (read + write-back to PF Master Contact List.xlsx, GET+POST both `requireArea('crm')`), `functions/lib/auth.js` classifies `/api/contacts` as the `crm` area (admin + partner + business_dev; field_ops blocked), and `index.html` gains contact typeahead + a "Save contact(s) to directory" write-back button. Carries no financials (names/titles/companies/phones/emails only). Shipped from `contact-directory-20260807` @ `bf27b2a` (base `general-info-rework-20260806` @ `8eae0af` = current prod canonical structure; `git merge-base --is-ancestor 8eae0af bf27b2a` = YES). Passed adversarial code review (GO, no blockers). New prod canonical `e1e3b3da` (env=production, branch=main). Prod auth fully gated: `/api/me` 401, `/` 401 (Basic realm), `/api/contacts` 401 (deployed + CRM-gated, not open/500).
 - DevOps function: team charter, release protocol, logging/monitoring runbook, and maintenance/support runbook under `docs/devops/`, plus this changelog. Formalizes how changes ship, get logged, and stay recoverable.
 
 ### Changed
