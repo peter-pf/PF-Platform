@@ -13473,7 +13473,17 @@ try {
           // pfIsDateLabel (\bstart\b) so field() routes it through pfFmtDate, and the
           // editor renders it as <input type="date"> via PF_FIELD_DATE_LABELS. Saves
           // + round-trips under the SAME `contract` override key as its siblings.
-          field('Released to Start Submittals', '')
+          field('Released to Start Submittals', ''),
+          // Bid Sent to GC (Brad 2026-08-07): a LINK to the proposal PF sent the GC,
+          // stored in SharePoint. fieldLinked(...,'website') renders the pasted URL
+          // as a clickable link (linkWebsite -> new tab, rel=noopener, auto-prefix
+          // https://) -- the SAME clickable pattern as the GC/Owner website fields.
+          // Blank until set (empty -> em-dash, no link). Editable: the user pastes /
+          // updates the SharePoint URL in the section editor; the value is the URL
+          // text so it round-trips through the SAME `contract` override key as its
+          // siblings. NOT docEmbed (that needs a synced drive-item id); this is a
+          // per-project editable link, never a hard-coded URL.
+          fieldLinked('Bid Sent to GC', '', '', 'website')
         ])
         + subhead('Contract Recap')
         // CONDENSED into a fixed two-column grouping (twoCol) so Contract Recap is
