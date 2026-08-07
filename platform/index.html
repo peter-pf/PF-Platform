@@ -13465,7 +13465,15 @@ try {
           field('Bid Due Date', bid.due_date, 'Bid Log'),
           field('Prelim Completed By', bid.design_completed_date, 'Bid Log'),
           field('Date Bid Submitted', bid.date_submitted, 'Bid Log'),
-          field('LOI/NOI Date', '')
+          field('LOI/NOI Date', ''),
+          // Released to Start Submittals (Brad 2026-08-07): a DATE milestone in the
+          // bid->award handoff. Empty by default (manual entry now via the editor's
+          // native date picker; intended to be auto-populated by later
+          // upload->extract). Display auto-normalizes to MM/DD/YYYY: the label hits
+          // pfIsDateLabel (\bstart\b) so field() routes it through pfFmtDate, and the
+          // editor renders it as <input type="date"> via PF_FIELD_DATE_LABELS. Saves
+          // + round-trips under the SAME `contract` override key as its siblings.
+          field('Released to Start Submittals', '')
         ])
         + subhead('Contract Recap')
         // CONDENSED into a fixed two-column grouping (twoCol) so Contract Recap is
@@ -14528,15 +14536,56 @@ try {
       'Column Diameter': ['24"', '30"']
     };
 
+    // Labels whose editor input is a NATIVE DATE PICKER (Brad 2026-08-07: "hard
+    // enter or select from a date function/feature"). Key = exact field label.
+    // Rendered as <input type="date"> so the user can either type or pick from the
+    // browser's calendar. The control's value is YYYY-MM-DD (HTML date-input
+    // format); it is SAVED as that plain string through the same override plumbing
+    // and DISPLAYS back as MM/DD/YYYY via pfFmtDate (which normalizes YYYY-MM-DD).
+    // Add future date fields here to give them a picker without touching anything else.
+    var PF_FIELD_DATE_LABELS = {
+      'Released to Start Submittals': true
+    };
+    // Coerce a stored/displayed date (MM/DD/YYYY, M/D/YY, YYYY-MM-DD, ...) into the
+    // YYYY-MM-DD form a native <input type="date"> requires to pre-fill. Anything
+    // that is not a recognizable date shape -> '' (leave the picker empty rather
+    // than mangle it); the sibling <input type="text"> path is unaffected.
+    function pfToDateInputValue(v){
+      if (v == null) return '';
+      var s = String(v).trim();
+      if (!s) return '';
+      var m;
+      if ((m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s))) {
+        return m[1] + '-' + _pf2(m[2]) + '-' + _pf2(m[3]);
+      }
+      // M/D/Y or M-D-Y (Y = 2 or 4 digits)
+      if ((m = /^(\d{1,2})[/-](\d{1,2})[/-](\d{2}|\d{4})$/.exec(s))) {
+        var yy = m[3].length === 2 ? (Number(m[3]) + 2000) : Number(m[3]);
+        var mo = Number(m[1]), da = Number(m[2]);
+        if (mo >= 1 && mo <= 12 && da >= 1 && da <= 31) {
+          return yy + '-' + _pf2(mo) + '-' + _pf2(da);
+        }
+      }
+      return '';
+    }
+
     // The 5 fields that make up one repeatable contact block, in order. Used by the
     // "Add contact" button to append a fresh numbered block.
     var PF_CONTACT_FIELDS = ['Contact Name', 'Title', 'Office Phone', 'Cell Phone', 'Email'];
 
-    // Render one editor input row (text OR select for dropdown labels).
+    // Render one editor input row (text, select for dropdown labels, OR a native
+    // date picker for PF_FIELD_DATE_LABELS labels).
     function pfEditInputRow(label, value){
       var opts = PF_FIELD_DROPDOWNS[label];
       var control;
-      if (opts) {
+      if (PF_FIELD_DATE_LABELS[label]) {
+        // Native date picker. Seed from the displayed value (MM/DD/YYYY) converted
+        // to the required YYYY-MM-DD; a non-date/blank stored value -> empty picker.
+        // pfSaveSection reads inp.value (YYYY-MM-DD) exactly like any text input, so
+        // the override save + MM/DD/YYYY re-display round-trip is unchanged.
+        control = '<input class="pr-edit-input" type="date" data-pr-field-label="' + esc2(label) + '" '
+          + 'value="' + esc2(pfToDateInputValue(value)) + '">';
+      } else if (opts) {
         var cur = value == null ? '' : String(value);
         var o = '<option value=""' + (cur === '' ? ' selected' : '') + '>— select —</option>';
         // If the stored value is not one of the options, keep it as a selected custom
