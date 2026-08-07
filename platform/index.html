@@ -2094,6 +2094,24 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 .pr-edit-add { flex-direction: row; gap: 8px; margin-top: 4px; }
 .pr-edit-add .pr-edit-newlabel { flex: 0 0 40%; }
 .pr-edit-add .pr-edit-newvalue { flex: 1 1 auto; }
+/* Dropdown control in the editor (SOW / Column Diameter) matches text inputs. */
+.pr-edit-select { appearance: auto; cursor: pointer; }
+/* Rows added by "+ Add ... contact" get a subtle accent rail so the new block reads. */
+.pr-edit-added { border-left: 2px solid var(--accent); padding-left: 8px; }
+/* Add-contact button bar for repeatable groups (Owner / engineers / PF team). */
+.pr-add-contact-bar { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0; }
+.pr-add-contact-btn {
+  padding: 5px 12px;
+  font-size: 0.76rem; font-weight: 600;
+  color: var(--accent);
+  background: var(--bg-0);
+  border: 1px dashed var(--accent);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.pr-add-contact-btn:hover { background: var(--accent); color: #fff; }
+/* Company sub-subhead inside Design Professionals reads lighter than a .pr-subhead. */
+.pr-card[data-pr-section="engineering"] .pr-subhead { font-size: 0.78rem; }
 .pr-edit-err {
   font-size: 0.82rem; color: #c0392b; font-weight: 600;
   padding: 8px 10px;
@@ -12055,8 +12073,15 @@ try {
       return '<div class="pr-field" data-pr-label="'+E(label)+'"><span class="pr-field-label">'+E(label)+editMark+'</span>'
            + '<span class="'+cls+'">'+shown+'</span>'+srcHtml+'</div>';
     }
-    function fields(rows){
-      return '<div class="pr-fields">'+rows.join('')+'</div>';
+    // fields(rows, contactGroup?): renders the flat label/value grid. If a
+    // contactGroup token is passed, the grid is tagged data-pr-contact-group so the
+    // section editor can offer an "Add contact" button that appends a numbered
+    // 5-field contact block (Contact Name/Title/Office Phone/Cell Phone/Email) under
+    // that same prefix. The token is the label PREFIX (e.g. "Geotechnical -",
+    // "Owner", "PF Team") used to name the new fields.
+    function fields(rows, contactGroup){
+      var attr = contactGroup ? ' data-pr-contact-group="'+E(contactGroup)+'"' : '';
+      return '<div class="pr-fields"'+attr+'>'+rows.join('')+'</div>';
     }
     function subhead(t){ return '<div class="pr-subhead">'+E(t)+'</div>'; }
 
@@ -13054,37 +13079,68 @@ try {
       // General Contractor Info = GC-specific fields; the GC Contacts personnel list
       //   is folded in (injected after render, right after these fields).
       // Documents (linkRow) is moved to the BOTTOM of the card, injected after render.
+      // Brad (2026-08-07 restructure): General Info is now the 5-subsection spec.
+      //   1. Project Info  2. General Contractor Info (+ GC Project Team)
+      //   3. Owner Info (+ repeatable Owner Contacts)  4. Design Professionals
+      //   (Engineering & Design MOVED IN here, 4 company blocks)  5. PF Project Team
+      //   (role-based) ... then Documents at the very bottom.
+      // Subsections 1+2+3 are subhead() dividers WITHIN the single general card body
+      // (flat editable field() rows -> the "general" override key round-trips through
+      // the existing editor unchanged). Design Professionals + PF Project Team are
+      // nested .pr-cards (their own "engineering"/"pfTeam" override keys) injected
+      // after render. Owner contacts + engineer/PF-team contacts + the SOW / Column
+      // Diameter DROPDOWNS are all saveable through the section editor (dropdown +
+      // add-contact support added to pfEditSection).
+      //
+      // GC Project Team contact helper: find a GC contact whose scope matches a role.
+      var _gcRole = function(re){ return (g.gc||[]).find(function(c){ return re.test(c.scope||''); }) || {}; };
+      var _gcPM = (g.gc && g.gc[0]) ? g.gc[0] : _gcRole(/pm|project manager/i);
+      var _gcSup = _gcRole(/super/i);
+      var _gcPE = _gcRole(/project eng|proj eng|\bpe\b/i);
       _curSection = 'general';
       html += card(1, 'General Info', null,
         subhead('Project Info')
         + fields([
+          field('PF Project #', D.project_number, 'Record'),
+          field('Project Name', D.project_name, 'Record'),
           field('Project Address', bid.address || SF.project_address, bid.address ? 'Bid Log' : SS),
-          field('City / State', bid.city_state, 'Bid Log'),
           field('County', ''),
           field('Township', ''),
-          field('Project Scope', SF.confirmed_scope || 'Aggregate Piers', SF.confirmed_scope ? SS : 'Bid Log sheet'),
+          field('Total Bldg SF', bid.total_sf, 'Bid Log'),
           field('Site Size (Acres)', bid.site_acres, 'Bid Log'),
-          field('Total SF (Bldg Pad)', bid.total_sf, 'Bid Log'),
-          field('Total Piers (Qty)', bid.total_columns, 'Bid Log'),
-          field('Total LF', bid.total_lf, 'Bid Log'),
+          field('Anticipated Project Start', bid.projected_start, 'Bid Log'),
+          field('Projected Duration (Days)', bid.duration_days, 'Bid Log'),
+          field('Project Completion', ''),
+          // DROPDOWN (SOW). Value seeds from the confirmed subcontract scope where present.
+          field('Project Scope of Work (SOW)', SF.confirmed_scope, SF.confirmed_scope ? SS : ''),
+          field('SOW Notes', ''),
+          field('Total Pier Qty (Prelim)', bid.total_columns, 'Bid Log'),
+          field('Total LF (Prelim)', bid.total_lf, 'Bid Log'),
+          field('Total Pier Qty (Approved Submittal)', ''),
+          field('Total LF (Approved Submittal)', ''),
+          // DROPDOWN (Column Diameter: 24" / 30").
           field('Column Diameter', ''),
           field('Estimated Stone (TN)', bid.total_stone_tn, 'Bid Log'),
-          field('Estimated Spoils (CY)', ''),
-          field('Top Feed or Bottom Feed', bid.feed_type, 'Bid Log'),
-          field('Projected PF Start Date', bid.projected_start, 'Bid Log'),
-          field('Commencement Date (NTP)', SF.commencement_date, SS),
-          field('Contract Duration (working days)', bid.duration_days, 'Bid Log'),
-          field('Contract Duration (calendar days)', SF.contract_duration_calendar, SS),
-          field('Estimated Project Completion', ''),
-          field('Subcontract / Bid Value', bid.bid_total_value ? ('$'+bid.bid_total_value) : SF.subcontract_value, bid.bid_total_value ? 'Bid Log' : SS),
-          field('Award Status', bid.bid_status, 'Bid Log')
+          field('Estimated Spoils (CY)', '')
         ])
         + subhead('General Contractor Info')
         + fields([
-          field('General Contractor', bid.gc_name || SF.gc_party, bid.gc_name ? 'Bid Log' : SS),
-          field('GC Project Number / Contract No.', SF.subcontract_number, SS),
-          field('GC Project Manager', (g.gc&&g.gc[0]?g.gc[0].name:''), 'Contacts'),
-          field('Site Superintendent', (function(){var s=(g.gc||[]).find(function(c){return /super/i.test(c.scope||'');});return s?s.name:'';})(), 'Contacts')
+          field('General Contractor', bid.gc_name || SF.gc_party || (g.gc&&g.gc[0]?g.gc[0].company:''), bid.gc_name ? 'Bid Log' : SS),
+          field('GC Address', (g.gc&&g.gc[0]?g.gc[0].address:''), 'Contacts'),
+          field('GC Office Phone', (g.gc&&g.gc[0]?g.gc[0].phone:''), 'Contacts'),
+          field('GC Website', (g.gc&&g.gc[0]?g.gc[0].website:''), 'Contacts')
+        ])
+        + subhead('GC Project Team')
+        + fields([
+          field('GC Project Manager - Name', _gcPM.name || '', 'Contacts'),
+          field('GC Project Manager - Office Phone', _gcPM.phone || '', 'Contacts'),
+          field('GC Project Manager - Cell Phone', _gcPM.cell || '', 'Contacts'),
+          field('GC Project Manager - Email', _gcPM.email || '', 'Contacts'),
+          field('GC Superintendent - Cell Phone', _gcSup.cell || '', 'Contacts'),
+          field('GC Superintendent - Email', _gcSup.email || '', 'Contacts'),
+          field('GC Project Engineer - Office Phone', _gcPE.phone || '', 'Contacts'),
+          field('GC Project Engineer - Cell Phone', _gcPE.cell || '', 'Contacts'),
+          field('GC Project Engineer - Email', _gcPE.email || '', 'Contacts')
         ]), false, 'general');
 
       // ----- (PF Team merged into General Info) -----
@@ -13208,11 +13264,74 @@ try {
         html += card('2b', 'Subcontract Analysis', riskMeta, ab, false);
       }
 
-      // ----- 4. Engineering & Design -----
+      // ----- Design Professionals (Engineering & Design MOVED INTO General Info) -----
+      // Brad (2026-08-07): the standalone "Engineering & Design" card is REMOVED from
+      // the top-level section list and rebuilt as the "Design Professionals" nested
+      // card injected inside General Info below. It keeps its own data-pr-section
+      // "engineering" override key (zero data loss / zero migration). Built here as a
+      // body string (dpBody); the nested card is emitted in the injection block.
+      // Spec = 4 company sub-blocks: Ground Improvement Engineering, Geotechnical,
+      // Civil, Structural. Each: Company / Address / Office Phone / Website + contacts
+      // (minimum 1, add-more). The existing Bid-Log engineering firm + submittal
+      // tracking fields (previously in the Engineering card) are PRESERVED under the
+      // Ground Improvement Engineering block (mapped: AP design firm = ground
+      // improvement engineer) + an "Engineering & Design Tracking" tail so no data or
+      // in-flight submittal tracking is lost.
       _curSection = 'engineering';
-      var engBody = subhead('Engineering & Design Contacts') + contactList(g.engineering)
+      // Seed the Ground Improvement Engineering company + contact 1 from the synced
+      // AP-design contact (g.engineering[0]) / Bid Log firm.
+      var _gie = (g.engineering && g.engineering[0]) ? g.engineering[0] : {};
+      var dpBody =
+          subhead('Ground Improvement Engineering')
         + fields([
-            field('AP Design Firm', bid.engineer_firm, 'Bid Log'),
+            field('Ground Improvement - Company', _gie.company || bid.engineer_firm || '', _gie.company ? 'Contacts' : 'Bid Log'),
+            field('Ground Improvement - Address', _gie.address || '', 'Contacts'),
+            field('Ground Improvement - Office Phone', _gie.phone || '', 'Contacts'),
+            field('Ground Improvement - Website', _gie.website || '', 'Contacts'),
+            field('Ground Improvement - Contact 1 - Contact Name', _gie.name || '', 'Contacts'),
+            field('Ground Improvement - Contact 1 - Title', _gie.scope || '', 'Contacts'),
+            field('Ground Improvement - Contact 1 - Office Phone', _gie.phone || '', 'Contacts'),
+            field('Ground Improvement - Contact 1 - Cell Phone', _gie.cell || '', 'Contacts'),
+            field('Ground Improvement - Contact 1 - Email', _gie.email || '', 'Contacts')
+          ], 'Ground Improvement')
+        + subhead('Geotechnical Engineer')
+        + fields([
+            field('Geotechnical - Company', ''),
+            field('Geotechnical - Address', ''),
+            field('Geotechnical - Office Phone', ''),
+            field('Geotechnical - Website', ''),
+            field('Geotechnical - Contact 1 - Contact Name', ''),
+            field('Geotechnical - Contact 1 - Title', ''),
+            field('Geotechnical - Contact 1 - Office Phone', ''),
+            field('Geotechnical - Contact 1 - Cell Phone', ''),
+            field('Geotechnical - Contact 1 - Email', '')
+          ], 'Geotechnical')
+        + subhead('Civil Engineer')
+        + fields([
+            field('Civil - Company', ''),
+            field('Civil - Address', ''),
+            field('Civil - Office Phone', ''),
+            field('Civil - Website', ''),
+            field('Civil - Contact 1 - Contact Name', ''),
+            field('Civil - Contact 1 - Title', ''),
+            field('Civil - Contact 1 - Office Phone', ''),
+            field('Civil - Contact 1 - Cell Phone', ''),
+            field('Civil - Contact 1 - Email', '')
+          ], 'Civil')
+        + subhead('Structural Engineer')
+        + fields([
+            field('Structural - Company', ''),
+            field('Structural - Address', ''),
+            field('Structural - Office Phone', ''),
+            field('Structural - Website', ''),
+            field('Structural - Contact 1 - Contact Name', ''),
+            field('Structural - Contact 1 - Title', ''),
+            field('Structural - Contact 1 - Office Phone', ''),
+            field('Structural - Contact 1 - Cell Phone', ''),
+            field('Structural - Contact 1 - Email', '')
+          ], 'Structural')
+        + subhead('Engineering & Design Tracking')
+        + fields([
             field('Prelim Design Fee', bid.prelim_design_fee, 'Bid Log'),
             field('Design Completed Date', bid.design_completed_date, 'Bid Log'),
             field('Design Fee Paid Date', bid.design_paid_date, 'Bid Log'),
@@ -13225,12 +13344,15 @@ try {
             field('Submittals Approved & Returned', ''),
             field('Shop Drawings Ready for Pickup', ''),
             field('Jack to Be Used for Testing (Big/Small)', '')
-          ]) + linkRow(L.engineering);
-      html += card(3, 'Engineering & Design', null, engBody, false, 'engineering');
+          ])
+        + linkRow(L.engineering);
+        // NOTE: unrendered "engineering" overrides (e.g. added engineer contacts) are
+        // surfaced post-render by the nested-card override dedupe below, so no inline
+        // ovExtras() here (which would DUPLICATE overrides that match a rendered field).
 
       // ----- 4. Project Safety -----
       _curSection = 'safety';
-      html += card(4, 'Project Safety', null,
+      html += card(3, 'Project Safety', null,
         fields([
           field('Site Specific Safety Plan (SSSP)', 'On file (see link)', 'SharePoint'),
           field('Safety Consultant', (function(){var s=(g.vendors||[]).find(function(c){return /safety/i.test(c.scope||'');});return s?(s.company+(s.name?' / '+s.name:'')):'';})(), 'Contacts'),
@@ -13247,7 +13369,7 @@ try {
 
       // ----- 5. Site Readiness -----
       _curSection = 'siteReadiness';
-      html += card(5, 'Site Readiness', null,
+      html += card(4, 'Site Readiness', null,
         fields([
           field('Mod Load Test Report', ''),
           field('Mod Test Jack Calibration Report', ''),
@@ -13261,7 +13383,7 @@ try {
       // ----- 6. Equipment -----
       _curSection = 'equipment';
       var equipVendors = (g.vendors||[]).filter(function(c){return /equipment|rental|trucking|transport/i.test(c.scope||'');});
-      html += card(6, 'Equipment', null,
+      html += card(5, 'Equipment', null,
         subhead('PF Equipment Mobilization to Site')
         + fields([
             field('Predrill Rig (Sany)', ''),
@@ -13276,7 +13398,7 @@ try {
       // ----- 7. Material -----
       _curSection = 'material';
       var matVendors = (g.vendors||[]).filter(function(c){return /stone|aggregate|fuel/i.test(c.scope||'');});
-      html += card(7, 'Material', null,
+      html += card(6, 'Material', null,
         subhead('Stone / Fuel Vendors')
         + contactList(matVendors)
         + subhead('Material Detail')
@@ -13312,7 +13434,7 @@ try {
       }
       var qaMeta = q ? (q.installed_columns + ' cols / ' + q.installed_lf + ' LF') : null;
       var qaNote = '<div class="pr-empty-note">Baseline pending - approved Garbin design totals not yet confirmed, so % complete is withheld (installed quantities shown).</div>';
-      html += card(8, 'QA / QC', qaMeta, qaNote + fields(qaRows) + linkRow(L.qaqc), false, 'qaqc');
+      html += card(7, 'QA / QC', qaMeta, qaNote + fields(qaRows) + linkRow(L.qaqc), false, 'qaqc');
 
       // ----- 10. Financials -----
       // Phase 1: a per-project BUDGET vs ACTUAL table seeded from the standard
@@ -13614,11 +13736,11 @@ try {
         + finSub('Project Invoicing', finInvoicingBody, false)
         + finSub('Project Costs (Budget vs Actual)', baHtml, false);
 
-      html += card(9, 'Financials', baMeta, finBody, false);
+      html += card(8, 'Financials', baMeta, finBody, false);
 
       // ----- 10. Project Closeout -----
       _curSection = 'closeout';
-      html += card(10, 'Project Closeout', null,
+      html += card(9, 'Project Closeout', null,
         fields([
           field('Final As Built Dwgs to Garbin Geo', ''),
           field('Column Logs from Rig (PDF) to Garbin', ''),
@@ -13628,166 +13750,163 @@ try {
           field('PF Check Garbin As Builts vs PF', ''),
           field('Final As Built Dwgs Sent to GC', '')
         ]), false, 'closeout');
+      // (office renumber 2026-08-07: was 10; Engineering moved into General Info so
+      // the top-level list is now gap-free 1-9, Closeout = 9.)
 
-      // ----- Owner / GC Contacts / PF Team / Documents appended into General Info -----
-      // Brad batch-2 (2026-08-06): everything below is injected into the ONE General
-      // Info card body (data-pr-section "general") in this ORDER so the served card
-      // reads: Project Info -> General Contractor Info (+ GC contacts) -> Owner ->
-      // PF Team -> Documents (bottom). All are appended with beforeend, so the source
-      // order here IS the on-screen order. NONE of these injected blocks carry
-      // data-pr-label editable fields (contact lists + linkRow are read-only), except
-      // the PF Team NESTED card which owns its own data-pr-section="pfTeam" -> the
-      // "general" editor scan (scoped to closest('.pr-card') === the general card)
-      // never touches them, so the general/pfTeam override keys stay clean.
+      // ----- General Info subsections injected after render (Brad 2026-08-07) -----
+      // Injected into the ONE General Info card body (data-pr-section "general") in
+      // this ORDER so the served card reads:
+      //   1. Project Info  2. General Contractor Info (+ GC Project Team)  [rendered
+      //      above as flat fields]  3. Owner Info (+ Owner Contacts, flat editable)
+      //   4. Design Professionals (Engineering MOVED IN, nested card, its own
+      //      "engineering" key)  5. PF Project Team (nested card, "pfTeam" key)  then
+      //   Documents at the very bottom.
+      // Owner Info fields are flat field() rows under the "general" key (they save
+      // through the general editor). Design Professionals + PF Project Team stay
+      // NESTED cards so their own override keys ("engineering" / "pfTeam") round-trip
+      // independently and the general editor scan (scoped to closest('.pr-card') ===
+      // the general card) never touches them.
       root.innerHTML = html;
 
       var genCard = root.querySelector('.pr-card[data-pr-section="general"] .pr-card-body');
 
-      // (a) GC Contacts fold in under "General Contractor Info". The GC-Info fields are
-      // the LAST fields in the body, so appending the GC contacts here places them
-      // directly under that blue subhead. Uses the same .pr-subhead blue-header class.
+      // (3) Owner Info — company block + repeatable Owner Contacts (spec: min 2, add
+      // more). Flat field() rows under the "general" key. Seed the company + first two
+      // contacts from the synced owner group (g.owner) where present.
       if (genCard) {
+        var _own = g.owner || [];
+        var _own0 = _own[0] || {};
+        var ownerRows = [
+          field('Owner', _own0.company || '', _own0.company ? 'Contacts' : ''),
+          field('Owner Address', _own0.address || '', 'Contacts'),
+          field('Owner Office Phone', _own0.phone || '', 'Contacts'),
+          field('Owner Website', _own0.website || '', 'Contacts')
+        ];
+        // Owner Contacts: at least 2 rows (spec minimum), seeded from synced contacts.
+        var ownerContactRows = [];
+        var _ownCount = Math.max(2, _own.length);
+        for (var _oi = 0; _oi < _ownCount; _oi++) {
+          var _oc = _own[_oi] || {};
+          var _n = _oi + 1;
+          ownerContactRows.push(
+            field('Owner Contact ' + _n + ' - Contact Name', _oc.name || '', _oc.name ? 'Contacts' : ''),
+            field('Owner Contact ' + _n + ' - Title', _oc.scope || '', _oc.scope ? 'Contacts' : ''),
+            field('Owner Contact ' + _n + ' - Office Phone', _oc.phone || '', _oc.phone ? 'Contacts' : ''),
+            field('Owner Contact ' + _n + ' - Cell Phone', _oc.cell || '', _oc.cell ? 'Contacts' : ''),
+            field('Owner Contact ' + _n + ' - Email', _oc.email || '', _oc.email ? 'Contacts' : '')
+          );
+        }
         genCard.insertAdjacentHTML('beforeend',
-          subhead('General Contractor Contacts') + contactList(g.gc));
+          subhead('Owner Info') + fields(ownerRows)
+          + subhead('Owner Contacts') + fields(ownerContactRows, 'Owner Contact'));
       }
 
-      // (b) Owner subsection (its own blue header), below General Contractor Info.
-      if (genCard && g.owner && g.owner.length) {
-        genCard.insertAdjacentHTML('beforeend', subhead('Owner') + contactList(g.owner));
-      }
-
-      // ----- PF Team (merged into General Info) -----
-      // Renders the former standalone "PF Team" card as a nested collapsible card
-      // INSIDE the General Info body. It carries its own data-pr-section="pfTeam", so:
-      //   - the PF Team contact list (contacts.groups.pf_team) still renders,
-      //   - any pfTeam manual overrides (KV PF_PROJECT_OVERRIDES[num].sections.pfTeam)
-      //     still render via ovExtras('pfTeam') AND still SAVE under the "pfTeam" key
-      //     (pfEditSection/pfSaveSection resolve the card via closest('.pr-card') ->
-      //     the nested card, so add/edit-manual-field keeps working in its new home).
-      // No pfTeam data is orphaned or migrated; the same read/write key is reused.
+      // (4) Design Professionals — Engineering & Design MOVED INTO General Info as a
+      // nested card with its OWN data-pr-section="engineering" key (built above as
+      // dpBody). Open by default so the 4 engineer blocks are visible.
       if (genCard) {
-        var _prevSec = _curSection;
-        _curSection = 'pfTeam';
-        var pfTeamBody = contactList(g.pf_team) + ovExtras('pfTeam');
-        _curSection = _prevSec;
-        var pfTeamMeta = (g.pf_team ? g.pf_team.length + ' members' : null);
-        // Nested card; open by default so the PF Team roster is visible without a
-        // second click now that it lives inside General Info.
+        var _prevEng = _curSection;
+        _curSection = 'engineering';
+        var engMeta = (g.engineering ? g.engineering.length + ' contacts' : null);
+        _curSection = _prevEng;
         genCard.insertAdjacentHTML('beforeend',
           '<div class="pr-nested-card-wrap">'
-          + card('', 'PF Team', pfTeamMeta, pfTeamBody, true, 'pfTeam')
+          + card('', 'Design Professionals', engMeta, dpBody, true, 'engineering')
           + '</div>');
       }
 
-      // (c) Documents — moved to the BOTTOM of the General Info card (Brad batch-2).
-      // linkRow() already emits a "Documents" blue subhead (.pr-subhead) + the folder
-      // links, so it matches the other subsection headers. Appended LAST so it sits
-      // below Project Info / General Contractor Info / Owner / PF Team. It carries no
-      // editable pr-field rows, so the "general" override editor ignores it.
+      // (5) PF Project Team — nested card (its own "pfTeam" key). Spec = role-based
+      // members (BD Contact, Precon & Estimating, Project Manager, Field Operations
+      // Manager, Operator #1/#2/#3) each with Name/Title/Office/Cell/Email, plus ADD
+      // capability. Rendered as flat field() rows so they save through the pfTeam
+      // editor. Existing synced pf_team contacts (g.pf_team) seed the roster BY MATCH
+      // on their scope where possible. Any prior manual pfTeam overrides (and any
+      // added members) are re-surfaced post-render by the _surfaceExtras('pfTeam')
+      // dedupe below, so no synced or manual PF-team data is lost or orphaned.
+      if (genCard) {
+        var _prevPf = _curSection;
+        _curSection = 'pfTeam';
+        var _pf = g.pf_team || [];
+        // Match a synced pf_team contact to a role by keyword (best-effort seed).
+        var _pfRole = function(re){ return _pf.find(function(c){ return re.test((c.scope||'') + ' ' + (c.name||'')); }) || {}; };
+        var pfRoles = [
+          ['BD Contact',              _pfRole(/\bbd\b|business dev|development/i)],
+          ['Precon & Estimating',     _pfRole(/precon|estimat/i)],
+          ['Project Manager',         _pfRole(/project manager|\bpm\b/i)],
+          ['Field Operations Manager',_pfRole(/field op|operations manager/i)],
+          ['Operator #1',             _pfRole(/operator/i)],
+          ['Operator #2',             {}],
+          ['Operator #3',             {}]
+        ];
+        var pfRows = [];
+        pfRoles.forEach(function(pair){
+          var role = pair[0], c = pair[1] || {};
+          pfRows.push(
+            field(role + ' - Contact Name', c.name || '', c.name ? 'Contacts' : ''),
+            field(role + ' - Title', c.scope || role, ''),
+            field(role + ' - Office Phone', c.phone || '', c.phone ? 'Contacts' : ''),
+            field(role + ' - Cell Phone', c.cell || '', c.cell ? 'Contacts' : ''),
+            field(role + ' - Email', c.email || '', c.email ? 'Contacts' : '')
+          );
+        });
+        // No inline ovExtras('pfTeam') — unrendered pfTeam overrides (added members)
+        // are surfaced post-render by the nested-card dedupe below, avoiding
+        // duplicates for overrides that already match a rendered role field.
+        var pfTeamBody = fields(pfRows, 'PF Team Member');
+        _curSection = _prevPf;
+        var pfTeamMeta = (g.pf_team ? g.pf_team.length + ' synced' : null);
+        genCard.insertAdjacentHTML('beforeend',
+          '<div class="pr-nested-card-wrap">'
+          + card('', 'PF Project Team', pfTeamMeta, pfTeamBody, true, 'pfTeam')
+          + '</div>');
+      }
+
+      // Surface any manual overrides for a section that don't already have a rendered
+      // field row (e.g. an Owner/engineer/PF-team contact ADDED via "+ Add ... contact"
+      // which saves as a brand-new label). Without this, an added field would save but
+      // not re-render on load. Dedupe against labels already shown in that card body
+      // (scoped to the card itself, skipping any nested cards inside it). Uses the same
+      // add-contact group token so the re-rendered extras stay addable.
+      var _surfaceExtras = function(cardBody, sectionKey, headLabel, groupToken){
+        if (!cardBody) return;
+        var ov = (_curOverrides && _curOverrides[sectionKey]) || {};
+        var labels = Object.keys(ov);
+        if (!labels.length) return;
+        var ownCard = cardBody.closest('.pr-card');
+        var shown = {};
+        cardBody.querySelectorAll('.pr-field[data-pr-label]').forEach(function(f){
+          if (f.closest('.pr-card') !== ownCard) return; // skip nested cards
+          shown[(f.getAttribute('data-pr-label') || '').toLowerCase()] = true;
+        });
+        var prev = _curSection; _curSection = sectionKey;
+        var extraRows = labels
+          .filter(function(lbl){ return !shown[String(lbl).toLowerCase()]; })
+          .map(function(lbl){ return field(lbl, '', ''); });
+        _curSection = prev;
+        if (extraRows.length) {
+          cardBody.insertAdjacentHTML('beforeend', subhead(headLabel) + fields(extraRows, groupToken));
+        }
+      };
+      // General Info (flat "general" key — includes added Owner Contacts).
+      _surfaceExtras(genCard, 'general', 'Additional Contacts / Fields', 'Owner Contact');
+      // Design Professionals nested card ("engineering" key — added engineer contacts).
+      _surfaceExtras(root.querySelector('.pr-card[data-pr-section="engineering"] .pr-card-body'),
+        'engineering', 'Additional Engineer Contacts / Fields', 'Engineer');
+      // PF Project Team nested card ("pfTeam" key — added team members).
+      _surfaceExtras(root.querySelector('.pr-card[data-pr-section="pfTeam"] .pr-card-body'),
+        'pfTeam', 'Additional Team Members / Fields', 'PF Team Member');
+
+      // Documents — moved to the very BOTTOM of the General Info card. linkRow() emits
+      // a "Documents" blue subhead (.pr-subhead) + folder links; no editable pr-field
+      // rows, so the "general" editor ignores it.
       if (genCard) {
         genCard.insertAdjacentHTML('beforeend', linkRow(L.general));
       }
 
-      // Inject "Engineering & Design Comments" subsection into the Engineering & Design
-      // card body (section-key "engineering"), after its fields — same append idiom as
-      // the Owner block above, so the per-section Edit button / override structure is
-      // untouched. Renders for EVERY project through this shared renderer (existing +
-      // synthesized new estimating/award projects). For now it is a labeled container
-      // with an HONEST EMPTY STATE only — no comment content is fabricated.
-      // <!-- FUTURE: populate from Garbin submittal-review Excel, matched by project number -->
-      var engCard = root.querySelector('.pr-card[data-pr-section="engineering"] .pr-card-body');
-      if (engCard) {
-        engCard.insertAdjacentHTML('beforeend',
-          subhead('Engineering & Design Comments')
-          + '<div class="pr-note">No submittal review comments yet — pending Dr. Garbin\'s submittal review.</div>');
-      }
-
-      // ----- MERGE tracked items from the Project Dashboard INTO their section cards -----
-      // Brad's request (2026-07-28): the standalone "Tracked items to complete" panel was
-      // redundant with these drop-down sections, so it is removed and its data folded in
-      // here. For each PF_PROJECT_DASHBOARD section (matched by project number), find the
-      // matching section card and append any tracked items whose label is NOT already
-      // displayed in that card (case/space-insensitive dedupe). Rendered as READ-ONLY rows
-      // WITHOUT data-pr-label — same idiom as the Owner / E&D-Comments injections above —
-      // so the per-section Edit editor (which scans .pr-field[data-pr-label]) ignores them
-      // and no phantom editable fields are created. Financials is omitted at ingest, so no
-      // Financials section flows through here (and if a dashboard section has no matching
-      // card, it is skipped — the standalone panel is never resurrected). Projects with no
-      // dashboard entry render exactly as before.
-      try {
-        var _dash = window.PF_PROJECT_DASHBOARD;
-        if (_dash && Array.isArray(_dash.projects)) {
-          var _pnum = String(D.project_number || '').trim().toLowerCase();
-          var _dproj = _dash.projects.find(function(p){
-            return String(p.projectNumber || '').trim().toLowerCase() === _pnum;
-          });
-          if (_dproj && Array.isArray(_dproj.sections)) {
-            // dashboard section NAME -> the card body that owns it. General Info has no
-            // data-pr-section (it is the first .pr-card), so it is selected positionally.
-            var _norm = function(s){ return String(s == null ? '' : s).replace(/\s+/g,' ').trim().toLowerCase(); };
-            var _sectionCardBody = function(name){
-              var keyByName = {
-                'general info'         : null, // first card, no section attr
-                'pf team'              : 'pfTeam',
-                'contract info'        : 'contract',
-                'engineering & design' : 'engineering',
-                'project safety'       : 'safety',
-                'site readiness'       : 'siteReadiness',
-                'equipment'            : 'equipment',
-                'material'             : 'material',
-                'qa / qc'              : 'qaqc',
-                'project closeout'     : 'closeout'
-              };
-              var n = _norm(name);
-              if (!(n in keyByName)) return null;
-              var key = keyByName[n];
-              if (key === null) {
-                var first = root.querySelector('.pr-card');
-                return first ? first.querySelector('.pr-card-body') : null;
-              }
-              return root.querySelector('.pr-card[data-pr-section="' + key + '"] .pr-card-body');
-            };
-            _dproj.sections.forEach(function(sec){
-              if (!sec || !Array.isArray(sec.items) || !sec.items.length) return;
-              var body = _sectionCardBody(sec.name);
-              if (!body) return; // no matching card (e.g. an unexpected/Financials name) -> skip
-              // labels already shown in this card (synced fields + any prior injected rows)
-              // Skip fields inside a NESTED card (e.g. the PF Team card now living inside
-              // General Info) so a merge into General never dedupes against / mixes with
-              // PF Team's own fields. _ownCard = the card body's own .pr-card.
-              var _ownCard = body.closest ? body.closest('.pr-card') : null;
-              var shown = {};
-              body.querySelectorAll('.pr-field[data-pr-label]').forEach(function(f){
-                if (_ownCard && f.closest('.pr-card') !== _ownCard) return;
-                shown[_norm(f.getAttribute('data-pr-label'))] = true;
-              });
-              body.querySelectorAll('.pd-merge-item[data-pd-label]').forEach(function(f){
-                shown[_norm(f.getAttribute('data-pd-label'))] = true;
-              });
-              var extras = sec.items.filter(function(it){
-                var lbl = _norm(it && it.label);
-                if (!lbl || shown[lbl]) return false;
-                shown[lbl] = true; // guard against duplicate labels within the feed itself
-                return true;
-              });
-              if (!extras.length) return;
-              var rows = extras.map(function(it){
-                var v = (it.value === undefined || it.value === null || String(it.value).trim() === '') ? '' : String(it.value);
-                var cls = v ? 'pr-field-value' : 'pr-field-value empty';
-                var shownV = v ? E(v) : '-';
-                // READ-ONLY: .pr-field WITHOUT data-pr-label (editor scan skips it);
-                // data-pd-label marks it as a merged tracked item for dedupe re-runs.
-                return '<div class="pr-field pd-merge-item" data-pd-label="' + E(it.label) + '">'
-                     + '<span class="pr-field-label">' + E(it.label) + '</span>'
-                     + '<span class="' + cls + '">' + shownV + '</span>'
-                     + '<span class="pr-field-src">Project Dashboard</span></div>';
-              }).join('');
-              body.insertAdjacentHTML('beforeend',
-                subhead('Tracked Items') + '<div class="pr-fields">' + rows + '</div>');
-            });
-          }
-        }
-      } catch (e) { /* fail soft: cards still render without the merged tracked items */ }
+      // NOTE (Brad 2026-08-07): the Project-Dashboard "Tracked Items" merge that used
+      // to fold window.PF_PROJECT_DASHBOARD items into each section card was REMOVED
+      // from General Info (and from the section merge entirely) — no longer needed.
+      // The standalone tracked-items panel stays gone; nothing resurrects it here.
 
       _curSection = ''; // done rendering this record
     }
@@ -13966,6 +14085,47 @@ try {
     // error - we NEVER show "saved" or collapse the editor when the save failed.
     function esc2(s){ return window.esc ? window.esc(s) : String(s); }
 
+    // Labels that must render as a fixed-choice DROPDOWN in the section editor (Brad
+    // 2026-08-07 spec). Key = field label, value = the allowed options. The selected
+    // value is saved as a plain string through the same override plumbing, so the
+    // read/display path is unchanged.
+    var PF_FIELD_DROPDOWNS = {
+      'Project Scope of Work (SOW)': [
+        'Aggregate Piers, Top Feed',
+        'Aggregate Piers, Bottom Feed',
+        'Helical Pilings',
+        'Grouted Aggregate Piers',
+        'Rigid Inclusions'
+      ],
+      'Column Diameter': ['24"', '30"']
+    };
+
+    // The 5 fields that make up one repeatable contact block, in order. Used by the
+    // "Add contact" button to append a fresh numbered block.
+    var PF_CONTACT_FIELDS = ['Contact Name', 'Title', 'Office Phone', 'Cell Phone', 'Email'];
+
+    // Render one editor input row (text OR select for dropdown labels).
+    function pfEditInputRow(label, value){
+      var opts = PF_FIELD_DROPDOWNS[label];
+      var control;
+      if (opts) {
+        var cur = value == null ? '' : String(value);
+        var o = '<option value=""' + (cur === '' ? ' selected' : '') + '>— select —</option>';
+        // If the stored value is not one of the options, keep it as a selected custom
+        // option so an existing/legacy value is never silently dropped.
+        var known = opts.indexOf(cur) !== -1;
+        if (cur && !known) o += '<option value="' + esc2(cur) + '" selected>' + esc2(cur) + ' (current)</option>';
+        opts.forEach(function(op){
+          o += '<option value="' + esc2(op) + '"' + (op === cur ? ' selected' : '') + '>' + esc2(op) + '</option>';
+        });
+        control = '<select class="pr-edit-input pr-edit-select" data-pr-field-label="' + esc2(label) + '">' + o + '</select>';
+      } else {
+        control = '<input class="pr-edit-input" type="text" data-pr-field-label="' + esc2(label) + '" '
+          + 'value="' + esc2(value == null ? '' : value) + '">';
+      }
+      return '<div class="pr-edit-row"><label class="pr-edit-label">' + esc2(label) + '</label>' + control + '</div>';
+    }
+
     window.pfEditSection = function(btn){
       var card = btn.closest ? btn.closest('.pr-card') : null;
       if (!card) return;
@@ -13975,12 +14135,24 @@ try {
       // Ensure the card is open so the editor is visible.
       card.classList.add('open');
 
+      // Discover repeatable-contact GROUPS in this card (a .pr-fields tagged with
+      // data-pr-contact-group). For each we learn the label PREFIX + the current
+      // highest contact number so the "Add contact" button can append the next block.
+      // Scoped to THIS card only (skip nested cards) so a General edit does not see
+      // the nested Design Professionals / PF Team groups.
+      var groups = {}; // prefix -> { max: <int> }
+      body.querySelectorAll('.pr-fields[data-pr-contact-group]').forEach(function(grid){
+        if (grid.closest('.pr-card') !== card) return;
+        var prefix = grid.getAttribute('data-pr-contact-group') || '';
+        if (!prefix) return;
+        if (!groups[prefix]) groups[prefix] = { max: 0 };
+      });
+
       // Collect current (label -> displayed value) from the rendered fields.
       // Scope to THIS card only: skip any field that belongs to a NESTED card (e.g.
-      // the PF Team card now lives inside General Info). Without this, editing
-      // General Info would slurp PF Team's rows into the "general" override key and
-      // orphan the "pfTeam" data. Editing the nested PF Team card scans only its own
-      // fields (its closest .pr-card IS the pfTeam card).
+      // the Design Professionals / PF Team cards now live inside General Info).
+      // Without this, editing General Info would slurp their rows into the "general"
+      // override key and orphan their own keys.
       var rows = [];
       body.querySelectorAll('.pr-field[data-pr-label]').forEach(function(f){
         if (f.closest('.pr-card') !== card) return;
@@ -13989,17 +14161,34 @@ try {
         var raw = valEl ? valEl.textContent : '';
         if (raw === '-') raw = ''; // em-dash placeholder = empty
         if (label) rows.push({ label: label, value: raw });
+        // Track the max contact number per group prefix (label like
+        // "<prefix> - Contact <N> - <field>" or "<prefix> <N> - <field>").
+        Object.keys(groups).forEach(function(prefix){
+          var m = label.match(new RegExp('^' + prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?:\\s*-\\s*Contact|\\s+Member|\\s+Contact)?\\s*(\\d+)\\s*-'));
+          if (m) { var n = parseInt(m[1], 10); if (n > groups[prefix].max) groups[prefix].max = n; }
+        });
       });
 
-      // Build the editor form. Each existing field -> a labeled text input. An
-      // extra "add manual field" row lets the office introduce a brand-new field
-      // (useful on synthetic/new-project records that start mostly blank).
-      var inputs = rows.map(function(r, i){
-        return '<div class="pr-edit-row">'
-          + '<label class="pr-edit-label">' + esc2(r.label) + '</label>'
-          + '<input class="pr-edit-input" type="text" data-pr-field-label="' + esc2(r.label) + '" '
-          +   'value="' + esc2(r.value) + '">'
-          + '</div>';
+      // Build the editor form. Each existing field -> a labeled input (text or a
+      // dropdown for SOW / Column Diameter). Rows that belong to a contact group are
+      // grouped so the "Add contact" button can inject the next numbered block right
+      // after that group.
+      var inputs = rows.map(function(r){
+        // Tag the row with its group prefix (if any) so Add-contact can find the tail.
+        var grp = '';
+        Object.keys(groups).forEach(function(prefix){
+          if (r.label.indexOf(prefix) === 0) grp = prefix;
+        });
+        var rowHtml = pfEditInputRow(r.label, r.value);
+        if (grp) rowHtml = rowHtml.replace('<div class="pr-edit-row"', '<div class="pr-edit-row" data-pr-group="' + esc2(grp) + '"');
+        return rowHtml;
+      }).join('');
+
+      // "Add contact" buttons — one per discovered contact group.
+      var addContactBtns = Object.keys(groups).map(function(prefix){
+        return '<button type="button" class="pr-add-contact-btn" data-pr-group="' + esc2(prefix) + '" '
+          + 'data-pr-next="' + (groups[prefix].max + 1) + '" '
+          + 'onclick="window.pfAddContact(this)">+ Add ' + esc2(prefix) + ' contact</button>';
       }).join('');
 
       var addRow = '<div class="pr-edit-row pr-edit-add">'
@@ -14010,6 +14199,7 @@ try {
       var form = '<div class="pr-editor" data-pr-section="' + esc2(section) + '">'
         + '<div class="pr-edit-note">Manual override - what you enter here wins over the synced data and is saved for the whole office.</div>'
         + inputs
+        + (addContactBtns ? '<div class="pr-add-contact-bar">' + addContactBtns + '</div>' : '')
         + addRow
         + '<div class="pr-edit-err" style="display:none"></div>'
         + '<div class="pr-edit-actions">'
@@ -14023,6 +14213,29 @@ try {
       body.innerHTML = form;
       // Hide the Edit button while editing.
       btn.style.display = 'none';
+    };
+
+    // Append a fresh numbered contact block (5 inputs) for a repeatable group. The
+    // new inputs carry data-pr-field-label so pfSaveSection picks them up like any
+    // other field. Inserted right after the last existing row of that group (or before
+    // the add-contact bar if none). Uses the label convention "<prefix> N - <field>".
+    window.pfAddContact = function(btn){
+      var editor = btn.closest('.pr-editor');
+      if (!editor) return;
+      var prefix = btn.getAttribute('data-pr-group') || '';
+      var n = parseInt(btn.getAttribute('data-pr-next') || '1', 10) || 1;
+      btn.setAttribute('data-pr-next', n + 1); // next add uses the following number
+      var rowsHtml = PF_CONTACT_FIELDS.map(function(fld){
+        var label = prefix + ' ' + n + ' - ' + fld;
+        return '<div class="pr-edit-row pr-edit-added" data-pr-group="' + esc2(prefix) + '">'
+          + '<label class="pr-edit-label">' + esc2(label) + '</label>'
+          + '<input class="pr-edit-input" type="text" data-pr-field-label="' + esc2(label) + '" value="">'
+          + '</div>';
+      }).join('');
+      // Insert before the add-contact bar so new blocks stack in order.
+      var bar = editor.querySelector('.pr-add-contact-bar');
+      if (bar) bar.insertAdjacentHTML('beforebegin', rowsHtml);
+      else editor.querySelector('.pr-edit-actions').insertAdjacentHTML('beforebegin', rowsHtml);
     };
 
     // Restore the section to its pre-edit rendering (no save).
