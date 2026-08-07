@@ -13642,40 +13642,16 @@ try {
           field('Field Ops Mgr Jobsite Visit w/ GC', '')
         ]) + linkRow(L.site), false, 'siteReadiness');
 
-      // ----- 6. Equipment -----
-      _curSection = 'equipment';
-      var equipVendors = (g.vendors||[]).filter(function(c){return /equipment|rental|trucking|transport/i.test(c.scope||'');});
-      html += card(6, 'Equipment', null,
-        subhead('PF Equipment Mobilization to Site')
-        + fields([
-            field('Predrill Rig (Sany)', ''),
-            field('Mast, Vibro Rig (Deere 350G)', ''),
-            field('PF Parts Load - Gooseneck Trailer', ''),
-            field('Fall Off Load', '')
-          ])
-        + subhead('Rental Equipment & Transport (vendors)')
-        + contactList(equipVendors)
-        + ovExtras('equipment'), false, 'equipment');
+      // ----- Equipment + Material MOVED IN (Brad 2026-08-07 batch-11) -----
+      // The standalone top-level Equipment (#6) and Material (#7) sections were
+      // DELETED and are now rendered as NESTED editable cards INSIDE the Site
+      // Readiness / Project Setup section body (injected post-render below, after
+      // root.innerHTML = html). Each nested card KEEPS its own override key
+      // ('equipment' / 'material') — both already in the API allowlist — so edit /
+      // save / add-more vendor contacts keep working with ZERO data migration and
+      // zero API change. See the Site-Readiness nested-card injection block below.
 
-      // ----- 7. Material -----
-      _curSection = 'material';
-      var matVendors = (g.vendors||[]).filter(function(c){return /stone|aggregate|fuel/i.test(c.scope||'');});
-      html += card(7, 'Material', null,
-        subhead('Stone / Fuel Vendors')
-        + contactList(matVendors)
-        + subhead('Material Detail')
-        + fields([
-            field('Stone Material Approved by Eng', ''),
-            field('Stone Material Name/Nomenclature', (function(){var s=matVendors.find(function(c){return /stone|aggregate/i.test(c.scope||'');});return s&&s.notes?s.notes:'';})(), 'Contacts note'),
-            field('Stone Material Qty (TN)', bid.total_stone_tn, 'Bid Log'),
-            field('Stone Delivery Setup/Ordered', ''),
-            field('Concrete Mix (Rigid Inclusions)', ''),
-            field('Helical Material Approved by Eng', ''),
-            field('Fuel Tank/Containment', ''),
-            field('Fuel Delivery', '')
-          ]) + linkRow(L.material), false, 'material');
-
-      // ----- 9. QA / QC -----
+      // ----- 6. QA / QC -----
       _curSection = 'qaqc';
       var qaRows;
       if (q) {
@@ -13696,9 +13672,9 @@ try {
       }
       var qaMeta = q ? (q.installed_columns + ' cols / ' + q.installed_lf + ' LF') : null;
       var qaNote = '<div class="pr-empty-note">Baseline pending - approved Garbin design totals not yet confirmed, so % complete is withheld (installed quantities shown).</div>';
-      html += card(8, 'QA / QC', qaMeta, qaNote + fields(qaRows) + linkRow(L.qaqc), false, 'qaqc');
+      html += card(6, 'QA / QC', qaMeta, qaNote + fields(qaRows) + linkRow(L.qaqc), false, 'qaqc');
 
-      // ----- 10. Financials -----
+      // ----- 7. Financials -----
       // Phase 1: a per-project BUDGET vs ACTUAL table seeded from the standard
       // ~69 cost-code template (window.PF_COST_CODE_TEMPLATE, ZEROED) with saved
       // budgets merged on top (_curBudget). Office roles get an inline Edit Budget
@@ -13998,11 +13974,11 @@ try {
         + finSub('Project Invoicing', finInvoicingBody, false)
         + finSub('Project Costs (Budget vs Actual)', baHtml, false);
 
-      html += card(9, 'Financials', baMeta, finBody, false);
+      html += card(7, 'Financials', baMeta, finBody, false);
 
-      // ----- 10. Project Closeout -----
+      // ----- 8. Project Closeout -----
       _curSection = 'closeout';
-      html += card(10, 'Project Closeout', null,
+      html += card(8, 'Project Closeout', null,
         fields([
           field('Final As Built Dwgs to Garbin Geo', ''),
           field('Column Logs from Rig (PDF) to Garbin', ''),
@@ -14012,8 +13988,10 @@ try {
           field('PF Check Garbin As Builts vs PF', ''),
           field('Final As Built Dwgs Sent to GC', '')
         ]), false, 'closeout');
-      // (office renumber 2026-08-07 batch-8: standalone Engineering & Design RESTORED
-      // as top-level section #3, so the list is gap-free 1-10, Closeout = 10.)
+      // (office renumber 2026-08-07 batch-11: Equipment + Material MOVED INTO Site
+      // Readiness / Project Setup as nested cards, so top-level list is now gap-free
+      // 1-8: General Info=1, Subcontract Agreement=2, Engineering & Design=3, Project
+      // Safety=4, Site Readiness / Project Setup=5, QA/QC=6, Financials=7, Closeout=8.)
 
       // ----- General Info subsections injected after render (Brad 2026-08-07) -----
       // Injected into the ONE General Info card body (data-pr-section "general") in
@@ -14136,6 +14114,96 @@ try {
           + '</div>');
       }
 
+      // ----- Equipment + Material NESTED cards inside Site Readiness / Project Setup
+      // (Brad 2026-08-07 batch-11) -----
+      // The former standalone Equipment (#6) and Material (#7) sections now live as
+      // NESTED editable cards inside the Site Readiness / Project Setup card body.
+      // Each nested card keeps its OWN data-pr-section override key ('equipment' /
+      // 'material') — both already in the API VALID_SECTIONS allowlist — so:
+      //   - pfEditSection/pfSaveSection resolve the card via btn.closest('.pr-card')
+      //     (=> the nested card) and read ITS data-pr-section => edits save under the
+      //     same 'equipment'/'material' keys => ZERO data migration, ZERO API change.
+      //   - The general/siteReadiness editor scans are scoped to closest('.pr-card')
+      //     === their own card, so nesting these does NOT leak equipment/material rows
+      //     into siteReadiness (and vice-versa).
+      // Vendor contacts use the contact-card grid (consistent with the rest) so
+      // "Add contact" keeps appending numbered cards. Order within Site Readiness:
+      // existing Site Readiness fields first (rendered above), then Equipment, then
+      // Material.
+      var srCard = root.querySelector('.pr-card[data-pr-section="siteReadiness"] .pr-card-body');
+      if (srCard) {
+        // --- Equipment nested card ('equipment' key) ---
+        var _prevEq = _curSection; _curSection = 'equipment';
+        var equipVendors = (g.vendors||[]).filter(function(c){return /equipment|rental|trucking|transport/i.test(c.scope||'');});
+        var eqVendorCards = [];
+        var _eqCount = Math.max(1, equipVendors.length);
+        for (var _ei = 0; _ei < _eqCount; _ei++) {
+          var _ev = equipVendors[_ei] || {};
+          var _en = _ei + 1;
+          eqVendorCards.push(contactCard(_ev.company || _ev.name || ('Rental / Transport Vendor ' + _en), _ev.scope || '', [
+            field('Rental / Transport Vendor ' + _en + ' - Company', _ev.company || '', _ev.company ? 'Contacts' : ''),
+            field('Rental / Transport Vendor ' + _en + ' - Contact Name', _ev.name || '', _ev.name ? 'Contacts' : ''),
+            field('Rental / Transport Vendor ' + _en + ' - Scope', _ev.scope || '', _ev.scope ? 'Contacts' : ''),
+            fieldLinked('Rental / Transport Vendor ' + _en + ' - Office Phone', _ev.phone || '', _ev.phone ? 'Contacts' : '', 'phone'),
+            fieldLinked('Rental / Transport Vendor ' + _en + ' - Cell Phone', _ev.cell || '', _ev.cell ? 'Contacts' : '', 'phone'),
+            fieldLinked('Rental / Transport Vendor ' + _en + ' - Email', _ev.email || '', _ev.email ? 'Contacts' : '', 'email')
+          ]));
+        }
+        var eqBody = subhead('PF Equipment Mobilization to Site')
+          + fields([
+              field('Predrill Rig (Sany)', ''),
+              field('Mast, Vibro Rig (Deere 350G)', ''),
+              field('PF Parts Load - Gooseneck Trailer', ''),
+              field('Fall Off Load', '')
+            ])
+          + subhead('Rental Equipment & Transport (vendors)')
+          + contactCardGrid(eqVendorCards, 'Rental / Transport Vendor');
+        _curSection = _prevEq;
+        var eqMeta = (equipVendors.length ? equipVendors.length + ' vendor' + (equipVendors.length === 1 ? '' : 's') : null);
+        srCard.insertAdjacentHTML('beforeend',
+          '<div class="pr-nested-card-wrap">'
+          + card('', 'Equipment', eqMeta, eqBody, true, 'equipment')
+          + '</div>');
+
+        // --- Material nested card ('material' key) ---
+        var _prevMat = _curSection; _curSection = 'material';
+        var matVendors = (g.vendors||[]).filter(function(c){return /stone|aggregate|fuel/i.test(c.scope||'');});
+        var matVendorCards = [];
+        var _mCount = Math.max(1, matVendors.length);
+        for (var _mi = 0; _mi < _mCount; _mi++) {
+          var _mv = matVendors[_mi] || {};
+          var _mn = _mi + 1;
+          matVendorCards.push(contactCard(_mv.company || _mv.name || ('Stone / Fuel Vendor ' + _mn), _mv.scope || '', [
+            field('Stone / Fuel Vendor ' + _mn + ' - Company', _mv.company || '', _mv.company ? 'Contacts' : ''),
+            field('Stone / Fuel Vendor ' + _mn + ' - Contact Name', _mv.name || '', _mv.name ? 'Contacts' : ''),
+            field('Stone / Fuel Vendor ' + _mn + ' - Scope', _mv.scope || '', _mv.scope ? 'Contacts' : ''),
+            fieldLinked('Stone / Fuel Vendor ' + _mn + ' - Office Phone', _mv.phone || '', _mv.phone ? 'Contacts' : '', 'phone'),
+            fieldLinked('Stone / Fuel Vendor ' + _mn + ' - Cell Phone', _mv.cell || '', _mv.cell ? 'Contacts' : '', 'phone'),
+            fieldLinked('Stone / Fuel Vendor ' + _mn + ' - Email', _mv.email || '', _mv.email ? 'Contacts' : '', 'email')
+          ]));
+        }
+        var _matStone = matVendors.find(function(c){return /stone|aggregate/i.test(c.scope||'');});
+        var matBody = subhead('Stone / Fuel Vendors')
+          + contactCardGrid(matVendorCards, 'Stone / Fuel Vendor')
+          + subhead('Material Detail')
+          + fields([
+              field('Stone Material Approved by Eng', ''),
+              field('Stone Material Name/Nomenclature', (_matStone && _matStone.notes) ? _matStone.notes : '', (_matStone && _matStone.notes) ? 'Contacts note' : ''),
+              field('Stone Material Qty (TN)', bid.total_stone_tn, 'Bid Log'),
+              field('Stone Delivery Setup/Ordered', ''),
+              field('Concrete Mix (Rigid Inclusions)', ''),
+              field('Helical Material Approved by Eng', ''),
+              field('Fuel Tank/Containment', ''),
+              field('Fuel Delivery', '')
+            ]) + linkRow(L.material);
+        _curSection = _prevMat;
+        var matMeta = (matVendors.length ? matVendors.length + ' vendor' + (matVendors.length === 1 ? '' : 's') : null);
+        srCard.insertAdjacentHTML('beforeend',
+          '<div class="pr-nested-card-wrap">'
+          + card('', 'Material', matMeta, matBody, true, 'material')
+          + '</div>');
+      }
+
       // Surface any manual overrides for a section that don't already have a rendered
       // field row (e.g. an Owner/engineer/PF-team contact ADDED via "+ Add ... contact"
       // which saves as a brand-new label). Without this, an added field would save but
@@ -14173,6 +14241,14 @@ try {
       // PF Project Team nested card ("pfTeam" key — added team members).
       _surfaceExtras(root.querySelector('.pr-card[data-pr-section="pfTeam"] .pr-card-body'),
         'pfTeam', 'Additional Team Members / Fields', 'PF Team Member');
+      // Equipment nested card ("equipment" key — added rental/transport vendors +
+      // any manual fields). Nested inside Site Readiness / Project Setup; its
+      // querySelector resolves to the single .pr-card[data-pr-section="equipment"].
+      _surfaceExtras(root.querySelector('.pr-card[data-pr-section="equipment"] .pr-card-body'),
+        'equipment', 'Additional Equipment Vendors / Fields', 'Rental / Transport Vendor');
+      // Material nested card ("material" key — added stone/fuel vendors + manual fields).
+      _surfaceExtras(root.querySelector('.pr-card[data-pr-section="material"] .pr-card-body'),
+        'material', 'Additional Material Vendors / Fields', 'Stone / Fuel Vendor');
 
       // Documents (Brad 2026-08-07): MOVED OUT of General Info. It now lives inside
       // the Engineering & Design (Design Professionals) nested card — the general
