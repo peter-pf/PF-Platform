@@ -13468,13 +13468,32 @@ try {
           field('LOI/NOI Date', '')
         ])
         + subhead('Contract Recap')
-        + fields([
+        // CONDENSED into a fixed two-column grouping (twoCol) so Contract Recap is
+        // tighter/shorter instead of one long single column. Every field stays a
+        // direct .pr-field[data-pr-label] descendant of the ONE `contract` card
+        // (twoCol is wrapper-agnostic: pfEditSection/pfSaveSection scan
+        // body.querySelectorAll('.pr-field[data-pr-label]') filtered to
+        // closest('.pr-card')===card), so the `contract` override key + edit/save
+        // round-trip are UNCHANGED. LEFT = recap identifiers + the contract dates;
+        // Subcontract Value is anchored top-left directly UNDER GC Project #
+        // (Brad 2026-08-07). RIGHT = the dollar/rate/terms fields grouped together.
+        // ("Agreement Date (face)" field deleted this round; "Substantial / Final
+        // Completion" renamed to "Project Substantial Completion Date" — display
+        // label only, same SF.completion_dates data + override round-trip.)
+        + twoCol([
           field('GC Project #', SF.gc_project_number, SS),
-          field('GC Subcontract #', SF.subcontract_number, SS),
-          field('Agreement Date (face)', SF.agreement_date, SS),
-          field('Fully Executed Contract Date', SF.fully_executed_date, SS),
-          field('Substantial / Final Completion', SF.completion_dates, SS),
           field('Subcontract Value', SF.subcontract_value, SS),
+          field('GC Subcontract #', SF.subcontract_number, SS),
+          field('Fully Executed Contract Date', SF.fully_executed_date, SS),
+          field('Project Substantial Completion Date', SF.completion_dates, SS),
+          field('Retainage % Withheld', SF.retainage_pct, SS),
+          field('Retainage Release', SF.retainage_release, SS),
+          field('Payment Terms', SF.payment_terms, SS),
+          field('Liquidated Damages', SF.liquidated_damages, SS),
+          field('Personal / Performance Guaranty', SF.personal_guaranty, SS),
+          field('Date COI Sent to GC', ''),
+          field('Date W9 Sent to GC', '')
+        ], [
           field('Tax Exempt? / Tax', bid.tax, 'Bid Log'),
           field('Tax Status (per subcontract)', SF.tax_note, SS),
           field('If not Tax Exempt, Sales Tax Rate', ''),
@@ -13482,17 +13501,10 @@ try {
           field('Prevailing Wage? Rate?', SF.prevailing_wage || bid.wage_req, SF.prevailing_wage ? SS : 'Bid Log'),
           field('Minimum Insurance Requirement', bid.min_insurance_req, 'Bid Log'),
           field('Insurance Requirements (per subcontract)', SF.insurance_requirements, SS),
-          field('Retainage % Withheld', SF.retainage_pct, SS),
-          field('Retainage Release', SF.retainage_release, SS),
-          field('Payment Terms', SF.payment_terms, SS),
-          field('Liquidated Damages', SF.liquidated_damages, SS),
-          field('Personal / Performance Guaranty', SF.personal_guaranty, SS),
           field('Surveying & Staking (who performs)', SF.surveying_staking, SS),
           field('Surveyor', (function(){var s=(g.engineering||[]).find(function(c){return /survey/i.test(c.scope||'');});return s?s.company:'';})(), 'Contacts'),
           field('Anticipated Spoils (CY)', ''),
-          field('Project Working Hours', SF.working_hours, SS),
-          field('Date COI Sent to GC', ''),
-          field('Date W9 Sent to GC', '')
+          field('Project Working Hours', SF.working_hours, SS)
         ])
         + docEmbed((D.subcontract && D.subcontract.item_id),
                    L.contract,
