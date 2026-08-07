@@ -75,6 +75,33 @@ export async function onRequest(context) {
 
   const SECRET = env.PF_TOKEN_SECRET;
   if (!SECRET) {
+    // PREVIEW-ONLY graceful degrade.
+    // Cloudflare Pages binds env secrets PER-ENVIRONMENT. Production has
+    // PF_TOKEN_SECRET bound; the PREVIEW environment has NO env vars bound
+    // (env_vars: []), so on a preview deployment env.PF_TOKEN_SECRET is
+    // undefined. Previously this returned a hard 500 ("Server misconfigured"),
+    // which blocked the SPA from ever loading -> Brad could not review preview
+    // builds. Because the Functions bundle DOES run on preview deploys, the
+    // 500 fired before index.html was served, so the client-side isPreviewHost
+    // office-view fallback never got a chance.
+    //
+    // Fix: when (and ONLY when) the secret is absent AND we are on a preview
+    // host (*.pf-platform.pages.dev that is NOT the bare prod host, and not a
+    // custom domain), SKIP the auth gate and serve the static SPA so the
+    // preview renders for visual review. The client then applies its own
+    // isPreviewHost -> office-view default (batch-3).
+    //
+    // PROD-SAFETY: production ALWAYS has PF_TOKEN_SECRET bound, so `!SECRET` is
+    // never true in production -> this branch is unreachable on prod. The host
+    // check is a belt-and-suspenders second gate: it excludes the bare prod
+    // host and any custom domain. If somehow the prod secret were ever missing,
+    // prod would STILL hard-fail closed (below) rather than open.
+    const host = url.hostname.toLowerCase();
+    const isPreviewHost =
+      /\.pf-platform\.pages\.dev$/i.test(host) && host !== 'pf-platform.pages.dev';
+    if (isPreviewHost) {
+      return context.next();
+    }
     return new Response('Server misconfigured: authentication is not available.', {
       status: 500, headers: { 'Content-Type': 'text/plain' },
     });
