@@ -2015,6 +2015,19 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 .pr-field-label { font-size: 0.72rem; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.03em; }
 .pr-field-value { font-size: 0.9rem; color: var(--text-1); word-break: break-word; }
 .pr-field-value.empty { color: var(--text-3); }
+/* Multi-line (textarea-backed) field values: preserve entered line breaks. */
+.pr-field-value-multiline { white-space: pre-wrap; }
+/* Multi-line editor control for PF_FIELD_TEXTAREA_LABELS fields. */
+.pr-edit-textarea { width: 100%; min-height: 84px; resize: vertical; font: inherit;
+  line-height: 1.35; box-sizing: border-box; }
+/* Non-blocking advisory toast (e.g. Design Professionals master-directory sync). */
+.pr-toast { position: fixed; right: 18px; bottom: 18px; z-index: 99999; max-width: 340px;
+  padding: 11px 15px; border-radius: 8px; font-size: 0.86rem; line-height: 1.35;
+  color: #fff; box-shadow: 0 6px 22px rgba(0,0,0,0.28); opacity: 0; transform: translateY(10px);
+  transition: opacity .28s ease, transform .28s ease; pointer-events: none; }
+.pr-toast-show { opacity: 1; transform: translateY(0); }
+.pr-toast-ok { background: #1e7d34; }
+.pr-toast-warn { background: #b9791b; }
 .pr-field-src { font-size: 0.66rem; color: var(--text-3); font-style: italic; }
 .pr-field-edited { margin-left: 5px; color: var(--accent); font-size: 0.7rem; }
 
@@ -12297,6 +12310,11 @@ try {
       // DISPLAY-ONLY: normalize phone fields to (111) 111-1111 (same approach).
       else if (v && pfIsPhoneLabel(label)) v = String(pfFmtPhone(v));
       var cls = v ? "pr-field-value" : "pr-field-value empty";
+      // Multi-line textarea fields: preserve line breaks in the read view
+      // (white-space:pre-wrap via .pr-field-value-multiline). E(v) escapes the text
+      // but keeps the \n characters, and the editor reads valEl.textContent so the
+      // newlines round-trip back into the textarea on the next edit.
+      if (typeof pfIsTextareaLabel === 'function' && pfIsTextareaLabel(label)) cls += ' pr-field-value-multiline';
       var shown = v ? E(v) : "-";
       var srcHtml = (src && v) ? '<span class="pr-field-src">'+E(src)+'</span>' : '';
       var editMark = edited ? '<span class="pr-field-edited" title="Manually edited">&#9998;</span>' : '';
@@ -13623,9 +13641,9 @@ try {
           // (who performs)" field is PARKED in "To Be Placed" — do not assume it is
           // the same as this yes/no inclusion field; Brad to confirm mapping.)
           field('Staking & Layout Included? (Yes/No)', ''),
-          // NEW: extra SOW language. Rendered as a wide text field for now (the
-          // section editor emits a single-line <input type="text">; a multi-line
-          // textarea control is NOT yet supported by pfEditInputRow — FLAGGED).
+          // NEW: extra SOW language. MULTI-LINE: registered in
+          // PF_FIELD_TEXTAREA_LABELS so the section editor renders a <textarea> and the
+          // read view preserves line breaks (Brad 2026-08-07).
           field('Extra Scope of Work Language', '')
         ])
 
@@ -14970,6 +14988,23 @@ try {
       'Response Date Due from GC': true,
       'Actual Response Date from GC': true
     };
+
+    // Labels whose editor input is a MULTI-LINE <textarea> (Brad 2026-08-07: free-form
+    // notes/language that needs line breaks). Key = exact field label. Rendered as a
+    // <textarea class="pr-edit-input"> so the user can enter multiple lines; pfSaveSection
+    // reads inp.value (textareas expose .value like inputs) so newlines round-trip through
+    // the SAME override plumbing as every other field. The read view preserves the line
+    // breaks because field() adds .pr-field-value-multiline (white-space:pre-wrap) for
+    // these labels, and the editor reads the value back via valEl.textContent (which keeps
+    // the newlines). Add future free-form fields here to give them a textarea + wrapped
+    // display without touching anything else.
+    var PF_FIELD_TEXTAREA_LABELS = {
+      // Contract Recap > Scope of Work: extra SOW language (was a single-line input).
+      'Extra Scope of Work Language': true,
+      // Engineering & Design > As Built Drawings > Field As-Built: free-form field notes.
+      'Field As-Built Notes': true
+    };
+    function pfIsTextareaLabel(label){ return !!PF_FIELD_TEXTAREA_LABELS[label]; }
     // Coerce a stored/displayed date (MM/DD/YYYY, M/D/YY, YYYY-MM-DD, ...) into the
     // YYYY-MM-DD form a native <input type="date"> requires to pre-fill. Anything
     // that is not a recognizable date shape -> '' (leave the picker empty rather
@@ -15002,7 +15037,15 @@ try {
     function pfEditInputRow(label, value){
       var opts = PF_FIELD_DROPDOWNS[label];
       var control;
-      if (PF_FIELD_DATE_LABELS[label]) {
+      if (PF_FIELD_TEXTAREA_LABELS[label]) {
+        // Multi-line textarea. The value is placed as TEXT CONTENT (not a value=
+        // attribute) so embedded newlines survive. pfSaveSection reads inp.value the
+        // same as any input, so the override save + multi-line re-display round-trip
+        // is unchanged. Full-width + a reasonable default height (grows/scrolls).
+        control = '<textarea class="pr-edit-input pr-edit-textarea" rows="4" '
+          + 'data-pr-field-label="' + esc2(label) + '">'
+          + esc2(value == null ? '' : value) + '</textarea>';
+      } else if (PF_FIELD_DATE_LABELS[label]) {
         // Native date picker. Seed from the displayed value (MM/DD/YYYY) converted
         // to the required YYYY-MM-DD; a non-date/blank stored value -> empty picker.
         // pfSaveSection reads inp.value (YYYY-MM-DD) exactly like any text input, so
@@ -15319,20 +15362,16 @@ try {
     // "<firm> - Company" input) + the mapped Category. FAIL CLOSED + honest: on any
     // error it reports the failure inline; it NEVER touches the project record and
     // NEVER claims success it did not get. Entirely independent of pfSaveSection.
-    window.pfSaveContactsToDirectory = function(btn){
-      var editor = btn.closest('.pr-editor'); if (!editor) return;
-      var msgEl = editor.querySelector('.pr-dir-msg');
-      function msg(text, good){
-        if (!msgEl) return;
-        msgEl.textContent = text;
-        msgEl.style.color = good ? '#1e7d34' : '#c0392b';
-        msgEl.style.display = 'block';
-      }
-      // Collect all contact-name prefixes present, then gather each block's fields.
-      // ALSO collect firm-level Company / Website / Office Phone keyed by firm root, so
-      // a Design Professionals contact can be tagged with its firm + category.
+    // ---- shared directory-backfeed helpers (used by the manual button AND the
+    // automatic DP save-backfeed) ----------------------------------------------
+    // Scan a live editor's inputs and build the array of contacts to write to the PF
+    // Master Contact List. Groups by contact-name prefix; for Design Professionals
+    // blocks it attaches the firm Company / Website / Address (from the firm-level
+    // "<firm> - Company|Website|Address" inputs) + the mapped Category. Returns only
+    // blocks that have a name.
+    function pfCollectDirectoryContacts(editor){
       var blocks = {}; // prefix -> {name,title,officePhone,cellPhone,email}
-      var firms = {};  // firmRoot -> {company,website,officePhone}
+      var firms = {};  // firmRoot -> {company,website,address,officePhone}
       editor.querySelectorAll('.pr-edit-input[data-pr-field-label]').forEach(function(inp){
         var label = inp.getAttribute('data-pr-field-label') || '';
         var pfx = pfContactPrefix(label);
@@ -15365,7 +15404,7 @@ try {
         }
       });
       // Keep only blocks that have a name. Attach firm company + category for DP blocks.
-      var toSave = Object.keys(blocks)
+      return Object.keys(blocks)
         .map(function(p){
           var b = blocks[p] || {};
           var root = pfDpFirmRoot(p);
@@ -15379,19 +15418,20 @@ try {
           return b;
         })
         .filter(function(b){ return b && b.name; });
-      if (!toSave.length) { msg('Enter a contact name first, then save to the directory.', false); return; }
-
-      btn.disabled = true; var orig = btn.innerHTML; btn.textContent = 'Saving…';
-      msg('Saving ' + toSave.length + ' contact' + (toSave.length>1?'s':'') + '…', true);
-
-      // Split each name into first/last for the sheet (last word = last name).
-      function splitName(n){
-        var parts = String(n).trim().split(/\s+/);
-        if (parts.length === 1) return { firstName: parts[0], lastName: '' };
-        return { firstName: parts.slice(0, -1).join(' '), lastName: parts[parts.length-1] };
-      }
+    }
+    // Split a display name into first/last for the sheet (last word = last name).
+    function pfSplitContactName(n){
+      var parts = String(n).trim().split(/\s+/);
+      if (parts.length === 1) return { firstName: parts[0], lastName: '' };
+      return { firstName: parts.slice(0, -1).join(' '), lastName: parts[parts.length-1] };
+    }
+    // POST every collected contact to /api/contacts (action:'add'; the backend
+    // duplicate-guard re-routes a repeat to an in-place update so no C#### row is ever
+    // duplicated). Returns a Promise of a results array [{ok, body}]. NEVER throws;
+    // each request fails soft to {ok:false, body:...}. Callers decide how to surface it.
+    function pfPostDirectoryContacts(toSave){
       var results = toSave.map(function(b){
-        var nm = splitName(b.name);
+        var nm = pfSplitContactName(b.name);
         return fetch('/api/contacts', {
           method: 'POST', credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
@@ -15402,11 +15442,29 @@ try {
             email: b.email || '', companyWebsite: b.companyWebsite || '',
             companyAddress: b.companyAddress || '',
           } })
-        }).then(function(res){ return res.json().then(function(j){ return { ok: res.ok && j && j.ok, body: j }; })
-          .catch(function(){ return { ok: false, body: null }; }); })
-          .catch(function(){ return { ok: false, body: null }; });
+        }).then(function(res){ return res.json().then(function(j){ return { ok: res.ok && j && j.ok, status: res.status, body: j }; })
+          .catch(function(){ return { ok: false, status: res.status, body: null }; }); })
+          .catch(function(){ return { ok: false, status: 0, body: null }; });
       });
-      Promise.all(results).then(function(rs){
+      return Promise.all(results);
+    }
+
+    window.pfSaveContactsToDirectory = function(btn){
+      var editor = btn.closest('.pr-editor'); if (!editor) return;
+      var msgEl = editor.querySelector('.pr-dir-msg');
+      function msg(text, good){
+        if (!msgEl) return;
+        msgEl.textContent = text;
+        msgEl.style.color = good ? '#1e7d34' : '#c0392b';
+        msgEl.style.display = 'block';
+      }
+      var toSave = pfCollectDirectoryContacts(editor);
+      if (!toSave.length) { msg('Enter a contact name first, then save to the directory.', false); return; }
+
+      btn.disabled = true; var orig = btn.innerHTML; btn.textContent = 'Saving…';
+      msg('Saving ' + toSave.length + ' contact' + (toSave.length>1?'s':'') + '…', true);
+
+      pfPostDirectoryContacts(toSave).then(function(rs){
         var okCount = rs.filter(function(r){ return r.ok; }).length;
         var failCount = rs.length - okCount;
         btn.disabled = false; btn.innerHTML = orig;
@@ -15422,6 +15480,47 @@ try {
         }
       });
     };
+
+    // AUTOMATIC Design-Professionals backfeed (Brad 2026-08-07: "every DP edit auto-write
+    // to the master"). Called by pfSaveSection AFTER a successful design_professionals
+    // project-override save, with the contacts collected from the editor BEFORE the
+    // re-render. BEST-EFFORT + NON-BLOCKING: the project override is already saved by the
+    // time this runs, so any failure here (423 Excel-locked, network, 5xx) NEVER unwinds
+    // the project save — it only shows a soft, transient toast. The backend dup-guard
+    // means a repeated auto-write UPDATES the existing row (never a duplicate C####).
+    function pfAutoBackfeedDP(toSave){
+      if (!toSave || !toSave.length) return;
+      pfPostDirectoryContacts(toSave).then(function(rs){
+        var okCount = rs.filter(function(r){ return r.ok; }).length;
+        var failCount = rs.length - okCount;
+        if (failCount === 0) {
+          PF_CONTACTS = null; _pfContactsPromise = null; // refresh directory cache
+          pfToast('Contacts synced to the master directory (' + okCount + ').', true);
+        } else {
+          // Distinguish an Excel lock (423) from a generic failure for a clearer, softer
+          // message. Either way the PROJECT save already succeeded — this is advisory.
+          var locked = rs.some(function(r){ return r.status === 423 || (r.body && /open in excel|locked/i.test(r.body.message||'')); });
+          if (okCount > 0) PF_CONTACTS = null, _pfContactsPromise = null;
+          pfToast(locked
+            ? 'Saved to project. Contact directory is open in Excel — sync will apply on the next save.'
+            : 'Saved to project. Contact directory sync will retry (' + failCount + ' pending).', false);
+        }
+      }).catch(function(){
+        pfToast('Saved to project. Contact directory sync will retry.', false);
+      });
+    }
+    // Lightweight, non-blocking toast (auto-dismisses). Used for advisory notices that
+    // must NOT read as a hard error. Falls back to nothing if the DOM is unavailable.
+    function pfToast(text, good){
+      try {
+        var t = document.createElement('div');
+        t.className = 'pr-toast' + (good ? ' pr-toast-ok' : ' pr-toast-warn');
+        t.textContent = text;
+        document.body.appendChild(t);
+        setTimeout(function(){ t.classList.add('pr-toast-show'); }, 10);
+        setTimeout(function(){ t.classList.remove('pr-toast-show'); setTimeout(function(){ try{ t.remove(); }catch(e){} }, 300); }, good ? 3500 : 6000);
+      } catch(e){}
+    }
 
     // Restore the section to its pre-edit rendering (no save).
     window.pfCancelSection = function(btn){
@@ -15465,6 +15564,14 @@ try {
         fields[nl.value.trim()] = nv ? nv.value : '';
       }
 
+      // AUTO-BACKFEED (Design Professionals only): collect the firm contacts from the
+      // LIVE editor NOW, before the fetch + the success re-render tears the editor down.
+      // The actual POSTs run only AFTER the project override save succeeds (see below),
+      // and are BEST-EFFORT — they never block or unwind the project save.
+      var dpBackfeed = (section === 'design_professionals')
+        ? pfCollectDirectoryContacts(editor)
+        : null;
+
       if (errEl) errEl.style.display = 'none';
       setBusy(true);
 
@@ -15496,6 +15603,11 @@ try {
           sections: (r.body.sections) || {},
           _meta: (r.body._meta) || null
         };
+        // AUTO-BACKFEED the DP firm contacts to the master directory. Fire-and-forget:
+        // the project override is ALREADY saved, so this best-effort sync must not block
+        // or fail the save. Kicked off BEFORE the re-render (which is fine — the contacts
+        // were captured from the editor above, not from the post-render DOM).
+        if (dpBackfeed && dpBackfeed.length) pfAutoBackfeedDP(dpBackfeed);
         // Re-render into the ROOT this card actually lives in (POET uses #prRoot,
         // every other project uses #prGenericRoot) so editing either view works.
         var root = card.closest('.pr-root') || card.parentElement || document.getElementById('prGenericRoot');
