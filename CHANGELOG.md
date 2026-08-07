@@ -16,6 +16,7 @@ with a release-stage suffix (see `docs/PLATFORM-RELEASE-STAGES.md` and `docs/dev
 - DevOps function: team charter, release protocol, logging/monitoring runbook, and maintenance/support runbook under `docs/devops/`, plus this changelog. Formalizes how changes ship, get logged, and stay recoverable.
 
 ### Changed
+- General Info rework (office project-detail view): the standalone PF Team section was merged into General Info (data preserved via the `pfTeam` override key), General Info condensed to a responsive multi-column layout with black+bold field labels and reorganized into blue-headered subsections (Project Info -> General Contractor Info with GC contacts -> Owner -> PF Team -> Documents at bottom), and the "Contract Info" section was renamed to "Subcontract Agreement". Shipped from `general-info-rework-20260806` (base `pm-fullwidth-v2-20260806`, which carries the current section structure). Brad approved the preview.
 - PM pages full-width redone on the correct base after regression rollback. The 4 PM wrapper classes (`.pf-index-root`, `.ts-root`, `.pr-root`, `.ba-wrap`) set to `max-width: none` and `.pr-root .ba-table-wrap` breakout set to `width: 100%`, shipped from `pm-fullwidth-v2-20260806` (base `financials-widen-v2-20260804`, which carries the current section structure). CSS-only; Brad approved v2 preview.
 
 ### Notes
