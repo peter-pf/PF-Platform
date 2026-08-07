@@ -2326,6 +2326,16 @@ body.role-field-ops .nav-sub[data-fo-hide] {
   font-size: 0.72rem; color: var(--text-2); font-style: italic;
   margin: 0 0 6px 18px;
 }
+/* Site Readiness batch-13: clickable action buttons under a subgroup (FedEx print,
+   Pipefy SSSP). Display-only launcher links; open in a new tab. */
+.pr-subgroup-actions { margin: 2px 0 6px 18px; }
+.pr-action-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.76rem; font-weight: 600; text-decoration: none;
+  color: #fff; background: var(--accent);
+  padding: 5px 12px; border-radius: 6px; line-height: 1.2;
+}
+.pr-action-link:hover { filter: brightness(1.08); }
 
 .pr-contact {
   border: 1px solid var(--border-light);
@@ -14048,37 +14058,156 @@ try {
         // editable "engineering" key. Keeping them here would duplicate labels across two
         // views of the same key. This subsection is now contacts-only (display).
 
-      // ----- 4. Project Safety -----
-      _curSection = 'safety';
-      html += card(4, 'Project Safety', null,
-        fields([
-          field('Site Specific Safety Plan (SSSP)', 'On file (see link)', 'SharePoint'),
-          field('Safety Consultant', (function(){var s=(g.vendors||[]).find(function(c){return /safety/i.test(c.scope||'');});return s?(s.company+(s.name?' / '+s.name:'')):'';})(), 'Contacts'),
-          field('Material Safety Data Sheets (MSDS)', ''),
-          field('Toolbox Talks Prepared', ''),
-          field('Jobsite Safety Analysis (JSA)', ''),
-          field('Daily Equipment Checklist', ''),
-          field('Hand Log Sheets', ''),
-          field('Locate Ticket # (Excavator ID)', ''),
-          field('Date Locates Called In', ''),
-          field('Date Ticket Cleared to Start', ''),
-          field('Date Ticket Expires', '')
-        ]) + linkRow(L.safety), false, 'safety');
-
-      // ----- 5. Site Readiness / Project Setup -----
-      // Display title only (Brad 2026-08-07). sectionKey stays 'siteReadiness' so data
-      // + edit/save plumbing are unchanged.
+      // ----- 4. Site Readiness / Project Setup (6 subsections; Brad 2026-08-07 batch-13)
+      // The standalone "Project Safety" section (former #4) was REMOVED and its content
+      // absorbed into Subsection 4 (Safety) here. Top-level renumber: this card is now #4.
+      //
+      // STRUCTURE (this build): six blue subgroup() sub-headers inside the ONE
+      // data-pr-section="siteReadiness" card body for the fields owned by the
+      // siteReadiness key (subsections 1, 2, 3, 5, and the siteReadiness-owned rows of 6):
+      //   1. Shop Drawings   2. Testing   3. Staking & Layout
+      //   5. Mobilization Preparation   6. Mobilization to Site (siteReadiness rows)
+      // Subsection 4 (Safety) is rendered as a NESTED editable card that KEEPS the
+      // existing `safety` override key (injected post-render, same idiom as Equipment/
+      // Material) so ALL prior safety data + its Edit/Save plumbing survive with ZERO
+      // migration. Subsection 6 also folds the existing Equipment + Material nested cards
+      // (their `equipment`/`material` keys preserved), injected post-render below.
+      //
+      // AUTOMATION IS FUTURE: every subgroupNote describing extraction / reminders /
+      // notify / upload-integration is a NOTE only — no logic is wired in this build.
       _curSection = 'siteReadiness';
-      html += card(5, 'Site Readiness / Project Setup', null,
-        fields([
-          field('Mod Load Test Report', ''),
-          field('Mod Test Jack Calibration Report', ''),
-          field('Bldg Pad Passed Proof Roll Report', ''),
-          field('Building Pad Elevation at Staking', ''),
-          field('Bldg Pad Prep Notes', ''),
-          field('Project Files in PM & Field OneDrive', ''),
-          field('Field Ops Mgr Jobsite Visit w/ GC', '')
-        ]) + linkRow(L.site), false, 'siteReadiness');
+      var _fedexPrint = 'https://www.office.fedex.com/default/architecture-construction-engineering.html';
+      var _pipefySSSP = 'https://app.pipefy.com/public/form/7j9G40Zp';
+      var srBody =
+        // ---- Subsection 1: Shop Drawings ----
+          subgroup('1. Shop Drawings')
+        + '<div class="pr-subgroup-actions"><a class="pr-action-link" href="' + E(_fedexPrint) + '" target="_blank" rel="noopener noreferrer">&#128424; Sent to Print (FedEx Office)</a></div>'
+        + subgroupNote('Print spec: B&W, 24x36 Standard White, 1-sided, 3 copies, horizontal orientation, bind on left. Login credentials are stored securely (not shown here).')
+        + fields([
+            fieldLinked('Shop Drawings Print Order Link', '', '', 'website')
+          ])
+        + subgroupNote('Date Ready for Pickup = anticipated date; email pickup person with order details.')
+        + fields([
+            field('Date Ready for Pickup', '')
+          ])
+
+        // ---- Subsection 2: Testing ----
+        + subgroup('2. Testing')
+        + fields([
+            field('Modulus Load Test Required?', ''),
+            field('# of Load Tests', ''),
+            field('AP Design Diameter (ft)', ''),
+            field('Diameter of Place (ft)', ''),
+            field('AP Reaction Modulus - Design (pci)', ''),
+            field('AP Design Load (kips)', ''),
+            field('Load Test Jack Calibration Factor (psi/kip)', ''),
+            field('Load Test Size (kips)', ''),
+            field('Which Jack', ''),
+            field('Testing Equipment vs Rig', ''),
+            field('Test Document Status', '')
+          ])
+        + fields([
+            fieldLinked('Test Document Link', '', '', 'website'),
+            fieldLinked('Mod Test Jack Calibration Report', '', '', 'website')
+          ])
+        + subgroupNote('Threshold ~85 kip determines testing equipment vs rig. FUTURE automation: Peter extracts test data from approved shop drawings + generates the test doc in SharePoint on Garbin approval. Annual jack recalibration reminder every Dec/Jan.')
+
+        // ---- Subsection 3: Staking & Layout ----
+        + subgroup('3. Staking & Layout')
+        + fields([
+            field('CAD & PDF Sent to Surveyor (MLS)?', ''),
+            field('Date Sent to MLS', '')
+          ])
+        + fields([
+            fieldLinked('Email to MLS Link', '', '', 'website')
+          ])
+
+        // ---- Subsection 4: Safety ----
+        // The Safety fields render in their OWN nested `safety`-keyed card injected
+        // post-render (below) so the existing safety override data is preserved. Here we
+        // place only the blue header + a pointer note; the nested card lands right under it
+        // in DOM order (both are children of this card body, appended in sequence).
+        + subgroup('4. Safety')
+
+        // ---- Subsection 5: Mobilization Preparation ----
+        + subgroup('5. Mobilization Preparation')
+        + subgroupNote('Proof roll: obtain from GC on geotech letterhead before mobilizing.')
+        + fields([
+            field('Building Pad Passed Proof Roll', ''),
+            field('Date Proof Roll Received', '')
+          ])
+        + fields([
+            fieldLinked('Proof Roll Report Link', '', '', 'website')
+          ])
+        + subgroupNote('FUTURE automation: flag red + notify PM / Field Ops Mgr / Owners if the elevation difference exceeds 2 ft.')
+        + fields([
+            field('Expected Building Pad Elevation', ''),
+            field('Actual Building Pad Elevation', ''),
+            field('Elevation Difference', '')
+          ])
+        + subgroupNote('Send site readiness checklist >= 3 weeks prior; PM confirms all items with GC/Super; 100% complete = clear to mobilize.')
+        + fields([
+            field('Site Readiness Checklist Sent?', ''),
+            field('Date Site Readiness Checklist Sent to GC', ''),
+            field('Checklist Items 100% Confirmed w/ GC?', '')
+          ])
+        + fields([
+            fieldLinked('Site Readiness Checklist Link', '', '', 'website'),
+            field('Checklist Notes', '')
+          ])
+        + subgroup('Field Ops Manager Jobsite Visit')
+        + fields([
+            field('Field Ops Manager Visit - Scheduled Date', ''),
+            field('Field Ops Manager Visit - Actual Date Visited', ''),
+            field('Field Ops Manager Visit - Comments / Recap', '')
+          ])
+
+        // ---- Subsection 6: Mobilization to Site (siteReadiness-owned rows) ----
+        // The PF Equipment MOB / DEMOB, Rental, Materials, and Fuel fields owned by the
+        // siteReadiness key render here. The existing Equipment + Material NESTED cards
+        // (their own equipment/material keys) are also folded into this subsection,
+        // injected post-render below in DOM order right after these rows.
+        + subgroup('6. Mobilization to Site')
+        + subhead('PF Equipment MOB')
+        + fields([
+            field('Equipment Needed - VSC Rig', ''),
+            field('Equipment Needed - Predrill Rig', ''),
+            field('Equipment Needed - Gooseneck w/ Connex', ''),
+            field('Equipment Needed - Testing Material Fall Off Load', '')
+          ])
+        + subhead('PF Equipment DEMOB')
+        + fields([
+            field('Demob Equipment', ''),
+            field('Demob Date', ''),
+            field('Demob Transport Company', '')
+          ])
+        + subhead('Rental Equipment')
+        + fields([
+            field('Rental Equipment', ''),
+            field('Rental Company', ''),
+            field('Rental Date Rented/Active', ''),
+            field('Rental Anticipated Days Needed', ''),
+            field('Rental Anticipated Return Date', ''),
+            field('Rental Actual Date Called Off Rent', '')
+          ])
+        + subhead('Materials (Stone, if Aggregate Pier)')
+        + subgroupNote('Helical -> piling form (TBD); Rigid Inclusions -> other items.')
+        + fields([
+            field('Stone Vendor & Contact', ''),
+            field('Stone Name/Nomenclature', ''),
+            field('Stone Qty (TN)', bid.total_stone_tn, 'Bid Log'),
+            field('Stone Approved by Engineer (GGG)?', ''),
+            field('Stone Delivery Start Date', ''),
+            field('Stone Qty Day 1 (TN)', '')
+          ])
+        + subhead('Equipment Fuel')
+        + fields([
+            field('Fuel Vendor', ''),
+            field('Fuel Contact', ''),
+            field('Fuel Delivery Dates', '')
+          ]);
+      html += card(4, 'Site Readiness / Project Setup', null,
+        srBody + linkRow(L.site), false, 'siteReadiness');
 
       // ----- 6. Project Photos (LIVE, READ-ONLY gallery) -----
       // A live thumbnail gallery of this project's SharePoint "02 - Project Photos"
@@ -14087,7 +14216,7 @@ try {
       // Body is a placeholder that the async loader (pfLoadProjectPhotos, fired
       // post-render below) replaces with the grid / empty state / error state.
       var _photoNum = _curNum;
-      html += card(6, 'Project Photos', null,
+      html += card(5, 'Project Photos', null,
         '<div class="pr-photos" data-photos-num="' + E(_photoNum) + '">'
         + '<div class="pr-photos-status">Loading photos&hellip;</div>'
         + '<div class="pr-photos-grid" style="display:none"></div>'
@@ -14441,11 +14570,11 @@ try {
         + finSub('Project Invoicing', finInvoicingBody, false)
         + finSub('Project Costs (Budget vs Actual)', baHtml, false);
 
-      html += card(7, 'Financials', baMeta, finBody, false);
+      html += card(6, 'Financials', baMeta, finBody, false);
 
-      // ----- 8. Project Closeout -----
+      // ----- 7. Project Closeout -----
       _curSection = 'closeout';
-      html += card(8, 'Project Closeout', null,
+      html += card(7, 'Project Closeout', null,
         fields([
           field('Final As Built Dwgs to Garbin Geo', ''),
           field('Column Logs from Rig (PDF) to Garbin', ''),
@@ -14455,13 +14584,15 @@ try {
           field('PF Check Garbin As Builts vs PF', ''),
           field('Final As Built Dwgs Sent to GC', '')
         ]), false, 'closeout');
-      // (office renumber 2026-08-07: Project Photos inserted at #6, so the top-level
-      // list is now gap-free 1-8:
-      // 1. General Info  2. Subcontract Agreement  3. Engineering & Design (now holds
+      // (office renumber 2026-08-07 batch-13: standalone Project Safety REMOVED and
+      // absorbed into Site Readiness > Subsection 4 (Safety). Top-level list is now
+      // gap-free 1-7:
+      // 1. General Info  2. Subcontract Agreement  3. Engineering & Design (holds
       // Prelim Design / PF Design Submittal / As Built Drawings + a nested QA/QC card)
-      // 4. Project Safety  5. Site Readiness / Project Setup  6. Project Photos (LIVE
-      // SharePoint gallery)  7. Financials  8. Closeout.
-      // Prior batch-11 had Equipment + Material nested into Site Readiness.)
+      // 4. Site Readiness / Project Setup (6 subgroups: Shop Drawings / Testing /
+      //    Staking & Layout / Safety [nested safety key] / Mobilization Preparation /
+      //    Mobilization to Site [+ nested Equipment + Material])
+      // 5. Project Photos (LIVE SharePoint gallery)  6. Financials  7. Closeout.)
 
       // ----- General Info subsections injected after render (Brad 2026-08-07) -----
       // Injected into the ONE General Info card body (data-pr-section "general") in
@@ -14596,6 +14727,100 @@ try {
           '<div class="pr-nested-card-wrap">'
           + card('', 'PF Project Team', pfTeamMeta, pfTeamBody, true, 'pfTeam')
           + '</div>');
+      }
+
+      // ----- Safety NESTED card inside Site Readiness / Project Setup (Subsection 4)
+      // (Brad 2026-08-07 batch-13) -----
+      // The former standalone "Project Safety" section (#4) is REMOVED; its content lives
+      // here as a NESTED editable card that KEEPS the existing `safety` override key (in
+      // VALID_SECTIONS already) so ALL prior safety override data + Edit/Save plumbing
+      // survive with ZERO migration. The card is INSERTED before the "5. Mobilization
+      // Preparation" subgroup so it renders under the "4. Safety" blue header in order.
+      // It carries: the migrated Project-Safety fields (SSSP/consultant/MSDS/toolbox/
+      // JSA/daily-equip-checklist/hand-logs/locate ticket + the 3 locate dates) PLUS the
+      // new structural Safety fields (SSSP Pipefy action + dates + links, MSDS dates/links,
+      // Other Safety Items textarea, toolbox/JSA/checklist links, hand-log date, and the
+      // full Utility Locates group). AUTOMATION IS FUTURE (subgroupNotes only).
+      var srCardForSafety = root.querySelector('.pr-card[data-pr-section="siteReadiness"] .pr-card-body');
+      if (srCardForSafety) {
+        var _prevSafety = _curSection; _curSection = 'safety';
+        var _safetyConsultant = (function(){var s=(g.vendors||[]).find(function(c){return /safety/i.test(c.scope||'');});return s?(s.company+(s.name?' / '+s.name:'')):'';})();
+        var safetyBody =
+            // --- SSSP (Site Specific Safety Plan) ---
+            subgroup('Site Specific Safety Plan (SSSP)')
+          + '<div class="pr-subgroup-actions"><a class="pr-action-link" href="' + E(_pipefySSSP) + '" target="_blank" rel="noopener noreferrer">&#128221; Create / Send SSSP (Pipefy)</a></div>'
+          + subgroupNote('FUTURE automation — SSSP field checklist: Order# = PF Job#; name/phone/email of preparer = PM or Admin; Long/Short Company Name = Pier Foundations LLC; Project Name / Number / Address / City / State / Zip; Company Logo at "01-Admin/01-Marketing/03-Logo Design"; Project Description = "Install Aggregate Piers"; PM name/phone/email; Super name/phone/email. Save final SSSP to SharePoint + portal.')
+          + fields([
+              field('Site Specific Safety Plan (SSSP)', 'On file (see link)', 'SharePoint'),
+              field('Safety Consultant', _safetyConsultant, 'Contacts'),
+              field('Date SSSP Sent to GC', '')
+            ])
+          + fields([
+              fieldLinked('SSSP Email/Copy Link', '', '', 'website')
+            ])
+            // --- MSDS ---
+          + subgroup('MSDS (Material Safety Data Sheets)')
+          + fields([
+              field('Material Safety Data Sheets (MSDS)', ''),
+              field('MSDS Sent?', ''),
+              field('Date MSDS Sent', '')
+            ])
+          + fields([
+              fieldLinked('MSDS Copy Link', '', '', 'website')
+            ])
+            // --- Safety Docs / Checklists ---
+          + subgroup('Safety Docs & Checklists')
+          + fields([
+              field('Toolbox Talks Prepared', ''),
+              field('Jobsite Safety Analysis (JSA)', ''),
+              field('Daily Equipment Checklist', ''),
+              field('Other Safety Items', '')
+            ])
+          + fields([
+              fieldLinked('Toolbox Talks', '', '', 'website'),
+              fieldLinked('JSA (Jobsite Safety Analysis)', '', '', 'website'),
+              fieldLinked('Daily Equipment Checklist Link', '', '', 'website')
+            ])
+            // --- Hand Log Sheets ---
+          + subgroup('Hand Log Sheets')
+          + subgroupNote('FUTURE automation: hand logs pull from daily-report uploads; saved in PM \\[project]\\03 - Engineering & Design\\QAQC folder.')
+          + fields([
+              field('Hand Log Sheets', ''),
+              field('Hand Log Sheets - Date Uploaded', '')
+            ])
+          + fields([
+              fieldLinked('Hand Log Sheets Link', '', '', 'website')
+            ])
+            // --- Utility Locates ---
+          + subgroup('Utility Locates')
+          + subgroupNote('FUTURE automation: auto to-do to call locate >= 4 business days before project start; if in Indiana call 811, else the state\'s 811.')
+          + fields([
+              field('Locate Ticket #', ''),
+              field('Locate Ticket # (Excavator ID)', ''),
+              field('Date Locate Called In', ''),
+              field('Date Locates Called In', ''),
+              field('Date Cleared to Start', ''),
+              field('Date Ticket Cleared to Start', ''),
+              field('Date Ticket Expires', '')
+            ])
+          + fields([
+              fieldLinked('Locate Ticket PDF Link', '', '', 'website')
+            ]);
+        _curSection = _prevSafety;
+        var safetyMeta = null;
+        var safetyCardHtml = '<div class="pr-nested-card-wrap">'
+          + card('', 'Safety', safetyMeta, safetyBody + linkRow(L.safety), true, 'safety')
+          + '</div>';
+        // Insert BEFORE the "5. Mobilization Preparation" subgroup so Safety lands under
+        // the "4. Safety" header. Find that subgroup by text; fall back to beforeend.
+        var _mobPrepHdr = Array.prototype.find.call(
+          srCardForSafety.querySelectorAll('.pr-subgroup'),
+          function(el){ return /^5\.\s*Mobilization Preparation/.test((el.textContent||'').trim()); });
+        if (_mobPrepHdr) {
+          _mobPrepHdr.insertAdjacentHTML('beforebegin', safetyCardHtml);
+        } else {
+          srCardForSafety.insertAdjacentHTML('beforeend', safetyCardHtml);
+        }
       }
 
       // ----- Equipment + Material NESTED cards inside Site Readiness / Project Setup
@@ -14765,6 +14990,23 @@ try {
       // Material nested card ("material" key — added stone/fuel vendors + manual fields).
       _surfaceExtras(root.querySelector('.pr-card[data-pr-section="material"] .pr-card-body'),
         'material', 'Additional Material Vendors / Fields', 'Stone / Fuel Vendor');
+      // Safety nested card ("safety" key — MIGRATED from the former standalone Project
+      // Safety section). Surfaces any stored safety override whose label no longer maps
+      // to a rendered field (so migrated data is never orphaned). Scoped to the single
+      // .pr-card[data-pr-section="safety"] (nested inside Site Readiness). No add-group.
+      _surfaceExtras(root.querySelector('.pr-card[data-pr-section="safety"] .pr-card-body'),
+        'safety', 'To Be Placed (pending Brad\'s direction)', null);
+      // Site Readiness top-level card ("siteReadiness" key). The former flat Site
+      // Readiness fields (Mod Load Test Report, Mod Test Jack Calibration Report, Bldg
+      // Pad Passed Proof Roll Report, Building Pad Elevation at Staking, Bldg Pad Prep
+      // Notes, Project Files in PM & Field OneDrive, Field Ops Mgr Jobsite Visit w/ GC)
+      // were superseded by the new 6-subsection structure. This surfaces any of those
+      // (or other) stored siteReadiness overrides whose OLD label no longer matches a
+      // new rendered field into a "To Be Placed" group so NO stored data is orphaned.
+      // The closest('.pr-card') guard in _surfaceExtras skips the nested safety/
+      // equipment/material cards, so only true siteReadiness-key rows are considered.
+      _surfaceExtras(root.querySelector('.pr-card[data-pr-section="siteReadiness"] .pr-card-body'),
+        'siteReadiness', 'To Be Placed (pending Brad\'s direction)', null);
 
       // Documents (Brad 2026-08-07): MOVED OUT of General Info. It now lives inside
       // the Engineering & Design (Design Professionals) nested card — the general
@@ -15328,7 +15570,23 @@ try {
       // Engineering & Design > PF Design Submittal (Brad 2026-08-07, batch-12).
       'Design Status': ['Released to Start Design', 'Awaiting Docs for Design'],
       'Submittal Stage': ['In Design', 'Received', 'Submitted', 'Returned'],
-      'Submittal Disposition': ['Approved', 'Approved as Noted', 'For Record', 'Revise & Resubmit']
+      'Submittal Disposition': ['Approved', 'Approved as Noted', 'For Record', 'Revise & Resubmit'],
+      // ===== Site Readiness / Project Setup 6-subsection build (Brad 2026-08-07, batch-13) =====
+      // Subsection 2: Testing
+      'Modulus Load Test Required?': ['Yes', 'No'],
+      'Which Jack': ['Big (>175 kip)', 'Small (<175 kip)'],
+      'Test Document Status': ['Not Started', 'In Progress', 'Complete'],
+      // Subsection 3: Staking & Layout
+      'CAD & PDF Sent to Surveyor (MLS)?': ['Yes', 'No'],
+      // Subsection 4: Safety
+      'MSDS Sent?': ['Yes', 'No'],
+      // Subsection 5: Mobilization Preparation
+      'Building Pad Passed Proof Roll': ['Yes', 'No'],
+      'Site Readiness Checklist Sent?': ['Yes', 'No'],
+      'Checklist Items 100% Confirmed w/ GC?': ['Yes', 'No'],
+      // Subsection 6: Mobilization to Site
+      'Demob Transport Company': ['Stephan', 'Paddacks', 'Other'],
+      'Stone Approved by Engineer (GGG)?': ['Yes', 'No']
     };
 
     // Labels whose editor input is a NATIVE DATE PICKER (Brad 2026-08-07: "hard
@@ -15353,7 +15611,30 @@ try {
       // Engineering & Design > PF Design Submittal (Brad 2026-08-07, batch-12): GC
       // response-date milestones get the native date picker + MM/DD/YYYY display.
       'Response Date Due from GC': true,
-      'Actual Response Date from GC': true
+      'Actual Response Date from GC': true,
+      // ===== Site Readiness / Project Setup 6-subsection build (Brad 2026-08-07, batch-13) =====
+      // Subsection 1: Shop Drawings
+      'Date Ready for Pickup': true,
+      // Subsection 3: Staking & Layout
+      'Date Sent to MLS': true,
+      // Subsection 4: Safety
+      'Date SSSP Sent to GC': true,
+      'Date MSDS Sent': true,
+      'Hand Log Sheets - Date Uploaded': true,
+      'Date Locate Called In': true,
+      'Date Cleared to Start': true,
+      'Date Ticket Expires': true,
+      // Subsection 5: Mobilization Preparation
+      'Date Proof Roll Received': true,
+      'Date Site Readiness Checklist Sent to GC': true,
+      'Field Ops Manager Visit - Scheduled Date': true,
+      'Field Ops Manager Visit - Actual Date Visited': true,
+      // Subsection 6: Mobilization to Site
+      'Demob Date': true,
+      'Rental Date Rented/Active': true,
+      'Rental Anticipated Return Date': true,
+      'Rental Actual Date Called Off Rent': true,
+      'Stone Delivery Start Date': true
     };
 
     // Labels whose editor input is a MULTI-LINE <textarea> (Brad 2026-08-07: free-form
@@ -15369,7 +15650,13 @@ try {
       // Contract Recap > Scope of Work: extra SOW language (was a single-line input).
       'Extra Scope of Work Language': true,
       // Engineering & Design > As Built Drawings > Field As-Built: free-form field notes.
-      'Field As-Built Notes': true
+      'Field As-Built Notes': true,
+      // ===== Site Readiness / Project Setup 6-subsection build (Brad 2026-08-07, batch-13) =====
+      // Subsection 4: Safety — free-form catch-all for any safety items not fielded.
+      'Other Safety Items': true,
+      // Subsection 5: Mobilization Preparation — site-readiness checklist + FOM visit notes.
+      'Checklist Notes': true,
+      'Field Ops Manager Visit - Comments / Recap': true
     };
     function pfIsTextareaLabel(label){ return !!PF_FIELD_TEXTAREA_LABELS[label]; }
     // Coerce a stored/displayed date (MM/DD/YYYY, M/D/YY, YYYY-MM-DD, ...) into the
