@@ -213,6 +213,85 @@ async function refreshFromGraph(env) {
   return active;
 }
 
+// ---- CRM cascading-selector shaping (Brad 2026-08-11) ----------------------
+// Two THIN, additive projections over the SAME active-contact list the flat GET
+// already returns. They do NOT change the sheet, the schema, or the default GET;
+// they only re-shape the in-memory list the server already has:
+//   ?trade=<Category>            -> distinct COMPANIES for that trade
+//        [{ company, contactCount, address, website }]
+//   ?company=<name>&trade=<Cat>  -> that company's ACTIVE contacts in that trade
+//        [{ contactId, name, title, officePhone, cellPhone, email }]
+// Trade match is case-insensitive + whitespace-collapsed against col F (Category).
+// Company match is likewise normalized so "Acme  Eng." == "acme eng.". A blank or
+// unknown trade simply yields an empty array (a greenfield trade -> UI shows only
+// "+ Add company"); we NEVER fabricate a company or contact.
+function normCmp(v) { return String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g, ' '); }
+
+// Distinct companies for a trade. First non-empty address/website seen for a
+// company wins (so the dropdown can prefill the firm block). contactCount counts
+// the trade-matching active contacts at that company.
+function companiesForTrade(contacts, trade) {
+  const want = normCmp(trade);
+  if (!want) return [];
+  const byCompany = new Map(); // normCompany -> { company, contactCount, address, website }
+  for (const c of contacts) {
+    if (normCmp(c.category) !== want) continue;
+    const company = String(c.company || '').trim();
+    if (!company) continue; // a contact with no company can't seed a company option
+    const key = normCmp(company);
+    let e = byCompany.get(key);
+    if (!e) { e = { company, contactCount: 0, address: '', website: '' }; byCompany.set(key, e); }
+    e.contactCount += 1;
+    if (!e.address && c.companyAddress) e.address = String(c.companyAddress);
+    if (!e.website && c.companyWebsite) e.website = String(c.companyWebsite);
+  }
+  return Array.from(byCompany.values())
+    .sort((a, b) => a.company.toLowerCase().localeCompare(b.company.toLowerCase()));
+}
+
+// Active contacts at one company within one trade (both filters applied so a
+// person mis-filed under a different trade at the same firm doesn't leak in).
+function contactsForCompany(contacts, company, trade) {
+  const wantCo = normCmp(company);
+  const wantTr = normCmp(trade);
+  if (!wantCo) return [];
+  return contacts
+    .filter((c) => normCmp(c.company) === wantCo && (!wantTr || normCmp(c.category) === wantTr))
+    .map((c) => ({
+      contactId: c.contactId || '',
+      name: (c.name || ((c.firstName || '') + ' ' + (c.lastName || ''))).trim(),
+      title: c.title || '',
+      officePhone: c.officePhone || '',
+      cellPhone: c.cellPhone || '',
+      email: c.email || '',
+      company: c.company || '',
+    }))
+    .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+}
+
+// Resolve the active contact list ONCE for a request (cache-first, same policy as
+// the flat GET), so the ?trade / ?company projections reuse the exact same data.
+async function resolveActiveContacts(env, forceRefresh) {
+  if (!graphConfigured(env)) {
+    const cached = await readCache(env);
+    return { contacts: (cached && cached.contacts) || [], source: cached ? 'cache-unconfigured' : 'unconfigured' };
+  }
+  if (!forceRefresh) {
+    const cached = await readCache(env);
+    if (cached && (Date.now() - cached.cachedAt) < CACHE_TTL_MS) {
+      return { contacts: cached.contacts, source: 'cache' };
+    }
+  }
+  try {
+    const contacts = await refreshFromGraph(env);
+    return { contacts, source: 'graph' };
+  } catch (e) {
+    const cached = await readCache(env);
+    if (cached && cached.contacts.length) return { contacts: cached.contacts, source: 'cache-stale' };
+    return { contacts: [], source: (e && e.locked) ? 'locked' : 'error' };
+  }
+}
+
 // ---- GET: list the active contact directory --------------------------------
 export async function onRequestGet(context) {
   const { request, env } = context;
@@ -221,6 +300,26 @@ export async function onRequestGet(context) {
   try {
     const url = new URL(request.url);
     const forceRefresh = url.searchParams.get('refresh') === '1';
+
+    // CRM cascading selector (thin, additive). If ?trade is present we return the
+    // company/contact projection instead of the flat list. This does NOT alter the
+    // default GET (no ?trade -> unchanged flat list below). Both projections degrade
+    // to an empty array when Graph is unconfigured / list unavailable (honest empty,
+    // never fabricated), so a greenfield directory just shows "+ Add".
+    const tradeParam = url.searchParams.get('trade');
+    const companyParam = url.searchParams.get('company');
+    if (tradeParam != null || companyParam != null) {
+      const { contacts, source } = await resolveActiveContacts(env, forceRefresh);
+      if (companyParam != null) {
+        // Need a company to scope to; trade is an optional secondary filter.
+        const rows = contactsForCompany(contacts, companyParam, tradeParam || '');
+        return json({ ok: true, mode: 'contacts', trade: tradeParam || '', company: companyParam,
+          contacts: rows, count: rows.length, source });
+      }
+      const companies = companiesForTrade(contacts, tradeParam || '');
+      return json({ ok: true, mode: 'companies', trade: tradeParam || '',
+        companies, count: companies.length, source });
+    }
 
     // If Graph is not configured (branch preview / no secrets), return an EMPTY
     // list gracefully. The typeahead degrades to "no suggestions"; manual entry

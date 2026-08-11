@@ -2149,6 +2149,27 @@ body.role-field-ops .nav-sub[data-fo-hide] {
   cursor: pointer;
 }
 .pr-add-contact-btn:hover { background: var(--accent); color: #fff; }
+/* ---- CRM cascading contact selector (Brad 2026-08-11) --------------------- */
+.pr-crm-wrap { display: flex; flex-direction: column; gap: 10px; margin: 6px 0 10px; }
+.pr-crm {
+  border: 1px solid var(--border, #d5dbe3); border-radius: 8px;
+  padding: 8px 10px; background: var(--bg-0);
+}
+.pr-crm-head { font-size: 0.78rem; font-weight: 700; color: var(--accent); margin-bottom: 6px; }
+.pr-crm-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.pr-crm-company {
+  flex: 1 1 220px; min-width: 160px; padding: 5px 8px; font-size: 0.82rem;
+  border: 1px solid var(--border, #cdd4dd); border-radius: 6px; background: #fff;
+}
+.pr-crm-contacts { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+.pr-crm-hint { font-size: 0.76rem; color: var(--muted, #7a828c); font-style: italic; }
+.pr-crm-contact { display: flex; align-items: baseline; gap: 6px; font-size: 0.8rem; cursor: pointer; }
+.pr-crm-contact input { margin: 0 2px 0 0; }
+.pr-crm-cname { font-weight: 600; }
+.pr-crm-cmeta { color: var(--muted, #7a828c); font-size: 0.72rem; }
+/* Resolved CRM cards host in the read view (under each firm block). */
+.pr-crm-cards:empty { display: none; }
+.pr-crm-company-sub { font-size: 0.76rem; font-weight: 700; color: var(--muted, #55606d); margin: 4px 0 2px; }
 /* ---- Contact directory typeahead (autocomplete) --------------------------- */
 /* Anchored to a contact-name input; a floating list of directory matches.      */
 .pr-ta-wrap { position: relative; }
@@ -2427,6 +2448,17 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 .pr-ccard-name { font-size: 0.86rem; font-weight: 700; color: var(--text-0); }
 .pr-ccard-role { font-size: 0.68rem; font-weight: 600; color: var(--accent-dark);
   text-transform: uppercase; letter-spacing: 0.02em; }
+/* PF Project Team cards ONLY (Brad 2026-08-11): name first, TITLE on its own    */
+/* line directly BELOW the name (uniform across every PF team card, matching     */
+/* the Jonathan Reinking reference). Scoped strictly to the "PF Team Member"     */
+/* grid so GC-team / Owner / Design-Professional cards keep the inline-tag look. */
+/* stack the head vertically; role forced onto a full-width new line under name. */
+.pr-ccards[data-pr-contact-group="PF Team Member"] .pr-ccard-head {
+  flex-direction: column; align-items: flex-start; gap: 0;
+}
+.pr-ccards[data-pr-contact-group="PF Team Member"] .pr-ccard-role {
+  flex-basis: 100%; margin-top: 1px;
+}
 /* inside a contact card the field rows are compact + borderless (the card    */
 /* itself is the visual grouping, so drop the per-row divider). Tight leading.*/
 .pr-ccard .pr-field { padding: 1px 0; border-bottom: none; gap: 0; line-height: 1.2; }
@@ -12372,6 +12404,31 @@ try {
     var _curOverrides = {};  // sections map for the current project ({} if none)
     var _curMeta = null;     // _meta of the current project's overrides
 
+    // Reserved structured override key (CRM cascading selector, Brad 2026-08-11).
+    // Under sections.design_professionals it holds an OBJECT, not a display label:
+    //   { "<Section>": { company, contactIds:[...] } }. It must be SKIPPED by every
+    //   loop that treats section keys as field labels (firmExtraContacts /
+    //   _surfaceExtras / ovExtras) so it is never rendered as a "__crm" text field.
+    var PF_CRM_KEY = '__crm';
+    // Design Professionals firm sections -> master-list trade (Category). Reuses the
+    // PF_DP_FIRM_CATEGORY buckets (defined later) + adds GC. Section labels here are
+    // the firm subheads the DP block renders; the value is the contact Category used
+    // to filter the directory (/api/contacts?trade=). Owner is available if needed.
+    var PF_CRM_SECTION_TRADE = {
+      'Ground Improvement': 'Ground Improvement Engineer',
+      'Geotechnical': 'Geotechnical Engineer',
+      'Civil': 'Civil Engineer',
+      'Structural': 'Structural Engineer',
+      'GC': 'GC'
+    };
+    // Read the current project's __crm map (design_professionals only). Always an
+    // object; {} when absent/malformed so callers never crash on a legacy project.
+    function pfCrmMap(){
+      var dp = _curOverrides && _curOverrides['design_professionals'];
+      var crm = dp && dp[PF_CRM_KEY];
+      return (crm && typeof crm === 'object' && !Array.isArray(crm)) ? crm : {};
+    }
+
     // ---- PER-PROJECT BUDGET state (Financials Phase 1) --------------------
     // window.PF_PROJECT_BUDGETS = { num: { rows:{ cost_code:{budget} }, _meta, loaded, error } }
     // Loaded synchronously per project in openProjectRecord()/renderPoet() (like
@@ -12763,7 +12820,7 @@ try {
     function ovExtras(sectionKey){
       var sec = _curOverrides && _curOverrides[sectionKey];
       if (!sec) return '';
-      var labels = Object.keys(sec);
+      var labels = Object.keys(sec).filter(function(k){ return k !== PF_CRM_KEY; });
       if (!labels.length) return '';
       var prev = _curSection;
       _curSection = sectionKey;
@@ -13929,6 +13986,13 @@ try {
           field('Bid Due Date', bid.due_date, 'Bid Log'),
           field('Prelim Completed By', bid.design_completed_date, 'Bid Log'),
           field('Date Bid Submitted', bid.date_submitted, 'Bid Log'),
+          // Total Pier Qty / LF (Prelim) surfaced here (Brad 2026-08-11) so the Bid
+          // Recap matches General Info. IDENTICAL source as General Info > Project
+          // Info (lines 13906-13907): bid.total_columns / bid.total_lf, 'Bid Log'.
+          // Reusing the same expression guarantees the two views agree; commas come
+          // free via field()'s pfIsQtyLabel gate (label has \bpier\b / \bLF\b).
+          field('Total Pier Qty (Prelim)', bid.total_columns, 'Bid Log'),
+          field('Total LF (Prelim)', bid.total_lf, 'Bid Log'),
           field('LOI/NOI Date', ''),
           // Released to Start Submittals (Brad 2026-08-07): a DATE milestone in the
           // bid->award handoff. Empty by default (manual entry now via the editor's
@@ -14322,6 +14386,7 @@ try {
         var re = new RegExp('^' + esc + '(?:\\s*-\\s*Contact)?\\s*(\\d+)\\s*-\\s*(.+)$');
         var maxN = 0;
         Object.keys(ov).forEach(function(lbl){
+          if (lbl === PF_CRM_KEY) return; // reserved structured key, not a contact label
           var m = String(lbl).match(re);
           if (m){ var n = parseInt(m[1], 10); if (n > maxN) maxN = n; }
         });
@@ -14365,6 +14430,11 @@ try {
         // GROUP added contacts for this firm INSIDE its block (fix for the
         // bottom-dump bug). Rendered after the seeded card(s), before the grid close.
         + firmExtraContacts(head, prefix, seedCount);
+        // CRM cards host (Brad 2026-08-11): resolved __crm[prefix].contactIds render
+        // here as live cards under this firm, populated async post-render by
+        // pfCrmRenderCards. Empty for a project with no __crm selection (renders
+        // exactly as before). Keyed on the firm prefix so each firm gets its own set.
+        var crmHost = '<div class="pr-crm-cards" data-crm-cards="' + esc2(prefix) + '"></div>';
         return subhead(head)
           + twoCol([
               field(prefix + ' - Company', co.company || '', co.src || ''),
@@ -14372,7 +14442,7 @@ try {
               fieldLinked(prefix + ' - Office Phone', co.phone || '', co.src || '', 'phone'),
               fieldLinked(prefix + ' - Website', co.website || '', co.src || '', 'website')
             ], [
-              contactCardGrid([cards], prefix)
+              contactCardGrid([cards], prefix) + crmHost
             ]);
       };
       var dpBody =
@@ -14384,7 +14454,12 @@ try {
                cell: _gie.cell || '', email: _gie.email || '', src: 'Contacts' }])
         + firmBlock('Geotechnical Engineer', 'Geotechnical', {}, [{}])
         + firmBlock('Civil Engineer', 'Civil', {}, [{}])
-        + firmBlock('Structural Engineer', 'Structural', {}, [{}]);
+        + firmBlock('Structural Engineer', 'Structural', {}, [{}])
+        // GC firm block (CRM selector target). Seeds no synced firm contact here
+        // (GC contacts come from the CRM selection / __crm['GC']); a project with no
+        // GC selection renders an empty firm block (subhead + empty cards host), same
+        // as the others before selection. Prefix 'GC' matches PF_CRM_SECTION_TRADE.
+        + firmBlock('General Contractor', 'GC', {}, []);
         // Batch-8 CORRECTION: the "Engineering & Design Tracking" fields (Prelim Design
         // Fee, submittal dates, FFE, loads, jack, etc.) and the Documents block were
         // MOVED OUT of this display-only Design Professionals subsection and back into
@@ -15406,7 +15481,7 @@ try {
       var _surfaceExtras = function(cardBody, sectionKey, headLabel, groupToken){
         if (!cardBody) return;
         var ov = (_curOverrides && _curOverrides[sectionKey]) || {};
-        var labels = Object.keys(ov);
+        var labels = Object.keys(ov).filter(function(k){ return k !== PF_CRM_KEY; });
         if (!labels.length) return;
         var ownCard = cardBody.closest('.pr-card');
         var shown = {};
@@ -15434,6 +15509,9 @@ try {
       // added contact rejoin the add-contact flow if labeled that way (best-effort).
       _surfaceExtras(root.querySelector('.pr-card[data-pr-section="design_professionals"] .pr-card-body'),
         'design_professionals', 'Additional Design Professional Contacts / Fields', null);
+      // CRM: resolve any __crm[firm].contactIds into live cards under each firm block
+      // (async, fail-soft). No selection -> hosts stay empty (renders as before).
+      pfCrmRenderCards(root.querySelector('.pr-card[data-pr-section="design_professionals"] .pr-card-body') || root);
 
       // --- QA/QC nested card injected into Engineering & Design (Brad 2026-08-07,
       // batch-12) --- The former standalone QA/QC section now lives as a NESTED editable
@@ -16340,8 +16418,25 @@ try {
         + '<input class="pr-edit-newvalue" type="text" placeholder="Value">'
         + '</div>';
 
+      // CRM cascading selector (Design Professionals ONLY): one trade-filtered
+      // company + multi-select contact picker per firm section (GI/Geo/Civil/
+      // Structural/GC). Rendered ABOVE the free-text firm fields; its selection is
+      // saved into the reserved __crm override on Save. Other sections: none.
+      var crmBlocks = '';
+      if (section === 'design_professionals') {
+        crmBlocks = '<div class="pr-crm-wrap"><div class="pr-edit-note">'
+          + 'Select firms &amp; contacts from the master directory. Checked contacts render as cards under each firm. '
+          + 'Use &ldquo;+ Add company / contact&rdquo; to grow the directory.'
+          + '</div>'
+          + Object.keys(PF_CRM_SECTION_TRADE).map(function(sn){
+              return pfCrmSelectorBlock(sn, PF_CRM_SECTION_TRADE[sn]);
+            }).join('')
+          + '</div>';
+      }
+
       var form = '<div class="pr-editor" data-pr-section="' + esc2(section) + '">'
         + '<div class="pr-edit-note">Manual override - what you enter here wins over the synced data and is saved for the whole office.</div>'
+        + crmBlocks
         + inputs
         + ((addContactBtns || saveDirBtn) ? '<div class="pr-add-contact-bar">' + addContactBtns + saveDirBtn + '</div>' : '')
         + '<div class="pr-dir-msg" style="display:none;font-size:0.76rem;margin:2px 0;"></div>'
@@ -16361,7 +16456,7 @@ try {
       // Wire the contact-directory typeahead onto any contact-name inputs in this
       // editor (fail-soft: no backend => no menu, manual entry unaffected).
       var _editorEl = body.querySelector('.pr-editor');
-      if (_editorEl) pfWireTypeahead(_editorEl);
+      if (_editorEl) { pfWireTypeahead(_editorEl); pfCrmHydrate(_editorEl); }
     };
 
     // Append a fresh numbered contact block (5 inputs) for a repeatable group. The
@@ -16415,6 +16510,295 @@ try {
         .catch(function(){ PF_CONTACTS = []; return PF_CONTACTS; }); // fail soft
       return _pfContactsPromise;
     }
+
+    // =======================================================================
+    // CRM CASCADING CONTACT SELECTOR  (Brad 2026-08-11, OPTION 1)
+    // =======================================================================
+    // Per Design Professionals firm section (Ground Improvement / Geotechnical /
+    // Civil / Structural / GC) the user: (1) picks a COMPANY from a trade-filtered
+    // dropdown (distinct companies whose master-list Category === the section's
+    // trade), then (2) checks WHICH of that company's contacts belong on THIS
+    // project. The chosen { company, contactIds } is stored under the reserved
+    // __crm key in the design_professionals override (via pfSaveCrm below). Both
+    // "+ Add company" and "+ Add contact" reuse the EXISTING /api/contacts POST
+    // action:'add' (dup-guarded C#### mint) with category = the section trade.
+    //
+    // FAIL SOFT: every fetch degrades to an empty list on error (greenfield trade
+    // -> only "+ Add company"); a missing company / stale contactId never throws.
+    // The selector NEVER writes the project store on its own — persistence happens
+    // only when the user clicks the section Save (or the explicit CRM save button),
+    // which POSTs the whole __crm map. OPTION 1: no master-list schema change.
+
+    // Fetch distinct companies for a trade. Returns [] on any failure (fail soft).
+    function pfCrmFetchCompanies(trade){
+      if (!trade) return Promise.resolve([]);
+      return fetch('/api/contacts?trade=' + encodeURIComponent(trade), { credentials: 'same-origin' })
+        .then(function(res){ return res.ok ? res.json() : { companies: [] }; })
+        .then(function(b){ return (b && Array.isArray(b.companies)) ? b.companies : []; })
+        .catch(function(){ return []; });
+    }
+    // Fetch a company's contacts within a trade. Returns [] on any failure.
+    function pfCrmFetchContacts(company, trade){
+      if (!company) return Promise.resolve([]);
+      var q = '/api/contacts?company=' + encodeURIComponent(company);
+      if (trade) q += '&trade=' + encodeURIComponent(trade);
+      return fetch(q, { credentials: 'same-origin' })
+        .then(function(res){ return res.ok ? res.json() : { contacts: [] }; })
+        .then(function(b){ return (b && Array.isArray(b.contacts)) ? b.contacts : []; })
+        .catch(function(){ return []; });
+    }
+
+    // Build the selector UI for ONE firm section inside the DP editor. `sectionName`
+    // is the firm subhead ("Ground Improvement" etc); `trade` is its Category. The
+    // widget is a .pr-crm block carrying data-crm-section + data-crm-trade so the
+    // save reader can harvest the chosen company + checked ids. Seeded from the
+    // current __crm[sectionName] selection. Returns an HTML string (empty controls;
+    // the async company/contact lists are populated by pfCrmHydrate after insert).
+    function pfCrmSelectorBlock(sectionName, trade){
+      var cur = pfCrmMap()[sectionName] || {};
+      var selCompany = cur.company || '';
+      return ''
+        + '<div class="pr-crm" data-crm-section="' + esc2(sectionName) + '" data-crm-trade="' + esc2(trade) + '">'
+        +   '<div class="pr-crm-head">' + esc2(sectionName) + ' &mdash; select from directory</div>'
+        +   '<div class="pr-crm-row">'
+        +     '<select class="pr-crm-company" data-crm-selected="' + esc2(selCompany) + '">'
+        +       '<option value="">Loading companies&hellip;</option>'
+        +     '</select>'
+        +     '<button type="button" class="pr-add-contact-btn pr-crm-addco" '
+        +       'onclick="window.pfCrmAddCompany(this)">+ Add company</button>'
+        +   '</div>'
+        +   '<div class="pr-crm-contacts" data-crm-contacts>'
+        +     (selCompany
+              ? '<div class="pr-crm-hint">Loading contacts&hellip;</div>'
+              : '<div class="pr-crm-hint">Pick a company to choose its contacts.</div>')
+        +   '</div>'
+        + '</div>';
+    }
+
+    // Populate the company dropdown + (if a company is selected) its contact checkboxes
+    // for every .pr-crm block in an editor. Idempotent; safe to call after insert and
+    // after an add. Fail soft (empty lists just render "+ Add" affordances).
+    function pfCrmHydrate(editor){
+      if (!editor) return;
+      editor.querySelectorAll('.pr-crm').forEach(function(block){
+        var trade = block.getAttribute('data-crm-trade') || '';
+        var sel = block.querySelector('.pr-crm-company');
+        var want = sel ? (sel.getAttribute('data-crm-selected') || '') : '';
+        pfCrmFetchCompanies(trade).then(function(companies){
+          if (!sel) return;
+          var opts = ['<option value="">' + (companies.length ? '-- Select company --' : '-- No companies yet --') + '</option>'];
+          var haveWant = false;
+          companies.forEach(function(co){
+            var name = co.company || '';
+            if (!name) return;
+            if (name === want) haveWant = true;
+            var cnt = co.contactCount ? ' (' + co.contactCount + ')' : '';
+            opts.push('<option value="' + esc2(name) + '"' + (name === want ? ' selected' : '') + '>' + esc2(name) + cnt + '</option>');
+          });
+          // A previously-chosen company no longer in the directory: keep it selectable
+          // so the saved selection is not silently lost (honest, no data drop).
+          if (want && !haveWant) {
+            opts.push('<option value="' + esc2(want) + '" selected>' + esc2(want) + ' (saved)</option>');
+          }
+          sel.innerHTML = opts.join('');
+          if (want) pfCrmLoadContacts(block, want);
+        });
+      });
+    }
+
+    // Load + render the contact checkbox list for a company inside a firm block.
+    // Pre-checks any contactId already in the saved __crm selection for that firm.
+    function pfCrmLoadContacts(block, company){
+      var trade = block.getAttribute('data-crm-trade') || '';
+      var sectionName = block.getAttribute('data-crm-section') || '';
+      var host = block.querySelector('[data-crm-contacts]');
+      if (!host) return;
+      if (!company) { host.innerHTML = '<div class="pr-crm-hint">Pick a company to choose its contacts.</div>'; return; }
+      host.innerHTML = '<div class="pr-crm-hint">Loading contacts&hellip;</div>';
+      var cur = pfCrmMap()[sectionName] || {};
+      var chosen = {};
+      (cur.company === company && Array.isArray(cur.contactIds) ? cur.contactIds : []).forEach(function(id){ chosen[String(id).toUpperCase()] = 1; });
+      pfCrmFetchContacts(company, trade).then(function(list){
+        if (!list.length) {
+          host.innerHTML = '<div class="pr-crm-hint">No contacts yet for this company.</div>'
+            + '<button type="button" class="pr-add-contact-btn pr-crm-addcontact" onclick="window.pfCrmAddContact(this)">+ Add contact</button>';
+          return;
+        }
+        var rows = list.map(function(c){
+          var id = String(c.contactId || '').toUpperCase();
+          var meta = [c.title, c.email, pfFmtPhone(c.cellPhone || c.officePhone || '')].filter(Boolean).join(' &middot; ');
+          return '<label class="pr-crm-contact">'
+            + '<input type="checkbox" class="pr-crm-cb" value="' + esc2(id) + '"' + (chosen[id] ? ' checked' : '') + '>'
+            + '<span class="pr-crm-cname">' + esc2(c.name || id) + '</span>'
+            + (meta ? '<span class="pr-crm-cmeta">' + meta + '</span>' : '')
+            + '</label>';
+        }).join('');
+        host.innerHTML = rows
+          + '<button type="button" class="pr-add-contact-btn pr-crm-addcontact" onclick="window.pfCrmAddContact(this)">+ Add contact</button>';
+      });
+    }
+
+    // Company dropdown change -> reload that firm's contact list (pre-check saved ids
+    // when re-selecting the same company; empty when switching to a new one).
+    document.addEventListener('change', function(ev){
+      var sel = ev.target;
+      if (sel && sel.classList && sel.classList.contains('pr-crm-company')) {
+        var block = sel.closest('.pr-crm');
+        if (block) pfCrmLoadContacts(block, sel.value || '');
+      }
+    });
+
+    // "+ Add company" — prompt for a company name, mint it into the directory under
+    // the section trade (empty contact placeholder is NOT created; a company exists
+    // once it has >=1 contact, so we immediately open the add-contact flow for it).
+    // Actually simpler + honest: adding a company here just adds it to the dropdown
+    // locally and selects it; the real directory row is created when the first
+    // contact is added (a company with no contacts has nothing to store). This keeps
+    // OPTION 1 (no company table) true — company is derived from contacts.
+    window.pfCrmAddCompany = function(btn){
+      var block = btn.closest('.pr-crm'); if (!block) return;
+      var name = (window.prompt('New company name for this trade:') || '').trim();
+      if (!name) return;
+      var sel = block.querySelector('.pr-crm-company');
+      if (sel) {
+        // Add (or reuse) the option and select it.
+        var exists = false;
+        Array.prototype.forEach.call(sel.options, function(o){ if (o.value === name) exists = true; });
+        if (!exists) {
+          var opt = document.createElement('option');
+          opt.value = name; opt.textContent = name + ' (new)';
+          sel.appendChild(opt);
+        }
+        sel.value = name;
+        sel.setAttribute('data-crm-selected', name);
+      }
+      // Open an empty add-contact prompt straight away so the company gets a real row.
+      pfCrmLoadContacts(block, name);
+    };
+
+    // "+ Add contact" — collect a new contact for the firm's currently-selected
+    // company, POST it to /api/contacts (action:'add', category = section trade),
+    // then append it (checked) to the list. Reuses the dedupe-guarded write path.
+    window.pfCrmAddContact = function(btn){
+      var block = btn.closest('.pr-crm'); if (!block) return;
+      var sel = block.querySelector('.pr-crm-company');
+      var company = sel ? (sel.value || '') : '';
+      var trade = block.getAttribute('data-crm-trade') || '';
+      if (!company) { window.alert('Pick or add a company first.'); return; }
+      var name = (window.prompt('Contact name (First Last):') || '').trim();
+      if (!name) return;
+      var title = (window.prompt('Title (optional):') || '').trim();
+      var email = (window.prompt('Email (optional):') || '').trim();
+      var phone = (window.prompt('Cell phone (optional):') || '').trim();
+      var nm = pfSplitContactName(name);
+      btn.disabled = true; btn.textContent = 'Adding…';
+      fetch('/api/contacts', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'add', contact: {
+          firstName: nm.firstName, lastName: nm.lastName, title: title,
+          company: company, category: trade, cellPhone: phone, email: email
+        } })
+      }).then(function(res){ return res.json().then(function(j){ return { ok: res.ok && j && j.ok, body: j, status: res.status }; }); })
+        .then(function(r){
+          btn.disabled = false; btn.textContent = '+ Add contact';
+          if (!r.ok || !r.body || !r.body.contact) {
+            window.alert((r.body && r.body.message) ? r.body.message : 'Could not add the contact. Please retry.');
+            return;
+          }
+          // Invalidate the typeahead cache so future selectors see the new contact.
+          PF_CONTACTS = null; _pfContactsPromise = null;
+          var host = block.querySelector('[data-crm-contacts]');
+          var id = String(r.body.contact.contactId || '').toUpperCase();
+          if (host && id) {
+            // Remove any "no contacts yet" hint before appending.
+            var hint = host.querySelector('.pr-crm-hint'); if (hint) hint.remove();
+            var meta = [title, email, pfFmtPhone(phone)].filter(Boolean).join(' &middot; ');
+            var addBtn = host.querySelector('.pr-crm-addcontact');
+            var lblHtml = '<label class="pr-crm-contact">'
+              + '<input type="checkbox" class="pr-crm-cb" value="' + esc2(id) + '" checked>'
+              + '<span class="pr-crm-cname">' + esc2(name) + '</span>'
+              + (meta ? '<span class="pr-crm-cmeta">' + meta + '</span>' : '')
+              + '</label>';
+            if (addBtn) addBtn.insertAdjacentHTML('beforebegin', lblHtml);
+            else host.insertAdjacentHTML('beforeend', lblHtml);
+          }
+        })
+        .catch(function(){ btn.disabled = false; btn.textContent = '+ Add contact'; window.alert('Could not add the contact. Please retry.'); });
+    };
+
+    // Harvest the CRM selection from a DP editor into a __crm map
+    //   { "<Section>": { company, contactIds:[...] }, ... }
+    // Only firm blocks with a chosen company AND >=1 checked contact are stored;
+    // a block with a company but no checks stores an explicit empty selection so a
+    // deliberate clear round-trips. Returns {} if the editor has no .pr-crm blocks.
+    function pfCollectCrm(editor){
+      var out = {};
+      if (!editor) return out;
+      editor.querySelectorAll('.pr-crm').forEach(function(block){
+        var sectionName = block.getAttribute('data-crm-section') || '';
+        if (!sectionName) return;
+        var sel = block.querySelector('.pr-crm-company');
+        var company = sel ? (sel.value || '').trim() : '';
+        var ids = [];
+        block.querySelectorAll('.pr-crm-cb:checked').forEach(function(cb){
+          var v = String(cb.value || '').trim().toUpperCase();
+          if (/^C\d+$/.test(v) && ids.indexOf(v) === -1) ids.push(v);
+        });
+        // Store a firm entry only when the user touched it (chose a company). This
+        // avoids writing empty entries for firms the user never opened.
+        if (company || ids.length) out[sectionName] = { company: company, contactIds: ids };
+      });
+      return out;
+    }
+
+    // Render resolved __crm contact cards into their per-firm hosts (data-crm-cards=
+    // "<prefix>"). Called AFTER the DP block is in the DOM (the firm subheads + hosts
+    // exist). Resolves each firm's saved contactIds against the master directory
+    // (loaded once via pfLoadContacts) and renders name/title/phones/email cards
+    // grouped under the firm's company. FAIL SOFT + honest:
+    //   - no __crm for a firm       -> host stays empty (renders as today)
+    //   - a contactId not in the dir -> that card is skipped (stale id never crashes;
+    //                                   the others still render)
+    //   - directory unavailable      -> hosts stay empty (no fabricated cards)
+    // Idempotent: re-running replaces host contents. Only touches [data-crm-cards].
+    function pfCrmRenderCards(root){
+      if (!root) root = document;
+      var crm = pfCrmMap();
+      var hosts = root.querySelectorAll ? root.querySelectorAll('.pr-crm-cards[data-crm-cards]') : [];
+      if (!hosts.length) return;
+      // Any firm actually has a selection? If not, skip the directory fetch entirely.
+      var anySel = false;
+      hosts.forEach(function(h){
+        var pfx = h.getAttribute('data-crm-cards') || '';
+        var e = crm[pfx];
+        if (e && Array.isArray(e.contactIds) && e.contactIds.length) anySel = true;
+      });
+      if (!anySel) return;
+      pfLoadContacts().then(function(list){
+        var byId = {};
+        (list || []).forEach(function(c){ if (c && c.contactId) byId[String(c.contactId).toUpperCase()] = c; });
+        hosts.forEach(function(host){
+          var pfx = host.getAttribute('data-crm-cards') || '';
+          var e = crm[pfx];
+          if (!e || !Array.isArray(e.contactIds) || !e.contactIds.length) { host.innerHTML = ''; return; }
+          var cards = e.contactIds.map(function(id){
+            var c = byId[String(id).toUpperCase()];
+            if (!c) return ''; // stale/removed id: skip, never crash
+            var name = (c.name || ((c.firstName||'') + ' ' + (c.lastName||''))).trim();
+            var rows = [];
+            if (c.officePhone) rows.push('<div class="pr-field"><span class="pr-field-label">Office Phone</span><span class="pr-field-value"><a href="tel:' + esc2(c.officePhone) + '">' + esc2(pfFmtPhone(c.officePhone)) + '</a></span></div>');
+            if (c.cellPhone)   rows.push('<div class="pr-field"><span class="pr-field-label">Cell Phone</span><span class="pr-field-value"><a href="tel:' + esc2(c.cellPhone) + '">' + esc2(pfFmtPhone(c.cellPhone)) + '</a></span></div>');
+            if (c.email)       rows.push('<div class="pr-field"><span class="pr-field-label">Email</span><span class="pr-field-value"><a href="mailto:' + esc2(c.email) + '">' + esc2(c.email) + '</a></span></div>');
+            return contactCard(name || (c.contactId || ''), c.title || '', rows);
+          }).filter(Boolean);
+          host.innerHTML = cards.length
+            ? ('<div class="pr-crm-company-sub">' + esc2(e.company || '') + '</div>' + contactCardGrid(cards))
+            : '';
+        });
+      }).catch(function(){ /* fail soft: leave hosts empty */ });
+    }
+    window.pfCrmRenderCards = pfCrmRenderCards;
 
     // The label prefix of a contact-name field, e.g.
     //   "Owner Contact 1 - Contact Name"  ->  "Owner Contact 1 "
@@ -16754,6 +17138,17 @@ try {
       var nv = editor.querySelector('.pr-edit-newvalue');
       if (nl && nl.value && nl.value.trim()) {
         fields[nl.value.trim()] = nv ? nv.value : '';
+      }
+
+      // CRM cascading selection (Design Professionals only): attach the reserved
+      // __crm structured key so the picked company + checked contactIds persist with
+      // this save. The backend validates it (id shape, caps) and merges it as ONE
+      // object under design_professionals; every other field stays a string. Only
+      // sent for the DP section, and only when the editor actually has CRM blocks.
+      if (section === 'design_professionals') {
+        var crm = pfCollectCrm(editor);
+        // Send even an empty {} so a full clear round-trips; backend cleanCrm accepts it.
+        fields[PF_CRM_KEY] = crm;
       }
 
       // AUTO-BACKFEED (Design Professionals only): collect the firm contacts from the

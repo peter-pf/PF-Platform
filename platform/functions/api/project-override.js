@@ -51,6 +51,67 @@ const MAX_VALUE = 4000;             // a manually entered value (text/number/dat
 const MAX_FIELDS_PER_SECTION = 200; // generous cap; a section has ~25 fields
 const MAX_TOTAL_SECTIONS = 40;      // > the 11 cards, room to grow; bounds abuse
 
+// ---- __crm reserved structured key (Brad 2026-08-11, CRM cascading selector) --
+// The Design Professionals block gains a per-section CRM selection: for each firm
+// section (Ground Improvement / Geotechnical / Civil / Structural / GC) the user
+// picks a company from the master directory + checks which of that company's
+// contacts belong on THIS project. That selection is stored under ONE reserved,
+// object-valued key `__crm` INSIDE the `design_professionals` section:
+//   sections.design_professionals.__crm = {
+//     "<Section>": { company: "<name>", contactIds: ["C0005", ...] }, ...
+//   }
+// Every OTHER key in every section stays a plain string (the existing overlay).
+// __crm is the SOLE exception, allowed ONLY under design_professionals, and is
+// STRICTLY validated (below) so the store can never be corrupted by a crafted
+// object. It survives a normal per-field section save because the section merge
+// (Object.assign(existing, fields)) preserves any key the editor omits.
+const CRM_KEY = '__crm';
+const CRM_ALLOWED_SECTION = 'design_professionals';
+const CRM_MAX_FIRMS = 12;            // >5 real firm sections, bounds abuse
+const CRM_MAX_IDS = 40;              // contacts per firm on one project (generous)
+const CRM_MAX_COMPANY = 200;         // a company name length cap
+const CRM_MAX_SUBKEY = 60;           // a firm-section label length cap
+const CRM_ID_RE = /^C\d+$/;          // contact id shape (C#### minted by /api/contacts)
+
+// Validate + normalize an incoming __crm object into a clean, bounded structure.
+// Returns a SAFE object (possibly {}), or null if the input is present but so
+// malformed it must be rejected (caller fails the whole save closed). Rules:
+//   - top-level must be a plain object; each value must be a plain object with a
+//     string `company` (capped) and an array `contactIds` of `^C\d+$` strings.
+//   - unknown/oversized keys, non-C#### ids, and non-object firm entries are
+//     DROPPED (defensive) rather than accepted verbatim.
+//   - bounded on firm count + ids-per-firm; anything over the cap => reject (null)
+//     so we never silently truncate a user's selection.
+function cleanCrm(input) {
+  if (input == null) return {};                 // absent => empty (nothing to store)
+  if (typeof input !== 'object' || Array.isArray(input)) return null; // present but not an object => reject
+  const out = {};
+  const firmKeys = Object.keys(input);
+  if (firmKeys.length > CRM_MAX_FIRMS) return null;
+  for (const rawKey of firmKeys) {
+    const key = s(rawKey, CRM_MAX_SUBKEY);
+    if (!key) continue;
+    const entry = input[rawKey];
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
+    const company = s(entry.company, CRM_MAX_COMPANY);
+    const idsIn = Array.isArray(entry.contactIds) ? entry.contactIds : [];
+    if (idsIn.length > CRM_MAX_IDS) return null;
+    const seen = {};
+    const contactIds = [];
+    for (const rawId of idsIn) {
+      const id = String(rawId == null ? '' : rawId).trim().toUpperCase();
+      if (!CRM_ID_RE.test(id)) return null;      // any bad id => reject the whole save
+      if (seen[id]) continue;                    // de-dupe ids
+      seen[id] = 1;
+      contactIds.push(id);
+    }
+    // An entry with neither a company nor any ids is a cleared selection; keep it
+    // as an explicit empty (so re-render shows the firm block with nothing picked).
+    out[key] = { company, contactIds };
+  }
+  return out;
+}
+
 // The stable section keys the renderer uses for its 11 cards. A POST for any
 // other section key is rejected (400) so the store can never accumulate junk
 // keys. Mirrors the SECTION_LABELS map / card list in the client renderer.
@@ -120,6 +181,7 @@ function cleanFields(input) {
   if (!input || typeof input !== 'object') return out;
   const keys = Object.keys(input).slice(0, MAX_FIELDS_PER_SECTION);
   for (const k of keys) {
+    if (k === CRM_KEY) continue; // reserved structured key; handled separately, never string-flattened
     const label = s(k, MAX_LABEL);
     if (!label) continue;
     out[label] = s(input[k], MAX_VALUE);
@@ -181,6 +243,25 @@ export async function onRequestPost(context) {
 
     const fields = cleanFields(parsed && parsed.fields);
 
+    // Reserved __crm structured key: allowed ONLY under design_professionals. If the
+    // incoming fields carry a __crm object, validate it strictly. A malformed __crm
+    // fails the WHOLE save closed (we never partially write a corrupt selection). A
+    // __crm on any OTHER section is rejected (it has no meaning there and must not
+    // pollute the store). `crmUpdate === undefined` means the request did not touch
+    // __crm at all (a normal field save) -> the existing stored __crm is preserved.
+    const rawFieldsObj = (parsed && parsed.fields && typeof parsed.fields === 'object') ? parsed.fields : {};
+    const hasCrmInBody = Object.prototype.hasOwnProperty.call(rawFieldsObj, CRM_KEY);
+    let crmUpdate; // undefined => untouched
+    if (hasCrmInBody) {
+      if (section !== CRM_ALLOWED_SECTION) {
+        return json({ status: 'error', message: 'CRM selection is only valid on Design Professionals.' }, 400);
+      }
+      crmUpdate = cleanCrm(rawFieldsObj[CRM_KEY]);
+      if (crmUpdate === null) {
+        return json({ status: 'error', message: 'Invalid CRM selection; nothing was saved.' }, 400);
+      }
+    }
+
     // FAIL CLOSED: no KV -> we cannot persist. Do NOT report success.
     if (!env.PF_SCHEDULE) {
       return json({ status: 'error',
@@ -194,7 +275,16 @@ export async function onRequestPost(context) {
     // known limitation as daily-report; a D1 migration is the durable fix).
     const existing = (rec.sections[section] && typeof rec.sections[section] === 'object')
       ? rec.sections[section] : {};
+    // Carry forward any existing structured __crm; cleanFields already stripped it
+    // from `fields`, so a normal string-field save never disturbs it.
+    const prevCrm = (existing[CRM_KEY] && typeof existing[CRM_KEY] === 'object' && !Array.isArray(existing[CRM_KEY]))
+      ? existing[CRM_KEY] : undefined;
     const merged = Object.assign({}, existing, fields);
+    // Whole-object replace of __crm when the request supplied one (the client sends
+    // the complete per-firm selection each time); otherwise preserve the prior value.
+    if (crmUpdate !== undefined) merged[CRM_KEY] = crmUpdate;
+    else if (prevCrm !== undefined) merged[CRM_KEY] = prevCrm;
+    else delete merged[CRM_KEY]; // never leave a stray/non-object __crm behind
     rec.sections[section] = merged;
 
     // Bound the number of sections (defense against a crafted flood of junk keys;
