@@ -33,15 +33,22 @@ READ DISCIPLINE (no fabrication):
       and the miss is reported in the run summary + baked into the entry's "missing"
       list. Nothing is invented.
 
-FOLDER RESOLUTION + OLD EXCLUSION:
+FOLDER RESOLUTION + OLD EXCLUSION (TWO possible prelim folder names):
     - Enumerate the project folders, take the leading "NN-NNN" as the project number.
-    - Look for "<folder>/03 - Engineering & Design/Garbin Prelim".
+    - Under "<folder>/03 - Engineering & Design", look for the prelim subfolder under
+      EITHER name (case-insensitive), older-then-newer:
+          "Garbin Prelim"  (older projects, e.g. 26-002 POET)
+          "Bid Prelim"     (newer projects, e.g. 26-013 Park & Poplar - OldTown)
+      The names live in PRELIM_SUBFOLDER_NAMES so the list is easy to extend later.
     - Use the current Excel directly IN that folder. Any "OLD"/"old" SUBFOLDER is
       DISREGARDED (superseded workbooks live there). If several .xlsx sit directly in
       the folder, prefer one whose name contains "Preliminary Design Summary", else the
       most-recently-modified.
-    - Projects with no Garbin Prelim folder / no Excel simply get NO entry (the
-      frontend renders nothing for them, gracefully).
+    - If a project has BOTH prelim folders, we pick the one that actually holds a
+      current .xlsx. If BOTH hold files we FLAG it (both-folders) and prefer the newer
+      structure ("Bid Prelim", last in PRELIM_SUBFOLDER_NAMES).
+    - Projects with no prelim folder / no Excel simply get NO entry (the frontend
+      renders nothing for them, gracefully).
 
 Reuses the Graph token + env loader from /home/aiciv/tools/pf_email.py, exactly like
 build-project-record.py / sp-sync.py.
@@ -81,7 +88,15 @@ DATA_DIR = os.path.join(PLATFORM, "data")
 OUT_JS = os.path.join(DATA_DIR, "garbin-prelim.js")
 
 PROJECTS_BASE = "04 - Project Management/02 - Projects"
-ENG_SUBPATH = "03 - Engineering & Design/Garbin Prelim"
+ENG_BASE = "03 - Engineering & Design"
+# The prelim Excel lives in ONE of these subfolders under "03 - Engineering & Design".
+# The file structure was updated on more recent projects (Brad 2026-08-11):
+#   - "Garbin Prelim" = older structure (e.g. 26-002 POET)
+#   - "Bid Prelim"    = newer structure (e.g. 26-013 Park & Poplar - OldTown)
+# Matched case-insensitively. Easy to extend later -- just add a name here. When a
+# project has BOTH folders with files, we FLAG and prefer the newer structure order
+# (later entries win the tiebreak; "Bid Prelim" is listed last on purpose).
+PRELIM_SUBFOLDER_NAMES = ["Garbin Prelim", "Bid Prelim"]
 EXTRACT_TAB = "Prelim Design Summary"
 
 # Only real project folders start with an "NN-NNN" number. Skip the completed-projects
@@ -246,6 +261,48 @@ def pick_prelim_excel(children):
     return pool[0]
 
 
+def resolve_prelim_excel(token, folder):
+    """For one project folder, resolve the prelim Excel out of EITHER prelim-subfolder
+    name under '03 - Engineering & Design'. Returns (chosen_item, prelim_folder_name,
+    both_flag) where:
+      - chosen_item        = the driveItem for the .xlsx (or None if nothing usable)
+      - prelim_folder_name = the actual prelim subfolder we read from (or None)
+      - both_flag          = True if MORE THAN ONE prelim folder held a usable .xlsx
+    The '03 - Engineering & Design' children are listed ONCE; we match candidate names
+    case-insensitively. When several candidates hold files, we keep the one from the
+    folder LAST in PRELIM_SUBFOLDER_NAMES (newer structure 'Bid Prelim' wins) and flag."""
+    eng_path = f"{PROJECTS_BASE}/{folder}/{ENG_BASE}"
+    eng_kids = try_list_children_by_path(token, eng_path)
+    if eng_kids is None:
+        return None, None, False
+
+    # Index engineering-folder subfolders by lowercased name for case-insensitive match.
+    subfolders = {str(c.get("name", "")).lower(): c
+                  for c in eng_kids if c.get("folder")}
+
+    hits = []  # (order_index, actual_name, chosen_excel_item)
+    for idx, cand in enumerate(PRELIM_SUBFOLDER_NAMES):
+        sub = subfolders.get(cand.lower())
+        if sub is None:
+            continue
+        actual_name = str(sub.get("name", cand))
+        prelim_path = f"{eng_path}/{actual_name}"
+        kids = try_list_children_by_path(token, prelim_path)
+        if kids is None:
+            continue
+        chosen = pick_prelim_excel(kids)
+        if chosen is not None:
+            hits.append((idx, actual_name, chosen))
+
+    if not hits:
+        return None, None, False
+    both = len(hits) > 1
+    # Prefer the folder LAST in PRELIM_SUBFOLDER_NAMES (highest order index = newer).
+    hits.sort(key=lambda h: h[0])
+    _, actual_name, chosen = hits[-1]
+    return chosen, actual_name, both
+
+
 def resolve_projects(token, only=None):
     """Enumerate project folders and yield (project_number, folder_name)."""
     children = list_children_by_path(token, PROJECTS_BASE)
@@ -266,14 +323,9 @@ def build(token, only=None, verbose=True):
     projects = {}
     report = []  # (projnum, status, detail)
     for projnum, folder in resolve_projects(token, only=only):
-        gp_path = f"{PROJECTS_BASE}/{folder}/{ENG_SUBPATH}"
-        kids = try_list_children_by_path(token, gp_path)
-        if kids is None:
-            report.append((projnum, "no-folder", "no Garbin Prelim folder"))
-            continue
-        chosen = pick_prelim_excel(kids)
+        chosen, prelim_folder, both = resolve_prelim_excel(token, folder)
         if chosen is None:
-            report.append((projnum, "no-excel", "Garbin Prelim folder present but no .xlsx in it"))
+            report.append((projnum, "no-prelim", "no prelim folder/.xlsx (Garbin Prelim | Bid Prelim)"))
             continue
         item_id = chosen.get("id", "")
         webUrl = chosen.get("webUrl", "")
@@ -289,17 +341,20 @@ def build(token, only=None, verbose=True):
             report.append((projnum, "parse-error", f"{src_name}: {e}"))
             continue
         entry = build_entry(values, units, missing, webUrl, src_name, item_id)
+        entry["prelim_folder"] = prelim_folder  # which structure this came from
         projects[projnum] = entry
+        flag = "  [BOTH prelim folders had files -- used newer]" if both else ""
+        detail = f"[{prelim_folder}] {src_name}{flag}"
         status = "ok" if not missing else f"ok (missing: {','.join(missing)})"
-        report.append((projnum, status, src_name))
+        report.append((projnum, status, detail))
 
     data = {
         "projects": projects,
         "meta": {
             "generated": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-            "source": "SharePoint 03 - Engineering & Design/Garbin Prelim/<AP Preliminary Design Summary>.xlsx, tab 'Prelim Design Summary'",
+            "source": "SharePoint 03 - Engineering & Design/{Garbin Prelim|Bid Prelim}/<AP Preliminary Design Summary>.xlsx, tab 'Prelim Design Summary'",
             "extraction": "label-anchored col R -> value col T (unit col U)",
-            "note": "nominal_dia_ft is RAW feet; frontend x12 -> inches. OLD subfolders disregarded.",
+            "note": "nominal_dia_ft is RAW feet; frontend x12 -> inches. Prelim folder = 'Garbin Prelim' (older) OR 'Bid Prelim' (newer). OLD subfolders disregarded.",
             "project_count": len(projects),
         },
     }

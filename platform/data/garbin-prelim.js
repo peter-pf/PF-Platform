@@ -25,14 +25,130 @@ window.PF_GARBIN_PRELIM = {
         "bearing_psf": "239.4",
         "stone_tn": "tons"
       },
-      "missing": []
+      "missing": [],
+      "prelim_folder": "Garbin Prelim"
+    },
+    "26-011": {
+      "lf": 1830,
+      "total_columns": 183,
+      "nominal_dia_ft": 2.5,
+      "bearing_psf": 3000,
+      "stone_tn": 400,
+      "webUrl": "https://pierfoundations.sharepoint.com/sites/pf/_layouts/15/Doc.aspx?sourcedoc=%7B7485D4A0-82EB-4648-BD30-C5E8B4E5CDD3%7D&file=AP%20Preliminary%20Design%20Summary_Indianapolis%20Housing%20Hub.xlsx&action=default&mobileredirect=true",
+      "source_file": "AP Preliminary Design Summary_Indianapolis Housing Hub.xlsx",
+      "item_id": "016ISVH65A2SCXJ24CJBDL2MGF5C2OLTOT",
+      "tabs": [
+        "Prelim Design Summary",
+        "Design Notes"
+      ],
+      "units": {
+        "lf": "feet",
+        "total_columns": "cols",
+        "nominal_dia_ft": "feet",
+        "bearing_psf": "143.64000000000001",
+        "stone_tn": "tons"
+      },
+      "missing": [],
+      "prelim_folder": "Bid Prelim"
+    },
+    "26-013": {
+      "lf": 13397,
+      "total_columns": 1044,
+      "nominal_dia_ft": 2.5,
+      "bearing_psf": 6000,
+      "stone_tn": 2800,
+      "webUrl": "https://pierfoundations.sharepoint.com/sites/pf/_layouts/15/Doc.aspx?sourcedoc=%7B489245F7-FF0A-4FF4-BCE7-42A4A2A0F6E1%7D&file=AP%20Preliminary%20Design%20Summary%20Park%20and%20Poplar.xlsx&action=default&mobileredirect=true",
+      "source_file": "AP Preliminary Design Summary Park and Poplar.xlsx",
+      "item_id": "016ISVH67XIWJEQCX76RH3ZZ2CUSRKB5XB",
+      "tabs": [
+        "Prelim Design Summary",
+        "Design Notes"
+      ],
+      "units": {
+        "lf": "feet",
+        "total_columns": "cols",
+        "nominal_dia_ft": "feet",
+        "bearing_psf": "287.28000000000003",
+        "stone_tn": "tons"
+      },
+      "missing": [],
+      "prelim_folder": "Bid Prelim"
+    },
+    "26-014": {
+      "lf": 2140,
+      "total_columns": 214,
+      "nominal_dia_ft": 2,
+      "bearing_psf": 4000,
+      "stone_tn": 300,
+      "webUrl": "https://pierfoundations.sharepoint.com/sites/pf/_layouts/15/Doc.aspx?sourcedoc=%7B58356529-8EDF-4C96-BA18-576410664E0A%7D&file=AP%20Preliminary%20Design%20Summary%20TPS%20Dayton%20Rev2.xlsx&action=default&mobileredirect=true",
+      "source_file": "AP Preliminary Design Summary TPS Dayton Rev2.xlsx",
+      "item_id": "016ISVH6ZJMU2VRX4OSZGLUGCXMQIGMTQK",
+      "tabs": [
+        "Prelim Design Summary",
+        "Design Notes"
+      ],
+      "units": {
+        "lf": "feet",
+        "total_columns": "cols",
+        "nominal_dia_ft": "feet",
+        "bearing_psf": "191.52",
+        "stone_tn": "tons"
+      },
+      "missing": [],
+      "prelim_folder": "Bid Prelim"
+    },
+    "26-016": {
+      "lf": 3828.96,
+      "total_columns": 317,
+      "nominal_dia_ft": 2,
+      "bearing_psf": 3000,
+      "stone_tn": 550,
+      "webUrl": "https://pierfoundations.sharepoint.com/sites/pf/_layouts/15/Doc.aspx?sourcedoc=%7B4D44A13E-A4E8-4781-BB4F-1F3A7DF9E244%7D&file=AP%20Preliminary%20Design%20Summary%20Filager%20Campus%20Phase%20II.xlsx&action=default&mobileredirect=true",
+      "source_file": "AP Preliminary Design Summary Filager Campus Phase II.xlsx",
+      "item_id": "016ISVH6Z6UFCE32FEQFD3WTY7HJ67TYSE",
+      "tabs": [
+        "Prelim Design Summary",
+        "Design Notes"
+      ],
+      "units": {
+        "lf": "feet",
+        "total_columns": "cols",
+        "nominal_dia_ft": "feet",
+        "bearing_psf": "143.64000000000001",
+        "stone_tn": "tons"
+      },
+      "missing": [],
+      "prelim_folder": "Bid Prelim"
+    },
+    "26-018": {
+      "lf": 1520,
+      "total_columns": 190,
+      "nominal_dia_ft": 2,
+      "bearing_psf": 3000,
+      "stone_tn": 250,
+      "webUrl": "https://pierfoundations.sharepoint.com/sites/pf/_layouts/15/Doc.aspx?sourcedoc=%7B3D1BD8BA-EB45-4904-862E-F654C170BEFF%7D&file=AP%20Preliminary%20Design%20Summary%20Pivotal%20Perrysburg%20Sr%20Lofts.xlsx&action=default&mobileredirect=true",
+      "source_file": "AP Preliminary Design Summary Pivotal Perrysburg Sr Lofts.xlsx",
+      "item_id": "016ISVH6523ANT2RPLAREYMLXWKTAXBPX7",
+      "tabs": [
+        "Prelim Design Summary",
+        "Design Notes"
+      ],
+      "units": {
+        "lf": "feet",
+        "total_columns": "cols",
+        "nominal_dia_ft": "feet",
+        "bearing_psf": "143.64000000000001",
+        "stone_tn": "tons"
+      },
+      "missing": [],
+      "prelim_folder": "Bid Prelim"
     }
   },
   "meta": {
-    "generated": "2026-08-11T22:36:18.833990Z",
-    "source": "SharePoint 03 - Engineering & Design/Garbin Prelim/<AP Preliminary Design Summary>.xlsx, tab 'Prelim Design Summary'",
+    "generated": "2026-08-11T22:50:28.497705Z",
+    "source": "SharePoint 03 - Engineering & Design/{Garbin Prelim|Bid Prelim}/<AP Preliminary Design Summary>.xlsx, tab 'Prelim Design Summary'",
     "extraction": "label-anchored col R -> value col T (unit col U)",
-    "note": "nominal_dia_ft is RAW feet; frontend x12 -> inches. OLD subfolders disregarded.",
-    "project_count": 1
+    "note": "nominal_dia_ft is RAW feet; frontend x12 -> inches. Prelim folder = 'Garbin Prelim' (older) OR 'Bid Prelim' (newer). OLD subfolders disregarded.",
+    "project_count": 6
   }
 };
