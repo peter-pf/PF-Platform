@@ -151,9 +151,13 @@ function pcOrderedGroups(root){
   });
   if (!pc) return [];
   const out = [];
-  // Walk each nested card in DOM order, emitting its subhead group labels in order.
+  // Walk each nested card in DOM order, emitting its group labels in order. Brad
+  // 2026-08-11 followup: the upper groups (Owner/GC/DP firms/PF Team) now label each
+  // company with a `.pr-role-tag` chip (horizontal-table conversion) instead of a
+  // `.pr-subhead`; groups 8-13 still use `.pr-subhead` (pcContactBlock). Collect BOTH,
+  // in DOM order, so the ordered-group list reflects the horizontal layout.
   pc.querySelectorAll('.pr-card-body .pr-card').forEach(nested=>{
-    nested.querySelectorAll('.pr-subhead').forEach(sh=>{ out.push(sh.textContent); });
+    nested.querySelectorAll('.pr-role-tag, .pr-subhead').forEach(sh=>{ out.push(sh.textContent); });
   });
   return out;
 }

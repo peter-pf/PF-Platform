@@ -2676,6 +2676,35 @@ tr.pf-dragging { opacity: 0.45; }
   .pr-crow > span { flex: 1 1 46%; }
   .pr-crow-name { flex: 1 1 100%; }
 }
+/* (3) HORIZONTAL EVERYWHERE (Brad 2026-08-11 followup): make EVERY Project      */
+/* Contacts group render its contacts as the same horizontal .pr-crow table that */
+/* Equipment Transport uses. The upper groups (Owner / GC / the 4 Design         */
+/* Professionals firms / PF Project Team) previously emitted the LEGACY boxed     */
+/* vertical .pr-ccard cards for VIEW. Those cards still hold the editable         */
+/* .pr-field[data-pr-label] rows the section editor + "Add contact" require, so   */
+/* we do NOT delete them — we HIDE the boxed card grid in VIEW and render a       */
+/* parallel horizontal .pr-crow table from the same data. On Edit the whole card  */
+/* body is replaced with the editor form, so the hidden fields are still read.    */
+.pr-pc-section .pr-ccards { display: none !important; }
+/* Compact company detail line under the bold company name (address / phone /     */
+/* website on ONE small line, not the big stacked left-column field list). Brad's */
+/* target (image 2) shows only the company NAME; this keeps the company contact   */
+/* info without the tall field stack. FLAGGED for Brad.                           */
+.pr-pc-company-meta {
+  font-size: 0.72rem; color: var(--text-1, #55606d);
+  margin: 0 0 4px; line-height: 1.35;
+}
+.pr-pc-company-meta a { color: var(--accent); text-decoration: none; word-break: break-all; }
+.pr-pc-company-meta a:hover { text-decoration: underline; }
+.pr-pc-company-meta .pr-pc-meta-sep { color: var(--border-strong, #ccc); margin: 0 6px; }
+/* When a legacy group renders a horizontal table, the left "company fields"       */
+/* twoCol column (Owner Address / GC Address / firm Company+Address...) is folded  */
+/* into the compact meta line above, so hide that raw left column in VIEW inside   */
+/* Project Contacts. Editor still reads those .pr-field rows (whole body swapped). */
+.pr-pc-section .pr-pc-cofields { display: none !important; }
+/* A legacy group that now renders horizontally uses a plain single-column body    */
+/* (no twoCol split) since the company fields moved into the meta line. */
+.pr-pc-section .pr-pc-horiz-block { margin: 0 0 12px; }
 
 .pr-links { display: flex; flex-wrap: wrap; gap: 8px; }
 .pr-link {
@@ -13161,6 +13190,93 @@ try {
       return '<div class="pr-fields pr-ccards"'+attr+'>'+(cards||[]).join('')+'</div>';
     }
 
+    // ---- HORIZONTAL CONTACT TABLE (Brad 2026-08-11 followup) -----------------
+    // Brad: "the Equipment Transportation is good in how it is horizontal, make the
+    // rest of the contacts look like this." Every Project Contacts group must render
+    // its contacts as the SAME horizontal table Equipment Transport uses
+    // (pfCrmRenderCards / .pr-crow): role-tag chip -> bold company name -> compact
+    // company meta line -> a header row (Name|Title|Office Phone|Cell Phone|Email|
+    // Notes) + one row per contact. This replaces the boxed vertical .pr-ccard look
+    // (image 3) for the upper groups (Owner / GC / DP firms / PF Team).
+    //
+    // crowRow(c): one horizontal row from a plain contact object
+    //   {name,title,office,cell,email,notes}. Phones/email render as tel:/mailto:
+    //   links. Blank cells render clean (empty span) — NO yellow-blank (these are
+    //   display-only rows, per Brad; the yellow rule is only for editable field()).
+    function crowRow(c){
+      c = c || {};
+      var name  = (c.name  == null ? '' : String(c.name).trim());
+      var title = (c.title == null ? '' : String(c.title).trim());
+      var off   = c.office ? linkPhone(c.office) : '';
+      var cell  = c.cell   ? linkPhone(c.cell)   : '';
+      var email = c.email  ? linkEmail(c.email)  : '';
+      var notes = (c.notes == null ? '' : String(c.notes).trim());
+      return '<div class="pr-crow">'
+        + '<span class="pr-crow-name">'  + E(name)  + '</span>'
+        + '<span class="pr-crow-title">' + E(title) + '</span>'
+        + '<span class="pr-crow-off">'   + off      + '</span>'
+        + '<span class="pr-crow-cell">'  + cell     + '</span>'
+        + '<span class="pr-crow-email">' + email    + '</span>'
+        + '<span class="pr-crow-notes">' + E(notes) + '</span>'
+        + '</div>';
+    }
+    function crowHead(){
+      return '<div class="pr-crow pr-crow-head">'
+        + '<span class="pr-crow-name">Name</span>'
+        + '<span class="pr-crow-title">Title</span>'
+        + '<span class="pr-crow-off">Office Phone</span>'
+        + '<span class="pr-crow-cell">Cell Phone</span>'
+        + '<span class="pr-crow-email">Email</span>'
+        + '<span class="pr-crow-notes">Notes</span>'
+        + '</div>';
+    }
+    // horizContactBlock(opts): the full standalone-company horizontal block.
+    //   opts.roleTag  : small chip above the company (e.g. "Project Owner")
+    //   opts.company  : bold company name line
+    //   opts.meta     : [{label,value,link}] compact company detail (address/phone/
+    //                   website) rendered on ONE small line under the name. link =
+    //                   'phone'|'email'|'website'|null. Empty entries dropped.
+    //   opts.contacts : [{name,title,office,cell,email,notes}] -> horizontal rows.
+    //                   Rows with NO data at all are dropped so empty seed slots do
+    //                   not render blank rows (mirrors Equipment Transport empty look).
+    //   opts.hiddenFields : the LEGACY .pr-ccards editable grid (kept in the DOM,
+    //                   hidden via CSS) so the section editor + Add-contact still work.
+    // If there are no populated contacts AND no company, only the role tag + company
+    // name area + hidden fields render (clean empty group, like an empty Equipment
+    // Transport — no wall of blank fields).
+    function horizContactBlock(opts){
+      opts = opts || {};
+      var metaParts = (opts.meta || []).map(function(m){
+        var v = (m && m.value != null) ? String(m.value).trim() : '';
+        if (!v) return '';
+        var shown = m.link === 'phone' ? linkPhone(v)
+                  : m.link === 'email' ? linkEmail(v)
+                  : m.link === 'website' ? linkWebsite(v)
+                  : E(v);
+        return '<span class="pr-pc-meta-item">' + shown + '</span>';
+      }).filter(Boolean);
+      var metaLine = metaParts.length
+        ? '<div class="pr-pc-company-meta">' + metaParts.join('<span class="pr-pc-meta-sep">|</span>') + '</div>'
+        : '';
+      // Drop fully-empty contact rows (no name/title/phone/email/notes).
+      var live = (opts.contacts || []).filter(function(c){
+        if (!c) return false;
+        return (c.name || c.title || c.office || c.cell || c.email || c.notes);
+      });
+      var table = live.length
+        ? '<div class="pr-crow-table">' + crowHead() + live.map(crowRow).join('') + '</div>'
+        : '';
+      return '<div class="pr-pc-horiz-block">'
+        + (opts.roleTag ? '<div class="pr-role-tag">' + E(opts.roleTag) + '</div>' : '')
+        + '<div class="pr-pc-company">'
+        +   (opts.company ? '<div class="pr-pc-company-name">' + E(opts.company) + '</div>' : '')
+        +   metaLine
+        +   table
+        + '</div>'
+        + (opts.hiddenFields || '')
+        + '</div>';
+    }
+
     // ---- override "extras" for LIST-type sections (PF Team, Equipment) --------
     // These sections render CONTACT lists, not a flat pr-fields grid, so a manual
     // override added to them has no synced pr-field row to attach to. ovExtras
@@ -14756,6 +14872,37 @@ try {
       };
       // firmBlock(head, prefix, co, contacts): builds one firm's subhead+twoCol.
       // co = {company,address,phone,website,src}; contacts = [{name,title,phone,cell,email,src}]
+      // firmExtraHoriz(head, prefix, seedCount): the horizontal-row data for a firm's
+      // ADDED contacts (indices > seedCount), read override-wins from the stored
+      // labels — mirrors firmExtraContacts() but returns row objects instead of cards
+      // so the added contacts show in the SAME horizontal table (no data dropped).
+      var firmExtraHoriz = function(head, prefix, seedCount){
+        var ov = (_curOverrides && _curOverrides['design_professionals']) || {};
+        var esc = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        var re = new RegExp('^' + esc + '(?:\\s*-\\s*Contact)?\\s*(\\d+)\\s*-\\s*(.+)$');
+        var maxN = 0;
+        Object.keys(ov).forEach(function(lbl){
+          if (lbl === PF_CRM_KEY) return;
+          var m = String(lbl).match(re);
+          if (m){ var n = parseInt(m[1], 10); if (n > maxN) maxN = n; }
+        });
+        var out = [];
+        for (var n = 1; n <= maxN; n++){
+          if (n <= seedCount) continue;
+          var pPlain  = prefix + ' ' + n + ' - ';
+          var pDashed = prefix + ' - Contact ' + n + ' - ';
+          var hasPlain = DP_FIELD_MAP.some(function(f){ return Object.prototype.hasOwnProperty.call(ov, pPlain + f.fld); });
+          var p = hasPlain ? pPlain : pDashed;
+          out.push({
+            name:   ov[p + 'Contact Name'] || '',
+            title:  ov[p + 'Title'] || '',
+            office: ov[p + 'Office Phone'] || '',
+            cell:   ov[p + 'Cell Phone'] || '',
+            email:  ov[p + 'Email'] || ''
+          });
+        }
+        return out;
+      };
       var firmBlock = function(head, prefix, co, contacts){
         var seedCount = (contacts || []).length;
         var cards = (contacts || []).map(function(c, i){
@@ -14772,20 +14919,42 @@ try {
         // GROUP added contacts for this firm INSIDE its block (fix for the
         // bottom-dump bug). Rendered after the seeded card(s), before the grid close.
         + firmExtraContacts(head, prefix, seedCount);
+        // Parallel horizontal-row data (Brad 2026-08-11 followup): seeded contacts
+        // (override-wins) + this firm's added contacts, all as rows in ONE table.
+        var firmHoriz = (contacts || []).map(function(c, i){
+          var n = i + 1;
+          var p = prefix + ' - Contact ' + n + ' - ';
+          return {
+            name:   effVal('design_professionals', p + 'Contact Name', c.name || ''),
+            title:  effVal('design_professionals', p + 'Title', c.title || ''),
+            office: effVal('design_professionals', p + 'Office Phone', c.phone || ''),
+            cell:   effVal('design_professionals', p + 'Cell Phone', c.cell || ''),
+            email:  effVal('design_professionals', p + 'Email', c.email || '')
+          };
+        }).concat(firmExtraHoriz(head, prefix, seedCount));
         // CRM cards host (Brad 2026-08-11): resolved __crm[prefix].contactIds render
         // here as live cards under this firm, populated async post-render by
         // pfCrmRenderCards. Empty for a project with no __crm selection (renders
         // exactly as before). Keyed on the firm prefix so each firm gets its own set.
         var crmHost = '<div class="pr-crm-cards" data-crm-cards="' + esc2(prefix) + '" data-role-tag="' + esc2(head) + '"></div>';
-        return subhead(head)
-          + twoCol([
-              field(prefix + ' - Company', co.company || '', co.src || ''),
-              field(prefix + ' - Address', co.address || '', co.src || ''),
-              fieldLinked(prefix + ' - Office Phone', co.phone || '', co.src || '', 'phone'),
-              fieldLinked(prefix + ' - Website', co.website || '', co.src || '', 'website')
-            ], [
-              contactCardGrid([cards], prefix) + crmHost
-            ]);
+        // Company fields kept (hidden) for the editor; company detail shows in meta.
+        var coFields = '<div class="pr-fields pr-pc-cofields">'
+          + field(prefix + ' - Company', co.company || '', co.src || '')
+          + field(prefix + ' - Address', co.address || '', co.src || '')
+          + fieldLinked(prefix + ' - Office Phone', co.phone || '', co.src || '', 'phone')
+          + fieldLinked(prefix + ' - Website', co.website || '', co.src || '', 'website')
+          + '</div>';
+        return horizContactBlock({
+          roleTag: head,
+          company: effVal('design_professionals', prefix + ' - Company', co.company || '') || '',
+          meta: [
+            { label: prefix + ' - Address', value: effVal('design_professionals', prefix + ' - Address', co.address || '') },
+            { label: prefix + ' - Office Phone', value: effVal('design_professionals', prefix + ' - Office Phone', co.phone || ''), link:'phone' },
+            { label: prefix + ' - Website', value: effVal('design_professionals', prefix + ' - Website', co.website || ''), link:'website' }
+          ],
+          contacts: firmHoriz,
+          hiddenFields: coFields + contactCardGrid([cards], prefix)
+        }) + crmHost;
       };
       // Firm block ORDER (Brad 2026-08-11): the Design Professionals card holds
       // groups 3-6 of the Project Contacts order — Geotechnical, Civil, Structural,
@@ -15540,6 +15709,7 @@ try {
           fieldLinked('Owner Website', _own0.website || '', 'Contacts', 'website')
         ];
         var ownerCards = [];
+        var ownerHoriz = []; // parallel horizontal-row data (Brad 2026-08-11 followup)
         var _ownCount = Math.max(2, _own.length);
         for (var _oi = 0; _oi < _ownCount; _oi++) {
           var _oc = _own[_oi] || {};
@@ -15551,6 +15721,14 @@ try {
             fieldLinked('Owner Contact ' + _n + ' - Cell Phone', _oc.cell || '', _oc.cell ? 'Contacts' : '', 'phone'),
             fieldLinked('Owner Contact ' + _n + ' - Email', _oc.email || '', _oc.email ? 'Contacts' : '', 'email')
           ]));
+          // override-wins values (match what field() shows) for the horizontal row.
+          ownerHoriz.push({
+            name:   effVal('general', 'Owner Contact ' + _n + ' - Contact Name', _oc.name || ''),
+            title:  effVal('general', 'Owner Contact ' + _n + ' - Title', _oc.scope || ''),
+            office: effVal('general', 'Owner Contact ' + _n + ' - Office Phone', _oc.phone || ''),
+            cell:   effVal('general', 'Owner Contact ' + _n + ' - Cell Phone', _oc.cell || ''),
+            email:  effVal('general', 'Owner Contact ' + _n + ' - Email', _oc.email || '')
+          });
         }
         var ownerCrmHost = '<div class="pr-crm-cards" data-crm-cards="Owner" data-crm-cards-key="general" data-role-tag="Project Owner"></div>';
         // ---- (2) GENERAL CONTRACTOR — GC company block + GC Project Team + CRM
@@ -15574,19 +15752,65 @@ try {
             fieldLinked('GC Project Engineer - Email', _gcPE.email || '', 'Contacts', 'email')
           ])
         ];
+        // Parallel horizontal-row data for the GC team (override-wins values). The
+        // GC roles use MIXED label shapes ("GC Project Manager - Name" but
+        // "... - Office Phone/Cell Phone/Email"); pull each from its own label.
+        var gcHoriz = [
+          { name:   effVal('general', 'GC Project Manager - Name', _gcPM.name || ''),
+            title:  'Project Manager',
+            office: effVal('general', 'GC Project Manager - Office Phone', _gcPM.phone || ''),
+            cell:   effVal('general', 'GC Project Manager - Cell Phone', _gcPM.cell || ''),
+            email:  effVal('general', 'GC Project Manager - Email', _gcPM.email || '') },
+          { name:   _gcSup.name || '',
+            title:  'Superintendent',
+            office: '',
+            cell:   effVal('general', 'GC Superintendent - Cell Phone', _gcSup.cell || ''),
+            email:  effVal('general', 'GC Superintendent - Email', _gcSup.email || '') },
+          { name:   _gcPE.name || '',
+            title:  'Project Engineer',
+            office: effVal('general', 'GC Project Engineer - Office Phone', _gcPE.phone || ''),
+            cell:   effVal('general', 'GC Project Engineer - Cell Phone', _gcPE.cell || ''),
+            email:  effVal('general', 'GC Project Engineer - Email', _gcPE.email || '') }
+        ];
         var gcCrmHost = '<div class="pr-crm-cards" data-crm-cards="GC" data-crm-cards-key="general" data-role-tag="General Contractor"></div>';
+        // Company-level fields kept as .pr-field rows (editor reads them) but hidden
+        // in VIEW (.pr-pc-cofields) — the company detail shows compactly in the meta
+        // line instead. HORIZONTAL VIEW (Brad followup): role tag -> company name ->
+        // compact meta -> horizontal contact table; the boxed .pr-ccards grid is kept
+        // (hidden) so the editor + Add-contact keep working.
+        var _ownerCoFields = '<div class="pr-fields pr-pc-cofields">' + ownerRows.join('') + '</div>';
+        var _gcCoFields = '<div class="pr-fields pr-pc-cofields">'
+          + field('General Contractor', bid.gc_name || SF.gc_party || (g.gc&&g.gc[0]?g.gc[0].company:''), bid.gc_name ? 'Bid Log' : SS)
+          + field('GC Address', (g.gc&&g.gc[0]?g.gc[0].address:''), 'Contacts')
+          + fieldLinked('GC Office Phone', (g.gc&&g.gc[0]?g.gc[0].phone:''), 'Contacts', 'phone')
+          + fieldLinked('GC Website', (g.gc&&g.gc[0]?g.gc[0].website:''), 'Contacts', 'website')
+          + '</div>';
+        var _gcName = effVal('general', 'General Contractor', bid.gc_name || SF.gc_party || (g.gc&&g.gc[0]?g.gc[0].company:'')) || '';
         var ownerGcBody =
-            subhead('Project Owner')
-          + twoCol(ownerRows, [subhead('Owner Contacts'), contactCardGrid(ownerCards, 'Owner Contact'), ownerCrmHost])
-          + subhead('General Contractor')
-          + twoCol([
-              field('General Contractor', bid.gc_name || SF.gc_party || (g.gc&&g.gc[0]?g.gc[0].company:''), bid.gc_name ? 'Bid Log' : SS),
-              field('GC Address', (g.gc&&g.gc[0]?g.gc[0].address:''), 'Contacts'),
-              fieldLinked('GC Office Phone', (g.gc&&g.gc[0]?g.gc[0].phone:''), 'Contacts', 'phone'),
-              fieldLinked('GC Website', (g.gc&&g.gc[0]?g.gc[0].website:''), 'Contacts', 'website')
-            ], [
-              subhead('GC Project Team'), contactCardGrid(_gcCards), gcCrmHost
-            ]);
+            horizContactBlock({
+              roleTag: 'Project Owner',
+              company: effVal('general', 'Owner', _own0.company || '') || '',
+              meta: [
+                { label:'Owner Address', value: effVal('general','Owner Address', _own0.address || '') },
+                { label:'Owner Office Phone', value: effVal('general','Owner Office Phone', _own0.phone || ''), link:'phone' },
+                { label:'Owner Website', value: effVal('general','Owner Website', _own0.website || ''), link:'website' }
+              ],
+              contacts: ownerHoriz,
+              hiddenFields: _ownerCoFields + contactCardGrid(ownerCards, 'Owner Contact')
+            })
+          + ownerCrmHost
+          + horizContactBlock({
+              roleTag: 'General Contractor',
+              company: _gcName,
+              meta: [
+                { label:'GC Address', value: effVal('general','GC Address', (g.gc&&g.gc[0]?g.gc[0].address:'')) },
+                { label:'GC Office Phone', value: effVal('general','GC Office Phone', (g.gc&&g.gc[0]?g.gc[0].phone:'')), link:'phone' },
+                { label:'GC Website', value: effVal('general','GC Website', (g.gc&&g.gc[0]?g.gc[0].website:'')), link:'website' }
+              ],
+              contacts: gcHoriz,
+              hiddenFields: _gcCoFields + contactCardGrid(_gcCards)
+            })
+          + gcCrmHost;
         _curSection = _prevGen;
         pcHost.insertAdjacentHTML('beforeend',
           '<div class="pr-nested-card-wrap">'
@@ -15632,6 +15856,7 @@ try {
           ['Operator #3',             {}]
         ];
         var pfCards = [];
+        var pfHoriz = []; // parallel horizontal-row data (Brad 2026-08-11 followup)
         pfRoles.forEach(function(pair){
           var role = pair[0], c = pair[1] || {};
           var _pfNameOv = ovLookup('pfTeam', role + ' - Contact Name');
@@ -15645,6 +15870,18 @@ try {
             fieldLinked(role + ' - Cell Phone', c.cell || '', c.cell ? 'Contacts' : '', 'phone'),
             fieldLinked(role + ' - Email', c.email || '', c.email ? 'Contacts' : '', 'email')
           ]));
+          // Horizontal row: Name = the resolved person name; Title = the PF role
+          // (override-wins), so an unfilled role slot shows only Title (which is the
+          // role) — dropped by horizContactBlock only if EVERYTHING is blank, but the
+          // role Title is always present so PF roles always list. That matches Brad's
+          // "keep the roles visible" intent for the PF team.
+          pfHoriz.push({
+            name:   _pfName,
+            title:  effVal('pfTeam', role + ' - Title', c.scope || role),
+            office: effVal('pfTeam', role + ' - Office Phone', c.phone || ''),
+            cell:   effVal('pfTeam', role + ' - Cell Phone', c.cell || ''),
+            email:  effVal('pfTeam', role + ' - Email', c.email || '')
+          });
         });
         // Cascading company->contacts selector (Brad 2026-08-11): identical structure to
         // every other Project Contacts group. subhead + a .pr-crm-cards host that
@@ -15653,8 +15890,16 @@ try {
         // existing pfTeam entries surface exactly as before; this selector is the
         // go-forward model (same as the Owner/GC conversion). pcContactBlock is defined
         // later in this render, so the host markup is inlined here verbatim to match it.
-        var pfTeamBody = contactCardGrid(pfCards, 'PF Team Member')
-          + subhead('PF Project Team')
+        // HORIZONTAL VIEW (Brad 2026-08-11 followup): the PF Project Team renders as
+        // the same horizontal table every other group uses. Company = Pier Foundations.
+        // The legacy .pr-ccards grid is kept (hidden) so the editor + Add-contact work.
+        var pfTeamBody = horizContactBlock({
+            roleTag: 'PF Project Team',
+            company: 'Pier Foundations',
+            meta: [],
+            contacts: pfHoriz,
+            hiddenFields: contactCardGrid(pfCards, 'PF Team Member')
+          })
           + '<div class="pr-crm-cards" data-crm-cards="PF Project Team" data-crm-cards-key="pfTeam" data-role-tag="PF Project Team"></div>';
         _curSection = _prevPf;
         var pfTeamMeta = (g.pf_team ? g.pf_team.length + ' synced' : null);
