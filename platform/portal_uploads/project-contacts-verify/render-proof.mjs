@@ -432,8 +432,11 @@ await (async function(){
   const body = pfCard.querySelector('.pr-card-body');
   // Legacy role value surfaces (seeded into the "Project Manager - Contact Name" row).
   ok('K legacy role override surfaces', /Legacy PM Person/.test(body.textContent));
-  // Added custom field surfaces (via _surfaceExtras).
-  ok('K legacy extra field surfaces', /keep me/.test(body.textContent));
+  // Brad 2026-08-11: the "Additional Team Members / Fields" _surfaceExtras subsection
+  // was DELETED per his request. A manually-added pfTeam override ('Extra Custom Field')
+  // is NO LONGER surfaced (the catch-all subsection is gone). KV data is untouched — it
+  // just no longer renders/re-saves. Assert it is absent now.
+  ok('K removed subsection: extra field no longer surfaces', !/keep me/.test(body.textContent));
   // The cascading selection also renders (coexists, not replaced).
   await new Promise(r=>setTimeout(r,60));
   ok('K cascading selection coexists', /Brad Reinking/.test(body.textContent));
@@ -448,8 +451,11 @@ await (async function(){
   ok('K PF Team save POSTed pfTeam', !!pp);
   ok('K save preserves legacy role field',
     pp && pp.fields['Project Manager - Contact Name'] === 'Legacy PM Person');
-  ok('K save preserves legacy extra field',
-    pp && pp.fields['Extra Custom Field'] === 'keep me');
+  // The removed subsection no longer renders 'Extra Custom Field', so the editor's
+  // save-scan (.pr-field[data-pr-label]) does NOT re-POST it. Remaining fields still
+  // save correctly — this proves the editor round-trip is intact for the real rows.
+  ok('K removed subsection: extra field not re-POSTed (no render, no re-save)',
+    pp && pp.fields['Extra Custom Field'] === undefined);
   ok('K save sends __crm with selected contact',
     pp && pp.fields.__crm && pp.fields.__crm['PF Project Team'] &&
     pp.fields.__crm['PF Project Team'].contactIds.indexOf('C0012') !== -1);
