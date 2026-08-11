@@ -61,12 +61,23 @@ const MAX_TOTAL_SECTIONS = 40;      // > the 11 cards, room to grow; bounds abus
 //     "<Section>": { company: "<name>", contactIds: ["C0005", ...] }, ...
 //   }
 // Every OTHER key in every section stays a plain string (the existing overlay).
-// __crm is the SOLE exception, allowed ONLY under design_professionals, and is
-// STRICTLY validated (below) so the store can never be corrupted by a crafted
+// __crm is the SOLE exception, allowed under design_professionals AND general (the
+// General Info card's Owner + General Contractor selectors — Brad 2026-08-11), and
+// is STRICTLY validated (below) so the store can never be corrupted by a crafted
 // object. It survives a normal per-field section save because the section merge
-// (Object.assign(existing, fields)) preserves any key the editor omits.
+// (Object.assign(existing, fields)) preserves any key the editor omits. Under
+// `general` the __crm object coexists with the flat Owner/GC string fields; the two
+// firm keys used there are "Owner" and "GC".
 const CRM_KEY = '__crm';
-const CRM_ALLOWED_SECTION = 'design_professionals';
+// __crm is allowed under these section keys ONLY. design_professionals hosts the
+// engineering firm selectors (Ground Improvement / Geotechnical / Civil / Structural
+// / GC engineering entry); general hosts the project OWNER and General Contractor
+// selectors (Brad 2026-08-11: "same way you made companies/contacts populate, do the
+// same with project owners and general contractors"). Both persist the identical
+// { "<Section>": { company, contactIds[] } } shape validated by cleanCrm below; the
+// Owner/GC selection lives beside the flat Owner/GC string fields under `general`
+// (Object.assign merge preserves both). Any OTHER section rejects a __crm body (400).
+const CRM_ALLOWED_SECTIONS = { design_professionals: 1, general: 1 };
 const CRM_MAX_FIRMS = 12;            // >5 real firm sections, bounds abuse
 const CRM_MAX_IDS = 40;              // contacts per firm on one project (generous)
 const CRM_MAX_COMPANY = 200;         // a company name length cap
@@ -253,8 +264,8 @@ export async function onRequestPost(context) {
     const hasCrmInBody = Object.prototype.hasOwnProperty.call(rawFieldsObj, CRM_KEY);
     let crmUpdate; // undefined => untouched
     if (hasCrmInBody) {
-      if (section !== CRM_ALLOWED_SECTION) {
-        return json({ status: 'error', message: 'CRM selection is only valid on Design Professionals.' }, 400);
+      if (!CRM_ALLOWED_SECTIONS[section]) {
+        return json({ status: 'error', message: 'CRM selection is only valid on Design Professionals or General Info.' }, 400);
       }
       crmUpdate = cleanCrm(rawFieldsObj[CRM_KEY]);
       if (crmUpdate === null) {

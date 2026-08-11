@@ -39,6 +39,7 @@ function makeDom(role){
   // Page globals defined in OTHER script blocks that the record IIFE calls out to.
   w.pfFmtPhone = (v)=> String(v==null?'':v);
   w.pfFmtDate = (v)=> String(v==null?'':v);
+  w.pfFmtQty = (v)=> String(v==null?'':v); // added: global introduced post-harness (commit 0a97417)
   w.PF_PROJECT_POET = null;
   // Synthetic record WITH an engineering contact so the Ground Improvement firm block seeds.
   w.PF_PROJECT_RECORDS = { records: {

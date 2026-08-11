@@ -12503,11 +12503,26 @@ try {
       'Structural': 'Structural Engineer',
       'GC': 'GC'
     };
-    // Read the current project's __crm map (design_professionals only). Always an
-    // object; {} when absent/malformed so callers never crash on a legacy project.
-    function pfCrmMap(){
-      var dp = _curOverrides && _curOverrides['design_professionals'];
-      var crm = dp && dp[PF_CRM_KEY];
+    // General Info CRM selectors (Brad 2026-08-11): the PROJECT OWNER and the GENERAL
+    // CONTRACTOR, each a company dropdown FILTERED BY Category + multi-select contacts,
+    // add-on-the-fly. These are SEPARATE from the Design Professionals card's
+    // engineering-GC firm entry (that is why Brad names GC again). They persist under
+    // the 'general' override key's __crm map. Section name -> master-list Category
+    // (col F) EXACTLY as stored ("Owner" / "GC" per migration-preview.json), so the
+    // /api/contacts?trade= filter returns only that category's companies.
+    var PF_CRM_GENERAL_TRADE = {
+      'Owner': 'Owner',
+      'GC': 'GC'
+    };
+    // Read the current project's __crm map for a section key. Always an object; {}
+    // when absent/malformed so callers never crash on a legacy project. Defaults to
+    // design_professionals so existing DP callers are unchanged; the Owner/GC
+    // selectors live under 'general' and pass that key. Both sections store the same
+    // { "<Section>": { company, contactIds[] } } shape.
+    function pfCrmMap(sectionKey){
+      var sk = sectionKey || 'design_professionals';
+      var sec = _curOverrides && _curOverrides[sk];
+      var crm = sec && sec[PF_CRM_KEY];
       return (crm && typeof crm === 'object' && !Array.isArray(crm)) ? crm : {};
     }
 
@@ -14036,7 +14051,12 @@ try {
               fieldLinked('GC Project Engineer - Cell Phone', _gcPE.cell || '', 'Contacts', 'phone'),
               fieldLinked('GC Project Engineer - Email', _gcPE.email || '', 'Contacts', 'email')
             ])
-          ])
+          ]),
+          // CRM cards host (Brad 2026-08-11): resolved general.__crm['GC'].contactIds
+          // render here as live directory cards, populated async post-render by
+          // pfCrmRenderCards (data-crm-cards-key='general'). SEPARATE from the Design
+          // Professionals card's engineering-GC firm entry. Empty with no selection.
+          '<div class="pr-crm-cards" data-crm-cards="GC" data-crm-cards-key="general"></div>'
         ]), false, 'general');
 
       // ----- (PF Team merged into General Info) -----
@@ -15266,6 +15286,13 @@ try {
             fieldLinked('Owner Contact ' + _n + ' - Email', _oc.email || '', _oc.email ? 'Contacts' : '', 'email')
           ]));
         }
+        // CRM cards host (Brad 2026-08-11): resolved general.__crm['Owner'].contactIds
+        // render here as live directory cards, populated async post-render by
+        // pfCrmRenderCards. data-crm-cards-key='general' tells the renderer which
+        // override key holds the selection. Empty for a project with no Owner selection
+        // (renders exactly as before). Sits beside the legacy flat Owner Contact cards
+        // (left as-is per Brad's DP directive; selector model is used going forward).
+        var ownerCrmHost = '<div class="pr-crm-cards" data-crm-cards="Owner" data-crm-cards-key="general"></div>';
         // LEFT = owner company block; RIGHT = Owner Contact cards. The card grid
         // (not the twoCol column) carries the "Owner Contact" group token so
         // pfEditSection discovers it exactly once.
@@ -15273,7 +15300,7 @@ try {
           subhead('Owner Info')
           + twoCol(
               ownerRows,
-              [subhead('Owner Contacts'), contactCardGrid(ownerCards, 'Owner Contact')]));
+              [subhead('Owner Contacts'), contactCardGrid(ownerCards, 'Owner Contact'), ownerCrmHost]));
       }
 
       // (4) Design Professionals — CONTACTS import inside General Info. Brad
@@ -15594,6 +15621,11 @@ try {
       // CRM: resolve any __crm[firm].contactIds into live cards under each firm block
       // (async, fail-soft). No selection -> hosts stay empty (renders as before).
       pfCrmRenderCards(root.querySelector('.pr-card[data-pr-section="design_professionals"] .pr-card-body') || root);
+      // CRM (General Info): resolve general.__crm['Owner'/'GC'].contactIds into live
+      // directory cards under the Owner Info + GC Info subsections (async, fail-soft).
+      // Scoped to the general card body; the host data-crm-cards-key='general' selects
+      // the right override map. No selection -> hosts stay empty (renders as before).
+      pfCrmRenderCards(root.querySelector('.pr-card[data-pr-section="general"] .pr-card-body') || root);
 
       // --- QA/QC nested card injected into Engineering & Design (Brad 2026-08-07,
       // batch-12) --- The former standalone QA/QC section now lives as a NESTED editable
@@ -16500,10 +16532,14 @@ try {
         + '<input class="pr-edit-newvalue" type="text" placeholder="Value">'
         + '</div>';
 
-      // CRM cascading selector (Design Professionals ONLY): one trade-filtered
-      // company + multi-select contact picker per firm section (GI/Geo/Civil/
-      // Structural/GC). Rendered ABOVE the free-text firm fields; its selection is
-      // saved into the reserved __crm override on Save. Other sections: none.
+      // CRM cascading selector. Design Professionals: one trade-filtered company +
+      // multi-select contact picker per engineering firm (GI/Geo/Civil/Structural/GC),
+      // saved under the design_professionals __crm key. General Info: the project
+      // OWNER + the GENERAL CONTRACTOR (Brad 2026-08-11), Category-filtered ("Owner" /
+      // "GC"), saved under the general __crm key (crmKey='general' threaded through so
+      // the block reads/writes the right map; the General-Info GC is SEPARATE from the
+      // DP engineering-GC entry). Rendered ABOVE the free-text fields. Other sections:
+      // none.
       var crmBlocks = '';
       if (section === 'design_professionals') {
         crmBlocks = '<div class="pr-crm-wrap"><div class="pr-edit-note">'
@@ -16512,6 +16548,16 @@ try {
           + '</div>'
           + Object.keys(PF_CRM_SECTION_TRADE).map(function(sn){
               return pfCrmSelectorBlock(sn, PF_CRM_SECTION_TRADE[sn]);
+            }).join('')
+          + '</div>';
+      } else if (section === 'general') {
+        crmBlocks = '<div class="pr-crm-wrap"><div class="pr-edit-note">'
+          + 'Select the project Owner &amp; General Contractor (and their contacts) from the master directory. '
+          + 'Checked contacts render as cards under Owner Info / GC Info. '
+          + 'Use &ldquo;+ Add company / contact&rdquo; to grow the directory.'
+          + '</div>'
+          + Object.keys(PF_CRM_GENERAL_TRADE).map(function(sn){
+              return pfCrmSelectorBlock(sn, PF_CRM_GENERAL_TRADE[sn], 'general');
             }).join('')
           + '</div>';
       }
@@ -16636,11 +16682,12 @@ try {
     // save reader can harvest the chosen company + checked ids. Seeded from the
     // current __crm[sectionName] selection. Returns an HTML string (empty controls;
     // the async company/contact lists are populated by pfCrmHydrate after insert).
-    function pfCrmSelectorBlock(sectionName, trade){
-      var cur = pfCrmMap()[sectionName] || {};
+    function pfCrmSelectorBlock(sectionName, trade, crmKey){
+      var key = crmKey || 'design_professionals';
+      var cur = pfCrmMap(key)[sectionName] || {};
       var selCompany = cur.company || '';
       return ''
-        + '<div class="pr-crm" data-crm-section="' + esc2(sectionName) + '" data-crm-trade="' + esc2(trade) + '">'
+        + '<div class="pr-crm" data-crm-section="' + esc2(sectionName) + '" data-crm-trade="' + esc2(trade) + '" data-crm-key="' + esc2(key) + '">'
         +   '<div class="pr-crm-head">' + esc2(sectionName) + ' &mdash; select from directory</div>'
         +   '<div class="pr-crm-row">'
         +     '<select class="pr-crm-company" data-crm-selected="' + esc2(selCompany) + '">'
@@ -16693,11 +16740,12 @@ try {
     function pfCrmLoadContacts(block, company){
       var trade = block.getAttribute('data-crm-trade') || '';
       var sectionName = block.getAttribute('data-crm-section') || '';
+      var crmKey = block.getAttribute('data-crm-key') || 'design_professionals';
       var host = block.querySelector('[data-crm-contacts]');
       if (!host) return;
       if (!company) { host.innerHTML = '<div class="pr-crm-hint">Pick a company to choose its contacts.</div>'; return; }
       host.innerHTML = '<div class="pr-crm-hint">Loading contacts&hellip;</div>';
-      var cur = pfCrmMap()[sectionName] || {};
+      var cur = pfCrmMap(crmKey)[sectionName] || {};
       var chosen = {};
       (cur.company === company && Array.isArray(cur.contactIds) ? cur.contactIds : []).forEach(function(id){ chosen[String(id).toUpperCase()] = 1; });
       pfCrmFetchContacts(company, trade).then(function(list){
@@ -16846,14 +16894,19 @@ try {
     // Idempotent: re-running replaces host contents. Only touches [data-crm-cards].
     function pfCrmRenderCards(root){
       if (!root) root = document;
-      var crm = pfCrmMap();
+      // Each host declares which override key its selection lives under via
+      // data-crm-cards-key (default design_professionals). Owner/GC hosts pass
+      // 'general'. Resolve the map lazily per host so ONE call handles both the DP
+      // firm hosts and the General Info Owner/GC hosts.
+      var _mapCache = {};
+      var mapFor = function(k){ var kk = k || 'design_professionals'; if (!_mapCache[kk]) _mapCache[kk] = pfCrmMap(kk); return _mapCache[kk]; };
       var hosts = root.querySelectorAll ? root.querySelectorAll('.pr-crm-cards[data-crm-cards]') : [];
       if (!hosts.length) return;
       // Any firm actually has a selection? If not, skip the directory fetch entirely.
       var anySel = false;
       hosts.forEach(function(h){
         var pfx = h.getAttribute('data-crm-cards') || '';
-        var e = crm[pfx];
+        var e = mapFor(h.getAttribute('data-crm-cards-key'))[pfx];
         if (e && Array.isArray(e.contactIds) && e.contactIds.length) anySel = true;
       });
       if (!anySel) return;
@@ -16862,7 +16915,7 @@ try {
         (list || []).forEach(function(c){ if (c && c.contactId) byId[String(c.contactId).toUpperCase()] = c; });
         hosts.forEach(function(host){
           var pfx = host.getAttribute('data-crm-cards') || '';
-          var e = crm[pfx];
+          var e = mapFor(host.getAttribute('data-crm-cards-key'))[pfx];
           if (!e || !Array.isArray(e.contactIds) || !e.contactIds.length) { host.innerHTML = ''; return; }
           var cards = e.contactIds.map(function(id){
             var c = byId[String(id).toUpperCase()];
@@ -17222,12 +17275,14 @@ try {
         fields[nl.value.trim()] = nv ? nv.value : '';
       }
 
-      // CRM cascading selection (Design Professionals only): attach the reserved
-      // __crm structured key so the picked company + checked contactIds persist with
-      // this save. The backend validates it (id shape, caps) and merges it as ONE
-      // object under design_professionals; every other field stays a string. Only
-      // sent for the DP section, and only when the editor actually has CRM blocks.
-      if (section === 'design_professionals') {
+      // CRM cascading selection: attach the reserved __crm structured key so the
+      // picked company + checked contactIds persist with this save. The backend
+      // validates it (id shape, caps) and merges it as ONE object under the section;
+      // every other field stays a string. Sent for the DP section (engineering firms)
+      // and the General section (Owner + GC — Brad 2026-08-11), and only when the
+      // editor actually has CRM blocks. pfCollectCrm harvests whatever .pr-crm blocks
+      // this editor rendered (DP firms OR Owner/GC), so the same collector serves both.
+      if (section === 'design_professionals' || section === 'general') {
         var crm = pfCollectCrm(editor);
         // Send even an empty {} so a full clear round-trips; backend cleanCrm accepts it.
         fields[PF_CRM_KEY] = crm;
