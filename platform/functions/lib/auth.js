@@ -550,6 +550,14 @@ export function areaForPath(pathname) {
     // classified 'financials'). Without this line it would fall through to the
     // default 'user_admin' (admin-only) and the office (partner/BD) could not edit.
     if (pathname.startsWith('/api/project-override')) return 'financials';
+    // Project lifecycle STATUS overrides for the office summary drag-and-drop
+    // (Active -> Completed / Dead, and back). PROJECT-level financials area:
+    // admin + partner + business_dev (the office); field_ops BLOCKED by direct
+    // URL too. The handler ALSO calls requireArea(session, 'financials') on
+    // GET + POST. Same overlay-on-synced-data pattern as /api/project-override.
+    // Without this line it would fall through to the default 'user_admin'
+    // (admin-only) and the office (partner/BD) could not read or move projects.
+    if (pathname.startsWith('/api/project-status')) return 'financials';
     // Per-project Budget vs Actual budgets (Financials Phase 1): the office
     // hand-enters a per-cost-code BUDGET for a project; stored in KV, merged on
     // top of the ZEROED standard cost-code template at render. PROJECT-level

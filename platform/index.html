@@ -742,6 +742,8 @@ body.role-field-ops .nav-sub[data-fo-hide] {
 #completedRoot .pf-table td { text-align: center; vertical-align: middle; }
 #completedRoot .pf-table th.yearcol,
 #completedRoot .pf-table td.yearcol { white-space: nowrap; }
+#deadRoot .pf-table th.yearcol,
+#deadRoot .pf-table td.yearcol { white-space: nowrap; }
 .pf-pill {
   display: inline-block; padding: 2px 9px; border-radius: 20px;
   font-size: 0.72rem; font-weight: 600; background: var(--accent-light);
@@ -814,6 +816,90 @@ body.role-field-ops .nav-sub[data-fo-hide] {
   background: #FFF4E0; color: #9A6700; border-radius: 9px;
   font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em;
   text-transform: uppercase; vertical-align: middle;
+}
+/* ============================================================
+   PROJECT LIFECYCLE DRAG-AND-DROP (office summary page)
+   Active -> Completed / Dead, and back. Office (admin/partner/
+   business_dev) ONLY. The whole apparatus lives inside
+   #pfLifecycleBar / draggable rows / the modal, all injected by
+   the PROJECT LIFECYCLE MOVE script and only when window.PF_ME
+   is an office role. ============================================ */
+.pf-move-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+  margin: 0 0 16px; padding: 12px 14px;
+  background: var(--bg-1); border: 1px solid var(--border-light);
+  border-radius: 10px;
+}
+.pf-move-bar .pf-move-hint {
+  font-size: 0.8rem; color: var(--text-2); font-weight: 600; margin-right: 4px;
+}
+.pf-dropzone {
+  flex: 1 1 200px; min-height: 46px; display: flex; align-items: center;
+  justify-content: center; gap: 8px; padding: 10px 14px;
+  border: 2px dashed var(--border); border-radius: 10px;
+  font-size: 0.86rem; font-weight: 700; color: var(--text-2);
+  background: var(--bg-2); text-align: center; transition: all 0.12s ease;
+  user-select: none;
+}
+.pf-dropzone.completed { border-color: #6FBF87; color: #1E7A38; }
+.pf-dropzone.dead      { border-color: #E19A9A; color: #A12626; }
+.pf-dropzone.active    { border-color: #7FB4DB; color: var(--accent-dark); }
+.pf-dropzone.dragover {
+  background: var(--accent-light); border-style: solid; transform: translateY(-1px);
+}
+.pf-dropzone.completed.dragover { background: #E6F4EA; }
+.pf-dropzone.dead.dragover      { background: #FBEAEA; }
+tr.pf-draggable { cursor: grab; }
+tr.pf-draggable:active { cursor: grabbing; }
+tr.pf-dragging { opacity: 0.45; }
+.pf-move-handle {
+  color: var(--text-3); cursor: grab; user-select: none;
+  font-size: 0.9rem; letter-spacing: 1px;
+}
+/* Undo / move-back inline control on Completed & Dead rows */
+.pf-move-back {
+  display: inline-block; margin-left: 8px; padding: 2px 9px;
+  border: 1px solid var(--border); border-radius: 7px; cursor: pointer;
+  font-size: 0.72rem; font-weight: 600; background: var(--bg-1);
+  color: var(--text-2); white-space: nowrap;
+}
+.pf-move-back:hover { border-color: var(--accent); color: var(--accent); }
+/* Modal for capturing the completion / died date */
+.pf-move-modal-overlay {
+  position: fixed; inset: 0; z-index: 4000;
+  background: rgba(0,0,0,0.42); display: flex; align-items: center;
+  justify-content: center; padding: 20px;
+}
+.pf-move-modal {
+  background: #fff; border-radius: 14px; padding: 22px 24px;
+  width: 100%; max-width: 380px; box-shadow: 0 18px 50px rgba(0,0,0,0.25);
+}
+.pf-move-modal h3 { margin: 0 0 4px; font-size: 1.05rem; color: var(--text-0); }
+.pf-move-modal .pf-move-sub { margin: 0 0 16px; font-size: 0.84rem; color: var(--text-2); }
+.pf-move-modal label {
+  display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-1);
+  margin-bottom: 6px;
+}
+.pf-move-modal input[type="date"] {
+  width: 100%; padding: 9px 11px; font-size: 0.9rem;
+  border: 1px solid var(--border); border-radius: 8px; box-sizing: border-box;
+  color: var(--text-1);
+}
+.pf-move-modal .pf-move-actions {
+  display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;
+}
+.pf-move-btn {
+  padding: 8px 18px; border-radius: 8px; font-size: 0.86rem; font-weight: 600;
+  cursor: pointer; border: 1px solid var(--border); background: var(--bg-1);
+  color: var(--text-1);
+}
+.pf-move-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.pf-move-btn.primary:hover { background: var(--accent-dark); }
+.pf-move-btn:disabled { opacity: 0.5; cursor: default; }
+.pf-move-err { color: #A12626; font-size: 0.8rem; margin-top: 10px; min-height: 1em; }
+/* Touch devices can't HTML5-drag; the per-row move buttons remain the path. */
+@media (hover: none) and (pointer: coarse) {
+  .pf-move-bar .pf-move-hint::after { content: ' (use the Move buttons below)'; }
 }
 .pf-resolve-meta { color: var(--text-3); font-size: 0.72rem; font-style: italic; }
 /* Manual-bid intake (Actively Pricing): "Manual" row tag + inline Remove control,
@@ -18756,7 +18842,16 @@ try {
           + '<code>data/awarded-projects.js</code>.</p></div>';
         return;
       }
-      var list = D.projects.slice();
+      // LIFECYCLE OVERLAY: a project the office has moved to Completed or Dead
+      // (via the summary-page drag-and-drop, persisted in /api/project-status,
+      // mirrored to window.PF_PROJECT_STATUS) LEAVES the Active list. The move
+      // is a real status change: the project reappears under Completed/Dead and
+      // does NOT show here until it is moved back to Active (override cleared).
+      var LC = window.PF_PROJECT_STATUS || {};
+      var list = D.projects.slice().filter(function(p){
+        var st = LC[String(p.number || '')];
+        return !(st && (st.status === 'completed' || st.status === 'dead'));
+      });
       // Sort by ANTICIPATED START DATE ascending (soonest at top). Compare on the
       // raw SCHEDULE_SEED YYYY-MM-DD value (startSeedFor), which string-sorts
       // chronologically. Undated projects ('') sink to the BOTTOM, after all
@@ -18786,13 +18881,24 @@ try {
         + ' &middot; ' + E(D.generated || '') + ' &middot; ' + list.length + ' awarded</div>'
         + '</div>';
 
+      // OFFICE-ONLY drag-and-drop move bar (Active -> Completed / Dead). Injected
+      // by window.PF_LC.moveBarHtml() only for office roles; returns '' for
+      // field_ops (belt-and-suspenders on top of the server 403 + feed gating).
+      if (window.PF_LC && typeof window.PF_LC.moveBarHtml === 'function') {
+        html += window.PF_LC.moveBarHtml();
+      }
+
+      // Are rows draggable? Office roles only (window.PF_LC set); each row also
+      // carries data-num so the drag payload + touch move-buttons key off it.
+      var canMove = !!(window.PF_LC && window.PF_LC.canMove);
+
       html += '<div class="pf-table-wrap"><table class="pf-table"><thead><tr>'
+        + (canMove ? '<th aria-label="Drag handle"></th>' : '')
         + '<th>#</th>'
         + '<th>PF Project #</th><th>Project Name</th><th>PF Scope</th><th>Project Location</th>'
         + '<th>General Contractor</th><th>Contract Value</th>'
         + '<th>Total LF</th><th># of Piers</th><th class="startcol">Anticipated Start Date</th>'
         + '</tr></thead><tbody>';
-
       list.forEach(function(p, i){
         var isHp = /helical/i.test(p.discipline || '');
         var pill = '<span class="pf-pill' + (isHp ? ' hp' : '') + '">' + E(p.discipline || '') + '</span>';
@@ -18815,7 +18921,15 @@ try {
         var totalLf = totalLfFor(num);
         var piers   = piersFor(num);
         var startDt = startDateFor(num);
-        html += '<tr>'
+        // Office rows are draggable (HTML5 DnD) AND carry per-row Move buttons for
+        // touch devices. num is digits/hyphen-only by construction; safe in attrs.
+        var dragAttrs = (canMove && num)
+          ? ' class="pf-draggable" draggable="true" data-num="' + E(num) + '"' : '';
+        var handleCell = canMove
+          ? '<td class="pf-move-handle" title="Drag to Completed or Dead">' + (num ? '&#8942;&#8942;' : '') + '</td>'
+          : '';
+        html += '<tr' + dragAttrs + '>'
+          + handleCell
           + '<td class="num">' + (i + 1) + '</td>'  // positional row counter (index+1 of sorted list); auto-renumbers on re-sort/add/remove, never stored
           + numberCell
           + nameCell
@@ -18833,7 +18947,11 @@ try {
       html += '<div class="pf-index-foot">Awarded projects flow into Project Management. '
         + 'As each project record is built it becomes openable here.</div>';
       root.innerHTML = html;
+      // Wire drag sources + the drop zones after the DOM is in place (office only).
+      if (window.PF_LC && typeof window.PF_LC.wireActive === 'function') window.PF_LC.wireActive(root);
     }
+    // Exposed so the lifecycle-move orchestrator can re-render Active after a move.
+    window.pfRenderActive = render;
     document.addEventListener('DOMContentLoaded', render);
     if (document.readyState !== 'loading') render();
   } catch(e) {
@@ -18915,17 +19033,57 @@ try {
       return out;
     }
 
+    // Build normalized "completed" rows for projects the office DRAGGED from
+    // Active into Completed (persisted in /api/project-status). Source fields come
+    // from window.PF_AWARDED (the Active list); the completion date is the captured
+    // date, and `year` is derived from it for the year-tab grouping. `moved:true`
+    // marks these so we can render a move-back (undo) control on them.
+    function movedCompletedRows(){
+      var out = [];
+      var LC = window.PF_PROJECT_STATUS || {};
+      var A = (window.PF_AWARDED && window.PF_AWARDED.projects) ? window.PF_AWARDED.projects : [];
+      var byNum = {};
+      A.forEach(function(p){ if (p && p.number != null) byNum[String(p.number)] = p; });
+      Object.keys(LC).forEach(function(num){
+        var st = LC[num];
+        if (!st || st.status !== 'completed') return;
+        var src = byNum[num] || {};
+        var yr = (typeof st.date === 'string' && /^(\d{4})-/.test(st.date)) ? st.date.slice(0,4) : '';
+        out.push({
+          projectNo: num,
+          name: src.name || '',
+          gc: src.gc || '',
+          cityState: src.city_state || '',
+          buildingType: src.discipline || '',
+          year: yr,
+          commercial: { completedDate: st.date || '' },
+          actualProduction: null,
+          moved: true
+        });
+      });
+      return out;
+    }
+
     function render(){
       var root = document.getElementById('completedRoot');
       if (!root) return;
       var D = window.PF_PROJECT_HISTORY;
-      if (!D || !D.projects) {
+      var moved = movedCompletedRows();
+      // If neither the synced history NOR any moved project is present, show the
+      // honest placeholder. Otherwise render whatever we have (history may be
+      // absent for a role that still has moved-completed overrides + PF_AWARDED).
+      if ((!D || !D.projects) && !moved.length) {
         root.innerHTML = '<div class="pf-placeholder"><div class="pf-placeholder-icon">&#9635;</div>'
           + '<h2>Completed Projects</h2><p>History data not loaded. Ensure '
           + '<code>data/project-history.js</code> is present.</p></div>';
         return;
       }
-      var all = D.projects.slice();
+      var base = (D && D.projects) ? D.projects.slice() : [];
+      // Moved projects win: if a number exists in BOTH the synced history and the
+      // moved set, keep the moved override (dedupe by projectNo).
+      var movedNums = {};
+      moved.forEach(function(m){ movedNums[String(m.projectNo)] = 1; });
+      var all = base.filter(function(p){ return !movedNums[String(p.projectNo || '')]; }).concat(moved);
       // Sort by completion date DESCENDING (most recent first); undated sink to
       // the bottom; ties broken by project number for stable ordering.
       all.sort(function(a,b){
@@ -18949,16 +19107,16 @@ try {
         ? all
         : all.filter(function(p){ return String(p.year || '') === CUR_YEAR; });
 
-      var srcLink = D.source_url
+      var srcLink = (D && D.source_url)
         ? '<a href="' + E(D.source_url) + '" target="_blank" rel="noopener noreferrer">Completed Projects</a>'
-        : E(D.source || 'Project History');
+        : E((D && D.source) || 'Project History');
 
       var html = '<div class="pf-index-head">'
         + '<h2>Completed Projects</h2>'
         + '<p class="pf-index-sub">Projects Pier Foundations has finished installing. '
         + 'Filter by completion year; open a built record where available.</p>'
         + '<div class="pf-index-meta">Source: ' + srcLink
-        + ' &middot; ' + E(D.generated || '') + ' &middot; ' + list.length
+        + ' &middot; ' + E((D && D.generated) || '') + ' &middot; ' + list.length
         + (CUR_YEAR === 'all' ? ' completed' : ' completed in ' + E(CUR_YEAR)) + '</div>'
         + '</div>';
 
@@ -18982,10 +19140,15 @@ try {
         return;
       }
 
+      // Office roles get a trailing Actions column to reverse/relocate a MOVED
+      // project (undo). Synced-history rows have no action (they aren't overrides).
+      var canMove = !!(window.PF_LC && window.PF_LC.canMove);
+
       html += '<div class="pf-table-wrap"><table class="pf-table"><thead><tr>'
         + '<th>PF Project #</th><th>Project Name</th><th>Project Location</th>'
         + '<th>General Contractor</th><th>Building Type</th>'
         + '<th>Actual LF</th><th class="yearcol">Completed</th>'
+        + (canMove ? '<th>Actions</th>' : '')
         + '</tr></thead><tbody>';
 
       list.forEach(function(p){
@@ -19007,6 +19170,20 @@ try {
         var cd = completedDateOf(p);
         var completedDisp = cd ? E(fmtDate(cd)) : (p.year ? E(String(p.year)) : DASH);
 
+        // Undo/relocate controls appear ONLY on projects moved here via drag
+        // (p.moved), and ONLY for office roles. num is digits/hyphen by construction.
+        var actionCell = '';
+        if (canMove) {
+          if (p.moved && num) {
+            actionCell = '<td>'
+              + '<button class="pf-move-back" onclick="window.PF_LC.moveBack(\'' + E(num) + '\')">Back to Active</button>'
+              + '<button class="pf-move-back" onclick="window.PF_LC.openModal(\'' + E(num) + '\',\'dead\')">Mark Dead</button>'
+              + '</td>';
+          } else {
+            actionCell = '<td></td>';
+          }
+        }
+
         html += '<tr>'
           + numberCell
           + nameCell
@@ -19015,6 +19192,7 @@ try {
           + '<td>' + (p.buildingType ? E(p.buildingType) : DASH) + '</td>'
           + '<td class="num">' + actualLfFor(p) + '</td>'
           + '<td class="yearcol">' + completedDisp + '</td>'
+          + actionCell
           + '</tr>';
       });
 
@@ -19029,6 +19207,8 @@ try {
       CUR_YEAR = String(y);
       render();
     };
+    // Exposed so the lifecycle-move orchestrator can re-render Completed after a move.
+    window.pfRenderCompleted = render;
 
     document.addEventListener('DOMContentLoaded', render);
     if (document.readyState !== 'loading') render();
@@ -19069,24 +19249,84 @@ try {
       if (window.PF_PROJECT_RECORDS && window.PF_PROJECT_RECORDS[num]) return true;
       return false;
     }
+    // Reformat ISO (YYYY-MM-DD) died date -> MM/DD/YYYY by string split (no TZ shift).
+    function fmtDate(s){
+      if (!s) return s;
+      var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s));
+      if (m) return m[2] + '/' + m[3] + '/' + m[1];
+      return s;
+    }
+    var CUR_YEAR = 'all';   // active year filter over MOVED (dated) dead projects.
+
+    // Normalized "dead" rows for projects the office DRAGGED from Active into Dead
+    // (persisted in /api/project-status). Source fields from window.PF_AWARDED; the
+    // died date is the captured date, `diedYear` derived for the year-tab grouping.
+    function movedDeadRows(){
+      var out = [];
+      var LC = window.PF_PROJECT_STATUS || {};
+      var A = (window.PF_AWARDED && window.PF_AWARDED.projects) ? window.PF_AWARDED.projects : [];
+      var byNum = {};
+      A.forEach(function(p){ if (p && p.number != null) byNum[String(p.number)] = p; });
+      Object.keys(LC).forEach(function(num){
+        var st = LC[num];
+        if (!st || st.status !== 'dead') return;
+        var src = byNum[num] || {};
+        var yr = (typeof st.date === 'string' && /^(\d{4})-/.test(st.date)) ? st.date.slice(0,4) : '';
+        out.push({
+          number: num,
+          name: src.name || '',
+          city_state: src.city_state || '',
+          gc_name: src.gc || '',
+          bid_value: src.value != null ? src.value : '',
+          bid_status: 'Dead',
+          diedDate: st.date || '',
+          diedYear: yr,
+          moved: true
+        });
+      });
+      return out;
+    }
+
     function render(){
       var root = document.getElementById('deadRoot');
       if (!root) return;
       var bids = (typeof LIVE_BIDS !== 'undefined' && Array.isArray(LIVE_BIDS)) ? LIVE_BIDS : [];
-      if (!bids.length) {
+      var bidDead = bids.filter(function(b){ return isDead(b.bid_status); });
+      var moved = movedDeadRows();
+      // Moved projects win over any same-numbered bid-log entry (dedupe).
+      var movedNums = {};
+      moved.forEach(function(m){ movedNums[String(m.number)] = 1; });
+      bidDead = bidDead.filter(function(b){ return !movedNums[String(b.number || '')]; });
+
+      var all = bidDead.concat(moved);
+      if (!all.length) {
         root.innerHTML = '<div class="pf-placeholder"><div class="pf-placeholder-icon">&#9760;</div>'
-          + '<h2>Dead Projects</h2><p>Bid log not loaded. This list populates from '
-          + 'lost/cancelled entries in the Project Bid Log.</p></div>';
+          + '<h2>Dead Projects</h2><p>No lost, cancelled, or dead projects yet. '
+          + 'This list populates from cancelled entries in the Project Bid Log and from '
+          + 'projects moved here from Active.</p></div>';
         return;
       }
-      var list = bids.filter(function(b){ return isDead(b.bid_status); });
-      if (!list.length) {
-        root.innerHTML = '<div class="pf-placeholder"><div class="pf-placeholder-icon">&#9760;</div>'
-          + '<h2>Dead Projects</h2><p>No lost or cancelled projects in the current Bid Log.</p></div>';
-        return;
-      }
-      // Sort: numbered first (ascending), then unnumbered by name.
+
+      // Year tabs are derived from the MOVED projects' died-year (bid-log dead rows
+      // have no date). "All" shows everything; a year shows moved rows from that
+      // year (bid-log dead rows appear only under "All", never fabricated a year).
+      var years = (function(){
+        var seen = {}, o = [];
+        moved.forEach(function(m){ if (m.diedYear && !seen[m.diedYear]) { seen[m.diedYear]=1; o.push(m.diedYear);} });
+        o.sort(); o.reverse(); return o;
+      })();
+      if (CUR_YEAR !== 'all' && years.indexOf(CUR_YEAR) === -1) CUR_YEAR = 'all';
+
+      var list = (CUR_YEAR === 'all')
+        ? all
+        : moved.filter(function(m){ return m.diedYear === CUR_YEAR; });
+
+      // Sort: dated (moved) rows by died date DESC first, then numbered, then name.
       list.sort(function(a,b){
+        var da = a.diedDate || '', db = b.diedDate || '';
+        if (da && db) { if (da > db) return -1; if (da < db) return 1; }
+        else if (da) return -1;
+        else if (db) return 1;
         var an = String(a.number || ''), bn = String(b.number || '');
         if (an && bn) return an.localeCompare(bn);
         if (an) return -1;
@@ -19094,17 +19334,33 @@ try {
         return String(a.name || '').localeCompare(String(b.name || ''));
       });
 
+      var canMove = !!(window.PF_LC && window.PF_LC.canMove);
+
       var html = '<div class="pf-index-head">'
         + '<h2>Dead Projects</h2>'
-        + '<p class="pf-index-sub">Projects marked <strong>Not Awarded</strong> or cancelled in the '
-        + 'Project Bid Log. Most never received a project number; where a built record exists, '
-        + 'the number and name are clickable.</p>'
-        + '<div class="pf-index-meta">' + list.length + ' dead / lost</div>'
+        + '<p class="pf-index-sub">Projects cancelled in the Project Bid Log, plus projects '
+        + 'moved here from Active. Where a built record exists, the number and name are clickable.</p>'
+        + '<div class="pf-index-meta">' + list.length
+        + (CUR_YEAR === 'all' ? ' dead' : ' died in ' + E(CUR_YEAR)) + '</div>'
         + '</div>';
+
+      // Year filter bar (only meaningful once at least one dated/moved dead project
+      // exists). Reuses .pf-type-btn styling for consistency with Completed.
+      if (years.length) {
+        html += '<div class="pf-type-filter" style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">'
+          + '<button class="pf-type-btn' + (CUR_YEAR === 'all' ? ' active' : '') + '" '
+          + 'onclick="pfDeadYearFilter(\'all\')">All</button>';
+        years.forEach(function(y){
+          html += '<button class="pf-type-btn' + (CUR_YEAR === y ? ' active' : '') + '" '
+            + 'onclick="pfDeadYearFilter(\'' + E(y) + '\')">' + E(y) + '</button>';
+        });
+        html += '</div>';
+      }
 
       html += '<div class="pf-table-wrap"><table class="pf-table"><thead><tr>'
         + '<th>#</th><th>Project</th><th>City / State</th><th>General Contractor</th>'
-        + '<th>Value</th><th>Status</th>'
+        + '<th>Value</th><th>Status</th><th class="yearcol">Died</th>'
+        + (canMove ? '<th>Actions</th>' : '')
         + '</tr></thead><tbody>';
 
       list.forEach(function(p){
@@ -19116,6 +19372,18 @@ try {
         var nameCell = openJs
           ? '<td><a class="pf-record-link" onclick="' + openJs + '">' + E(p.name) + '</a></td>'
           : '<td>' + E(p.name) + '</td>';
+        var diedDisp = p.diedDate ? E(fmtDate(p.diedDate)) : '—';
+        var actionCell = '';
+        if (canMove) {
+          if (p.moved && num) {
+            actionCell = '<td>'
+              + '<button class="pf-move-back" onclick="window.PF_LC.moveBack(\'' + E(num) + '\')">Back to Active</button>'
+              + '<button class="pf-move-back" onclick="window.PF_LC.openModal(\'' + E(num) + '\',\'completed\')">Mark Completed</button>'
+              + '</td>';
+          } else {
+            actionCell = '<td></td>';
+          }
+        }
         html += '<tr>'
           + numberCell
           + nameCell
@@ -19123,17 +19391,239 @@ try {
           + '<td>' + E(p.gc_name || '') + '</td>'
           + '<td class="num">' + E(money(p.bid_value)) + '</td>'
           + '<td>' + E(p.bid_status || '') + '</td>'
+          + '<td class="yearcol">' + diedDisp + '</td>'
+          + actionCell
           + '</tr>';
       });
 
       html += '</tbody></table></div>';
-      html += '<div class="pf-index-foot">Source: Project Bid Log (lost / cancelled bids).</div>';
+      html += '<div class="pf-index-foot">Source: Project Bid Log (cancelled bids) + projects moved from Active.</div>';
       root.innerHTML = html;
     }
+
+    window.pfDeadYearFilter = function(y){ CUR_YEAR = String(y); render(); };
+    // Exposed so the lifecycle-move orchestrator can re-render Dead after a move.
+    window.pfRenderDead = render;
     document.addEventListener('DOMContentLoaded', render);
     if (document.readyState !== 'loading') render();
   } catch(e) {
     console.error("Dead projects index failed to load:", e);
+  }
+})();
+</script>
+
+<!-- ============================================================ -->
+<!-- PROJECT LIFECYCLE MOVE (office summary drag-and-drop)          -->
+<!-- Active -> Completed / Dead, and back. OFFICE (admin/partner/    -->
+<!-- business_dev) ONLY. Persists to /api/project-status (KV,        -->
+<!-- financials-gated, field_ops server-DENIED). window.PF_LC is the -->
+<!-- orchestrator the three index renderers call for the move bar,   -->
+<!-- draggable-row wiring, the date-capture modal, commit + undo.    -->
+<!-- ALL data-derived strings rendered via window.esc.               -->
+<!-- ============================================================ -->
+<script>
+(function(){
+  var E = window.esc;
+  // Office roles ONLY (admin/partner/business_dev). field_ops never sees the move
+  // apparatus (and the server 403s /api/project-status for it regardless). This is
+  // the SAME tier that loads PF_AWARDED (the Active list we move FROM).
+  var role = (window.PF_ME && window.PF_ME.role) || 'field_ops';
+  var canMove = (role === 'admin' || role === 'partner' || role === 'business_dev');
+
+  // window.PF_PROJECT_STATUS is the client mirror of the KV status map; the
+  // renderers overlay it. Start empty (fail-safe: no moves shown) until loaded.
+  window.PF_PROJECT_STATUS = window.PF_PROJECT_STATUS || {};
+  var STATE_VERSION = null;  // meta.updated stamp for optimistic concurrency.
+
+  function rerenderAll(){
+    try { if (typeof window.pfRenderActive === 'function') window.pfRenderActive(); } catch(e){}
+    try { if (typeof window.pfRenderCompleted === 'function') window.pfRenderCompleted(); } catch(e){}
+    try { if (typeof window.pfRenderDead === 'function') window.pfRenderDead(); } catch(e){}
+  }
+
+  // Load the persisted status overrides (office only). Async: the renderers show
+  // the un-overlaid lists first, then re-render once this resolves. Fail-safe: on
+  // any error PF_PROJECT_STATUS stays as-is (no fabricated moves).
+  function loadState(){
+    if (!canMove) return;
+    try {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', '/api/project-status', true);
+      xhr.onreadystatechange = function(){
+        if (xhr.readyState !== 4) return;
+        if (xhr.status === 200) {
+          try {
+            var d = JSON.parse(xhr.responseText);
+            if (d && d.statuses && typeof d.statuses === 'object') {
+              window.PF_PROJECT_STATUS = d.statuses;
+              STATE_VERSION = (d.meta && d.meta.updated) || null;
+              rerenderAll();
+            }
+          } catch(e){ /* leave state empty on parse error */ }
+        }
+        // Non-200 (401/403/5xx): leave state empty (fail-safe, honest empty).
+      };
+      xhr.send(null);
+    } catch(e){ /* leave state empty */ }
+  }
+
+  // ---- Move bar (rendered at the top of the Active list) --------------------
+  function moveBarHtml(){
+    if (!canMove) return '';
+    return '<div class="pf-move-bar" id="pfMoveBar">'
+      + '<span class="pf-move-hint">Drag a project to move it:</span>'
+      + '<div class="pf-dropzone completed" data-target="completed" '
+      +   'ondragover="window.PF_LC._over(event,this)" ondragleave="window.PF_LC._leave(this)" '
+      +   'ondrop="window.PF_LC._drop(event,this)">&#10003; Completed Projects</div>'
+      + '<div class="pf-dropzone dead" data-target="dead" '
+      +   'ondragover="window.PF_LC._over(event,this)" ondragleave="window.PF_LC._leave(this)" '
+      +   'ondrop="window.PF_LC._drop(event,this)">&#9760; Dead Projects</div>'
+      + '</div>';
+  }
+
+  var DRAG_NUM = null;  // fallback carrier when dataTransfer is unavailable.
+
+  // ---- Drag source wiring (called after the Active table renders) -----------
+  function wireActive(root){
+    if (!canMove || !root) return;
+    var rows = root.querySelectorAll('tr.pf-draggable[data-num]');
+    rows.forEach(function(tr){
+      tr.addEventListener('dragstart', function(ev){
+        DRAG_NUM = tr.getAttribute('data-num');
+        try { ev.dataTransfer.setData('text/plain', DRAG_NUM); ev.dataTransfer.effectAllowed = 'move'; } catch(e){}
+        tr.classList.add('pf-dragging');
+      });
+      tr.addEventListener('dragend', function(){ tr.classList.remove('pf-dragging'); DRAG_NUM = null; });
+    });
+  }
+
+  function _over(ev, zone){ ev.preventDefault(); try { ev.dataTransfer.dropEffect = 'move'; } catch(e){} zone.classList.add('dragover'); }
+  function _leave(zone){ zone.classList.remove('dragover'); }
+  function _drop(ev, zone){
+    ev.preventDefault();
+    zone.classList.remove('dragover');
+    var num = '';
+    try { num = ev.dataTransfer.getData('text/plain'); } catch(e){}
+    if (!num) num = DRAG_NUM || '';
+    DRAG_NUM = null;
+    var target = zone.getAttribute('data-target'); // 'completed' | 'dead'
+    if (!num || (target !== 'completed' && target !== 'dead')) return;
+    openModal(num, target);
+  }
+
+  // ---- Date-capture modal ---------------------------------------------------
+  function todayIso(){
+    var d = new Date();
+    function p2(n){ return (n < 10 ? '0' : '') + n; }
+    return d.getFullYear() + '-' + p2(d.getMonth()+1) + '-' + p2(d.getDate());
+  }
+
+  function closeModal(){
+    var ov = document.getElementById('pfMoveModalOverlay');
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+  }
+
+  // num: project number; status: 'completed' | 'dead'.
+  function openModal(num, status){
+    if (!canMove) return;
+    if (status !== 'completed' && status !== 'dead') return;
+    num = String(num);
+    closeModal();
+    var isDead = (status === 'dead');
+    var title = isDead ? 'Move to Dead Projects' : 'Move to Completed Projects';
+    var label = isDead ? 'Date Project Died' : 'Date Project Completed';
+    var ov = document.createElement('div');
+    ov.className = 'pf-move-modal-overlay';
+    ov.id = 'pfMoveModalOverlay';
+    // Project number is digits/hyphen by construction; escape defensively anyway.
+    ov.innerHTML = '<div class="pf-move-modal" role="dialog" aria-modal="true">'
+      + '<h3>' + E(title) + '</h3>'
+      + '<p class="pf-move-sub">Project ' + E(num) + '</p>'
+      + '<label for="pfMoveDate">' + E(label) + '</label>'
+      + '<input type="date" id="pfMoveDate" value="' + E(todayIso()) + '" max="9999-12-31">'
+      + '<div class="pf-move-err" id="pfMoveErr"></div>'
+      + '<div class="pf-move-actions">'
+      +   '<button class="pf-move-btn" id="pfMoveCancel">Cancel</button>'
+      +   '<button class="pf-move-btn primary" id="pfMoveConfirm">Confirm</button>'
+      + '</div></div>';
+    document.body.appendChild(ov);
+    // Cancel = no change (close only). Clicking the backdrop also cancels.
+    document.getElementById('pfMoveCancel').addEventListener('click', closeModal);
+    ov.addEventListener('click', function(ev){ if (ev.target === ov) closeModal(); });
+    document.getElementById('pfMoveConfirm').addEventListener('click', function(){
+      var input = document.getElementById('pfMoveDate');
+      var date = input ? String(input.value || '') : '';
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        document.getElementById('pfMoveErr').textContent = 'Please choose a valid date.';
+        return;
+      }
+      commit(num, status, date, this);
+    });
+  }
+
+  // ---- Commit / undo (POST /api/project-status) -----------------------------
+  // status: 'completed' | 'dead' | 'active' (active = move back / clear).
+  function commit(num, status, date, btn){
+    if (!canMove) return;
+    var payload = { num: String(num), status: status, meta: { updated: STATE_VERSION } };
+    if (status !== 'active') payload.date = date;
+    if (btn) btn.disabled = true;
+    var errEl = document.getElementById('pfMoveErr');
+    try {
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/project-status', true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.onreadystatechange = function(){
+        if (xhr.readyState !== 4) return;
+        var ok = false, d = null;
+        try { d = JSON.parse(xhr.responseText); } catch(e){}
+        if (xhr.status === 200 && d && d.ok) {
+          // Server returns the FULL authoritative map -> adopt it (server truth).
+          window.PF_PROJECT_STATUS = (d.statuses && typeof d.statuses === 'object') ? d.statuses : window.PF_PROJECT_STATUS;
+          STATE_VERSION = (d.meta && d.meta.updated) || STATE_VERSION;
+          ok = true;
+        } else if (xhr.status === 409 && d && d.statuses) {
+          // Someone else changed it: adopt current server state + retry once with it.
+          window.PF_PROJECT_STATUS = d.statuses;
+          STATE_VERSION = d.currentVersion || STATE_VERSION;
+          if (errEl) errEl.textContent = 'Statuses changed elsewhere; please retry.';
+          if (btn) btn.disabled = false;
+          rerenderAll();
+          return;
+        }
+        if (ok) {
+          closeModal();
+          rerenderAll();
+        } else {
+          var msg = (d && d.message) ? d.message : ('Save failed (' + xhr.status + '). Not saved.');
+          if (errEl) errEl.textContent = msg; else alert(msg);
+          if (btn) btn.disabled = false;
+        }
+      };
+      xhr.send(JSON.stringify(payload));
+    } catch(e){
+      if (errEl) errEl.textContent = 'Save failed. Not saved.'; else alert('Save failed. Not saved.');
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  // Move a project BACK to Active (clear the override). Reversible/undo path.
+  function moveBack(num){ commit(String(num), 'active', null, null); }
+
+  window.PF_LC = {
+    canMove: canMove,
+    moveBarHtml: moveBarHtml,
+    wireActive: wireActive,
+    openModal: openModal,
+    moveBack: moveBack,
+    _over: _over, _leave: _leave, _drop: _drop
+  };
+
+  // Kick off the state load once the DOM is ready (renderers run first, then we
+  // overlay + re-render). Office roles only.
+  if (canMove) {
+    if (document.readyState !== 'loading') loadState();
+    else document.addEventListener('DOMContentLoaded', loadState);
   }
 })();
 </script>
