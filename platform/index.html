@@ -14274,9 +14274,83 @@ try {
       // self-contained CONTACT CARDS (RIGHT). The contact card grid carries the
       // firm's contact-group token so "Add contact" appends a numbered card;
       // company phone/website + each contact's phones/email are clickable.
+      // ----- ADDED-CONTACT GROUPING (Brad 2026-08-11) -------------------------
+      // BUG being fixed: a SECOND (added) contact for an existing firm — e.g. a 2nd
+      // Ground Improvement contact — was saved into the `design_professionals`
+      // override under labels like "<prefix> <N> - <field>" (see pfAddContact,
+      // label convention "<prefix> N - <field>"). firmBlock only rendered its ONE
+      // seeded contact, so the added contact's labels matched NO rendered field and
+      // _surfaceExtras('design_professionals', ...) dumped them in a trailing
+      // "Additional Design Professional Contacts / Fields" block at the BOTTOM of the
+      // card instead of inside that firm's block.
+      //
+      // FIX: firmExtraContacts(prefix) discovers every ADDED contact index for a
+      // firm from the override map and returns one card PER index, rendered with the
+      // EXACT stored override labels. Because the labels now render as
+      // .pr-field[data-pr-label] rows INSIDE this firm's block, (a) the values
+      // round-trip (field()'s override lookup fills them) and (b) _surfaceExtras'
+      // dedup (which skips any label already shown as a rendered field) no longer
+      // re-dumps them at the bottom — they GROUP with their firm. No data is moved
+      // or dropped: this is display grouping only, keyed on the label prefix each
+      // contact was already saved under.
+      //
+      // Prefix matching is anchored (^<prefix> followed by " <N> - " or
+      // " - Contact <N> - ") and each firm prefix ("Ground Improvement",
+      // "Geotechnical", "Civil", "Structural") is NOT a prefix of another, so a
+      // "Ground Improvement 2 - Email" label can only ever bind to the Ground
+      // Improvement firm — no cross-firm mis-merge. FAIL-CLOSED: a label that
+      // matches no firm prefix (or an unexpected shape) is left untouched and still
+      // surfaces via _surfaceExtras, so nothing is ever lost.
+      //
+      // "seedCount" = how many contacts firmBlock already renders from the synced
+      // seed (1 for every firm here). Only indices STRICTLY GREATER than seedCount
+      // are treated as "added" here, so we never double-render contact 1 (whose
+      // fields are already rendered by the seed loop and captured by the same dedup).
+      var DP_FIELD_MAP = [
+        { key: 'name',  fld: 'Contact Name' },
+        { key: 'title', fld: 'Title' },
+        { key: 'phone', fld: 'Office Phone', link: 'phone' },
+        { key: 'cell',  fld: 'Cell Phone',   link: 'phone' },
+        { key: 'email', fld: 'Email',        link: 'email' }
+      ];
+      var firmExtraContacts = function(head, prefix, seedCount){
+        var ov = (_curOverrides && _curOverrides['design_professionals']) || {};
+        var esc = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Match BOTH stored shapes for an added contact:
+        //   "<prefix> <N> - <field>"            (pfAddContact convention)
+        //   "<prefix> - Contact <N> - <field>"  (seeded/edited convention)
+        var re = new RegExp('^' + esc + '(?:\\s*-\\s*Contact)?\\s*(\\d+)\\s*-\\s*(.+)$');
+        var maxN = 0;
+        Object.keys(ov).forEach(function(lbl){
+          var m = String(lbl).match(re);
+          if (m){ var n = parseInt(m[1], 10); if (n > maxN) maxN = n; }
+        });
+        var out = '';
+        for (var n = 1; n <= maxN; n++){
+          if (n <= seedCount) continue; // seed loop already rendered these indices
+          // Prefer the "<prefix> <N> - " label shape actually written by pfAddContact;
+          // fall back to the "<prefix> - Contact <N> - " shape so an edited/legacy
+          // contact still renders (field() resolves whichever label the override holds).
+          var pPlain  = prefix + ' ' + n + ' - ';
+          var pDashed = prefix + ' - Contact ' + n + ' - ';
+          var hasPlain  = DP_FIELD_MAP.some(function(f){ return Object.prototype.hasOwnProperty.call(ov, pPlain + f.fld); });
+          var p = hasPlain ? pPlain : pDashed;
+          var nm = ov[p + 'Contact Name'] || '';
+          var tl = ov[p + 'Title'] || '';
+          var rows = DP_FIELD_MAP.map(function(f){
+            var lbl = p + f.fld;
+            return f.link
+              ? fieldLinked(lbl, '', '', f.link)   // '' -> field() reads the override value
+              : field(lbl, '', '');
+          });
+          out += contactCard(nm || (head + ' Contact ' + n), tl, rows);
+        }
+        return out;
+      };
       // firmBlock(head, prefix, co, contacts): builds one firm's subhead+twoCol.
       // co = {company,address,phone,website,src}; contacts = [{name,title,phone,cell,email,src}]
       var firmBlock = function(head, prefix, co, contacts){
+        var seedCount = (contacts || []).length;
         var cards = (contacts || []).map(function(c, i){
           var n = i + 1;
           var p = prefix + ' - Contact ' + n + ' - ';
@@ -14287,7 +14361,10 @@ try {
             fieldLinked(p + 'Cell Phone', c.cell || '', c.src || '', 'phone'),
             fieldLinked(p + 'Email', c.email || '', c.src || '', 'email')
           ]);
-        });
+        }).join('')
+        // GROUP added contacts for this firm INSIDE its block (fix for the
+        // bottom-dump bug). Rendered after the seeded card(s), before the grid close.
+        + firmExtraContacts(head, prefix, seedCount);
         return subhead(head)
           + twoCol([
               field(prefix + ' - Company', co.company || '', co.src || ''),
@@ -14295,7 +14372,7 @@ try {
               fieldLinked(prefix + ' - Office Phone', co.phone || '', co.src || '', 'phone'),
               fieldLinked(prefix + ' - Website', co.website || '', co.src || '', 'website')
             ], [
-              contactCardGrid(cards, prefix)
+              contactCardGrid([cards], prefix)
             ]);
       };
       var dpBody =
