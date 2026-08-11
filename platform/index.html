@@ -1689,11 +1689,12 @@ body.role-field-ops .nav-sub[data-fo-hide] {
   margin-bottom: 18px;
 }
 .pr-header .pr-num {
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
   color: var(--accent);
   text-transform: uppercase;
+  line-height: 1.1;
 }
 .pr-header h1 {
   font-size: 1.5rem;
@@ -1701,7 +1702,31 @@ body.role-field-ops .nav-sub[data-fo-hide] {
   margin: 4px 0 2px;
   color: var(--text-0);
 }
+.pr-header .pr-addr { font-size: 0.92rem; color: var(--text-2); margin: 0 0 2px; }
 .pr-header .pr-loc { font-size: 0.92rem; color: var(--text-2); }
+/* Header quantities strip: Total LF + # of Piers, reusing the Active Projects
+   SUMMARY page values (totalLfFor / piersFor, keyed by project number). */
+.pr-header .pr-qty {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.pr-header .pr-qty .pr-qty-item { display: flex; flex-direction: column; }
+.pr-header .pr-qty .pr-qty-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.pr-header .pr-qty .pr-qty-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-0);
+}
 .pr-badge {
   display: inline-block;
   font-size: 0.72rem;
@@ -2844,6 +2869,44 @@ window.pfFmtPhone = function(v){
   if (digits.length === 11 && digits.charAt(0) === '1') digits = digits.slice(1);
   if (digits.length !== 10) return s;
   return '(' + digits.slice(0,3) + ') ' + digits.slice(3,6) + '-' + digits.slice(6) + ext;
+};
+
+// Defined at global scope so every inlined module can call window.pfFmtQty().
+// PORTAL-WIDE THOUSANDS-SEPARATOR STANDARD (Brad 2026-08-11): any displayed
+// QUANTITY / AMOUNT magnitude gets commas every 3 digits once it reaches 1,000+
+// (e.g. Total LF 17003 -> 17,003; Estimated Stone 3250 -> 3,250; a pier count of
+// 1975 -> 1,975). This is the SINGLE source of truth for that formatting so it is
+// a genuine standard, not one-off edits.
+//   DISPLAY-ONLY: never mutates stored/synced data or what an editor saves.
+//   - non-numeric / blank / null / undefined -> returned UNCHANGED (never "NaN").
+//     A dash placeholder ("-"/"—") or arbitrary text passes straight through.
+//   - decimals are PRESERVED as-entered (3,250.5 keeps its ".5"); only the integer
+//     part gets grouped. Trailing-zero decimals are kept as typed (no rounding).
+//   - negatives handled (commas on the magnitude, sign preserved).
+//   - IDEMPOTENT: a value that ALREADY has grouping commas (e.g. an override saved
+//     as "17,003") is re-parsed and re-formatted identically, so re-render never
+//     double-groups and the round-trip through the section editor is stable.
+//   This is intentionally magnitude-only. It is gated at the call sites (label
+//   allow-list) so IDENTIFIERS (project #, GC #, phone, ZIP, year, cost code) are
+//   never passed in. Mirrors window.pfFmtPhone / window.esc null pass-through.
+window.pfFmtQty = function(v){
+  if (v === undefined || v === null) return v;
+  var s = String(v).trim();
+  if (!s) return s;
+  // Match an optional sign, an integer part (digits, tolerating existing group
+  // commas / spaces), and an optional decimal part. Anything that is not a plain
+  // number in that shape (dates, ranges, text, values with units) passes through
+  // UNCHANGED - never mangled.
+  var m = /^([+-]?)(\d[\d,\s]*)(\.\d+)?$/.exec(s);
+  if (!m) return s;
+  var sign = m[1] === '-' ? '-' : '';
+  var intDigits = m[2].replace(/[,\s]/g, '');
+  if (!/^\d+$/.test(intDigits)) return s;
+  var dec = m[3] || '';
+  // Group the integer part with commas every 3 digits. Number()/toLocaleString on
+  // the integer part is safe (no float precision loss on the integer magnitude).
+  var grouped = Number(intDigits).toLocaleString('en-US'); // e.g. 17003 -> "17,003"
+  return sign + grouped + dec;
 };
 
 // ============================================================
@@ -6411,23 +6474,27 @@ try {
     var haulCost  = tons * s.haulRate;
     var taxCost   = tons * s.tax;
     var totalCost = tons * s.total;
+    // Portal thousands-separator standard (Brad 2026-08-11): tonnage is a quantity,
+    // so group its integer part with commas while preserving the 1-decimal display
+    // (e.g. 3250.5 -> "3,250.5"). window.pfFmtQty keeps the decimal, adds commas.
+    var tonsStr = window.pfFmtQty(tons.toFixed(1));
 
     var result = document.getElementById('calcResult');
     result.innerHTML =
       '<div class="grid grid-4" style="margin-bottom:12px">' +
         statCard('Total LF', lf.toLocaleString() + ' LF', '') +
-        statCard('Tons Required', tons.toFixed(1) + ' TN', lf.toLocaleString() + ' LF x ' + TONS_PER_LF + ' TN/LF') +
+        statCard('Tons Required', tonsStr + ' TN', lf.toLocaleString() + ' LF x ' + TONS_PER_LF + ' TN/LF') +
         statCard('Supplier', esc(s.supplier), esc(s.city) + ', ' + esc(s.state)) +
-        statCard('Total Material Cost', fmt(totalCost), fmt(s.total) + '/TN x ' + tons.toFixed(1) + ' TN') +
+        statCard('Total Material Cost', fmt(totalCost), fmt(s.total) + '/TN x ' + tonsStr + ' TN') +
       '</div>' +
       '<div class="card" style="padding:16px;margin-bottom:0">' +
         '<table>' +
           '<thead><tr><th>Component</th><th>Rate/TN</th><th>Tons</th><th style="text-align:right">Cost</th></tr></thead>' +
           '<tbody>' +
-            '<tr><td>Stone</td><td>' + fmt(s.stoneRate) + '</td><td>' + tons.toFixed(1) + '</td><td style="text-align:right">' + fmt(stoneCost) + '</td></tr>' +
-            '<tr><td>Hauling</td><td>' + fmt(s.haulRate) + '</td><td>' + tons.toFixed(1) + '</td><td style="text-align:right">' + fmt(haulCost) + '</td></tr>' +
-            '<tr><td>Tax</td><td>' + fmt(s.tax) + '</td><td>' + tons.toFixed(1) + '</td><td style="text-align:right">' + fmt(taxCost) + '</td></tr>' +
-            '<tr style="font-weight:700;border-top:2px solid var(--border)"><td>Total</td><td>' + fmt(s.total) + '</td><td>' + tons.toFixed(1) + '</td><td style="text-align:right;color:var(--accent)">' + fmt(totalCost) + '</td></tr>' +
+            '<tr><td>Stone</td><td>' + fmt(s.stoneRate) + '</td><td>' + tonsStr + '</td><td style="text-align:right">' + fmt(stoneCost) + '</td></tr>' +
+            '<tr><td>Hauling</td><td>' + fmt(s.haulRate) + '</td><td>' + tonsStr + '</td><td style="text-align:right">' + fmt(haulCost) + '</td></tr>' +
+            '<tr><td>Tax</td><td>' + fmt(s.tax) + '</td><td>' + tonsStr + '</td><td style="text-align:right">' + fmt(taxCost) + '</td></tr>' +
+            '<tr style="font-weight:700;border-top:2px solid var(--border)"><td>Total</td><td>' + fmt(s.total) + '</td><td>' + tonsStr + '</td><td style="text-align:right;color:var(--accent)">' + fmt(totalCost) + '</td></tr>' +
           '</tbody>' +
         '</table>' +
       '</div>';
@@ -12427,6 +12494,32 @@ try {
       return PF_PHONE_LABEL_RE.test(String(label || ''));
     }
 
+    // ---- shared QUANTITY-display gate (Brad 2026-08-11) ----------------------
+    // Portal-wide thousands-separator standard: a field's VALUE gets grouped with
+    // commas (via window.pfFmtQty) ONLY when its LABEL is a genuine quantity /
+    // amount magnitude - Total LF, pier / column counts, stone tonnage, spoils,
+    // building SF, site acres. Gating by label (an allow-list, not a deny-list) is
+    // the FAIL-CLOSED choice: identifier-ish labels (Project #, GC #, phone, ZIP,
+    // year, cost code, any *Date) are NOT matched, so an identifier can never be
+    // comma-mangled into a wrong number. pfFmtQty itself is also a no-op on any
+    // non-plain-number value, so this is belt-and-suspenders.
+    //   LF        -> linear feet totals ("Total LF (Prelim)", "Total LF", "LF")
+    //   pier/column counts -> "Total Pier Qty ...", "Total Columns", "# of Piers"
+    //   stone     -> "Estimated Stone (TN)", "Total Stone (TN)"
+    //   spoils    -> "Estimated Spoils (CY)"
+    //   building  -> "Total Bldg SF"
+    //   acres     -> "Site Size (Acres)"
+    // NOTE: money fields ($-prefixed, already grouped) are NOT routed here.
+    var PF_QTY_LABEL_RE = /\bLF\b|\bpier\b|\bpiers\b|\bcolumns?\b|\bstone\b|\bspoils\b|\bTN\b|\bSF\b|\bacres?\b/i;
+    // Explicit EXCLUDES so a stray unit token in an identifier-style label can
+    // never trip the allow-list (e.g. a label containing "SF" as part of a code).
+    var PF_QTY_LABEL_EXCLUDE_RE = /project\s*#|\bGC\b.*#|zip|\byear\b|\bdate\b|cost\s*code|\bphone\b/i;
+    function pfIsQtyLabel(label){
+      var l = String(label || '');
+      if (PF_QTY_LABEL_EXCLUDE_RE.test(l)) return false;
+      return PF_QTY_LABEL_RE.test(l);
+    }
+
     // ---- field renderers (label always shown; blank -> em-dash) ----
     // If a manual override exists for (_curSection, label), it WINS over the
     // synced value and the field is tagged as edited (subtle indicator).
@@ -12440,6 +12533,11 @@ try {
       if (v && pfIsDateLabel(label)) v = String(pfFmtDate(v));
       // DISPLAY-ONLY: normalize phone fields to (111) 111-1111 (same approach).
       else if (v && pfIsPhoneLabel(label)) v = String(pfFmtPhone(v));
+      // DISPLAY-ONLY: thousands-separator standard for quantity/amount fields
+      // (Total LF, pier/column counts, stone TN, spoils CY, bldg SF, acres). Same
+      // approach as date/phone: label-gated, never mutates stored/synced/override
+      // data, idempotent on re-render. pfFmtQty is a no-op on non-numeric values.
+      else if (v && pfIsQtyLabel(label)) v = String(window.pfFmtQty(v));
       var cls = v ? "pr-field-value" : "pr-field-value empty";
       // Multi-line textarea fields: preserve line breaks in the read view
       // (white-space:pre-wrap via .pr-field-value-multiline). E(v) escapes the text
@@ -13609,17 +13707,85 @@ try {
       if (!window.PF_PROJECT_INVOICING[_curNum]) { try { loadInvoicingSync(_curNum); } catch(e){} }
       _curInvoicing = window.PF_PROJECT_INVOICING[_curNum] || { subcontractValue: null, retainagePct: null, sov: [], payApps: [], _meta: null, loaded: false, error: 'unreachable' };
 
-      // ----- header -----
-      var status = bid.bid_status || '';
+      // ----- header (summary block: Project # + Name + Address, plus
+      //        Total LF and # of Piers) -----
+      // Brad (2026-08-11): (a) enlarge the PF Project # (see .pr-header .pr-num
+      // CSS), (b) drop the "Awarded" bid_status badge — every project in Active
+      // Projects is by definition awarded, so the tag is redundant, (c) show the
+      // project ADDRESS on its own line directly beneath the project name, and
+      // (d) surface Total LF + # of Piers in the header.
+      // Brad (2026-08-11, refinement): removed the standalone Location/city line
+      // from the header — the address line above already includes the city, so
+      // the separate .pr-loc element was redundant. Also removed the descriptive
+      // data_note text that rendered directly below the header card.
+      //
+      // CRITICAL: Total LF and # of Piers MUST equal the values on the Active
+      // Projects SUMMARY page. That page computes them via totalLfFor(num) /
+      // piersFor(num) (Awarded-index IIFE, ~L18016 / ~L18034), keyed by project
+      // number, from window.PF_PROGRESS then window.PF_PROJECT_RECORDS bid_log.
+      // Those helpers live in a SEPARATE IIFE and are out of scope here, so the
+      // IDENTICAL lookup is replicated inline below (same sources, same fallback
+      // order, same "—" for missing) so the two views can never disagree.
+      var _hnum = String(D.project_number || '');
+      var _hdash = '—'; // matches summary DASH
+      function _hIntOrDash(v){
+        if (v == null || v === '') return _hdash;
+        var n = +v; if (!isFinite(n)) return _hdash;
+        return Math.round(n).toLocaleString();
+      }
+      // Total LF: PF_PROGRESS.design_lf -> PF_PROJECT_RECORDS bid_log.total_lf
+      // (identical to totalLfFor()).
+      function _hTotalLf(num){
+        if (!num) return _hdash;
+        try {
+          var pp = window.PF_PROGRESS && window.PF_PROGRESS.projects;
+          if (pp && pp[num] && pp[num].design_lf != null && pp[num].design_lf !== '')
+            return _hIntOrDash(pp[num].design_lf);
+          var pr = window.PF_PROJECT_RECORDS && window.PF_PROJECT_RECORDS.records;
+          var rec = pr && pr[num];
+          if (rec && rec.bid_log && rec.bid_log.total_lf != null && rec.bid_log.total_lf !== '')
+            return _hIntOrDash(rec.bid_log.total_lf);
+        } catch(e) {}
+        return _hdash;
+      }
+      // # of Piers: PF_PROGRESS.design_columns -> PF_PROJECT_RECORDS bid_log.total_columns
+      // (identical to piersFor()).
+      function _hPiers(num){
+        if (!num) return _hdash;
+        try {
+          var pp = window.PF_PROGRESS && window.PF_PROGRESS.projects;
+          if (pp && pp[num] && pp[num].design_columns != null && pp[num].design_columns !== '')
+            return _hIntOrDash(pp[num].design_columns);
+          var pr = window.PF_PROJECT_RECORDS && window.PF_PROJECT_RECORDS.records;
+          var rec = pr && pr[num];
+          if (rec && rec.bid_log && rec.bid_log.total_columns != null && rec.bid_log.total_columns !== '')
+            return _hIntOrDash(rec.bid_log.total_columns);
+        } catch(e) {}
+        return _hdash;
+      }
+      var _hTotalLfVal = _hTotalLf(_hnum);
+      var _hPiersVal   = _hPiers(_hnum);
+      // Address for the summary block: Bid Log address, else subcontract address.
+      // Same provenance as the General Info > Project Address field below.
+      var _hAddr = bid.address || SF.project_address || '';
       var html = '<div class="pr-header">'
         + '<div class="pr-num">PF Project '+E(D.project_number)+'</div>'
-        + '<h1>'+E(D.project_name)
-        +   (status ? '<span class="pr-badge">'+E(status)+'</span>' : '')
-        + '</h1>'
-        + '<div class="pr-loc">'+E(D.location || bid.city_state || '')+'</div>'
+        + '<h1>'+E(D.project_name)+'</h1>'
+        + (_hAddr ? '<div class="pr-addr">'+E(_hAddr)+'</div>' : '')
+        + '<div class="pr-qty">'
+        +   '<div class="pr-qty-item"><span class="pr-qty-label">Total LF</span>'
+        +     '<span class="pr-qty-value">'+_hTotalLfVal+'</span></div>'
+        +   '<div class="pr-qty-item"><span class="pr-qty-label"># of Piers</span>'
+        +     '<span class="pr-qty-value">'+_hPiersVal+'</span></div>'
+        + '</div>'
         + '</div>';
 
-      html += '<div class="pr-note">'+E(D.data_note || '')+'</div>';
+      // Brad (2026-08-11): the descriptive data_note caption that used to render
+      // here (directly below the header card) is removed per request. It was a
+      // plain provenance/description string ("READ-ONLY. Bulk-populated from data
+      // we already hold ..."), NOT a data field or functional section, so removing
+      // its DISPLAY changes no stored data. The data_note value remains in the
+      // record; it is simply no longer surfaced in the Active Projects header view.
 
       // ----- Bid-Log vs Subcontract discrepancy banner (Bid Log kept; disagreement noted) -----
       var disc = D.discrepancies || [];

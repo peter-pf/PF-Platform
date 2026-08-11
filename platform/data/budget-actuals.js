@@ -1132,7 +1132,7 @@ window.PF_BUDGET_ACTUALS = {
   },
   "26-002": {
     "job": "26-002",
-    "name": "POET Projects",
+    "name": "POET Bioprocessing",
     "status": "ok",
     "source_folder": "04 - Project Management/02 - Projects/26-002 - POET Projects - POET",
     "source_file": "26-0709 POET Turnover Budget w add'l Bin CO.xlsm",
@@ -1140,9 +1140,9 @@ window.PF_BUDGET_ACTUALS = {
     "location": "",
     "grand_total": {
       "label": "Total Construction Contract",
-      "budget": null,
-      "actual": null,
-      "variance": 0.0
+      "budget": 418037.07,
+      "actual": 141674.23,
+      "variance": 276362.84
     },
     "actuals_by_group": {
       "general conditions oh": {
@@ -1171,9 +1171,11 @@ window.PF_BUDGET_ACTUALS = {
       "project professional services fees": {
         "5051": 38000.0,
         "5052": 0.0,
-        "5053": 10534.0
+        "5053": 14644.0
       },
       "project material costs": {
+        "5110": 37068.23,
+        "5130": 1496.0,
         "5190": 0.0
       },
       "project labor costs": {
@@ -1184,13 +1186,13 @@ window.PF_BUDGET_ACTUALS = {
         "5320": 1082.85,
         "5330": 0.0,
         "5350": 0.0,
-        "5360": 600.0
+        "5360": 703.49
       },
       "project equipment costs": {
-        "5405": 15185.0,
+        "5405": 16550.0,
         "5410": 8699.94,
         "5420": 0.0,
-        "5430": 4847.35,
+        "5430": 6653.33,
         "5500": 0.0
       },
       "project incentives contingencies": {
@@ -2141,13 +2143,13 @@ window.PF_BUDGET_ACTUALS = {
     "grand_total": {
       "label": "Total Construction Contract",
       "budget": 80700.0,
-      "actual": 9050.0,
-      "variance": 71650.0
+      "actual": 9125.41,
+      "variance": 71574.59
     },
     "actuals_by_group": {
       "general conditions oh": {
         "5600": 0.0,
-        "5710": 0.0,
+        "5710": 75.41,
         "5720": 0.0,
         "5730": 0.0,
         "6100": 0.0,
@@ -2281,9 +2283,9 @@ window.PF_BUDGET_ACTUALS = {
     "location": "Perrysburg, OH",
     "grand_total": {
       "label": "Total Construction Contract",
-      "budget": 53962.36,
+      "budget": 64233.0,
       "actual": 19420.0,
-      "variance": 34542.36
+      "variance": 44813.0
     },
     "actuals_by_group": {
       "general conditions oh": {
@@ -2358,7 +2360,7 @@ window.PF_BUDGET_ACTUALS = {
     }
   },
   "_meta": {
-    "generated": "2026-08-04T13:35:08.146845Z",
+    "generated": "2026-08-11T14:20:11.226344Z",
     "source": "Turnover Budget workbooks (sheet 'Budget vs Actual') via MS Graph. QuickBooks-independent.",
     "jobs": 42,
     "ok_count": 31,
@@ -2430,14 +2432,7 @@ window.PF_BUDGET_ACTUALS = {
         "file": ""
       }
     ],
-    "unmatched_actuals": [
-      {
-        "job": "26-002",
-        "group": "Project Material Costs",
-        "description": "Vibratory Stone Columns - Stone",
-        "actual": 24406.12
-      }
-    ],
+    "unmatched_actuals": [],
     "note": "Per-project ACTUAL costs parsed from each Turnover Budget workbook. Overlaid onto the standard cost-code template by (group title + cost code). Variance recomputed = Budget - Actual. Blanks stay blank; a job with no resolvable workbook shows a dash (never a fabricated 0)."
   }
 };
