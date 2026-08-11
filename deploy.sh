@@ -98,6 +98,7 @@ trap 'rm -rf "$STAGE"' EXIT
 rsync -a \
   --exclude 'sync' --exclude '.wrangler' --exclude 'downloads' \
   --exclude 'migrations' --exclude '*.toml' --exclude 'memories' \
+  --exclude '.claude' \
   "$PLATFORM/" "$STAGE/"
 
 if [ "$DRYRUN" -eq 1 ]; then
