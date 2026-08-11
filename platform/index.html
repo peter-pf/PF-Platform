@@ -14452,44 +14452,38 @@ try {
           field('W9 Date Sent to GC', '')
         ])
 
-        // --- Holding group: To Be Placed (pending Brad's direction) ---
-        // PRESERVATION RULE (Brad 2026-08-07): existing Contract Recap fields with no
-        // confirmed home are KEPT here (labels unchanged = stored override data still
-        // renders) rather than deleted. Peter relays this list to Brad for placement.
-        + subgroup('To Be Placed (pending Brad’s direction)')
-        + subgroupNote('Existing fields awaiting Brad’s confirmation on where they belong.')
-        + twoCol([
-          // 3 legacy tax fields — superseded by the new consolidated "Sales Tax" +
-          // "Taxes/Sales Tax Notes" above; kept until Brad confirms the merge.
-          field('Tax Exempt? / Tax', bid.tax, 'Bid Log'),
-          field('Tax Status (per subcontract)', SF.tax_note, SS),
-          field('If not Tax Exempt, Sales Tax Rate', '')
-          // ("Surveying & Staking (who performs)" removed per Brad 2026-08-07 —
-          // redundant with the new "Staking & Layout Included? (Yes/No)" field in
-          // the Scope of Work subsection.)
-        ], [
-          field('Surveyor', (function(){var s=(g.engineering||[]).find(function(c){return /survey/i.test(c.scope||'');});return s?s.company:'';})(),  'Contacts')
-          // Removed per Brad 2026-08-07:
-          //  - "Anticipated Spoils (CY)" -> now in Section 1 General Info ("Estimated Spoils (CY)").
-          //  - "Date COI Sent to GC" -> superseded by the COI tracking block in
-          //    "Needed for Contract Completion" (Requested/Received/Sent to GC).
-          //  - "Date W9 Sent to GC" -> superseded by "W9 Date Sent to GC" in
-          //    "Needed for Contract Completion".
-        ])
+        // --- Holding group: To Be Placed (pending Brad's direction) REMOVED ---
+        // Brad 2026-08-11: the "To Be Placed (pending Brad's direction)" holding group
+        // and all its parked fields are deleted. The 3 legacy tax fields
+        // ("Tax Exempt? / Tax", "Tax Status (per subcontract)",
+        // "If not Tax Exempt, Sales Tax Rate") and the parked "Surveyor" field are
+        // removed from the render/editor. The group became empty after their removal,
+        // so the group container is removed too (no empty labeled box). Stored override
+        // data for these specific labels, if any, is simply no longer surfaced (Brad's
+        // explicit decision); no other override keys are touched.
 
-        // --- Executed subcontract: SharePoint FOLDER link (replaces the removed
-        // live-PDF embed) --- Brad 2026-08-07 directed REMOVING the "Contract
-        // document (live)" docEmbed iframe and replacing it with an editable link to
-        // the SharePoint Subcontract Agreement FOLDER, so the team can open any
-        // version of the agreement. Same editable clickable pattern as
-        // "Bid Sent to GC" / "Approved SOV" (fieldLinked ... 'website'): stores a
-        // per-project SharePoint folder URL, opens a new tab, blank until set, never
-        // hard-coded. Round-trips through the SAME `contract` override key.
-        + subhead('Subcontract Agreement Folder')
-        + fields([
-          fieldLinked('Subcontract Agreement Folder (SharePoint)', '', '', 'website')
-        ])
-        + linkRow(L.contract), false, 'contract');
+        // --- Subcontract Agreement Folder subsection REMOVED (Brad 2026-08-11) ---
+        // The "Subcontract Agreement Folder" subhead and its lone
+        // "Subcontract Agreement Folder (SharePoint)" link field are deleted.
+
+        // --- Documents subhead renamed to "Subcontract Agreement" (Brad 2026-08-11) ---
+        // The card's trailing document-links block previously rendered via the shared
+        // linkRow() helper, which hard-codes a "Documents" subhead used by MANY other
+        // sections. To rename ONLY this card's subhead (display label) without altering
+        // every other section, the linkRow() output is inlined here with a
+        // "Subcontract Agreement" subhead. Same L.contract links, same markup, same
+        // classes — display-label change only, no stored data affected.
+        + (function(){
+            var links = L.contract;
+            if (!links || !links.length) return '';
+            var out = links.map(function(l){
+              if (l.found && l.url) {
+                return '<a class="pr-link" href="'+E(l.url)+'" target="_blank" rel="noopener noreferrer">&#128193; '+E(l.label)+'</a>';
+              }
+              return '<span class="pr-link missing" title="Folder not found in SharePoint">&#128193; '+E(l.label)+'</span>';
+            }).join('');
+            return '<div class="pr-subhead">Subcontract Agreement</div><div class="pr-links">'+out+'</div>';
+          })(), false, 'contract');
 
       // ----- 3b. Subcontract Analysis (migrated from the standalone Subcontracts tool) -----
       // PM-view only. Renders when the record carries an analysis block. Same content the
