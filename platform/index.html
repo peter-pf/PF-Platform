@@ -12496,12 +12496,15 @@ try {
     // PF_DP_FIRM_CATEGORY buckets (defined later) + adds GC. Section labels here are
     // the firm subheads the DP block renders; the value is the contact Category used
     // to filter the directory (/api/contacts?trade=). Owner is available if needed.
+    // Design Professionals firm sections (order matches the Project Contacts fixed
+    // order groups 3-6). GC was REMOVED here (Brad 2026-08-11): the General
+    // Contractor is now group #2 under the `general` key (PF_CRM_GENERAL_TRADE), so a
+    // GC firm block under design_professionals would duplicate it.
     var PF_CRM_SECTION_TRADE = {
-      'Ground Improvement': 'Ground Improvement Engineer',
       'Geotechnical': 'Geotechnical Engineer',
       'Civil': 'Civil Engineer',
       'Structural': 'Structural Engineer',
-      'GC': 'GC'
+      'Ground Improvement': 'Ground Improvement Engineer'
     };
     // General Info CRM selectors (Brad 2026-08-11): the PROJECT OWNER and the GENERAL
     // CONTRACTOR, each a company dropdown FILTERED BY Category + multi-select contacts,
@@ -12513,6 +12516,19 @@ try {
     var PF_CRM_GENERAL_TRADE = {
       'Owner': 'Owner',
       'GC': 'GC'
+    };
+    // NEW Project Contacts groups (Brad 2026-08-11, groups 8-13) that share existing
+    // override keys. Each entry maps an override key -> the contact groups it renders
+    // in Project Contacts, as { '<Section name>': '<master-list Category>' }. The
+    // Section name is the subhead + the CRM cards-host token; the Category is the
+    // /api/contacts?trade= filter. CATEGORY STRINGS ARE PROVISIONAL — FLAGGED FOR BRAD
+    // to confirm against the PF Master Contact List col F. An unknown Category yields
+    // an empty (greenfield) selector — the block still renders + is editable.
+    var PF_CRM_NEWGROUP_TRADE = {
+      safety:        { 'Safety Consultant': 'Safety Consultant' },
+      siteReadiness: { 'Staking & Layout': 'Staking & Layout' },
+      equipment:     { 'Equipment Transport': 'Equipment Transport', 'Rental Equipment': 'Rental Equipment' },
+      material:      { 'Material Vendor(s)': 'Material Vendor', 'Fuel Delivery': 'Fuel Delivery' }
     };
     // Read the current project's __crm map for a section key. Always an object; {}
     // when absent/malformed so callers never crash on a legacy project. Defaults to
@@ -14020,54 +14036,40 @@ try {
           field('Estimated Stone (TN)', bid.total_stone_tn, 'Bid Log'),
           field('Estimated Spoils (CY)', '')
         ])
-        // ---- General Contractor Info: FIXED 2-column grouping matching the
-        // GeneralContractorInfo PDF. LEFT = GC company/address/office phone/
-        // website; RIGHT = GC Project Team (PM / Superintendent / Project Engineer).
-        + subhead('General Contractor Info')
-        // LEFT = GC company block (clickable phone + website). RIGHT = GC Project
-        // Team as self-contained CONTACT CARDS (PM / Superintendent / Project
-        // Engineer). Each card keeps its .pr-field[data-pr-label] rows so the
-        // "general" editor saves them unchanged; phones/emails are clickable.
-        + twoCol([
-          field('General Contractor', bid.gc_name || SF.gc_party || (g.gc&&g.gc[0]?g.gc[0].company:''), bid.gc_name ? 'Bid Log' : SS),
-          field('GC Address', (g.gc&&g.gc[0]?g.gc[0].address:''), 'Contacts'),
-          fieldLinked('GC Office Phone', (g.gc&&g.gc[0]?g.gc[0].phone:''), 'Contacts', 'phone'),
-          fieldLinked('GC Website', (g.gc&&g.gc[0]?g.gc[0].website:''), 'Contacts', 'website')
-        ], [
-          subhead('GC Project Team'),
-          contactCardGrid([
-            contactCard(_gcPM.name || 'Project Manager', 'Project Manager', [
-              field('GC Project Manager - Name', _gcPM.name || '', 'Contacts'),
-              fieldLinked('GC Project Manager - Office Phone', _gcPM.phone || '', 'Contacts', 'phone'),
-              fieldLinked('GC Project Manager - Cell Phone', _gcPM.cell || '', 'Contacts', 'phone'),
-              fieldLinked('GC Project Manager - Email', _gcPM.email || '', 'Contacts', 'email')
-            ]),
-            contactCard(_gcSup.name || 'Superintendent', 'Superintendent', [
-              fieldLinked('GC Superintendent - Cell Phone', _gcSup.cell || '', 'Contacts', 'phone'),
-              fieldLinked('GC Superintendent - Email', _gcSup.email || '', 'Contacts', 'email')
-            ]),
-            contactCard(_gcPE.name || 'Project Engineer', 'Project Engineer', [
-              fieldLinked('GC Project Engineer - Office Phone', _gcPE.phone || '', 'Contacts', 'phone'),
-              fieldLinked('GC Project Engineer - Cell Phone', _gcPE.cell || '', 'Contacts', 'phone'),
-              fieldLinked('GC Project Engineer - Email', _gcPE.email || '', 'Contacts', 'email')
-            ])
-          ]),
-          // CRM cards host (Brad 2026-08-11): resolved general.__crm['GC'].contactIds
-          // render here as live directory cards, populated async post-render by
-          // pfCrmRenderCards (data-crm-cards-key='general'). SEPARATE from the Design
-          // Professionals card's engineering-GC firm entry. Empty with no selection.
-          '<div class="pr-crm-cards" data-crm-cards="GC" data-crm-cards-key="general"></div>'
-        ]), false, 'general');
+        // ---- CONTACT GROUPS MOVED OUT (Brad 2026-08-11): the General Contractor Info
+        // block + GC Project Team + GC CRM host were RELOCATED to the new top-level
+        // "Project Contacts" section (rendered between General Info and Subcontract
+        // Agreement). They still save under the `general` override key — the move is a
+        // relocation of WHERE the general-key GC contact rows render (into the Project
+        // Contacts card body, post-render), NOT a re-key. General Info now holds ONLY
+        // non-contact project fields (Project Info + Scope). See pcCardBody injection.
+        , false, 'general');
 
-      // ----- (PF Team merged into General Info) -----
-      // Brad (2026-08-06): the standalone "PF Team" card was removed and its full
-      // contents (contact list + any pfTeam manual overrides) are now rendered as a
-      // labeled subsection INSIDE the General Info card body, injected after render
-      // below (same beforeend idiom as the Owner / GC contact blocks). It is injected
-      // as its OWN nested .pr-card[data-pr-section="pfTeam"] so it keeps its own Edit
-      // button and its manual overrides STILL save under the "pfTeam" key -> zero data
-      // loss. The two General/dashboard field scans are scoped to skip nested-card
-      // fields so PF Team rows never leak into a "general" override.
+      // ===== 2. PROJECT CONTACTS (Brad 2026-08-11) =========================
+      // NEW top-level section positioned BETWEEN General Info and Subcontract
+      // Agreement. It gathers ALL project contact groups that previously lived
+      // scattered across General Info (Owner / GC / PF Team), the Design
+      // Professionals nested card, and Site Readiness. This container card has NO
+      // sectionKey of its own (no Edit button on the wrapper) — each contact group
+      // is injected post-render as its own nested .pr-card carrying its EXISTING
+      // override key (general / design_professionals / pfTeam / safety /
+      // siteReadiness / equipment / material), so every group keeps its own Edit
+      // button, cascading CRM selector, and per-key round-trip. This is a MOVE, not
+      // a re-key: no stored contact data is dropped or re-keyed. Groups are injected
+      // in Brad's EXACT fixed order (see the pcCardBody block far below):
+      //   1 Project Owner        2 General Contractor    3 Geotechnical Engineer
+      //   4 Civil Engineer       5 Structural Engineer   6 Ground Improvement Eng.
+      //   7 PF Project Team      8 Safety Consultant     9 Staking & Layout
+      //   10 Equipment Transport 11 Rental Equipment     12 Material Vendor(s)
+      //   13 Fuel Delivery
+      // Override-key contiguity: general(1,2) design_professionals(3-6) pfTeam(7)
+      // safety(8) siteReadiness(9) equipment(10,11) material(12,13) — every shared
+      // key's groups are adjacent in the order, so each key renders as ONE nested
+      // card with subhead() dividers for its sub-groups (never two cards per key,
+      // which would collide the section editor / _surfaceExtras querySelector).
+      html += card(2, 'Project Contacts', null,
+        '<div class="pr-empty-note pr-pc-placeholder">Loading contacts&hellip;</div>',
+        true);
 
       // ----- 3. Subcontract Agreement -----
       // Reorganized into two blue-headered (.pr-subhead) subsections within the ONE
@@ -14081,7 +14083,7 @@ try {
       // + saveable via the same override mechanism. (Fields are intended to be populated
       // by later extraction from the GC's subcontract; this round is formatting only.)
       _curSection = 'contract';
-      html += card(2, 'Subcontract Agreement', null,
+      html += card(3, 'Subcontract Agreement', null,
         subhead('Bid Recap')
         + fields([
           field('Bid Invite Date', bid.invite_date, 'Bid Log'),
@@ -14316,7 +14318,7 @@ try {
                 + ' Business-level summary, not legal advice.')
             + '</div>';
 
-        html += card('2b', 'Subcontract Analysis', riskMeta, ab, false);
+        html += card('3b', 'Subcontract Analysis', riskMeta, ab, false);
       }
 
       // ----- 3. Engineering & Design (RESTORED standalone top-level section) -----
@@ -14407,7 +14409,7 @@ try {
             fieldLinked('Stamped Final As-Built Link', '', '', 'website')
           ])
         + linkRow((L.engineering || []).concat(L.general || []));
-      html += card(3, 'Engineering & Design', null, engBody, false, 'engineering');
+      html += card(4, 'Engineering & Design', null, engBody, false, 'engineering');
 
       // ----- Design Professionals (CONTACTS import inside General Info) -----
       // Brad (2026-08-07, batch-8 CORRECTION): the standalone "Engineering & Design"
@@ -14547,21 +14549,24 @@ try {
               contactCardGrid([cards], prefix) + crmHost
             ]);
       };
+      // Firm block ORDER (Brad 2026-08-11): the Design Professionals card holds
+      // groups 3-6 of the Project Contacts order — Geotechnical, Civil, Structural,
+      // Ground Improvement — in that EXACT sequence. (Ground Improvement previously
+      // rendered first; reordered to match Brad's fixed order. Reordering firmBlock()
+      // calls only changes render order; each firm's override labels /
+      // design_professionals key round-trip unchanged.) The former GC firm block was
+      // REMOVED from this card: the General Contractor is now group #2 under the
+      // `general` key (Owner+GC CRM selectors), so a GC firm here would duplicate it.
       var dpBody =
-          firmBlock('Ground Improvement Engineering', 'Ground Improvement',
+          firmBlock('Geotechnical Engineer', 'Geotechnical', {}, [{}])
+        + firmBlock('Civil Engineer', 'Civil', {}, [{}])
+        + firmBlock('Structural Engineer', 'Structural', {}, [{}])
+        + firmBlock('Ground Improvement Engineering', 'Ground Improvement',
             { company: _gie.company || bid.engineer_firm || '', address: _gie.address || '',
               phone: _gie.phone || '', website: _gie.website || '',
               src: _gie.company ? 'Contacts' : 'Bid Log' },
             [{ name: _gie.name || '', title: _gie.scope || '', phone: _gie.phone || '',
-               cell: _gie.cell || '', email: _gie.email || '', src: 'Contacts' }])
-        + firmBlock('Geotechnical Engineer', 'Geotechnical', {}, [{}])
-        + firmBlock('Civil Engineer', 'Civil', {}, [{}])
-        + firmBlock('Structural Engineer', 'Structural', {}, [{}])
-        // GC firm block (CRM selector target). Seeds no synced firm contact here
-        // (GC contacts come from the CRM selection / __crm['GC']); a project with no
-        // GC selection renders an empty firm block (subhead + empty cards host), same
-        // as the others before selection. Prefix 'GC' matches PF_CRM_SECTION_TRADE.
-        + firmBlock('General Contractor', 'GC', {}, []);
+               cell: _gie.cell || '', email: _gie.email || '', src: 'Contacts' }]);
         // Batch-8 CORRECTION: the "Engineering & Design Tracking" fields (Prelim Design
         // Fee, submittal dates, FFE, loads, jack, etc.) and the Documents block were
         // MOVED OUT of this display-only Design Professionals subsection and back into
@@ -14740,7 +14745,7 @@ try {
             field('Fuel Contact', ''),
             field('Fuel Delivery Dates', '')
           ]);
-      html += card(4, 'Site Readiness / Project Setup', null,
+      html += card(5, 'Site Readiness / Project Setup', null,
         srBody + linkRow(L.site), false, 'siteReadiness');
 
       // ----- 6. Project Photos (LIVE, READ-ONLY gallery) -----
@@ -14750,7 +14755,7 @@ try {
       // Body is a placeholder that the async loader (pfLoadProjectPhotos, fired
       // post-render below) replaces with the grid / empty state / error state.
       var _photoNum = _curNum;
-      html += card(5, 'Project Photos', null,
+      html += card(6, 'Project Photos', null,
         '<div class="pr-photos" data-photos-num="' + E(_photoNum) + '">'
         + '<div class="pr-photos-status">Loading photos&hellip;</div>'
         + '<div class="pr-photos-grid" style="display:none"></div>'
@@ -15104,7 +15109,7 @@ try {
         + finSub('Project Invoicing', finInvoicingBody, false)
         + finSub('Project Costs (Budget vs Actual)', baHtml, false);
 
-      html += card(6, 'Financials', baMeta, finBody, false);
+      html += card(7, 'Financials', baMeta, finBody, false);
 
       // ----- 7. Project Closeout -----
       // Brad 2026-08-07 (batch-14): rebuilt the Closeout placeholder into 5 blue
@@ -15146,7 +15151,7 @@ try {
         ? 'Auto-read: Contract Recap = not required'
         : 'Contract Recap: certified payroll required — confirm submission';
 
-      html += card(7, 'Project Closeout', null,
+      html += card(8, 'Project Closeout', null,
         fields([
 
           // ===== Subsection 1: Field Closeout Procedure =====
@@ -15240,27 +15245,49 @@ try {
       //    Mobilization to Site [+ nested Equipment + Material])
       // 5. Project Photos (LIVE SharePoint gallery)  6. Financials  7. Closeout.)
 
-      // ----- General Info subsections injected after render (Brad 2026-08-07) -----
-      // Injected into the ONE General Info card body (data-pr-section "general") in
-      // this ORDER so the served card reads:
-      //   1. Project Info  2. General Contractor Info (+ GC Project Team)  [rendered
-      //      above as flat fields]  3. Owner Info (+ Owner Contacts, flat editable)
-      //   4. Design Professionals (Engineering MOVED IN, nested card, its own
-      //      "engineering" key)  5. PF Project Team (nested card, "pfTeam" key)  then
-      //   Documents at the very bottom.
-      // Owner Info fields are flat field() rows under the "general" key (they save
-      // through the general editor). Design Professionals + PF Project Team stay
-      // NESTED cards so their own override keys ("engineering" / "pfTeam") round-trip
-      // independently and the general editor scan (scoped to closest('.pr-card') ===
-      // the general card) never touches them.
+      // ===== PROJECT CONTACTS injected after render (Brad 2026-08-11) ==========
+      // ALL project contact groups are injected into the Project Contacts card body
+      // (top-level section #2) in Brad's EXACT fixed order. Each group is a nested
+      // .pr-card carrying its EXISTING override key so its Edit button, cascading CRM
+      // selector, and per-key round-trip are all preserved (MOVE, not re-key). The
+      // groups that share an override key (Owner+GC -> general; the 4 engineering
+      // firms -> design_professionals; Equipment Transport+Rental -> equipment;
+      // Material+Fuel -> material) are contiguous in the order, so each key renders as
+      // ONE nested card with subhead() dividers separating its sub-groups. NEW groups
+      // that had no prior contact block (Safety Consultant / Staking & Layout /
+      // Equipment Transport / Rental Equipment / Material Vendor(s) / Fuel Delivery)
+      // get first-class contact blocks with a cascading CRM selector where a
+      // master-list Category exists (see PF_CRM_CONTACT_TRADE); Category strings are
+      // FLAGGED for Brad to confirm.
       root.innerHTML = html;
 
       var genCard = root.querySelector('.pr-card[data-pr-section="general"] .pr-card-body');
+      // Project Contacts container card body. Every contact group injects here in
+      // order. Falls back to genCard only if the container is somehow absent (never
+      // silently drops a group).
+      var pcCard = (function(){
+        var cards = root.querySelectorAll('.pr-card');
+        for (var i = 0; i < cards.length; i++){
+          var t = cards[i].querySelector('.pr-card-title');
+          if (t && t.textContent === 'Project Contacts') return cards[i].querySelector('.pr-card-body');
+        }
+        return null;
+      })();
+      var pcHost = pcCard || genCard;
+      // Clear the "Loading contacts…" placeholder before injecting the real groups.
+      if (pcCard) pcCard.innerHTML = '';
 
-      // (3) Owner Info — company block + repeatable Owner Contacts (spec: min 2, add
-      // more). Flat field() rows under the "general" key. Seed the company + first two
-      // contacts from the synced owner group (g.owner) where present.
-      if (genCard) {
+      // ---- (1) PROJECT OWNER — company block + repeatable Owner Contacts + CRM
+      // selector (general.__crm.Owner). Nested card, `general` key. Owner rows +
+      // contacts save through the general editor exactly as before; only the render
+      // LOCATION moved (General Info -> Project Contacts). NOTE: because Owner + GC
+      // both live under the `general` key and BOTH must be editable within Project
+      // Contacts, they render as TWO subhead groups inside ONE `general`-keyed nested
+      // card (a single Edit button drives both — the general editor scans all
+      // .pr-field rows in this nested card). This keeps the general key's single
+      // editable owner (the section editor scopes to closest('.pr-card')).
+      if (pcHost) {
+        var _prevGen = _curSection; _curSection = 'general';
         var _own = g.owner || [];
         var _own0 = _own[0] || {};
         var ownerRows = [
@@ -15269,10 +15296,6 @@ try {
           fieldLinked('Owner Office Phone', _own0.phone || '', 'Contacts', 'phone'),
           fieldLinked('Owner Website', _own0.website || '', 'Contacts', 'website')
         ];
-        // Owner Contacts: at least 2 cards (spec minimum), seeded from synced
-        // contacts. Each contact = one self-contained CONTACT CARD; the card grid
-        // carries the "Owner Contact" group token so "Add contact" appends a
-        // numbered card. Phones/email clickable.
         var ownerCards = [];
         var _ownCount = Math.max(2, _own.length);
         for (var _oi = 0; _oi < _ownCount; _oi++) {
@@ -15286,51 +15309,63 @@ try {
             fieldLinked('Owner Contact ' + _n + ' - Email', _oc.email || '', _oc.email ? 'Contacts' : '', 'email')
           ]));
         }
-        // CRM cards host (Brad 2026-08-11): resolved general.__crm['Owner'].contactIds
-        // render here as live directory cards, populated async post-render by
-        // pfCrmRenderCards. data-crm-cards-key='general' tells the renderer which
-        // override key holds the selection. Empty for a project with no Owner selection
-        // (renders exactly as before). Sits beside the legacy flat Owner Contact cards
-        // (left as-is per Brad's DP directive; selector model is used going forward).
         var ownerCrmHost = '<div class="pr-crm-cards" data-crm-cards="Owner" data-crm-cards-key="general"></div>';
-        // LEFT = owner company block; RIGHT = Owner Contact cards. The card grid
-        // (not the twoCol column) carries the "Owner Contact" group token so
-        // pfEditSection discovers it exactly once.
-        genCard.insertAdjacentHTML('beforeend',
-          subhead('Owner Info')
-          + twoCol(
-              ownerRows,
-              [subhead('Owner Contacts'), contactCardGrid(ownerCards, 'Owner Contact'), ownerCrmHost]));
+        // ---- (2) GENERAL CONTRACTOR — GC company block + GC Project Team + CRM
+        // selector (general.__crm.GC). SAME `general` key, rendered as the second
+        // subhead group inside this nested card (relocated verbatim from the former
+        // General Info inline block — same labels => zero data loss / re-key).
+        var _gcCards = [
+          contactCard(_gcPM.name || 'Project Manager', 'Project Manager', [
+            field('GC Project Manager - Name', _gcPM.name || '', 'Contacts'),
+            fieldLinked('GC Project Manager - Office Phone', _gcPM.phone || '', 'Contacts', 'phone'),
+            fieldLinked('GC Project Manager - Cell Phone', _gcPM.cell || '', 'Contacts', 'phone'),
+            fieldLinked('GC Project Manager - Email', _gcPM.email || '', 'Contacts', 'email')
+          ]),
+          contactCard(_gcSup.name || 'Superintendent', 'Superintendent', [
+            fieldLinked('GC Superintendent - Cell Phone', _gcSup.cell || '', 'Contacts', 'phone'),
+            fieldLinked('GC Superintendent - Email', _gcSup.email || '', 'Contacts', 'email')
+          ]),
+          contactCard(_gcPE.name || 'Project Engineer', 'Project Engineer', [
+            fieldLinked('GC Project Engineer - Office Phone', _gcPE.phone || '', 'Contacts', 'phone'),
+            fieldLinked('GC Project Engineer - Cell Phone', _gcPE.cell || '', 'Contacts', 'phone'),
+            fieldLinked('GC Project Engineer - Email', _gcPE.email || '', 'Contacts', 'email')
+          ])
+        ];
+        var gcCrmHost = '<div class="pr-crm-cards" data-crm-cards="GC" data-crm-cards-key="general"></div>';
+        var ownerGcBody =
+            subhead('Project Owner')
+          + twoCol(ownerRows, [subhead('Owner Contacts'), contactCardGrid(ownerCards, 'Owner Contact'), ownerCrmHost])
+          + subhead('General Contractor')
+          + twoCol([
+              field('General Contractor', bid.gc_name || SF.gc_party || (g.gc&&g.gc[0]?g.gc[0].company:''), bid.gc_name ? 'Bid Log' : SS),
+              field('GC Address', (g.gc&&g.gc[0]?g.gc[0].address:''), 'Contacts'),
+              fieldLinked('GC Office Phone', (g.gc&&g.gc[0]?g.gc[0].phone:''), 'Contacts', 'phone'),
+              fieldLinked('GC Website', (g.gc&&g.gc[0]?g.gc[0].website:''), 'Contacts', 'website')
+            ], [
+              subhead('GC Project Team'), contactCardGrid(_gcCards), gcCrmHost
+            ]);
+        _curSection = _prevGen;
+        pcHost.insertAdjacentHTML('beforeend',
+          '<div class="pr-nested-card-wrap">'
+          + card('', 'Owner & General Contractor', null, ownerGcBody, true, 'general')
+          + '</div>');
       }
 
-      // (4) Design Professionals — CONTACTS import inside General Info. Brad
-      // (2026-08-07, DP-EDITABLE): now an EDITABLE nested card with its OWN
-      // `design_professionals` sectionKey => it gets an Edit button + data-pr-section,
-      // and its firm/contact edits save under `design_professionals` (NOT `engineering`,
-      // whose single editable owner remains the standalone Engineering & Design section
-      // #3). Because pfEditSection/pfSaveSection scope their field scan to
-      // closest('.pr-card') === this nested card, and the General editor likewise skips
-      // nested cards, the two keys never leak into each other. The firm contact groups
-      // (Ground Improvement / Geotechnical / Civil / Structural) surface the editor's
-      // "Save contact(s) to directory" button, which backfeeds these contacts to the
-      // PF Master Contact List (category-mapped, duplicate-guarded). Open by default.
-      if (genCard) {
+      // ---- (3-6) DESIGN PROFESSIONALS — Geotechnical / Civil / Structural / Ground
+      // Improvement engineering firms (design_professionals key, each with a
+      // cascading CRM selector). Relocated verbatim from General Info; firm blocks
+      // reordered to match Brad's 3-6 order. Same key => zero data loss / re-key.
+      if (pcHost) {
         var engMeta = (g.engineering ? g.engineering.length + ' contacts' : null);
-        genCard.insertAdjacentHTML('beforeend',
+        pcHost.insertAdjacentHTML('beforeend',
           '<div class="pr-nested-card-wrap">'
           + card('', 'Design Professionals', engMeta, dpBody, true, 'design_professionals')
           + '</div>');
       }
 
-      // (5) PF Project Team — nested card (its own "pfTeam" key). Spec = role-based
-      // members (BD Contact, Precon & Estimating, Project Manager, Field Operations
-      // Manager, Operator #1/#2/#3) each with Name/Title/Office/Cell/Email, plus ADD
-      // capability. Rendered as flat field() rows so they save through the pfTeam
-      // editor. Existing synced pf_team contacts (g.pf_team) seed the roster BY MATCH
-      // on their scope where possible. Any prior manual pfTeam overrides (and any
-      // added members) are re-surfaced post-render by the _surfaceExtras('pfTeam')
-      // dedupe below, so no synced or manual PF-team data is lost or orphaned.
-      if (genCard) {
+      // ---- (7) PF PROJECT TEAM — role-based members (pfTeam key). Relocated verbatim
+      // from General Info. Same key => zero data loss.
+      if (pcHost) {
         var _prevPf = _curSection;
         _curSection = 'pfTeam';
         var _pf = g.pf_team || [];
@@ -15345,19 +15380,9 @@ try {
           ['Operator #2',             {}],
           ['Operator #3',             {}]
         ];
-        // Each role = one self-contained CONTACT CARD (header = role, plus the
-        // person's name). Cards tile in a wrapping grid tagged "PF Team Member" so
-        // "Add member" appends a numbered card. Phones/email clickable. Field rows
-        // stay .pr-field[data-pr-label] so the pfTeam editor saves them unchanged.
         var pfCards = [];
         pfRoles.forEach(function(pair){
           var role = pair[0], c = pair[1] || {};
-          // CARD TITLE = the PERSON'S NAME (black bold top line), role as the small
-          // tag beside it — matching the Seth Willis / Operator #1 card (Brad 2026-08-07).
-          // The effective name is the SAVED OVERRIDE if present (a hand-entered name
-          // lives in _curOverrides.pfTeam), else the synced pf_team name. FALLBACK:
-          // when no name is entered yet (e.g. Operator #2/#3), title falls back to the
-          // ROLE so the empty card still shows something (never blank).
           var _pfNameOv = ovLookup('pfTeam', role + ' - Contact Name');
           var _pfName = (_pfNameOv.has && String(_pfNameOv.value || '').trim())
             ? String(_pfNameOv.value).trim()
@@ -15370,16 +15395,84 @@ try {
             fieldLinked(role + ' - Email', c.email || '', c.email ? 'Contacts' : '', 'email')
           ]));
         });
-        // No inline ovExtras('pfTeam') — unrendered pfTeam overrides (added members)
-        // are surfaced post-render by the nested-card dedupe below, avoiding
-        // duplicates for overrides that already match a rendered role field.
         var pfTeamBody = contactCardGrid(pfCards, 'PF Team Member');
         _curSection = _prevPf;
         var pfTeamMeta = (g.pf_team ? g.pf_team.length + ' synced' : null);
-        genCard.insertAdjacentHTML('beforeend',
+        pcHost.insertAdjacentHTML('beforeend',
           '<div class="pr-nested-card-wrap">'
           + card('', 'PF Project Team', pfTeamMeta, pfTeamBody, true, 'pfTeam')
           + '</div>');
+      }
+
+      // ---- (8-13) NEW contact groups (Brad 2026-08-11) -----------------------
+      // These six groups had NO prior standalone contact block (they were single
+      // fields or vendor-lists mixed into other sections). Each is created here as a
+      // first-class contact block with a cascading company->contacts CRM selector,
+      // rendered into Project Contacts in Brad's exact order. Each uses an EXISTING
+      // override key (safety / siteReadiness / equipment / material) so it inherits
+      // that key's RBAC + editor + _surfaceExtras plumbing with NO new API section.
+      // Groups sharing a key are contiguous (Equipment Transport + Rental Equipment ->
+      // equipment; Material Vendor(s) + Fuel Delivery -> material) so each key renders
+      // as ONE nested card with a subhead per sub-group.
+      //
+      // CATEGORY FLAG FOR BRAD: the CRM selector filters the PF Master Contact List by
+      // a Category string (contacts.js ?trade=). The Category strings below are my
+      // best guess and need Brad's confirmation against the master list col F. Any
+      // unknown Category simply yields an empty selector (greenfield — the block still
+      // renders + is editable), so this is safe to ship; confirming the strings just
+      // makes the dropdowns populate. Proposed: Safety Consultant -> "Safety
+      // Consultant"; Staking & Layout -> "Staking & Layout"; Equipment Transport ->
+      // "Equipment Transport"; Rental Equipment -> "Rental Equipment"; Material
+      // Vendor(s) -> "Material Vendor"; Fuel Delivery -> "Fuel Delivery".
+      //
+      // pcContactBlock(sectionName, trade): a subhead + a CRM selector cards host
+      // (data-crm-cards / data-crm-cards-key) resolved post-render by
+      // pfCrmRenderCards, exactly like Owner/GC/DP. The editor renders the matching
+      // selector from PF_CRM_NEWGROUP_TRADE (added near PF_CRM_GENERAL_TRADE).
+      var pcContactBlock = function(sectionName, crmKey){
+        return subhead(sectionName)
+          + '<div class="pr-crm-cards" data-crm-cards="' + esc2(sectionName)
+          + '" data-crm-cards-key="' + esc2(crmKey) + '"></div>';
+      };
+      if (pcHost) {
+        // (8) Safety Consultant — safety key. (The legacy "Safety Consultant" field in
+        // the Safety card under Site Readiness is left intact; this is the contact
+        // block per Brad's Project Contacts order.)
+        var _prevS = _curSection; _curSection = 'safety';
+        pcHost.insertAdjacentHTML('beforeend',
+          '<div class="pr-nested-card-wrap">'
+          + card('', 'Safety Consultant', null, pcContactBlock('Safety Consultant', 'safety'), true, 'safety')
+          + '</div>');
+        _curSection = _prevS;
+        // (9) Staking & Layout — siteReadiness key.
+        var _prevSr = _curSection; _curSection = 'siteReadiness';
+        pcHost.insertAdjacentHTML('beforeend',
+          '<div class="pr-nested-card-wrap">'
+          + card('', 'Staking & Layout', null, pcContactBlock('Staking & Layout', 'siteReadiness'), true, 'siteReadiness')
+          + '</div>');
+        _curSection = _prevSr;
+        // (10) Equipment Transport + (11) Rental Equipment — equipment key (one card,
+        // two subhead groups; contiguous in the order).
+        var _prevEqc = _curSection; _curSection = 'equipment';
+        pcHost.insertAdjacentHTML('beforeend',
+          '<div class="pr-nested-card-wrap">'
+          + card('', 'Equipment Transport & Rental', null,
+              pcContactBlock('Equipment Transport', 'equipment')
+              + pcContactBlock('Rental Equipment', 'equipment'),
+              true, 'equipment')
+          + '</div>');
+        _curSection = _prevEqc;
+        // (12) Material Vendor(s) + (13) Fuel Delivery — material key (one card, two
+        // subhead groups; contiguous in the order).
+        var _prevMatc = _curSection; _curSection = 'material';
+        pcHost.insertAdjacentHTML('beforeend',
+          '<div class="pr-nested-card-wrap">'
+          + card('', 'Material & Fuel Vendors', null,
+              pcContactBlock('Material Vendor(s)', 'material')
+              + pcContactBlock('Fuel Delivery', 'material'),
+              true, 'material')
+          + '</div>');
+        _curSection = _prevMatc;
       }
 
       // ----- Safety NESTED card inside Site Readiness / Project Setup (Subsection 4)
@@ -15394,7 +15487,21 @@ try {
       // new structural Safety fields (SSSP Pipefy action + dates + links, MSDS dates/links,
       // Other Safety Items textarea, toolbox/JSA/checklist links, hand-log date, and the
       // full Utility Locates group). AUTOMATION IS FUTURE (subgroupNotes only).
-      var srCardForSafety = root.querySelector('.pr-card[data-pr-section="siteReadiness"] .pr-card-body');
+      // Resolve the TOP-LEVEL Site Readiness card by TITLE, not by
+      // data-pr-section="siteReadiness" — the Project Contacts "Staking & Layout"
+      // group (injected above) now ALSO carries data-pr-section="siteReadiness" and
+      // appears EARLIER in the DOM, so a bare querySelector would wrongly target it
+      // and dump the Safety/Equipment/Material nested cards into Project Contacts.
+      // (Brad 2026-08-11, Project Contacts move.)
+      var _srTopBody = (function(){
+        var cards = root.querySelectorAll(':scope > .pr-card');
+        for (var i = 0; i < cards.length; i++){
+          var t = cards[i].querySelector('.pr-card-title');
+          if (t && t.textContent === 'Site Readiness / Project Setup') return cards[i].querySelector('.pr-card-body');
+        }
+        return null;
+      })();
+      var srCardForSafety = _srTopBody;
       if (srCardForSafety) {
         var _prevSafety = _curSection; _curSection = 'safety';
         var _safetyConsultant = (function(){var s=(g.vendors||[]).find(function(c){return /safety/i.test(c.scope||'');});return s?(s.company+(s.name?' / '+s.name:'')):'';})();
@@ -15507,7 +15614,7 @@ try {
       // "Add contact" keeps appending numbered cards. Order within Site Readiness:
       // existing Site Readiness fields first (rendered above), then Equipment, then
       // Material.
-      var srCard = root.querySelector('.pr-card[data-pr-section="siteReadiness"] .pr-card-body');
+      var srCard = _srTopBody; // top-level Site Readiness body (see _srTopBody note above)
       if (srCard) {
         // --- Equipment nested card ('equipment' key) ---
         var _prevEq = _curSection; _curSection = 'equipment';
@@ -15587,17 +15694,27 @@ try {
       // not re-render on load. Dedupe against labels already shown in that card body
       // (scoped to the card itself, skipping any nested cards inside it). Uses the same
       // add-contact group token so the re-rendered extras stay addable.
-      var _surfaceExtras = function(cardBody, sectionKey, headLabel, groupToken){
+      // extraShownCards (optional): additional card bodies whose rendered fields ALSO
+      // count as "already shown" for this key. Needed because the `general` key is now
+      // split across TWO cards (General Info + the relocated Owner & GC card): a general
+      // override shown in either card must NOT be re-dumped as an "extra" in the other.
+      var _surfaceExtras = function(cardBody, sectionKey, headLabel, groupToken, extraShownCards){
         if (!cardBody) return;
         var ov = (_curOverrides && _curOverrides[sectionKey]) || {};
         var labels = Object.keys(ov).filter(function(k){ return k !== PF_CRM_KEY; });
         if (!labels.length) return;
         var ownCard = cardBody.closest('.pr-card');
         var shown = {};
-        cardBody.querySelectorAll('.pr-field[data-pr-label]').forEach(function(f){
-          if (f.closest('.pr-card') !== ownCard) return; // skip nested cards
-          shown[(f.getAttribute('data-pr-label') || '').toLowerCase()] = true;
-        });
+        var collectShown = function(cb){
+          if (!cb) return;
+          var oc = cb.closest('.pr-card');
+          cb.querySelectorAll('.pr-field[data-pr-label]').forEach(function(f){
+            if (f.closest('.pr-card') !== oc) return; // skip nested cards
+            shown[(f.getAttribute('data-pr-label') || '').toLowerCase()] = true;
+          });
+        };
+        collectShown(cardBody);
+        (extraShownCards || []).forEach(collectShown);
         var prev = _curSection; _curSection = sectionKey;
         var extraRows = labels
           .filter(function(lbl){ return !shown[String(lbl).toLowerCase()]; })
@@ -15607,25 +15724,34 @@ try {
           cardBody.insertAdjacentHTML('beforeend', subhead(headLabel) + fields(extraRows, groupToken));
         }
       };
-      // General Info (flat "general" key — includes added Owner Contacts).
-      _surfaceExtras(genCard, 'general', 'Additional Contacts / Fields', 'Owner Contact');
+      // Locate a nested contact card by title inside Project Contacts (each nested card
+      // has a unique title). Returns its .pr-card-body or null.
+      var _pcNested = function(title){
+        var cards = root.querySelectorAll('.pr-card');
+        for (var i = 0; i < cards.length; i++){
+          var t = cards[i].querySelector('.pr-card-title');
+          if (t && t.textContent === title) return cards[i].querySelector('.pr-card-body');
+        }
+        return null;
+      };
+      var ownerGcBodyEl = _pcNested('Owner & General Contractor');
+
+      // General "extras": added Owner Contacts + any manual general fields that don't
+      // map to a rendered row. Surface them in the Owner & GC card (where Owner/GC
+      // contacts live), deduping against BOTH general cards so nothing double-renders.
+      _surfaceExtras(ownerGcBodyEl || genCard, 'general', 'Additional Contacts / Fields',
+        'Owner Contact', [genCard]);
 
       // Design Professionals nested card ("design_professionals" key — added firm
-      // contacts / manual fields). Nested inside General Info; its querySelector
-      // resolves to the single .pr-card[data-pr-section="design_professionals"]. The
-      // _surfaceExtras closest('.pr-card') guard keeps General's dedupe from counting
-      // these rows and vice-versa. Group token 'Ground Improvement' lets any surfaced
-      // added contact rejoin the add-contact flow if labeled that way (best-effort).
+      // contacts / manual fields). Now inside Project Contacts; its querySelector still
+      // resolves to the single .pr-card[data-pr-section="design_professionals"].
       _surfaceExtras(root.querySelector('.pr-card[data-pr-section="design_professionals"] .pr-card-body'),
         'design_professionals', 'Additional Design Professional Contacts / Fields', null);
-      // CRM: resolve any __crm[firm].contactIds into live cards under each firm block
-      // (async, fail-soft). No selection -> hosts stay empty (renders as before).
-      pfCrmRenderCards(root.querySelector('.pr-card[data-pr-section="design_professionals"] .pr-card-body') || root);
-      // CRM (General Info): resolve general.__crm['Owner'/'GC'].contactIds into live
-      // directory cards under the Owner Info + GC Info subsections (async, fail-soft).
-      // Scoped to the general card body; the host data-crm-cards-key='general' selects
-      // the right override map. No selection -> hosts stay empty (renders as before).
-      pfCrmRenderCards(root.querySelector('.pr-card[data-pr-section="general"] .pr-card-body') || root);
+      // CRM: resolve every group's __crm[...].contactIds into live cards. Scoped to the
+      // whole Project Contacts card body so ALL hosts (Owner / GC / the 4 DP firms / the
+      // new groups 8-13) render in one pass; each host's data-crm-cards-key selects its
+      // own override map. No selection -> hosts stay empty (renders as before).
+      pfCrmRenderCards(pcHost || root);
 
       // --- QA/QC nested card injected into Engineering & Design (Brad 2026-08-07,
       // batch-12) --- The former standalone QA/QC section now lives as a NESTED editable
@@ -15658,30 +15784,46 @@ try {
       // PF Project Team nested card ("pfTeam" key — added team members).
       _surfaceExtras(root.querySelector('.pr-card[data-pr-section="pfTeam"] .pr-card-body'),
         'pfTeam', 'Additional Team Members / Fields', 'PF Team Member');
+      // SCOPING NOTE (Brad 2026-08-11, Project Contacts move): the equipment / material
+      // / safety / siteReadiness keys are now each owned by TWO cards — the original
+      // card inside Site Readiness (with the real field rows) AND a new CRM-only contact
+      // card inside Project Contacts (Equipment Transport & Rental / Material & Fuel /
+      // Safety Consultant / Staking & Layout). A bare
+      // root.querySelector('.pr-card[data-pr-section="equipment"]') would now match the
+      // Project Contacts card FIRST (it appears earlier in the DOM), so we resolve the
+      // Site-Readiness-scoped card explicitly. The Project Contacts CRM-only cards have
+      // NO .pr-field rows, so their overrides (none) never need surfacing there; the
+      // real override rows always live in the Site Readiness card resolved here.
+      var srCardEl = (function(){
+        var cards = root.querySelectorAll('.pr-card');
+        for (var i = 0; i < cards.length; i++){
+          var t = cards[i].querySelector('.pr-card-title');
+          if (t && t.textContent === 'Site Readiness / Project Setup') return cards[i];
+        }
+        return null;
+      })();
+      var _srScoped = function(sec){
+        return srCardEl ? srCardEl.querySelector('.pr-card[data-pr-section="' + sec + '"] .pr-card-body') : null;
+      };
       // Equipment nested card ("equipment" key — added rental/transport vendors +
-      // any manual fields). Nested inside Site Readiness / Project Setup; its
-      // querySelector resolves to the single .pr-card[data-pr-section="equipment"].
-      _surfaceExtras(root.querySelector('.pr-card[data-pr-section="equipment"] .pr-card-body'),
+      // any manual fields). Scoped to the Site Readiness card (not the Project
+      // Contacts Equipment Transport & Rental CRM card).
+      _surfaceExtras(_srScoped('equipment'),
         'equipment', 'Additional Equipment Vendors / Fields', 'Rental / Transport Vendor');
       // Material nested card ("material" key — added stone/fuel vendors + manual fields).
-      _surfaceExtras(root.querySelector('.pr-card[data-pr-section="material"] .pr-card-body'),
+      _surfaceExtras(_srScoped('material'),
         'material', 'Additional Material Vendors / Fields', 'Stone / Fuel Vendor');
       // Safety nested card ("safety" key — MIGRATED from the former standalone Project
-      // Safety section). Surfaces any stored safety override whose label no longer maps
-      // to a rendered field (so migrated data is never orphaned). Scoped to the single
-      // .pr-card[data-pr-section="safety"] (nested inside Site Readiness). No add-group.
-      _surfaceExtras(root.querySelector('.pr-card[data-pr-section="safety"] .pr-card-body'),
+      // Safety section). Scoped to the Site Readiness card (not the Project Contacts
+      // Safety Consultant CRM card).
+      _surfaceExtras(_srScoped('safety'),
         'safety', 'To Be Placed (pending Brad\'s direction)', null);
-      // Site Readiness top-level card ("siteReadiness" key). The former flat Site
-      // Readiness fields (Mod Load Test Report, Mod Test Jack Calibration Report, Bldg
-      // Pad Passed Proof Roll Report, Building Pad Elevation at Staking, Bldg Pad Prep
-      // Notes, Project Files in PM & Field OneDrive, Field Ops Mgr Jobsite Visit w/ GC)
-      // were superseded by the new 6-subsection structure. This surfaces any of those
-      // (or other) stored siteReadiness overrides whose OLD label no longer matches a
-      // new rendered field into a "To Be Placed" group so NO stored data is orphaned.
-      // The closest('.pr-card') guard in _surfaceExtras skips the nested safety/
-      // equipment/material cards, so only true siteReadiness-key rows are considered.
-      _surfaceExtras(root.querySelector('.pr-card[data-pr-section="siteReadiness"] .pr-card-body'),
+      // Site Readiness top-level card ("siteReadiness" key). This IS the top-level Site
+      // Readiness card (resolved by title), NOT the Project Contacts Staking & Layout
+      // CRM card (which also carries data-pr-section="siteReadiness"). Surfaces any
+      // stored siteReadiness override whose OLD label no longer maps to a rendered field
+      // into a "To Be Placed" group so NO stored data is orphaned.
+      _surfaceExtras(srCardEl ? srCardEl.querySelector('.pr-card-body') : null,
         'siteReadiness', 'To Be Placed (pending Brad\'s direction)', null);
 
       // Project Closeout top-level card ("closeout" key). Brad 2026-08-07 (batch-14):
@@ -16540,8 +16682,16 @@ try {
       // the block reads/writes the right map; the General-Info GC is SEPARATE from the
       // DP engineering-GC entry). Rendered ABOVE the free-text fields. Other sections:
       // none.
+      // A card offers CRM selectors ONLY if it actually renders CRM cards-hosts
+      // (data-crm-cards). The `general` key is now split across TWO cards — General
+      // Info (Project-Info fields, NO CRM host) and the relocated Owner & General
+      // Contractor card (HAS CRM hosts). Gating on host presence keeps General Info's
+      // editor CRM-free while the Owner/GC card gets its selectors (Brad 2026-08-11).
+      var _cardHasCrmHost = !!(body && body.querySelector('.pr-crm-cards'));
       var crmBlocks = '';
-      if (section === 'design_professionals') {
+      if (!_cardHasCrmHost) {
+        crmBlocks = '';
+      } else if (section === 'design_professionals') {
         crmBlocks = '<div class="pr-crm-wrap"><div class="pr-edit-note">'
           + 'Select firms &amp; contacts from the master directory. Checked contacts render as cards under each firm. '
           + 'Use &ldquo;+ Add company / contact&rdquo; to grow the directory.'
@@ -16558,6 +16708,20 @@ try {
           + '</div>'
           + Object.keys(PF_CRM_GENERAL_TRADE).map(function(sn){
               return pfCrmSelectorBlock(sn, PF_CRM_GENERAL_TRADE[sn], 'general');
+            }).join('')
+          + '</div>';
+      } else if (PF_CRM_NEWGROUP_TRADE[section]) {
+        // NEW Project Contacts groups 8-13 (safety / siteReadiness / equipment /
+        // material). Render a cascading company->contacts selector per group under
+        // this key, saved into that key's __crm map (crmKey=section threaded through).
+        var _ngMap = PF_CRM_NEWGROUP_TRADE[section];
+        crmBlocks = '<div class="pr-crm-wrap"><div class="pr-edit-note">'
+          + 'Select the company &amp; contacts from the master directory. '
+          + 'Checked contacts render as cards in this group. '
+          + 'Use &ldquo;+ Add company / contact&rdquo; to grow the directory.'
+          + '</div>'
+          + Object.keys(_ngMap).map(function(sn){
+              return pfCrmSelectorBlock(sn, _ngMap[sn], section);
             }).join('')
           + '</div>';
       }
@@ -17278,11 +17442,18 @@ try {
       // CRM cascading selection: attach the reserved __crm structured key so the
       // picked company + checked contactIds persist with this save. The backend
       // validates it (id shape, caps) and merges it as ONE object under the section;
-      // every other field stays a string. Sent for the DP section (engineering firms)
-      // and the General section (Owner + GC — Brad 2026-08-11), and only when the
-      // editor actually has CRM blocks. pfCollectCrm harvests whatever .pr-crm blocks
-      // this editor rendered (DP firms OR Owner/GC), so the same collector serves both.
-      if (section === 'design_professionals' || section === 'general') {
+      // every other field stays a string. GATED ON THE EDITOR ACTUALLY HAVING .pr-crm
+      // BLOCKS — not just the section name (Brad 2026-08-11, Project Contacts move):
+      // the `general` key is now owned by TWO cards (General Info Project-Info fields
+      // + the relocated Owner & General Contractor contact card). Only the latter
+      // renders CRM blocks. If we keyed on section==='general' alone, saving the
+      // (CRM-less) General Info editor would send __crm:{} and WIPE the Owner/GC
+      // selection stored by the other general card. Gating on presence of .pr-crm
+      // blocks means each card only writes __crm when it truly owns the selector.
+      // (Also covers the new groups 8-13: safety / siteReadiness / equipment /
+      // material editors that now render CRM blocks.) pfCollectCrm harvests whatever
+      // .pr-crm blocks this editor rendered.
+      if (editor.querySelector('.pr-crm')) {
         var crm = pfCollectCrm(editor);
         // Send even an empty {} so a full clear round-trips; backend cleanCrm accepts it.
         fields[PF_CRM_KEY] = crm;

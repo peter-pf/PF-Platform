@@ -1,7 +1,9 @@
 // jsdom render-proof for the Owner/GC CRM cascading selector extension. Loads the
 // REAL project-record IIFE from platform/index.html (no reimplementation), drives a
 // synthetic record, and asserts:
-//   A. General Info editor exposes Owner + GC CRM selector blocks (data-crm-key=general),
+// (Updated 2026-08-11: Owner+GC relocated to the Project Contacts "Owner & General
+//  Contractor" nested card — still the `general` key. Assertions target that card.)
+//   A. The Owner & GC editor exposes Owner + GC CRM selector blocks (data-crm-key=general),
 //      each with a company dropdown + "+ Add company", and NO other trade blocks leak in.
 //   B. The Owner dropdown hydrates from trade=Owner (Owner-category companies only);
 //      the GC dropdown from trade=GC (GC-category only) — filter isolation.
@@ -9,10 +11,11 @@
 //      with section:"general" and a __crm payload carrying Owner + GC selections
 //      (contactIds validated ^C\d+$), coexisting with plain general fields.
 //   D. On reload with a saved general.__crm, pfCrmRenderCards resolves Owner + GC ids
-//      into live cards under the Owner Info / GC Info hosts (name-first card layout).
-//   E. No regression: the Design Professionals selector still renders its 5 firm
-//      blocks under design_professionals; DP + general __crm are independent.
-//   F. field_ops sees NO Edit button on the General card.
+//      into live cards under the Owner / GC hosts (name-first card layout).
+//   E. No regression: the Design Professionals selector renders its 4 firm blocks under
+//      design_professionals (GC firm removed -> GC now lives under general); DP + general
+//      __crm are independent.
+//   F. field_ops sees NO Edit button on the Owner & GC card.
 //
 // Run: OMP_NUM_THREADS=1 node portal_uploads/owner-gc-crm-verify/render-proof.mjs
 import { JSDOM } from 'jsdom';
@@ -121,15 +124,27 @@ function boot(dom, { overrideGet, fetchImpl }){
 const emptyOv = ()=>({status:200, text: JSON.stringify({ok:true,num:'26-002',sections:{},_meta:null})});
 const ovWith = (sections)=>()=>({status:200, text: JSON.stringify({ok:true,num:'26-002',sections,_meta:null})});
 
+// Owner+GC contact groups were RELOCATED to the Project Contacts section (Brad
+// 2026-08-11) into the "Owner & General Contractor" nested card (still `general` key).
+// Find a nested card by its title.
+function findCard(root, title){
+  let found = null;
+  root.querySelectorAll('.pr-card').forEach(c=>{
+    const t = c.querySelector('.pr-card-title');
+    if (t && t.textContent === title) found = c;
+  });
+  return found;
+}
+
 // ---- A + B: General editor exposes Owner + GC selectors, filtered by category ----
 await (async function(){
   const dom = makeDom('partner');
   const w = boot(dom, { overrideGet: emptyOv, fetchImpl: crmFetch(null) });
   w.openProjectRecord('26-002');
   const root = w.document.getElementById('prGenericRoot');
-  const genCard = root.querySelector('.pr-card[data-pr-section="general"]');
-  ok('A general card renders', !!genCard);
-  ok('A general card editable (office)', !!(genCard && genCard.querySelector('.pr-edit-btn')));
+  const genCard = findCard(root, 'Owner & General Contractor');
+  ok('A Owner & GC card renders', !!genCard);
+  ok('A Owner & GC card editable (office)', !!(genCard && genCard.querySelector('.pr-edit-btn')));
   w.pfEditSection(genCard.querySelector('.pr-edit-btn'));
   const editor = genCard.querySelector('.pr-editor');
   ok('A general editor opened', !!editor);
@@ -163,7 +178,7 @@ await (async function(){
   const w = boot(dom, { overrideGet: emptyOv, fetchImpl: crmFetch(posts) });
   w.openProjectRecord('26-002');
   const root = w.document.getElementById('prGenericRoot');
-  const genCard = root.querySelector('.pr-card[data-pr-section="general"]');
+  const genCard = findCard(root, 'Owner & General Contractor');
   w.pfEditSection(genCard.querySelector('.pr-edit-btn'));
   const editor = genCard.querySelector('.pr-editor');
   await new Promise(r=>setTimeout(r,60));
@@ -207,7 +222,7 @@ await (async function(){
   const w = boot(dom, { overrideGet: ovWith(savedSections), fetchImpl: crmFetch(null) });
   w.openProjectRecord('26-002');
   const root = w.document.getElementById('prGenericRoot');
-  const genBody = root.querySelector('.pr-card[data-pr-section="general"] .pr-card-body');
+  const genBody = findCard(root, 'Owner & General Contractor').querySelector('.pr-card-body');
   ok('D general card body present', !!genBody);
   const ownerHost = genBody.querySelector('.pr-crm-cards[data-crm-cards="Owner"][data-crm-cards-key="general"]');
   const gcHost = genBody.querySelector('.pr-crm-cards[data-crm-cards="GC"][data-crm-cards-key="general"]');
@@ -235,7 +250,7 @@ await (async function(){
   w.pfEditSection(dpCard.querySelector('.pr-edit-btn'));
   const dpEditor = dpCard.querySelector('.pr-editor');
   const dpBlocks = dpEditor.querySelectorAll('.pr-crm[data-crm-key="design_professionals"]');
-  ok('E DP editor has 5 firm CRM blocks', dpBlocks.length === 5);
+  ok('E DP editor has 4 firm CRM blocks (GC moved to general)', dpBlocks.length === 4);
   // The general card's CRM blocks are NOT inside the DP editor.
   const strayGeneral = dpEditor.querySelectorAll('.pr-crm[data-crm-key="general"]');
   ok('E no general CRM blocks leak into DP editor', strayGeneral.length === 0);
@@ -247,9 +262,9 @@ await (async function(){
   const w = boot(dom, { overrideGet: ()=>({status:403, text: JSON.stringify({status:'forbidden'})}), fetchImpl: crmFetch(null) });
   w.openProjectRecord('26-002');
   const root = w.document.getElementById('prGenericRoot');
-  const genCard = root.querySelector('.pr-card[data-pr-section="general"]');
-  ok('F general card renders for field_ops', !!genCard);
-  ok('F general card has NO Edit button for field_ops', !!genCard && !genCard.querySelector('.pr-edit-btn'));
+  const genCard = findCard(root, 'Owner & General Contractor');
+  ok('F Owner & GC card renders for field_ops', !!genCard);
+  ok('F Owner & GC card has NO Edit button for field_ops', !!genCard && !genCard.querySelector('.pr-edit-btn'));
 })();
 
 console.log('\n== RESULT ==  pass=' + pass + '  fail=' + fail);

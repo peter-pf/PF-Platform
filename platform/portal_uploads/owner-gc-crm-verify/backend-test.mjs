@@ -209,5 +209,39 @@ console.log('== contacts.js trade=Owner / trade=GC ==');
     !gc.some(c => c.contactId === 'C0009'));
 }
 
+// =====================================================================
+// 6. Project Contacts (Brad 2026-08-11): the new dedicated contact groups save
+//    __crm under EXISTING keys safety / siteReadiness / equipment / material.
+//    Those keys must now accept a __crm body (CRM_ALLOWED_SECTIONS extended); a
+//    still-disallowed key (contract) must keep rejecting __crm with 400.
+// =====================================================================
+console.log('\n== Project Contacts new CRM keys (safety/siteReadiness/equipment/material) ==');
+for (const key of ['safety', 'siteReadiness', 'equipment', 'material']) {
+  const kv = makeKV();
+  const env = { PF_SCHEDULE: kv };
+  const r = await override.onRequestPost({
+    request: req({ num: '26-PC', section: key, fields: {
+      '__crm': { 'Grp': { company: 'Acme Co', contactIds: ['C0100'] } }
+    } }),
+    env, data: { session: office },
+  });
+  const b = await r.json();
+  ok(key + ' accepts __crm (200 saved)', r.status === 200 && b.ok === true && b.saved === true);
+  const sec = b.sections && b.sections[key];
+  ok(key + ' __crm stored', sec && sec.__crm && sec.__crm.Grp &&
+    sec.__crm.Grp.company === 'Acme Co' && sec.__crm.Grp.contactIds[0] === 'C0100');
+}
+{
+  // contract is NOT in CRM_ALLOWED_SECTIONS -> __crm body must 400.
+  const kv = makeKV();
+  const r = await override.onRequestPost({
+    request: req({ num: '26-PC', section: 'contract', fields: {
+      '__crm': { 'Grp': { company: 'Acme Co', contactIds: ['C0100'] } }
+    } }),
+    env: { PF_SCHEDULE: kv }, data: { session: office },
+  });
+  ok('contract still rejects __crm (400)', r.status === 400);
+}
+
 console.log('\n== RESULT ==  pass=' + pass + '  fail=' + fail);
 process.exit(fail ? 1 : 0);

@@ -77,7 +77,16 @@ const CRM_KEY = '__crm';
 // { "<Section>": { company, contactIds[] } } shape validated by cleanCrm below; the
 // Owner/GC selection lives beside the flat Owner/GC string fields under `general`
 // (Object.assign merge preserves both). Any OTHER section rejects a __crm body (400).
-const CRM_ALLOWED_SECTIONS = { design_professionals: 1, general: 1 };
+// Brad 2026-08-11 (Project Contacts restructure): the new dedicated contact groups
+// (Safety Consultant / Staking & Layout / Equipment Transport + Rental Equipment /
+// Material Vendor(s) + Fuel Delivery) live in the Project Contacts section under
+// EXISTING override keys (safety / siteReadiness / equipment / material) and each
+// carries a cascading company->contacts CRM selector. So those four keys must accept a
+// __crm body too. Same { "<Section>": { company, contactIds[] } } shape + validation.
+const CRM_ALLOWED_SECTIONS = {
+  design_professionals: 1, general: 1,
+  safety: 1, siteReadiness: 1, equipment: 1, material: 1,
+};
 const CRM_MAX_FIRMS = 12;            // >5 real firm sections, bounds abuse
 const CRM_MAX_IDS = 40;              // contacts per firm on one project (generous)
 const CRM_MAX_COMPANY = 200;         // a company name length cap
@@ -265,7 +274,7 @@ export async function onRequestPost(context) {
     let crmUpdate; // undefined => untouched
     if (hasCrmInBody) {
       if (!CRM_ALLOWED_SECTIONS[section]) {
-        return json({ status: 'error', message: 'CRM selection is only valid on Design Professionals or General Info.' }, 400);
+        return json({ status: 'error', message: 'CRM selection is not valid on this section.' }, 400);
       }
       crmUpdate = cleanCrm(rawFieldsObj[CRM_KEY]);
       if (crmUpdate === null) {
