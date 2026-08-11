@@ -26,7 +26,34 @@ window.PF_GARBIN_PRELIM = {
         "stone_tn": "tons"
       },
       "missing": [],
-      "prelim_folder": "Garbin Prelim"
+      "prelim_folder": "Garbin Prelim",
+      "source": "named",
+      "source_path": "Garbin Prelim/AP Preliminary Design Summary POET Shelbyville Rev1.xlsx"
+    },
+    "26-008": {
+      "lf": 2880,
+      "total_columns": 160,
+      "nominal_dia_ft": 2.5,
+      "bearing_psf": 2000,
+      "stone_tn": 650,
+      "webUrl": "https://pierfoundations.sharepoint.com/sites/pf/_layouts/15/Doc.aspx?sourcedoc=%7B576D3173-C1BE-468A-B6A3-B63CB1036E5B%7D&file=AP%20Preliminary%20Design%20Summary%20INAW%20Terre%20Haute.xlsx&action=default&mobileredirect=true",
+      "source_file": "AP Preliminary Design Summary INAW Terre Haute.xlsx",
+      "item_id": "016ISVH63TGFWVPPWBRJDLNI5WHSYQG3S3",
+      "tabs": [
+        "Prelim Design Summary",
+        "Design Notes"
+      ],
+      "units": {
+        "lf": "feet",
+        "total_columns": "cols",
+        "nominal_dia_ft": "feet",
+        "bearing_psf": "95.76",
+        "stone_tn": "tons"
+      },
+      "missing": [],
+      "prelim_folder": "(fallback) Bid Design",
+      "source": "fallback",
+      "source_path": "Bid Design/AP Preliminary Design Summary INAW Terre Haute.xlsx"
     },
     "26-011": {
       "lf": 1830,
@@ -49,7 +76,9 @@ window.PF_GARBIN_PRELIM = {
         "stone_tn": "tons"
       },
       "missing": [],
-      "prelim_folder": "Bid Prelim"
+      "prelim_folder": "Bid Prelim",
+      "source": "named",
+      "source_path": "Bid Prelim/AP Preliminary Design Summary_Indianapolis Housing Hub.xlsx"
     },
     "26-013": {
       "lf": 13397,
@@ -72,7 +101,9 @@ window.PF_GARBIN_PRELIM = {
         "stone_tn": "tons"
       },
       "missing": [],
-      "prelim_folder": "Bid Prelim"
+      "prelim_folder": "Bid Prelim",
+      "source": "named",
+      "source_path": "Bid Prelim/AP Preliminary Design Summary Park and Poplar.xlsx"
     },
     "26-014": {
       "lf": 2140,
@@ -95,7 +126,9 @@ window.PF_GARBIN_PRELIM = {
         "stone_tn": "tons"
       },
       "missing": [],
-      "prelim_folder": "Bid Prelim"
+      "prelim_folder": "Bid Prelim",
+      "source": "named",
+      "source_path": "Bid Prelim/AP Preliminary Design Summary TPS Dayton Rev2.xlsx"
     },
     "26-016": {
       "lf": 3828.96,
@@ -118,7 +151,9 @@ window.PF_GARBIN_PRELIM = {
         "stone_tn": "tons"
       },
       "missing": [],
-      "prelim_folder": "Bid Prelim"
+      "prelim_folder": "Bid Prelim",
+      "source": "named",
+      "source_path": "Bid Prelim/AP Preliminary Design Summary Filager Campus Phase II.xlsx"
     },
     "26-018": {
       "lf": 1520,
@@ -141,14 +176,16 @@ window.PF_GARBIN_PRELIM = {
         "stone_tn": "tons"
       },
       "missing": [],
-      "prelim_folder": "Bid Prelim"
+      "prelim_folder": "Bid Prelim",
+      "source": "named",
+      "source_path": "Bid Prelim/AP Preliminary Design Summary Pivotal Perrysburg Sr Lofts.xlsx"
     }
   },
   "meta": {
-    "generated": "2026-08-11T22:50:28.497705Z",
-    "source": "SharePoint 03 - Engineering & Design/{Garbin Prelim|Bid Prelim}/<AP Preliminary Design Summary>.xlsx, tab 'Prelim Design Summary'",
+    "generated": "2026-08-11T23:08:48.557135Z",
+    "source": "SharePoint 03 - Engineering & Design/{Garbin Prelim|Bid Prelim}/<AP Preliminary Design Summary>.xlsx (or, fallback, any 'Preliminary Design Summary' workbook anywhere under E&D), tab 'Prelim Design Summary'",
     "extraction": "label-anchored col R -> value col T (unit col U)",
-    "note": "nominal_dia_ft is RAW feet; frontend x12 -> inches. Prelim folder = 'Garbin Prelim' (older) OR 'Bid Prelim' (newer). OLD subfolders disregarded.",
-    "project_count": 6
+    "note": "nominal_dia_ft is RAW feet; frontend x12 -> inches. Prelim from named folder 'Garbin Prelim' (older) OR 'Bid Prelim' (newer); FALLBACK = whole-E&D-tree filename search when neither named folder has a file (OLD/archive/superseded folders excluded, tab-verified). OLD subfolders disregarded.",
+    "project_count": 7
   }
 };

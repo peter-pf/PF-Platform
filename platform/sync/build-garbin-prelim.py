@@ -99,6 +99,44 @@ ENG_BASE = "03 - Engineering & Design"
 PRELIM_SUBFOLDER_NAMES = ["Garbin Prelim", "Bid Prelim"]
 EXTRACT_TAB = "Prelim Design Summary"
 
+# FALLBACK (Brad's rule of thumb, 2026-08-11): every job that reaches the active-projects
+# phase HAS a prelim done, so the AP Preliminary Design Summary workbook WILL exist somewhere
+# under "03 - Engineering & Design" -- most often in a "Bid Prelim" folder, but sometimes in a
+# differently-named (or no) subfolder. When neither NAMED prelim folder yields a file, we walk
+# the ENTIRE "03 - Engineering & Design" tree and match a workbook by NAME.
+#
+# The filename filter is DELIBERATELY specific so we never grab an unrelated Excel (budget,
+# takeoff, submittal log, RFI log, etc.). Both known real files are named
+# "AP Preliminary Design Summary <project>.xlsx". We accept, case-insensitively, a filename that
+# contains any of these distinctive phrases:
+PRELIM_NAME_PATTERNS = [
+    re.compile(r"preliminary\s*design\s*summary", re.I),  # canonical (most known files)
+    re.compile(r"prelim\s*design\s*summary", re.I),       # abbreviated variant
+    # "AP Preliminary Design ..." WITHOUT the word "Summary" -- same document, older naming
+    # (e.g. 26-007 "AP Preliminary Design Madison Lifestyle.xlsx"). The "AP" (aggregate pier)
+    # prefix keeps this specific to the prelim workbook, not a generic "design" file.
+    re.compile(r"\bap\s*preliminary\s*design\b", re.I),
+    re.compile(r"\bap\s*prelim\b", re.I),                 # "AP Prelim ..." variant
+]
+# Any path segment containing one of these words means a stale/superseded copy -> never read it.
+STALE_DIR_PATTERNS = [
+    re.compile(r"\bold\b", re.I),
+    re.compile(r"archive", re.I),
+    re.compile(r"superseded", re.I),
+]
+# Cap the tree walk so a pathological deep/huge Engineering folder can't blow up the sync.
+FALLBACK_MAX_DEPTH = 6
+
+
+def _name_is_prelim(name):
+    n = str(name or "")
+    return any(rx.search(n) for rx in PRELIM_NAME_PATTERNS)
+
+
+def _segment_is_stale(name):
+    n = str(name or "")
+    return any(rx.search(n) for rx in STALE_DIR_PATTERNS)
+
 # Only real project folders start with an "NN-NNN" number. Skip the completed-projects
 # roll-up folder, the template placeholder, and any non-project folders.
 PROJNUM_RE = re.compile(r"^(\d{2}-\d{3})\b")
@@ -147,6 +185,17 @@ def try_list_children_by_path(token, path):
         if e.code == 404:
             return None
         raise
+
+
+def list_children_by_item(token, item_id):
+    """List the direct children of a driveItem by its id (used to walk a subtree)."""
+    url = f"{GRAPH}/drives/{DRIVE_ID}/items/{item_id}/children"
+    items = []
+    while url:
+        data = gget(token, url)
+        items.extend(data.get("value", []))
+        url = data.get("@odata.nextLink")
+    return items
 
 
 def download_item_content(token, item_id):
@@ -261,46 +310,141 @@ def pick_prelim_excel(children):
     return pool[0]
 
 
-def resolve_prelim_excel(token, folder):
-    """For one project folder, resolve the prelim Excel out of EITHER prelim-subfolder
-    name under '03 - Engineering & Design'. Returns (chosen_item, prelim_folder_name,
-    both_flag) where:
-      - chosen_item        = the driveItem for the .xlsx (or None if nothing usable)
-      - prelim_folder_name = the actual prelim subfolder we read from (or None)
-      - both_flag          = True if MORE THAN ONE prelim folder held a usable .xlsx
-    The '03 - Engineering & Design' children are listed ONCE; we match candidate names
-    case-insensitively. When several candidates hold files, we keep the one from the
-    folder LAST in PRELIM_SUBFOLDER_NAMES (newer structure 'Bid Prelim' wins) and flag."""
-    eng_path = f"{PROJECTS_BASE}/{folder}/{ENG_BASE}"
-    eng_kids = try_list_children_by_path(token, eng_path)
-    if eng_kids is None:
-        return None, None, False
+def fallback_prelim_search(token, eng_root_item):
+    """FALLBACK when neither named prelim folder yields a file (Brad's rule: an active
+    project HAS a prelim somewhere under '03 - Engineering & Design').
 
-    # Index engineering-folder subfolders by lowercased name for case-insensitive match.
+    Walk the ENTIRE Engineering & Design subtree (direct files AND subfolders) and collect
+    every .xlsx/.xlsm whose NAME matches the prelim pattern (PRELIM_NAME_PATTERNS). Any path
+    that passes through an OLD/archive/superseded folder is EXCLUDED (stale copies). Returns a
+    list of candidate dicts: {item, path, in_named_folder, mtime}. Empty list = nothing found.
+
+    The name filter is specific enough to skip budgets/takeoffs/submittal logs/etc. Ranking
+    (which candidate wins) is done by the caller.
+    """
+    candidates = []
+    named_lower = {n.lower() for n in PRELIM_SUBFOLDER_NAMES}
+    # Stack of (item, path_segments_so_far, depth). Root's own name is not part of the path.
+    stack = [(eng_root_item, [], 0)]
+    while stack:
+        node, segs, depth = stack.pop()
+        try:
+            kids = list_children_by_item(token, node.get("id", ""))
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                continue
+            raise
+        for c in kids:
+            cname = str(c.get("name", ""))
+            if c.get("folder"):
+                if _segment_is_stale(cname):
+                    continue  # do not descend into OLD/archive/superseded
+                if depth + 1 <= FALLBACK_MAX_DEPTH:
+                    stack.append((c, segs + [cname], depth + 1))
+                continue
+            # file
+            if not cname.lower().endswith((".xlsx", ".xlsm")):
+                continue
+            if not _name_is_prelim(cname):
+                continue
+            in_named = any(s.lower() in named_lower for s in segs)
+            candidates.append({
+                "item": c,
+                "path": "/".join(segs + [cname]),
+                "in_named_folder": in_named,
+                "mtime": c.get("lastModifiedDateTime", "") or "",
+            })
+    return candidates
+
+
+def _get_item_by_path(token, path):
+    """Fetch a single driveItem (folder or file) by path. Returns the item, or None on 404."""
+    p = urllib.parse.quote(path)
+    url = f"{GRAPH}/drives/{DRIVE_ID}/root:/{p}"
+    try:
+        return gget(token, url)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return None
+        raise
+
+
+def resolve_prelim_excel(token, folder):
+    """For one project folder, resolve the prelim Excel under '03 - Engineering & Design'.
+
+    Priority order (Brad's rule: an active project HAS a prelim somewhere under E&D):
+      1. NAMED prelim subfolders first (current behavior): 'Garbin Prelim' then 'Bid Prelim'
+         (newer 'Bid Prelim' wins the tiebreak if both hold files).
+      2. FALLBACK: if neither named folder yields a file, walk the ENTIRE E&D tree and match a
+         workbook by NAME (PRELIM_NAME_PATTERNS). OLD/archive/superseded folders excluded.
+         Multiple matches -> prefer one inside a named prelim folder, else newest by mtime; flag.
+      3. Nothing found either way -> no entry.
+
+    Returns a dict:
+      {found: bool, item, prelim_folder, source: 'named'|'fallback'|None,
+       both_flag: bool, multi_flag: bool, path, candidate_paths: [..]}
+    """
+    result = {
+        "found": False, "item": None, "prelim_folder": None, "source": None,
+        "both_flag": False, "multi_flag": False, "path": None, "candidate_paths": [],
+        # ranked (item, folder_label, path) fallback candidates, best-first, so build() can
+        # skip a name-matched file that turns out to lack the Prelim Design Summary tab.
+        "fallback_ranked": [],
+    }
+    eng_root = _get_item_by_path(token, f"{PROJECTS_BASE}/{folder}/{ENG_BASE}")
+    if eng_root is None:
+        return result  # no Engineering & Design folder at all
+
+    eng_kids = try_list_children_by_path(token, f"{PROJECTS_BASE}/{folder}/{ENG_BASE}")
+    if eng_kids is None:
+        eng_kids = []
+
+    # ---- (1) NAMED prelim subfolders ----
     subfolders = {str(c.get("name", "")).lower(): c
                   for c in eng_kids if c.get("folder")}
-
     hits = []  # (order_index, actual_name, chosen_excel_item)
+    eng_path = f"{PROJECTS_BASE}/{folder}/{ENG_BASE}"
     for idx, cand in enumerate(PRELIM_SUBFOLDER_NAMES):
         sub = subfolders.get(cand.lower())
         if sub is None:
             continue
         actual_name = str(sub.get("name", cand))
-        prelim_path = f"{eng_path}/{actual_name}"
-        kids = try_list_children_by_path(token, prelim_path)
+        kids = try_list_children_by_path(token, f"{eng_path}/{actual_name}")
         if kids is None:
             continue
         chosen = pick_prelim_excel(kids)
         if chosen is not None:
             hits.append((idx, actual_name, chosen))
 
-    if not hits:
-        return None, None, False
-    both = len(hits) > 1
-    # Prefer the folder LAST in PRELIM_SUBFOLDER_NAMES (highest order index = newer).
-    hits.sort(key=lambda h: h[0])
-    _, actual_name, chosen = hits[-1]
-    return chosen, actual_name, both
+    if hits:
+        both = len(hits) > 1
+        hits.sort(key=lambda h: h[0])
+        _, actual_name, chosen = hits[-1]  # newest structure (last in list) wins
+        result.update(found=True, item=chosen, prelim_folder=actual_name,
+                      source="named", both_flag=both,
+                      path=f"{actual_name}/{chosen.get('name', '')}")
+        return result
+
+    # ---- (2) FALLBACK: walk the whole E&D tree by filename ----
+    candidates = fallback_prelim_search(token, eng_root)
+    if not candidates:
+        return result  # (3) genuinely nothing found
+
+    result["candidate_paths"] = [c["path"] for c in candidates]
+    # Rank: prefer a candidate INSIDE a named prelim folder, then newest by mtime.
+    candidates.sort(key=lambda c: (c["in_named_folder"], c["mtime"]), reverse=True)
+
+    def _folder_label(path):
+        d = os.path.dirname(path)
+        return "(fallback) " + d if d else "(fallback) E&D root"
+
+    ranked = [(c["item"], _folder_label(c["path"]), c["path"]) for c in candidates]
+    best = candidates[0]
+    result.update(found=True, item=best["item"],
+                  prelim_folder=_folder_label(best["path"]),
+                  source="fallback", multi_flag=len(candidates) > 1,
+                  path=best["path"], fallback_ranked=ranked)
+    return result
 
 
 def resolve_projects(token, only=None):
@@ -319,32 +463,88 @@ def resolve_projects(token, only=None):
         yield projnum, name
 
 
+def _extract_with_tab_guard(token, item):
+    """Download + extract ONE candidate workbook. Returns:
+      ('ok', values, units, missing)      -- has the Prelim Design Summary tab
+      ('no-tab', None, None, None)         -- lacks the tab (probably the wrong file -> skip it)
+      ('error', err_str, None, None)       -- download/parse failure
+    NO fabrication: a file without the extraction tab is never mined for values."""
+    try:
+        raw = download_item_content(token, item.get("id", ""))
+    except Exception as e:  # noqa: BLE001
+        return ("error", f"download: {e}", None, None)
+    try:
+        values, units, missing = extract_from_workbook(raw)
+    except Exception as e:  # noqa: BLE001
+        return ("error", f"parse: {e}", None, None)
+    if missing == [f"tab:{EXTRACT_TAB}"]:
+        return ("no-tab", None, None, None)
+    return ("ok", values, units, missing)
+
+
 def build(token, only=None, verbose=True):
     projects = {}
     report = []  # (projnum, status, detail)
     for projnum, folder in resolve_projects(token, only=only):
-        chosen, prelim_folder, both = resolve_prelim_excel(token, folder)
-        if chosen is None:
-            report.append((projnum, "no-prelim", "no prelim folder/.xlsx (Garbin Prelim | Bid Prelim)"))
+        res = resolve_prelim_excel(token, folder)
+        if not res["found"]:
+            report.append((projnum, "no-prelim",
+                           "no prelim in named folders OR anywhere under E&D (fallback searched)"))
             continue
-        item_id = chosen.get("id", "")
-        webUrl = chosen.get("webUrl", "")
-        src_name = chosen.get("name", "")
-        try:
-            raw = download_item_content(token, item_id)
-        except Exception as e:  # noqa: BLE001
-            report.append((projnum, "download-error", f"{src_name}: {e}"))
+
+        source = res["source"]
+        # Build the ordered list of candidates to TRY. For a fallback with multiple matches we
+        # try them best-first, skipping any that lack the Prelim Design Summary tab (wrong file).
+        if source == "fallback" and res["fallback_ranked"]:
+            trylist = res["fallback_ranked"]  # (item, folder_label, path)
+        else:
+            trylist = [(res["item"], res["prelim_folder"], res["path"])]
+
+        skipped_no_tab = []
+        chosen_tuple = None
+        outcome = None
+        for item, folder_label, path in trylist:
+            kind, values, units, missing = _extract_with_tab_guard(token, item)
+            if kind == "error":
+                report.append((projnum, "download/parse-error", f"{path}: {values}"))
+                outcome = "hard-error"
+                break
+            if kind == "no-tab":
+                skipped_no_tab.append(path)
+                continue
+            chosen_tuple = (item, folder_label, path, values, units, missing)
+            break
+
+        if outcome == "hard-error":
             continue
-        try:
-            values, units, missing = extract_from_workbook(raw)
-        except Exception as e:  # noqa: BLE001
-            report.append((projnum, "parse-error", f"{src_name}: {e}"))
+        if chosen_tuple is None:
+            # every candidate lacked the tab -> no entry, flag WHY.
+            detail = f"candidate(s) lacked '{EXTRACT_TAB}' tab (skipped, not extracted): " \
+                     + "; ".join(skipped_no_tab)
+            report.append((projnum, "no-prelim (wrong-file)", detail))
             continue
+
+        item, folder_label, path, values, units, missing = chosen_tuple
+        webUrl = item.get("webUrl", "")
+        src_name = item.get("name", "")
+        item_id = item.get("id", "")
         entry = build_entry(values, units, missing, webUrl, src_name, item_id)
-        entry["prelim_folder"] = prelim_folder  # which structure this came from
+        entry["prelim_folder"] = folder_label      # which folder/structure this came from
+        entry["source"] = source                   # 'named' or 'fallback'
+        entry["source_path"] = path                 # provenance path under E&D
         projects[projnum] = entry
-        flag = "  [BOTH prelim folders had files -- used newer]" if both else ""
-        detail = f"[{prelim_folder}] {src_name}{flag}"
+
+        flags = []
+        if source == "named" and res["both_flag"]:
+            flags.append("[BOTH named prelim folders had files -- used newer]")
+        if source == "fallback":
+            flags.append("[FALLBACK tree-search]")
+            if res["multi_flag"]:
+                flags.append(f"[{len(res['candidate_paths'])} name-matches -- picked best]")
+        if skipped_no_tab:
+            flags.append(f"[skipped {len(skipped_no_tab)} no-tab candidate(s)]")
+        flag = ("  " + " ".join(flags)) if flags else ""
+        detail = f"[{folder_label}] {src_name}{flag}"
         status = "ok" if not missing else f"ok (missing: {','.join(missing)})"
         report.append((projnum, status, detail))
 
@@ -352,9 +552,9 @@ def build(token, only=None, verbose=True):
         "projects": projects,
         "meta": {
             "generated": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-            "source": "SharePoint 03 - Engineering & Design/{Garbin Prelim|Bid Prelim}/<AP Preliminary Design Summary>.xlsx, tab 'Prelim Design Summary'",
+            "source": "SharePoint 03 - Engineering & Design/{Garbin Prelim|Bid Prelim}/<AP Preliminary Design Summary>.xlsx (or, fallback, any 'Preliminary Design Summary' workbook anywhere under E&D), tab 'Prelim Design Summary'",
             "extraction": "label-anchored col R -> value col T (unit col U)",
-            "note": "nominal_dia_ft is RAW feet; frontend x12 -> inches. Prelim folder = 'Garbin Prelim' (older) OR 'Bid Prelim' (newer). OLD subfolders disregarded.",
+            "note": "nominal_dia_ft is RAW feet; frontend x12 -> inches. Prelim from named folder 'Garbin Prelim' (older) OR 'Bid Prelim' (newer); FALLBACK = whole-E&D-tree filename search when neither named folder has a file (OLD/archive/superseded folders excluded, tab-verified). OLD subfolders disregarded.",
             "project_count": len(projects),
         },
     }
