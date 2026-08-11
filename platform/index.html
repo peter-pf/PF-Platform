@@ -3010,6 +3010,7 @@ tr.pf-dragging { opacity: 0.45; }
     '/data/projects-data.js',
     '/data/project-record-poet.js',
     '/data/project-records.js',
+    '/data/garbin-prelim.js',
     '/data/budget-actual-poet.js',
     '/data/awarded-projects.js',
     '/data/precon-pipeline.js',
@@ -3078,6 +3079,7 @@ tr.pf-dragging { opacity: 0.45; }
   feeds.push('/data/progress-data.js');
   if (isPrivileged) {
     feeds.push('/data/project-record-poet.js', '/data/project-records.js',
+               '/data/garbin-prelim.js',
                '/data/budget-actual-poet.js', '/data/cost-code-template.js',
                '/data/budget-actuals.js', '/data/invoice-ledger.js',
                '/data/awarded-projects.js', '/data/project-history.js',
@@ -13088,6 +13090,77 @@ try {
     function subgroup(t){ return '<div class="pr-subgroup">'+E(t)+'</div>'; }
     function subgroupNote(t){ return '<div class="pr-subgroup-note">'+E(t)+'</div>'; }
 
+    // ---- Garbin Prelim (Engineering & Design) --------------------------------
+    // Reads window.PF_GARBIN_PRELIM.projects[num] (from data/garbin-prelim.js, built
+    // by sync/build-garbin-prelim.py off the SharePoint "Prelim Design Summary" tab).
+    // DISTINCT global from window.PF_GARBIN (the per-bid sent-to-Garbin flags) to
+    // avoid a name collision. Fail-closed: any missing global / project / value
+    // renders blank (never "undefined"/"NaN").
+    function pfGarbinPrelim(num){
+      try {
+        var g = window.PF_GARBIN_PRELIM;
+        if (!g || !g.projects || !num) return null;
+        return g.projects[String(num)] || null;
+      } catch (e) { return null; }
+    }
+    // Display a Garbin qty (thousands-separated) or "-" when absent. Numbers only;
+    // null/undefined/blank -> em-dash (never "NaN"/"undefined").
+    function pfGP(v){
+      if (v === undefined || v === null || v === '') return '-';
+      return String(window.pfFmtQty(v));
+    }
+    // "GGG Design Notes" block (rendered UNDER PF Design Submittal). Shows the four
+    // pulled values + a clickable link to the workbook naming its two tabs. Renders
+    // only when a Garbin entry exists for this project; otherwise returns ''.
+    function garbinDesignNotesBlock(gp){
+      if (!gp) return '';
+      // Column Diameter: RAW nominal_dia_ft x12 -> inches, labeled "(in)".
+      var diaIn = '-';
+      if (gp.nominal_dia_ft !== undefined && gp.nominal_dia_ft !== null && gp.nominal_dia_ft !== '') {
+        var n = Number(gp.nominal_dia_ft);
+        if (!isNaN(n)) diaIn = String(window.pfFmtQty(n * 12));
+      }
+      var rows = [
+        field('LF', gp.lf, gp.lf != null ? 'Garbin Prelim' : ''),
+        field('Total Columns', gp.total_columns, gp.total_columns != null ? 'Garbin Prelim' : ''),
+        // Field/unit label carries the "(in)" unit per Brad; value is x12 inches.
+        field('Column Diameter (in)', diaIn === '-' ? '' : diaIn, diaIn !== '-' ? 'Garbin Prelim' : ''),
+        // Bearing label has no qty token (psf), so pre-format for the thousands
+        // separator (5000 -> 5,000) to match the portal's pfFmtQty standard.
+        field('Bearing Capacity (psf)',
+              gp.bearing_psf != null ? window.pfFmtQty(gp.bearing_psf) : '',
+              gp.bearing_psf != null ? 'Garbin Prelim' : '')
+      ];
+      // Clickable link to the workbook + note the two tabs to toggle between.
+      var url = (gp.webUrl == null) ? '' : String(gp.webUrl).trim();
+      var linkHtml;
+      if (url) {
+        var href = /^[a-z][a-z0-9+.-]*:\/\//i.test(url) ? url : ('https://' + url.replace(/^\/+/, ''));
+        var label = gp.source_file ? String(gp.source_file) : 'Open Garbin Prelim workbook';
+        linkHtml = '<a href="'+E(href)+'" target="_blank" rel="noopener noreferrer">'+E(label)+'</a>';
+      } else {
+        linkHtml = '<span class="pr-field-value empty blank">-</span>';
+      }
+      var linkRowHtml =
+          '<div class="pr-field" data-pr-label="Garbin Prelim Workbook">'
+        +   '<span class="pr-field-label">Garbin Prelim Workbook</span>'
+        +   '<span class="pr-field-value">'+linkHtml+'</span>'
+        + '</div>';
+      var tabsNote = subgroupNote('Toggle between the two tabs in the workbook: '
+        + '"Prelim Design Summary" and "Design Notes".');
+      return subgroup('GGG Design Notes')
+        + subgroupNote('Values pulled from the Garbin Prelim workbook (Prelim Design Summary tab).')
+        + fields(rows)
+        + linkRowHtml
+        + tabsNote;
+    }
+    // "Total Stone (TN):" field (rendered on the Prelim Design subsection). Returns a
+    // single field() row when a Garbin stone value exists; else '' (nothing shown).
+    function garbinTotalStoneField(gp){
+      if (!gp || gp.stone_tn == null || gp.stone_tn === '') return '';
+      return field('Total Stone (TN)', gp.stone_tn, 'Garbin Prelim');
+    }
+
     // ---- computed automations (phase 2, Brad 2026-08-07) ---------------------
     // DISPLAY-ONLY computed HINTS layered next to existing manual fields. These
     // read existing field values (synced value or manual override, override wins
@@ -14733,6 +14806,10 @@ try {
       // override mechanism. AUTOMATION (auto-extract from the linked doc, submittal-
       // approved auto-save, daily as-built compare) is FUTURE — only the UI shells +
       // subgroupNote descriptions are built here, no automation wired.
+      // Garbin Prelim design values for THIS project (data/garbin-prelim.js),
+      // keyed by project number. null when the project has no Garbin Prelim
+      // workbook -> the added display pieces render nothing (graceful).
+      var gp = pfGarbinPrelim(_curNum);
       var engBody =
           // --- Subsection 1: Prelim Design ---
           // The prelim design the bid was based on. LF / Total Columns / Column
@@ -14754,7 +14831,11 @@ try {
             // DROPDOWN (SOW — reuses the existing Project SOW values via a new
             // PF_FIELD_DROPDOWNS['SOW'] entry pointing at the same value list).
             field('SOW', '')
-          ])
+          ].concat(
+            // "Total Stone (TN):" pulled from the Garbin Prelim (Stone Required tons).
+            // Rendered only when a Garbin entry has a stone value; '' otherwise.
+            garbinTotalStoneField(gp) ? [garbinTotalStoneField(gp)] : []
+          ))
           // --- Subsection 2: PF Design Submittal ---
         + subgroup('PF Design Submittal')
         + subgroupNote('FUTURE (not yet built): on Approved, the submittal auto-saves to SharePoint, feeds Site Readiness / Project Setup, and becomes the source of truth vs the field as-builts.')
@@ -14772,6 +14853,11 @@ try {
             field('Submittal Disposition', ''),
             fieldLinked('Approved Submittal Link', '', '', 'website')
           ])
+          // "GGG Design Notes" block UNDER PF Design Submittal (Brad): LF / Total
+          // Columns / Column Diameter (in) / Bearing Capacity (psf) pulled from the
+          // Garbin Prelim, plus a clickable link to the workbook + its two tab names.
+          // Renders only when this project has a Garbin entry ('' otherwise).
+        + garbinDesignNotesBlock(gp)
           // --- Subsection 3: As Built Drawings (two sub-sub-groups) ---
         + subgroup('As Built Drawings')
           // Sub-sub-group A: Field As-Built Drawings (daily field uploads). UI shell
