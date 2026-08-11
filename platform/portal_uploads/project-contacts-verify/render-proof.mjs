@@ -36,7 +36,7 @@ function ok(name, cond){ if(cond){pass++;} else {fail++; fails.push(name); conso
 const OWNER_COMPANIES = [{ company:'Westhoff Development', contactCount:2, address:'1 A St', website:'wd.com' }];
 const GC_COMPANIES = [{ company:'Weigand Construction', contactCount:2, address:'2 B St', website:'weigand.com' }];
 const OWNER_CONTACTS = [
-  { contactId:'C0009', name:'Nathan Westhoff', title:'Owner', officePhone:'', cellPhone:'2604131111', email:'nw@x.com' },
+  { contactId:'C0009', name:'Nathan Westhoff', title:'Owner', officePhone:'2604130000', cellPhone:'2604131111', email:'nw@x.com', notes:'Primary decision maker' },
   { contactId:'C0014', name:'Larry Blanchard', title:'Partner', officePhone:'', cellPhone:'2604132222', email:'lb@x.com' }
 ];
 const GC_CONTACTS = [
@@ -69,6 +69,14 @@ function makeDom(role){
   w.pfFmtQty = (v)=> String(v==null?'':v);
   w.pfFmtMoney = (v)=> String(v==null?'':v);
   w.pfFmtNum = (v)=> String(v==null?'':v);
+  // Globals defined in earlier <script> blocks the harness doesn't eval (it only
+  // evals the render IIFE). Stub them so the renderer's date-label + business-day
+  // helpers don't throw. (Harness debt from code drift — not part of this change.)
+  w.PF_DATE_LABEL_RE = /date|deadline|expires|due/i;
+  w.pfIsDateLabel = (label)=> w.PF_DATE_LABEL_RE.test(String(label||''));
+  w.pfParseDate = ()=> null;
+  w.pfAddBusinessDays = ()=> null;
+  w.pfFmtDateObj = (d)=> String(d==null?'':d);
   w.PF_PROJECT_POET = null;
   w.PF_PROJECT_RECORDS = { records: {
     '26-002': { project_number:'26-002', project_name:'POET', location:'Warsaw, IN',
@@ -242,7 +250,39 @@ await (async function(){
   ok('D Owner cards rendered from saved ids', /Nathan Westhoff/.test(ot) && /Larry Blanchard/.test(ot));
   ok('D GC card rendered from saved id', /Tanner Schweer/.test(gt));
   ok('D GC did NOT render unselected id', !/Jacob Lincoln/.test(gt));
-  ok('D cards use shared name-first head', !!ownerHost.querySelector('.pr-ccard-head, .pr-ccard'));
+  // Brad 2026-08-11 rework: NO category box + standalone company + role tag +
+  // horizontal contact rows (Name|Title|Office Phone|Cell Phone|Email|Notes).
+  ok('D role tag chip present (Project Owner)',
+    !!ownerHost.querySelector('.pr-role-tag') &&
+    /Project Owner/.test(ownerHost.querySelector('.pr-role-tag').textContent));
+  ok('D GC role tag chip present (General Contractor)',
+    !!gcHost.querySelector('.pr-role-tag') &&
+    /General Contractor/.test(gcHost.querySelector('.pr-role-tag').textContent));
+  ok('D standalone company name block', !!ownerHost.querySelector('.pr-pc-company .pr-pc-company-name') &&
+    /Westhoff Development/.test(ownerHost.querySelector('.pr-pc-company-name').textContent));
+  ok('D contacts are horizontal rows (not vertical cards)',
+    ownerHost.querySelectorAll('.pr-crow').length >= 3 && // header + 2 contacts
+    !ownerHost.querySelector('.pr-ccard-head, .pr-ccard'));
+  const hdr = ownerHost.querySelector('.pr-crow.pr-crow-head');
+  ok('D header row = Name|Title|Office Phone|Cell Phone|Email|Notes', !!hdr &&
+    [...hdr.querySelectorAll('span')].map(s=>s.textContent).join('|') ===
+    'Name|Title|Office Phone|Cell Phone|Email|Notes');
+  // The first data row (Nathan) exposes all six columns incl Notes.
+  const dataRows = [...ownerHost.querySelectorAll('.pr-crow:not(.pr-crow-head)')];
+  const nathan = dataRows.find(r=>/Nathan Westhoff/.test(r.textContent));
+  ok('D data row has 6 column spans', !!nathan && nathan.querySelectorAll(':scope > span').length === 6);
+  ok('D Notes column populated from contact record', !!nathan && /Primary decision maker/.test(nathan.textContent));
+  ok('D office + cell phone both render in row', !!nathan &&
+    /2604130000/.test(nathan.querySelector('.pr-crow-off').innerHTML) &&
+    /2604131111/.test(nathan.querySelector('.pr-crow-cell').innerHTML));
+  // A contact with blank fields (Larry: no office phone, no notes) renders clean —
+  // no yellow highlight (contact rows are display-only, not editable field() rows).
+  const larry = dataRows.find(r=>/Larry Blanchard/.test(r.textContent));
+  ok('D blank field renders clean (no yellow highlight on contact rows)', !!larry &&
+    !larry.querySelector('.pr-field-edited, .pf-blank, [style*="yellow"]') &&
+    larry.querySelector('.pr-crow-off').textContent.trim() === '');
+  // Project Contacts card carries the scoping class so the CSS applies only here.
+  ok('D Project Contacts card tagged pr-pc-section', pc.classList.contains('pr-pc-section'));
 })();
 
 // ---- E: DP editor now has 4 firm CRM blocks (GC removed) ----

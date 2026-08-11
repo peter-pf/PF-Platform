@@ -63,6 +63,12 @@ function makeDom(role){
   w.pfFmtQty = (v)=> String(v==null?'':v);
   w.pfFmtMoney = (v)=> String(v==null?'':v);
   w.pfFmtNum = (v)=> String(v==null?'':v);
+  // Globals from earlier <script> blocks the harness doesn't eval (pre-existing debt).
+  w.PF_DATE_LABEL_RE = /date|deadline|expires|due/i;
+  w.pfIsDateLabel = (label)=> w.PF_DATE_LABEL_RE.test(String(label||''));
+  w.pfParseDate = ()=> null;
+  w.pfAddBusinessDays = ()=> null;
+  w.pfFmtDateObj = (d)=> String(d==null?'':d);
   w.PF_PROJECT_POET = null;
   w.PF_PROJECT_RECORDS = { records: {
     '26-002': { project_number:'26-002', project_name:'POET', location:'Warsaw, IN',
@@ -235,8 +241,18 @@ await (async function(){
   ok('D Owner host shows company sub-label', /Westhoff Development/.test(ownerText));
   ok('D GC host renders the selected GC contact', /Tanner Schweer/.test(gcText));
   ok('D GC host did NOT render unselected id', !/Jacob Lincoln/.test(gcText));
-  // cards use the shared name-first/title-below layout (.pr-ccard-head)
-  ok('D Owner cards use shared card head layout', !!ownerHost.querySelector('.pr-ccard-head, .pr-ccard'));
+  // Brad 2026-08-11 rework: standalone company + small role tag + horizontal rows
+  // (Name|Title|Office Phone|Cell Phone|Email|Notes), NOT vertical .pr-ccard.
+  ok('D Owner contacts render as horizontal rows (not .pr-ccard)',
+    ownerHost.querySelectorAll('.pr-crow').length >= 3 && !ownerHost.querySelector('.pr-ccard'));
+  ok('D Owner role tag chip = Project Owner',
+    !!ownerHost.querySelector('.pr-role-tag') && /Project Owner/.test(ownerHost.querySelector('.pr-role-tag').textContent));
+  ok('D GC role tag chip = General Contractor',
+    !!gcHost.querySelector('.pr-role-tag') && /General Contractor/.test(gcHost.querySelector('.pr-role-tag').textContent));
+  ok('D Owner header row is the 6-field order',
+    !!ownerHost.querySelector('.pr-crow-head') &&
+    [...ownerHost.querySelector('.pr-crow-head').querySelectorAll('span')].map(s=>s.textContent).join('|') ===
+    'Name|Title|Office Phone|Cell Phone|Email|Notes');
 })();
 
 // ---- E: no regression — DP selector still renders its 5 firm blocks ----

@@ -2598,6 +2598,85 @@ tr.pf-dragging { opacity: 0.45; }
 .pr-subhead:has(+ .pr-ccards) { margin: 8px 0 4px; }
 .pr-ccards + .pr-subhead { margin-top: 8px; }
 
+/* ============================================================================ */
+/* PROJECT CONTACTS — standalone companies + small role tags + horizontal rows  */
+/* (Brad 2026-08-11). Two display changes, DISPLAY-ONLY (editor/selector intact):*/
+/*  (1) Drop the heavy category-group BOX chrome so each company reads as its    */
+/*      own standalone block in a clean ordered list, each with a small role tag */
+/*      chip above it.                                                           */
+/*  (2) CRM-resolved contacts render as HORIZONTAL rows (Name | Title | Office   */
+/*      Phone | Cell Phone | Email | Notes) instead of vertical cards.           */
+/* Scoped to `.pr-pc-section` (added to the Project Contacts top-level card) so  */
+/* NOTHING else in the portal is affected.                                       */
+/* ---------------------------------------------------------------------------- */
+/* (1) Flatten the nested category cards: remove the box border/fill + heavy     */
+/* head bar. The head still holds the small group context + the Edit button      */
+/* (the cascading selector lives behind Edit — must stay reachable), but it no    */
+/* longer looks like a boxed container.                                          */
+.pr-pc-section .pr-nested-card-wrap { margin-top: 2px; }
+.pr-pc-section .pr-nested-card-wrap > .pr-card {
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+.pr-pc-section .pr-nested-card-wrap > .pr-card > .pr-card-head {
+  background: transparent;
+  padding: 4px 0 2px;
+  border-bottom: 1px solid var(--border-light);
+}
+.pr-pc-section .pr-nested-card-wrap > .pr-card > .pr-card-head .pr-card-title {
+  font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.03em; color: var(--muted, #55606d);
+}
+.pr-pc-section .pr-nested-card-wrap > .pr-card > .pr-card-body { padding-left: 0; padding-right: 0; }
+/* Small ROLE TAG chip shown above each company block. Compact + subtle — Brad   */
+/* will review and may revise the styling.                                       */
+.pr-role-tag {
+  display: inline-block;
+  font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--accent-dark, #1a5a8a);
+  background: var(--bg-2, #eef2f6);
+  border: 1px solid var(--border-light);
+  border-radius: 4px; padding: 1px 6px;
+  margin: 8px 0 3px;
+}
+/* Standalone company block: name line, then its horizontal contact rows.        */
+.pr-pc-company { margin: 0 0 10px; }
+.pr-pc-company-name { font-size: 0.9rem; font-weight: 700; color: var(--text-0); margin: 0 0 3px; }
+/* (2) Horizontal contact rows. A lightweight table-like flex layout: header row */
+/* + one row per contact. Compact so more fits on screen; Notes wraps.           */
+.pr-crow-table { width: 100%; margin: 2px 0 0; }
+.pr-crow {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 4px 0; border-bottom: 1px solid var(--border-light);
+  font-size: 0.78rem; line-height: 1.25;
+}
+.pr-crow.pr-crow-head {
+  font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.03em; color: var(--muted, #55606d);
+  border-bottom: 1px solid var(--border-light); padding-bottom: 3px;
+}
+.pr-crow > span { min-width: 0; overflow-wrap: anywhere; }
+.pr-crow-name  { flex: 1 1 130px; font-weight: 600; color: var(--text-0); }
+.pr-crow-title { flex: 1 1 120px; color: var(--text-1, #444); }
+.pr-crow-off   { flex: 0 1 120px; }
+.pr-crow-cell  { flex: 0 1 120px; }
+.pr-crow-email { flex: 1 1 170px; }
+.pr-crow-notes { flex: 2 1 180px; color: var(--text-1, #444); white-space: normal; }
+.pr-crow-head .pr-crow-name,
+.pr-crow-head .pr-crow-title,
+.pr-crow-head .pr-crow-email,
+.pr-crow-head .pr-crow-notes { font-weight: 700; color: var(--muted, #55606d); }
+.pr-crow a { color: var(--accent); text-decoration: none; word-break: break-all; }
+.pr-crow a:hover { text-decoration: underline; }
+@media (max-width: 720px) {
+  .pr-crow { flex-wrap: wrap; gap: 2px 10px; }
+  .pr-crow.pr-crow-head { display: none; } /* header row hidden on narrow screens */
+  .pr-crow > span { flex: 1 1 46%; }
+  .pr-crow-name { flex: 1 1 100%; }
+}
+
 .pr-links { display: flex; flex-wrap: wrap; gap: 8px; }
 .pr-link {
   display: inline-flex; align-items: center; gap: 6px;
@@ -14703,7 +14782,7 @@ try {
         // here as live cards under this firm, populated async post-render by
         // pfCrmRenderCards. Empty for a project with no __crm selection (renders
         // exactly as before). Keyed on the firm prefix so each firm gets its own set.
-        var crmHost = '<div class="pr-crm-cards" data-crm-cards="' + esc2(prefix) + '"></div>';
+        var crmHost = '<div class="pr-crm-cards" data-crm-cards="' + esc2(prefix) + '" data-role-tag="' + esc2(head) + '"></div>';
         return subhead(head)
           + twoCol([
               field(prefix + ' - Company', co.company || '', co.src || ''),
@@ -15434,7 +15513,12 @@ try {
         var cards = root.querySelectorAll('.pr-card');
         for (var i = 0; i < cards.length; i++){
           var t = cards[i].querySelector('.pr-card-title');
-          if (t && t.textContent === 'Project Contacts') return cards[i].querySelector('.pr-card-body');
+          if (t && t.textContent === 'Project Contacts') {
+            // Tag the top-level Project Contacts card so the standalone-company +
+            // role-tag + horizontal-row styling (Brad 2026-08-11) scopes ONLY here.
+            cards[i].classList.add('pr-pc-section');
+            return cards[i].querySelector('.pr-card-body');
+          }
         }
         return null;
       })();
@@ -15474,7 +15558,7 @@ try {
             fieldLinked('Owner Contact ' + _n + ' - Email', _oc.email || '', _oc.email ? 'Contacts' : '', 'email')
           ]));
         }
-        var ownerCrmHost = '<div class="pr-crm-cards" data-crm-cards="Owner" data-crm-cards-key="general"></div>';
+        var ownerCrmHost = '<div class="pr-crm-cards" data-crm-cards="Owner" data-crm-cards-key="general" data-role-tag="Project Owner"></div>';
         // ---- (2) GENERAL CONTRACTOR — GC company block + GC Project Team + CRM
         // selector (general.__crm.GC). SAME `general` key, rendered as the second
         // subhead group inside this nested card (relocated verbatim from the former
@@ -15496,7 +15580,7 @@ try {
             fieldLinked('GC Project Engineer - Email', _gcPE.email || '', 'Contacts', 'email')
           ])
         ];
-        var gcCrmHost = '<div class="pr-crm-cards" data-crm-cards="GC" data-crm-cards-key="general"></div>';
+        var gcCrmHost = '<div class="pr-crm-cards" data-crm-cards="GC" data-crm-cards-key="general" data-role-tag="General Contractor"></div>';
         var ownerGcBody =
             subhead('Project Owner')
           + twoCol(ownerRows, [subhead('Owner Contacts'), contactCardGrid(ownerCards, 'Owner Contact'), ownerCrmHost])
@@ -15577,7 +15661,7 @@ try {
         // later in this render, so the host markup is inlined here verbatim to match it.
         var pfTeamBody = contactCardGrid(pfCards, 'PF Team Member')
           + subhead('PF Project Team')
-          + '<div class="pr-crm-cards" data-crm-cards="PF Project Team" data-crm-cards-key="pfTeam"></div>';
+          + '<div class="pr-crm-cards" data-crm-cards="PF Project Team" data-crm-cards-key="pfTeam" data-role-tag="PF Project Team"></div>';
         _curSection = _prevPf;
         var pfTeamMeta = (g.pf_team ? g.pf_team.length + ' synced' : null);
         pcHost.insertAdjacentHTML('beforeend',
@@ -15614,7 +15698,7 @@ try {
       var pcContactBlock = function(sectionName, crmKey){
         return subhead(sectionName)
           + '<div class="pr-crm-cards" data-crm-cards="' + esc2(sectionName)
-          + '" data-crm-cards-key="' + esc2(crmKey) + '"></div>';
+          + '" data-crm-cards-key="' + esc2(crmKey) + '" data-role-tag="' + esc2(sectionName) + '"></div>';
       };
       if (pcHost) {
         // (8) Safety Consultant — safety key. (The legacy "Safety Consultant" field in
@@ -17263,19 +17347,49 @@ try {
           var pfx = host.getAttribute('data-crm-cards') || '';
           var e = mapFor(host.getAttribute('data-crm-cards-key'))[pfx];
           if (!e || !Array.isArray(e.contactIds) || !e.contactIds.length) { host.innerHTML = ''; return; }
-          var cards = e.contactIds.map(function(id){
+          // Brad 2026-08-11: render each COMPANY as its own standalone block —
+          //   [small role tag]  Company name
+          //   Name | Title | Office Phone | Cell Phone | Email | Notes  (horizontal rows)
+          // (was: a vertical contact-card grid inside a category box). The role tag
+          // comes from data-role-tag (the group's role name). Fields are pulled from
+          // the pfCrm-resolved contact records (byId, full /api/contacts records so
+          // Notes is present). Blank fields render clean (no yellow highlight — these
+          // are display-only, not editable field() rows).
+          var roleTag = host.getAttribute('data-role-tag') || '';
+          var rows = e.contactIds.map(function(id){
             var c = byId[String(id).toUpperCase()];
             if (!c) return ''; // stale/removed id: skip, never crash
             var name = (c.name || ((c.firstName||'') + ' ' + (c.lastName||''))).trim();
-            var rows = [];
-            if (c.officePhone) rows.push('<div class="pr-field"><span class="pr-field-label">Office Phone</span><span class="pr-field-value"><a href="tel:' + esc2(c.officePhone) + '">' + esc2(pfFmtPhone(c.officePhone)) + '</a></span></div>');
-            if (c.cellPhone)   rows.push('<div class="pr-field"><span class="pr-field-label">Cell Phone</span><span class="pr-field-value"><a href="tel:' + esc2(c.cellPhone) + '">' + esc2(pfFmtPhone(c.cellPhone)) + '</a></span></div>');
-            if (c.email)       rows.push('<div class="pr-field"><span class="pr-field-label">Email</span><span class="pr-field-value"><a href="mailto:' + esc2(c.email) + '">' + esc2(c.email) + '</a></span></div>');
-            return contactCard(name || (c.contactId || ''), c.title || '', rows);
+            var off = c.officePhone
+              ? '<a href="tel:' + esc2(c.officePhone) + '">' + esc2(pfFmtPhone(c.officePhone)) + '</a>' : '';
+            var cell = c.cellPhone
+              ? '<a href="tel:' + esc2(c.cellPhone) + '">' + esc2(pfFmtPhone(c.cellPhone)) + '</a>' : '';
+            var email = c.email
+              ? '<a href="mailto:' + esc2(c.email) + '">' + esc2(c.email) + '</a>' : '';
+            return '<div class="pr-crow">'
+              + '<span class="pr-crow-name">'  + esc2(name || (c.contactId || '')) + '</span>'
+              + '<span class="pr-crow-title">' + esc2(c.title || '') + '</span>'
+              + '<span class="pr-crow-off">'   + off + '</span>'
+              + '<span class="pr-crow-cell">'  + cell + '</span>'
+              + '<span class="pr-crow-email">' + email + '</span>'
+              + '<span class="pr-crow-notes">' + esc2(c.notes || '') + '</span>'
+              + '</div>';
           }).filter(Boolean);
-          host.innerHTML = cards.length
-            ? ('<div class="pr-crm-company-sub">' + esc2(e.company || '') + '</div>' + contactCardGrid(cards))
-            : '';
+          if (!rows.length) { host.innerHTML = ''; return; }
+          var headRow = '<div class="pr-crow pr-crow-head">'
+            + '<span class="pr-crow-name">Name</span>'
+            + '<span class="pr-crow-title">Title</span>'
+            + '<span class="pr-crow-off">Office Phone</span>'
+            + '<span class="pr-crow-cell">Cell Phone</span>'
+            + '<span class="pr-crow-email">Email</span>'
+            + '<span class="pr-crow-notes">Notes</span>'
+            + '</div>';
+          host.innerHTML =
+              (roleTag ? '<div class="pr-role-tag">' + esc2(roleTag) + '</div>' : '')
+            + '<div class="pr-pc-company">'
+            +   '<div class="pr-pc-company-name">' + esc2(e.company || '') + '</div>'
+            +   '<div class="pr-crow-table">' + headRow + rows.join('') + '</div>'
+            + '</div>';
         });
       }).catch(function(){ /* fail soft: leave hosts empty */ });
     }

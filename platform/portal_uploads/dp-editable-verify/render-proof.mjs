@@ -40,6 +40,12 @@ function makeDom(role){
   w.pfFmtPhone = (v)=> String(v==null?'':v);
   w.pfFmtDate = (v)=> String(v==null?'':v);
   w.pfFmtQty = (v)=> String(v==null?'':v); // added: global introduced post-harness (commit 0a97417)
+  // Globals from earlier <script> blocks the harness doesn't eval (pre-existing debt).
+  w.PF_DATE_LABEL_RE = /date|deadline|expires|due/i;
+  w.pfIsDateLabel = (label)=> w.PF_DATE_LABEL_RE.test(String(label||''));
+  w.pfParseDate = ()=> null;
+  w.pfAddBusinessDays = ()=> null;
+  w.pfFmtDateObj = (d)=> String(d==null?'':d);
   w.PF_PROJECT_POET = null;
   // Synthetic record WITH an engineering contact so the Ground Improvement firm block seeds.
   w.PF_PROJECT_RECORDS = { records: {
