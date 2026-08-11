@@ -267,6 +267,32 @@ body {
   color: var(--text-0);
 }
 
+/* Back control (Brad 2026-08-11): top-left of every page/sheet, returns to the
+   previous in-app view via the SPA view-history stack (see pfNavBack). Hidden
+   when there is nowhere to go back to (landing / empty history) so the user is
+   never stranded. Styled subtle to match the portal chrome. */
+.topbar-back {
+  display: none;               /* pfNavRefreshBack() toggles to inline-flex */
+  align-items: center;
+  gap: 5px;
+  background: var(--bg-1);
+  border: 1px solid var(--border-light);
+  color: var(--text-1);
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 5px 11px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  line-height: 1;
+  transition: background 0.12s, border-color 0.12s;
+}
+.topbar-back:hover {
+  background: var(--accent-light);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.topbar-back .topbar-back-chev { font-size: 0.95rem; line-height: 1; }
+
 .topbar-right {
   display: flex;
   align-items: center;
@@ -2126,6 +2152,22 @@ tr.pf-dragging { opacity: 0.45; }
 .pr-field-label { font-size: 0.72rem; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.03em; }
 .pr-field-value { font-size: 0.9rem; color: var(--text-1); word-break: break-word; }
 .pr-field-value.empty { color: var(--text-3); }
+/* Blank-field highlight (Brad 2026-08-11): a project-detail field with no value
+   renders on the amber/yellow placeholder background (matches the budget
+   "yellow = placeholder / needs filling" convention, --amber-light #fef3c7) so
+   incomplete fields are obvious at a glance in the VIEW. Cleared automatically
+   once a real value is present (field() drops the .blank class). Text stays a
+   readable dark amber. Scoped to .pr-field-value so it never touches computed
+   hints, subheads, contact cards, or section headers. */
+.pr-field-value.blank {
+  background: var(--amber-light);
+  color: var(--amber);
+  border-radius: 4px;
+  padding: 1px 6px;
+  display: inline-block;
+  min-width: 28px;
+  text-align: center;
+}
 /* Multi-line (textarea-backed) field values: preserve entered line breaks. */
 .pr-field-value-multiline { white-space: pre-wrap; }
 /* Multi-line editor control for PF_FIELD_TEXTAREA_LABELS fields. */
@@ -3622,6 +3664,7 @@ document.addEventListener('click', function(e) {
 <header class="topbar">
   <div style="display:flex;align-items:center;gap:12px;">
     <button class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">&#9776;</button>
+    <button class="topbar-back" id="topbarBack" type="button" onclick="pfNavBack()" title="Back to previous page" aria-label="Back to previous page"><span class="topbar-back-chev">&#8592;</span>Back</button>
     <span class="topbar-title" id="pageTitle">Dashboard</span>
   </div>
   <div class="topbar-right">
@@ -4758,7 +4801,48 @@ const moduleTitles = {
   'bd-templates': 'Templates & Quick-Send'
 };
 
+// ---- SPA view-history stack (Brad 2026-08-11) -------------------------------
+// The portal is a single-page app: every "page/sheet" is a .module-view that
+// showModule(id) activates. To give a reliable top-left Back button that returns
+// to the PREVIOUS in-app view (not out of the app via history.back), we track the
+// sequence of modules the user actually visited. This is the single choke point:
+// EVERY navigation path (nav links, dashboard cards, openProjectRecord, the later
+// window.showModule wrappers) bottoms out here via prev(id), so pushing here
+// captures all of them exactly once per real switch.
+window.__pfViewStack = window.__pfViewStack || [];
+// pfNavBack is the Back button handler: drop the current view, navigate to the
+// prior one. It sets a guard so the resulting showModule() call does NOT re-push
+// (otherwise back would just re-add what we popped). No-op / stays put if there is
+// no previous view (guarded again by the button being hidden).
+window.pfNavBack = function () {
+  var st = window.__pfViewStack;
+  if (!st || st.length < 2) return;          // nothing to go back to
+  st.pop();                                   // discard current view
+  var target = st[st.length - 1];             // the previous view
+  window.__pfNavBackInProgress = true;
+  try { if (typeof window.showModule === 'function') window.showModule(target); }
+  finally { window.__pfNavBackInProgress = false; }
+};
+// Show/hide the Back button: visible only when there is a prior view to return to.
+window.pfNavRefreshBack = function () {
+  var btn = document.getElementById('topbarBack');
+  if (!btn) return;
+  var st = window.__pfViewStack || [];
+  btn.style.display = (st.length > 1) ? 'inline-flex' : 'none';
+};
+
 function showModule(id) {
+  // Record the view in the history stack (unless this call is a Back navigation,
+  // which re-shows a view already on the stack). Collapse consecutive duplicates
+  // so re-selecting the current module doesn't stack phantom entries.
+  try {
+    if (!window.__pfNavBackInProgress) {
+      var st = window.__pfViewStack;
+      if (!st.length || st[st.length - 1] !== id) st.push(id);
+      if (st.length > 50) st.shift();  // bound the stack
+    }
+    if (typeof window.pfNavRefreshBack === 'function') window.pfNavRefreshBack();
+  } catch (e) { /* never break navigation on history bookkeeping */ }
   document.querySelectorAll('.module-view').forEach(m => m.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   // Null-guard both lookups so a module with NO matching nav item (e.g.
@@ -4823,6 +4907,27 @@ function applyHashRoute() {
 window.addEventListener('hashchange', applyHashRoute);
 if (document.readyState !== 'loading') applyHashRoute();
 else document.addEventListener('DOMContentLoaded', applyHashRoute);
+
+// Seed the view-history stack with the landing module that is active on load
+// (mod-dashboard has .active in markup and may never route through showModule).
+// This makes the FIRST navigation record a real "previous" (dashboard), so Back
+// returns to the landing rather than being hidden after one hop. If a deep-link
+// already pushed a view, we don't double-seed. The Back button stays hidden while
+// only this single landing entry exists (no-strand on landing).
+function pfSeedViewStack() {
+  try {
+    var st = window.__pfViewStack || (window.__pfViewStack = []);
+    if (!st.length) {
+      var active = document.querySelector('.module-view.active');
+      if (active && active.id && active.id.indexOf('mod-') === 0) {
+        st.push(active.id.slice(4));
+      }
+    }
+    if (typeof window.pfNavRefreshBack === 'function') window.pfNavRefreshBack();
+  } catch (e) { /* history seed is best-effort */ }
+}
+if (document.readyState !== 'loading') pfSeedViewStack();
+else document.addEventListener('DOMContentLoaded', pfSeedViewStack);
 
 // ---- LIVE DASHBOARD (data from LIVE_BIDS / LIVE_PROJECTS injected by embed-data.py) ----
 
@@ -12757,7 +12862,11 @@ try {
       // approach as date/phone: label-gated, never mutates stored/synced/override
       // data, idempotent on re-render. pfFmtQty is a no-op on non-numeric values.
       else if (v && pfIsQtyLabel(label)) v = String(window.pfFmtQty(v));
-      var cls = v ? "pr-field-value" : "pr-field-value empty";
+      // Blank -> yellow highlight (Brad 2026-08-11). A field with no real value
+      // (empty/whitespace, which also covers the "-" em-dash fallback since that
+      // is what an empty v renders as) gets the .blank amber-placeholder class so
+      // incomplete fields stand out in the view. A filled value renders normally.
+      var cls = v ? "pr-field-value" : "pr-field-value empty blank";
       // Multi-line textarea fields: preserve line breaks in the read view
       // (white-space:pre-wrap via .pr-field-value-multiline). E(v) escapes the text
       // but keeps the \n characters, and the editor reads valEl.textContent so the
@@ -12813,7 +12922,8 @@ try {
       // DISPLAY-ONLY date normalization (MM/DD/YYYY) for date-kind / date-labeled
       // fields, consistent with field(). Never mutates the stored value.
       if (raw && (kind === 'date' || pfIsDateLabel(label))) raw = String(pfFmtDate(raw));
-      var cls = raw ? "pr-field-value" : "pr-field-value empty";
+      // Blank -> yellow highlight (Brad 2026-08-11), same rule as field().
+      var cls = raw ? "pr-field-value" : "pr-field-value empty blank";
       var inner;
       if (!raw) inner = '-';
       else if (kind === 'email') inner = linkEmail(raw);
