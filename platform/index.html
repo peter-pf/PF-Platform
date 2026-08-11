@@ -2168,6 +2168,32 @@ tr.pf-dragging { opacity: 0.45; }
   min-width: 28px;
   text-align: center;
 }
+/* General Info field-completion status bar (Brad 2026-08-11). Sits at the TOP of
+   the General Info card body as the section's completion indicator: a readout
+   ("X/Y Fields Complete, XX%") plus an on-brand PF-azure progress bar whose fill
+   width mirrors the same percent. Count reuses the SAME blank rule as the yellow
+   blank-field highlight (a .pr-field-value.blank span = incomplete) so the number
+   always matches what the user sees highlighted. Recomputed per project at render
+   time from the live DOM (post all injections). */
+.pr-genstatus {
+  display: flex; align-items: center; gap: 12px;
+  margin: 0 0 14px; padding: 10px 14px;
+  background: var(--bg-2); border: 1px solid var(--border-light);
+  border-left: 3px solid var(--accent); border-radius: 8px;
+}
+.pr-genstatus-text {
+  flex: 0 0 auto; font-size: 0.82rem; font-weight: 700; color: var(--text-1);
+  white-space: nowrap;
+}
+.pr-genstatus-text .pr-genstatus-pct { color: var(--accent); }
+.pr-genstatus-track {
+  flex: 1 1 auto; height: 8px; border-radius: 999px;
+  background: var(--border-light); overflow: hidden; min-width: 60px;
+}
+.pr-genstatus-fill {
+  height: 100%; border-radius: 999px;
+  background: var(--accent); transition: width 0.3s ease;
+}
 /* Multi-line (textarea-backed) field values: preserve entered line breaks. */
 .pr-field-value-multiline { white-space: pre-wrap; }
 /* Multi-line editor control for PF_FIELD_TEXTAREA_LABELS fields. */
@@ -16359,7 +16385,53 @@ try {
       // user never opens the card, no request is made.
       try { wireProjectPhotos(root); } catch (e) {}
 
+      // General Info field-completion status bar (Brad 2026-08-11). Built LAST, from
+      // the finalized General Info DOM, so the count reflects exactly the fields the
+      // user sees in that section (and matches the yellow blank-field highlighting).
+      try { pfRenderGeneralInfoStatusBar(root); } catch (e) {}
+
       _curSection = ''; // done rendering this record
+    }
+
+    // ---- General Info completion status bar (Brad 2026-08-11) ------------------
+    // Counts the genuine data fields rendered in the General Info section and shows
+    // "X/Y Fields Complete, XX%" + an on-brand PF-azure progress bar at the TOP of
+    // the section body. "Completed" reuses the EXACT blank rule of the yellow
+    // blank-field highlight: field() / fieldLinked() emit .pr-field-value.blank for
+    // an empty/whitespace/null/undefined value (which is also what the "-" placeholder
+    // renders from), so a span WITHOUT .blank == a real value == complete. This keeps
+    // the count identical to what the user sees highlighted. We count each
+    // .pr-field[data-pr-label] row once (its single .pr-field-value span); section
+    // headers (.pr-subhead), computed hints (.pr-computed-hint) and the status bar
+    // itself are NOT .pr-field rows, so they are never counted. Scoped strictly to the
+    // General Info card body (data-pr-section="general") — never other sections.
+    function pfRenderGeneralInfoStatusBar(root){
+      if (!root) return;
+      var body = root.querySelector('.pr-card[data-pr-section="general"] > .pr-card-body');
+      if (!body) return;
+      // Only fields inside THIS general card body. General Info holds no nested
+      // .pr-cards, so every .pr-field[data-pr-label] here is a General Info field.
+      var fieldEls = body.querySelectorAll('.pr-field[data-pr-label]');
+      var total = 0, done = 0;
+      for (var i = 0; i < fieldEls.length; i++){
+        var val = fieldEls[i].querySelector('.pr-field-value');
+        if (!val) continue;              // safety: not a real data field row
+        total++;
+        // Same blank rule as the yellow highlight: .blank => incomplete.
+        if (!val.classList.contains('blank')) done++;
+      }
+      var pct = total > 0 ? Math.round((done / total) * 100) : 0;
+      var readout = done + '/' + total + ' Fields Complete, '
+        + '<span class="pr-genstatus-pct">' + pct + '%</span>';
+      var bar = '<div class="pr-genstatus" role="status" aria-label="'
+        + E(done + ' of ' + total + ' General Info fields complete, ' + pct + ' percent') + '">'
+        +   '<span class="pr-genstatus-text">' + readout + '</span>'
+        +   '<span class="pr-genstatus-track"><span class="pr-genstatus-fill" style="width:'
+        +     pct + '%"></span></span>'
+        + '</div>';
+      // Insert as the FIRST child of the section body (above the "Project Info"
+      // subhead) so it reads as the section's completion indicator at the top.
+      body.insertAdjacentHTML('afterbegin', bar);
     }
 
     // ---- Project Photos: lazy gallery loader ---------------------------------
