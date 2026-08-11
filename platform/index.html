@@ -12525,6 +12525,17 @@ try {
     // to confirm against the PF Master Contact List col F. An unknown Category yields
     // an empty (greenfield) selector — the block still renders + is editable.
     var PF_CRM_NEWGROUP_TRADE = {
+      // (7) PF Project Team (Brad 2026-08-11): converted from role-based plain cards to
+      // the SAME cascading company->contacts selector as every other Project Contacts
+      // group. The company dropdown filters the PF Master Contact List by Category
+      // "PF Team" (col F, the exact string the migrated PF team members C0010 John
+      // Willis / C0011 Seth Willis / C0012 Brad Reinking / C0013 Ray VanAmburg were
+      // added under); the company is Pier Foundations, so the company dropdown shows
+      // Pier Foundations and the contact dropdown its team members — consistent with
+      // the others even though there is effectively one company. Legacy pfTeam flat
+      // role fields are LEFT INTACT (surfaced via _surfaceExtras) so no stored data is
+      // dropped; the selector is the go-forward model (same approach as Owner/GC).
+      pfTeam:        { 'PF Project Team': 'PF Team' },
       safety:        { 'Safety Consultant': 'Safety Consultant' },
       siteReadiness: { 'Staking & Layout': 'Staking & Layout' },
       equipment:     { 'Equipment Transport': 'Equipment Transport', 'Rental Equipment': 'Rental Equipment' },
@@ -15363,8 +15374,16 @@ try {
           + '</div>');
       }
 
-      // ---- (7) PF PROJECT TEAM — role-based members (pfTeam key). Relocated verbatim
-      // from General Info. Same key => zero data loss.
+      // ---- (7) PF PROJECT TEAM — cascading CRM selector (pfTeam key). Brad 2026-08-11:
+      // converted from role-based plain cards to the SAME company->contacts cascading
+      // selector every other Project Contacts group uses (PF_CRM_NEWGROUP_TRADE.pfTeam,
+      // Category "PF Team", company Pier Foundations). DATA PRESERVED: the legacy
+      // role-based flat fields ("<Role> - Contact Name/Title/Phone/Email" under the
+      // pfTeam __override) are LEFT INTACT and still surface via _surfaceExtras (see
+      // below) exactly as before — nothing is dropped or re-keyed. The go-forward model
+      // is the cascading selector + its cards host (data-crm-cards="PF Project Team",
+      // key pfTeam), rendered by pfCrmRenderCards / editable via the standard selector.
+      // Same approach used when Owner + GC were converted from flat blocks to cascading.
       if (pcHost) {
         var _prevPf = _curSection;
         _curSection = 'pfTeam';
@@ -15395,7 +15414,16 @@ try {
             fieldLinked(role + ' - Email', c.email || '', c.email ? 'Contacts' : '', 'email')
           ]));
         });
-        var pfTeamBody = contactCardGrid(pfCards, 'PF Team Member');
+        // Cascading company->contacts selector (Brad 2026-08-11): identical structure to
+        // every other Project Contacts group. subhead + a .pr-crm-cards host that
+        // pfCrmRenderCards fills from pfTeam.__crm['PF Project Team'] (Category "PF Team",
+        // company Pier Foundations). The legacy role-based cards above are LEFT INTACT so
+        // existing pfTeam entries surface exactly as before; this selector is the
+        // go-forward model (same as the Owner/GC conversion). pcContactBlock is defined
+        // later in this render, so the host markup is inlined here verbatim to match it.
+        var pfTeamBody = contactCardGrid(pfCards, 'PF Team Member')
+          + subhead('PF Project Team')
+          + '<div class="pr-crm-cards" data-crm-cards="PF Project Team" data-crm-cards-key="pfTeam"></div>';
         _curSection = _prevPf;
         var pfTeamMeta = (g.pf_team ? g.pf_team.length + ' synced' : null);
         pcHost.insertAdjacentHTML('beforeend',

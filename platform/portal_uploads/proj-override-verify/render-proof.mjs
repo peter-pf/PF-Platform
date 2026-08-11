@@ -32,6 +32,13 @@ function makeDom(role){
   w.esc = (s)=> String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   w.PF_ME = { role, name: 'Tester' };
   w.showModule = ()=>{};
+  // Formatter stubs the render IIFE relies on (added 2026-08-11: this stale harness
+  // predates the pfFmt* helpers; without them renderInto throws on qty labels).
+  w.pfFmtPhone = (v)=> String(v==null?'':v);
+  w.pfFmtDate = (v)=> String(v==null?'':v);
+  w.pfFmtQty = (v)=> String(v==null?'':v);
+  w.pfFmtMoney = (v)=> String(v==null?'':v);
+  w.pfFmtNum = (v)=> String(v==null?'':v);
   w.PF_PROJECT_POET = null;         // no POET auto-render in this harness
   w.PF_PROJECT_RECORDS = { records: {
     '26-002': { project_number:'26-002', project_name:'POET', location:'Warsaw, IN',

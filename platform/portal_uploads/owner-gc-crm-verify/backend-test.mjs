@@ -215,8 +215,9 @@ console.log('== contacts.js trade=Owner / trade=GC ==');
 //    Those keys must now accept a __crm body (CRM_ALLOWED_SECTIONS extended); a
 //    still-disallowed key (contract) must keep rejecting __crm with 400.
 // =====================================================================
-console.log('\n== Project Contacts new CRM keys (safety/siteReadiness/equipment/material) ==');
-for (const key of ['safety', 'siteReadiness', 'equipment', 'material']) {
+// pfTeam added 2026-08-11: PF Project Team converted to the cascading CRM selector too.
+console.log('\n== Project Contacts new CRM keys (pfTeam/safety/siteReadiness/equipment/material) ==');
+for (const key of ['pfTeam', 'safety', 'siteReadiness', 'equipment', 'material']) {
   const kv = makeKV();
   const env = { PF_SCHEDULE: kv };
   const r = await override.onRequestPost({

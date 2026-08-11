@@ -83,8 +83,13 @@ const CRM_KEY = '__crm';
 // EXISTING override keys (safety / siteReadiness / equipment / material) and each
 // carries a cascading company->contacts CRM selector. So those four keys must accept a
 // __crm body too. Same { "<Section>": { company, contactIds[] } } shape + validation.
+// pfTeam added 2026-08-11: the PF Project Team group (Project Contacts #7) was converted
+// from role-based plain cards to the same cascading company->contacts CRM selector as
+// the other groups (Category "PF Team"), so its key must also accept a __crm body. Same
+// { "<Section>": { company, contactIds[] } } shape + validation as every other CRM key.
 const CRM_ALLOWED_SECTIONS = {
   design_professionals: 1, general: 1,
+  pfTeam: 1,
   safety: 1, siteReadiness: 1, equipment: 1, material: 1,
 };
 const CRM_MAX_FIRMS = 12;            // >5 real firm sections, bounds abuse

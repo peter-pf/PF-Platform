@@ -43,7 +43,16 @@ const GC_CONTACTS = [
   { contactId:'C0007', name:'Tanner Schweer', title:'PM', officePhone:'2604133333', cellPhone:'', email:'ts@x.com' },
   { contactId:'C0008', name:'Jacob Lincoln', title:'Super', officePhone:'', cellPhone:'2604134444', email:'jl@x.com' }
 ];
-const ALL_CONTACTS = OWNER_CONTACTS.concat(GC_CONTACTS);
+// PF Team (Brad 2026-08-11): the migrated team members C0010-C0013 under Category
+// "PF Team", company Pier Foundations. Used to prove group 7 is now cascading.
+const PFTEAM_COMPANIES = [{ company:'Pier Foundations', contactCount:4, address:'', website:'pierfoundations.com' }];
+const PFTEAM_CONTACTS = [
+  { contactId:'C0010', name:'John Willis', title:'Owner', officePhone:'2605551010', cellPhone:'', email:'jw@pf.com' },
+  { contactId:'C0011', name:'Seth Willis', title:'Operator', officePhone:'', cellPhone:'2605551011', email:'sw@pf.com' },
+  { contactId:'C0012', name:'Brad Reinking', title:'CEO', officePhone:'2605551012', cellPhone:'', email:'br@pf.com' },
+  { contactId:'C0013', name:'Ray VanAmburg', title:'Field Ops', officePhone:'', cellPhone:'2605551013', email:'rv@pf.com' }
+];
+const ALL_CONTACTS = OWNER_CONTACTS.concat(GC_CONTACTS).concat(PFTEAM_CONTACTS);
 
 function makeDom(role){
   const dom = new JSDOM(`<!doctype html><html><body>
@@ -86,11 +95,13 @@ function crmFetch(posts){
       const trade = params.get('trade') || '';
       const company = params.get('company');
       if (company != null) {
-        const list = trade === 'Owner' ? OWNER_CONTACTS : trade === 'GC' ? GC_CONTACTS : [];
+        const list = trade === 'Owner' ? OWNER_CONTACTS : trade === 'GC' ? GC_CONTACTS
+          : trade === 'PF Team' ? PFTEAM_CONTACTS : [];
         return Promise.resolve({ ok:true, status:200, json:()=>Promise.resolve({ ok:true, mode:'contacts', contacts:list }) });
       }
       if (trade) {
-        const cos = trade === 'Owner' ? OWNER_COMPANIES : trade === 'GC' ? GC_COMPANIES : [];
+        const cos = trade === 'Owner' ? OWNER_COMPANIES : trade === 'GC' ? GC_COMPANIES
+          : trade === 'PF Team' ? PFTEAM_COMPANIES : [];
         return Promise.resolve({ ok:true, status:200, json:()=>Promise.resolve({ ok:true, mode:'companies', companies:cos }) });
       }
       return Promise.resolve({ ok:true, status:200, json:()=>Promise.resolve({ ok:true, contacts:ALL_CONTACTS }) });
@@ -313,6 +324,118 @@ await (async function(){
   let pc=null; root.querySelectorAll('.pr-card').forEach(c=>{const t=c.querySelector('.pr-card-title'); if(t&&t.textContent==='Project Contacts')pc=c;});
   ok('H Project Contacts renders for field_ops', !!pc);
   ok('H no Edit buttons in Project Contacts for field_ops', pc.querySelectorAll('.pr-edit-btn').length === 0);
+})();
+
+// ---- I: PF Project Team is now a cascading selector (identical to the others) ----
+await (async function(){
+  const dom = makeDom('partner');
+  const w = boot(dom, { overrideGet: emptyOv, fetchImpl: crmFetch(null) });
+  w.openProjectRecord('26-002');
+  const root = w.document.getElementById('prGenericRoot');
+  let pfCard=null; root.querySelectorAll('.pr-card').forEach(c=>{const t=c.querySelector('.pr-card-title'); if(t&&t.textContent==='PF Project Team')pfCard=c;});
+  ok('I PF Project Team card renders', !!pfCard);
+  // The PF Team card now carries a cascading CRM cards host (data-crm-cards="PF Project
+  // Team", key pfTeam) — identical structure to every other Project Contacts group.
+  const host = pfCard && pfCard.querySelector('.pr-crm-cards[data-crm-cards="PF Project Team"][data-crm-cards-key="pfTeam"]');
+  ok('I PF Team has cascading CRM host (key pfTeam)', !!host);
+  // Editor renders the SAME cascading company->contacts selector block.
+  w.pfEditSection(pfCard.querySelector('.pr-edit-btn'));
+  const pfEditor = pfCard.querySelector('.pr-editor');
+  const pfBlocks = pfEditor.querySelectorAll('.pr-crm[data-crm-key="pfTeam"]');
+  ok('I PF Team editor has 1 cascading CRM block', pfBlocks.length === 1);
+  ok('I PF Team CRM section = "PF Project Team"',
+    pfBlocks.length === 1 && pfBlocks[0].getAttribute('data-crm-section') === 'PF Project Team');
+})();
+
+// ---- J: saved pfTeam.__crm round-trips into live cards (company + selected contacts) ----
+await (async function(){
+  const dom = makeDom('partner');
+  const savedSections = {
+    pfTeam: { __crm: {
+      'PF Project Team': { company:'Pier Foundations', contactIds:['C0011','C0013'] }
+    } }
+  };
+  const w = boot(dom, { overrideGet: ovWith(savedSections), fetchImpl: crmFetch(null) });
+  w.openProjectRecord('26-002');
+  const root = w.document.getElementById('prGenericRoot');
+  let pfCard=null; root.querySelectorAll('.pr-card').forEach(c=>{const t=c.querySelector('.pr-card-title'); if(t&&t.textContent==='PF Project Team')pfCard=c;});
+  const host = pfCard.querySelector('.pr-crm-cards[data-crm-cards="PF Project Team"][data-crm-cards-key="pfTeam"]');
+  ok('J PF Team host present', !!host);
+  await new Promise(r=>setTimeout(r,80));
+  const ht = host ? host.textContent : '';
+  ok('J PF Team selected contacts rendered', /Seth Willis/.test(ht) && /Ray VanAmburg/.test(ht));
+  ok('J PF Team unselected contacts NOT rendered', !/John Willis/.test(ht) && !/Brad Reinking/.test(ht));
+  ok('J PF Team company sub-label shown', /Pier Foundations/.test(ht));
+})();
+
+// ---- K: DATA PRESERVATION — legacy pfTeam flat role fields still surface + still saved ----
+await (async function(){
+  const dom = makeDom('partner');
+  const posts = [];
+  // A legacy pfTeam override: a role contact name stored the old way, PLUS an added
+  // manual field. Neither should be dropped by the cascading conversion.
+  const savedSections = {
+    pfTeam: {
+      'Project Manager - Contact Name': 'Legacy PM Person',
+      'Extra Custom Field': 'keep me',
+      __crm: { 'PF Project Team': { company:'Pier Foundations', contactIds:['C0012'] } }
+    }
+  };
+  const w = boot(dom, { overrideGet: ovWith(savedSections), fetchImpl: crmFetch(posts) });
+  w.openProjectRecord('26-002');
+  const root = w.document.getElementById('prGenericRoot');
+  let pfCard=null; root.querySelectorAll('.pr-card').forEach(c=>{const t=c.querySelector('.pr-card-title'); if(t&&t.textContent==='PF Project Team')pfCard=c;});
+  const body = pfCard.querySelector('.pr-card-body');
+  // Legacy role value surfaces (seeded into the "Project Manager - Contact Name" row).
+  ok('K legacy role override surfaces', /Legacy PM Person/.test(body.textContent));
+  // Added custom field surfaces (via _surfaceExtras).
+  ok('K legacy extra field surfaces', /keep me/.test(body.textContent));
+  // The cascading selection also renders (coexists, not replaced).
+  await new Promise(r=>setTimeout(r,60));
+  ok('K cascading selection coexists', /Brad Reinking/.test(body.textContent));
+  // Round-trip a save: legacy fields + __crm must ALL be in the POST (no drop).
+  w.pfEditSection(pfCard.querySelector('.pr-edit-btn'));
+  // Wait for the selector to hydrate (company dropdown + saved-contact checkboxes load
+  // async via pfCrmHydrate). A real user waits for the dropdown before saving.
+  await new Promise(r=>setTimeout(r,120));
+  w.pfSaveSection(pfCard.querySelector('.pr-save-btn'));
+  await new Promise(r=>setTimeout(r,60));
+  const pp = posts.find(p=>p.section==='pfTeam');
+  ok('K PF Team save POSTed pfTeam', !!pp);
+  ok('K save preserves legacy role field',
+    pp && pp.fields['Project Manager - Contact Name'] === 'Legacy PM Person');
+  ok('K save preserves legacy extra field',
+    pp && pp.fields['Extra Custom Field'] === 'keep me');
+  ok('K save sends __crm with selected contact',
+    pp && pp.fields.__crm && pp.fields.__crm['PF Project Team'] &&
+    pp.fields.__crm['PF Project Team'].contactIds.indexOf('C0012') !== -1);
+})();
+
+// ---- L: ALL 13 groups render the identical cascading structure (a .pr-crm-cards host
+//         with a data-crm-cards token + a data-crm-cards-key override key) ----
+await (async function(){
+  const dom = makeDom('partner');
+  const w = boot(dom, { overrideGet: emptyOv, fetchImpl: crmFetch(null) });
+  w.openProjectRecord('26-002');
+  const root = w.document.getElementById('prGenericRoot');
+  let pc=null; root.querySelectorAll('.pr-card').forEach(c=>{const t=c.querySelector('.pr-card-title'); if(t&&t.textContent==='Project Contacts')pc=c;});
+  // Every group is a .pr-crm-cards host with a data-crm-cards token. The override key
+  // is data-crm-cards-key, defaulting to design_professionals when omitted (the DP firm
+  // hosts pre-date the explicit-key attribute; pfCrmRenderCards.mapFor resolves the same
+  // default). So a missing key === 'design_professionals'.
+  const hosts = [...pc.querySelectorAll('.pr-crm-cards[data-crm-cards]')]
+    .map(h=>h.getAttribute('data-crm-cards') + '::' + (h.getAttribute('data-crm-cards-key') || 'design_professionals'));
+  const want = [
+    'Owner::general','GC::general',
+    'Geotechnical::design_professionals','Civil::design_professionals',
+    'Structural::design_professionals','Ground Improvement::design_professionals',
+    'PF Project Team::pfTeam',
+    'Safety Consultant::safety','Staking & Layout::siteReadiness',
+    'Equipment Transport::equipment','Rental Equipment::equipment',
+    'Material Vendor(s)::material','Fuel Delivery::material'
+  ];
+  ok('L exactly 13 cascading hosts', hosts.length === 13);
+  ok('L all 13 groups are identical cascading hosts in order', hosts.join('|') === want.join('|'));
 })();
 
 console.log('\n== RESULT ==  pass=' + pass + '  fail=' + fail);
