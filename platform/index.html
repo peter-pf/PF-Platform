@@ -13279,6 +13279,29 @@ try {
       // No override, no Garbin -> graceful empty editable field (blank, amber, no link).
       return fieldLinked(label, '', '', 'website');
     }
+    // "Garbin Prelim Folder" field (Brad 2026-08-12): renders IMMEDIATELY NEXT TO the
+    // workbook link (garbinPrelimLinkField) so a user can open the workbook file OR its
+    // containing SharePoint folder ("Garbin Prelim" / "Bid Prelim" / fallback folder).
+    // Link points at gp.folder_url (the folder's SharePoint webUrl, captured by the
+    // sync). When folder_url is absent (no Garbin entry, or the sync couldn't resolve
+    // the parent folder), it renders a graceful blank field -- NO broken link, no
+    // "undefined". This is DERIVED/read-only display (no manual-override round-trip):
+    // the field is not in the section editor's save scope, so no data-pr-label is
+    // emitted for it (consistent with the display-only Garbin readouts).
+    function garbinPrelimFolderField(gp){
+      var label = 'Garbin Prelim Folder';
+      var url = (gp && gp.folder_url != null) ? String(gp.folder_url).trim() : '';
+      if (url) {
+        var href = /^[a-z][a-z0-9+.-]*:\/\//i.test(url) ? url : ('https://' + url.replace(/^\/+/, ''));
+        var linkHtml = '<a href="'+E(href)+'" target="_blank" rel="noopener noreferrer">Open folder</a>';
+        return '<div class="pr-field"><span class="pr-field-label">'+E(label)+'</span>'
+             + '<span class="pr-field-value">'+linkHtml+'</span>'
+             + '<span class="pr-field-src">Garbin Prelim</span></div>';
+      }
+      // No folder_url -> graceful blank (yellow, no link), same look as an empty field().
+      return '<div class="pr-field"><span class="pr-field-label">'+E(label)+'</span>'
+           + '<span class="pr-field-value empty blank">-</span></div>';
+    }
 
     // ---- computed automations (phase 2, Brad 2026-08-07) ---------------------
     // DISPLAY-ONLY computed HINTS layered next to existing manual fields. These
@@ -14946,6 +14969,11 @@ try {
             // (Brad 2026-08-11). Manual override (typed URL) wins; else the Garbin
             // webUrl; else blank/no-broken-link. See garbinPrelimLinkField.
             garbinPrelimLinkField(gp),
+            // "Garbin Prelim Folder" link IMMEDIATELY NEXT TO the workbook link
+            // (Brad 2026-08-12): opens the CONTAINING SharePoint folder so someone can
+            // reach the folder for easy access. gp.folder_url; blank/no-broken-link when
+            // absent. See garbinPrelimFolderField.
+            garbinPrelimFolderField(gp),
             // "Total LF (Prelim)" <- Garbin Grand Total LF (gp.lf). Override wins (via
             // field()'s ovLookup); else Garbin; else '' (blank). Thousands-separated by
             // the qty label gate. Falls back to the Bid Log seed ONLY when there is no

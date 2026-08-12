@@ -12,6 +12,7 @@ window.PF_GARBIN_PRELIM = {
       "bearing_psf": 5000,
       "stone_tn": 3650,
       "webUrl": "https://pierfoundations.sharepoint.com/sites/pf/_layouts/15/Doc.aspx?sourcedoc=%7B82772674-0CC0-4111-9CA3-A900455C527A%7D&file=AP%20Preliminary%20Design%20Summary%20POET%20Shelbyville%20Rev1.xlsx&action=default&mobileredirect=true",
+      "folder_url": "https://pierfoundations.sharepoint.com/sites/pf/Shared%20Documents/04%20-%20Project%20Management/02%20-%20Projects/26-002%20-%20POET%20Projects%20-%20POET/03%20-%20Engineering%20%26%20Design/Garbin%20Prelim",
       "source_file": "AP Preliminary Design Summary POET Shelbyville Rev1.xlsx",
       "item_id": "016ISVH63UEZ3YFQAMCFAZZI5JABCVYUT2",
       "tabs": [
@@ -37,6 +38,7 @@ window.PF_GARBIN_PRELIM = {
       "bearing_psf": 2000,
       "stone_tn": 650,
       "webUrl": "https://pierfoundations.sharepoint.com/sites/pf/_layouts/15/Doc.aspx?sourcedoc=%7B576D3173-C1BE-468A-B6A3-B63CB1036E5B%7D&file=AP%20Preliminary%20Design%20Summary%20INAW%20Terre%20Haute.xlsx&action=default&mobileredirect=true",
+      "folder_url": "https://pierfoundations.sharepoint.com/sites/pf/Shared%20Documents/04%20-%20Project%20Management/02%20-%20Projects/26-008%20-%20INAW%20Terre%20Haute%20-%20Reynolds/03%20-%20Engineering%20%26%20Design/Bid%20Design",
       "source_file": "AP Preliminary Design Summary INAW Terre Haute.xlsx",
       "item_id": "016ISVH63TGFWVPPWBRJDLNI5WHSYQG3S3",
       "tabs": [
@@ -62,6 +64,7 @@ window.PF_GARBIN_PRELIM = {
       "bearing_psf": 3000,
       "stone_tn": 400,
       "webUrl": "https://pierfoundations.sharepoint.com/sites/pf/_layouts/15/Doc.aspx?sourcedoc=%7B7485D4A0-82EB-4648-BD30-C5E8B4E5CDD3%7D&file=AP%20Preliminary%20Design%20Summary_Indianapolis%20Housing%20Hub.xlsx&action=default&mobileredirect=true",
+      "folder_url": "https://pierfoundations.sharepoint.com/sites/pf/Shared%20Documents/04%20-%20Project%20Management/02%20-%20Projects/26-011%20-%20Indy%20Housing%20-%20Shiel%20Sexton/03%20-%20Engineering%20%26%20Design/Bid%20Prelim",
       "source_file": "AP Preliminary Design Summary_Indianapolis Housing Hub.xlsx",
       "item_id": "016ISVH65A2SCXJ24CJBDL2MGF5C2OLTOT",
       "tabs": [
@@ -87,6 +90,7 @@ window.PF_GARBIN_PRELIM = {
       "bearing_psf": 6000,
       "stone_tn": 2800,
       "webUrl": "https://pierfoundations.sharepoint.com/sites/pf/_layouts/15/Doc.aspx?sourcedoc=%7B489245F7-FF0A-4FF4-BCE7-42A4A2A0F6E1%7D&file=AP%20Preliminary%20Design%20Summary%20Park%20and%20Poplar.xlsx&action=default&mobileredirect=true",
+      "folder_url": "https://pierfoundations.sharepoint.com/sites/pf/Shared%20Documents/04%20-%20Project%20Management/02%20-%20Projects/26-013%20-%20Park%20%26%20Poplar%20-%20OldTown/03%20-%20Engineering%20%26%20Design/Bid%20Prelim",
       "source_file": "AP Preliminary Design Summary Park and Poplar.xlsx",
       "item_id": "016ISVH67XIWJEQCX76RH3ZZ2CUSRKB5XB",
       "tabs": [
@@ -112,6 +116,7 @@ window.PF_GARBIN_PRELIM = {
       "bearing_psf": 4000,
       "stone_tn": 300,
       "webUrl": "https://pierfoundations.sharepoint.com/sites/pf/_layouts/15/Doc.aspx?sourcedoc=%7B58356529-8EDF-4C96-BA18-576410664E0A%7D&file=AP%20Preliminary%20Design%20Summary%20TPS%20Dayton%20Rev2.xlsx&action=default&mobileredirect=true",
+      "folder_url": "https://pierfoundations.sharepoint.com/sites/pf/Shared%20Documents/04%20-%20Project%20Management/02%20-%20Projects/26-014%20-%20TPS%20Dayton%20-%20Brackett/03%20-%20Engineering%20%26%20Design/Bid%20Prelim",
       "source_file": "AP Preliminary Design Summary TPS Dayton Rev2.xlsx",
       "item_id": "016ISVH6ZJMU2VRX4OSZGLUGCXMQIGMTQK",
       "tabs": [
@@ -137,6 +142,7 @@ window.PF_GARBIN_PRELIM = {
       "bearing_psf": 3000,
       "stone_tn": 550,
       "webUrl": "https://pierfoundations.sharepoint.com/sites/pf/_layouts/15/Doc.aspx?sourcedoc=%7B4D44A13E-A4E8-4781-BB4F-1F3A7DF9E244%7D&file=AP%20Preliminary%20Design%20Summary%20Filager%20Campus%20Phase%20II.xlsx&action=default&mobileredirect=true",
+      "folder_url": "https://pierfoundations.sharepoint.com/sites/pf/Shared%20Documents/04%20-%20Project%20Management/02%20-%20Projects/26-016%20-%20Filager%20Campus%20-%20Graybach/03%20-%20Engineering%20%26%20Design/Bid%20Prelim",
       "source_file": "AP Preliminary Design Summary Filager Campus Phase II.xlsx",
       "item_id": "016ISVH6Z6UFCE32FEQFD3WTY7HJ67TYSE",
       "tabs": [
@@ -162,6 +168,7 @@ window.PF_GARBIN_PRELIM = {
       "bearing_psf": 3000,
       "stone_tn": 250,
       "webUrl": "https://pierfoundations.sharepoint.com/sites/pf/_layouts/15/Doc.aspx?sourcedoc=%7B3D1BD8BA-EB45-4904-862E-F654C170BEFF%7D&file=AP%20Preliminary%20Design%20Summary%20Pivotal%20Perrysburg%20Sr%20Lofts.xlsx&action=default&mobileredirect=true",
+      "folder_url": "https://pierfoundations.sharepoint.com/sites/pf/Shared%20Documents/04%20-%20Project%20Management/02%20-%20Projects/26-018%20-%20Pivitol%20Perrysburg%20-%20Ruscilli/03%20-%20Engineering%20%26%20Design/Bid%20Prelim",
       "source_file": "AP Preliminary Design Summary Pivotal Perrysburg Sr Lofts.xlsx",
       "item_id": "016ISVH6523ANT2RPLAREYMLXWKTAXBPX7",
       "tabs": [
@@ -182,7 +189,7 @@ window.PF_GARBIN_PRELIM = {
     }
   },
   "meta": {
-    "generated": "2026-08-11T23:08:48.557135Z",
+    "generated": "2026-08-12T00:29:34.096142Z",
     "source": "SharePoint 03 - Engineering & Design/{Garbin Prelim|Bid Prelim}/<AP Preliminary Design Summary>.xlsx (or, fallback, any 'Preliminary Design Summary' workbook anywhere under E&D), tab 'Prelim Design Summary'",
     "extraction": "label-anchored col R -> value col T (unit col U)",
     "note": "nominal_dia_ft is RAW feet; frontend x12 -> inches. Prelim from named folder 'Garbin Prelim' (older) OR 'Bid Prelim' (newer); FALLBACK = whole-E&D-tree filename search when neither named folder has a file (OLD/archive/superseded folders excluded, tab-verified). OLD subfolders disregarded.",

@@ -204,6 +204,38 @@ def download_item_content(token, item_id):
     return urllib.request.urlopen(req).read()
 
 
+def get_item_by_id(token, item_id):
+    """Fetch a single driveItem by its id (any type -- file or folder). Returns the
+    item dict, or None on 404. Used to grab the parent prelim FOLDER's webUrl so the
+    portal can offer a 'Garbin Prelim Folder' link next to the workbook link."""
+    if not item_id:
+        return None
+    url = f"{GRAPH}/drives/{DRIVE_ID}/items/{urllib.parse.quote(str(item_id))}"
+    try:
+        return gget(token, url)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return None
+        raise
+
+
+def folder_web_url_for_file(token, file_item):
+    """Given the chosen workbook driveItem, return the webUrl of its CONTAINING folder
+    (the 'Garbin Prelim' / 'Bid Prelim' / fallback folder). Graph gives every driveItem
+    -- including folders -- a webUrl; we resolve the parent via the file's
+    parentReference.id and fetch that folder item. Returns '' if it can't be determined
+    (fail-soft: the frontend renders the folder link blank rather than a broken link)."""
+    try:
+        parent = (file_item or {}).get("parentReference") or {}
+        parent_id = parent.get("id", "")
+        folder_item = get_item_by_id(token, parent_id)
+        if folder_item:
+            return folder_item.get("webUrl", "") or ""
+    except Exception:  # noqa: BLE001  -- fail-soft, never break the sync over the folder link
+        pass
+    return ""
+
+
 # ---------------- value helpers ----------------
 def _num(v):
     """Coerce a cell value to a JSON-friendly number (int when whole), else None."""
@@ -264,7 +296,7 @@ def extract_from_workbook(raw_bytes):
     return values, units, missing
 
 
-def build_entry(values, units, missing, webUrl, source_file, item_id):
+def build_entry(values, units, missing, webUrl, source_file, item_id, folder_url=""):
     """Assemble the per-project portal entry from extracted raw numbers.
     nominal_dia is stored RAW in feet (frontend multiplies x12 -> inches).
     Only keys actually extracted are populated; the rest are null (frontend -> blank)."""
@@ -276,6 +308,10 @@ def build_entry(values, units, missing, webUrl, source_file, item_id):
         "bearing_psf": values.get("bearing"),
         "stone_tn": values.get("stone"),
         "webUrl": webUrl or "",
+        # webUrl of the CONTAINING prelim folder (Garbin Prelim / Bid Prelim / fallback
+        # folder). Lets the portal offer a 'Garbin Prelim Folder' link next to the
+        # workbook link. '' when it couldn't be resolved (frontend renders blank).
+        "folder_url": folder_url or "",
         "source_file": source_file,
         "item_id": item_id,
         "tabs": ["Prelim Design Summary", "Design Notes"],
@@ -528,7 +564,10 @@ def build(token, only=None, verbose=True):
         webUrl = item.get("webUrl", "")
         src_name = item.get("name", "")
         item_id = item.get("id", "")
-        entry = build_entry(values, units, missing, webUrl, src_name, item_id)
+        # Parent prelim FOLDER webUrl (for the 'Garbin Prelim Folder' portal link).
+        folder_url = folder_web_url_for_file(token, item)
+        entry = build_entry(values, units, missing, webUrl, src_name, item_id,
+                            folder_url=folder_url)
         entry["prelim_folder"] = folder_label      # which folder/structure this came from
         entry["source"] = source                   # 'named' or 'fallback'
         entry["source_path"] = path                 # provenance path under E&D
