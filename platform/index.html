@@ -2628,6 +2628,21 @@ tr.pf-dragging { opacity: 0.45; }
   font-size: 0.72rem; color: var(--text-2); font-style: italic;
   margin: 0 0 6px 18px;
 }
+/* COLLAPSIBLE subgroup (Brad 2026-08-12): a top-level subgroup whose whole body rolls up
+   / expands. Reuses the .pr-subgroup visual (accent left-bar header) + the .pr-card '.open'
+   toggle idiom (header click toggles .open on .pr-cgroup; the caret rotates; the body shows
+   only when open). DEFAULT expanded. In-session toggle only. */
+.pr-cgroup { margin: 2px 0 4px 0; }
+.pr-cgroup-head {
+  display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;
+  /* .pr-subgroup supplies the font/color/left-bar; keep its margins so it reads identically. */
+}
+.pr-cgroup-head:hover { background: rgba(0,123,196,0.05); }
+.pr-cgroup-title { flex: 1; }
+.pr-cgroup-chev { font-size: 0.72rem; color: var(--text-3); transition: transform 0.15s ease; margin-right: 6px; }
+.pr-cgroup.open .pr-cgroup-chev { transform: rotate(90deg); }
+.pr-cgroup-body { display: none; }
+.pr-cgroup.open .pr-cgroup-body { display: block; }
 /* Site Readiness batch-13: clickable action buttons under a subgroup (FedEx print,
    Pipefy SSSP). Display-only launcher links; open in a new tab. */
 .pr-subgroup-actions { margin: 2px 0 6px 18px; }
@@ -3085,17 +3100,31 @@ tr.pf-dragging { opacity: 0.45; }
 .pr-pc-section .pr-pc-horiz-block { margin: 0 0 12px; }
 
 .pr-links { display: flex; flex-wrap: wrap; gap: 8px; }
+/* Documents folder links (linkRow) — restyled 2026-08-12 to MATCH the .pf-folder-link
+   button (batch 2) so every SharePoint folder link portal-wide reads identically: SVG
+   folder icon (emitted inline at each site) + azure text + subtle button look, hover fills
+   accent. A real anchor (target _blank rel=noopener). The .missing variant (folder not
+   found in SharePoint) stays a muted, non-clickable dashed chip. */
 .pr-link {
   display: inline-flex; align-items: center; gap: 6px;
-  font-size: 0.82rem; font-weight: 600;
-  padding: 6px 12px;
-  border-radius: 7px;
-  background: var(--accent-light); color: var(--accent-dark);
-  border: 1px solid var(--accent);
-  text-decoration: none;
+  padding: 3px 10px; border-radius: 6px;
+  font-size: 0.82rem; font-weight: 600; line-height: 1.3;
+  color: var(--accent);
+  background: rgba(0,123,196,0.07);
+  border: 1px solid rgba(0,123,196,0.35);
+  text-decoration: none; word-break: normal;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
-.pr-link:hover { background: var(--accent); color: #fff; }
-.pr-link.missing { background: var(--bg-2); color: var(--text-3); border: 1px dashed var(--border); cursor: not-allowed; }
+.pr-link:hover, .pr-link:focus { background: var(--accent); color: #fff; border-color: var(--accent); text-decoration: none; }
+.pr-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* The inline SVG folder icon inherits currentColor so it flips to white on hover. */
+.pr-link .pf-folder-ico { width: 15px; height: 15px; flex: 0 0 auto; display: block; }
+.pr-link.missing {
+  color: var(--text-3); background: var(--bg-2);
+  border: 1px dashed var(--border); cursor: not-allowed;
+}
+.pr-link.missing:hover { background: var(--bg-2); color: var(--text-3); border-color: var(--border); }
+.pr-link.missing .pf-folder-ico { opacity: 0.6; }
 .pr-empty-note { font-size: 0.84rem; color: var(--text-3); font-style: italic; }
 
 /* ---- PROJECT PHOTOS (live SharePoint gallery, read-only) ---- */
@@ -13479,6 +13508,24 @@ try {
     // longer reads as if it lives under PF Design Submittal.
     function subgroupSub(t){ return '<div class="pr-subgroup pr-subgroup-sub">'+E(t)+'</div>'; }
     function subgroupNote(t){ return '<div class="pr-subgroup-note">'+E(t)+'</div>'; }
+    // COLLAPSIBLE subgroup (Brad 2026-08-12): a top-level subgroup whose ENTIRE body rolls
+    // up / expands. Reuses the EXISTING .pr-card collapse idiom (a clickable header that
+    // toggles the sibling body via classList.toggle('open') + a .pr-chev caret), so it looks
+    // and behaves like every other collapsible in the portal. DEFAULT = expanded (open).
+    // The body is a plain wrapper div INSIDE the section card, so every .pr-field[data-pr-label]
+    // inside is still a descendant of data-pr-section — the section editor's save-scan +
+    // the .pf-swf-/.pf-sge- blocks' closest('.pr-card') lookups are unaffected. In-session
+    // toggle only (no persisted open-state), matching the other collapsibles.
+    function collapsibleSubgroup(title, innerHtml, open){
+      var isOpen = (open !== false); // default expanded
+      return '<div class="pr-cgroup'+(isOpen ? ' open' : '')+'">'
+        + '<div class="pr-cgroup-head pr-subgroup" onclick="this.parentElement.classList.toggle(\'open\')">'
+        +   '<span class="pr-cgroup-title">'+E(title)+'</span>'
+        +   '<span class="pr-chev pr-cgroup-chev">&#9654;</span>'
+        + '</div>'
+        + '<div class="pr-cgroup-body">'+innerHtml+'</div>'
+        + '</div>';
+    }
 
     // ---- Garbin Prelim (Engineering & Design) --------------------------------
     // Reads window.PF_GARBIN_PRELIM.projects[num] (from data/garbin-prelim.js, built
@@ -13553,16 +13600,19 @@ try {
     // folder-link helper). text is the visible label. A REAL anchor (target _blank,
     // rel=noopener) for accessibility. Callers only pass this when a url exists; the
     // blank-graceful path stays with each caller (yellow "-" placeholder, no anchor).
+    // The inline SVG folder glyph shared by pfFolderLink AND the Documents linkRow buttons
+    // (currentColor so it flips to white on hover; aria-hidden — the link text is the
+    // accessible name). One source of truth for the icon markup.
+    function pfFolderIcoSvg(){
+      return '<svg class="pf-folder-ico" viewBox="0 0 24 24" fill="none" '
+        + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+        + '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>';
+    }
     function pfFolderLink(url, text){
       var raw = String(url == null ? '' : url).trim();
       var href = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : ('https://' + raw.replace(/^\/+/, ''));
-      // Inline SVG folder glyph (currentColor so it flips to white on hover). aria-hidden:
-      // the anchor text is the accessible name.
-      var ico = '<svg class="pf-folder-ico" viewBox="0 0 24 24" fill="none" '
-        + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-        + '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>';
       return '<a class="pf-folder-link" href="'+E(href)+'" target="_blank" rel="noopener noreferrer">'
-        + ico + '<span class="pf-folder-txt">'+E(text)+'</span></a>';
+        + pfFolderIcoSvg() + '<span class="pf-folder-txt">'+E(text)+'</span></a>';
     }
     // "Garbin Prelim Workbook" field (Brad 2026-08-12): DISPLAY-ONLY, auto-from-Garbin
     // clickable link to the Garbin Prelim workbook file. This REPLACES the former
@@ -13933,7 +13983,7 @@ try {
         + '</tr>'
         + '</thead>';
       return '<div class="pf-prq-wrap" data-prq-num="'+E(_curNum)+'">'
-        + subgroup('PF Prerequisites for Submittal Design')
+        + subgroup('PF Info Needed for Submittal Design')
         + subgroupNote('Items PF needs from the GC before starting the full Submittal Design. Fill a Date Received to mark an item received; PF begins once all are received.')
         + shopDwgInfoLinkRow(sdi)
         + statusLine
@@ -14589,9 +14639,9 @@ try {
       if (!links || !links.length) return '';
       var out = links.map(function(l){
         if (l.found && l.url) {
-          return '<a class="pr-link" href="'+E(l.url)+'" target="_blank" rel="noopener noreferrer">&#128193; '+E(l.label)+'</a>';
+          return '<a class="pr-link" href="'+E(l.url)+'" target="_blank" rel="noopener noreferrer">'+pfFolderIcoSvg()+'<span class="pf-folder-txt">'+E(l.label)+'</span></a>';
         }
-        return '<span class="pr-link missing" title="Folder not found in SharePoint">&#128193; '+E(l.label)+'</span>';
+        return '<span class="pr-link missing" title="Folder not found in SharePoint">'+pfFolderIcoSvg()+'<span class="pf-folder-txt">'+E(l.label)+'</span></span>';
       }).join('');
       return '<div class="pr-subhead">Documents</div><div class="pr-links">'+out+'</div>';
     }
@@ -15859,9 +15909,9 @@ try {
             if (!links || !links.length) return '';
             var out = links.map(function(l){
               if (l.found && l.url) {
-                return '<a class="pr-link" href="'+E(l.url)+'" target="_blank" rel="noopener noreferrer">&#128193; '+E(l.label)+'</a>';
+                return '<a class="pr-link" href="'+E(l.url)+'" target="_blank" rel="noopener noreferrer">'+pfFolderIcoSvg()+'<span class="pf-folder-txt">'+E(l.label)+'</span></a>';
               }
-              return '<span class="pr-link missing" title="Folder not found in SharePoint">&#128193; '+E(l.label)+'</span>';
+              return '<span class="pr-link missing" title="Folder not found in SharePoint">'+pfFolderIcoSvg()+'<span class="pf-folder-txt">'+E(l.label)+'</span></span>';
             }).join('');
             return '<div class="pr-subhead">Subcontract Agreement</div><div class="pr-links">'+out+'</div>';
           })(), false, 'contract');
@@ -15976,18 +16026,17 @@ try {
       // keyed by project number. null when the project has no Garbin Prelim
       // workbook -> the added display pieces render nothing (graceful).
       var gp = pfGarbinPrelim(_curNum);
-      var engBody =
-          // --- Subsection 1: Prelim Design ---
-          // The prelim design the bid was based on. LF / Total Columns / Column
-          // Diameter / SOW are ENGINEERING-scoped copies (own labels distinct from the
-          // General Info > Project Info "Total Pier Qty (Prelim)" / "Total LF (Prelim)"
-          // / "Column Diameter" / "Project Scope of Work (SOW)" rows, which stay in
-          // section 1 under the `general` key and are NOT moved — moving them would
-          // touch section 1 + its override key). These new rows seed read-only from the
-          // Bid Log for convenience but save under `engineering`. Auto-extract of these
-          // values from the linked Prelim Design doc is FUTURE (see subgroupNote).
-          subgroup('Prelim Design')
-        + subgroupNote('The prelim design the bid was based on. FUTURE: values auto-extract from the linked Prelim Design document.')
+      // --- Subsection 1: Prelim Design (INNER content; wrapped collapsible below) ---
+      // The prelim design the bid was based on. LF / Total Columns / Column
+      // Diameter / SOW are ENGINEERING-scoped copies (own labels distinct from the
+      // General Info > Project Info "Total Pier Qty (Prelim)" / "Total LF (Prelim)"
+      // / "Column Diameter" / "Project Scope of Work (SOW)" rows, which stay in
+      // section 1 under the `general` key and are NOT moved — moving them would
+      // touch section 1 + its override key). These new rows seed read-only from the
+      // Bid Log for convenience but save under `engineering`. Auto-extract of these
+      // values from the linked Prelim Design doc is FUTURE (see subgroupNote).
+      var prelimInner =
+          subgroupNote('The prelim design the bid was based on. FUTURE: values auto-extract from the linked Prelim Design document.')
         + fields([
             // "Garbin Prelim Workbook" — DISPLAY-ONLY auto link to the Garbin workbook
             // file (Brad 2026-08-12). REPLACES the former fillable "Link to Prelim Design"
@@ -16036,16 +16085,16 @@ try {
             // PF_FIELD_DROPDOWNS['SOW'] entry pointing at the same value list). Now the
             // BOTTOM field of the Prelim Design subsection (Brad 2026-08-12).
             field('SOW', '')
-          ]))
-          // --- Subsection 2: PF Submittal Design ---
-        + subgroup('PF Submittal Design')
+          ]));
+      // --- Subsection 2: PF Submittal Design (INNER content; wrapped collapsible below) ---
+      var submittalInner =
           // GC PREREQUISITES CHECKLIST (Brad 2026-08-12): rendered AHEAD of all the
           // PF Design Submittal fields — the items PF needs from the GC before starting
           // the full Submittal Design (responsible party + Date Received per item, a
           // Shop Dwg Info folder link, and a reminder-email action). Its own inline
           // editor + reserved __submittal_prereqs override key (NOT a .pr-field, so the
           // engineering section editor's save-scan ignores it). See submittalPrereqsBlock.
-        + submittalPrereqsBlock(pfShopDwgInfo(_curNum))
+          submittalPrereqsBlock(pfShopDwgInfo(_curNum))
           // PF DESIGN SUBMITTAL WORKFLOW (Stage 2, Brad 2026-08-12): the linear date
           // chain + status is now a set of REVISION CYCLES (Original + Rev1/Rev2/...),
           // rendered directly BELOW the PF Prerequisites checklist. See
@@ -16061,17 +16110,17 @@ try {
           // Columns / Column Diameter (in) / Bearing Capacity (psf) pulled from the
           // Garbin Prelim, plus a clickable link to the workbook + its two tab names.
           // Renders only when this project has a Garbin entry ('' otherwise).
-        + garbinDesignNotesBlock(gp)
+        + garbinDesignNotesBlock(gp);
           // NOTE (Brad 2026-08-12): Site Grade Elevations is NO LONGER a standalone E&D
-          // subgroup here — it is rendered as COMPACT CONTENT INSIDE submittalWorkflowBlock
-          // (see siteGradeElevationsInline). This keeps Engineering & Design at EXACTLY 3
-          // subgroups: Prelim Design / PF Submittal Design / As Built Drawings.
-          // --- Subsection 3: As Built Drawings (two sub-sub-groups) ---
-        + subgroup('As Built Drawings')
+          // subgroup — it is rendered as COMPACT CONTENT INSIDE submittalWorkflowBlock
+          // (see siteGradeElevationsInline). E&D stays at EXACTLY 3 subgroups: Prelim
+          // Design / PF Submittal Design / As Built Drawings.
+      // --- Subsection 3: As Built Drawings (INNER content; wrapped collapsible below) ---
+      var asBuiltInner =
           // Sub-sub-group A: Field As-Built Drawings (daily field uploads). UI shell
           // only — an editable link/list field for now. Rendered as its own subgroup()
           // header so it reads as a distinct group beneath "As Built Drawings".
-        + subgroupSub('Field As-Built Drawings')
+          subgroupSub('Field As-Built Drawings')
         + subgroupNote('FUTURE (not yet built): each daily-report upload saves a dated file per day; Peter compares installed vs the Approved Shop Drawing and posts a daily summary (LF, columns, start/end from rig data).')
         + fields([
             fieldLinked('Field As-Built Drawings Link', '', '', 'website'),
@@ -16083,6 +16132,13 @@ try {
             fieldLinked('Stamped Final As-Built Link', '', '', 'website')
           ])
         + linkRow((L.engineering || []).concat(L.general || []));
+      // Assemble the 3 COLLAPSIBLE subsections (default expanded). Each rolls up/expands
+      // independently via the shared .pr-card collapse idiom (collapsibleSubgroup). E&D
+      // stays exactly 3 top-level subsections.
+      var engBody =
+          collapsibleSubgroup('Prelim Design', prelimInner)
+        + collapsibleSubgroup('PF Submittal Design', submittalInner)
+        + collapsibleSubgroup('As Built Drawings', asBuiltInner);
       html += card(4, 'Engineering & Design', null, engBody, false, 'engineering');
 
       // ----- Design Professionals (CONTACTS import inside General Info) -----
@@ -26727,13 +26783,21 @@ try {
       if (!arr || !arr.length) return '<div class="pr-empty-note">No contacts recorded for this group yet.</div>';
       return arr.map(contactBlock).join('');
     }
+    // Inline SVG folder glyph for this (second) renderer's Documents links — a scope-local
+    // copy of block #22's pfFolderIcoSvg (this IIFE can't see that one). Same markup so all
+    // folder links portal-wide match (Brad 2026-08-12 Documents restyle).
+    function pfFolderIcoSvg(){
+      return '<svg class="pf-folder-ico" viewBox="0 0 24 24" fill="none" '
+        + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+        + '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>';
+    }
     function linkRow(links){
       if (!links || !links.length) return '';
       var out = links.map(function(l){
         if (l.found && l.url) {
-          return '<a class="pr-link" href="'+E(l.url)+'" target="_blank" rel="noopener noreferrer">&#128193; '+E(l.label)+'</a>';
+          return '<a class="pr-link" href="'+E(l.url)+'" target="_blank" rel="noopener noreferrer">'+pfFolderIcoSvg()+'<span class="pf-folder-txt">'+E(l.label)+'</span></a>';
         }
-        return '<span class="pr-link missing" title="Folder not found in SharePoint">&#128193; '+E(l.label)+'</span>';
+        return '<span class="pr-link missing" title="Folder not found in SharePoint">'+pfFolderIcoSvg()+'<span class="pf-folder-txt">'+E(l.label)+'</span></span>';
       }).join('');
       return '<div class="pr-subhead">Documents</div><div class="pr-links">'+out+'</div>';
     }
