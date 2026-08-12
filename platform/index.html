@@ -2622,6 +2622,52 @@ tr.pf-dragging { opacity: 0.45; }
 /* PF Design Submittal WORKFLOW (Stage 1, Brad 2026-08-12): the "email to Garbin
    needed" flag on the AAN / Revise status notes. Stands out on the red flag hint. */
 .pf-wf-flag { color: #c0392b; font-weight: 700; white-space: nowrap; }
+/* PF Design Submittal REVISION CYCLES (Stage 2, Brad 2026-08-12): the workflow becomes
+   a set of cycles (Original + Rev1/Rev2/...). Self-contained wrap with its OWN editor +
+   reserved __submittal_cycles key, so the generic engineering section editor's save-scan
+   ignores its rows (they are .pf-swf-field, NOT .pr-field[data-pr-label]). */
+.pf-swf-wrap { margin: 4px 0 10px 10px; }
+/* Cycle-nav tabs: Original | Rev1 | Rev2 ... The active tab is filled accent. */
+.pf-swf-nav { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px 8px; }
+.pf-swf-tab {
+  font-size: 0.74rem; font-weight: 600; cursor: pointer; line-height: 1.2;
+  padding: 4px 12px; border-radius: 14px; border: 1px solid var(--accent);
+  color: var(--accent); background: transparent;
+}
+.pf-swf-tab:hover { background: rgba(0,123,196,0.08); }
+.pf-swf-tab-on { color: #fff; background: var(--accent); }
+.pf-swf-body { margin-left: 8px; }
+/* Per-cycle display field rows (label + value). Same visual grammar as .pr-field but
+   deliberately a DIFFERENT class so the section editor never scans them. */
+.pf-swf-field {
+  display: flex; align-items: baseline; gap: 8px; margin: 0 0 5px 0;
+  font-size: 0.8rem; line-height: 1.3;
+}
+.pf-swf-label { min-width: 250px; color: var(--text-2); font-weight: 600; }
+.pf-swf-val { color: var(--text-1); }
+.pf-swf-blank {
+  color: #b06a00; background: rgba(217,138,0,0.10);
+  padding: 0 6px; border-radius: 3px;
+}
+.pf-swf-bar { margin: 8px 0 2px 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+.pf-swf-edit, .pf-swf-startrev, .pf-swf-save, .pf-swf-cancel {
+  font-size: 0.74rem; font-weight: 600; cursor: pointer; line-height: 1.2;
+  padding: 5px 12px; border-radius: 6px; border: 1px solid var(--accent);
+}
+.pf-swf-edit, .pf-swf-cancel { color: var(--accent); background: #fff; }
+.pf-swf-startrev, .pf-swf-save { color: #fff; background: var(--accent); border-color: var(--accent); }
+.pf-swf-edit:hover, .pf-swf-cancel:hover { background: rgba(0,123,196,0.06); }
+.pf-swf-startrev:hover, .pf-swf-save:hover { filter: brightness(1.08); }
+.pf-swf-editor { margin: 6px 0 4px 8px; }
+.pf-swf-edit-note { font-size: 0.74rem; color: var(--text-2); font-style: italic; margin: 0 0 8px 0; }
+.pf-swf-erow { display: flex; align-items: center; gap: 8px; margin: 0 0 6px 0; font-size: 0.8rem; }
+.pf-swf-erow > label { min-width: 250px; color: var(--text-2); font-weight: 600; }
+.pf-swf-in { font-size: 0.8rem; padding: 3px 6px; }
+.pf-swf-edit-err { color: #c0392b; font-size: 0.76rem; font-weight: 600; margin: 4px 0; }
+.pf-swf-edit-actions { margin-top: 8px; display: flex; gap: 8px; }
+.pf-swf-msg { font-size: 0.76rem; margin: 6px 0 0 8px; }
+.pf-swf-msg-ok { color: #2e7d32; }
+.pf-swf-msg-err { color: #c0392b; font-weight: 600; }
 /* GC Prerequisites checklist (PF Design Submittal, Brad 2026-08-12). A table at the
    TOP of the subsection: Item | Responsible Party | Date Received (+ Reminder for office).
    Received rows read green/checked, outstanding rows amber. NOT .pr-field rows, so the
@@ -13788,57 +13834,171 @@ try {
     // STAGE 1 SCOPE: on "AAN"/"Revise" the note FLAGS "email to Garbin needed" only —
     // no email is sent (Stage 3 wires the send). The Rev1/Rev2 revision-cycle
     // mechanism is Stage 2 and is only FLAGGED here, never built.
+    // ---- Stage 2: submittal REVISION CYCLES (Brad 2026-08-12) -----------------
+    // The 3 dropdown status values (single source of truth; the editor + note logic
+    // reference this so a reword never drifts).
+    var PF_SUBMITTAL_STATUSES = ['Approved / Reviewed', 'AAN (Approved as Noted)', 'Revise & Resubmit'];
+    // Human label for a cycle index: 0 => "Original", n => "Rev{n}".
+    function pfCycleLabel(rev){ return (Number(rev) === 0) ? 'Original' : ('Rev' + Number(rev)); }
+    // Read the stored __submittal_cycles ARRAY from the engineering override. Returns a
+    // NORMALIZED array of {rev, prereqs_sent, actual_completion, pf_submits_gc, status}
+    // (rev reassigned positionally so it is always honest). When NO cycles array is
+    // stored yet, MIGRATE the Stage-1 FLAT workflow fields into a single Original (rev 0)
+    // cycle so existing entered data is never lost. Never throws.
+    //
+    // MIGRATION (Brad-flagged): a project that already has Stage-1 flat data
+    // (Date Submittal Prereqs Sent to GGG / Actual Submittal Completion Date / Date PF
+    // Submits to GC / Submittal Status under the engineering override) is treated as the
+    // Original cycle — we READ those flat overrides (effVal, override-wins) into cycle 0.
+    // Nothing is destructively rewritten: the flat overrides stay in KV harmlessly until
+    // the next cycles-save persists the array; from then on the array is the source of
+    // truth and the flat fields are ignored by this block (they no longer render).
+    function pfSubmittalCycles(){
+      try {
+        var eng = _curOverrides && _curOverrides.engineering;
+        var arr = eng && eng.__submittal_cycles;
+        if (Array.isArray(arr) && arr.length) {
+          return arr.map(function(c, i){
+            c = (c && typeof c === 'object') ? c : {};
+            return {
+              rev: (Number.isInteger(c.rev) && c.rev >= 0) ? c.rev : i,
+              prereqs_sent:      String(c.prereqs_sent == null ? '' : c.prereqs_sent),
+              actual_completion: String(c.actual_completion == null ? '' : c.actual_completion),
+              pf_submits_gc:     String(c.pf_submits_gc == null ? '' : c.pf_submits_gc),
+              status:            String(c.status == null ? '' : c.status)
+            };
+          });
+        }
+      } catch (e) {}
+      // MIGRATE Stage-1 flat fields -> a single Original cycle (rev 0).
+      return [{
+        rev: 0,
+        prereqs_sent:      String(effVal('engineering', 'Date Submittal Prereqs Sent to GGG', '') || ''),
+        actual_completion: String(effVal('engineering', 'Actual Submittal Completion Date', '') || ''),
+        pf_submits_gc:     String(effVal('engineering', 'Date PF Submits to GC', '') || ''),
+        status:            String(effVal('engineering', 'Submittal Status', '') || '')
+      }];
+    }
+    // Which cycle is shown by default: the LATEST (active) one. A per-project view
+    // preference (set when the user clicks a tab) lets the re-render after a save keep
+    // the same cycle in focus; otherwise default to the last cycle.
+    var _pfCycleView = {}; // num -> rev index currently viewed
+    function pfActiveCycleRev(cycles){
+      var n = _curNum || '';
+      var pref = _pfCycleView[n];
+      if (pref != null) {
+        for (var i = 0; i < cycles.length; i++) if (cycles[i].rev === pref) return pref;
+      }
+      return cycles.length ? cycles[cycles.length - 1].rev : 0;
+    }
+    // The per-cycle computed dates + status note (shared by read + after an edit).
+    function pfCycleComputed(cy){
+      var out = {};
+      // #2 Shop Drawings Due from Garbin = prereqs_sent + 15 business days.
+      var shopDue = pfAddBusinessDays(pfParseDate(cy.prereqs_sent), 15);
+      out.shopDueTxt = shopDue ? pfFmtDateObj(shopDue) : '';
+      // #5 Submittal Due Back from GC By = pf_submits_gc + 10 business days.
+      var gcDue = pfAddBusinessDays(pfParseDate(cy.pf_submits_gc), 10);
+      out.gcDueTxt = gcDue ? pfFmtDateObj(gcDue) : '';
+      return out;
+    }
+    // The submittal workflow, now a set of CYCLES (Original + Rev1/Rev2/...). Renders a
+    // self-contained .pf-swf-wrap: (a) a clickable cycle-nav bar, (b) the ACTIVE cycle's
+    // full field chain (display) + its two computed dates + status note, (c) office
+    // actions (Edit this cycle; Start Rev N when the active cycle is Revise & Resubmit).
+    // NOTE: the field chain is rendered as display rows INSIDE the wrap — NOT
+    // .pr-field[data-pr-label] — so the generic engineering section editor's save-scan
+    // ignores them (the wrap owns its OWN editor + the reserved __submittal_cycles key,
+    // exactly like the prereqs checklist owns __submittal_prereqs). dsf = the Approved
+    // Shop Dwgs folder record for the folder link (shared across all cycles).
     function submittalWorkflowBlock(dsf){
-      // Effective (override-wins) value of each manual date, matching field()'s
-      // display resolution so the computed dates see exactly what the user sees.
-      var d1 = effVal('engineering', 'Date Submittal Prereqs Sent to GGG', '');
-      var d4 = effVal('engineering', 'Date PF Submits to GC', '');
-      var status = effVal('engineering', 'Submittal Status', '');
-      // #2 Shop Drawings Due from Garbin = #1 + 15 business days (blank if #1 empty).
-      var shopDue = pfAddBusinessDays(pfParseDate(d1), 15);
-      var shopDueTxt = shopDue ? pfFmtDateObj(shopDue) : '';
-      var hint2 = shopDueTxt
+      var cycles = pfSubmittalCycles();
+      var activeRev = pfActiveCycleRev(cycles);
+      var active = null;
+      for (var i = 0; i < cycles.length; i++) if (cycles[i].rev === activeRev) { active = cycles[i]; break; }
+      if (!active) active = cycles[cycles.length - 1] || { rev:0, prereqs_sent:'', actual_completion:'', pf_submits_gc:'', status:'' };
+      // Cycle-nav bar: Original | Rev1 | Rev2 ... The active tab is highlighted; each
+      // tab carries data-swf-rev so the click handler switches the view.
+      var tabs = cycles.map(function(c){
+        var on = (c.rev === active.rev) ? ' pf-swf-tab-on' : '';
+        return '<button type="button" class="pf-swf-tab'+on+'" data-swf-rev="'+E(String(c.rev))+'" '
+          + 'onclick="event.stopPropagation();window.pfSwfView(this)">'+E(pfCycleLabel(c.rev))+'</button>';
+      }).join('');
+      var navBar = '<div class="pf-swf-nav" role="tablist" aria-label="Submittal revision cycles">'+tabs+'</div>';
+      // Read view of the active cycle's field chain + computed dates + status note.
+      var body = pfSwfCycleReadHtml(active);
+      // #7 Approved Shop Dwgs Folder link (SharePoint) — shared across cycles.
+      var folderRow = pfDesignSubmittalFolderRow(dsf);
+      // Office actions: Edit this cycle (always, office); Start Rev N (only when the
+      // ACTIVE cycle's status is Revise & Resubmit AND it is the LATEST cycle, so a
+      // revision only spawns off the newest Revise decision — never off an older one).
+      var isLatest = (active.rev === cycles[cycles.length - 1].rev);
+      var canStartRev = isLatest && (String(active.status || '').trim() === 'Revise & Resubmit');
+      var actions = '';
+      if (canEdit()) {
+        var editBtn = '<button type="button" class="pf-swf-edit" onclick="event.stopPropagation();window.pfSwfEdit(this)">Edit '+E(pfCycleLabel(active.rev))+'</button>';
+        var startBtn = canStartRev
+          ? '<button type="button" class="pf-swf-startrev" onclick="event.stopPropagation();window.pfSwfStartRev(this)">Start '+E(pfCycleLabel(cycles[cycles.length-1].rev + 1))+'</button>'
+          : '';
+        actions = '<div class="pf-swf-bar">'+editBtn+' '+startBtn+'</div>';
+      }
+      return '<div class="pf-swf-wrap" data-swf-num="'+E(_curNum)+'" data-swf-rev="'+E(String(active.rev))+'">'
+        + subgroupNote('Submittal workflow: dates flow top-to-bottom. The two grey lines are auto-computed (business days, weekends skipped) and are not editable. Each revision (Original, Rev1, Rev2...) keeps its own full history — click a tab above to view it.')
+        + navBar
+        + '<div class="pf-swf-body">' + body + '</div>'
+        + fields([ folderRow ])
+        + actions
+        + '<div class="pf-swf-msg" style="display:none"></div>'
+        + '</div>';
+    }
+    // Read-view HTML for ONE cycle's field chain: the 3 manual dates (display), the two
+    // computed date hints interleaved, and the status + next-step note. Display-only
+    // rows (.pf-swf-field, NOT .pr-field[data-pr-label]) so the generic editor ignores
+    // them. Values render MM/DD/YYYY via pfFmtDate; blanks show a yellow placeholder.
+    function pfSwfCycleReadHtml(cy){
+      var comp = pfCycleComputed(cy);
+      function dispDate(v){
+        var s = (v == null ? '' : String(v)).trim();
+        return s ? E(String(pfFmtDate(s))) : '';
+      }
+      function row(label, v){
+        var shown = dispDate(v);
+        var cls = shown ? 'pf-swf-val' : 'pf-swf-val pf-swf-blank';
+        return '<div class="pf-swf-field"><span class="pf-swf-label">'+E(label)+'</span>'
+          + '<span class="'+cls+'">'+(shown || '-')+'</span></div>';
+      }
+      var hint2 = comp.shopDueTxt
         ? computedHint('Shop Drawings Due from Garbin: <span class="pr-computed-val">'
-            + E(shopDueTxt) + '</span> <span style="font-style:italic">(15 business days after prereqs sent to GGG)</span>')
+            + E(comp.shopDueTxt) + '</span> <span style="font-style:italic">(15 business days after prereqs sent to GGG)</span>')
         : computedHint('<span style="font-style:italic">Shop Drawings Due from Garbin: computed as 15 business days after the prereqs-sent date above.</span>');
-      // #5 Submittal Due Back from GC By = #4 + 10 business days (blank if #4 empty).
-      var gcDue = pfAddBusinessDays(pfParseDate(d4), 10);
-      var gcDueTxt = gcDue ? pfFmtDateObj(gcDue) : '';
-      var hint5 = gcDueTxt
+      var hint5 = comp.gcDueTxt
         ? computedHint('Submittal Due Back from GC By: <span class="pr-computed-val">'
-            + E(gcDueTxt) + '</span> <span style="font-style:italic">(10 business days after PF submits to GC)</span>')
+            + E(comp.gcDueTxt) + '</span> <span style="font-style:italic">(10 business days after PF submits to GC)</span>')
         : computedHint('<span style="font-style:italic">Submittal Due Back from GC By: computed as 10 business days after the "Date PF Submits to GC" above.</span>');
-      // #6 next-step note per Submittal Status selection. AAN/Revise carry the
-      // "email to Garbin needed" FLAG (Stage 1 = flag only). Revise also notes the
-      // FUTURE Rev1/Rev2 cycle (Stage 2, NOT built here).
+      // Status row (display) + next-step note.
+      var st = String(cy.status || '').trim();
+      var statusShown = st ? E(st) : '-';
+      var statusRow = '<div class="pf-swf-field"><span class="pf-swf-label">Submittal Status</span>'
+        + '<span class="'+(st ? 'pf-swf-val' : 'pf-swf-val pf-swf-blank')+'">'+statusShown+'</span></div>';
       var statusNote = '';
-      var s = String(status || '').trim();
-      if (s === 'Approved / Reviewed') {
+      if (st === 'Approved / Reviewed') {
         statusNote = computedHint('Save to the Approved Shop Dwgs Folder as the final for-construction submittal. No further action.');
-      } else if (s === 'AAN (Approved as Noted)') {
+      } else if (st === 'AAN (Approved as Noted)') {
         statusNote = computedHint('Save as final, and return to Garbin (GGG) to pick up the notes on the final as-built. '
           + '<span class="pf-wf-flag">&#9873; Email to Garbin needed.</span>', true);
-      } else if (s === 'Revise & Resubmit') {
+      } else if (st === 'Revise & Resubmit') {
         statusNote = computedHint('Save, and send back to Garbin for revisions. '
           + '<span class="pf-wf-flag">&#9873; Email to Garbin needed.</span> '
-          + '<span style="font-style:italic">A new revision cycle (Rev1, Rev2...) will start.</span>', true);
+          + '<span style="font-style:italic">Use "Start Rev" below to open the next revision cycle.</span>', true);
       }
-      // #7 Approved Shop Dwgs Folder link (SharePoint). Graceful blank when the
-      // folder was not found for this project.
-      var folderRow = pfDesignSubmittalFolderRow(dsf);
-      // Interleave: each manual field renders in its OWN fields([...]) grid so a
-      // computed hint (a sibling div, NOT inside .pr-fields) can sit directly beneath
-      // the field it derives from — reading top-to-bottom as the linear chain.
       return ''
-        + subgroupNote('Submittal workflow: dates flow top-to-bottom. The two grey lines are auto-computed (business days, weekends skipped) and are not editable.')
-        + fields([ field('Date Submittal Prereqs Sent to GGG', '') ])
+        + row('Date Submittal Prereqs Sent to GGG', cy.prereqs_sent)
         + hint2
-        + fields([ field('Actual Submittal Completion Date', '') ])
-        + fields([ field('Date PF Submits to GC', '') ])
+        + row('Actual Submittal Completion Date', cy.actual_completion)
+        + row('Date PF Submits to GC', cy.pf_submits_gc)
         + hint5
-        + fields([ field('Submittal Status', '') ])
-        + statusNote
-        + fields([ folderRow ]);
+        + statusRow
+        + statusNote;
     }
     // #7 link row for the Approved Shop Dwgs SharePoint folder (read view). dsf =
     // pf-design-submittal record ({folder_url,...}) or null. Same idiom as
@@ -15605,16 +15765,16 @@ try {
           // editor + reserved __submittal_prereqs override key (NOT a .pr-field, so the
           // engineering section editor's save-scan ignores it). See submittalPrereqsBlock.
         + submittalPrereqsBlock(pfShopDwgInfo(_curNum))
-          // PF DESIGN SUBMITTAL WORKFLOW (Stage 1, Brad 2026-08-12): the linear date
-          // chain + status dropdown + folder link, rendered directly BELOW the PF
-          // Prerequisites checklist. See submittalWorkflowBlock for the full field
-          // order + business-day computations. This REPLACES the earlier flat
-          // Design Status / Submittal Stage / Response-date / Submittal Disposition /
-          // Approved Submittal Link fields (Brad-confirmed reorg): "Design Status" is
-          // renamed to the "Date Submittal Prereqs Sent to GGG" date, "Actual Response
-          // Date from GC" is renamed to "Actual Submittal Completion Date", and the
-          // remaining legacy fields are superseded by the linear chain. Stage 2
-          // (Rev1/Rev2 cycle) is only FLAGGED here, not built.
+          // PF DESIGN SUBMITTAL WORKFLOW (Stage 2, Brad 2026-08-12): the linear date
+          // chain + status is now a set of REVISION CYCLES (Original + Rev1/Rev2/...),
+          // rendered directly BELOW the PF Prerequisites checklist. See
+          // submittalWorkflowBlock for the cycle-nav bar, per-cycle field chain +
+          // business-day computations, and the office-gated Edit/Start-Rev actions. The
+          // cycles persist as the reserved __submittal_cycles ARRAY under the engineering
+          // override (its own editor, NOT the generic section editor). Existing Stage-1
+          // flat workflow data (Date Submittal Prereqs Sent to GGG / Actual Submittal
+          // Completion Date / Date PF Submits to GC / Submittal Status) MIGRATES into
+          // the Original (rev 0) cycle on first render, so no entered data is lost.
         + submittalWorkflowBlock(pfDesignSubmittalFolder(_curNum))
           // "GGG Design Notes" block UNDER PF Design Submittal (Brad): LF / Total
           // Columns / Column Diameter (in) / Bearing Capacity (psf) pulled from the
@@ -19746,6 +19906,198 @@ try {
         var g = byEmail[em];
         pfPrqSendReminder(wrap, g.name, em, g.labels);
       });
+    };
+
+    // =======================================================================
+    // PF Design Submittal REVISION CYCLES editor (Stage 2, Brad 2026-08-12) — office
+    // =======================================================================
+    // The submittal workflow (.pf-swf-wrap) is a set of cycles: Original + Rev1/Rev2/...
+    // Each cycle stores its own MANUAL fields (3 dates + status); the two computed dates
+    // derive at render per cycle. The wrap owns its OWN inline editor + the reserved
+    // __submittal_cycles ARRAY key (POST { section:'engineering', fields:{
+    // __submittal_cycles:[...] } }). The backend validates + whole-array-replaces that
+    // key while preserving the flat engineering fields + __submittal_prereqs (and vice
+    // versa). Office-gated: field_ops never sees the controls (canEdit()) AND the server
+    // 403s a field_ops POST regardless.
+    function pfSwfWrap(btn){ return btn && btn.closest ? btn.closest('.pf-swf-wrap') : null; }
+    function pfSwfMsg(wrap, text, isErr){
+      var m = wrap && wrap.querySelector('.pf-swf-msg');
+      if (!m) return;
+      m.textContent = text || '';
+      m.style.display = text ? 'block' : 'none';
+      m.className = 'pf-swf-msg' + (isErr ? ' pf-swf-msg-err' : ' pf-swf-msg-ok');
+    }
+    // Switch the viewed cycle (click a tab). Records the per-project view preference and
+    // re-renders the whole record so the chosen cycle becomes the active view. No save.
+    window.pfSwfView = function(btn){
+      var wrap = pfSwfWrap(btn);
+      if (!wrap) return;
+      var num = wrap.getAttribute('data-swf-num') || _curNum || '';
+      var rev = parseInt(btn.getAttribute('data-swf-rev'), 10);
+      if (!num || isNaN(rev)) return;
+      // Do not switch away from an OPEN editor (data-swf-orig present) without discarding.
+      if (wrap.getAttribute('data-swf-orig') != null) {
+        if (!window.confirm('Discard your unsaved edits to this cycle and switch view?')) return;
+      }
+      _pfCycleView[num] = rev;
+      var card = wrap.closest('.pr-card');
+      var root = (card && card.closest('.pr-root')) || (card && card.parentElement) || document.getElementById('prGenericRoot');
+      window.renderProjectRecord(num, root);
+    };
+    // Convert a stored date (ISO or MM/DD/YYYY) to an <input type=date> value (YYYY-MM-DD).
+    function pfSwfToInputDate(v){
+      var s = (v == null ? '' : String(v)).trim();
+      if (!s) return '';
+      var m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);      // ISO
+      if (m) return m[1] + '-' + ('0'+m[2]).slice(-2) + '-' + ('0'+m[3]).slice(-2);
+      m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);         // MM/DD/YYYY
+      if (m) return m[3] + '-' + ('0'+m[1]).slice(-2) + '-' + ('0'+m[2]).slice(-2);
+      return '';
+    }
+    // Edit the ACTIVE cycle: replace the read-view body with an inline editor (3 date
+    // inputs + a status dropdown). Only THIS cycle's manual fields are editable; the
+    // computed dates + folder link are display-only and stay out of the editor.
+    window.pfSwfEdit = function(btn){
+      if (!canEdit()) return; // defense-in-depth (server also 403s)
+      var wrap = pfSwfWrap(btn);
+      if (!wrap) return;
+      var activeRev = parseInt(wrap.getAttribute('data-swf-rev'), 10);
+      if (isNaN(activeRev)) return;
+      var cycles = pfSubmittalCycles();
+      var cy = null;
+      for (var i = 0; i < cycles.length; i++) if (cycles[i].rev === activeRev) { cy = cycles[i]; break; }
+      if (!cy) return;
+      var lbl = pfCycleLabel(cy.rev);
+      var statusOpts = ['<option value=""'+(!cy.status?' selected':'')+'>-- select --</option>']
+        .concat(PF_SUBMITTAL_STATUSES.map(function(s){
+          var sel = (String(cy.status||'').trim() === s) ? ' selected' : '';
+          return '<option value="'+esc2(s)+'"'+sel+'>'+esc2(s)+'</option>';
+        })).join('');
+      var editorHtml = '<div class="pf-swf-editor" data-swf-edit-rev="'+esc2(String(cy.rev))+'">'
+        + '<div class="pf-swf-edit-note">Editing <strong>'+esc2(lbl)+'</strong>. Shop Drawings Due (+15 business days) and Submittal Due Back from GC (+10 business days) recompute automatically from these dates.</div>'
+        + '<div class="pf-swf-erow"><label>Date Submittal Prereqs Sent to GGG</label>'
+        +   '<input type="date" class="pf-swf-in pf-swf-in-prereqs" value="'+esc2(pfSwfToInputDate(cy.prereqs_sent))+'"></div>'
+        + '<div class="pf-swf-erow"><label>Actual Submittal Completion Date</label>'
+        +   '<input type="date" class="pf-swf-in pf-swf-in-actual" value="'+esc2(pfSwfToInputDate(cy.actual_completion))+'"></div>'
+        + '<div class="pf-swf-erow"><label>Date PF Submits to GC</label>'
+        +   '<input type="date" class="pf-swf-in pf-swf-in-pfgc" value="'+esc2(pfSwfToInputDate(cy.pf_submits_gc))+'"></div>'
+        + '<div class="pf-swf-erow"><label>Submittal Status</label>'
+        +   '<select class="pf-swf-in pf-swf-in-status">'+statusOpts+'</select></div>'
+        + '<div class="pf-swf-edit-err" style="display:none"></div>'
+        + '<div class="pf-swf-edit-actions">'
+        +   '<button type="button" class="pf-swf-save" onclick="event.stopPropagation();window.pfSwfSave(this)">Save '+esc2(lbl)+'</button>'
+        +   '<button type="button" class="pf-swf-cancel" onclick="event.stopPropagation();window.pfSwfCancel(this)">Cancel</button>'
+        + '</div>'
+        + '</div>';
+      var bodyEl = wrap.querySelector('.pf-swf-body');
+      if (!bodyEl) return;
+      wrap.setAttribute('data-swf-orig', bodyEl.innerHTML);
+      bodyEl.innerHTML = editorHtml;
+    };
+    window.pfSwfCancel = function(btn){
+      var wrap = pfSwfWrap(btn);
+      if (!wrap) return;
+      var orig = wrap.getAttribute('data-swf-orig');
+      var bodyEl = wrap.querySelector('.pf-swf-body');
+      if (orig != null && bodyEl) { bodyEl.innerHTML = orig; wrap.removeAttribute('data-swf-orig'); }
+    };
+    // Build the COMPLETE cycles array to persist: start from the stored/migrated cycles,
+    // replace the edited cycle's manual fields with the editor inputs. (The client always
+    // sends the whole array; the backend whole-array-replaces __submittal_cycles.)
+    function pfSwfBuildArray(wrap, editRev, patch){
+      var cycles = pfSubmittalCycles();
+      return cycles.map(function(c){
+        var base = { rev: c.rev, prereqs_sent: c.prereqs_sent, actual_completion: c.actual_completion,
+                     pf_submits_gc: c.pf_submits_gc, status: c.status };
+        if (c.rev === editRev && patch) {
+          base.prereqs_sent = patch.prereqs_sent;
+          base.actual_completion = patch.actual_completion;
+          base.pf_submits_gc = patch.pf_submits_gc;
+          base.status = patch.status;
+        }
+        return base;
+      });
+    }
+    // Shared POST helper: persist a cycles array, adopt server truth, re-render. keepRev
+    // = which cycle to focus after the re-render. onErr(msg) shows the error inline.
+    function pfSwfPersist(wrap, num, arr, keepRev, saveBtn, onErr){
+      if (saveBtn) { saveBtn.disabled = true; var _t = saveBtn.textContent; saveBtn.setAttribute('data-swf-t', _t); saveBtn.textContent = 'Saving...'; }
+      fetch('/api/project-override', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ num: num, section: 'engineering', fields: { __submittal_cycles: arr } })
+      }).then(function(res){
+        return res.json().then(function(b){ return { ok: res.ok, status: res.status, body: b }; })
+          .catch(function(){ return { ok: res.ok, status: res.status, body: null }; });
+      }).then(function(r){
+        // FAIL CLOSED: only a clean {ok:true, saved:true} is success.
+        if (!r.ok || !r.body || r.body.ok !== true || r.body.saved !== true) {
+          var msg = (r.body && r.body.message) ? r.body.message
+            : (r.status === 403 ? 'You do not have permission to edit this project.'
+                                 : 'Save failed (' + r.status + '). Your changes were NOT saved - please retry.');
+          if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.getAttribute('data-swf-t') || 'Save'; }
+          if (onErr) onErr(msg);
+          return;
+        }
+        // Adopt server truth + focus the requested cycle, then re-render the record.
+        window.PF_PROJECT_OVERRIDES[num] = { sections: (r.body.sections) || {}, _meta: (r.body._meta) || null };
+        if (keepRev != null) _pfCycleView[num] = keepRev;
+        var card = wrap.closest('.pr-card');
+        var root = (card && card.closest('.pr-root')) || (card && card.parentElement) || document.getElementById('prGenericRoot');
+        window.renderProjectRecord(num, root);
+      }).catch(function(){
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.getAttribute('data-swf-t') || 'Save'; }
+        if (onErr) onErr('Save failed: could not reach the server. Your changes were NOT saved - please retry.');
+      });
+    }
+    window.pfSwfSave = function(btn){
+      if (!canEdit()) return;
+      var wrap = pfSwfWrap(btn);
+      if (!wrap) return;
+      var num = wrap.getAttribute('data-swf-num') || _curNum || '';
+      var editor = wrap.querySelector('.pf-swf-editor');
+      var errEl = wrap.querySelector('.pf-swf-edit-err');
+      function showErr(msg){ if (errEl) { errEl.textContent = msg; errEl.style.display='block'; } }
+      if (!num || !editor) { showErr('Missing project number; nothing was saved.'); return; }
+      var editRev = parseInt(editor.getAttribute('data-swf-edit-rev'), 10);
+      if (isNaN(editRev)) { showErr('Could not identify the cycle; nothing was saved.'); return; }
+      var patch = {
+        prereqs_sent:      String((wrap.querySelector('.pf-swf-in-prereqs')||{}).value || '').trim(),
+        actual_completion: String((wrap.querySelector('.pf-swf-in-actual')||{}).value || '').trim(),
+        pf_submits_gc:     String((wrap.querySelector('.pf-swf-in-pfgc')||{}).value || '').trim(),
+        status:            String((wrap.querySelector('.pf-swf-in-status')||{}).value || '').trim()
+      };
+      if (errEl) errEl.style.display = 'none';
+      var arr = pfSwfBuildArray(wrap, editRev, patch);
+      pfSwfPersist(wrap, num, arr, editRev, wrap.querySelector('.pf-swf-save'), showErr);
+    };
+    // Start the next revision: append a new EMPTY cycle (rev = lastRev+1) and switch to
+    // it. Gated: office-only + only fires from the Start Rev button (which renders only
+    // when the LATEST cycle's status is Revise & Resubmit) + an explicit confirm so an
+    // accidental status pick can never spawn a revision. (UX choice flagged in report.)
+    window.pfSwfStartRev = function(btn){
+      if (!canEdit()) return;
+      var wrap = pfSwfWrap(btn);
+      if (!wrap) return;
+      var num = wrap.getAttribute('data-swf-num') || _curNum || '';
+      if (!num) { pfSwfMsg(wrap, 'Missing project number; no revision was started.', true); return; }
+      var cycles = pfSubmittalCycles();
+      if (!cycles.length) return;
+      var last = cycles[cycles.length - 1];
+      // Guard: only start a revision off a LATEST cycle marked Revise & Resubmit.
+      if (String(last.status || '').trim() !== 'Revise & Resubmit') {
+        pfSwfMsg(wrap, 'A new revision can only start from the latest cycle when its status is "Revise & Resubmit".', true);
+        return;
+      }
+      var nextRev = last.rev + 1;
+      if (!window.confirm('Start ' + pfCycleLabel(nextRev) + '? This saves the current cycle as history and opens a new empty revision workflow.')) return;
+      var arr = cycles.map(function(c){
+        return { rev: c.rev, prereqs_sent: c.prereqs_sent, actual_completion: c.actual_completion,
+                 pf_submits_gc: c.pf_submits_gc, status: c.status };
+      });
+      arr.push({ rev: nextRev, prereqs_sent: '', actual_completion: '', pf_submits_gc: '', status: '' });
+      pfSwfPersist(wrap, num, arr, nextRev, null, function(msg){ pfSwfMsg(wrap, msg, true); });
     };
 
     // =======================================================================

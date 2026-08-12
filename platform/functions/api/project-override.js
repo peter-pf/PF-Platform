@@ -175,6 +175,64 @@ function cleanPrereqs(input) {
   return { items };
 }
 
+// ---- __submittal_cycles reserved structured key (Brad 2026-08-12, Stage 2) ----
+// The PF Design Submittal workflow (the linear date chain + status) can go through
+// MULTIPLE revision cycles: the Original submittal, then Rev1, Rev2, ... when the GC
+// returns "Revise & Resubmit". Each cycle is a FULL copy of the Stage-1 workflow's
+// MANUAL fields (the two computed dates are derived at render per cycle, never stored).
+// The whole set is stored as ONE reserved, ARRAY-valued key `__submittal_cycles` INSIDE
+// the `engineering` section:
+//   sections.engineering.__submittal_cycles = [
+//     { rev:0, prereqs_sent, actual_completion, pf_submits_gc, status },  // Original
+//     { rev:1, prereqs_sent, actual_completion, pf_submits_gc, status },  // Rev1
+//     ...
+//   ]
+// rev is a non-negative integer index (0 = Original). prereqs_sent / actual_completion /
+// pf_submits_gc are date strings (ISO or MM/DD/YYYY); status is one of the 3 dropdown
+// values (validated loosely as a capped string -- the client owns the option list; a
+// free string never corrupts the store). This is the THIRD reserved key (alongside
+// __crm and __submittal_prereqs) and rides the SAME merge: Object.assign(existing,
+// fields) preserves it when a normal field save omits it, so editing the flat
+// engineering fields never wipes the cycles and vice-versa. STRICTLY validated
+// (cleanCycles below); a malformed body fails the WHOLE save closed. Allowed ONLY under
+// the `engineering` section (rejected 400 anywhere else).
+const CYCLES_KEY = '__submittal_cycles';
+const CYCLES_ALLOWED_SECTIONS = { engineering: 1 };
+const CYCLES_MAX = 60;               // Original + up to 59 revisions; bounds abuse
+const CYCLES_MAX_DATE = 40;          // a date string (ISO YYYY-MM-DD or MM/DD/YYYY)
+const CYCLES_MAX_STATUS = 60;        // a status dropdown value
+
+// Validate + normalize an incoming __submittal_cycles ARRAY into a clean, bounded
+// structure. Returns a SAFE array, or null if present-but-malformed (caller fails the
+// whole save closed). Rules mirror cleanPrereqs' defensive posture:
+//   - top-level must be an ARRAY; over the cap => reject (null) so nothing is silently
+//     lost.
+//   - each entry must be a plain object; prereqs_sent / actual_completion /
+//     pf_submits_gc / status are strings, length-capped + angle-bracket stripped (s()).
+//   - rev is coerced to a non-negative integer; if absent/invalid it is reassigned to
+//     the entry's array index (rev is positional -- Original=0, Rev1=1, ...). This keeps
+//     the stored rev honest even if a client omits it.
+function cleanCycles(input) {
+  if (input == null) return [];                        // absent => empty
+  if (!Array.isArray(input)) return null;              // present but not an array => reject
+  if (input.length > CYCLES_MAX) return null;
+  const out = [];
+  for (let i = 0; i < input.length; i++) {
+    const entry = input[i];
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
+    let rev = Number(entry.rev);
+    if (!Number.isInteger(rev) || rev < 0) rev = i;    // positional fallback
+    out.push({
+      rev: rev,
+      prereqs_sent:      s(entry.prereqs_sent, CYCLES_MAX_DATE),
+      actual_completion: s(entry.actual_completion, CYCLES_MAX_DATE),
+      pf_submits_gc:     s(entry.pf_submits_gc, CYCLES_MAX_DATE),
+      status:            s(entry.status, CYCLES_MAX_STATUS),
+    });
+  }
+  return out;
+}
+
 // Validate + normalize an incoming __crm object into a clean, bounded structure.
 // Returns a SAFE object (possibly {}), or null if the input is present but so
 // malformed it must be rejected (caller fails the whole save closed). Rules:
@@ -283,7 +341,7 @@ function cleanFields(input) {
   if (!input || typeof input !== 'object') return out;
   const keys = Object.keys(input).slice(0, MAX_FIELDS_PER_SECTION);
   for (const k of keys) {
-    if (k === CRM_KEY || k === PREREQ_KEY) continue; // reserved structured keys; handled separately, never string-flattened
+    if (k === CRM_KEY || k === PREREQ_KEY || k === CYCLES_KEY) continue; // reserved structured keys; handled separately, never string-flattened
     const label = s(k, MAX_LABEL);
     if (!label) continue;
     out[label] = s(input[k], MAX_VALUE);
@@ -383,6 +441,26 @@ export async function onRequestPost(context) {
       }
     }
 
+    // Reserved __submittal_cycles structured key (Brad 2026-08-12, Stage 2): the PF
+    // Design Submittal revision-cycle array (Original + Rev1/Rev2/...) on the Engineering
+    // & Design > PF Design Submittal subsection. Allowed ONLY under `engineering`. Same
+    // posture as __submittal_prereqs: absent => untouched (preserve prior), present =>
+    // strictly validated, malformed => reject the WHOLE save closed. A cycles save from
+    // the client sends this key WITHOUT the flat engineering fields, so cleanFields yields
+    // {} and only the cycles array is replaced; a normal engineering field save omits this
+    // key so the stored cycles are preserved by the merge below.
+    const hasCyclesInBody = Object.prototype.hasOwnProperty.call(rawFieldsObj, CYCLES_KEY);
+    let cyclesUpdate; // undefined => untouched
+    if (hasCyclesInBody) {
+      if (!CYCLES_ALLOWED_SECTIONS[section]) {
+        return json({ status: 'error', message: 'Submittal cycles are not valid on this section.' }, 400);
+      }
+      cyclesUpdate = cleanCycles(rawFieldsObj[CYCLES_KEY]);
+      if (cyclesUpdate === null) {
+        return json({ status: 'error', message: 'Invalid submittal cycles; nothing was saved.' }, 400);
+      }
+    }
+
     // FAIL CLOSED: no KV -> we cannot persist. Do NOT report success.
     if (!env.PF_SCHEDULE) {
       return json({ status: 'error',
@@ -403,6 +481,9 @@ export async function onRequestPost(context) {
     // Carry forward any existing structured __submittal_prereqs the same way.
     const prevPrereq = (existing[PREREQ_KEY] && typeof existing[PREREQ_KEY] === 'object' && !Array.isArray(existing[PREREQ_KEY]))
       ? existing[PREREQ_KEY] : undefined;
+    // Carry forward any existing structured __submittal_cycles (an ARRAY, unlike the two
+    // object keys above -- so the type guard checks Array.isArray, not the object shape).
+    const prevCycles = Array.isArray(existing[CYCLES_KEY]) ? existing[CYCLES_KEY] : undefined;
     const merged = Object.assign({}, existing, fields);
     // Whole-object replace of __crm when the request supplied one (the client sends
     // the complete per-firm selection each time); otherwise preserve the prior value.
@@ -414,6 +495,11 @@ export async function onRequestPost(context) {
     if (prereqUpdate !== undefined) merged[PREREQ_KEY] = prereqUpdate;
     else if (prevPrereq !== undefined) merged[PREREQ_KEY] = prevPrereq;
     else delete merged[PREREQ_KEY]; // never leave a stray/non-object key behind
+    // Same whole-object (array) replace/preserve for __submittal_cycles (the client sends
+    // the COMPLETE Original+Rev1+Rev2... array each save); otherwise preserve the prior.
+    if (cyclesUpdate !== undefined) merged[CYCLES_KEY] = cyclesUpdate;
+    else if (prevCycles !== undefined) merged[CYCLES_KEY] = prevCycles;
+    else delete merged[CYCLES_KEY]; // never leave a stray/non-array key behind
     rec.sections[section] = merged;
 
     // Bound the number of sections (defense against a crafted flood of junk keys;
