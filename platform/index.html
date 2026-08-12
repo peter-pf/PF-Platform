@@ -20314,8 +20314,10 @@ try {
       var val = String(el.value == null ? '' : el.value).trim();
       var patch = {}; patch[field] = val;
       var arr = pfSwfBuildArray(wrap, activeRev, patch);
-      // Persist; keep the same cycle in focus. Inline msg (no Save button to disable).
-      pfSwfPersist(wrap, num, arr, activeRev, null, function(msg){ pfSwfMsg(wrap, msg, true); });
+      // Persist; keep the same cycle in focus. SURGICAL in-place refresh on success (pass
+      // the wrap as inPlaceWrap) so the user STAYS on this project detail — no full record
+      // re-render, no jump to summary. Inline msg (no Save button to disable).
+      pfSwfPersist(wrap, num, arr, activeRev, null, function(msg){ pfSwfMsg(wrap, msg, true); }, wrap);
     };
     // Reset the Shop Drawings Due override back to the auto-computed date (clears
     // shop_due_override on the active cycle, so the +15-biz-day value shows again).
@@ -20327,7 +20329,8 @@ try {
       var activeRev = parseInt(wrap.getAttribute('data-swf-rev'), 10);
       if (!num || isNaN(activeRev)) return;
       var arr = pfSwfBuildArray(wrap, activeRev, { shop_due_override: '' });
-      pfSwfPersist(wrap, num, arr, activeRev, null, function(msg){ pfSwfMsg(wrap, msg, true); });
+      // SURGICAL in-place refresh (pass wrap) so resetting stays on this detail too.
+      pfSwfPersist(wrap, num, arr, activeRev, null, function(msg){ pfSwfMsg(wrap, msg, true); }, wrap);
     };
     // Build the COMPLETE cycles array to persist: start from the stored/migrated cycles,
     // replace the edited cycle's manual fields with the editor inputs. (The client always
@@ -20348,9 +20351,49 @@ try {
         return base;
       });
     }
-    // Shared POST helper: persist a cycles array, adopt server truth, re-render. keepRev
-    // = which cycle to focus after the re-render. onErr(msg) shows the error inline.
-    function pfSwfPersist(wrap, num, arr, keepRev, saveBtn, onErr){
+    // SURGICAL in-place refresh of the submittal workflow AFTER a successful save-on-change.
+    // Recomputes ONLY the active cycle's date grid (computed Shop Drawings Due / GC due +
+    // reset-to-auto link + status note) from the now-updated overrides and swaps the
+    // .pf-swf-body innerHTML. Does NOT re-render the whole project record — so the user
+    // stays EXACTLY where they are (same project detail, E&D card + submittal subsection
+    // still open, scroll position unchanged). BUGFIX 2026-08-12: the prior full
+    // renderProjectRecord() on every date pick collapsed the E&D card (card open=false) +
+    // reset scroll, which read as "the page closed and jumped to summary".
+    function pfSwfRefreshInPlace(wrap, num){
+      try {
+        var cycles = pfSubmittalCycles();
+        var activeRev = pfActiveCycleRev(cycles);
+        var active = null;
+        for (var i = 0; i < cycles.length; i++) if (cycles[i].rev === activeRev) { active = cycles[i]; break; }
+        if (!active) active = cycles[cycles.length - 1] || { rev:0, prereqs_sent:'', actual_completion:'', pf_submits_gc:'', status:'', shop_due_override:'' };
+        // Keep the wrap's active-rev attribute honest (used by field-change + reset).
+        wrap.setAttribute('data-swf-rev', String(active.rev));
+        var bodyEl = wrap.querySelector('.pf-swf-body');
+        if (bodyEl) bodyEl.innerHTML = pfSwfCycleReadHtml(active);
+        // Refresh the Start Rev action row: it shows only when the active (latest) cycle is
+        // Revise & Resubmit. Recompute + replace just that bar so a status change reflects
+        // without a full re-render.
+        var isLatest = (active.rev === cycles[cycles.length - 1].rev);
+        var canStartRev = isLatest && (String(active.status || '').trim() === 'Revise & Resubmit');
+        var oldBar = wrap.querySelector('.pf-swf-bar');
+        if (oldBar) oldBar.parentNode.removeChild(oldBar);
+        if (canEdit() && canStartRev) {
+          var bar = document.createElement('div');
+          bar.className = 'pf-swf-bar';
+          bar.innerHTML = '<button type="button" class="pf-swf-startrev" '
+            + 'onclick="event.stopPropagation();window.pfSwfStartRev(this)">Start '
+            + esc2(pfCycleLabel(cycles[cycles.length-1].rev + 1)) + '</button>';
+          var msgEl = wrap.querySelector('.pf-swf-msg');
+          if (msgEl) wrap.insertBefore(bar, msgEl); else wrap.appendChild(bar);
+        }
+      } catch (e) { /* fail-soft: a partial-refresh hiccup never navigates away */ }
+    }
+    // Shared POST helper: persist a cycles array, adopt server truth. keepRev = which cycle
+    // to focus. onErr(msg) shows the error inline. inPlaceWrap (optional): when provided,
+    // a successful save does a SURGICAL in-place refresh of that .pf-swf-wrap (no full
+    // record re-render) so the user stays put — used by save-on-change. When omitted, the
+    // whole record is re-rendered (used by Start Rev / tab switch, which change the view).
+    function pfSwfPersist(wrap, num, arr, keepRev, saveBtn, onErr, inPlaceWrap){
       if (saveBtn) { saveBtn.disabled = true; var _t = saveBtn.textContent; saveBtn.setAttribute('data-swf-t', _t); saveBtn.textContent = 'Saving...'; }
       fetch('/api/project-override', {
         method: 'POST',
@@ -20370,9 +20413,21 @@ try {
           if (onErr) onErr(msg);
           return;
         }
-        // Adopt server truth + focus the requested cycle, then re-render the record.
+        // Adopt server truth into the override store AND the module-local _curOverrides so
+        // the next read (surgical or full) reflects the save.
         window.PF_PROJECT_OVERRIDES[num] = { sections: (r.body.sections) || {}, _meta: (r.body._meta) || null };
+        try {
+          if (String(num) === String(_curNum) && r.body.sections && typeof r.body.sections === 'object') {
+            _curOverrides = r.body.sections;
+          }
+        } catch (e) {}
         if (keepRev != null) _pfCycleView[num] = keepRev;
+        if (inPlaceWrap) {
+          // SURGICAL: refresh only the submittal block; do NOT navigate/re-render the record.
+          pfSwfRefreshInPlace(inPlaceWrap, num);
+          return;
+        }
+        // Full re-render (Start Rev / tab switch): keep the user on THIS project's detail.
         var card = wrap.closest('.pr-card');
         var root = (card && card.closest('.pr-root')) || (card && card.parentElement) || document.getElementById('prGenericRoot');
         window.renderProjectRecord(num, root);
@@ -20550,11 +20605,39 @@ try {
           if (onErr) onErr(msg);
           return;
         }
-        // Adopt server truth + re-render the whole record.
+        // Adopt server truth into the store + module-local overrides.
         window.PF_PROJECT_OVERRIDES[num] = { sections: (r.body.sections) || {}, _meta: (r.body._meta) || null };
-        var card = wrap.closest('.pr-card');
-        var root = (card && card.closest('.pr-root')) || (card && card.parentElement) || document.getElementById('prGenericRoot');
-        window.renderProjectRecord(num, root);
+        try {
+          if (String(num) === String(_curNum) && r.body.sections && typeof r.body.sections === 'object') {
+            _curOverrides = r.body.sections;
+          }
+        } catch (e) {}
+        // SURGICAL in-place refresh of ONLY the SGE block (BUGFIX 2026-08-12: a full
+        // renderProjectRecord here collapsed the E&D card + reset scroll — same regression
+        // as the submittal dates). Rebuild the read view (table or empty hint) into
+        // .pf-sge-body and restore the inline Edit action; the user stays put.
+        try {
+          var bodyEl = wrap.querySelector('.pf-sge-body');
+          if (bodyEl) {
+            var freshInner = siteGradeElevationsInline(); // full wrap html
+            // Extract just the inner body from the fresh wrap (the <div class="pf-sge-body">...</div>).
+            var tmp = document.createElement('div');
+            tmp.innerHTML = freshInner;
+            var freshBody = tmp.querySelector('.pf-sge-body');
+            bodyEl.innerHTML = freshBody ? freshBody.innerHTML : '';
+          }
+          wrap.removeAttribute('data-sge-orig');
+          var acts = wrap.querySelector('.pf-sge-inline-actions');
+          if (acts) acts.style.display = '';
+          pfSgeMsg(wrap, 'Saved.', false);
+        } catch (e) {
+          // Fail-soft: if the surgical refresh throws, fall back to a full re-render (still
+          // correct data) rather than leaving a stale editor. This never navigates away
+          // unexpectedly under normal success.
+          var card = wrap.closest('.pr-card');
+          var root = (card && card.closest('.pr-root')) || (card && card.parentElement) || document.getElementById('prGenericRoot');
+          window.renderProjectRecord(num, root);
+        }
       }).catch(function(){
         if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.getAttribute('data-sge-t') || 'Save'; }
         if (onErr) onErr('Save failed: could not reach the server. Your changes were NOT saved - please retry.');
