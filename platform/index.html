@@ -13442,6 +13442,104 @@ try {
         return (items && typeof items === 'object') ? items : {};
       } catch (e) { return {}; }
     }
+    // ---- Responsible-Party dropdown source (Brad 2026-08-12) ----------------
+    // Gather THIS project's assigned contacts for the prereq "Responsible Party"
+    // dropdown/typeahead. Sources (de-duplicated):
+    //   1. Directory (__crm) selections resolved to master-list records: every
+    //      CRM override key's __crm map -> each group's contactIds -> the matching
+    //      PF_CONTACTS record (carries name + email + contactId). This is the
+    //      Project Contacts directory the whole record is built on.
+    //   2. Any prereq item that ALREADY stored a free responsible_name/email (so a
+    //      previously typed party that is NOT a directory contact still appears).
+    // Returns [{ contactId|null, name, email }]. Directory contacts win on a
+    // (name+email) collision. Requires PF_CONTACTS loaded (async); before that it
+    // still returns the legacy stored parties so the dropdown is never empty-broken.
+    // NEVER throws; a malformed override just yields fewer entries.
+    // The set of override keys that can hold a __crm contact map (mirrors the
+    // Project Contacts groups: DP firms + Owner/GC(general) + the new groups 8-13).
+    var PF_CRM_CONTACT_KEYS = ['design_professionals','general','pfTeam','safety','siteReadiness','equipment','material'];
+    function pfContactById(cid){
+      try {
+        var key = String(cid || '').toUpperCase();
+        // PF_CONTACTS is the module-local directory cache (populated by pfLoadContacts);
+        // it's declared later in this same IIFE, so reference it directly (hoisted var).
+        if (!key || !Array.isArray(PF_CONTACTS)) return null;
+        for (var i = 0; i < PF_CONTACTS.length; i++) {
+          var c = PF_CONTACTS[i];
+          if (c && String(c.contactId || '').toUpperCase() === key) return c;
+        }
+      } catch (e) {}
+      return null;
+    }
+    function pfContactName(c){
+      if (!c) return '';
+      return String(c.name || (((c.firstName||'') + ' ' + (c.lastName||'')).trim()) || '').trim();
+    }
+    function pfProjectContacts(){
+      var out = [];
+      var seen = {};   // dedupe: contactId (upper) OR lowercased "name|email"
+      function push(entry){
+        var cid = entry.contactId ? String(entry.contactId).toUpperCase() : '';
+        var nm = String(entry.name || '').trim();
+        var em = String(entry.email || '').trim();
+        if (!nm && !em) return;                 // nothing selectable
+        var k = cid || (nm.toLowerCase() + '|' + em.toLowerCase());
+        if (seen[k]) return;
+        seen[k] = 1;
+        out.push({ contactId: cid || null, name: nm, email: em });
+      }
+      // 1. Directory selections across every CRM override key.
+      try {
+        for (var ki = 0; ki < PF_CRM_CONTACT_KEYS.length; ki++) {
+          var crm = pfCrmMap(PF_CRM_CONTACT_KEYS[ki]); // {} when absent
+          Object.keys(crm).forEach(function(grp){
+            var e = crm[grp];
+            var ids = (e && Array.isArray(e.contactIds)) ? e.contactIds : [];
+            ids.forEach(function(id){
+              var c = pfContactById(id);
+              if (c) push({ contactId: c.contactId, name: pfContactName(c), email: String(c.email || '').trim() });
+            });
+          });
+        }
+      } catch (e) {}
+      // 2. Legacy / free responsible parties already stored on prereq items.
+      try {
+        var data = pfPrereqData();
+        Object.keys(data).forEach(function(k){
+          var d = data[k] || {};
+          // Prefer a live directory record when a contactId was stored.
+          if (d.responsible_contact_id) {
+            var c = pfContactById(d.responsible_contact_id);
+            if (c) { push({ contactId: c.contactId, name: pfContactName(c), email: String(c.email || '').trim() }); return; }
+          }
+          push({ contactId: null, name: String(d.responsible_name || '').trim(), email: String(d.responsible_email || '').trim() });
+        });
+      } catch (e) {}
+      // Stable sort by display name (case-insensitive) for a tidy dropdown.
+      out.sort(function(a,b){ return (a.name||'').toLowerCase() < (b.name||'').toLowerCase() ? -1 : 1; });
+      return out;
+    }
+    // Resolve a stored prereq item's { responsible_contact_id, responsible_name,
+    // responsible_email } to the EFFECTIVE { name, email } at render/click time.
+    // Prefers the directory record for the tied contactId (so a later email change
+    // in the directory is picked up automatically); falls back to the stored
+    // name/email. Never throws.
+    function pfPrqResolveParty(d){
+      d = d || {};
+      var name = String(d.responsible_name || '').trim();
+      var email = String(d.responsible_email || '').trim();
+      var cid = d.responsible_contact_id ? String(d.responsible_contact_id).toUpperCase() : '';
+      if (cid) {
+        var c = pfContactById(cid);
+        if (c) {
+          var cn = pfContactName(c);
+          var ce = String(c.email || '').trim();
+          if (cn) name = cn;
+          if (ce) email = ce;   // directory email wins when present
+        }
+      }
+      return { contactId: cid || null, name: name, email: email };
+    }
     // A "Shop Dwg Info folder" link row (read view). gp = shop-dwg-info record. Renders
     // a clickable "Open folder" link when folder_url is present; graceful blank otherwise
     // (no broken href). Display-only (no override round-trip).
@@ -13470,8 +13568,13 @@ try {
       var received = 0;
       var rowsHtml = PF_SUBMITTAL_PREREQ_ITEMS.map(function(it){
         var d = data[it.key] || {};
-        var name = (d.responsible_name == null ? '' : String(d.responsible_name)).trim();
-        var email = (d.responsible_email == null ? '' : String(d.responsible_email)).trim();
+        // Responsible party: prefer the tied directory contact (resolve name+email
+        // from responsible_contact_id at render time so a later directory email change
+        // is reflected); fall back to the stored free name/email. (Brad 2026-08-12)
+        var _rp = pfPrqResolveParty(d);
+        var cid = _rp.contactId || '';
+        var name = _rp.name;
+        var email = _rp.email;
         var dr = (d.date_received == null ? '' : String(d.date_received)).trim();
         var isReceived = !!dr;
         if (isReceived) received++;
@@ -13510,7 +13613,7 @@ try {
             remindCell = '<span class="pf-prq-muted" title="Set a responsible-party email (Edit) to enable a reminder">no email</span>';
           }
         }
-        return '<tr class="pf-prq-row'+(isReceived?' pf-prq-row-recd':' pf-prq-row-out')+'" data-prq-item="'+E(it.key)+'" data-prq-label="'+E(it.label)+'" data-prq-email="'+E(email)+'" data-prq-name="'+E(name)+'">'
+        return '<tr class="pf-prq-row'+(isReceived?' pf-prq-row-recd':' pf-prq-row-out')+'" data-prq-item="'+E(it.key)+'" data-prq-label="'+E(it.label)+'" data-prq-email="'+E(email)+'" data-prq-name="'+E(name)+'" data-prq-cid="'+E(cid)+'">'
           + '<td class="pf-prq-item">'+statusCell+' '+E(it.label)+'</td>'
           + rfCell(rfSub, 'Submittal Design')
           + rfCell(rfStk, 'Staking Layout')
@@ -13560,6 +13663,32 @@ try {
         + ((editBtn || remindAll) ? '<div class="pf-prq-bar">'+editBtn+' '+remindAll+'</div>' : '')
         + '<div class="pf-prq-msg" style="display:none"></div>'
         + '</div>';
+    }
+    // Re-render the prereq READ view once the contact directory (PF_CONTACTS) has
+    // loaded async, so directory-tied responsible parties resolve to their live
+    // name/email and the editor datalist has the project's contacts (Brad 2026-08-12).
+    // The initial synchronous render already shows stored name/email (never broken);
+    // this just upgrades the display to the resolved directory values. SKIPS a wrap
+    // that is currently in edit mode (has data-prq-orig) so it never clobbers an open
+    // editor. Idempotent + fail-soft.
+    function pfPrqRefreshAfterContacts(root){
+      try {
+        var scope = root || document;
+        var wraps = scope.querySelectorAll ? scope.querySelectorAll('.pf-prq-wrap') : [];
+        if (!wraps || !wraps.length) return;
+        pfLoadContacts().then(function(){
+          for (var i = 0; i < wraps.length; i++) {
+            var w = wraps[i];
+            if (!w || w.getAttribute('data-prq-orig') != null) continue; // editor open — leave it
+            var fresh = submittalPrereqsBlock(pfShopDwgInfo(_curNum));
+            // Replace in place (fresh returns a full .pf-prq-wrap; swap outerHTML).
+            var tmp = document.createElement('div');
+            tmp.innerHTML = fresh;
+            var newWrap = tmp.firstChild;
+            if (newWrap && w.parentNode) w.parentNode.replaceChild(newWrap, w);
+          }
+        });
+      } catch (e) {}
     }
 
     // ---- computed automations (phase 2, Brad 2026-08-07) ---------------------
@@ -15255,15 +15384,23 @@ try {
             // else blank. FLAGGED for Brad: shown in INCHES (x12) to match GGG; say the
             // word if you want raw feet here instead.
             field('Column Diameter (inches)', garbinDiaInches(gp),
-                  garbinDiaInches(gp) ? 'Garbin Prelim' : ''),
-            // DROPDOWN (SOW — reuses the existing Project SOW values via a new
-            // PF_FIELD_DROPDOWNS['SOW'] entry pointing at the same value list).
-            field('SOW', '')
+                  garbinDiaInches(gp) ? 'Garbin Prelim' : '')
+            // FIELD ORDER (Brad 2026-08-12): SOW moved to the BOTTOM of Prelim Design;
+            // Total Stone (TN) moved UP into SOW's former position. Values/bindings
+            // unchanged (Total Stone still pulls Garbin Stone Required tons; SOW keeps
+            // its dropdown behavior). Total Stone stays conditional (only when a Garbin
+            // stone value exists); SOW renders unconditionally as the LAST row.
           ].concat(
             // "Total Stone (TN):" pulled from the Garbin Prelim (Stone Required tons).
-            // Rendered only when a Garbin entry has a stone value; '' otherwise.
+            // Rendered only when a Garbin entry has a stone value; '' otherwise. Now
+            // ABOVE SOW (was below it).
             garbinTotalStoneField(gp) ? [garbinTotalStoneField(gp)] : []
-          ))
+          ).concat([
+            // DROPDOWN (SOW — reuses the existing Project SOW values via a new
+            // PF_FIELD_DROPDOWNS['SOW'] entry pointing at the same value list). Now the
+            // BOTTOM field of the Prelim Design subsection (Brad 2026-08-12).
+            field('SOW', '')
+          ]))
           // --- Subsection 2: PF Design Submittal ---
         + subgroup('PF Design Submittal')
           // GC PREREQUISITES CHECKLIST (Brad 2026-08-12): rendered AHEAD of all the
@@ -16799,6 +16936,12 @@ try {
       // new groups 8-13) render in one pass; each host's data-crm-cards-key selects its
       // own override map. No selection -> hosts stay empty (renders as before).
       pfCrmRenderCards(pcHost || root);
+
+      // Prereq checklist: once the contact directory loads, re-render the read view so
+      // directory-tied responsible parties resolve to live name/email and the editor
+      // datalist is populated from THIS project's contacts (Brad 2026-08-12). Scoped to
+      // the whole record root so the Engineering & Design prereq wrap is covered.
+      if (typeof pfPrqRefreshAfterContacts === 'function') pfPrqRefreshAfterContacts(root);
 
       // --- QA/QC nested card injected into Engineering & Design (Brad 2026-08-07,
       // batch-12) --- The former standalone QA/QC section now lives as a NESTED editable
@@ -19074,16 +19217,64 @@ try {
       return ''; // unknown shape -> leave the date input empty (never a bogus value)
     }
 
+    // Responsible-Party typeahead handler (Brad 2026-08-12): when the user types or
+    // selects a NAME that matches one of THIS project's contacts, auto-associate that
+    // contact's EMAIL + contactId (so the reminder email has a recipient tied to the
+    // directory). Matching is case-insensitive on the exact display name; a partial /
+    // non-matching name clears the tie (contactId) and leaves the email editable so a
+    // one-off (not-in-project) party still works. Never throws.
+    window.pfPrqOnPartyInput = function(nameEl){
+      try {
+        var tr = nameEl && nameEl.closest ? nameEl.closest('tr') : null;
+        if (!tr) return;
+        var emailEl = tr.querySelector('.pf-prq-in-email');
+        var cidEl = tr.querySelector('.pf-prq-in-cid');
+        var typed = String(nameEl.value || '').trim().toLowerCase();
+        var contacts = (typeof pfProjectContacts === 'function') ? pfProjectContacts() : [];
+        var match = null;
+        for (var i = 0; i < contacts.length; i++) {
+          if (String(contacts[i].name || '').trim().toLowerCase() === typed && typed) { match = contacts[i]; break; }
+        }
+        if (match) {
+          if (cidEl) cidEl.value = match.contactId || '';
+          // Auto-fill the tied email (directory email is the source of truth).
+          if (emailEl && match.email) emailEl.value = match.email;
+        } else {
+          // No exact project-contact match: drop the tie; keep whatever email is typed.
+          if (cidEl) cidEl.value = '';
+        }
+      } catch (e) {}
+    };
+
     // Edit: replace the read-view table with an inline editor (name + email + date per row).
     window.pfPrereqEdit = function(btn){
       if (!canEdit()) return; // defense-in-depth (server also 403s)
       var wrap = pfPrqWrap(btn);
       if (!wrap) return;
       var data = (typeof pfPrereqData === 'function') ? pfPrereqData() : {};
+      // Responsible Party = dropdown/typeahead of THIS project's contacts (Brad
+      // 2026-08-12). Build the project's contact list ONCE; the name input is a
+      // <datalist>-backed typeahead of those names, and selecting/typing a matching
+      // name auto-associates that contact's email + contactId (pfPrqOnPartyInput,
+      // wired below). Typing a name NOT in the project's contacts is still allowed
+      // (graceful path): the email field stays editable so a one-off party works —
+      // primary UX is select-from-project-contacts. (Flagged in report.)
+      var projContacts = (typeof pfProjectContacts === 'function') ? pfProjectContacts() : [];
+      var dlId = 'pf-prq-contacts-dl';
+      var dlOpts = projContacts.map(function(pc){
+        // option value = display name; label carries the email for disambiguation.
+        var lbl = pc.email ? (pc.name + ' <' + pc.email + '>') : pc.name;
+        return '<option value="'+esc2(pc.name)+'" label="'+esc2(lbl)+'"></option>';
+      }).join('');
+      var datalistHtml = '<datalist id="'+dlId+'">'+dlOpts+'</datalist>';
       var rows = PF_PRQ_ITEMS.map(function(it){
         var d = data[it.key] || {};
-        var name = esc2(d.responsible_name || '');
-        var email = esc2(d.responsible_email || '');
+        // Resolve the stored party (contactId wins for name+email) so the editor
+        // shows the current directory values, not a stale stored copy.
+        var _rp = (typeof pfPrqResolveParty === 'function') ? pfPrqResolveParty(d) : { contactId:(d.responsible_contact_id||''), name:(d.responsible_name||''), email:(d.responsible_email||'') };
+        var name = esc2(_rp.name || '');
+        var email = esc2(_rp.email || '');
+        var cid = esc2(_rp.contactId || '');
         var dval = esc2(pfPrqToInputDate(d.date_received || ''));
         var rf = (d.required_for && typeof d.required_for === 'object') ? d.required_for : {};
         var rfSub = (rf.submittal_design === true) ? ' checked' : '';
@@ -19092,13 +19283,14 @@ try {
           + '<td class="pf-prq-item">'+esc2(it.label)+'</td>'
           + '<td class="pf-prq-rf"><input type="checkbox" class="pf-prq-in-rf pf-prq-in-rf-sub"'+rfSub+' aria-label="Required for Submittal Design"></td>'
           + '<td class="pf-prq-rf"><input type="checkbox" class="pf-prq-in-rf pf-prq-in-rf-stk"'+rfStk+' aria-label="Required for Staking Layout"></td>'
-          + '<td><input type="text" class="pf-prq-in pf-prq-in-name" placeholder="Responsible party" value="'+name+'"></td>'
+          + '<td><input type="text" class="pf-prq-in pf-prq-in-name" list="'+dlId+'" placeholder="Select or type a project contact" value="'+name+'" autocomplete="off" oninput="window.pfPrqOnPartyInput(this)"><input type="hidden" class="pf-prq-in-cid" value="'+cid+'"></td>'
           + '<td><input type="email" class="pf-prq-in pf-prq-in-email" placeholder="email@company.com" value="'+email+'"></td>'
           + '<td><input type="date" class="pf-prq-in pf-prq-in-date" value="'+dval+'"></td>'
           + '</tr>';
       }).join('');
+      rows = datalistHtml + rows;
       var editorHtml = '<div class="pf-prq-editor">'
-        + '<div class="pf-prq-edit-note">Assign a responsible party (name + email for reminders) and set a Date Received when each item arrives. A filled date marks the item received. Check "Required For" to mark whether an item is needed for Submittal Design and/or Staking Layout.</div>'
+        + '<div class="pf-prq-edit-note">Assign a responsible party by selecting or typing one of this project\'s contacts (the email auto-fills for reminders), and set a Date Received when each item arrives. A filled date marks the item received. Check "Required For" to mark whether an item is needed for Submittal Design and/or Staking Layout.</div>'
         + '<table class="pf-prq-table pf-prq-table-edit">'
         + '<thead>'
         +   '<tr>'
@@ -19147,14 +19339,20 @@ try {
         if (!key) return;
         var nameEl = tr.querySelector('.pf-prq-in-name');
         var emailEl = tr.querySelector('.pf-prq-in-email');
+        var cidEl = tr.querySelector('.pf-prq-in-cid');
         var dateEl = tr.querySelector('.pf-prq-in-date');
         var rfSubEl = tr.querySelector('.pf-prq-in-rf-sub');
         var rfStkEl = tr.querySelector('.pf-prq-in-rf-stk');
         var name = nameEl ? String(nameEl.value || '').trim() : '';
         var email = emailEl ? String(emailEl.value || '').trim() : '';
+        var cid = cidEl ? String(cidEl.value || '').trim() : '';
         var dr = dateEl ? String(dateEl.value || '').trim() : '';
         if (email && !pfPrqEmailValid(email)) bad = bad || email;
+        // Persist the directory tie (responsible_contact_id) when the party is a
+        // project contact, AND the resolved name+email (so the reminder flow keeps
+        // working even if the tie can't be resolved later). Brad 2026-08-12.
         items[key] = {
+          responsible_contact_id: cid || '',
           responsible_name: name, responsible_email: email, date_received: dr,
           required_for: {
             submittal_design: !!(rfSubEl && rfSubEl.checked),

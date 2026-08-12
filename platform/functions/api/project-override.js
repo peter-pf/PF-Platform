@@ -124,6 +124,7 @@ const PREREQ_MAX_ITEMKEY = 60;       // an item slug length cap
 const PREREQ_MAX_NAME = 200;         // responsible-party name cap
 const PREREQ_MAX_EMAIL = 254;        // RFC max email length
 const PREREQ_MAX_DATE = 40;          // a date string (ISO YYYY-MM-DD or MM/DD/YYYY)
+const PREREQ_MAX_CID = 20;           // a directory contactId (C#### shape)
 
 // Validate + normalize an incoming __submittal_prereqs object into a clean, bounded
 // structure. Returns a SAFE object, or null if present-but-malformed (caller fails the
@@ -154,7 +155,14 @@ function cleanPrereqs(input) {
     // received-count (that is date_received only).
     const rf = (entry.required_for && typeof entry.required_for === 'object' && !Array.isArray(entry.required_for))
       ? entry.required_for : {};
+    // responsible_contact_id (Brad 2026-08-12): the tied directory contactId when the
+    // responsible party was chosen from the project's contacts. Optional; validated to
+    // the C#### shape (upper-cased) or dropped to '' (a bad/absent tie never rejects the
+    // save — the name/email still persist so reminders work). Metadata, not a gate.
+    const cidRaw = s(entry.responsible_contact_id, PREREQ_MAX_CID).toUpperCase();
+    const responsibleCid = /^C\d+$/.test(cidRaw) ? cidRaw : '';
     items[key] = {
+      responsible_contact_id: responsibleCid,
       responsible_name:  s(entry.responsible_name, PREREQ_MAX_NAME),
       responsible_email: s(entry.responsible_email, PREREQ_MAX_EMAIL),
       date_received:     s(entry.date_received, PREREQ_MAX_DATE),
