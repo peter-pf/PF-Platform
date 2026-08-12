@@ -105,8 +105,11 @@ const CRM_ID_RE = /^C\d+$/;          // contact id shape (C#### minted by /api/c
 // email) and a Date Received (filled = received). That per-item state is stored under ONE
 // reserved, object-valued key `__submittal_prereqs` INSIDE the `engineering` section:
 //   sections.engineering.__submittal_prereqs = {
-//     items: { "<itemKey>": { responsible_name, responsible_email, date_received }, ... }
+//     items: { "<itemKey>": { responsible_name, responsible_email, date_received,
+//                             required_for:{ submittal_design, staking_layout } }, ... }
 //   }
+// required_for (Brad 2026-08-12) = metadata booleans marking whether the item is needed
+// for Submittal Design and/or Staking Layout. NOT part of the received-count.
 // itemKey is a short stable slug the client mints per row (e.g. "struct_foundation_cad").
 // Every OTHER key in the engineering section stays a plain string (the existing overlay).
 // This is the SECOND reserved object key (alongside __crm) and rides the SAME merge:
@@ -145,10 +148,20 @@ function cleanPrereqs(input) {
     if (!key) continue;
     const entry = itemsIn[rawKey];
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
+    // required_for: metadata flags for what the item is needed for (Brad 2026-08-12).
+    // Optional object; coerced to two strict booleans. Absent/malformed => both false
+    // (never rejects the save — this is metadata, not a gate). Never part of the
+    // received-count (that is date_received only).
+    const rf = (entry.required_for && typeof entry.required_for === 'object' && !Array.isArray(entry.required_for))
+      ? entry.required_for : {};
     items[key] = {
       responsible_name:  s(entry.responsible_name, PREREQ_MAX_NAME),
       responsible_email: s(entry.responsible_email, PREREQ_MAX_EMAIL),
       date_received:     s(entry.date_received, PREREQ_MAX_DATE),
+      required_for: {
+        submittal_design: rf.submittal_design === true,
+        staking_layout:   rf.staking_layout === true,
+      },
     };
   }
   return { items };

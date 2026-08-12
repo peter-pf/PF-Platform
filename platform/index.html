@@ -2671,6 +2671,17 @@ tr.pf-dragging { opacity: 0.45; }
   background: var(--bg-0); color: var(--text-1);
 }
 .pf-prq-edit-actions { margin-top: 8px; display: flex; gap: 8px; }
+/* Required For: spanning header + two centered checkbox sub-columns (Brad 2026-08-12) */
+.pf-prq-rf-span {
+  text-align: center; border-left: 1px solid var(--border-light);
+  border-right: 1px solid var(--border-light);
+}
+.pf-prq-rf-sub {
+  text-align: center; white-space: nowrap; font-size: 0.66rem;
+}
+.pf-prq-table th.pf-prq-rf-sub:first-of-type { border-left: 1px solid var(--border-light); }
+.pf-prq-rf { text-align: center; width: 96px; }
+.pf-prq-rf-box { cursor: default; }
 .pr-computed-hint.pr-computed-flag .pr-computed-val { color: #c0392b; }
 
 .pr-contact {
@@ -13471,6 +13482,17 @@ try {
         else if (email) party = '<span class="pf-prq-email">'+E(email)+'</span>';
         else party = '<span class="pf-prq-muted">Unassigned</span>';
         var drShown = isReceived ? E(pfFmtDate(dr)) : '<span class="pf-prq-muted">Outstanding</span>';
+        // Required For: two metadata booleans (Brad 2026-08-12). Read view shows a
+        // disabled checkbox per sub-column reflecting stored state; toggling happens in
+        // the editor. Not part of the received-count.
+        var rf = (d.required_for && typeof d.required_for === 'object') ? d.required_for : {};
+        var rfSub = (rf.submittal_design === true);
+        var rfStk = (rf.staking_layout === true);
+        var rfCell = function(on, lbl){
+          return '<td class="pf-prq-rf">'
+            + '<input type="checkbox" class="pf-prq-rf-box" disabled'+(on?' checked':'')
+            + ' aria-label="'+E(lbl)+(on?': required':': not required')+'" title="'+E(lbl)+(on?': required':': not required')+'"></td>';
+        };
         var statusCell = isReceived
           ? '<span class="pf-prq-badge pf-prq-recd">&#10003; Received</span>'
           : '<span class="pf-prq-badge pf-prq-out">Outstanding</span>';
@@ -13490,6 +13512,8 @@ try {
         }
         return '<tr class="pf-prq-row'+(isReceived?' pf-prq-row-recd':' pf-prq-row-out')+'" data-prq-item="'+E(it.key)+'" data-prq-label="'+E(it.label)+'" data-prq-email="'+E(email)+'" data-prq-name="'+E(name)+'">'
           + '<td class="pf-prq-item">'+statusCell+' '+E(it.label)+'</td>'
+          + rfCell(rfSub, 'Submittal Design')
+          + rfCell(rfStk, 'Staking Layout')
           + '<td class="pf-prq-party">'+party+'</td>'
           + '<td class="pf-prq-date">'+drShown+'</td>'
           + (canEdit() ? '<td class="pf-prq-action">'+remindCell+'</td>' : '')
@@ -13511,14 +13535,28 @@ try {
       var editBtn = canEdit()
         ? '<button type="button" class="pf-prq-edit" onclick="event.stopPropagation();window.pfPrereqEdit(this)">Edit checklist</button>'
         : '';
-      var headCols = '<th>Item</th><th>Responsible Party</th><th>Date Received</th>'
-        + (canEdit() ? '<th>Reminder</th>' : '');
+      // Two-row header: a "Required For" header spans the two centered checkbox
+      // sub-columns (Submittal Design / Staking Layout). The other columns span both
+      // header rows via rowspan. Reminder column (office only) stays rightmost.
+      var thead = '<thead>'
+        + '<tr>'
+        +   '<th rowspan="2">Description</th>'
+        +   '<th colspan="2" class="pf-prq-rf-span">Required For</th>'
+        +   '<th rowspan="2">Responsible Party</th>'
+        +   '<th rowspan="2">Date Received</th>'
+        +   (canEdit() ? '<th rowspan="2">Reminder</th>' : '')
+        + '</tr>'
+        + '<tr>'
+        +   '<th class="pf-prq-rf-sub">Submittal Design</th>'
+        +   '<th class="pf-prq-rf-sub">Staking Layout</th>'
+        + '</tr>'
+        + '</thead>';
       return '<div class="pf-prq-wrap" data-prq-num="'+E(_curNum)+'">'
         + subgroup('PF Prerequisites for Submittal Design')
         + subgroupNote('Items PF needs from the GC before starting the full Submittal Design. Fill a Date Received to mark an item received; PF begins once all are received.')
         + shopDwgInfoLinkRow(sdi)
         + statusLine
-        + '<table class="pf-prq-table"><thead><tr>'+headCols+'</tr></thead><tbody>'+rowsHtml+'</tbody></table>'
+        + '<table class="pf-prq-table">'+thead+'<tbody>'+rowsHtml+'</tbody></table>'
         + ((editBtn || remindAll) ? '<div class="pf-prq-bar">'+editBtn+' '+remindAll+'</div>' : '')
         + '<div class="pf-prq-msg" style="display:none"></div>'
         + '</div>';
@@ -19047,18 +19085,34 @@ try {
         var name = esc2(d.responsible_name || '');
         var email = esc2(d.responsible_email || '');
         var dval = esc2(pfPrqToInputDate(d.date_received || ''));
+        var rf = (d.required_for && typeof d.required_for === 'object') ? d.required_for : {};
+        var rfSub = (rf.submittal_design === true) ? ' checked' : '';
+        var rfStk = (rf.staking_layout === true) ? ' checked' : '';
         return '<tr data-prq-item="'+esc2(it.key)+'">'
           + '<td class="pf-prq-item">'+esc2(it.label)+'</td>'
+          + '<td class="pf-prq-rf"><input type="checkbox" class="pf-prq-in-rf pf-prq-in-rf-sub"'+rfSub+' aria-label="Required for Submittal Design"></td>'
+          + '<td class="pf-prq-rf"><input type="checkbox" class="pf-prq-in-rf pf-prq-in-rf-stk"'+rfStk+' aria-label="Required for Staking Layout"></td>'
           + '<td><input type="text" class="pf-prq-in pf-prq-in-name" placeholder="Responsible party" value="'+name+'"></td>'
           + '<td><input type="email" class="pf-prq-in pf-prq-in-email" placeholder="email@company.com" value="'+email+'"></td>'
           + '<td><input type="date" class="pf-prq-in pf-prq-in-date" value="'+dval+'"></td>'
           + '</tr>';
       }).join('');
       var editorHtml = '<div class="pf-prq-editor">'
-        + '<div class="pf-prq-edit-note">Assign a responsible party (name + email for reminders) and set a Date Received when each item arrives. A filled date marks the item received.</div>'
-        + '<table class="pf-prq-table pf-prq-table-edit"><thead><tr>'
-        +   '<th>Item</th><th>Responsible Party</th><th>Email</th><th>Date Received</th>'
-        + '</tr></thead><tbody>'+rows+'</tbody></table>'
+        + '<div class="pf-prq-edit-note">Assign a responsible party (name + email for reminders) and set a Date Received when each item arrives. A filled date marks the item received. Check "Required For" to mark whether an item is needed for Submittal Design and/or Staking Layout.</div>'
+        + '<table class="pf-prq-table pf-prq-table-edit">'
+        + '<thead>'
+        +   '<tr>'
+        +     '<th rowspan="2">Description</th>'
+        +     '<th colspan="2" class="pf-prq-rf-span">Required For</th>'
+        +     '<th rowspan="2">Responsible Party</th>'
+        +     '<th rowspan="2">Email</th>'
+        +     '<th rowspan="2">Date Received</th>'
+        +   '</tr>'
+        +   '<tr>'
+        +     '<th class="pf-prq-rf-sub">Submittal Design</th>'
+        +     '<th class="pf-prq-rf-sub">Staking Layout</th>'
+        +   '</tr>'
+        + '</thead><tbody>'+rows+'</tbody></table>'
         + '<div class="pf-prq-edit-err" style="display:none"></div>'
         + '<div class="pf-prq-edit-actions">'
         +   '<button type="button" class="pf-prq-save" onclick="event.stopPropagation();window.pfPrereqSave(this)">Save checklist</button>'
@@ -19094,11 +19148,19 @@ try {
         var nameEl = tr.querySelector('.pf-prq-in-name');
         var emailEl = tr.querySelector('.pf-prq-in-email');
         var dateEl = tr.querySelector('.pf-prq-in-date');
+        var rfSubEl = tr.querySelector('.pf-prq-in-rf-sub');
+        var rfStkEl = tr.querySelector('.pf-prq-in-rf-stk');
         var name = nameEl ? String(nameEl.value || '').trim() : '';
         var email = emailEl ? String(emailEl.value || '').trim() : '';
         var dr = dateEl ? String(dateEl.value || '').trim() : '';
         if (email && !pfPrqEmailValid(email)) bad = bad || email;
-        items[key] = { responsible_name: name, responsible_email: email, date_received: dr };
+        items[key] = {
+          responsible_name: name, responsible_email: email, date_received: dr,
+          required_for: {
+            submittal_design: !!(rfSubEl && rfSubEl.checked),
+            staking_layout:   !!(rfStkEl && rfStkEl.checked)
+          }
+        };
       });
       if (bad) { showErr('That email address does not look valid: ' + bad + '. Fix it or clear it, then save.'); return; }
       if (errEl) errEl.style.display = 'none';
