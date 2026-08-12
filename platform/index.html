@@ -17048,78 +17048,122 @@ try {
       // user never opens the card, no request is made.
       try { wireProjectPhotos(root); } catch (e) {}
 
-      // General Info field-completion readout (Brad 2026-08-11). Built LAST, from the
-      // finalized General Info DOM, so the count reflects exactly the fields the user
-      // sees in that section (and matches the yellow blank-field highlighting). Injects
-      // "X/Y Fields Complete, XX%" into the section HEADER line so it stays visible
-      // when the section is collapsed/rolled up.
-      try { pfRenderGeneralInfoStatusBar(root); } catch (e) {}
+      // Field-completion readout (Brad 2026-08-11, generalized 2026-08-12). Built LAST,
+      // from the finalized DOM, so each count reflects exactly the fields the user sees
+      // in that section (and matches the yellow blank-field highlighting). Injects
+      // "X/Y Fields Complete, XX%" into EVERY top-level section HEADER line (General Info
+      // + all sections below it) so it stays visible when the section is collapsed/rolled
+      // up. Each section counts ITS OWN direct fields; sections with no countable fields
+      // omit the badge (no broken "0/0").
+      try { pfRenderAllSectionStatusBars(root); } catch (e) {}
 
       _curSection = ''; // done rendering this record
     }
 
-    // ---- General Info completion status bar (Brad 2026-08-11) ------------------
-    // Counts the genuine data fields rendered in the General Info section and shows
-    // "X/Y Fields Complete, XX%" on the SECTION HEADER LINE (Brad 2026-08-11: move it
-    // up into the "General Info" header row so it stays visible when the section is
-    // rolled up/collapsed). "Completed" reuses the EXACT blank rule of the yellow
-    // blank-field highlight: field() / fieldLinked() emit .pr-field-value.blank for
-    // an empty/whitespace/null/undefined value (which is also what the "-" placeholder
-    // renders from), so a span WITHOUT .blank == a real value == complete. This keeps
-    // the count identical to what the user sees highlighted. We count each
-    // .pr-field[data-pr-label] row once (its single .pr-field-value span); section
-    // headers (.pr-subhead), computed hints (.pr-computed-hint) are NOT .pr-field
-    // rows, so they are never counted. Scoped strictly to the General Info card
-    // (data-pr-section="general") — never other sections. The counted fields live in
-    // the card BODY, which stays in the DOM (display:none) even when collapsed, so the
-    // count is correct regardless of open/closed state.
-    function pfRenderGeneralInfoStatusBar(root){
-      if (!root) return;
-      var gCard = root.querySelector('.pr-card[data-pr-section="general"]');
-      if (!gCard) return;
-      var body = gCard.querySelector(':scope > .pr-card-body');
-      var head = gCard.querySelector(':scope > .pr-card-head');
+    // ---- Section completion status bars (Brad 2026-08-11; generalized 2026-08-12) ---
+    // Brad: "Add the xx/xx fields complete, % complete verbiage and formatting the exact
+    // same way you did for the 'General Info' section to all sections below it for each
+    // project." So the readout that originally lived only on General Info now lives on
+    // EVERY top-level section header — each counting ITS OWN fields.
+    //
+    // pfRenderSectionStatusBar(card): compute + inject the "X/Y Fields Complete, XX%"
+    // badge into ONE top-level section card's header. Reusable — General Info uses the
+    // exact same code path, so it stays byte-identical to what shipped before.
+    //
+    // COUNT logic (unchanged from the General Info original): count each
+    // .pr-field[data-pr-label] row once (its single .pr-field-value span). "Completed"
+    // reuses the EXACT blank rule of the yellow blank-field highlight: field() /
+    // fieldLinked() emit .pr-field-value.blank for an empty/whitespace/null/undefined
+    // value (also what the "-" placeholder renders from), so a span WITHOUT .blank == a
+    // real value == complete. The count therefore ALWAYS matches what the user sees
+    // highlighted. Subheads (.pr-subhead), computed hints (.pr-computed-hint), contact
+    // rows (.pr-crow), and the GC-prereq checklist rows are NOT .pr-field[data-pr-label]
+    // rows, so they are never counted.
+    //
+    // SCOPE (the generalization key): count only fields that belong DIRECTLY to THIS
+    // top-level card — i.e. `field.closest('.pr-card') === card`. This EXCLUDES fields
+    // that live inside NESTED .pr-cards (e.g. Project Contacts' Owner&GC / Design
+    // Professionals / PF Team cards, or Site Readiness' Equipment/Material/Safety cards,
+    // or Engineering & Design's QA/QC card). Each top-level section thus reports only its
+    // own direct fields and never cross-counts another section's — nested subsections
+    // are their own edit/save keys and are not folded into the parent's count. The
+    // counted fields live in the card BODY (display:none when collapsed but still in the
+    // DOM) so the count is correct in either open/closed state.
+    //
+    // OMIT-WHEN-EMPTY: if a section has 0 direct countable fields (e.g. Project Contacts
+    // renders only nested-card contact groups; Project Photos is a gallery; Financials is
+    // a budget-vs-actual table), NO badge is injected — never a broken "0/0".
+    function pfRenderSectionStatusBar(card){
+      if (!card) return;
+      var body = card.querySelector(':scope > .pr-card-body');
+      var head = card.querySelector(':scope > .pr-card-head');
       if (!body || !head) return;
-      // Only fields inside THIS general card body. General Info holds no nested
-      // .pr-cards, so every .pr-field[data-pr-label] here is a General Info field.
       var fieldEls = body.querySelectorAll('.pr-field[data-pr-label]');
       var total = 0, done = 0;
       for (var i = 0; i < fieldEls.length; i++){
+        // DIRECT-fields-only: skip any field that lives inside a nested .pr-card so this
+        // section never counts a subsection card's fields (or another section's).
+        if (fieldEls[i].closest('.pr-card') !== card) continue;
         var val = fieldEls[i].querySelector('.pr-field-value');
         if (!val) continue;              // safety: not a real data field row
         total++;
         // Same blank rule as the yellow highlight: .blank => incomplete.
         if (!val.classList.contains('blank')) done++;
       }
-      var pct = total > 0 ? Math.round((done / total) * 100) : 0;
-      var readout = done + '/' + total + ' Fields Complete, '
-        + '<span class="pr-genstatus-pct">' + pct + '%</span>';
-      // Header readout: a plain <span> (no onclick) placed in the .pr-card-head so it
-      // lives on the same line as the "General Info" title and stays VISIBLE when the
-      // section is collapsed. Because it carries no handler, a click on it bubbles up
-      // to the .pr-card-head onclick and still toggles .open — collapse intact.
-      var badge = '<span class="pr-genstatus-head" role="status" aria-label="'
-        + E(done + ' of ' + total + ' General Info fields complete, ' + pct + ' percent') + '">'
-        +   readout
-        + '</span>';
       // Idempotency: renderInto rebuilds innerHTML each pass, but guard anyway so a
       // re-run never leaves two badges.
-      var existing = head.querySelector('.pr-genstatus-head');
+      var existing = head.querySelector(':scope > .pr-genstatus-head');
       if (existing) existing.parentNode.removeChild(existing);
-      // Placement (Brad 2026-08-12): the readout sits to the LEFT of the Edit button
-      // and is CENTERED within the General Info header bar. Insert it just BEFORE the
-      // Edit button (fallback: before the chevron; final fallback: header end). A marker
-      // class on the head lets scoped CSS center it (title stops growing so the badge
-      // gets shared free space + margin:0 auto centers it between title and Edit btn).
-      // `badge` is an HTML string, so use insertAdjacentHTML (Node-typed insertBefore
-      // would reject a string). NO onclick on the badge -> a click still bubbles to the
-      // .pr-card-head collapse-toggle handler (collapse intact).
+      head.classList.remove('pr-head-hasstatus');
+      // OMIT the badge for sections with no countable fields (no "0/0").
+      if (total === 0) return;
+      var pct = Math.round((done / total) * 100);
+      var readout = done + '/' + total + ' Fields Complete, '
+        + '<span class="pr-genstatus-pct">' + pct + '%</span>';
+      var titleEl = head.querySelector(':scope > .pr-card-title');
+      var titleTxt = (titleEl && titleEl.textContent) ? titleEl.textContent : 'Section';
+      // Header readout: a plain <span> (no onclick) placed in the .pr-card-head so it
+      // lives on the same line as the section title and stays VISIBLE when the section is
+      // collapsed. Because it carries no handler, a click on it bubbles up to the
+      // .pr-card-head onclick and still toggles .open — collapse intact.
+      var badge = '<span class="pr-genstatus-head" role="status" aria-label="'
+        + E(done + ' of ' + total + ' ' + titleTxt + ' fields complete, ' + pct + ' percent') + '">'
+        +   readout
+        + '</span>';
+      // Placement (Brad 2026-08-12): the readout sits to the LEFT of the Edit button and
+      // is CENTERED within the section header bar. Insert it just BEFORE the Edit button
+      // (fallback: before the chevron; final fallback: header end). The pr-head-hasstatus
+      // marker lets scoped CSS center it (title stops growing so the badge gets shared
+      // free space + margin auto centers it between title and Edit btn). `badge` is an
+      // HTML string, so use insertAdjacentHTML (Node-typed insertBefore rejects a
+      // string). NO onclick on the badge -> a click still bubbles to the .pr-card-head
+      // collapse-toggle handler (collapse intact).
       head.classList.add('pr-head-hasstatus');
-      var editBtn = head.querySelector('.pr-edit-btn');
-      var chev = head.querySelector('.pr-chev');
+      var editBtn = head.querySelector(':scope > .pr-edit-btn');
+      var chev = head.querySelector(':scope > .pr-chev');
       if (editBtn) editBtn.insertAdjacentHTML('beforebegin', badge);
       else if (chev) chev.insertAdjacentHTML('beforebegin', badge);
       else head.insertAdjacentHTML('beforeend', badge);
+    }
+
+    // Iterate EVERY top-level section card (the direct .pr-card children of the record
+    // root) and render each one's completion badge. Nested cards live inside a parent
+    // card body (.pr-nested-card-wrap), so `:scope > *` walking from root only visits the
+    // top-level sections — nested subsection cards never get their own top-level badge
+    // and their fields are excluded from the parent count by the closest() guard above.
+    // Called on every render/save cycle (renderInto runs this last; pfSaveSection
+    // re-runs renderInto), so counts recompute after any edit.
+    function pfRenderAllSectionStatusBars(root){
+      if (!root) return;
+      // Top-level cards are direct children of root. Some are wrapped only for nested
+      // cards; the numbered section cards themselves are direct root children. Select
+      // direct-child .pr-cards only, so we never treat a nested card as a top-level
+      // section. (The '3b' Subcontract Analysis card is a computed summary with no
+      // data fields -> total 0 -> omitted automatically.)
+      var cards = root.querySelectorAll(':scope > .pr-card');
+      for (var i = 0; i < cards.length; i++){
+        try { pfRenderSectionStatusBar(cards[i]); } catch (e) {}
+      }
     }
 
     // ---- Project Photos: lazy gallery loader ---------------------------------
