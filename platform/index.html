@@ -2315,6 +2315,71 @@ tr.pf-dragging { opacity: 0.45; }
 /* Resolved CRM cards host in the read view (under each firm block). */
 .pr-crm-cards:empty { display: none; }
 .pr-crm-company-sub { font-size: 0.76rem; font-weight: 700; color: var(--muted, #55606d); margin: 4px 0 2px; }
+/* ---- Full ADD-CONTACT card (Brad 2026-08-12) ------------------------------ */
+/* Brad: "It would be nice if it opened a whole contact card that i can then    */
+/* enter the contact information: name, title, office phone, cell phone, email, */
+/* and any notes." Replaces the one-field-at-a-time window.prompt() flow with   */
+/* an inline 6-field form (same look as the .pr-crow-edit inline editor). All   */
+/* six fields are collected + POSTed at once so Office Phone + Notes finally     */
+/* populate. Rendered inside the cascading selector's contacts host.            */
+.pr-crm-addform {
+  padding: 8px; margin: 4px 0; border: 1px solid var(--accent);
+  border-radius: 6px; background: var(--bg-1, #f6f8fa);
+}
+.pr-crm-addform .pr-crm-addform-note {
+  font-size: 0.7rem; color: var(--muted, #55606d); margin: 0 0 6px;
+}
+.pr-crm-addform .pr-crm-addform-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 10px;
+}
+.pr-crm-addform .pr-crm-addform-field { display: flex; flex-direction: column; gap: 2px; }
+.pr-crm-addform .pr-crm-addform-field.pr-crm-addform-notes { grid-column: 1 / -1; }
+.pr-crm-addform label {
+  font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.03em; color: var(--muted, #55606d);
+}
+.pr-crm-addform input, .pr-crm-addform textarea {
+  font-size: 0.8rem; padding: 4px 6px; border: 1px solid var(--border-light);
+  border-radius: 4px; background: #fff; color: var(--text-0); width: 100%;
+  box-sizing: border-box; font-family: inherit;
+}
+.pr-crm-addform textarea { min-height: 46px; resize: vertical; }
+.pr-crm-addform-actions { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.pr-crm-addform-err { color: #b3261e; font-size: 0.72rem; display: none; }
+@media (max-width: 720px) {
+  .pr-crm-addform .pr-crm-addform-grid { grid-template-columns: 1fr; }
+}
+/* ---- Per-row REMOVE-from-project affordance (Brad 2026-08-12) -------------- */
+/* Brad: "to be able to delete contacts from a project... if people get         */
+/* promoted or change jobs with other companies." A small "✕ Remove" button     */
+/* next to the ✎ Edit pencil unassigns a contact from THIS project (drops the   */
+/* id from the section __crm list) — it NEVER deletes the master directory      */
+/* record. Office/CRM-gated. A confirm step guards accidental clicks.           */
+.pr-crow-rmbtn {
+  border: 1px solid var(--border-light); background: var(--bg-2, #eef2f6);
+  color: #b3261e; border-radius: 4px;
+  font-size: 0.68rem; line-height: 1; padding: 3px 7px; cursor: pointer;
+  margin-left: 6px;
+}
+.pr-crow-rmbtn:hover { background: #b3261e; color: #fff; border-color: #b3261e; }
+/* Inline confirm bar (swaps in over the row on remove-click). */
+.pr-crow-rmconfirm {
+  padding: 6px 8px; margin: 4px 0; border: 1px solid #e6b3ae;
+  border-radius: 6px; background: #fdf3f2;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.pr-crow-rmconfirm .pr-crow-rmconfirm-msg { font-size: 0.76rem; color: #7a2620; }
+.pr-crow-rmconfirm .pr-crow-rmconfirm-msg strong { color: #5c1c17; }
+.pr-crow-rmconfirm-actions { display: flex; gap: 6px; margin-left: auto; }
+.pr-crow-rmconfirm .pr-rm-yes {
+  border: 1px solid #b3261e; background: #b3261e; color: #fff;
+  border-radius: 4px; font-size: 0.72rem; padding: 3px 10px; cursor: pointer;
+}
+.pr-crow-rmconfirm .pr-rm-no {
+  border: 1px solid var(--border-light); background: #fff; color: var(--text-0);
+  border-radius: 4px; font-size: 0.72rem; padding: 3px 10px; cursor: pointer;
+}
+.pr-crow-rmconfirm-err { color: #b3261e; font-size: 0.72rem; width: 100%; display: none; }
 /* ---- Contact directory typeahead (autocomplete) --------------------------- */
 /* Anchored to a contact-name input; a floating list of directory matches.      */
 .pr-ta-wrap { position: relative; }
@@ -17705,55 +17770,132 @@ try {
       pfCrmLoadContacts(block, name);
     };
 
-    // "+ Add contact" — collect a new contact for the firm's currently-selected
-    // company, POST it to /api/contacts (action:'add', category = section trade),
-    // then append it (checked) to the list. Reuses the dedupe-guarded write path.
+    // "+ Add contact" — Brad 2026-08-12: open a FULL contact card (all six fields at
+    // once: Name / Title / Office Phone / Cell Phone / Email / Notes) instead of the
+    // old one-field-at-a-time window.prompt() chain (which was MISSING Office Phone +
+    // Notes entirely — the bug Brad hit). The form is an inline .pr-crm-addform (same
+    // look as the .pr-crow-edit inline editor). Submit collects ALL six + the block's
+    // currently-selected company + the block trade (Category) and POSTs them to
+    // /api/contacts action:'add' (dedupe-guarded C#### mint). On success the new
+    // contact is appended CHECKED to the selector list (so the section Save assigns it
+    // to this project's __crm) and the local directory cache is invalidated.
     window.pfCrmAddContact = function(btn){
       var block = btn.closest('.pr-crm'); if (!block) return;
       var sel = block.querySelector('.pr-crm-company');
       var company = sel ? (sel.value || '') : '';
       var trade = block.getAttribute('data-crm-trade') || '';
       if (!company) { window.alert('Pick or add a company first.'); return; }
-      var name = (window.prompt('Contact name (First Last):') || '').trim();
-      if (!name) return;
-      var title = (window.prompt('Title (optional):') || '').trim();
-      var email = (window.prompt('Email (optional):') || '').trim();
-      var phone = (window.prompt('Cell phone (optional):') || '').trim();
+      var host = block.querySelector('[data-crm-contacts]');
+      if (!host) return;
+      // Guard against opening two add forms in the same block.
+      if (host.querySelector('.pr-crm-addform')) {
+        var open = host.querySelector('.pr-crm-addform input'); if (open) open.focus();
+        return;
+      }
+      function fld(key, label, wide){
+        return '<div class="pr-crm-addform-field' + (wide ? ' pr-crm-addform-notes' : '') + '">'
+          + '<label>' + esc2(label) + '</label>'
+          + (wide
+              ? '<textarea data-af="' + esc2(key) + '"></textarea>'
+              : '<input type="text" data-af="' + esc2(key) + '">')
+          + '</div>';
+      }
+      var form = document.createElement('div');
+      form.className = 'pr-crm-addform';
+      form.innerHTML = ''
+        + '<div class="pr-crm-addform-note">New contact for <strong>' + esc2(company)
+        +   '</strong> &mdash; added to the shared PF directory and assigned to this project.</div>'
+        + '<div class="pr-crm-addform-grid">'
+        +   fld('name',  'Name')
+        +   fld('title', 'Title')
+        +   fld('officePhone', 'Office Phone')
+        +   fld('cellPhone',   'Cell Phone')
+        +   fld('email', 'Email')
+        +   fld('notes', 'Notes', true)
+        + '</div>'
+        + '<div class="pr-crm-addform-err"></div>'
+        + '<div class="pr-crm-addform-actions">'
+        +   '<button type="button" class="pr-save-btn" onclick="window.pfCrmAddContactSave(this)">Add contact</button>'
+        +   '<button type="button" class="pr-cancel-btn" onclick="window.pfCrmAddContactCancel(this)">Cancel</button>'
+        + '</div>';
+      // Insert the form just above the "+ Add contact" button; hide the button while open.
+      btn.insertAdjacentElement('beforebegin', form);
+      btn.style.display = 'none';
+      form._addBtn = btn;
+      var first = form.querySelector('input'); if (first) first.focus();
+    };
+
+    // Cancel the inline add-contact form: drop it, restore the "+ Add contact" button.
+    window.pfCrmAddContactCancel = function(btn){
+      var form = btn.closest ? btn.closest('.pr-crm-addform') : null;
+      if (!form) return;
+      var addBtn = form._addBtn;
+      if (addBtn) addBtn.style.display = '';
+      form.remove();
+    };
+
+    // Submit the inline add-contact form -> POST /api/contacts action:'add' with ALL
+    // SIX fields populated (Office Phone + Notes now actually SENT — the fix). On
+    // success append the new contact CHECKED to the selector list so the section Save
+    // assigns it to this project. FAIL CLOSED: any error keeps the form open + shows
+    // an honest inline message; never fabricates a saved contact.
+    window.pfCrmAddContactSave = function(btn){
+      var form = btn.closest ? btn.closest('.pr-crm-addform') : null;
+      if (!form) return;
+      var block = form.closest('.pr-crm'); if (!block) return;
+      var sel = block.querySelector('.pr-crm-company');
+      var company = sel ? (sel.value || '') : '';
+      var trade = block.getAttribute('data-crm-trade') || '';
+      var errEl = form.querySelector('.pr-crm-addform-err');
+      function showErr(m){ if (errEl){ errEl.textContent = m; errEl.style.display = 'block'; } }
+      function busy(b){ btn.disabled = b; btn.textContent = b ? 'Adding…' : 'Add contact'; }
+      if (!company) { showErr('Pick or add a company first.'); return; }
+      var vals = {};
+      form.querySelectorAll('[data-af]').forEach(function(el){ vals[el.getAttribute('data-af')] = (el.value == null ? '' : el.value).trim(); });
+      var name = (vals.name || '').trim();
+      if (!name) { showErr('Please enter the contact name.'); var ni = form.querySelector('[data-af="name"]'); if (ni) ni.focus(); return; }
       var nm = pfSplitContactName(name);
-      btn.disabled = true; btn.textContent = 'Adding…';
+      if (errEl) errEl.style.display = 'none';
+      busy(true);
       fetch('/api/contacts', {
         method: 'POST', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'add', contact: {
-          firstName: nm.firstName, lastName: nm.lastName, title: title,
-          company: company, category: trade, cellPhone: phone, email: email
+          firstName: nm.firstName, lastName: nm.lastName, title: vals.title || '',
+          company: company, category: trade,
+          officePhone: vals.officePhone || '', cellPhone: vals.cellPhone || '',
+          email: vals.email || '', notes: vals.notes || ''
         } })
-      }).then(function(res){ return res.json().then(function(j){ return { ok: res.ok && j && j.ok, body: j, status: res.status }; }); })
+      }).then(function(res){ return res.json().then(function(j){ return { ok: res.ok && j && j.ok, body: j, status: res.status }; })
+          .catch(function(){ return { ok: false, body: null, status: res.status }; }); })
         .then(function(r){
-          btn.disabled = false; btn.textContent = '+ Add contact';
           if (!r.ok || !r.body || !r.body.contact) {
-            window.alert((r.body && r.body.message) ? r.body.message : 'Could not add the contact. Please retry.');
-            return;
+            busy(false);
+            showErr((r.body && r.body.message) ? r.body.message
+              : (r.status === 403 ? 'You do not have permission to add contacts.'
+                 : 'Could not add the contact (' + r.status + '). Please retry.'));
+            return; // stay in the form
           }
           // Invalidate the typeahead cache so future selectors see the new contact.
           PF_CONTACTS = null; _pfContactsPromise = null;
           var host = block.querySelector('[data-crm-contacts]');
           var id = String(r.body.contact.contactId || '').toUpperCase();
           if (host && id) {
-            // Remove any "no contacts yet" hint before appending.
             var hint = host.querySelector('.pr-crm-hint'); if (hint) hint.remove();
-            var meta = [title, email, pfFmtPhone(phone)].filter(Boolean).join(' &middot; ');
-            var addBtn = host.querySelector('.pr-crm-addcontact');
+            var meta = [vals.title, vals.email, pfFmtPhone(vals.cellPhone || vals.officePhone || '')].filter(Boolean).join(' &middot; ');
+            var addBtn = form._addBtn;
             var lblHtml = '<label class="pr-crm-contact">'
               + '<input type="checkbox" class="pr-crm-cb" value="' + esc2(id) + '" checked>'
               + '<span class="pr-crm-cname">' + esc2(name) + '</span>'
               + (meta ? '<span class="pr-crm-cmeta">' + meta + '</span>' : '')
               + '</label>';
-            if (addBtn) addBtn.insertAdjacentHTML('beforebegin', lblHtml);
-            else host.insertAdjacentHTML('beforeend', lblHtml);
+            form.insertAdjacentHTML('beforebegin', lblHtml);
           }
+          // Restore the add button + drop the form.
+          if (form._addBtn) form._addBtn.style.display = '';
+          form.remove();
         })
-        .catch(function(){ btn.disabled = false; btn.textContent = '+ Add contact'; window.alert('Could not add the contact. Please retry.'); });
+        .catch(function(){ busy(false); showErr('Could not reach the server. The contact was NOT added — please retry.'); });
     };
 
     // Harvest the CRM selection from a DP editor into a __crm map
@@ -17842,10 +17984,16 @@ try {
             var email = c.email
               ? '<a href="mailto:' + esc2(c.email) + '">' + esc2(c.email) + '</a>' : '';
             var cid = String(c.contactId || '').toUpperCase();
+            // Edit (updates the shared directory) + Remove (unassigns from THIS project
+            // only — drops the id from this section's __crm list; the master directory
+            // record is untouched). Both office/CRM-gated (server 403s writes regardless).
             var editBtn = (_rowEditable && cid)
               ? '<span class="pr-crow-act"><button type="button" class="pr-crow-editbtn" '
                 + 'data-crm-cid="' + esc2(cid) + '" title="Edit this contact (updates the shared directory)" '
-                + 'onclick="window.pfCrmEditContactRow(this)">&#9998; Edit</button></span>'
+                + 'onclick="window.pfCrmEditContactRow(this)">&#9998; Edit</button>'
+                + '<button type="button" class="pr-crow-rmbtn" '
+                + 'data-crm-cid="' + esc2(cid) + '" title="Remove this contact from THIS project (keeps them in the directory)" '
+                + 'onclick="window.pfCrmRemoveContactRow(this)">&#10005; Remove</button></span>'
               : (_rowEditable ? '<span class="pr-crow-act"></span>' : '');
             return '<div class="pr-crow" data-crm-cid="' + esc2(cid) + '">'
               + '<span class="pr-crow-name">'  + esc2(name || (c.contactId || '')) + '</span>'
@@ -18022,6 +18170,129 @@ try {
       }).catch(function(){
         busy(false);
         showErr('Save failed: could not reach the server. Your changes were NOT saved - please retry.');
+      });
+    };
+
+    // ---- REMOVE A DIRECTORY CONTACT FROM THIS PROJECT (Brad 2026-08-12) --------
+    // Brad: "to be able to delete contacts from a project... if people get promoted
+    // or change jobs with other companies and we need to remove from a project."
+    // SEMANTICS: unassign only — drop this contactId from THIS project's __crm list
+    // for its section/prefix and persist via /api/project-override. The MASTER
+    // directory record is NOT touched (the person still exists for other projects;
+    // re-add via the cascading selector). A lightweight inline CONFIRM guards an
+    // accidental click. Office/CRM-gated in render; the server 403s the write too.
+    //
+    // BACKEND NOTE (critical): /api/project-override does a WHOLE-OBJECT replace of
+    // the section's __crm when a request supplies one. So we must resend the COMPLETE
+    // __crm map for the section (every prefix), with only the target prefix's
+    // contactIds edited — sending just the one prefix would wipe the others (e.g.
+    // Owner + GC both live under the `general` section).
+    window.pfCrmRemoveContactRow = function(btn){
+      if (!btn) return;
+      var row = btn.closest ? btn.closest('.pr-crow') : null;
+      if (!row || row.classList.contains('pr-crow-head')) return;
+      var cid = String(btn.getAttribute('data-crm-cid') || row.getAttribute('data-crm-cid') || '').toUpperCase();
+      if (!cid) return;
+      var host = row.closest ? row.closest('.pr-crm-cards') : null;
+      var prefix = host ? (host.getAttribute('data-crm-cards') || '') : '';
+      var sectionKey = host ? (host.getAttribute('data-crm-cards-key') || 'design_professionals') : 'design_professionals';
+      if (!prefix) { window.alert('Could not resolve which group this contact belongs to. Please refresh and retry.'); return; }
+      if (row.getAttribute('data-crm-removing') === '1') return;
+      row.setAttribute('data-crm-removing', '1');
+      // Resolve a friendly name for the confirm message.
+      var nameEl = row.querySelector('.pr-crow-name');
+      var who = nameEl ? (nameEl.textContent || '').trim() : '';
+      if (!who) {
+        (PF_CONTACTS || []).forEach(function(x){
+          if (x && String(x.contactId||'').toUpperCase() === cid) {
+            who = (x.name || ((x.firstName||'') + ' ' + (x.lastName||''))).trim();
+          }
+        });
+      }
+      var confirmBar = document.createElement('div');
+      confirmBar.className = 'pr-crow-rmconfirm';
+      confirmBar.setAttribute('data-crm-cid', cid);
+      confirmBar.setAttribute('data-crm-prefix', prefix);
+      confirmBar.setAttribute('data-crm-key', sectionKey);
+      confirmBar.innerHTML = ''
+        + '<span class="pr-crow-rmconfirm-msg">Remove <strong>' + esc2(who || 'this contact')
+        +   '</strong> from <strong>this project</strong>? They stay in the PF directory and can be re-added.</span>'
+        + '<span class="pr-crow-rmconfirm-actions">'
+        +   '<button type="button" class="pr-rm-yes" onclick="window.pfCrmRemoveContactConfirm(this)">Remove from project</button>'
+        +   '<button type="button" class="pr-rm-no" onclick="window.pfCrmRemoveContactCancel(this)">Cancel</button>'
+        + '</span>'
+        + '<span class="pr-crow-rmconfirm-err"></span>';
+      confirmBar._origRow = row;
+      row.style.display = 'none';
+      row.insertAdjacentElement('afterend', confirmBar);
+    };
+
+    // Cancel a pending remove: drop the confirm bar, restore the row.
+    window.pfCrmRemoveContactCancel = function(btn){
+      var bar = btn.closest ? btn.closest('.pr-crow-rmconfirm') : null;
+      if (!bar) return;
+      var row = bar._origRow;
+      if (row) { row.style.display = ''; row.removeAttribute('data-crm-removing'); }
+      bar.remove();
+    };
+
+    // Confirm the remove -> rebuild the FULL __crm map for the section with this id
+    // dropped from its prefix, POST to /api/project-override, re-render on success.
+    // FAIL CLOSED: any non-ok response keeps the confirm bar open + shows an honest
+    // inline error; never fabricates a removed state. The master directory record is
+    // never touched (this endpoint only edits the per-project override).
+    window.pfCrmRemoveContactConfirm = function(btn){
+      var bar = btn.closest ? btn.closest('.pr-crow-rmconfirm') : null;
+      if (!bar) return;
+      var cid = String(bar.getAttribute('data-crm-cid') || '').toUpperCase();
+      var prefix = bar.getAttribute('data-crm-prefix') || '';
+      var sectionKey = bar.getAttribute('data-crm-key') || 'design_professionals';
+      var num = _curNum || '';
+      var errEl = bar.querySelector('.pr-crow-rmconfirm-err');
+      function showErr(m){ if (errEl){ errEl.textContent = m; errEl.style.display = 'block'; } }
+      function busy(b){ btn.disabled = b; btn.textContent = b ? 'Removing…' : 'Remove from project'; }
+      if (!num || !cid || !prefix) { showErr('Could not resolve the project or contact; refresh and retry.'); return; }
+      // Build the COMPLETE current __crm map for the section (whole-object replace on
+      // the backend — we must resend every prefix, editing only the target one).
+      var cur = pfCrmMap(sectionKey) || {};
+      var out = {};
+      Object.keys(cur).forEach(function(k){
+        var entry = cur[k] || {};
+        var ids = Array.isArray(entry.contactIds) ? entry.contactIds.slice() : [];
+        if (k === prefix) {
+          ids = ids.filter(function(id){ return String(id || '').toUpperCase() !== cid; });
+        }
+        out[k] = { company: entry.company || '', contactIds: ids };
+      });
+      if (errEl) errEl.style.display = 'none';
+      busy(true);
+      fetch('/api/project-override', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ num: num, section: sectionKey, fields: { __crm: out } })
+      }).then(function(res){
+        return res.json().then(function(j){ return { ok: res.ok, status: res.status, body: j }; })
+          .catch(function(){ return { ok: res.ok, status: res.status, body: null }; });
+      }).then(function(r){
+        if (!r.ok || !r.body || r.body.ok !== true || r.body.saved !== true) {
+          busy(false);
+          showErr((r.body && r.body.message) ? r.body.message
+            : (r.status === 403 ? 'You do not have permission to edit this project.'
+               : 'Remove failed (' + r.status + '). Nothing was changed — please retry.'));
+          return; // stay in confirm mode
+        }
+        // Adopt the server's authoritative override object, then re-render so the row
+        // disappears (the id is no longer in __crm) — mirrors pfSaveSection success.
+        window.PF_PROJECT_OVERRIDES[num] = {
+          sections: (r.body.sections) || {},
+          _meta: (r.body._meta) || null
+        };
+        var card = bar.closest ? bar.closest('.pr-card') : null;
+        var root = (card && (card.closest('.pr-root') || card.parentElement)) || document.getElementById('prGenericRoot');
+        if (window.renderProjectRecord) window.renderProjectRecord(num, root);
+      }).catch(function(){
+        busy(false);
+        showErr('Remove failed: could not reach the server. Nothing was changed — please retry.');
       });
     };
 
