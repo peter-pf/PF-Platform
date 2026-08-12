@@ -2278,6 +2278,32 @@ tr.pf-dragging { opacity: 0.45; }
 .pr-nested-card-wrap > .pr-card > .pr-card-head { background: var(--bg-2); padding: 10px 14px; }
 .pr-nested-card-wrap > .pr-card > .pr-card-head .pr-card-num { display: none; }
 .pr-nested-card-wrap > .pr-card > .pr-card-head .pr-card-title { font-size: 0.9rem; }
+/* INLINE SAFETY (Brad 2026-08-12): the Safety fields keep their own data-pr-section="safety"
+   .pr-card (so the safety override key + Edit/Save + field-scan isolation are preserved), but
+   this wrapper STRIPS the visual chrome so the fields render flat + inline directly under the
+   "4. Safety" subgroup header — no gray box, no duplicate "Safety" header. */
+.pr-safety-inline { margin-top: 0; }
+.pr-safety-inline > .pr-card {
+  background: transparent; border: none; border-radius: 0; margin-bottom: 0; overflow: visible;
+}
+/* Hide the nested card's own head (duplicate "Safety" title + number + chevron + collapse
+   affordance) — the "4. Safety" subgroup above IS the header now. Keep the Edit button by
+   pulling it out of the (hidden) head via a flex bar overlay. */
+.pr-safety-inline > .pr-card > .pr-card-head {
+  background: transparent; padding: 0; border-bottom: none; cursor: default;
+  min-height: 0; position: relative;
+}
+.pr-safety-inline > .pr-card > .pr-card-head:hover { background: transparent; }
+.pr-safety-inline > .pr-card > .pr-card-head > .pr-card-num,
+.pr-safety-inline > .pr-card > .pr-card-head > .pr-card-title,
+.pr-safety-inline > .pr-card > .pr-card-head > .pr-chev { display: none; }
+/* Keep the Edit button visible + right-aligned inline (office-only; it carries
+   data-pr-section="safety" so Save still routes to the safety key). */
+.pr-safety-inline > .pr-card > .pr-card-head > .pr-edit-btn { margin-left: auto; }
+.pr-safety-inline > .pr-card > .pr-card-head > .pr-card-meta { }
+/* Body: always shown (the head's collapse toggle is hidden), flush inline (no box padding),
+   matching the flat field layout of Testing/Staking under their subgroup headers. */
+.pr-safety-inline > .pr-card > .pr-card-body { display: block; padding: 0; }
 
 /* ---- per-section manual-override editor ---- */
 .pr-edit-btn {
@@ -17649,7 +17675,16 @@ try {
             ]);
         _curSection = _prevSafety;
         var safetyMeta = null;
-        var safetyCardHtml = '<div class="pr-nested-card-wrap">'
+        // INLINE SAFETY (Brad 2026-08-12): the Safety fields still live in their OWN
+        // data-pr-section="safety" .pr-card (REQUIRED — pfEditSection/pfSaveSection resolve
+        // the override key via btn.closest('.pr-card') + the section field-scan isolates on
+        // f.closest('.pr-card') !== card, so the safety key + editability are preserved and
+        // the fields do NOT leak into the siteReadiness save). But the `pr-safety-inline`
+        // wrapper class STRIPS the visual chrome via CSS: no gray box/border, and the card's
+        // own "Safety" head (duplicate header + chevron) is hidden, so the fields render
+        // flat + inline directly under the "4. Safety" subgroup header — visually identical
+        // to Testing/Staking. The Edit button stays (re-anchored top-right, office-only).
+        var safetyCardHtml = '<div class="pr-nested-card-wrap pr-safety-inline">'
           + card('', 'Safety', safetyMeta, safetyBody + linkRow(L.safety), true, 'safety')
           + '</div>';
         // Insert BEFORE the "5. Mobilization Preparation" subgroup so Safety lands under
