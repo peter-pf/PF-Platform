@@ -3529,6 +3529,7 @@ tr.pf-dragging { opacity: 0.45; }
                '/data/garbin-prelim.js',
                '/data/shop-dwg-info.js',
                '/data/pf-design-submittal.js',
+               '/data/safety-folder.js',
                '/data/budget-actual-poet.js', '/data/cost-code-template.js',
                '/data/budget-actuals.js', '/data/invoice-ledger.js',
                '/data/awarded-projects.js', '/data/project-history.js',
@@ -3565,6 +3566,10 @@ tr.pf-dragging { opacity: 0.45; }
     // same posture as shop-dwg-info (folder webUrls only, no $, office-only). admin/
     // partner loaded it in the privileged block above; add it for BD here (guarded).
     if (!isPrivileged) feeds.push('/data/pf-design-submittal.js');
+    // Safety "06 - Safety" folder link (SSSP field, Brad 2026-08-12): same posture --
+    // folder webUrls only, no $, office-only. Add for the BD-only case (admin/partner
+    // loaded it in the privileged block above).
+    if (!isPrivileged) feeds.push('/data/safety-folder.js');
   }
   // SEC-12: privileged roles get the raw schedule (value/gc_name); field_ops
   // gets the $/GC-stripped derivative. The raw file is server-DENIED to field_ops.
@@ -13746,6 +13751,19 @@ try {
         return g.projects[String(num)] || null;
       } catch (e) { return null; }
     }
+    // Read the current project's "06 - Safety" Field Operations folder record
+    // (window.PF_SAFETY_FOLDER, from data/safety-folder.js, built by
+    // sync/build-safety-folder.py). This is the Site-Specific Safety Plan folder in
+    // 05 - Field Operations/01 - Projects/<project>/06 - Safety. Fail-closed: any missing
+    // global / project / value returns null (the SSSP link renders gracefully blank). Same
+    // idiom as pfShopDwgInfo / pfDesignSubmittalFolder.
+    function pfSafetyFolder(num){
+      try {
+        var g = window.PF_SAFETY_FOLDER;
+        if (!g || !g.projects || !num) return null;
+        return g.projects[String(num)] || null;
+      } catch (e) { return null; }
+    }
     // Read the stored __submittal_prereqs items map for the current project (from the
     // engineering override). Returns an object keyed by item key -> {responsible_name,
     // responsible_email, date_received}. Empty object when none stored. Never throws.
@@ -14460,6 +14478,26 @@ try {
       if (url) {
         return '<div class="pr-field"><span class="pr-field-label">'+E(label)+'</span>'
              + '<span class="pr-field-value">'+pfFolderLink(url, 'Approved Shop Drawings')+'</span>'
+             + '<span class="pr-field-src">SharePoint</span></div>';
+      }
+      return '<div class="pr-field"><span class="pr-field-label">'+E(label)+'</span>'
+           + '<span class="pr-field-value empty blank">-</span></div>';
+    }
+    // "Site Specific Safety Plan (SSSP)" folder link row (Brad 2026-08-12). Reads the
+    // current project's "06 - Safety" Field Operations folder (pfSafetyFolder(_curNum) ->
+    // {folder_url,...}). Same DISPLAY-ONLY blank-graceful idiom as pfDesignSubmittalFolderRow:
+    // a styled .pf-folder-link button where the folder exists, a yellow "-" placeholder
+    // otherwise (never a broken href). NOT a .pr-field[data-pr-label] editable field, so the
+    // safety section editor's save-scan ignores it (the field is now an auto folder link, not
+    // a manual value). Any legacy `safety` override under the old "Site Specific Safety Plan
+    // (SSSP)" label is still surfaced by _surfaceExtras('safety', ...) so no stored data is lost.
+    function pfSspFolderRow(){
+      var rec = pfSafetyFolder(_curNum);
+      var url = (rec && rec.folder_url != null) ? String(rec.folder_url).trim() : '';
+      var label = 'Site Specific Safety Plan (SSSP)';
+      if (url) {
+        return '<div class="pr-field"><span class="pr-field-label">'+E(label)+'</span>'
+             + '<span class="pr-field-value">'+pfFolderLink(url, 'Open Safety folder')+'</span>'
              + '<span class="pr-field-src">SharePoint</span></div>';
       }
       return '<div class="pr-field"><span class="pr-field-label">'+E(label)+'</span>'
@@ -17646,8 +17684,13 @@ try {
             subgroup('Site Specific Safety Plan (SSSP)')
           + '<div class="pr-subgroup-actions"><a class="pr-action-link" href="' + E(_pipefySSSP) + '" target="_blank" rel="noopener noreferrer">&#128221; Create / Send SSSP (Pipefy)</a></div>'
           + subgroupNote('FUTURE automation — SSSP field checklist: Order# = PF Job#; name/phone/email of preparer = PM or Admin; Long/Short Company Name = Pier Foundations LLC; Project Name / Number / Address / City / State / Zip; Company Logo at "01-Admin/01-Marketing/03-Logo Design"; Project Description = "Install Aggregate Piers"; PM name/phone/email; Super name/phone/email. Save final SSSP to SharePoint + portal.')
+          // "Site Specific Safety Plan (SSSP)" is now a clickable link to the project's
+          // 06 - Safety Field Ops folder (Brad 2026-08-12) — display-only folder-link row
+          // (pfSspFolderRow), blank-graceful when the folder is absent. The manual value it
+          // used to hold ("On file (see link)") is gone; a legacy safety override under this
+          // label is surfaced by _surfaceExtras('safety',...).
+          + pfSspFolderRow()
           + fields([
-              field('Site Specific Safety Plan (SSSP)', 'On file (see link)', 'SharePoint'),
               field('Safety Consultant', _safetyConsultant, 'Contacts'),
               field('Date SSSP Sent to GC', '')
             ])
