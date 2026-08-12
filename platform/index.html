@@ -22898,9 +22898,29 @@ try {
     return d.getFullYear() + '-' + p2(d.getMonth()+1) + '-' + p2(d.getDate());
   }
 
+  // SNAP-BACK: clear any lingering drag visuals across the Active Projects DnD.
+  // A canceled/abandoned move (modal Cancel, backdrop click, Esc, or a drop that
+  // never commits) must instantly restore every row to opacity 1 and drop the
+  // drop-zone hover, so a row never LOOKS displaced/faded until a refresh. Pure
+  // class cleanup -- NO data change, NO re-render. Idempotent + safe to over-call.
+  function clearLcDragArtifacts(){
+    try {
+      document.querySelectorAll('tr.pf-draggable.pf-dragging')
+        .forEach(function(tr){ tr.classList.remove('pf-dragging'); });
+      document.querySelectorAll('.pf-dropzone.dragover')
+        .forEach(function(z){ z.classList.remove('dragover'); });
+    } catch(e){}
+    DRAG_NUM = null;
+  }
+
   function closeModal(){
     var ov = document.getElementById('pfMoveModalOverlay');
+    if (ov && typeof ov._pfTeardownEsc === 'function') { try { ov._pfTeardownEsc(); } catch(e){} }
     if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+    // Cancel/backdrop/Esc closes the modal WITHOUT committing -> snap the source
+    // row back to normal immediately (the dragend class-clear may have raced the
+    // modal open on some browsers, leaving the row faded until refresh).
+    clearLcDragArtifacts();
   }
 
   // num: project number; status: 'completed' | 'dead'.
@@ -22930,6 +22950,18 @@ try {
     // Cancel = no change (close only). Clicking the backdrop also cancels.
     document.getElementById('pfMoveCancel').addEventListener('click', closeModal);
     ov.addEventListener('click', function(ev){ if (ev.target === ov) closeModal(); });
+    // Esc = cancel (same no-op-then-snap-back path as Cancel/backdrop). One-shot:
+    // the listener removes itself once the modal closes so it never leaks.
+    var onEsc = function(ev){
+      if (ev.key === 'Escape' || ev.keyCode === 27) {
+        document.removeEventListener('keydown', onEsc);
+        closeModal();
+      }
+    };
+    document.addEventListener('keydown', onEsc);
+    // Ensure the Esc listener is torn down whenever the modal closes by any path
+    // (Cancel / backdrop / Confirm) -> closeModal() calls this before removing it.
+    ov._pfTeardownEsc = function(){ document.removeEventListener('keydown', onEsc); };
     document.getElementById('pfMoveConfirm').addEventListener('click', function(){
       var input = document.getElementById('pfMoveDate');
       var date = input ? String(input.value || '') : '';
@@ -25334,9 +25366,23 @@ try {
           }
         });
         tr.addEventListener('dragend', function(){
+          // SNAP-BACK: dragend fires on the source row whether the drag COMMITTED
+          // (dropped on a zone) or was ABANDONED (dropped outside / Esc). Either
+          // way the row must return to opacity 1 and every zone must drop its
+          // hover. Clear GLOBALLY across all precon mounts (not just this mount's
+          // captured lists) so a stale dz-over on another mount can't linger and a
+          // re-rendered source row can't stay faded. Pure class cleanup: NO data
+          // change, NO renderAll -- a canceled drag is a data no-op, as before.
           tr.classList.remove('pf-dragging');
           dragKey = null;
-          zones.forEach(function(z){ z.classList.remove('dz-over'); });
+          try {
+            document.querySelectorAll('tr.pf-dragging')
+              .forEach(function(r){ r.classList.remove('pf-dragging'); });
+            document.querySelectorAll('.precon-dropzone.dz-over')
+              .forEach(function(z){ z.classList.remove('dz-over'); });
+          } catch (e) {
+            zones.forEach(function(z){ z.classList.remove('dz-over'); });
+          }
         });
       });
 
