@@ -13560,36 +13560,13 @@ try {
       if (v === undefined || v === null || v === '') return '-';
       return String(window.pfFmtQty(v));
     }
-    // "GGG Design Notes" block (rendered UNDER PF Design Submittal). Shows the four
-    // pulled values + a clickable link to the workbook naming its two tabs. Renders
-    // only when a Garbin entry exists for this project; otherwise returns ''.
-    function garbinDesignNotesBlock(gp){
-      if (!gp) return '';
-      // Column Diameter: RAW nominal_dia_ft x12 -> inches, labeled "(in)".
-      var diaIn = '-';
-      if (gp.nominal_dia_ft !== undefined && gp.nominal_dia_ft !== null && gp.nominal_dia_ft !== '') {
-        var n = Number(gp.nominal_dia_ft);
-        if (!isNaN(n)) diaIn = String(window.pfFmtQty(n * 12));
-      }
-      var rows = [
-        field('LF', gp.lf, gp.lf != null ? 'Garbin Prelim' : ''),
-        field('Total Columns', gp.total_columns, gp.total_columns != null ? 'Garbin Prelim' : ''),
-        // Field/unit label carries the "(in)" unit per Brad; value is x12 inches.
-        field('Column Diameter (in)', diaIn === '-' ? '' : diaIn, diaIn !== '-' ? 'Garbin Prelim' : ''),
-        // Bearing label has no qty token (psf), so pre-format for the thousands
-        // separator (5000 -> 5,000) to match the portal's pfFmtQty standard.
-        field('Bearing Capacity (psf)',
-              gp.bearing_psf != null ? window.pfFmtQty(gp.bearing_psf) : '',
-              gp.bearing_psf != null ? 'Garbin Prelim' : '')
-      ];
-      // NOTE (Brad 2026-08-11/12): the clickable workbook LINK was MOVED OUT of this block
-      // to the display-only "Garbin Prelim Workbook" field in the Prelim Design subsection
-      // (see garbinPrelimWorkbookField). This block now shows the DATA READOUT only
-      // (LF / Total Columns / Column Diameter (in) / Bearing).
-      return subgroupSub('GGG Design Notes')
-        + subgroupNote('Values pulled from the Garbin Prelim workbook (Prelim Design Summary tab). Workbook link: see "Garbin Prelim Workbook" above.')
-        + fields(rows);
-    }
+    // "GGG Design Notes" block DELETED (Brad 2026-08-12). It rendered the 4 individual
+    // Garbin readout fields (LF / Total Columns / Column Diameter (in) / Bearing Capacity
+    // (psf)) as a subgroup under PF Submittal Design. Removed because those values now live
+    // as COLUMNS in the Submittal Summary table (Pier Qty / Total LF / Column Diameter /
+    // Bearing Capacity (PSF)). The garbin-prelim.js feed is NOT orphaned — still used by
+    // garbinPrelimWorkbookField / garbinPrelimFolderField (Prelim Design links),
+    // garbinDiaInches (Prelim Design "Column Diameter (inches)") and garbinTotalStoneField.
     // "Total Stone (TN):" field (rendered on the Prelim Design subsection). Returns a
     // single field() row when a Garbin stone value exists; else '' (nothing shown).
     function garbinTotalStoneField(gp){
@@ -16202,12 +16179,15 @@ try {
           // flat workflow data (Date Submittal Prereqs Sent to GGG / Actual Submittal
           // Completion Date / Date PF Submits to GC / Submittal Status) MIGRATES into
           // the Original (rev 0) cycle on first render, so no entered data is lost.
-        + submittalWorkflowBlock(pfDesignSubmittalFolder(_curNum))
-          // "GGG Design Notes" block UNDER PF Design Submittal (Brad): LF / Total
-          // Columns / Column Diameter (in) / Bearing Capacity (psf) pulled from the
-          // Garbin Prelim, plus a clickable link to the workbook + its two tab names.
-          // Renders only when this project has a Garbin entry ('' otherwise).
-        + garbinDesignNotesBlock(gp);
+        + submittalWorkflowBlock(pfDesignSubmittalFolder(_curNum));
+          // DELETED (Brad 2026-08-12): the "GGG Design Notes" block (the 4 individual Garbin
+          // readout fields — LF / Total Columns / Column Diameter (in) / Bearing Capacity
+          // (psf)) is removed per Brad. Those values now live as COLUMNS in the Submittal
+          // Summary table (Pier Qty / Total LF / Column Diameter / Bearing Capacity (PSF)),
+          // so the standalone readout block is redundant. The Garbin Prelim workbook + folder
+          // LINKS stay in the Prelim Design subsection (garbinPrelimWorkbookField /
+          // garbinPrelimFolderField); the garbin-prelim.js feed is still used by those + the
+          // Prelim Design fields + Total Stone, so it is NOT orphaned.
           // NOTE (Brad 2026-08-12): Site Grade Elevations is NO LONGER a standalone E&D
           // subgroup — it is rendered as COMPACT CONTENT INSIDE submittalWorkflowBlock
           // (see siteGradeElevationsInline). E&D stays at EXACTLY 3 subgroups: Prelim
