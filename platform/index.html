@@ -2180,11 +2180,19 @@ tr.pf-dragging { opacity: 0.45; }
    Muted/secondary weight so the title still reads as the title; % in PF azure. */
 .pr-genstatus-head {
   flex: 0 1 auto; min-width: 0;
-  margin-left: auto; margin-right: 4px;
+  /* Centered within the General Info header bar (Brad 2026-08-12): margin auto on
+     BOTH sides shares the free space so the badge centers between the (non-growing)
+     title and the Edit button, sitting to the LEFT of Edit. */
+  margin-left: auto; margin-right: auto;
   font-size: 0.78rem; font-weight: 600; color: var(--text-3);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .pr-genstatus-head .pr-genstatus-pct { color: var(--accent); font-weight: 700; }
+/* When a header carries the completion readout, the title must stop growing so the
+   badge gets shareable free space to center within. Without this the flex:1 1 auto
+   title eats all slack and pins the badge to the right. Scoped to heads that actually
+   have the readout, so no other card header is affected. */
+.pr-card-head.pr-head-hasstatus > .pr-card-title { flex: 0 1 auto; }
 /* Multi-line (textarea-backed) field values: preserve entered line breaks. */
 .pr-field-value-multiline { white-space: pre-wrap; }
 /* Multi-line editor control for PF_FIELD_TEXTAREA_LABELS fields. */
@@ -13147,8 +13155,20 @@ try {
     // synced value and the field is tagged as edited (subtle indicator).
     function field(label, val, src){
       var ov = ovLookup(_curSection, label);
-      var edited = ov.has;
-      if (edited) { val = ov.value; src = 'Manual override'; }
+      // An override WINS over the synced/computed value — BUT ONLY when it carries a
+      // real (non-empty) value. Fix (Brad 2026-08-12, POET Column Diameter blank): the
+      // section editor persists EVERY field label it scans on Save, including ones left
+      // blank ("An empty value is a legitimate blank-this-field override" — pfSaveSection).
+      // A stored EMPTY override for a Garbin-bound derived field (Column Diameter <-
+      // Garbin Nominal Dia x12, Total LF / Total Pier Qty <- Garbin) was suppressing the
+      // Garbin fallback and rendering the field blank. An empty override carries no
+      // information, so it must NOT hide a real fallback value: treat override-present-
+      // but-empty as "no override" for value selection. A NON-empty override still wins
+      // (manual edit precedence preserved). This is the fail-safe choice — a blank
+      // override can never hide real synced/Garbin data.
+      var ovHasValue = ov.has && !(ov.value === undefined || ov.value === null || String(ov.value).trim() === "");
+      var edited = ovHasValue;
+      if (ovHasValue) { val = ov.value; src = 'Manual override'; }
       var v = (val === undefined || val === null || String(val).trim() === "") ? "" : String(val);
       // DISPLAY-ONLY: normalize date fields to MM/DD/YYYY. The underlying data /
       // override value is untouched; only the shown text changes.
@@ -13214,8 +13234,12 @@ try {
     // overrides still win + render as the same link kind.
     function fieldLinked(label, val, src, kind){
       var ov = ovLookup(_curSection, label);
-      var edited = ov.has;
-      if (edited) { val = ov.value; src = 'Manual override'; }
+      // Same fix as field() (Brad 2026-08-12): a stored EMPTY override must NOT suppress
+      // a real fallback value — only a non-empty override wins. Fail-safe: a blank
+      // override can never hide real synced/Garbin data.
+      var ovHasValue = ov.has && !(ov.value === undefined || ov.value === null || String(ov.value).trim() === "");
+      var edited = ovHasValue;
+      if (ovHasValue) { val = ov.value; src = 'Manual override'; }
       var raw = (val === undefined || val === null || String(val).trim() === "") ? "" : String(val).trim();
       // DISPLAY-ONLY date normalization (MM/DD/YYYY) for date-kind / date-labeled
       // fields, consistent with field(). Never mutates the stored value.
@@ -13293,12 +13317,12 @@ try {
               gp.bearing_psf != null ? window.pfFmtQty(gp.bearing_psf) : '',
               gp.bearing_psf != null ? 'Garbin Prelim' : '')
       ];
-      // NOTE (Brad 2026-08-11): the clickable workbook LINK was MOVED OUT of this block
-      // to the "Link to Prelim Design" field in the Prelim Design subsection (see
-      // garbinPrelimLinkField). The two-tab note moved WITH the link. This block now
-      // shows the DATA READOUT only (LF / Total Columns / Column Diameter (in) / Bearing).
+      // NOTE (Brad 2026-08-11/12): the clickable workbook LINK was MOVED OUT of this block
+      // to the display-only "Garbin Prelim Workbook" field in the Prelim Design subsection
+      // (see garbinPrelimWorkbookField). This block now shows the DATA READOUT only
+      // (LF / Total Columns / Column Diameter (in) / Bearing).
       return subgroup('GGG Design Notes')
-        + subgroupNote('Values pulled from the Garbin Prelim workbook (Prelim Design Summary tab). Workbook link: see "Link to Prelim Design" above.')
+        + subgroupNote('Values pulled from the Garbin Prelim workbook (Prelim Design Summary tab). Workbook link: see "Garbin Prelim Workbook" above.')
         + fields(rows);
     }
     // "Total Stone (TN):" field (rendered on the Prelim Design subsection). Returns a
@@ -13318,36 +13342,33 @@ try {
       if (isNaN(n)) return '';
       return String(window.pfFmtQty(n * 12));
     }
-    // "Link to Prelim Design" field (Brad 2026-08-11): this field IS the clickable
-    // link to the Garbin Prelim workbook (moved here from the GGG Design Notes block).
-    // PRECEDENCE: a manual override (someone typed a URL into this field) WINS over the
-    // Garbin webUrl — preserves the existing editable/override capability rather than
-    // hard-binding to the sync. When no override exists, the Garbin webUrl renders as
-    // the clickable link (visible label = the workbook file name). When neither exists
-    // (no Garbin entry AND no override), it falls back to a plain empty field() (blank
-    // + amber highlight, no broken link). data-pr-label stays "Link to Prelim Design"
-    // so the section editor round-trips it under `engineering` unchanged.
-    function garbinPrelimLinkField(gp){
-      var label = 'Link to Prelim Design';
-      // Manual override wins (preserve edit capability). ovLookup keys off _curSection
-      // (engineering) + label, same as field()/fieldLinked().
-      var ov = ovLookup(_curSection, label);
-      if (ov.has) return fieldLinked(label, ov.value, '', 'website');
-      // No override -> use the Garbin webUrl as the link (custom label = file name).
+    // "Garbin Prelim Workbook" field (Brad 2026-08-12): DISPLAY-ONLY, auto-from-Garbin
+    // clickable link to the Garbin Prelim workbook file. This REPLACES the former
+    // fillable "Link to Prelim Design" field — Brad: that field is not fillable; keep the
+    // workbook link but as a display-only auto link, sitting immediately next to the
+    // "Garbin Prelim Folder" display link (workbook file + its containing folder together).
+    // Link = gp.webUrl (visible label = the workbook file name). When absent (no Garbin
+    // entry, or the sync couldn't resolve the file url) it renders a graceful blank field
+    // -- NO broken link, no "undefined". DERIVED/read-only: NO manual-override round-trip
+    // and NO data-pr-label, so the engineering section editor's save-scan ignores it
+    // (matches garbinPrelimFolderField and the other display-only Garbin readouts).
+    function garbinPrelimWorkbookField(gp){
+      var label = 'Garbin Prelim Workbook';
       var url = (gp && gp.webUrl != null) ? String(gp.webUrl).trim() : '';
       if (url) {
         var href = /^[a-z][a-z0-9+.-]*:\/\//i.test(url) ? url : ('https://' + url.replace(/^\/+/, ''));
-        var lbl = gp.source_file ? String(gp.source_file) : 'Open Garbin Prelim workbook';
+        var lbl = gp.source_file ? String(gp.source_file) : 'Open workbook';
         var linkHtml = '<a href="'+E(href)+'" target="_blank" rel="noopener noreferrer">'+E(lbl)+'</a>';
-        return '<div class="pr-field" data-pr-label="'+E(label)+'"><span class="pr-field-label">'+E(label)+'</span>'
+        return '<div class="pr-field"><span class="pr-field-label">'+E(label)+'</span>'
              + '<span class="pr-field-value">'+linkHtml+'</span>'
              + '<span class="pr-field-src">Garbin Prelim</span></div>';
       }
-      // No override, no Garbin -> graceful empty editable field (blank, amber, no link).
-      return fieldLinked(label, '', '', 'website');
+      // No webUrl -> graceful blank (yellow, no link), same look as an empty field().
+      return '<div class="pr-field"><span class="pr-field-label">'+E(label)+'</span>'
+           + '<span class="pr-field-value empty blank">-</span></div>';
     }
     // "Garbin Prelim Folder" field (Brad 2026-08-12): renders IMMEDIATELY NEXT TO the
-    // workbook link (garbinPrelimLinkField) so a user can open the workbook file OR its
+    // workbook link (garbinPrelimWorkbookField) so a user can open the workbook file OR its
     // containing SharePoint folder ("Garbin Prelim" / "Bid Prelim" / fallback folder).
     // Link points at gp.folder_url (the folder's SharePoint webUrl, captured by the
     // sync). When folder_url is absent (no Garbin entry, or the sync couldn't resolve
@@ -15163,10 +15184,13 @@ try {
           subgroup('Prelim Design')
         + subgroupNote('The prelim design the bid was based on. FUTURE: values auto-extract from the linked Prelim Design document.')
         + fields([
-            // "Link to Prelim Design" IS the clickable Garbin Prelim workbook link now
-            // (Brad 2026-08-11). Manual override (typed URL) wins; else the Garbin
-            // webUrl; else blank/no-broken-link. See garbinPrelimLinkField.
-            garbinPrelimLinkField(gp),
+            // "Garbin Prelim Workbook" — DISPLAY-ONLY auto link to the Garbin workbook
+            // file (Brad 2026-08-12). REPLACES the former fillable "Link to Prelim Design"
+            // field (Brad: not a fillable field). gp.webUrl; blank/no-broken-link when
+            // absent. See garbinPrelimWorkbookField. Sits immediately next to the folder
+            // link below so the two display-only auto links (workbook file + its folder)
+            // are together.
+            garbinPrelimWorkbookField(gp),
             // "Garbin Prelim Folder" link IMMEDIATELY NEXT TO the workbook link
             // (Brad 2026-08-12): opens the CONTAINING SharePoint folder so someone can
             // reach the folder for easy access. gp.folder_url; blank/no-broken-link when
@@ -16623,61 +16647,37 @@ try {
       var srCard = _srTopBody; // top-level Site Readiness body (see _srTopBody note above)
       if (srCard) {
         // --- Equipment nested card ('equipment' key) ---
+        // VENDOR CONTACTS DELETED (Brad 2026-08-12): the "Rental Equipment & Transport
+        // (vendors)" contact grid was REMOVED from this section — that vendor contact
+        // info is now captured in Project Contacts (Equipment Transport / Rental
+        // Equipment groups), so it was duplicated here. Only the vendor CONTACT block was
+        // removed; the "PF Equipment Mobilization to Site" operational fields stay.
+        // NO override key deleted: the `equipment` key is unchanged; any stored vendor
+        // override ("Rental / Transport Vendor N - ...") is still surfaced (never lost)
+        // by _surfaceExtras('equipment', ...) below.
         var _prevEq = _curSection; _curSection = 'equipment';
-        var equipVendors = (g.vendors||[]).filter(function(c){return /equipment|rental|trucking|transport/i.test(c.scope||'');});
-        var eqVendorCards = [];
-        var _eqCount = Math.max(1, equipVendors.length);
-        for (var _ei = 0; _ei < _eqCount; _ei++) {
-          var _ev = equipVendors[_ei] || {};
-          var _en = _ei + 1;
-          eqVendorCards.push(contactCard(_ev.company || _ev.name || ('Rental / Transport Vendor ' + _en), _ev.scope || '', [
-            field('Rental / Transport Vendor ' + _en + ' - Company', _ev.company || '', _ev.company ? 'Contacts' : ''),
-            field('Rental / Transport Vendor ' + _en + ' - Contact Name', _ev.name || '', _ev.name ? 'Contacts' : ''),
-            field('Rental / Transport Vendor ' + _en + ' - Scope', _ev.scope || '', _ev.scope ? 'Contacts' : ''),
-            fieldLinked('Rental / Transport Vendor ' + _en + ' - Office Phone', _ev.phone || '', _ev.phone ? 'Contacts' : '', 'phone'),
-            fieldLinked('Rental / Transport Vendor ' + _en + ' - Cell Phone', _ev.cell || '', _ev.cell ? 'Contacts' : '', 'phone'),
-            fieldLinked('Rental / Transport Vendor ' + _en + ' - Email', _ev.email || '', _ev.email ? 'Contacts' : '', 'email'),
-            field('Rental / Transport Vendor ' + _en + ' - Notes', '', '')
-          ]));
-        }
         var eqBody = subhead('PF Equipment Mobilization to Site')
           + fields([
               field('Predrill Rig (Sany)', ''),
               field('Mast, Vibro Rig (Deere 350G)', ''),
               field('PF Parts Load - Gooseneck Trailer', ''),
               field('Fall Off Load', '')
-            ])
-          + subhead('Rental Equipment & Transport (vendors)')
-          + contactCardGrid(eqVendorCards, 'Rental / Transport Vendor');
+            ]);
         _curSection = _prevEq;
-        var eqMeta = (equipVendors.length ? equipVendors.length + ' vendor' + (equipVendors.length === 1 ? '' : 's') : null);
         srCard.insertAdjacentHTML('beforeend',
           '<div class="pr-nested-card-wrap">'
-          + card('', 'Equipment', eqMeta, eqBody, true, 'equipment')
+          + card('', 'Equipment', null, eqBody, true, 'equipment')
           + '</div>');
 
         // --- Material nested card ('material' key) ---
+        // VENDOR CONTACTS DELETED (Brad 2026-08-12): the "Stone / Fuel Vendors" contact
+        // grid was REMOVED — captured now in Project Contacts (Material Vendors / Fuel
+        // Delivery groups). Only the vendor CONTACT block was removed; the "Material
+        // Detail" operational fields stay. `material` key unchanged; any stored vendor
+        // override is still surfaced (never lost) by _surfaceExtras('material', ...) below.
         var _prevMat = _curSection; _curSection = 'material';
-        var matVendors = (g.vendors||[]).filter(function(c){return /stone|aggregate|fuel/i.test(c.scope||'');});
-        var matVendorCards = [];
-        var _mCount = Math.max(1, matVendors.length);
-        for (var _mi = 0; _mi < _mCount; _mi++) {
-          var _mv = matVendors[_mi] || {};
-          var _mn = _mi + 1;
-          matVendorCards.push(contactCard(_mv.company || _mv.name || ('Stone / Fuel Vendor ' + _mn), _mv.scope || '', [
-            field('Stone / Fuel Vendor ' + _mn + ' - Company', _mv.company || '', _mv.company ? 'Contacts' : ''),
-            field('Stone / Fuel Vendor ' + _mn + ' - Contact Name', _mv.name || '', _mv.name ? 'Contacts' : ''),
-            field('Stone / Fuel Vendor ' + _mn + ' - Scope', _mv.scope || '', _mv.scope ? 'Contacts' : ''),
-            fieldLinked('Stone / Fuel Vendor ' + _mn + ' - Office Phone', _mv.phone || '', _mv.phone ? 'Contacts' : '', 'phone'),
-            fieldLinked('Stone / Fuel Vendor ' + _mn + ' - Cell Phone', _mv.cell || '', _mv.cell ? 'Contacts' : '', 'phone'),
-            fieldLinked('Stone / Fuel Vendor ' + _mn + ' - Email', _mv.email || '', _mv.email ? 'Contacts' : '', 'email'),
-            field('Stone / Fuel Vendor ' + _mn + ' - Notes', '', '')
-          ]));
-        }
-        var _matStone = matVendors.find(function(c){return /stone|aggregate/i.test(c.scope||'');});
-        var matBody = subhead('Stone / Fuel Vendors')
-          + contactCardGrid(matVendorCards, 'Stone / Fuel Vendor')
-          + subhead('Material Detail')
+        var _matStone = (g.vendors||[]).find(function(c){return /stone|aggregate/i.test(c.scope||'');});
+        var matBody = subhead('Material Detail')
           + fields([
               field('Stone Material Approved by Eng', ''),
               field('Stone Material Name/Nomenclature', (_matStone && _matStone.notes) ? _matStone.notes : '', (_matStone && _matStone.notes) ? 'Contacts note' : ''),
@@ -16689,10 +16689,9 @@ try {
               field('Fuel Delivery', '')
             ]) + linkRow(L.material);
         _curSection = _prevMat;
-        var matMeta = (matVendors.length ? matVendors.length + ' vendor' + (matVendors.length === 1 ? '' : 's') : null);
         srCard.insertAdjacentHTML('beforeend',
           '<div class="pr-nested-card-wrap">'
-          + card('', 'Material', matMeta, matBody, true, 'material')
+          + card('', 'Material', null, matBody, true, 'material')
           + '</div>');
       }
 
@@ -16924,12 +16923,19 @@ try {
       // re-run never leaves two badges.
       var existing = head.querySelector('.pr-genstatus-head');
       if (existing) existing.parentNode.removeChild(existing);
-      // Insert just BEFORE the chevron so the readout sits to the right of the title
-      // (which is flex:1 1 auto and pushes the badge to the right) and never overlaps
-      // the chevron. Fallback: append to the header end. `badge` is an HTML string, so
-      // use insertAdjacentHTML (Node-typed insertBefore would reject a string).
+      // Placement (Brad 2026-08-12): the readout sits to the LEFT of the Edit button
+      // and is CENTERED within the General Info header bar. Insert it just BEFORE the
+      // Edit button (fallback: before the chevron; final fallback: header end). A marker
+      // class on the head lets scoped CSS center it (title stops growing so the badge
+      // gets shared free space + margin:0 auto centers it between title and Edit btn).
+      // `badge` is an HTML string, so use insertAdjacentHTML (Node-typed insertBefore
+      // would reject a string). NO onclick on the badge -> a click still bubbles to the
+      // .pr-card-head collapse-toggle handler (collapse intact).
+      head.classList.add('pr-head-hasstatus');
+      var editBtn = head.querySelector('.pr-edit-btn');
       var chev = head.querySelector('.pr-chev');
-      if (chev) chev.insertAdjacentHTML('beforebegin', badge);
+      if (editBtn) editBtn.insertAdjacentHTML('beforebegin', badge);
+      else if (chev) chev.insertAdjacentHTML('beforebegin', badge);
       else head.insertAdjacentHTML('beforeend', badge);
     }
 
