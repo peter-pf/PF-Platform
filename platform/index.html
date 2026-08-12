@@ -2612,7 +2612,7 @@ tr.pf-dragging { opacity: 0.45; }
 .pr-subgroup {
   font-size: 0.74rem; font-weight: 700; color: var(--accent);
   text-transform: uppercase; letter-spacing: 0.03em;
-  margin: 12px 0 6px 10px; padding: 2px 0 3px 8px;
+  margin: 8px 0 4px 10px; padding: 2px 0 3px 8px;
   border-left: 3px solid var(--accent);
 }
 /* Child-level sub-header: one level deeper than a top-level .pr-subgroup. Extra
@@ -2655,9 +2655,9 @@ tr.pf-dragging { opacity: 0.45; }
    a set of cycles (Original + Rev1/Rev2/...). Self-contained wrap with its OWN editor +
    reserved __submittal_cycles key, so the generic engineering section editor's save-scan
    ignores its rows (they are .pf-swf-field, NOT .pr-field[data-pr-label]). */
-.pf-swf-wrap { margin: 4px 0 10px 10px; }
+.pf-swf-wrap { margin: 2px 0 6px 8px; }
 /* Cycle-nav tabs: Original | Rev1 | Rev2 ... The active tab is filled accent. */
-.pf-swf-nav { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px 8px; }
+.pf-swf-nav { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 6px 0; }
 .pf-swf-tab {
   font-size: 0.74rem; font-weight: 600; cursor: pointer; line-height: 1.2;
   padding: 4px 12px; border-radius: 14px; border: 1px solid var(--accent);
@@ -2666,19 +2666,39 @@ tr.pf-dragging { opacity: 0.45; }
 .pf-swf-tab:hover { background: rgba(0,123,196,0.08); }
 .pf-swf-tab-on { color: #fff; background: var(--accent); }
 .pf-swf-body { margin-left: 8px; }
-/* Per-cycle display field rows (label + value). Same visual grammar as .pr-field but
-   deliberately a DIFFERENT class so the section editor never scans them. */
-.pf-swf-field {
-  display: flex; align-items: baseline; gap: 8px; margin: 0 0 5px 0;
-  font-size: 0.8rem; line-height: 1.3;
+/* DENSE date grid (Brad 2026-08-12 density pass): one uniform row per date/status. Every
+   .pf-swf-drow has the SAME label + control sizing so no row (incl. the auto Shop Drawings
+   Due) looks diminished. NOT .pr-field[data-pr-label] so the section editor never scans it. */
+.pf-swf-grid { display: flex; flex-direction: column; gap: 2px; margin: 2px 0 4px 0; }
+.pf-swf-drow {
+  display: flex; align-items: center; gap: 8px; margin: 0; padding: 1px 0;
+  font-size: 0.8rem; line-height: 1.35;
 }
-.pf-swf-label { min-width: 250px; color: var(--text-2); font-weight: 600; }
+.pf-swf-label { min-width: 210px; flex: 0 0 210px; color: var(--text-2); font-weight: 600; }
+.pf-swf-ctl { display: inline-flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+/* Uniform live inputs — same font/size for EVERY date + the status, so the (overridable)
+   auto Shop Drawings Due looks identical to its sibling date rows. */
+.pf-swf-date, .pf-swf-status {
+  font-size: 0.8rem; padding: 3px 6px; line-height: 1.3;
+  border: 1px solid var(--border-light); border-radius: 4px; color: var(--text-1); background: var(--bg-0);
+}
+.pf-swf-status { min-width: 200px; }
 .pf-swf-val { color: var(--text-1); }
 .pf-swf-blank {
   color: #b06a00; background: rgba(217,138,0,0.10);
   padding: 0 6px; border-radius: 3px;
 }
-.pf-swf-bar { margin: 8px 0 2px 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+/* Small inline "auto" hint + reset-to-auto affordance next to a computed/overridable date. */
+.pf-swf-auto { font-size: 0.68rem; color: var(--text-3); font-style: italic; white-space: nowrap; }
+.pf-swf-reset {
+  font-size: 0.68rem; font-weight: 600; cursor: pointer; color: var(--accent);
+  background: none; border: none; padding: 0; text-decoration: underline; white-space: nowrap;
+}
+.pf-swf-reset:hover { filter: brightness(1.1); }
+/* Compact status next-step note (replaces the old computedHint block; tighter margins). */
+.pf-swf-note { font-size: 0.72rem; color: var(--text-2); margin: 3px 0 2px 0; line-height: 1.3; }
+.pf-swf-note-flag { color: #c0392b; font-weight: 600; }
+.pf-swf-bar { margin: 6px 0 2px 0; display: flex; gap: 8px; flex-wrap: wrap; }
 .pf-swf-edit, .pf-swf-startrev, .pf-swf-save, .pf-swf-cancel {
   font-size: 0.74rem; font-weight: 600; cursor: pointer; line-height: 1.2;
   padding: 5px 12px; border-radius: 6px; border: 1px solid var(--accent);
@@ -2697,36 +2717,33 @@ tr.pf-dragging { opacity: 0.45; }
 .pf-swf-msg { font-size: 0.76rem; margin: 6px 0 0 8px; }
 .pf-swf-msg-ok { color: #2e7d32; }
 .pf-swf-msg-err { color: #c0392b; font-weight: 600; }
-/* SITE GRADE ELEVATIONS (Brad 2026-08-12): per-project list of named areas/buildings,
-   each an expandable sub-card capturing site grade elevation during PF install + FFE.
-   Self-contained wrap with its OWN editor + reserved __site_elevations key (its rows are
-   .pf-sge-*, NOT .pr-field[data-pr-label], so the generic section editor never scans
-   them). Reuses the collapsible toggle idiom (.open on the card) as the section cards. */
-.pf-sge-wrap { margin: 4px 0 10px 10px; }
-.pf-sge-body { margin-left: 8px; }
-.pf-sge-empty {
-  font-size: 0.78rem; color: var(--text-2); font-style: italic;
-  padding: 6px 10px; margin: 4px 0 6px 0;
-  border-left: 3px solid var(--border-light); background: var(--bg-0); border-radius: 4px;
+/* SITE GRADE ELEVATIONS (Brad 2026-08-12 density pass): COMPACT content INSIDE the PF
+   Submittal Design section (NOT its own E&D subgroup). A small inline group label + a
+   dense table (Area / Site Grade Elev / FFE). Own editor + reserved __site_elevations key
+   (rows are .pf-sge-*, NOT .pr-field[data-pr-label], so the section editor never scans). */
+.pf-sge-wrap { margin: 8px 0 4px 0; }
+.pf-sge-body { margin: 0; }
+.pf-sge-inline-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 3px 0;
 }
-.pf-sge-list { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 6px 0; }
-/* One area as a collapsible sub-card (lighter than a top-level .pr-card). */
-.pf-sge-card { border: 1px solid var(--border-light); border-radius: 6px; background: var(--bg-0); overflow: hidden; }
-.pf-sge-card-head {
-  display: flex; align-items: center; gap: 8px; cursor: pointer;
-  padding: 7px 10px; user-select: none;
+.pf-sge-inline-title {
+  font-size: 0.72rem; font-weight: 700; color: var(--text-2);
+  text-transform: uppercase; letter-spacing: 0.02em;
 }
-.pf-sge-card-head:hover { background: rgba(0,123,196,0.04); }
-.pf-sge-card-title { font-size: 0.82rem; font-weight: 600; color: var(--text-1); flex: 1; }
+.pf-sge-inline-actions { display: inline-flex; gap: 6px; }
+.pf-sge-empty { font-size: 0.74rem; color: var(--text-3); font-style: italic; margin: 2px 0 4px 0; }
+/* Dense read table. */
+.pf-sge-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin: 2px 0 4px 0; }
+.pf-sge-table th {
+  text-align: left; font-size: 0.66rem; font-weight: 600; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: 0.02em; padding: 2px 8px 3px 0;
+  border-bottom: 1px solid var(--border-light); white-space: nowrap;
+}
+.pf-sge-table td { padding: 3px 8px 3px 0; border-bottom: 1px solid var(--border-light); vertical-align: baseline; color: var(--text-1); }
+.pf-sge-c-area { font-weight: 600; }
+.pf-sge-c-val { color: var(--text-1); }
 .pf-sge-untitled { color: var(--text-3); font-style: italic; font-weight: 500; }
-.pf-sge-chev { font-size: 0.7rem; color: var(--text-3); transition: transform 0.15s ease; }
-.pf-sge-card.open .pf-sge-chev { transform: rotate(90deg); }
-.pf-sge-card-body { display: none; padding: 4px 12px 10px 12px; }
-.pf-sge-card.open .pf-sge-card-body { display: block; }
-.pf-sge-field { display: flex; align-items: baseline; gap: 8px; margin: 4px 0; font-size: 0.8rem; line-height: 1.3; }
-.pf-sge-label { min-width: 250px; color: var(--text-2); font-weight: 600; }
-.pf-sge-val { color: var(--text-1); }
-.pf-sge-blank { color: #b06a00; background: rgba(217,138,0,0.10); padding: 0 6px; border-radius: 3px; }
+.pf-sge-blank { color: #b06a00; background: rgba(217,138,0,0.10); padding: 0 5px; border-radius: 3px; }
 /* Editor */
 .pf-sge-editor { margin: 6px 0 4px 8px; }
 .pf-sge-rows { display: flex; flex-direction: column; gap: 10px; }
@@ -13980,7 +13997,11 @@ try {
               prereqs_sent:      String(c.prereqs_sent == null ? '' : c.prereqs_sent),
               actual_completion: String(c.actual_completion == null ? '' : c.actual_completion),
               pf_submits_gc:     String(c.pf_submits_gc == null ? '' : c.pf_submits_gc),
-              status:            String(c.status == null ? '' : c.status)
+              status:            String(c.status == null ? '' : c.status),
+              // shop_due_override: manual override of the +15-biz-day computed "Shop
+              // Drawings Due from Garbin" date (Brad 2026-08-12). '' => use the computed
+              // value; a date string here wins. Absent on pre-override cycles => ''.
+              shop_due_override: String(c.shop_due_override == null ? '' : c.shop_due_override)
             };
           });
         }
@@ -13991,7 +14012,8 @@ try {
         prereqs_sent:      String(effVal('engineering', 'Date Submittal Prereqs Sent to GGG', '') || ''),
         actual_completion: String(effVal('engineering', 'Actual Submittal Completion Date', '') || ''),
         pf_submits_gc:     String(effVal('engineering', 'Date PF Submits to GC', '') || ''),
-        status:            String(effVal('engineering', 'Submittal Status', '') || '')
+        status:            String(effVal('engineering', 'Submittal Status', '') || ''),
+        shop_due_override: ''
       }];
     }
     // Which cycle is shown by default: the LATEST (active) one. A per-project view
@@ -14009,9 +14031,16 @@ try {
     // The per-cycle computed dates + status note (shared by read + after an edit).
     function pfCycleComputed(cy){
       var out = {};
-      // #2 Shop Drawings Due from Garbin = prereqs_sent + 15 business days.
+      // #2 Shop Drawings Due from Garbin = prereqs_sent + 15 business days (the COMPUTED
+      // value). This date is MANUALLY OVERRIDABLE (cy.shop_due_override) when a faster
+      // turnaround is agreed; the override wins for display + the live input's value, but
+      // the computed value is kept so the UI can hint what the auto date would be.
       var shopDue = pfAddBusinessDays(pfParseDate(cy.prereqs_sent), 15);
-      out.shopDueTxt = shopDue ? pfFmtDateObj(shopDue) : '';
+      out.shopDueComputed = shopDue ? pfFmtDateObj(shopDue) : '';
+      var ovr = String(cy && cy.shop_due_override != null ? cy.shop_due_override : '').trim();
+      out.shopDueOverride = ovr;
+      // Effective value shown/edited: override if set, else the computed date.
+      out.shopDueTxt = ovr ? pfFmtDate(ovr) : out.shopDueComputed;
       // #5 Submittal Due Back from GC By = pf_submits_gc + 10 business days.
       var gcDue = pfAddBusinessDays(pfParseDate(cy.pf_submits_gc), 10);
       out.gcDueTxt = gcDue ? pfFmtDateObj(gcDue) : '';
@@ -14047,75 +14076,108 @@ try {
       // Stamped Drawings folder link (submitted to GC) — rendered BEFORE the Approved
       // Shop Drawings link (stamped = submitted, approved = after). Same shared record.
       var stampedRow = pfStampedDrawingsFolderRow(dsf);
-      // Office actions: Edit this cycle (always, office); Start Rev N (only when the
-      // ACTIVE cycle's status is Revise & Resubmit AND it is the LATEST cycle, so a
-      // revision only spawns off the newest Revise decision — never off an older one).
+      // Office actions: Start Rev N ONLY (the per-field Edit button is gone — dates are now
+      // always-live inputs that save on change). Start Rev shows only when the ACTIVE cycle
+      // is the LATEST and its status is Revise & Resubmit, so a revision only spawns off the
+      // newest Revise decision.
       var isLatest = (active.rev === cycles[cycles.length - 1].rev);
       var canStartRev = isLatest && (String(active.status || '').trim() === 'Revise & Resubmit');
       var actions = '';
-      if (canEdit()) {
-        var editBtn = '<button type="button" class="pf-swf-edit" onclick="event.stopPropagation();window.pfSwfEdit(this)">Edit '+E(pfCycleLabel(active.rev))+'</button>';
-        var startBtn = canStartRev
-          ? '<button type="button" class="pf-swf-startrev" onclick="event.stopPropagation();window.pfSwfStartRev(this)">Start '+E(pfCycleLabel(cycles[cycles.length-1].rev + 1))+'</button>'
-          : '';
-        actions = '<div class="pf-swf-bar">'+editBtn+' '+startBtn+'</div>';
+      if (canEdit() && canStartRev) {
+        actions = '<div class="pf-swf-bar"><button type="button" class="pf-swf-startrev" '
+          + 'onclick="event.stopPropagation();window.pfSwfStartRev(this)">Start '
+          + E(pfCycleLabel(cycles[cycles.length-1].rev + 1))+'</button></div>';
       }
+      // Site Grade Elevations is COMPACT CONTENT INSIDE this section (Brad 2026-08-12): it
+      // is NOT its own E&D subgroup. Rendered after the folder links, before the actions.
+      var sgeInline = siteGradeElevationsInline();
       return '<div class="pf-swf-wrap" data-swf-num="'+E(_curNum)+'" data-swf-rev="'+E(String(active.rev))+'">'
-        + subgroupNote('Submittal workflow: dates flow top-to-bottom. The two grey lines are auto-computed (business days, weekends skipped) and are not editable. Each revision (Original, Rev1, Rev2...) keeps its own full history — click a tab above to view it.')
-        + navBar
+        + (cycles.length > 1 ? navBar : '')
         + '<div class="pf-swf-body">' + body + '</div>'
         + fields([ stampedRow, folderRow ])
+        + sgeInline
         + actions
         + '<div class="pf-swf-msg" style="display:none"></div>'
         + '</div>';
     }
-    // Read-view HTML for ONE cycle's field chain: the 3 manual dates (display), the two
-    // computed date hints interleaved, and the status + next-step note. Display-only
-    // rows (.pf-swf-field, NOT .pr-field[data-pr-label]) so the generic editor ignores
-    // them. Values render MM/DD/YYYY via pfFmtDate; blanks show a yellow placeholder.
+    // Read/edit HTML for ONE cycle's field chain — a DENSE date grid. Every date renders
+    // as a uniform .pf-swf-drow (same label + control sizing) so no row looks diminished.
+    // For office roles (canEdit) each MANUAL date + the (overridable) Shop Drawings Due +
+    // the status render as ALWAYS-LIVE inputs that SAVE ON CHANGE (data-swf-field carries
+    // the field name; the wrap's delegated change handler persists). For non-office roles
+    // every control renders READ-ONLY (a value span; no inputs). The two auto dates keep
+    // their +biz-day computation; Shop Drawings Due is manually overridable (its input is
+    // seeded from the override, or the computed value as a placeholder). NOT
+    // .pr-field[data-pr-label] rows, so the generic section editor's save-scan ignores them.
     function pfSwfCycleReadHtml(cy){
       var comp = pfCycleComputed(cy);
-      function dispDate(v){
-        var s = (v == null ? '' : String(v)).trim();
-        return s ? E(String(pfFmtDate(s))) : '';
+      var edit = canEdit();
+      function toInput(v){ return pfSwfToInputDate(v); }
+      // A live date input (office) OR a read-only value span (non-office). field = the
+      // cycle field name (data-swf-field) used by the save-on-change handler.
+      function dateCtl(field, storedVal){
+        if (edit) {
+          return '<input type="date" class="pf-swf-date" data-swf-field="'+E(field)+'" '
+            + 'value="'+E(toInput(storedVal))+'" onchange="event.stopPropagation();window.pfSwfFieldChange(this)">';
+        }
+        var shown = String(storedVal || '').trim() ? E(String(pfFmtDate(storedVal))) : '';
+        return '<span class="'+(shown ? 'pf-swf-val' : 'pf-swf-val pf-swf-blank')+'">'+(shown || '-')+'</span>';
       }
-      function row(label, v){
-        var shown = dispDate(v);
-        var cls = shown ? 'pf-swf-val' : 'pf-swf-val pf-swf-blank';
-        return '<div class="pf-swf-field"><span class="pf-swf-label">'+E(label)+'</span>'
-          + '<span class="'+cls+'">'+(shown || '-')+'</span></div>';
+      function drow(label, ctl, extra){
+        return '<div class="pf-swf-drow"><span class="pf-swf-label">'+E(label)+'</span>'
+          + '<span class="pf-swf-ctl">'+ctl+(extra||'')+'</span></div>';
       }
-      var hint2 = comp.shopDueTxt
-        ? computedHint('Shop Drawings Due from Garbin: <span class="pr-computed-val">'
-            + E(comp.shopDueTxt) + '</span> <span style="font-style:italic">(15 business days after prereqs sent to GGG)</span>')
-        : computedHint('<span style="font-style:italic">Shop Drawings Due from Garbin: computed as 15 business days after the prereqs-sent date above.</span>');
-      var hint5 = comp.gcDueTxt
-        ? computedHint('Submittal Due Back from GC By: <span class="pr-computed-val">'
-            + E(comp.gcDueTxt) + '</span> <span style="font-style:italic">(10 business days after PF submits to GC)</span>')
-        : computedHint('<span style="font-style:italic">Submittal Due Back from GC By: computed as 10 business days after the "Date PF Submits to GC" above.</span>');
-      // Status row (display) + next-step note.
+      // Shop Drawings Due control: office = a live input seeded from the override (or the
+      // computed value as placeholder/default), with a small "auto +15 biz days" hint and,
+      // when an override is set, a reset-to-auto link. Non-office = the effective value.
+      var shopCtl, shopExtra = '';
+      if (edit) {
+        var seed = comp.shopDueOverride ? pfSwfToInputDate(comp.shopDueOverride) : pfSwfToInputDate(comp.shopDueComputed);
+        shopCtl = '<input type="date" class="pf-swf-date" data-swf-field="shop_due_override" '
+          + 'value="'+E(seed)+'" onchange="event.stopPropagation();window.pfSwfFieldChange(this)">';
+        if (comp.shopDueOverride) {
+          shopExtra = ' <button type="button" class="pf-swf-reset" title="Reset to the auto-computed date" '
+            + 'onclick="event.stopPropagation();window.pfSwfResetShopDue(this)">reset to auto ('+E(comp.shopDueComputed || '—')+')</button>';
+        } else {
+          shopExtra = ' <span class="pf-swf-auto">auto +15 biz days</span>';
+        }
+      } else {
+        var s2 = comp.shopDueTxt ? E(comp.shopDueTxt) : '';
+        shopCtl = '<span class="'+(s2 ? 'pf-swf-val' : 'pf-swf-val pf-swf-blank')+'">'+(s2 || '-')+'</span>';
+      }
+      // Status control: office = live <select>; non-office = value span.
       var st = String(cy.status || '').trim();
-      var statusShown = st ? E(st) : '-';
-      var statusRow = '<div class="pf-swf-field"><span class="pf-swf-label">Submittal Status</span>'
-        + '<span class="'+(st ? 'pf-swf-val' : 'pf-swf-val pf-swf-blank')+'">'+statusShown+'</span></div>';
+      var statusCtl;
+      if (edit) {
+        var opts = ['<option value=""'+(!st?' selected':'')+'>-- select --</option>']
+          .concat(PF_SUBMITTAL_STATUSES.map(function(o){
+            return '<option value="'+esc2(o)+'"'+(st===o?' selected':'')+'>'+esc2(o)+'</option>';
+          })).join('');
+        statusCtl = '<select class="pf-swf-status" data-swf-field="status" '
+          + 'onchange="event.stopPropagation();window.pfSwfFieldChange(this)">'+opts+'</select>';
+      } else {
+        statusCtl = '<span class="'+(st ? 'pf-swf-val' : 'pf-swf-val pf-swf-blank')+'">'+(st ? E(st) : '-')+'</span>';
+      }
+      // GC due hint (kept compact, inline note under the PF-submits date).
+      var gcHint = comp.gcDueTxt
+        ? '<span class="pf-swf-auto">GC review due '+E(comp.gcDueTxt)+' (+10 biz days)</span>'
+        : '<span class="pf-swf-auto">GC review due = +10 biz days after this date</span>';
+      // Status next-step note (compact).
       var statusNote = '';
       if (st === 'Approved / Reviewed') {
-        statusNote = computedHint('Save to the Approved Shop Dwgs Folder as the final for-construction submittal. No further action.');
+        statusNote = '<div class="pf-swf-note">Save to the Approved Shop Drawings folder as the final for-construction submittal. No further action.</div>';
       } else if (st === 'AAN (Approved as Noted)') {
-        statusNote = computedHint('Save as final, and return to Garbin (GGG) to pick up the notes on the final as-built. '
-          + '<span class="pf-wf-flag">&#9873; Email to Garbin needed.</span>', true);
+        statusNote = '<div class="pf-swf-note pf-swf-note-flag">Save as final, and return to Garbin (GGG) to pick up the notes on the final as-built. <span class="pf-wf-flag">&#9873; Email to Garbin needed.</span></div>';
       } else if (st === 'Revise & Resubmit') {
-        statusNote = computedHint('Save, and send back to Garbin for revisions. '
-          + '<span class="pf-wf-flag">&#9873; Email to Garbin needed.</span> '
-          + '<span style="font-style:italic">Use "Start Rev" below to open the next revision cycle.</span>', true);
+        statusNote = '<div class="pf-swf-note pf-swf-note-flag">Save, and send back to Garbin for revisions. <span class="pf-wf-flag">&#9873; Email to Garbin needed.</span> Use "Start Rev" below to open the next revision cycle.</div>';
       }
-      return ''
-        + row('Date Submittal Prereqs Sent to GGG', cy.prereqs_sent)
-        + hint2
-        + row('Actual Submittal Completion Date', cy.actual_completion)
-        + row('Date PF Submits to GC', cy.pf_submits_gc)
-        + hint5
-        + statusRow
+      return '<div class="pf-swf-grid">'
+        + drow('Prereqs Sent to GGG', dateCtl('prereqs_sent', cy.prereqs_sent))
+        + drow('Shop Drawings Due from Garbin', shopCtl, shopExtra)
+        + drow('Actual Submittal Completion', dateCtl('actual_completion', cy.actual_completion))
+        + drow('Date PF Submits to GC', dateCtl('pf_submits_gc', cy.pf_submits_gc), ' ' + gcHint)
+        + drow('Submittal Status', statusCtl)
+        + '</div>'
         + statusNote;
     }
     // ==== SITE GRADE ELEVATIONS (Brad 2026-08-12) =============================
@@ -14154,53 +14216,49 @@ try {
     function pfSiteElevNewId(){
       return 'sge_' + Date.now().toString(36) + '_' + Math.floor(Math.random() * 1e6).toString(36);
     }
-    // Read-view of ONE area as a collapsible card: header = area name (fallback
-    // "Untitled Area"), body = the 3 fields (grade elevation + FFE; area name is the
-    // title). Reuses the .pr-card collapsible toggle idiom (click head => toggle open)
-    // but with dedicated .pf-sge-* classes so it is visually a nested sub-card, never
-    // scanned by the section editor. Blank field values show a yellow placeholder.
-    function pfSiteElevAreaCard(a){
+    // Read-view of ONE area as a COMPACT single row (Brad 2026-08-12 density pass): a small
+    // table-like row — Area | Site Grade Elev | FFE — NOT a collapsible card. Blank values
+    // show a yellow placeholder; a blank area name falls back to "Untitled Area".
+    function pfSiteElevAreaReadRow(a){
       function val(v){
         var s = (v == null ? '' : String(v)).trim();
-        return s
-          ? '<span class="pf-sge-val">'+E(s)+'</span>'
-          : '<span class="pf-sge-val pf-sge-blank">-</span>';
+        return s ? E(s) : '<span class="pf-sge-blank">-</span>';
       }
-      var title = (a.area && a.area.trim()) ? E(a.area.trim()) : '<span class="pf-sge-untitled">Untitled Area</span>';
-      var body = ''
-        + '<div class="pf-sge-field"><span class="pf-sge-label">Site Grade Elevation During PF Install</span>'
-        +   val(a.gradeElev) + '</div>'
-        + '<div class="pf-sge-field"><span class="pf-sge-label">FFE (Finish Floor Elevation)</span>'
-        +   val(a.ffe) + '</div>';
-      return '<div class="pf-sge-card" data-sge-id="'+E(a.id)+'">'
-        + '<div class="pf-sge-card-head" onclick="this.parentElement.classList.toggle(\'open\')">'
-        +   '<span class="pf-sge-card-title">'+title+'</span>'
-        +   '<span class="pf-sge-chev">&#9654;</span>'
-        + '</div>'
-        + '<div class="pf-sge-card-body">'+body+'</div>'
-        + '</div>';
+      var name = (a.area && a.area.trim()) ? E(a.area.trim()) : '<span class="pf-sge-untitled">Untitled Area</span>';
+      return '<tr class="pf-sge-row" data-sge-id="'+E(a.id)+'">'
+        + '<td class="pf-sge-c-area">'+name+'</td>'
+        + '<td class="pf-sge-c-val">'+val(a.gradeElev)+'</td>'
+        + '<td class="pf-sge-c-val">'+val(a.ffe)+'</td>'
+        + '</tr>';
     }
-    // The Site Grade Elevations subsection. Self-contained .pf-sge-wrap owning its own
-    // editor + reserved __site_elevations key. Read view: subgroup header + note, the
-    // list of area cards (or a muted empty hint), and (office) an "Edit" affordance.
-    function siteGradeElevationsBlock(){
+    // Site Grade Elevations rendered as COMPACT CONTENT INSIDE the PF Submittal Design
+    // section (Brad 2026-08-12) — NOT its own E&D subgroup/subheader. A small inline group
+    // label + a dense table (Area / Site Grade Elev During PF Install / FFE) + an office
+    // Edit affordance. Own inline editor + reserved __site_elevations key (unchanged). The
+    // .pf-sge-wrap host + data-sge-num + the editor handlers stay identical, so add/save/
+    // remove behavior is preserved; only the read presentation + placement changed.
+    function siteGradeElevationsInline(){
       var areas = pfSiteElevations();
       var listHtml;
       if (areas.length) {
-        listHtml = '<div class="pf-sge-list">' + areas.map(pfSiteElevAreaCard).join('') + '</div>';
+        listHtml = '<table class="pf-sge-table"><thead><tr>'
+          + '<th>Area</th><th>Site Grade Elev (PF Install)</th><th>FFE</th>'
+          + '</tr></thead><tbody>'
+          + areas.map(pfSiteElevAreaReadRow).join('')
+          + '</tbody></table>';
       } else {
-        listHtml = '<div class="pf-sge-empty">No areas yet.'
-          + (canEdit() ? ' Use <strong>Edit</strong> then <strong>+ Add Area</strong> to capture site grade + finish floor elevations per building.' : '')
+        listHtml = '<div class="pf-sge-empty">No areas recorded.'
+          + (canEdit() ? ' <strong>Edit</strong> &rarr; <strong>+ Add Area</strong> to capture site grade + FFE per building.' : '')
           + '</div>';
       }
       var editBtn = canEdit()
-        ? '<div class="pf-sge-bar"><button type="button" class="pf-sge-edit" onclick="event.stopPropagation();window.pfSgeEdit(this)">Edit</button></div>'
+        ? '<button type="button" class="pf-sge-edit" onclick="event.stopPropagation();window.pfSgeEdit(this)">Edit</button>'
         : '';
       return '<div class="pf-sge-wrap" data-sge-num="'+E(_curNum)+'">'
-        + subgroup('Site Grade Elevations')
-        + subgroupNote('Site grade elevation during PF install + finish floor elevation (FFE) per named area/building. Free text — type units or decimals as needed (e.g. 612.50 or 612.5 ft).')
+        + '<div class="pf-sge-inline-head"><span class="pf-sge-inline-title">Site Grade Elevations</span>'
+        +   (editBtn ? '<span class="pf-sge-inline-actions">'+editBtn+'</span>' : '')
+        + '</div>'
         + '<div class="pf-sge-body">' + listHtml + '</div>'
-        + editBtn
         + '<div class="pf-sge-msg" style="display:none"></div>'
         + '</div>';
     }
@@ -15979,8 +16037,8 @@ try {
             // BOTTOM field of the Prelim Design subsection (Brad 2026-08-12).
             field('SOW', '')
           ]))
-          // --- Subsection 2: PF Design Submittal ---
-        + subgroup('PF Design Submittal')
+          // --- Subsection 2: PF Submittal Design ---
+        + subgroup('PF Submittal Design')
           // GC PREREQUISITES CHECKLIST (Brad 2026-08-12): rendered AHEAD of all the
           // PF Design Submittal fields — the items PF needs from the GC before starting
           // the full Submittal Design (responsible party + Date Received per item, a
@@ -16004,14 +16062,10 @@ try {
           // Garbin Prelim, plus a clickable link to the workbook + its two tab names.
           // Renders only when this project has a Garbin entry ('' otherwise).
         + garbinDesignNotesBlock(gp)
-          // --- Site Grade Elevations (Brad 2026-08-12): rendered DIRECTLY BELOW the PF
-          // Design Submittal workflow and above As Built Drawings (its sibling subgroup).
-          // Per-project capture of site grade + finish floor elevation for MULTIPLE named
-          // areas/buildings. Its own inline editor + reserved __site_elevations ARRAY
-          // override key (NOT .pr-field rows, so the generic engineering section editor's
-          // save-scan ignores it — exactly like the submittal workflow owns
-          // __submittal_cycles and the prereqs checklist owns __submittal_prereqs).
-        + siteGradeElevationsBlock()
+          // NOTE (Brad 2026-08-12): Site Grade Elevations is NO LONGER a standalone E&D
+          // subgroup here — it is rendered as COMPACT CONTENT INSIDE submittalWorkflowBlock
+          // (see siteGradeElevationsInline). This keeps Engineering & Design at EXACTLY 3
+          // subgroups: Prelim Design / PF Submittal Design / As Built Drawings.
           // --- Subsection 3: As Built Drawings (two sub-sub-groups) ---
         + subgroup('As Built Drawings')
           // Sub-sub-group A: Field As-Built Drawings (daily field uploads). UI shell
@@ -20187,52 +20241,37 @@ try {
       if (m) return m[3] + '-' + ('0'+m[1]).slice(-2) + '-' + ('0'+m[2]).slice(-2);
       return '';
     }
-    // Edit the ACTIVE cycle: replace the read-view body with an inline editor (3 date
-    // inputs + a status dropdown). Only THIS cycle's manual fields are editable; the
-    // computed dates + folder link are display-only and stay out of the editor.
-    window.pfSwfEdit = function(btn){
-      if (!canEdit()) return; // defense-in-depth (server also 403s)
-      var wrap = pfSwfWrap(btn);
+    // SAVE-ON-CHANGE (Brad 2026-08-12): each submittal date/status renders as an always-live
+    // input (office only) with data-swf-field. On change, persist immediately — no Edit/Save
+    // friction. The changed input's value patches ONLY its field on the ACTIVE cycle; the
+    // complete cycles array is rebuilt + POSTed to /api/project-override (reusing pfSwfPersist,
+    // the same endpoint + fail-closed handling as before). Non-office roles never see these
+    // inputs (read-only spans), and the server 403s their POST regardless.
+    window.pfSwfFieldChange = function(el){
+      if (!canEdit()) return;                 // defense-in-depth (server also 403s)
+      var wrap = pfSwfWrap(el);
       if (!wrap) return;
+      var num = wrap.getAttribute('data-swf-num') || _curNum || '';
       var activeRev = parseInt(wrap.getAttribute('data-swf-rev'), 10);
-      if (isNaN(activeRev)) return;
-      var cycles = pfSubmittalCycles();
-      var cy = null;
-      for (var i = 0; i < cycles.length; i++) if (cycles[i].rev === activeRev) { cy = cycles[i]; break; }
-      if (!cy) return;
-      var lbl = pfCycleLabel(cy.rev);
-      var statusOpts = ['<option value=""'+(!cy.status?' selected':'')+'>-- select --</option>']
-        .concat(PF_SUBMITTAL_STATUSES.map(function(s){
-          var sel = (String(cy.status||'').trim() === s) ? ' selected' : '';
-          return '<option value="'+esc2(s)+'"'+sel+'>'+esc2(s)+'</option>';
-        })).join('');
-      var editorHtml = '<div class="pf-swf-editor" data-swf-edit-rev="'+esc2(String(cy.rev))+'">'
-        + '<div class="pf-swf-edit-note">Editing <strong>'+esc2(lbl)+'</strong>. Shop Drawings Due (+15 business days) and Submittal Due Back from GC (+10 business days) recompute automatically from these dates.</div>'
-        + '<div class="pf-swf-erow"><label>Date Submittal Prereqs Sent to GGG</label>'
-        +   '<input type="date" class="pf-swf-in pf-swf-in-prereqs" value="'+esc2(pfSwfToInputDate(cy.prereqs_sent))+'"></div>'
-        + '<div class="pf-swf-erow"><label>Actual Submittal Completion Date</label>'
-        +   '<input type="date" class="pf-swf-in pf-swf-in-actual" value="'+esc2(pfSwfToInputDate(cy.actual_completion))+'"></div>'
-        + '<div class="pf-swf-erow"><label>Date PF Submits to GC</label>'
-        +   '<input type="date" class="pf-swf-in pf-swf-in-pfgc" value="'+esc2(pfSwfToInputDate(cy.pf_submits_gc))+'"></div>'
-        + '<div class="pf-swf-erow"><label>Submittal Status</label>'
-        +   '<select class="pf-swf-in pf-swf-in-status">'+statusOpts+'</select></div>'
-        + '<div class="pf-swf-edit-err" style="display:none"></div>'
-        + '<div class="pf-swf-edit-actions">'
-        +   '<button type="button" class="pf-swf-save" onclick="event.stopPropagation();window.pfSwfSave(this)">Save '+esc2(lbl)+'</button>'
-        +   '<button type="button" class="pf-swf-cancel" onclick="event.stopPropagation();window.pfSwfCancel(this)">Cancel</button>'
-        + '</div>'
-        + '</div>';
-      var bodyEl = wrap.querySelector('.pf-swf-body');
-      if (!bodyEl) return;
-      wrap.setAttribute('data-swf-orig', bodyEl.innerHTML);
-      bodyEl.innerHTML = editorHtml;
+      var field = el.getAttribute('data-swf-field') || '';
+      if (!num || isNaN(activeRev) || !field) { pfSwfMsg(wrap, 'Could not save that change; please retry.', true); return; }
+      var val = String(el.value == null ? '' : el.value).trim();
+      var patch = {}; patch[field] = val;
+      var arr = pfSwfBuildArray(wrap, activeRev, patch);
+      // Persist; keep the same cycle in focus. Inline msg (no Save button to disable).
+      pfSwfPersist(wrap, num, arr, activeRev, null, function(msg){ pfSwfMsg(wrap, msg, true); });
     };
-    window.pfSwfCancel = function(btn){
+    // Reset the Shop Drawings Due override back to the auto-computed date (clears
+    // shop_due_override on the active cycle, so the +15-biz-day value shows again).
+    window.pfSwfResetShopDue = function(btn){
+      if (!canEdit()) return;
       var wrap = pfSwfWrap(btn);
       if (!wrap) return;
-      var orig = wrap.getAttribute('data-swf-orig');
-      var bodyEl = wrap.querySelector('.pf-swf-body');
-      if (orig != null && bodyEl) { bodyEl.innerHTML = orig; wrap.removeAttribute('data-swf-orig'); }
+      var num = wrap.getAttribute('data-swf-num') || _curNum || '';
+      var activeRev = parseInt(wrap.getAttribute('data-swf-rev'), 10);
+      if (!num || isNaN(activeRev)) return;
+      var arr = pfSwfBuildArray(wrap, activeRev, { shop_due_override: '' });
+      pfSwfPersist(wrap, num, arr, activeRev, null, function(msg){ pfSwfMsg(wrap, msg, true); });
     };
     // Build the COMPLETE cycles array to persist: start from the stored/migrated cycles,
     // replace the edited cycle's manual fields with the editor inputs. (The client always
@@ -20241,12 +20280,14 @@ try {
       var cycles = pfSubmittalCycles();
       return cycles.map(function(c){
         var base = { rev: c.rev, prereqs_sent: c.prereqs_sent, actual_completion: c.actual_completion,
-                     pf_submits_gc: c.pf_submits_gc, status: c.status };
+                     pf_submits_gc: c.pf_submits_gc, status: c.status,
+                     shop_due_override: c.shop_due_override || '' };
         if (c.rev === editRev && patch) {
-          base.prereqs_sent = patch.prereqs_sent;
-          base.actual_completion = patch.actual_completion;
-          base.pf_submits_gc = patch.pf_submits_gc;
-          base.status = patch.status;
+          if (patch.prereqs_sent !== undefined) base.prereqs_sent = patch.prereqs_sent;
+          if (patch.actual_completion !== undefined) base.actual_completion = patch.actual_completion;
+          if (patch.pf_submits_gc !== undefined) base.pf_submits_gc = patch.pf_submits_gc;
+          if (patch.status !== undefined) base.status = patch.status;
+          if (patch.shop_due_override !== undefined) base.shop_due_override = patch.shop_due_override;
         }
         return base;
       });
@@ -20284,27 +20325,8 @@ try {
         if (onErr) onErr('Save failed: could not reach the server. Your changes were NOT saved - please retry.');
       });
     }
-    window.pfSwfSave = function(btn){
-      if (!canEdit()) return;
-      var wrap = pfSwfWrap(btn);
-      if (!wrap) return;
-      var num = wrap.getAttribute('data-swf-num') || _curNum || '';
-      var editor = wrap.querySelector('.pf-swf-editor');
-      var errEl = wrap.querySelector('.pf-swf-edit-err');
-      function showErr(msg){ if (errEl) { errEl.textContent = msg; errEl.style.display='block'; } }
-      if (!num || !editor) { showErr('Missing project number; nothing was saved.'); return; }
-      var editRev = parseInt(editor.getAttribute('data-swf-edit-rev'), 10);
-      if (isNaN(editRev)) { showErr('Could not identify the cycle; nothing was saved.'); return; }
-      var patch = {
-        prereqs_sent:      String((wrap.querySelector('.pf-swf-in-prereqs')||{}).value || '').trim(),
-        actual_completion: String((wrap.querySelector('.pf-swf-in-actual')||{}).value || '').trim(),
-        pf_submits_gc:     String((wrap.querySelector('.pf-swf-in-pfgc')||{}).value || '').trim(),
-        status:            String((wrap.querySelector('.pf-swf-in-status')||{}).value || '').trim()
-      };
-      if (errEl) errEl.style.display = 'none';
-      var arr = pfSwfBuildArray(wrap, editRev, patch);
-      pfSwfPersist(wrap, num, arr, editRev, wrap.querySelector('.pf-swf-save'), showErr);
-    };
+    // (pfSwfEdit / pfSwfSave / pfSwfCancel removed 2026-08-12: the per-field Edit/Save/Cancel
+    // flow is replaced by always-live save-on-change inputs — see pfSwfFieldChange above.)
     // Start the next revision: append a new EMPTY cycle (rev = lastRev+1) and switch to
     // it. Gated: office-only + only fires from the Start Rev button (which renders only
     // when the LATEST cycle's status is Revise & Resubmit) + an explicit confirm so an
@@ -20327,9 +20349,9 @@ try {
       if (!window.confirm('Start ' + pfCycleLabel(nextRev) + '? This saves the current cycle as history and opens a new empty revision workflow.')) return;
       var arr = cycles.map(function(c){
         return { rev: c.rev, prereqs_sent: c.prereqs_sent, actual_completion: c.actual_completion,
-                 pf_submits_gc: c.pf_submits_gc, status: c.status };
+                 pf_submits_gc: c.pf_submits_gc, status: c.status, shop_due_override: c.shop_due_override || '' };
       });
-      arr.push({ rev: nextRev, prereqs_sent: '', actual_completion: '', pf_submits_gc: '', status: '' });
+      arr.push({ rev: nextRev, prereqs_sent: '', actual_completion: '', pf_submits_gc: '', status: '', shop_due_override: '' });
       pfSwfPersist(wrap, num, arr, nextRev, null, function(msg){ pfSwfMsg(wrap, msg, true); });
     };
 
@@ -20387,8 +20409,8 @@ try {
         + '</div>';
       wrap.setAttribute('data-sge-orig', bodyEl.innerHTML);
       bodyEl.innerHTML = editorHtml;
-      // Hide the read-view Edit affordance while editing.
-      var bar = wrap.querySelector('.pf-sge-bar');
+      // Hide the read-view Edit affordance while editing (inline header actions).
+      var bar = wrap.querySelector('.pf-sge-inline-actions');
       if (bar) bar.style.display = 'none';
     };
     // Append a fresh empty area row to the editor.
@@ -20423,7 +20445,7 @@ try {
       var orig = wrap.getAttribute('data-sge-orig');
       var bodyEl = wrap.querySelector('.pf-sge-body');
       if (orig != null && bodyEl) { bodyEl.innerHTML = orig; wrap.removeAttribute('data-sge-orig'); }
-      var bar = wrap.querySelector('.pf-sge-bar');
+      var bar = wrap.querySelector('.pf-sge-inline-actions');
       if (bar) bar.style.display = '';
     };
     // Save: gather every editor row into the COMPLETE array + POST it. The client always

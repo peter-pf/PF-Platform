@@ -228,6 +228,13 @@ function cleanCycles(input) {
       actual_completion: s(entry.actual_completion, CYCLES_MAX_DATE),
       pf_submits_gc:     s(entry.pf_submits_gc, CYCLES_MAX_DATE),
       status:            s(entry.status, CYCLES_MAX_STATUS),
+      // shop_due_override (Brad 2026-08-12): the "Shop Drawings Due from Garbin" date is
+      // auto-computed (prereqs_sent + 15 business days) but MANUALLY OVERRIDABLE when a
+      // faster-than-3-week turnaround is agreed. A non-empty string here wins over the
+      // computed value at render; empty => fall back to the computed date. Same date-string
+      // treatment as the other date fields (trim + length cap; the client owns the format).
+      // Backward-compatible: cycles saved before this field simply carry '' (absent => '').
+      shop_due_override: s(entry.shop_due_override, CYCLES_MAX_DATE),
     });
   }
   return out;
