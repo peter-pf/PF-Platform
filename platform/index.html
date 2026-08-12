@@ -13442,22 +13442,6 @@ try {
         return (items && typeof items === 'object') ? items : {};
       } catch (e) { return {}; }
     }
-    // ---- Responsible-Party dropdown source (Brad 2026-08-12) ----------------
-    // Gather THIS project's assigned contacts for the prereq "Responsible Party"
-    // dropdown/typeahead. Sources (de-duplicated):
-    //   1. Directory (__crm) selections resolved to master-list records: every
-    //      CRM override key's __crm map -> each group's contactIds -> the matching
-    //      PF_CONTACTS record (carries name + email + contactId). This is the
-    //      Project Contacts directory the whole record is built on.
-    //   2. Any prereq item that ALREADY stored a free responsible_name/email (so a
-    //      previously typed party that is NOT a directory contact still appears).
-    // Returns [{ contactId|null, name, email }]. Directory contacts win on a
-    // (name+email) collision. Requires PF_CONTACTS loaded (async); before that it
-    // still returns the legacy stored parties so the dropdown is never empty-broken.
-    // NEVER throws; a malformed override just yields fewer entries.
-    // The set of override keys that can hold a __crm contact map (mirrors the
-    // Project Contacts groups: DP firms + Owner/GC(general) + the new groups 8-13).
-    var PF_CRM_CONTACT_KEYS = ['design_professionals','general','pfTeam','safety','siteReadiness','equipment','material'];
     function pfContactById(cid){
       try {
         var key = String(cid || '').toUpperCase();
@@ -13475,6 +13459,22 @@ try {
       if (!c) return '';
       return String(c.name || (((c.firstName||'') + ' ' + (c.lastName||'')).trim()) || '').trim();
     }
+    // Responsible-Party dropdown source (Brad 2026-08-12): a PF prerequisite is
+    // "typically the owner or GC", so this list is scoped to the project's OWNER and
+    // GENERAL CONTRACTOR contacts ONLY. It gathers them from BOTH storage models:
+    //   (1) __crm DIRECTORY selections under the `general` key's "Owner" and "GC"
+    //       sections (contactIds resolved to the live directory record), and
+    //   (2) LEGACY per-project Owner/GC contact fields — the synced g.owner / g.gc
+    //       roles with any per-project `general` override applied (effVal), PLUS any
+    //       manually-added Owner*/GC* contact overrides (firmExtra additions) that
+    //       carry a "... - Contact Name/Name" label with a sibling "... - Email".
+    // Deliberately EXCLUDED: the vendor groups (Material/Stone, Fuel, Equipment
+    // Transport, Rental Equipment = "stone & trucking vendors"), the Design
+    // Professional engineer firms (Geo/Civil/Structural/Ground Improvement), the PF
+    // Team, Safety, and Staking. (FLAG: engineers/PF Team are one-line additions if
+    // Brad wants prereqs that originate from them selectable too.)
+    // Already-stored responsible parties on prereq items are ALSO surfaced so an
+    // existing selection is never lost even if that person is no longer Owner/GC.
     function pfProjectContacts(){
       var out = [];
       var seen = {};   // dedupe: contactId (upper) OR lowercased "name|email"
@@ -13488,21 +13488,78 @@ try {
         seen[k] = 1;
         out.push({ contactId: cid || null, name: nm, email: em });
       }
-      // 1. Directory selections across every CRM override key.
+      // 1. Directory selections under the `general` key — OWNER + GC sections ONLY.
+      //    (pfCrmMap('general') = { "Owner": {company, contactIds[]}, "GC": {...} }.)
       try {
-        for (var ki = 0; ki < PF_CRM_CONTACT_KEYS.length; ki++) {
-          var crm = pfCrmMap(PF_CRM_CONTACT_KEYS[ki]); // {} when absent
-          Object.keys(crm).forEach(function(grp){
-            var e = crm[grp];
-            var ids = (e && Array.isArray(e.contactIds)) ? e.contactIds : [];
-            ids.forEach(function(id){
-              var c = pfContactById(id);
-              if (c) push({ contactId: c.contactId, name: pfContactName(c), email: String(c.email || '').trim() });
-            });
+        var gcrm = pfCrmMap('general'); // {} when absent
+        ['Owner', 'GC'].forEach(function(grp){
+          var e = gcrm[grp];
+          var ids = (e && Array.isArray(e.contactIds)) ? e.contactIds : [];
+          ids.forEach(function(id){
+            var c = pfContactById(id);
+            if (c) push({ contactId: c.contactId, name: pfContactName(c), email: String(c.email || '').trim() });
+          });
+        });
+      } catch (e) {}
+      // 2. LEGACY per-project Owner + GC contact fields. Resolve the current record
+      //    (synced g.owner / g.gc) the same way the render path does, then apply the
+      //    `general` per-project override (effVal) so the harvested name/email match
+      //    exactly what the Owner & General Contractor card shows.
+      try {
+        var D = null; try { D = resolveRecord(_curNum); } catch (e2) { D = null; }
+        var g = (D && D.contacts && D.contacts.groups) || {};
+        // -- Owner contacts: fixed slots (min 2, matching the render loop) plus any
+        //    synced entries, name/email each override-aware.
+        var _own = Array.isArray(g.owner) ? g.owner : [];
+        var _ownCount = Math.max(2, _own.length);
+        for (var _oi = 0; _oi < _ownCount; _oi++) {
+          var _oc = _own[_oi] || {};
+          var _n = _oi + 1;
+          push({
+            contactId: null,
+            name:  effVal('general', 'Owner Contact ' + _n + ' - Contact Name', _oc.name || ''),
+            email: effVal('general', 'Owner Contact ' + _n + ' - Email', _oc.email || '')
           });
         }
+        // -- GC contacts: the three role slots (PM / Superintendent / Project
+        //    Engineer), each with its synced default + override. GC roles use the
+        //    "GC <Role> - Name" / "GC <Role> - Email" label shape.
+        var _gcAll = Array.isArray(g.gc) ? g.gc : [];
+        var _gcRole = function(re){ return _gcAll.find(function(c){ return re.test(c.scope || ''); }) || {}; };
+        var _gcPM  = _gcAll[0] || _gcRole(/pm|project manager/i);
+        var _gcSup = _gcRole(/super/i);
+        var _gcPE  = _gcRole(/project eng|proj eng|\bpe\b/i);
+        push({ contactId: null,
+          name:  effVal('general', 'GC Project Manager - Name', _gcPM.name || ''),
+          email: effVal('general', 'GC Project Manager - Email', _gcPM.email || '') });
+        push({ contactId: null,
+          name:  effVal('general', 'GC Superintendent - Name', _gcSup.name || ''),
+          email: effVal('general', 'GC Superintendent - Email', _gcSup.email || '') });
+        push({ contactId: null,
+          name:  effVal('general', 'GC Project Engineer - Name', _gcPE.name || ''),
+          email: effVal('general', 'GC Project Engineer - Email', _gcPE.email || '') });
       } catch (e) {}
-      // 2. Legacy / free responsible parties already stored on prereq items.
+      // 2b. Catch manually-ADDED Owner*/GC* contacts stored purely as `general`
+      //     overrides (firmExtra additions beyond the fixed slots). Scan the general
+      //     override map for any "<Owner|GC ...> - Contact Name" / "- Name" label and
+      //     pair it with the sibling "- Email" of the same prefix. Skips the reserved
+      //     __crm key. Vendor / engineer / PF-team labels are never Owner*/GC* so they
+      //     are naturally excluded.
+      try {
+        var gsec = (_curOverrides && _curOverrides['general']) || {};
+        Object.keys(gsec).forEach(function(lbl){
+          if (lbl === PF_CRM_KEY) return;
+          var m = /^((?:Owner|GC)\b.*?)\s-\s(?:Contact Name|Name)$/i.exec(lbl);
+          if (!m) return;
+          var prefix = m[1];
+          var nm = effVal('general', lbl, '');
+          var em = effVal('general', prefix + ' - Email', '');
+          push({ contactId: null, name: nm, email: em });
+        });
+      } catch (e) {}
+      // 3. Legacy / free responsible parties already stored on prereq items — so an
+      //    existing selection stays selectable even if that person is no longer in the
+      //    (now Owner+GC-only) list.
       try {
         var data = pfPrereqData();
         Object.keys(data).forEach(function(k){
