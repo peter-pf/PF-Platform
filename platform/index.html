@@ -2653,6 +2653,22 @@ tr.pf-dragging { opacity: 0.45; }
   padding: 5px 12px; border-radius: 6px; line-height: 1.2;
 }
 .pr-action-link:hover { filter: brightness(1.08); }
+/* Site Readiness workflow ACTIVATION banner (Brad 2026-08-12): a status banner at the top
+   of the Site Readiness section. Green = all 3 kickoff gates pass (ACTIVE); amber = waiting,
+   with a list of the pending gates. Display-only (NOT .pr-field). */
+.pr-sr-banner {
+  display: flex; align-items: flex-start; gap: 8px;
+  margin: 2px 0 10px 0; padding: 8px 12px; border-radius: 6px;
+  font-size: 0.82rem; line-height: 1.35; border: 1px solid transparent;
+}
+.pr-sr-banner-icon { flex: 0 0 auto; font-size: 0.95rem; line-height: 1.3; }
+.pr-sr-banner-txt { flex: 1; }
+.pr-sr-banner-active { background: rgba(46,125,50,0.08); border-color: rgba(46,125,50,0.4); color: #2e7d32; }
+.pr-sr-banner-active .pr-sr-banner-txt strong { color: #2e7d32; }
+.pr-sr-banner-wait { background: rgba(217,138,0,0.08); border-color: rgba(217,138,0,0.4); color: #8a6d00; }
+.pr-sr-banner-wait .pr-sr-banner-txt strong { color: #8a6d00; }
+.pr-sr-banner-list { margin: 3px 0 0 0; padding: 0 0 0 18px; }
+.pr-sr-banner-list li { margin: 1px 0; }
 /* Computed automations (phase 2, Brad 2026-08-07): DISPLAY-ONLY computed hint
    rows layered next to existing manual fields. NOT .pr-field[data-pr-label] so the
    section editor's save-scan never treats them as editable data. Normal = muted
@@ -16445,6 +16461,59 @@ try {
         // editable "engineering" key. Keeping them here would duplicate labels across two
         // views of the same key. This subsection is now contacts-only (display).
 
+      // Site Readiness WORKFLOW ACTIVATION banner (Brad 2026-08-12, Increment 1). Reads the
+      // 3 kickoff gates and renders a GREEN "ACTIVE" banner when all pass, or an amber
+      // "Waiting to start" banner listing exactly which gates are still pending.
+      //   Gate A — submittal APPROVED: the active __submittal_cycles cycle's status is
+      //     Approved/Reviewed or AAN. Cross-section read from `engineering` -> reuses
+      //     pfSubmittalCycles() + pfActiveCycleRev() + pfSwfIsApprovedStatus() (NO duplicated
+      //     logic). Note: __submittal_cycles lives under the `engineering` override, which is
+      //     already loaded into _curOverrides for the whole record, so this read works from
+      //     the siteReadiness render.
+      //   Gate B — approved_submittal_date filled on that same active cycle.
+      //   Gate C — manual office confirm field (siteReadiness, Yes/No) that the approved PDF
+      //     is saved in the Approved Shop Drawings folder (the portal can't auto-detect
+      //     SharePoint folder contents). Read via effVal('siteReadiness', <label>, '').
+      // Display-only (the Gate C field itself is the editable control, gated by canEdit()).
+      function siteReadinessActivationBanner(){
+        var GATE_C_LABEL = 'Approved shop drawing PDF saved to Approved Shop Drawings folder?';
+        var pending = [];
+        // Gate A + B: read the ACTIVE submittal cycle (same helpers the submittal block uses).
+        var cy = null;
+        try {
+          var cycles = pfSubmittalCycles();
+          var activeRev = pfActiveCycleRev(cycles);
+          for (var i = 0; i < cycles.length; i++) if (cycles[i].rev === activeRev) { cy = cycles[i]; break; }
+          if (!cy) cy = cycles[cycles.length - 1] || null;
+        } catch (e) { cy = null; }
+        var status = cy ? String(cy.status || '').trim() : '';
+        var approvedDate = cy ? String(cy.approved_submittal_date || '').trim() : '';
+        var gateA = pfSwfIsApprovedStatus(status);          // Approved/Reviewed or AAN
+        var gateB = !!approvedDate;
+        // Gate C: the manual siteReadiness confirm (Yes wins). effVal returns the override
+        // value or '' — compare case-insensitively so "yes"/"Yes" both count.
+        var gateCVal = String(effVal('siteReadiness', GATE_C_LABEL, '') || '').trim().toLowerCase();
+        var gateC = (gateCVal === 'yes');
+        if (!gateA) pending.push('submittal not yet approved');
+        if (!gateB) pending.push('approved submittal date not filled');
+        if (!gateC) pending.push('PDF-in-folder not confirmed');
+        if (!pending.length) {
+          // ALL gates pass -> ACTIVE. Show the approval date (MM/DD/YYYY via pfFmtDate).
+          var dShown = approvedDate ? E(String(pfFmtDate(approvedDate))) : '';
+          return '<div class="pr-sr-banner pr-sr-banner-active">'
+            + '<span class="pr-sr-banner-icon">&#10003;</span>'
+            + '<span class="pr-sr-banner-txt"><strong>Site Readiness workflow ACTIVE</strong>'
+            + (dShown ? ' &mdash; submittal approved on ' + dShown : '') + '.</span>'
+            + '</div>';
+        }
+        // Not all gates -> amber waiting banner listing the pending gates.
+        var items = pending.map(function(p){ return '<li>'+E(p)+'</li>'; }).join('');
+        return '<div class="pr-sr-banner pr-sr-banner-wait">'
+          + '<span class="pr-sr-banner-icon">&#9203;</span>'
+          + '<span class="pr-sr-banner-txt"><strong>Waiting to start:</strong>'
+          + '<ul class="pr-sr-banner-list">'+items+'</ul></span>'
+          + '</div>';
+      }
       // ----- 4. Site Readiness / Project Setup (6 subsections; Brad 2026-08-07 batch-13)
       // The standalone "Project Safety" section (former #4) was REMOVED and its content
       // absorbed into Subsection 4 (Safety) here. Top-level renumber: this card is now #4.
@@ -16465,9 +16534,23 @@ try {
       _curSection = 'siteReadiness';
       var _fedexPrint = 'https://www.office.fedex.com/default/architecture-construction-engineering.html';
       var _pipefySSSP = 'https://app.pipefy.com/public/form/7j9G40Zp';
+      // Site Readiness workflow ACTIVATION (Brad 2026-08-12, Increment 1): a banner at the
+      // top of this section reading the 3 kickoff gates + the Gate C manual confirm field.
+      // See siteReadinessActivationBanner (reads engineering __submittal_cycles cross-section)
+      // + the Gate C field below (a plain siteReadiness Yes/No field, saved via the section
+      // Edit->Save + PF_FIELD_DROPDOWNS entry; no validator change — siteReadiness is a flat
+      // VALID_SECTIONS key).
       var srBody =
+          siteReadinessActivationBanner()
+        + fields([
+            // Gate C — manual office confirmation that the approved shop-drawing PDF is
+            // actually saved in the Approved Shop Drawings SharePoint folder (the portal
+            // cannot auto-detect folder contents). Yes/No dropdown (PF_FIELD_DROPDOWNS);
+            // reads via effVal('siteReadiness', <label>, '') the same as every other field.
+            field('Approved shop drawing PDF saved to Approved Shop Drawings folder?', '')
+          ])
         // ---- Subsection 1: Shop Drawings ----
-          subgroup('1. Shop Drawings')
+        + subgroup('1. Shop Drawings')
         + '<div class="pr-subgroup-actions"><a class="pr-action-link" href="' + E(_fedexPrint) + '" target="_blank" rel="noopener noreferrer">&#128424; Sent to Print (FedEx Office)</a></div>'
         + subgroupNote('Print spec: B&W, 24x36 Standard White, 1-sided, 3 copies, horizontal orientation, bind on left. Login credentials are stored securely (not shown here).')
         + fields([
@@ -18506,6 +18589,8 @@ try {
       // the actual send).
       'Submittal Status': ['Approved / Reviewed', 'AAN (Approved as Noted)', 'Revise & Resubmit'],
       // ===== Site Readiness / Project Setup 6-subsection build (Brad 2026-08-07, batch-13) =====
+      // Workflow activation Gate C (Brad 2026-08-12): manual PDF-in-folder confirmation.
+      'Approved shop drawing PDF saved to Approved Shop Drawings folder?': ['Yes', 'No'],
       // Subsection 2: Testing
       'Modulus Load Test Required?': ['Yes', 'No'],
       'Which Jack': ['Big (>175 kip)', 'Small (<175 kip)'],
