@@ -2751,7 +2751,7 @@ tr.pf-dragging { opacity: 0.45; }
    3 columns), with a tight max-width so it never spans the card. Header row is BLUE, matching
    the "Original" cycle-tab button just above it (var(--accent) = #006DB0, white text). */
 .pf-sge-table {
-  width: auto; max-width: 420px; border-collapse: collapse; font-size: 0.8rem;
+  width: auto; max-width: 680px; border-collapse: collapse; font-size: 0.8rem;
   margin: 2px 0 4px 0; border: 1px solid var(--border-light);
 }
 .pf-sge-table th {
@@ -14285,7 +14285,11 @@ try {
               id: id,
               area:      String(a.area == null ? '' : a.area),
               gradeElev: String(a.gradeElev == null ? '' : a.gradeElev),
-              ffe:       String(a.ffe == null ? '' : a.ffe)
+              ffe:       String(a.ffe == null ? '' : a.ffe),
+              // Pier Qty (count) + Total LF (linear feet) per area (Brad 2026-08-12).
+              // Manually entered for now; absent on pre-existing rows => ''.
+              pierQty:   String(a.pierQty == null ? '' : a.pierQty),
+              totalLf:   String(a.totalLf == null ? '' : a.totalLf)
             };
           });
         }
@@ -14305,11 +14309,19 @@ try {
         var s = (v == null ? '' : String(v)).trim();
         return s ? E(s) : '<span class="pf-sge-blank">-</span>';
       }
+      // Pier Qty + Total LF display: thousands-comma via pfFmtQty (17272 -> 17,272). pfFmtQty
+      // is a no-op on non-numeric input, so any free-text a user types passes through intact.
+      function qty(v){
+        var s = (v == null ? '' : String(v)).trim();
+        return s ? E(String(window.pfFmtQty(s))) : '<span class="pf-sge-blank">-</span>';
+      }
       var name = (a.area && a.area.trim()) ? E(a.area.trim()) : '<span class="pf-sge-untitled">Untitled Area</span>';
       return '<tr class="pf-sge-row" data-sge-id="'+E(a.id)+'">'
         + '<td class="pf-sge-c-area">'+name+'</td>'
         + '<td class="pf-sge-c-val">'+val(a.gradeElev)+'</td>'
         + '<td class="pf-sge-c-val">'+val(a.ffe)+'</td>'
+        + '<td class="pf-sge-c-val">'+qty(a.pierQty)+'</td>'
+        + '<td class="pf-sge-c-val">'+qty(a.totalLf)+'</td>'
         + '</tr>';
     }
     // Site Grade Elevations rendered as COMPACT CONTENT INSIDE the PF Submittal Design
@@ -14323,7 +14335,7 @@ try {
       var listHtml;
       if (areas.length) {
         listHtml = '<table class="pf-sge-table"><thead><tr>'
-          + '<th>Area</th><th>Site Grade Elev (PF Install)</th><th>FFE</th>'
+          + '<th>Area</th><th>Site Grade Elev (PF Install)</th><th>FFE</th><th>Pier Qty</th><th>Total LF</th>'
           + '</tr></thead><tbody>'
           + areas.map(pfSiteElevAreaReadRow).join('')
           + '</tbody></table>';
@@ -20577,6 +20589,10 @@ try {
         +     '<input type="text" class="pf-sge-in pf-sge-in-grade" placeholder="e.g. 612.50 ft" value="'+esc2(a.gradeElev||'')+'"></label>'
         +   '<label class="pf-sge-elabel">FFE (Finish Floor Elevation)'
         +     '<input type="text" class="pf-sge-in pf-sge-in-ffe" placeholder="e.g. 615.00 ft" value="'+esc2(a.ffe||'')+'"></label>'
+        +   '<label class="pf-sge-elabel">Pier Qty'
+        +     '<input type="text" class="pf-sge-in pf-sge-in-pierqty" placeholder="e.g. 1,837" value="'+esc2(a.pierQty||'')+'"></label>'
+        +   '<label class="pf-sge-elabel">Total LF'
+        +     '<input type="text" class="pf-sge-in pf-sge-in-totallf" placeholder="e.g. 17,272" value="'+esc2(a.totalLf||'')+'"></label>'
         + '</div>'
         + '</div>';
     }
@@ -20659,7 +20675,9 @@ try {
         var area  = String((r.querySelector('.pf-sge-in-area')  || {}).value || '').trim();
         var grade = String((r.querySelector('.pf-sge-in-grade') || {}).value || '').trim();
         var ffe   = String((r.querySelector('.pf-sge-in-ffe')   || {}).value || '').trim();
-        arr.push({ id: id, area: area, gradeElev: grade, ffe: ffe });
+        var pierQty = String((r.querySelector('.pf-sge-in-pierqty') || {}).value || '').trim();
+        var totalLf = String((r.querySelector('.pf-sge-in-totallf') || {}).value || '').trim();
+        arr.push({ id: id, area: area, gradeElev: grade, ffe: ffe, pierQty: pierQty, totalLf: totalLf });
       }
       var saveBtn = wrap.querySelector('.pf-sge-save');
       pfSgePersist(wrap, num, arr, saveBtn, showErr);

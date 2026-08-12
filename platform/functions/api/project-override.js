@@ -294,6 +294,12 @@ function cleanSiteElevations(input) {
       area:      s(entry.area, SITE_ELEV_MAX_AREA).trim(),
       gradeElev: s(entry.gradeElev, SITE_ELEV_MAX_VALUE).trim(),
       ffe:       s(entry.ffe, SITE_ELEV_MAX_VALUE).trim(),
+      // pierQty (a pier count) + totalLf (linear feet) per area (Brad 2026-08-12). MANUALLY
+      // entered for now (import is future). Free-text strings, same sanitize/trim as the
+      // other cells (the client owns any comma/number formatting). Backward-compatible:
+      // rows saved before these fields simply carry '' (absent => '').
+      pierQty:   s(entry.pierQty, SITE_ELEV_MAX_VALUE).trim(),
+      totalLf:   s(entry.totalLf, SITE_ELEV_MAX_VALUE).trim(),
     });
   }
   return out;
