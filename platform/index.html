@@ -13439,12 +13439,14 @@ try {
         return g.projects[String(num)] || null;
       } catch (e) { return null; }
     }
-    // Read the current project's "PF Design Submittal" SharePoint folder record
+    // Read the current project's "Approved Shop Dwgs" SharePoint folder record
     // (window.PF_DESIGN_SUBMITTAL, from data/pf-design-submittal.js, built by
-    // sync/build-pf-design-submittal-folder.py). This is where the FINAL
-    // for-construction submittal is saved. Fail-closed: any missing global / project /
-    // value returns null (the link renders gracefully blank). Same idiom as
-    // pfShopDwgInfo (Stage 1 PF Design Submittal workflow, Brad 2026-08-12).
+    // sync/build-pf-design-submittal-folder.py). This is where approved/reviewed
+    // submittals are saved. Fail-closed: any missing global / project / value returns
+    // null (the link renders gracefully blank). Same idiom as pfShopDwgInfo. (Global
+    // name PF_DESIGN_SUBMITTAL kept from Stage 1 for RBAC/feed plumbing continuity;
+    // TASK B repointed it from the nonexistent "PF Design Submittal" folder to the real
+    // "Approved Shop Dwgs" folder, Brad 2026-08-12.)
     function pfDesignSubmittalFolder(num){
       try {
         var g = window.PF_DESIGN_SUBMITTAL;
@@ -13752,7 +13754,7 @@ try {
     //   4. Date PF Submits to GC                MANUAL date (new)
     //   5. Submittal Due Back from GC By        AUTO = #4 + 10 BUSINESS days (hint)
     //   6. Submittal Status                     DROPDOWN (3 options) + next-step note
-    //   7. PF Design Submittal Folder           SharePoint folder link
+    //   7. Approved Shop Dwgs Folder            SharePoint folder link
     //
     // PERSISTENCE: #1, #3, #4 and #6 are ordinary field()/dropdown rows under the
     // `engineering` section — they round-trip through the SAME section editor +
@@ -13792,7 +13794,7 @@ try {
       var statusNote = '';
       var s = String(status || '').trim();
       if (s === 'Approved / Reviewed') {
-        statusNote = computedHint('Save to the PF Design Submittal Folder as the final for-construction submittal. No further action.');
+        statusNote = computedHint('Save to the Approved Shop Dwgs Folder as the final for-construction submittal. No further action.');
       } else if (s === 'AAN (Approved as Noted)') {
         statusNote = computedHint('Save as final, and return to Garbin (GGG) to pick up the notes on the final as-built. '
           + '<span class="pf-wf-flag">&#9873; Email to Garbin needed.</span>', true);
@@ -13801,7 +13803,7 @@ try {
           + '<span class="pf-wf-flag">&#9873; Email to Garbin needed.</span> '
           + '<span style="font-style:italic">A new revision cycle (Rev1, Rev2...) will start.</span>', true);
       }
-      // #7 PF Design Submittal Folder link (SharePoint). Graceful blank when the
+      // #7 Approved Shop Dwgs Folder link (SharePoint). Graceful blank when the
       // folder was not found for this project.
       var folderRow = pfDesignSubmittalFolderRow(dsf);
       // Interleave: each manual field renders in its OWN fields([...]) grid so a
@@ -13818,18 +13820,19 @@ try {
         + statusNote
         + fields([ folderRow ]);
     }
-    // #7 link row for the PF Design Submittal SharePoint folder (read view). dsf =
+    // #7 link row for the Approved Shop Dwgs SharePoint folder (read view). dsf =
     // pf-design-submittal record ({folder_url,...}) or null. Same idiom as
     // shopDwgInfoLinkRow: valid href where the folder exists, gracefully blank (yellow,
     // no link) otherwise. NOT a .pr-field[data-pr-label] editable field (display-only
-    // auto link, like garbinPrelimFolderField / shopDwgInfoLinkRow).
+    // auto link, like garbinPrelimFolderField / shopDwgInfoLinkRow). Opens the folder
+    // where approved/reviewed submittals are saved (TASK B, Brad 2026-08-12).
     function pfDesignSubmittalFolderRow(dsf){
-      var label = 'PF Design Submittal Folder';
+      var label = 'Approved Shop Dwgs Folder';
       var url = (dsf && dsf.folder_url != null) ? String(dsf.folder_url).trim() : '';
       if (url) {
         var href = /^[a-z][a-z0-9+.-]*:\/\//i.test(url) ? url : ('https://' + url.replace(/^\/+/, ''));
         return '<div class="pr-field"><span class="pr-field-label">'+E(label)+'</span>'
-             + '<span class="pr-field-value"><a href="'+E(href)+'" target="_blank" rel="noopener noreferrer">PF Design Submittal Folder</a></span>'
+             + '<span class="pr-field-value"><a href="'+E(href)+'" target="_blank" rel="noopener noreferrer">Open folder</a></span>'
              + '<span class="pr-field-src">SharePoint</span></div>';
       }
       return '<div class="pr-field"><span class="pr-field-label">'+E(label)+'</span>'
@@ -17130,10 +17133,18 @@ try {
 
       // Standalone Engineering & Design section (card #3, the single editable
       // "engineering" key). Batch-8: the Design Professionals subsection in General Info
-      // is display-only now, so this querySelector resolves to the restored standalone
-      // top-level card (the only .pr-card[data-pr-section="engineering"] in the DOM).
-      _surfaceExtras(root.querySelector('.pr-card[data-pr-section="engineering"] .pr-card-body'),
-        'engineering', 'Additional Engineer Contacts / Fields', 'Engineer');
+      // is display-only now, so this querySelector would resolve to the restored
+      // standalone top-level card (the only .pr-card[data-pr-section="engineering"]).
+      // TASK C (Brad 2026-08-12): the "Additional Engineer Contacts / Fields"
+      // _surfaceExtras subsection was REMOVED per his request — delete the header + all
+      // its fields to clean it up. Same treatment as the Project Contacts pfTeam
+      // "Additional Team Members / Fields" removal (2026-08-11): this was a display+re-save
+      // catch-all for ORPHANED engineering overrides (labels not matched by a rendered
+      // field row). Removing the call means such orphaned engineering overrides no longer
+      // surface OR round-trip through save going forward. NO KV data is deleted (existing
+      // overrides stay in KV, they just stop displaying/re-saving). The real engineering
+      // field rows + their section editor save are UNAFFECTED (they render via engBody
+      // above, not via this catch-all).
       // QA/QC nested card ("qaqc" key — added/overridden QA fields). Nested inside
       // Engineering & Design; its querySelector resolves to the single
       // .pr-card[data-pr-section="qaqc"].

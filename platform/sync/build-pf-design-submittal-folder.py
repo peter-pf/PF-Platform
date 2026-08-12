@@ -1,17 +1,23 @@
 #!/usr/bin/env python3
-"""Build data/pf-design-submittal.js -- the SharePoint "PF Design Submittal" folder webUrl per project.
+"""Build data/pf-design-submittal.js -- the SharePoint "Approved Shop Dwgs" folder webUrl per project.
 
-WHY (Brad 2026-08-12, Stage 1 submittal workflow): the Engineering & Design > PF Design
-Submittal workflow ends with a clickable link to the project's SharePoint "PF Design
-Submittal" folder, where the FINAL for-construction submittal is saved. This sync finds
-that folder under each project's "03 - Engineering & Design" and captures its webUrl so the
-portal can render a clickable "PF Design Submittal Folder" link. A project with no such
-folder simply gets NO entry, and the portal renders the link gracefully blank (never a
-broken href).
+WHY (Brad 2026-08-12, TASK B repoint): once submittals are approved/reviewed, the file is
+saved to the project's "Approved Shop Dwgs" folder under "03 - Engineering & Design". The
+portal's Engineering & Design > PF Design Submittal subsection needs a clickable link that
+opens that folder from SharePoint. This sync finds the "Approved Shop Dwgs" folder under
+each project's "03 - Engineering & Design" and captures its webUrl so the portal can render
+a clickable "Approved Shop Dwgs Folder" link. A project with no such folder simply gets NO
+entry, and the portal renders the link gracefully blank (never a broken href).
+
+REPOINT NOTE: Stage 1 originally targeted a "PF Design Submittal" folder that does NOT exist
+under any project (0 populated). The real, existing target folder is "Approved Shop Dwgs"
+(seen under every project's E&D during Stage 1's enumeration). The data file name +
+window.PF_DESIGN_SUBMITTAL global are KEPT (so the auth.js RBAC map + portal feed plumbing
+stay unchanged); only the folder the sync matches, plus the portal link label, changed.
 
 FOLDER LOCATION (example):
     04 - Project Management/02 - Projects/
-        26-016 - Filager Campus - Graybach/03 - Engineering & Design/PF Design Submittal
+        26-016 - Filager Campus - Graybach/03 - Engineering & Design/Approved Shop Dwgs
 
 DATA SOURCE DECISION (flagged): this is a DEDICATED file (data/pf-design-submittal.js),
 independently runnable, mirroring build-shop-dwg-info.py exactly (same folder-webUrl
@@ -55,9 +61,10 @@ OUT_JS = os.path.join(DATA_DIR, "pf-design-submittal.js")
 PROJECTS_BASE = "04 - Project Management/02 - Projects"
 ENG_BASE = "03 - Engineering & Design"
 # The folder we look for under "03 - Engineering & Design". Matched case-insensitively,
-# tolerant of minor naming ("PF Design Submittal", "PF Design Submittals",
-# "PF Submittal", "Design Submittal").
-PFDS_FOLDER_RE = re.compile(r"(pf\s*)?design\s*submittals?|pf\s*submittals?", re.I)
+# tolerant of the close naming variant "Approved Shop Drawings" (vs the abbreviated
+# "Approved Shop Dwgs" that projects actually use). "Dwg"/"Dwgs"/"Drawing"/"Drawings"
+# all accepted; optional trailing 's'.
+PFDS_FOLDER_RE = re.compile(r"approved\s*shop\s*(dwgs?|drawings?)\b", re.I)
 
 # Only real project folders start with an "NN-NNN" number. Skip the completed-projects
 # roll-up folder, the template placeholder, and any non-project folders.
@@ -112,11 +119,11 @@ def resolve_projects(token, only=None):
 
 
 def resolve_pfds_folder(token, folder):
-    """For one project folder, find the "PF Design Submittal" folder under
+    """For one project folder, find the "Approved Shop Dwgs" folder under
     '03 - Engineering & Design' and return its webUrl (or None if absent).
 
     Returns a dict: {found: bool, webUrl, folder_name, path} -- found=False when the
-    project has no Engineering & Design folder OR no PF Design Submittal subfolder.
+    project has no Engineering & Design folder OR no Approved Shop Dwgs subfolder.
     """
     result = {"found": False, "webUrl": "", "folder_name": "", "path": ""}
     eng_kids = try_list_children_by_path(token, f"{PROJECTS_BASE}/{folder}/{ENG_BASE}")
@@ -143,7 +150,7 @@ def build(token, only=None, verbose=True):
     for projnum, folder in resolve_projects(token, only=only):
         res = resolve_pfds_folder(token, folder)
         if not res["found"]:
-            report.append((projnum, "no-pfds-folder", "no 'PF Design Submittal' folder under E&D"))
+            report.append((projnum, "no-approved-shop-dwgs-folder", "no 'Approved Shop Dwgs' folder under E&D"))
             continue
         projects[projnum] = {
             "folder_url": res["webUrl"],
@@ -156,13 +163,13 @@ def build(token, only=None, verbose=True):
         "projects": projects,
         "meta": {
             "generated": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-            "source": "SharePoint 04 - Project Management/02 - Projects/<project>/03 - Engineering & Design/PF Design Submittal (folder webUrl)",
-            "note": "folder_url is the driveItem webUrl of the project's 'PF Design Submittal' folder; projects without one get no entry (portal renders the link gracefully blank).",
+            "source": "SharePoint 04 - Project Management/02 - Projects/<project>/03 - Engineering & Design/Approved Shop Dwgs (folder webUrl)",
+            "note": "folder_url is the driveItem webUrl of the project's 'Approved Shop Dwgs' folder; projects without one get no entry (portal renders the link gracefully blank).",
             "project_count": len(projects),
         },
     }
     if verbose:
-        print("PF Design Submittal folder sync:")
+        print("Approved Shop Dwgs folder sync:")
         for projnum, status, detail in report:
             print(f"  {projnum}: {status}  {detail}")
         print(f"  -> {len(projects)} project(s) populated")
@@ -173,9 +180,9 @@ def write_js(data):
     os.makedirs(DATA_DIR, exist_ok=True)
     with open(OUT_JS, "w") as f:
         f.write("// AUTO-GENERATED by sync/build-pf-design-submittal-folder.py -- do not edit by hand.\n")
-        f.write("// Per-project SharePoint 'PF Design Submittal' folder webUrl (Engineering & Design).\n")
-        f.write("// Source: '03 - Engineering & Design/PF Design Submittal' driveItem webUrl.\n")
-        f.write("// Read by the PF Design Submittal Stage 1 workflow 'PF Design Submittal Folder' link.\n")
+        f.write("// Per-project SharePoint 'Approved Shop Dwgs' folder webUrl (Engineering & Design).\n")
+        f.write("// Source: '03 - Engineering & Design/Approved Shop Dwgs' driveItem webUrl.\n")
+        f.write("// Read by the Engineering & Design 'Approved Shop Dwgs Folder' link (window.PF_DESIGN_SUBMITTAL global kept for RBAC/feed plumbing continuity).\n")
         f.write("window.PF_DESIGN_SUBMITTAL = ")
         json.dump(data, f, indent=2)
         f.write(";\n")
