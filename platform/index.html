@@ -2747,14 +2747,20 @@ tr.pf-dragging { opacity: 0.45; }
 }
 .pf-sge-inline-actions { display: inline-flex; gap: 6px; }
 .pf-sge-empty { font-size: 0.74rem; color: var(--text-3); font-style: italic; margin: 2px 0 4px 0; }
-/* Dense read table. */
-.pf-sge-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin: 2px 0 4px 0; }
-.pf-sge-table th {
-  text-align: left; font-size: 0.66rem; font-weight: 600; color: var(--text-3);
-  text-transform: uppercase; letter-spacing: 0.02em; padding: 2px 8px 3px 0;
-  border-bottom: 1px solid var(--border-light); white-space: nowrap;
+/* Dense read table (Brad 2026-08-12): NARROW — sized to its content, not full width (only
+   3 columns), with a tight max-width so it never spans the card. Header row is BLUE, matching
+   the "Original" cycle-tab button just above it (var(--accent) = #006DB0, white text). */
+.pf-sge-table {
+  width: auto; max-width: 420px; border-collapse: collapse; font-size: 0.8rem;
+  margin: 2px 0 4px 0; border: 1px solid var(--border-light);
 }
-.pf-sge-table td { padding: 3px 8px 3px 0; border-bottom: 1px solid var(--border-light); vertical-align: baseline; color: var(--text-1); }
+.pf-sge-table th {
+  text-align: left; font-size: 0.66rem; font-weight: 700; color: #fff;
+  background: var(--accent); text-transform: uppercase; letter-spacing: 0.02em;
+  padding: 3px 10px; border-bottom: 1px solid var(--accent); white-space: nowrap;
+}
+.pf-sge-table td { padding: 3px 10px; border-bottom: 1px solid var(--border-light); vertical-align: baseline; color: var(--text-1); }
+.pf-sge-table tr:last-child td { border-bottom: none; }
 .pf-sge-c-area { font-weight: 600; }
 .pf-sge-c-val { color: var(--text-1); }
 .pf-sge-untitled { color: var(--text-3); font-style: italic; font-weight: 500; }
@@ -14051,7 +14057,11 @@ try {
               // shop_due_override: manual override of the +15-biz-day computed "Shop
               // Drawings Due from Garbin" date (Brad 2026-08-12). '' => use the computed
               // value; a date string here wins. Absent on pre-override cycles => ''.
-              shop_due_override: String(c.shop_due_override == null ? '' : c.shop_due_override)
+              shop_due_override: String(c.shop_due_override == null ? '' : c.shop_due_override),
+              // approved_submittal_date: date the submittal was returned + approved by the
+              // GC (Brad 2026-08-12). Rendered/prefilled only when status is Approved/AAN.
+              // Absent on pre-existing cycles => ''.
+              approved_submittal_date: String(c.approved_submittal_date == null ? '' : c.approved_submittal_date)
             };
           });
         }
@@ -14063,7 +14073,8 @@ try {
         actual_completion: String(effVal('engineering', 'Actual Submittal Completion Date', '') || ''),
         pf_submits_gc:     String(effVal('engineering', 'Date PF Submits to GC', '') || ''),
         status:            String(effVal('engineering', 'Submittal Status', '') || ''),
-        shop_due_override: ''
+        shop_due_override: '',
+        approved_submittal_date: ''
       }];
     }
     // Which cycle is shown by default: the LATEST (active) one. A per-project view
@@ -14220,6 +14231,17 @@ try {
       var gcHint = comp.gcDueTxt
         ? '<span class="pf-swf-auto">GC review due '+E(comp.gcDueTxt)+' (+10 biz days)</span>'
         : '<span class="pf-swf-auto">GC review due = +10 biz days after this date</span>';
+      // "Approved Submittal Date" (Brad 2026-08-12): the date the submittal was returned +
+      // approved from the GC. CONDITIONAL — shown ONLY when status is Approved/Reviewed or
+      // AAN (the Revise & Resubmit / unset case is handled by the Start Rev / cycle
+      // workflow). Rendered BELOW the Submittal Status. Office = live date input (saves in
+      // place); non-office = read-only value. Prefill-to-today when it first appears empty
+      // is done in pfSwfFieldChange (on the status change that surfaces it), so the stored
+      // value is authoritative here — this row just renders whatever is stored.
+      var showApproved = (st === 'Approved / Reviewed' || st === 'AAN (Approved as Noted)');
+      var approvedRow = showApproved
+        ? drow('Approved Submittal Date', dateCtl('approved_submittal_date', cy.approved_submittal_date))
+        : '';
       // Status next-step note (compact).
       var statusNote = '';
       if (st === 'Approved / Reviewed') {
@@ -14235,6 +14257,7 @@ try {
         + drow('Shop Drawings Received from Garbin', dateCtl('actual_completion', cy.actual_completion))
         + drow('PF Submitted to GC', dateCtl('pf_submits_gc', cy.pf_submits_gc), ' ' + gcHint)
         + drow('Submittal Status', statusCtl)
+        + approvedRow
         + '</div>'
         + statusNote;
     }
@@ -20306,6 +20329,14 @@ try {
       if (m) return m[3] + '-' + ('0'+m[1]).slice(-2) + '-' + ('0'+m[2]).slice(-2);
       return '';
     }
+    // Today's date as YYYY-MM-DD (same convention as the portal's other `today()` helpers),
+    // scoped to this block for the Approved Submittal Date prefill.
+    function pfSwfTodayIso(){ return new Date().toISOString().slice(0, 10); }
+    // The two statuses that surface + prefill the Approved Submittal Date row.
+    function pfSwfIsApprovedStatus(st){
+      st = String(st || '').trim();
+      return st === 'Approved / Reviewed' || st === 'AAN (Approved as Noted)';
+    }
     // SAVE-ON-CHANGE (Brad 2026-08-12): each submittal date/status renders as an always-live
     // input (office only) with data-swf-field. On change, persist immediately — no Edit/Save
     // friction. The changed input's value patches ONLY its field on the ACTIVE cycle; the
@@ -20322,6 +20353,21 @@ try {
       if (!num || isNaN(activeRev) || !field) { pfSwfMsg(wrap, 'Could not save that change; please retry.', true); return; }
       var val = String(el.value == null ? '' : el.value).trim();
       var patch = {}; patch[field] = val;
+      // PREFILL-TODAY (Brad 2026-08-12): when the STATUS is being set to Approved/Reviewed or
+      // AAN and this cycle has no Approved Submittal Date yet, default that date to TODAY in
+      // the SAME save (so the row appears in place already populated + persisted, editable
+      // afterward). We look up the active cycle's current approved date; only fill when empty
+      // so an existing date is never overwritten. Changing status away leaves the stored date
+      // untouched (the row simply hides) — never destructive.
+      if (field === 'status' && pfSwfIsApprovedStatus(val)) {
+        try {
+          var _cyc = pfSubmittalCycles();
+          var _cur = null;
+          for (var _i = 0; _i < _cyc.length; _i++) if (_cyc[_i].rev === activeRev) { _cur = _cyc[_i]; break; }
+          var _hasDate = _cur && String(_cur.approved_submittal_date || '').trim();
+          if (!_hasDate) patch.approved_submittal_date = pfSwfTodayIso();
+        } catch (e) { /* prefill is best-effort; never blocks the status save */ }
+      }
       var arr = pfSwfBuildArray(wrap, activeRev, patch);
       // Persist; keep the same cycle in focus. SURGICAL in-place refresh on success (pass
       // the wrap as inPlaceWrap) so the user STAYS on this project detail — no full record
@@ -20349,13 +20395,15 @@ try {
       return cycles.map(function(c){
         var base = { rev: c.rev, prereqs_sent: c.prereqs_sent, actual_completion: c.actual_completion,
                      pf_submits_gc: c.pf_submits_gc, status: c.status,
-                     shop_due_override: c.shop_due_override || '' };
+                     shop_due_override: c.shop_due_override || '',
+                     approved_submittal_date: c.approved_submittal_date || '' };
         if (c.rev === editRev && patch) {
           if (patch.prereqs_sent !== undefined) base.prereqs_sent = patch.prereqs_sent;
           if (patch.actual_completion !== undefined) base.actual_completion = patch.actual_completion;
           if (patch.pf_submits_gc !== undefined) base.pf_submits_gc = patch.pf_submits_gc;
           if (patch.status !== undefined) base.status = patch.status;
           if (patch.shop_due_override !== undefined) base.shop_due_override = patch.shop_due_override;
+          if (patch.approved_submittal_date !== undefined) base.approved_submittal_date = patch.approved_submittal_date;
         }
         return base;
       });
@@ -20488,9 +20536,10 @@ try {
       if (!window.confirm('Start ' + pfCycleLabel(nextRev) + '? This saves the current cycle as history and opens a new empty revision workflow.')) return;
       var arr = cycles.map(function(c){
         return { rev: c.rev, prereqs_sent: c.prereqs_sent, actual_completion: c.actual_completion,
-                 pf_submits_gc: c.pf_submits_gc, status: c.status, shop_due_override: c.shop_due_override || '' };
+                 pf_submits_gc: c.pf_submits_gc, status: c.status, shop_due_override: c.shop_due_override || '',
+                 approved_submittal_date: c.approved_submittal_date || '' };
       });
-      arr.push({ rev: nextRev, prereqs_sent: '', actual_completion: '', pf_submits_gc: '', status: '', shop_due_override: '' });
+      arr.push({ rev: nextRev, prereqs_sent: '', actual_completion: '', pf_submits_gc: '', status: '', shop_due_override: '', approved_submittal_date: '' });
       // IN-PLACE (Brad 2026-08-12): starting a revision persists the new cycle and refreshes
       // ONLY the submittal block (nav bar gains the new tab, body switches to the new cycle),
       // keeping the E&D card open + scroll preserved. No full record re-render / bounce.

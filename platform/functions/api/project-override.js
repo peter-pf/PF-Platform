@@ -235,6 +235,11 @@ function cleanCycles(input) {
       // treatment as the other date fields (trim + length cap; the client owns the format).
       // Backward-compatible: cycles saved before this field simply carry '' (absent => '').
       shop_due_override: s(entry.shop_due_override, CYCLES_MAX_DATE),
+      // approved_submittal_date (Brad 2026-08-12): the date the submittal was returned +
+      // approved from the GC. Only meaningful when status is Approved/Reviewed or AAN (the
+      // client renders + prefills it conditionally); stored verbatim as a date string.
+      // Same trim + length cap as the other date fields. Backward-compatible: absent => ''.
+      approved_submittal_date: s(entry.approved_submittal_date, CYCLES_MAX_DATE),
     });
   }
   return out;
