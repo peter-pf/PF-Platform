@@ -2751,9 +2751,17 @@ tr.pf-dragging { opacity: 0.45; }
    3 columns), with a tight max-width so it never spans the card. Header row is BLUE, matching
    the "Original" cycle-tab button just above it (var(--accent) = #006DB0, white text). */
 .pf-sge-table {
-  width: auto; max-width: 680px; border-collapse: collapse; font-size: 0.8rem;
+  width: auto; max-width: 920px; border-collapse: collapse; font-size: 0.8rem;
   margin: 2px 0 4px 0; border: 1px solid var(--border-light);
 }
+/* Totals footer row (Brad 2026-08-12): sums of Pier Qty + Total LF. Subtle emphasis + a
+   top rule separating it from the area rows. */
+.pf-sge-total-row td {
+  font-weight: 700; border-top: 2px solid var(--accent);
+  background: rgba(0,109,176,0.05);
+}
+.pf-sge-c-total-label { color: var(--text-2); text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.02em; }
+.pf-sge-c-total { color: var(--text-1); }
 .pf-sge-table th {
   text-align: left; font-size: 0.66rem; font-weight: 700; color: #fff;
   background: var(--accent); text-transform: uppercase; letter-spacing: 0.02em;
@@ -14289,7 +14297,11 @@ try {
               // Pier Qty (count) + Total LF (linear feet) per area (Brad 2026-08-12).
               // Manually entered for now; absent on pre-existing rows => ''.
               pierQty:   String(a.pierQty == null ? '' : a.pierQty),
-              totalLf:   String(a.totalLf == null ? '' : a.totalLf)
+              totalLf:   String(a.totalLf == null ? '' : a.totalLf),
+              // Column Diameter + Bearing Capacity (PSF) per area (Brad 2026-08-12).
+              // Manual free-text; absent on pre-existing rows => ''.
+              columnDiameter:  String(a.columnDiameter == null ? '' : a.columnDiameter),
+              bearingCapacity: String(a.bearingCapacity == null ? '' : a.bearingCapacity)
             };
           });
         }
@@ -14300,6 +14312,29 @@ try {
     // ids; the backend also mints a positional fallback if this is ever blank).
     function pfSiteElevNewId(){
       return 'sge_' + Date.now().toString(36) + '_' + Math.floor(Math.random() * 1e6).toString(36);
+    }
+    // Parse ONE Submittal Summary cell to a number for totalling: strip commas + any
+    // non-numeric chars (keep digits, one dot, leading minus), parseFloat. Blank / no-digit
+    // / non-numeric => NaN (ignored by the sum). Handles "1,837", "17,272 LF", "  42 ", "".
+    function pfSgeCellNum(v){
+      var s = (v == null ? '' : String(v)).trim();
+      if (!s) return NaN;
+      // Keep the first run that looks numeric: strip commas, then remove everything except
+      // digits / dot / minus (so "17,272 LF" -> "17272", "4,000 psf" -> "4000").
+      var cleaned = s.replace(/,/g, '').replace(/[^0-9.\-]/g, '');
+      if (!/\d/.test(cleaned)) return NaN;
+      var n = parseFloat(cleaned);
+      return isFinite(n) ? n : NaN;
+    }
+    // Sum ONE field across all areas (ignoring blanks / non-numeric). Returns a Number
+    // (0 when nothing numeric). Used for the Pier Qty + Total LF totals row.
+    function pfSgeSumField(areas, field){
+      var total = 0, any = false;
+      for (var i = 0; i < areas.length; i++) {
+        var n = pfSgeCellNum(areas[i] && areas[i][field]);
+        if (!isNaN(n)) { total += n; any = true; }
+      }
+      return any ? total : 0;
     }
     // Read-view of ONE area as a COMPACT single row (Brad 2026-08-12 density pass): a small
     // table-like row — Area | Site Grade Elev | FFE — NOT a collapsible card. Blank values
@@ -14322,6 +14357,10 @@ try {
         + '<td class="pf-sge-c-val">'+val(a.ffe)+'</td>'
         + '<td class="pf-sge-c-val">'+qty(a.pierQty)+'</td>'
         + '<td class="pf-sge-c-val">'+qty(a.totalLf)+'</td>'
+        // Column Diameter: plain val() so units (e.g. 24" / 30") pass through verbatim.
+        + '<td class="pf-sge-c-val">'+val(a.columnDiameter)+'</td>'
+        // Bearing Capacity (PSF): qty() so large values comma-format (4000 -> 4,000).
+        + '<td class="pf-sge-c-val">'+qty(a.bearingCapacity)+'</td>'
         + '</tr>';
     }
     // Site Grade Elevations rendered as COMPACT CONTENT INSIDE the PF Submittal Design
@@ -14334,11 +14373,26 @@ try {
       var areas = pfSiteElevations();
       var listHtml;
       if (areas.length) {
+        // Totals row (Brad 2026-08-12): sum Pier Qty + Total LF across all areas, comma-
+        // formatted; the other columns' total cells are blank. Recomputed every render from
+        // the current __site_elevations, so a fresh render after an Edit->Save shows correct
+        // totals.
+        var pierTotal = pfSgeSumField(areas, 'pierQty');
+        var lfTotal   = pfSgeSumField(areas, 'totalLf');
+        var tfoot = '<tfoot><tr class="pf-sge-total-row">'
+          + '<td class="pf-sge-c-total-label">Total</td>'
+          + '<td></td><td></td>'
+          + '<td class="pf-sge-c-total">'+E(String(window.pfFmtQty(pierTotal)))+'</td>'
+          + '<td class="pf-sge-c-total">'+E(String(window.pfFmtQty(lfTotal)))+'</td>'
+          + '<td></td><td></td>'
+          + '</tr></tfoot>';
         listHtml = '<table class="pf-sge-table"><thead><tr>'
-          + '<th>Area</th><th>Site Grade Elev (PF Install)</th><th>FFE</th><th>Pier Qty</th><th>Total LF</th>'
+          + '<th>Area</th><th>Site Grade Elev (PF Install)</th><th>FFE</th><th>Pier Qty</th><th>Total LF</th><th>Column Diameter</th><th>Bearing Capacity (PSF)</th>'
           + '</tr></thead><tbody>'
           + areas.map(pfSiteElevAreaReadRow).join('')
-          + '</tbody></table>';
+          + '</tbody>'
+          + tfoot
+          + '</table>';
       } else {
         listHtml = '<div class="pf-sge-empty">No areas recorded.'
           + (canEdit() ? ' <strong>Edit</strong> &rarr; <strong>+ Add Area</strong> to capture site grade + FFE per building.' : '')
@@ -14348,7 +14402,7 @@ try {
         ? '<button type="button" class="pf-sge-edit" onclick="event.stopPropagation();window.pfSgeEdit(this)">Edit</button>'
         : '';
       return '<div class="pf-sge-wrap" data-sge-num="'+E(_curNum)+'">'
-        + '<div class="pf-sge-inline-head"><span class="pf-sge-inline-title">Site Grade Elevations</span>'
+        + '<div class="pf-sge-inline-head"><span class="pf-sge-inline-title">Submittal Summary</span>'
         +   (editBtn ? '<span class="pf-sge-inline-actions">'+editBtn+'</span>' : '')
         + '</div>'
         + '<div class="pf-sge-body">' + listHtml + '</div>'
@@ -20593,6 +20647,10 @@ try {
         +     '<input type="text" class="pf-sge-in pf-sge-in-pierqty" placeholder="e.g. 1,837" value="'+esc2(a.pierQty||'')+'"></label>'
         +   '<label class="pf-sge-elabel">Total LF'
         +     '<input type="text" class="pf-sge-in pf-sge-in-totallf" placeholder="e.g. 17,272" value="'+esc2(a.totalLf||'')+'"></label>'
+        +   '<label class="pf-sge-elabel">Column Diameter'
+        +     '<input type="text" class="pf-sge-in pf-sge-in-coldia" placeholder="e.g. 30&quot;" value="'+esc2(a.columnDiameter||'')+'"></label>'
+        +   '<label class="pf-sge-elabel">Bearing Capacity (PSF)'
+        +     '<input type="text" class="pf-sge-in pf-sge-in-bearing" placeholder="e.g. 4,000" value="'+esc2(a.bearingCapacity||'')+'"></label>'
         + '</div>'
         + '</div>';
     }
@@ -20677,7 +20735,9 @@ try {
         var ffe   = String((r.querySelector('.pf-sge-in-ffe')   || {}).value || '').trim();
         var pierQty = String((r.querySelector('.pf-sge-in-pierqty') || {}).value || '').trim();
         var totalLf = String((r.querySelector('.pf-sge-in-totallf') || {}).value || '').trim();
-        arr.push({ id: id, area: area, gradeElev: grade, ffe: ffe, pierQty: pierQty, totalLf: totalLf });
+        var coldia  = String((r.querySelector('.pf-sge-in-coldia')  || {}).value || '').trim();
+        var bearing = String((r.querySelector('.pf-sge-in-bearing') || {}).value || '').trim();
+        arr.push({ id: id, area: area, gradeElev: grade, ffe: ffe, pierQty: pierQty, totalLf: totalLf, columnDiameter: coldia, bearingCapacity: bearing });
       }
       var saveBtn = wrap.querySelector('.pf-sge-save');
       pfSgePersist(wrap, num, arr, saveBtn, showErr);

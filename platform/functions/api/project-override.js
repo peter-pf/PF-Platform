@@ -300,6 +300,10 @@ function cleanSiteElevations(input) {
       // rows saved before these fields simply carry '' (absent => '').
       pierQty:   s(entry.pierQty, SITE_ELEV_MAX_VALUE).trim(),
       totalLf:   s(entry.totalLf, SITE_ELEV_MAX_VALUE).trim(),
+      // columnDiameter + bearingCapacity (PSF) per area (Brad 2026-08-12). Same MANUAL
+      // free-text treatment as the other cells; backward-compatible (absent => '').
+      columnDiameter:  s(entry.columnDiameter, SITE_ELEV_MAX_VALUE).trim(),
+      bearingCapacity: s(entry.bearingCapacity, SITE_ELEV_MAX_VALUE).trim(),
     });
   }
   return out;
