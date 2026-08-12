@@ -365,6 +365,7 @@ const DATA_FILE_AREAS = {
   '/data/pm-overlay.js':           'financials',      // PROJECT: KV-mirror placeholder (PM overlay read via /api/pm-project) - reserved
   '/data/shop-dwg-info.js':        'financials',      // PROJECT: 'Shop Dwg Info' SharePoint folder webUrl per project (PF Design Submittal GC-prerequisites checklist link) — no $, office-only (admin/partner/business_dev), field_ops BLOCKED
   '/data/pf-design-submittal.js':  'financials',      // PROJECT: 'Approved Shop Dwgs' SharePoint folder webUrl per project (Engineering & Design folder link; file name/global kept from Stage 1) — no $, office-only (admin/partner/business_dev), field_ops BLOCKED
+  '/data/safety-folder.js':        'financials',      // PROJECT: '06 - Safety' SharePoint folder webUrl per project (Site Specific Safety Plan (SSSP) link, Field Ops area) — no $, office-only (admin/partner/business_dev), field_ops BLOCKED
   '/data/project-history.js':      'financials',      // PROJECT: per-job ContractValue/totalContractValue
   '/data/precon-pipeline.js':      'preconstruction', // PROJECT/BD: opportunity pipeline ($ per opp) — BD domain
   '/data/feasibility-history.js':  'preconstruction', // PROJECT/BD: completed feasibility studies (verdict/drivers), no $; precon analysis, field_ops BLOCKED
