@@ -2671,6 +2671,70 @@ tr.pf-dragging { opacity: 0.45; }
 .pf-swf-msg { font-size: 0.76rem; margin: 6px 0 0 8px; }
 .pf-swf-msg-ok { color: #2e7d32; }
 .pf-swf-msg-err { color: #c0392b; font-weight: 600; }
+/* SITE GRADE ELEVATIONS (Brad 2026-08-12): per-project list of named areas/buildings,
+   each an expandable sub-card capturing site grade elevation during PF install + FFE.
+   Self-contained wrap with its OWN editor + reserved __site_elevations key (its rows are
+   .pf-sge-*, NOT .pr-field[data-pr-label], so the generic section editor never scans
+   them). Reuses the collapsible toggle idiom (.open on the card) as the section cards. */
+.pf-sge-wrap { margin: 4px 0 10px 10px; }
+.pf-sge-body { margin-left: 8px; }
+.pf-sge-empty {
+  font-size: 0.78rem; color: var(--text-2); font-style: italic;
+  padding: 6px 10px; margin: 4px 0 6px 0;
+  border-left: 3px solid var(--border-light); background: var(--bg-0); border-radius: 4px;
+}
+.pf-sge-list { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 6px 0; }
+/* One area as a collapsible sub-card (lighter than a top-level .pr-card). */
+.pf-sge-card { border: 1px solid var(--border-light); border-radius: 6px; background: var(--bg-0); overflow: hidden; }
+.pf-sge-card-head {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  padding: 7px 10px; user-select: none;
+}
+.pf-sge-card-head:hover { background: rgba(0,123,196,0.04); }
+.pf-sge-card-title { font-size: 0.82rem; font-weight: 600; color: var(--text-1); flex: 1; }
+.pf-sge-untitled { color: var(--text-3); font-style: italic; font-weight: 500; }
+.pf-sge-chev { font-size: 0.7rem; color: var(--text-3); transition: transform 0.15s ease; }
+.pf-sge-card.open .pf-sge-chev { transform: rotate(90deg); }
+.pf-sge-card-body { display: none; padding: 4px 12px 10px 12px; }
+.pf-sge-card.open .pf-sge-card-body { display: block; }
+.pf-sge-field { display: flex; align-items: baseline; gap: 8px; margin: 4px 0; font-size: 0.8rem; line-height: 1.3; }
+.pf-sge-label { min-width: 250px; color: var(--text-2); font-weight: 600; }
+.pf-sge-val { color: var(--text-1); }
+.pf-sge-blank { color: #b06a00; background: rgba(217,138,0,0.10); padding: 0 6px; border-radius: 3px; }
+/* Editor */
+.pf-sge-editor { margin: 6px 0 4px 8px; }
+.pf-sge-rows { display: flex; flex-direction: column; gap: 10px; }
+.pf-sge-erow { border: 1px solid var(--border-light); border-radius: 6px; padding: 8px 10px; background: var(--bg-0); }
+.pf-sge-erow-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.pf-sge-erow-head .pf-sge-in-area { flex: 1; font-weight: 600; }
+.pf-sge-erow-fields { display: flex; flex-direction: column; gap: 8px; }
+.pf-sge-elabel { display: flex; flex-direction: column; gap: 3px; font-size: 0.76rem; font-weight: 600; color: var(--text-2); }
+.pf-sge-in { font-size: 0.8rem; padding: 4px 7px; border: 1px solid var(--border-light); border-radius: 4px; }
+.pf-sge-remove {
+  font-size: 0.72rem; font-weight: 600; cursor: pointer; line-height: 1.2;
+  padding: 4px 10px; border-radius: 6px; border: 1px solid #c0392b; color: #c0392b; background: #fff;
+  white-space: nowrap;
+}
+.pf-sge-remove:hover { background: rgba(192,57,43,0.06); }
+.pf-sge-add {
+  font-size: 0.74rem; font-weight: 600; cursor: pointer; line-height: 1.2; margin: 10px 0 2px 0;
+  padding: 5px 12px; border-radius: 6px; border: 1px dashed var(--accent); color: var(--accent); background: #fff;
+}
+.pf-sge-add:hover { background: rgba(0,123,196,0.06); }
+.pf-sge-edit-err { color: #c0392b; font-size: 0.76rem; font-weight: 600; margin: 6px 0; }
+.pf-sge-edit-actions { margin-top: 8px; display: flex; gap: 8px; }
+.pf-sge-bar { margin: 8px 0 2px 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+.pf-sge-edit, .pf-sge-save, .pf-sge-cancel {
+  font-size: 0.74rem; font-weight: 600; cursor: pointer; line-height: 1.2;
+  padding: 5px 12px; border-radius: 6px; border: 1px solid var(--accent);
+}
+.pf-sge-edit, .pf-sge-cancel { color: var(--accent); background: #fff; }
+.pf-sge-save { color: #fff; background: var(--accent); border-color: var(--accent); }
+.pf-sge-edit:hover, .pf-sge-cancel:hover { background: rgba(0,123,196,0.06); }
+.pf-sge-save:hover { filter: brightness(1.08); }
+.pf-sge-msg { font-size: 0.76rem; margin: 6px 0 0 8px; }
+.pf-sge-msg-ok { color: #2e7d32; }
+.pf-sge-msg-err { color: #c0392b; font-weight: 600; }
 /* GC Prerequisites checklist (PF Design Submittal, Brad 2026-08-12). A table at the
    TOP of the subsection: Item | Responsible Party | Date Received (+ Reminder for office).
    Received rows read green/checked, outstanding rows amber. NOT .pr-field rows, so the
@@ -14012,6 +14076,92 @@ try {
         + statusRow
         + statusNote;
     }
+    // ==== SITE GRADE ELEVATIONS (Brad 2026-08-12) =============================
+    // A per-project list of named AREAS/buildings, each capturing the site grade
+    // elevation during PF install + the finish floor elevation (FFE). All THREE fields
+    // are FREE-TEXT (users type units/decimals like "612.50" or "612.5 ft"). Stored as
+    // the reserved __site_elevations ARRAY under the engineering override; own inline
+    // editor (NOT .pr-field rows) so the generic section editor's save-scan ignores it,
+    // exactly like the submittal workflow (__submittal_cycles) and prereqs checklist
+    // (__submittal_prereqs). Blank-graceful: no areas => just the "+ Add Area" affordance
+    // (office) or a muted empty hint (read-only). Office-gated edit controls (canEdit()).
+    // Read the stored __site_elevations ARRAY from the engineering override. Returns a
+    // NORMALIZED array of {id, area, gradeElev, ffe}. No areas stored => empty array
+    // (blank-graceful; NEVER a fabricated default row). Never throws.
+    function pfSiteElevations(){
+      try {
+        var eng = _curOverrides && _curOverrides.engineering;
+        var arr = eng && eng.__site_elevations;
+        if (Array.isArray(arr)) {
+          return arr.map(function(a, i){
+            a = (a && typeof a === 'object') ? a : {};
+            var id = String(a.id == null ? '' : a.id).trim() || ('area-' + i);
+            return {
+              id: id,
+              area:      String(a.area == null ? '' : a.area),
+              gradeElev: String(a.gradeElev == null ? '' : a.gradeElev),
+              ffe:       String(a.ffe == null ? '' : a.ffe)
+            };
+          });
+        }
+      } catch (e) {}
+      return [];
+    }
+    // Mint a stable client-side id for a new area row (same idiom as other client-minted
+    // ids; the backend also mints a positional fallback if this is ever blank).
+    function pfSiteElevNewId(){
+      return 'sge_' + Date.now().toString(36) + '_' + Math.floor(Math.random() * 1e6).toString(36);
+    }
+    // Read-view of ONE area as a collapsible card: header = area name (fallback
+    // "Untitled Area"), body = the 3 fields (grade elevation + FFE; area name is the
+    // title). Reuses the .pr-card collapsible toggle idiom (click head => toggle open)
+    // but with dedicated .pf-sge-* classes so it is visually a nested sub-card, never
+    // scanned by the section editor. Blank field values show a yellow placeholder.
+    function pfSiteElevAreaCard(a){
+      function val(v){
+        var s = (v == null ? '' : String(v)).trim();
+        return s
+          ? '<span class="pf-sge-val">'+E(s)+'</span>'
+          : '<span class="pf-sge-val pf-sge-blank">-</span>';
+      }
+      var title = (a.area && a.area.trim()) ? E(a.area.trim()) : '<span class="pf-sge-untitled">Untitled Area</span>';
+      var body = ''
+        + '<div class="pf-sge-field"><span class="pf-sge-label">Site Grade Elevation During PF Install</span>'
+        +   val(a.gradeElev) + '</div>'
+        + '<div class="pf-sge-field"><span class="pf-sge-label">FFE (Finish Floor Elevation)</span>'
+        +   val(a.ffe) + '</div>';
+      return '<div class="pf-sge-card" data-sge-id="'+E(a.id)+'">'
+        + '<div class="pf-sge-card-head" onclick="this.parentElement.classList.toggle(\'open\')">'
+        +   '<span class="pf-sge-card-title">'+title+'</span>'
+        +   '<span class="pf-sge-chev">&#9654;</span>'
+        + '</div>'
+        + '<div class="pf-sge-card-body">'+body+'</div>'
+        + '</div>';
+    }
+    // The Site Grade Elevations subsection. Self-contained .pf-sge-wrap owning its own
+    // editor + reserved __site_elevations key. Read view: subgroup header + note, the
+    // list of area cards (or a muted empty hint), and (office) an "Edit" affordance.
+    function siteGradeElevationsBlock(){
+      var areas = pfSiteElevations();
+      var listHtml;
+      if (areas.length) {
+        listHtml = '<div class="pf-sge-list">' + areas.map(pfSiteElevAreaCard).join('') + '</div>';
+      } else {
+        listHtml = '<div class="pf-sge-empty">No areas yet.'
+          + (canEdit() ? ' Use <strong>Edit</strong> then <strong>+ Add Area</strong> to capture site grade + finish floor elevations per building.' : '')
+          + '</div>';
+      }
+      var editBtn = canEdit()
+        ? '<div class="pf-sge-bar"><button type="button" class="pf-sge-edit" onclick="event.stopPropagation();window.pfSgeEdit(this)">Edit</button></div>'
+        : '';
+      return '<div class="pf-sge-wrap" data-sge-num="'+E(_curNum)+'">'
+        + subgroup('Site Grade Elevations')
+        + subgroupNote('Site grade elevation during PF install + finish floor elevation (FFE) per named area/building. Free text — type units or decimals as needed (e.g. 612.50 or 612.5 ft).')
+        + '<div class="pf-sge-body">' + listHtml + '</div>'
+        + editBtn
+        + '<div class="pf-sge-msg" style="display:none"></div>'
+        + '</div>';
+    }
     // #7 link row for the Approved Shop Dwgs SharePoint folder (read view). dsf =
     // pf-design-submittal record ({folder_url,...}) or null. Same idiom as
     // shopDwgInfoLinkRow: valid href where the folder exists, gracefully blank (yellow,
@@ -15793,6 +15943,14 @@ try {
           // Garbin Prelim, plus a clickable link to the workbook + its two tab names.
           // Renders only when this project has a Garbin entry ('' otherwise).
         + garbinDesignNotesBlock(gp)
+          // --- Site Grade Elevations (Brad 2026-08-12): rendered DIRECTLY BELOW the PF
+          // Design Submittal workflow and above As Built Drawings (its sibling subgroup).
+          // Per-project capture of site grade + finish floor elevation for MULTIPLE named
+          // areas/buildings. Its own inline editor + reserved __site_elevations ARRAY
+          // override key (NOT .pr-field rows, so the generic engineering section editor's
+          // save-scan ignores it — exactly like the submittal workflow owns
+          // __submittal_cycles and the prereqs checklist owns __submittal_prereqs).
+        + siteGradeElevationsBlock()
           // --- Subsection 3: As Built Drawings (two sub-sub-groups) ---
         + subgroup('As Built Drawings')
           // Sub-sub-group A: Field As-Built Drawings (daily field uploads). UI shell
@@ -20113,6 +20271,156 @@ try {
       arr.push({ rev: nextRev, prereqs_sent: '', actual_completion: '', pf_submits_gc: '', status: '' });
       pfSwfPersist(wrap, num, arr, nextRev, null, function(msg){ pfSwfMsg(wrap, msg, true); });
     };
+
+    // =======================================================================
+    // SITE GRADE ELEVATIONS editor (Brad 2026-08-12) — office only
+    // =======================================================================
+    // Self-contained inline editor for the reserved __site_elevations ARRAY under the
+    // engineering override. Edit reveals a per-area row editor (Area Name / Site Grade
+    // Elevation During PF Install / FFE — all free text) with a "× Remove" (confirm) per
+    // area and a "+ Add Area" affordance. Save gathers all rows, POSTs the COMPLETE array
+    // to /api/project-override (fields:{__site_elevations:[...]}), and on a clean
+    // {ok:true,saved:true} adopts server truth + re-renders. FAIL CLOSED: any non-clean
+    // response keeps the editor open + shows an honest inline error, NEVER "saved".
+    // field_ops never sees these controls (canEdit()); the server also 403s their POST.
+    function pfSgeWrap(btn){ return btn && btn.closest ? btn.closest('.pf-sge-wrap') : null; }
+    function pfSgeMsg(wrap, msg, isErr){
+      var el = wrap && wrap.querySelector('.pf-sge-msg');
+      if (!el) return;
+      el.textContent = msg;
+      el.className = 'pf-sge-msg ' + (isErr ? 'pf-sge-msg-err' : 'pf-sge-msg-ok');
+      el.style.display = 'block';
+    }
+    // Build the editor HTML for one area row. a = {id, area, gradeElev, ffe}.
+    function pfSgeRowEditorHtml(a){
+      return '<div class="pf-sge-erow" data-sge-id="'+esc2(a.id)+'">'
+        + '<div class="pf-sge-erow-head">'
+        +   '<input type="text" class="pf-sge-in pf-sge-in-area" placeholder="e.g. Building 1" value="'+esc2(a.area||'')+'" aria-label="Area Name">'
+        +   '<button type="button" class="pf-sge-remove" onclick="event.stopPropagation();window.pfSgeRemoveArea(this)" title="Remove this area">&times; Remove</button>'
+        + '</div>'
+        + '<div class="pf-sge-erow-fields">'
+        +   '<label class="pf-sge-elabel">Site Grade Elevation During PF Install'
+        +     '<input type="text" class="pf-sge-in pf-sge-in-grade" placeholder="e.g. 612.50 ft" value="'+esc2(a.gradeElev||'')+'"></label>'
+        +   '<label class="pf-sge-elabel">FFE (Finish Floor Elevation)'
+        +     '<input type="text" class="pf-sge-in pf-sge-in-ffe" placeholder="e.g. 615.00 ft" value="'+esc2(a.ffe||'')+'"></label>'
+        + '</div>'
+        + '</div>';
+    }
+    // Enter edit mode: replace the read-view body with the row editor + "+ Add Area".
+    window.pfSgeEdit = function(btn){
+      if (!canEdit()) return; // defense-in-depth (server also 403s)
+      var wrap = pfSgeWrap(btn);
+      if (!wrap) return;
+      var bodyEl = wrap.querySelector('.pf-sge-body');
+      if (!bodyEl) return;
+      var areas = pfSiteElevations();
+      var rowsHtml = areas.map(pfSgeRowEditorHtml).join('');
+      var editorHtml = '<div class="pf-sge-editor">'
+        + '<div class="pf-sge-rows">' + rowsHtml + '</div>'
+        + '<button type="button" class="pf-sge-add" onclick="event.stopPropagation();window.pfSgeAddArea(this)">+ Add Area</button>'
+        + '<div class="pf-sge-edit-err" style="display:none"></div>'
+        + '<div class="pf-sge-edit-actions">'
+        +   '<button type="button" class="pf-sge-save" onclick="event.stopPropagation();window.pfSgeSave(this)">Save</button>'
+        +   '<button type="button" class="pf-sge-cancel" onclick="event.stopPropagation();window.pfSgeCancel(this)">Cancel</button>'
+        + '</div>'
+        + '</div>';
+      wrap.setAttribute('data-sge-orig', bodyEl.innerHTML);
+      bodyEl.innerHTML = editorHtml;
+      // Hide the read-view Edit affordance while editing.
+      var bar = wrap.querySelector('.pf-sge-bar');
+      if (bar) bar.style.display = 'none';
+    };
+    // Append a fresh empty area row to the editor.
+    window.pfSgeAddArea = function(btn){
+      if (!canEdit()) return;
+      var wrap = pfSgeWrap(btn);
+      if (!wrap) return;
+      var rows = wrap.querySelector('.pf-sge-rows');
+      if (!rows) return;
+      var tmp = document.createElement('div');
+      tmp.innerHTML = pfSgeRowEditorHtml({ id: pfSiteElevNewId(), area: '', gradeElev: '', ffe: '' });
+      var node = tmp.firstChild;
+      rows.appendChild(node);
+      var areaInput = node.querySelector('.pf-sge-in-area');
+      if (areaInput) areaInput.focus();
+    };
+    // Remove one area row (with a confirm step, matching the remove-with-confirm idiom
+    // used elsewhere). Only removes from the editor DOM; the Save persists the result.
+    window.pfSgeRemoveArea = function(btn){
+      if (!canEdit()) return;
+      var row = btn && btn.closest ? btn.closest('.pf-sge-erow') : null;
+      if (!row) return;
+      var areaInput = row.querySelector('.pf-sge-in-area');
+      var name = (areaInput && areaInput.value && areaInput.value.trim()) ? areaInput.value.trim() : 'this area';
+      if (!window.confirm('Remove ' + name + '? This is not saved until you click Save.')) return;
+      row.parentNode.removeChild(row);
+    };
+    // Cancel: restore the read-view body verbatim, re-show the Edit affordance.
+    window.pfSgeCancel = function(btn){
+      var wrap = pfSgeWrap(btn);
+      if (!wrap) return;
+      var orig = wrap.getAttribute('data-sge-orig');
+      var bodyEl = wrap.querySelector('.pf-sge-body');
+      if (orig != null && bodyEl) { bodyEl.innerHTML = orig; wrap.removeAttribute('data-sge-orig'); }
+      var bar = wrap.querySelector('.pf-sge-bar');
+      if (bar) bar.style.display = '';
+    };
+    // Save: gather every editor row into the COMPLETE array + POST it. The client always
+    // sends the whole array; the backend whole-array-replaces __site_elevations.
+    window.pfSgeSave = function(btn){
+      if (!canEdit()) return;
+      var wrap = pfSgeWrap(btn);
+      if (!wrap) return;
+      var num = wrap.getAttribute('data-sge-num') || _curNum || '';
+      var editor = wrap.querySelector('.pf-sge-editor');
+      var errEl = wrap.querySelector('.pf-sge-edit-err');
+      function showErr(msg){ if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; } }
+      if (!num || !editor) { showErr('Missing project number; nothing was saved.'); return; }
+      if (errEl) errEl.style.display = 'none';
+      var arr = [];
+      var rowEls = editor.querySelectorAll('.pf-sge-erow');
+      for (var i = 0; i < rowEls.length; i++) {
+        var r = rowEls[i];
+        var id = r.getAttribute('data-sge-id') || pfSiteElevNewId();
+        var area  = String((r.querySelector('.pf-sge-in-area')  || {}).value || '').trim();
+        var grade = String((r.querySelector('.pf-sge-in-grade') || {}).value || '').trim();
+        var ffe   = String((r.querySelector('.pf-sge-in-ffe')   || {}).value || '').trim();
+        arr.push({ id: id, area: area, gradeElev: grade, ffe: ffe });
+      }
+      var saveBtn = wrap.querySelector('.pf-sge-save');
+      pfSgePersist(wrap, num, arr, saveBtn, showErr);
+    };
+    // Shared POST helper: persist the site-elevations array, adopt server truth, re-render.
+    function pfSgePersist(wrap, num, arr, saveBtn, onErr){
+      if (saveBtn) { saveBtn.disabled = true; saveBtn.setAttribute('data-sge-t', saveBtn.textContent); saveBtn.textContent = 'Saving...'; }
+      fetch('/api/project-override', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ num: num, section: 'engineering', fields: { __site_elevations: arr } })
+      }).then(function(res){
+        return res.json().then(function(b){ return { ok: res.ok, status: res.status, body: b }; })
+          .catch(function(){ return { ok: res.ok, status: res.status, body: null }; });
+      }).then(function(r){
+        // FAIL CLOSED: only a clean {ok:true, saved:true} is success.
+        if (!r.ok || !r.body || r.body.ok !== true || r.body.saved !== true) {
+          var msg = (r.body && r.body.message) ? r.body.message
+            : (r.status === 403 ? 'You do not have permission to edit this project.'
+                                 : 'Save failed (' + r.status + '). Your changes were NOT saved - please retry.');
+          if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.getAttribute('data-sge-t') || 'Save'; }
+          if (onErr) onErr(msg);
+          return;
+        }
+        // Adopt server truth + re-render the whole record.
+        window.PF_PROJECT_OVERRIDES[num] = { sections: (r.body.sections) || {}, _meta: (r.body._meta) || null };
+        var card = wrap.closest('.pr-card');
+        var root = (card && card.closest('.pr-root')) || (card && card.parentElement) || document.getElementById('prGenericRoot');
+        window.renderProjectRecord(num, root);
+      }).catch(function(){
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.getAttribute('data-sge-t') || 'Save'; }
+        if (onErr) onErr('Save failed: could not reach the server. Your changes were NOT saved - please retry.');
+      });
+    }
 
     // =======================================================================
     // BUDGET vs ACTUAL editor (Financials Phase 1) — office only

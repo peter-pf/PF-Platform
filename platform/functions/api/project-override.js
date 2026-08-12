@@ -233,6 +233,60 @@ function cleanCycles(input) {
   return out;
 }
 
+// ---- __site_elevations reserved structured key (Brad 2026-08-12) --------------
+// The Engineering & Design section gains a "Site Grade Elevations" subsection directly
+// BELOW the PF Design Submittal workflow: per-project site grade + finish floor elevation
+// capture for MULTIPLE named areas/buildings. The whole list is stored as ONE reserved,
+// ARRAY-valued key `__site_elevations` INSIDE the `engineering` section:
+//   sections.engineering.__site_elevations = [
+//     { id, area, gradeElev, ffe }, ...
+//   ]
+// id is a stable client-minted key (like the CRM contact ids / cycle rows). area /
+// gradeElev / ffe are FREE-TEXT strings (not numeric -- users type units/decimals like
+// "612.50" or "612.5 ft"). This is the FOURTH reserved key (alongside __crm,
+// __submittal_prereqs, __submittal_cycles) and rides the SAME merge: Object.assign(
+// existing, fields) preserves it when a normal flat field save omits it, so editing the
+// flat engineering fields never wipes the elevations and vice-versa. STRICTLY validated
+// (cleanSiteElevations below); a malformed body fails the WHOLE save closed. Allowed ONLY
+// under the `engineering` section (rejected 400 anywhere else). MANUAL-ENTRY only -- no
+// external sync feed writes this key.
+const SITE_ELEV_KEY = '__site_elevations';
+const SITE_ELEV_ALLOWED_SECTIONS = { engineering: 1 };
+const SITE_ELEV_MAX = 100;            // named areas/buildings on one project; bounds abuse
+const SITE_ELEV_MAX_ID = 60;          // a client-minted row id length cap
+const SITE_ELEV_MAX_AREA = 200;       // an area/building name cap
+const SITE_ELEV_MAX_VALUE = 200;      // a free-text elevation value (e.g. "612.50 ft")
+
+// Validate + normalize an incoming __site_elevations ARRAY into a clean, bounded
+// structure. Returns a SAFE array, or null if present-but-malformed (caller fails the
+// whole save closed). Rules mirror cleanCycles' defensive posture:
+//   - top-level must be an ARRAY; over the cap => reject (null) so nothing is silently
+//     lost.
+//   - each entry must be a plain object; area / gradeElev / ffe are strings, trimmed,
+//     length-capped, and angle-bracket stripped (via s()).
+//   - id is a client-minted stable key; kept if it is a non-empty capped string, else a
+//     positional fallback ("area-<index>") is minted so every row always has a stable id.
+//   - unknown keys on an entry are DROPPED (only id/area/gradeElev/ffe survive).
+function cleanSiteElevations(input) {
+  if (input == null) return [];                        // absent => empty
+  if (!Array.isArray(input)) return null;              // present but not an array => reject
+  if (input.length > SITE_ELEV_MAX) return null;
+  const out = [];
+  for (let i = 0; i < input.length; i++) {
+    const entry = input[i];
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
+    let id = s(entry.id, SITE_ELEV_MAX_ID).trim();
+    if (!id) id = 'area-' + i;                          // positional fallback: always have a stable id
+    out.push({
+      id: id,
+      area:      s(entry.area, SITE_ELEV_MAX_AREA).trim(),
+      gradeElev: s(entry.gradeElev, SITE_ELEV_MAX_VALUE).trim(),
+      ffe:       s(entry.ffe, SITE_ELEV_MAX_VALUE).trim(),
+    });
+  }
+  return out;
+}
+
 // Validate + normalize an incoming __crm object into a clean, bounded structure.
 // Returns a SAFE object (possibly {}), or null if the input is present but so
 // malformed it must be rejected (caller fails the whole save closed). Rules:
@@ -341,7 +395,7 @@ function cleanFields(input) {
   if (!input || typeof input !== 'object') return out;
   const keys = Object.keys(input).slice(0, MAX_FIELDS_PER_SECTION);
   for (const k of keys) {
-    if (k === CRM_KEY || k === PREREQ_KEY || k === CYCLES_KEY) continue; // reserved structured keys; handled separately, never string-flattened
+    if (k === CRM_KEY || k === PREREQ_KEY || k === CYCLES_KEY || k === SITE_ELEV_KEY) continue; // reserved structured keys; handled separately, never string-flattened
     const label = s(k, MAX_LABEL);
     if (!label) continue;
     out[label] = s(input[k], MAX_VALUE);
@@ -461,6 +515,26 @@ export async function onRequestPost(context) {
       }
     }
 
+    // Reserved __site_elevations structured key (Brad 2026-08-12): the Site Grade
+    // Elevations subsection array on the Engineering & Design section (per-area site grade
+    // + FFE capture). Allowed ONLY under `engineering`. Same posture as __submittal_cycles:
+    // absent => untouched (preserve prior), present => strictly validated, malformed =>
+    // reject the WHOLE save closed. A site-elevations save from the client sends this key
+    // WITHOUT the flat engineering fields, so cleanFields yields {} and only the array is
+    // replaced; a normal engineering field save omits this key so the stored array is
+    // preserved by the merge below.
+    const hasSiteElevInBody = Object.prototype.hasOwnProperty.call(rawFieldsObj, SITE_ELEV_KEY);
+    let siteElevUpdate; // undefined => untouched
+    if (hasSiteElevInBody) {
+      if (!SITE_ELEV_ALLOWED_SECTIONS[section]) {
+        return json({ status: 'error', message: 'Site grade elevations are not valid on this section.' }, 400);
+      }
+      siteElevUpdate = cleanSiteElevations(rawFieldsObj[SITE_ELEV_KEY]);
+      if (siteElevUpdate === null) {
+        return json({ status: 'error', message: 'Invalid site grade elevations; nothing was saved.' }, 400);
+      }
+    }
+
     // FAIL CLOSED: no KV -> we cannot persist. Do NOT report success.
     if (!env.PF_SCHEDULE) {
       return json({ status: 'error',
@@ -484,6 +558,8 @@ export async function onRequestPost(context) {
     // Carry forward any existing structured __submittal_cycles (an ARRAY, unlike the two
     // object keys above -- so the type guard checks Array.isArray, not the object shape).
     const prevCycles = Array.isArray(existing[CYCLES_KEY]) ? existing[CYCLES_KEY] : undefined;
+    // Carry forward any existing structured __site_elevations (also an ARRAY).
+    const prevSiteElev = Array.isArray(existing[SITE_ELEV_KEY]) ? existing[SITE_ELEV_KEY] : undefined;
     const merged = Object.assign({}, existing, fields);
     // Whole-object replace of __crm when the request supplied one (the client sends
     // the complete per-firm selection each time); otherwise preserve the prior value.
@@ -500,6 +576,11 @@ export async function onRequestPost(context) {
     if (cyclesUpdate !== undefined) merged[CYCLES_KEY] = cyclesUpdate;
     else if (prevCycles !== undefined) merged[CYCLES_KEY] = prevCycles;
     else delete merged[CYCLES_KEY]; // never leave a stray/non-array key behind
+    // Same whole-array replace/preserve for __site_elevations (the client sends the
+    // COMPLETE areas array each save); otherwise preserve the prior.
+    if (siteElevUpdate !== undefined) merged[SITE_ELEV_KEY] = siteElevUpdate;
+    else if (prevSiteElev !== undefined) merged[SITE_ELEV_KEY] = prevSiteElev;
+    else delete merged[SITE_ELEV_KEY]; // never leave a stray/non-array key behind
     rec.sections[section] = merged;
 
     // Bound the number of sections (defense against a crafted flood of junk keys;
