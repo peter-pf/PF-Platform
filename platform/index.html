@@ -2687,11 +2687,50 @@ tr.pf-dragging { opacity: 0.45; }
 .pr-crow-head .pr-crow-notes { font-weight: 700; color: var(--muted, #55606d); }
 .pr-crow a { color: var(--accent); text-decoration: none; word-break: break-all; }
 .pr-crow a:hover { text-decoration: underline; }
+/* Per-row edit affordance for DIRECTORY contacts (Brad 2026-08-11: make every    */
+/* field of every contact editable). A small pencil at the end of each .pr-crow    */
+/* directory row opens an inline editor that writes back to the master directory   */
+/* (/api/contacts update). Office/CRM-gated (only rendered when canEdit()).        */
+.pr-crow-act { flex: 0 0 auto; margin-left: auto; }
+.pr-crow-editbtn {
+  border: 1px solid var(--border-light); background: var(--bg-2, #eef2f6);
+  color: var(--accent-dark, #1a5a8a); border-radius: 4px;
+  font-size: 0.68rem; line-height: 1; padding: 3px 7px; cursor: pointer;
+}
+.pr-crow-editbtn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.pr-crow-head .pr-crow-act { visibility: hidden; } /* keep header columns aligned */
+/* Inline directory-row editor (swaps in place of the .pr-crow row). */
+.pr-crow-edit {
+  padding: 8px; margin: 4px 0; border: 1px solid var(--border-light);
+  border-radius: 6px; background: var(--bg-1, #f6f8fa);
+}
+.pr-crow-edit .pr-crow-edit-note {
+  font-size: 0.7rem; color: var(--muted, #55606d); margin: 0 0 6px;
+}
+.pr-crow-edit .pr-crow-edit-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 10px;
+}
+.pr-crow-edit .pr-crow-edit-field { display: flex; flex-direction: column; gap: 2px; }
+.pr-crow-edit .pr-crow-edit-field.pr-crow-edit-notes { grid-column: 1 / -1; }
+.pr-crow-edit label {
+  font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.03em; color: var(--muted, #55606d);
+}
+.pr-crow-edit input, .pr-crow-edit textarea {
+  font-size: 0.8rem; padding: 4px 6px; border: 1px solid var(--border-light);
+  border-radius: 4px; background: #fff; color: var(--text-0); width: 100%;
+  box-sizing: border-box; font-family: inherit;
+}
+.pr-crow-edit textarea { min-height: 46px; resize: vertical; }
+.pr-crow-edit-actions { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.pr-crow-edit-err { color: #b3261e; font-size: 0.72rem; display: none; }
 @media (max-width: 720px) {
   .pr-crow { flex-wrap: wrap; gap: 2px 10px; }
   .pr-crow.pr-crow-head { display: none; } /* header row hidden on narrow screens */
   .pr-crow > span { flex: 1 1 46%; }
   .pr-crow-name { flex: 1 1 100%; }
+  .pr-crow-edit .pr-crow-edit-grid { grid-template-columns: 1fr; }
 }
 /* (3) HORIZONTAL EVERYWHERE (Brad 2026-08-11 followup): make EVERY Project      */
 /* Contacts group render its contacts as the same horizontal .pr-crow table that */
@@ -14936,7 +14975,8 @@ try {
         { key: 'title', fld: 'Title' },
         { key: 'phone', fld: 'Office Phone', link: 'phone' },
         { key: 'cell',  fld: 'Cell Phone',   link: 'phone' },
-        { key: 'email', fld: 'Email',        link: 'email' }
+        { key: 'email', fld: 'Email',        link: 'email' },
+        { key: 'notes', fld: 'Notes' }
       ];
       var firmExtraContacts = function(head, prefix, seedCount){
         var ov = (_curOverrides && _curOverrides['design_professionals']) || {};
@@ -15001,7 +15041,8 @@ try {
             title:  ov[p + 'Title'] || '',
             office: ov[p + 'Office Phone'] || '',
             cell:   ov[p + 'Cell Phone'] || '',
-            email:  ov[p + 'Email'] || ''
+            email:  ov[p + 'Email'] || '',
+            notes:  ov[p + 'Notes'] || ''
           });
         }
         return out;
@@ -15016,7 +15057,8 @@ try {
             field(p + 'Title', c.title || '', c.src || ''),
             fieldLinked(p + 'Office Phone', c.phone || '', c.src || '', 'phone'),
             fieldLinked(p + 'Cell Phone', c.cell || '', c.src || '', 'phone'),
-            fieldLinked(p + 'Email', c.email || '', c.src || '', 'email')
+            fieldLinked(p + 'Email', c.email || '', c.src || '', 'email'),
+            field(p + 'Notes', '', '')
           ]);
         }).join('')
         // GROUP added contacts for this firm INSIDE its block (fix for the
@@ -15032,7 +15074,8 @@ try {
             title:  effVal('design_professionals', p + 'Title', c.title || ''),
             office: effVal('design_professionals', p + 'Office Phone', c.phone || ''),
             cell:   effVal('design_professionals', p + 'Cell Phone', c.cell || ''),
-            email:  effVal('design_professionals', p + 'Email', c.email || '')
+            email:  effVal('design_professionals', p + 'Email', c.email || ''),
+            notes:  effVal('design_professionals', p + 'Notes', '')
           };
         }).concat(firmExtraHoriz(head, prefix, seedCount));
         // CRM cards host (Brad 2026-08-11): resolved __crm[prefix].contactIds render
@@ -15822,15 +15865,18 @@ try {
             field('Owner Contact ' + _n + ' - Title', _oc.scope || '', _oc.scope ? 'Contacts' : ''),
             fieldLinked('Owner Contact ' + _n + ' - Office Phone', _oc.phone || '', _oc.phone ? 'Contacts' : '', 'phone'),
             fieldLinked('Owner Contact ' + _n + ' - Cell Phone', _oc.cell || '', _oc.cell ? 'Contacts' : '', 'phone'),
-            fieldLinked('Owner Contact ' + _n + ' - Email', _oc.email || '', _oc.email ? 'Contacts' : '', 'email')
+            fieldLinked('Owner Contact ' + _n + ' - Email', _oc.email || '', _oc.email ? 'Contacts' : '', 'email'),
+            field('Owner Contact ' + _n + ' - Notes', '', '')
           ]));
           // override-wins values (match what field() shows) for the horizontal row.
+          // Notes has no synced source, so it lives purely as a per-project override.
           ownerHoriz.push({
             name:   effVal('general', 'Owner Contact ' + _n + ' - Contact Name', _oc.name || ''),
             title:  effVal('general', 'Owner Contact ' + _n + ' - Title', _oc.scope || ''),
             office: effVal('general', 'Owner Contact ' + _n + ' - Office Phone', _oc.phone || ''),
             cell:   effVal('general', 'Owner Contact ' + _n + ' - Cell Phone', _oc.cell || ''),
-            email:  effVal('general', 'Owner Contact ' + _n + ' - Email', _oc.email || '')
+            email:  effVal('general', 'Owner Contact ' + _n + ' - Email', _oc.email || ''),
+            notes:  effVal('general', 'Owner Contact ' + _n + ' - Notes', '')
           });
         }
         var ownerCrmHost = '<div class="pr-crm-cards" data-crm-cards="Owner" data-crm-cards-key="general" data-role-tag="Project Owner"></div>';
@@ -15843,16 +15889,22 @@ try {
             field('GC Project Manager - Name', _gcPM.name || '', 'Contacts'),
             fieldLinked('GC Project Manager - Office Phone', _gcPM.phone || '', 'Contacts', 'phone'),
             fieldLinked('GC Project Manager - Cell Phone', _gcPM.cell || '', 'Contacts', 'phone'),
-            fieldLinked('GC Project Manager - Email', _gcPM.email || '', 'Contacts', 'email')
+            fieldLinked('GC Project Manager - Email', _gcPM.email || '', 'Contacts', 'email'),
+            field('GC Project Manager - Notes', '', '')
           ]),
           contactCard(_gcSup.name || 'Superintendent', 'Superintendent', [
+            field('GC Superintendent - Name', _gcSup.name || '', _gcSup.name ? 'Contacts' : ''),
+            fieldLinked('GC Superintendent - Office Phone', _gcSup.phone || '', 'Contacts', 'phone'),
             fieldLinked('GC Superintendent - Cell Phone', _gcSup.cell || '', 'Contacts', 'phone'),
-            fieldLinked('GC Superintendent - Email', _gcSup.email || '', 'Contacts', 'email')
+            fieldLinked('GC Superintendent - Email', _gcSup.email || '', 'Contacts', 'email'),
+            field('GC Superintendent - Notes', '', '')
           ]),
           contactCard(_gcPE.name || 'Project Engineer', 'Project Engineer', [
+            field('GC Project Engineer - Name', _gcPE.name || '', _gcPE.name ? 'Contacts' : ''),
             fieldLinked('GC Project Engineer - Office Phone', _gcPE.phone || '', 'Contacts', 'phone'),
             fieldLinked('GC Project Engineer - Cell Phone', _gcPE.cell || '', 'Contacts', 'phone'),
-            fieldLinked('GC Project Engineer - Email', _gcPE.email || '', 'Contacts', 'email')
+            fieldLinked('GC Project Engineer - Email', _gcPE.email || '', 'Contacts', 'email'),
+            field('GC Project Engineer - Notes', '', '')
           ])
         ];
         // Parallel horizontal-row data for the GC team (override-wins values). The
@@ -15863,17 +15915,20 @@ try {
             title:  'Project Manager',
             office: effVal('general', 'GC Project Manager - Office Phone', _gcPM.phone || ''),
             cell:   effVal('general', 'GC Project Manager - Cell Phone', _gcPM.cell || ''),
-            email:  effVal('general', 'GC Project Manager - Email', _gcPM.email || '') },
-          { name:   _gcSup.name || '',
+            email:  effVal('general', 'GC Project Manager - Email', _gcPM.email || ''),
+            notes:  effVal('general', 'GC Project Manager - Notes', '') },
+          { name:   effVal('general', 'GC Superintendent - Name', _gcSup.name || ''),
             title:  'Superintendent',
-            office: '',
+            office: effVal('general', 'GC Superintendent - Office Phone', _gcSup.phone || ''),
             cell:   effVal('general', 'GC Superintendent - Cell Phone', _gcSup.cell || ''),
-            email:  effVal('general', 'GC Superintendent - Email', _gcSup.email || '') },
-          { name:   _gcPE.name || '',
+            email:  effVal('general', 'GC Superintendent - Email', _gcSup.email || ''),
+            notes:  effVal('general', 'GC Superintendent - Notes', '') },
+          { name:   effVal('general', 'GC Project Engineer - Name', _gcPE.name || ''),
             title:  'Project Engineer',
             office: effVal('general', 'GC Project Engineer - Office Phone', _gcPE.phone || ''),
             cell:   effVal('general', 'GC Project Engineer - Cell Phone', _gcPE.cell || ''),
-            email:  effVal('general', 'GC Project Engineer - Email', _gcPE.email || '') }
+            email:  effVal('general', 'GC Project Engineer - Email', _gcPE.email || ''),
+            notes:  effVal('general', 'GC Project Engineer - Notes', '') }
         ];
         var gcCrmHost = '<div class="pr-crm-cards" data-crm-cards="GC" data-crm-cards-key="general" data-role-tag="General Contractor"></div>';
         // Company-level fields kept as .pr-field rows (editor reads them) but hidden
@@ -15971,7 +16026,8 @@ try {
             field(role + ' - Title', c.scope || role, ''),
             fieldLinked(role + ' - Office Phone', c.phone || '', c.phone ? 'Contacts' : '', 'phone'),
             fieldLinked(role + ' - Cell Phone', c.cell || '', c.cell ? 'Contacts' : '', 'phone'),
-            fieldLinked(role + ' - Email', c.email || '', c.email ? 'Contacts' : '', 'email')
+            fieldLinked(role + ' - Email', c.email || '', c.email ? 'Contacts' : '', 'email'),
+            field(role + ' - Notes', '', '')
           ]));
           // Horizontal row: Name = the resolved person name; Title = the PF role
           // (override-wins), so an unfilled role slot shows only Title (which is the
@@ -15983,7 +16039,8 @@ try {
             title:  effVal('pfTeam', role + ' - Title', c.scope || role),
             office: effVal('pfTeam', role + ' - Office Phone', c.phone || ''),
             cell:   effVal('pfTeam', role + ' - Cell Phone', c.cell || ''),
-            email:  effVal('pfTeam', role + ' - Email', c.email || '')
+            email:  effVal('pfTeam', role + ' - Email', c.email || ''),
+            notes:  effVal('pfTeam', role + ' - Notes', '')
           });
         });
         // Cascading company->contacts selector (Brad 2026-08-11): identical structure to
@@ -16238,7 +16295,8 @@ try {
             field('Rental / Transport Vendor ' + _en + ' - Scope', _ev.scope || '', _ev.scope ? 'Contacts' : ''),
             fieldLinked('Rental / Transport Vendor ' + _en + ' - Office Phone', _ev.phone || '', _ev.phone ? 'Contacts' : '', 'phone'),
             fieldLinked('Rental / Transport Vendor ' + _en + ' - Cell Phone', _ev.cell || '', _ev.cell ? 'Contacts' : '', 'phone'),
-            fieldLinked('Rental / Transport Vendor ' + _en + ' - Email', _ev.email || '', _ev.email ? 'Contacts' : '', 'email')
+            fieldLinked('Rental / Transport Vendor ' + _en + ' - Email', _ev.email || '', _ev.email ? 'Contacts' : '', 'email'),
+            field('Rental / Transport Vendor ' + _en + ' - Notes', '', '')
           ]));
         }
         var eqBody = subhead('PF Equipment Mobilization to Site')
@@ -16271,7 +16329,8 @@ try {
             field('Stone / Fuel Vendor ' + _mn + ' - Scope', _mv.scope || '', _mv.scope ? 'Contacts' : ''),
             fieldLinked('Stone / Fuel Vendor ' + _mn + ' - Office Phone', _mv.phone || '', _mv.phone ? 'Contacts' : '', 'phone'),
             fieldLinked('Stone / Fuel Vendor ' + _mn + ' - Cell Phone', _mv.cell || '', _mv.cell ? 'Contacts' : '', 'phone'),
-            fieldLinked('Stone / Fuel Vendor ' + _mn + ' - Email', _mv.email || '', _mv.email ? 'Contacts' : '', 'email')
+            fieldLinked('Stone / Fuel Vendor ' + _mn + ' - Email', _mv.email || '', _mv.email ? 'Contacts' : '', 'email'),
+            field('Stone / Fuel Vendor ' + _mn + ' - Notes', '', '')
           ]));
         }
         var _matStone = matVendors.find(function(c){return /stone|aggregate/i.test(c.scope||'');});
@@ -17766,6 +17825,12 @@ try {
           // Notes is present). Blank fields render clean (no yellow highlight — these
           // are display-only, not editable field() rows).
           var roleTag = host.getAttribute('data-role-tag') || '';
+          // Office/CRM users get a per-row Edit pencil that opens an inline editor
+          // writing back to the MASTER directory (/api/contacts update) — so every
+          // field of a directory contact (Name/Title/Office/Cell/Email/Notes) is
+          // editable from the project view (Brad 2026-08-11). Read-only roles get
+          // no button (and the server 403s the write regardless).
+          var _rowEditable = (typeof canEdit === 'function') ? canEdit() : false;
           var rows = e.contactIds.map(function(id){
             var c = byId[String(id).toUpperCase()];
             if (!c) return ''; // stale/removed id: skip, never crash
@@ -17776,13 +17841,20 @@ try {
               ? '<a href="tel:' + esc2(c.cellPhone) + '">' + esc2(pfFmtPhone(c.cellPhone)) + '</a>' : '';
             var email = c.email
               ? '<a href="mailto:' + esc2(c.email) + '">' + esc2(c.email) + '</a>' : '';
-            return '<div class="pr-crow">'
+            var cid = String(c.contactId || '').toUpperCase();
+            var editBtn = (_rowEditable && cid)
+              ? '<span class="pr-crow-act"><button type="button" class="pr-crow-editbtn" '
+                + 'data-crm-cid="' + esc2(cid) + '" title="Edit this contact (updates the shared directory)" '
+                + 'onclick="window.pfCrmEditContactRow(this)">&#9998; Edit</button></span>'
+              : (_rowEditable ? '<span class="pr-crow-act"></span>' : '');
+            return '<div class="pr-crow" data-crm-cid="' + esc2(cid) + '">'
               + '<span class="pr-crow-name">'  + esc2(name || (c.contactId || '')) + '</span>'
               + '<span class="pr-crow-title">' + esc2(c.title || '') + '</span>'
               + '<span class="pr-crow-off">'   + off + '</span>'
               + '<span class="pr-crow-cell">'  + cell + '</span>'
               + '<span class="pr-crow-email">' + email + '</span>'
               + '<span class="pr-crow-notes">' + esc2(c.notes || '') + '</span>'
+              + editBtn
               + '</div>';
           }).filter(Boolean);
           if (!rows.length) { host.innerHTML = ''; return; }
@@ -17793,6 +17865,7 @@ try {
             + '<span class="pr-crow-cell">Cell Phone</span>'
             + '<span class="pr-crow-email">Email</span>'
             + '<span class="pr-crow-notes">Notes</span>'
+            + (_rowEditable ? '<span class="pr-crow-act"></span>' : '')
             + '</div>';
           host.innerHTML =
               (roleTag ? '<div class="pr-role-tag">' + esc2(roleTag) + '</div>' : '')
@@ -17804,6 +17877,153 @@ try {
       }).catch(function(){ /* fail soft: leave hosts empty */ });
     }
     window.pfCrmRenderCards = pfCrmRenderCards;
+
+    // ---- DIRECTORY-CONTACT ROW EDITOR (Brad 2026-08-11) ----------------------
+    // Make every field of a DIRECTORY contact editable straight from the project
+    // Project Contacts view. The pencil on a .pr-crow directory row swaps that row
+    // into an inline editor (Name / Title / Office Phone / Cell Phone / Email /
+    // Notes). Save writes back to the MASTER directory via /api/contacts
+    // action:'update' (Option A — single source of truth: the change reflects
+    // everywhere this contact is used). company + category + address + website are
+    // carried through unchanged (the backend update overwrites the WHOLE row, so we
+    // must resend them or they would blank). FAIL CLOSED: any non-ok response keeps
+    // the editor open with an honest inline error; never fabricates a saved state.
+    // Office/CRM-gated in render (button only emitted when canEdit()); the server
+    // ALSO 403s the write for non-crm roles (defense in depth).
+    window.pfCrmEditContactRow = function(btn){
+      if (!btn) return;
+      var row = btn.closest ? btn.closest('.pr-crow') : null;
+      if (!row || row.classList.contains('pr-crow-head')) return;
+      var cid = String(btn.getAttribute('data-crm-cid') || row.getAttribute('data-crm-cid') || '').toUpperCase();
+      if (!cid) return;
+      // Resolve the full record from the loaded directory (has notes/company/etc.).
+      var c = null;
+      (PF_CONTACTS || []).forEach(function(x){ if (x && String(x.contactId||'').toUpperCase() === cid) c = x; });
+      if (!c) { window.alert('Could not load this contact to edit. Please refresh and retry.'); return; }
+      // Guard against opening two editors on the same row.
+      if (row.getAttribute('data-crm-editing') === '1') return;
+      row.setAttribute('data-crm-editing', '1');
+      var name = (c.name || ((c.firstName||'') + ' ' + (c.lastName||''))).trim();
+      function fld(key, label, val, wide){
+        return '<div class="pr-crow-edit-field' + (wide ? ' pr-crow-edit-notes' : '') + '">'
+          + '<label>' + esc2(label) + '</label>'
+          + (wide
+              ? '<textarea data-cf="' + esc2(key) + '">' + esc2(val || '') + '</textarea>'
+              : '<input type="text" data-cf="' + esc2(key) + '" value="' + esc2(val || '') + '">')
+          + '</div>';
+      }
+      var ed = document.createElement('div');
+      ed.className = 'pr-crow-edit';
+      ed.setAttribute('data-crm-cid', cid);
+      ed.innerHTML = ''
+        + '<div class="pr-crow-edit-note">Editing <strong>' + esc2(c.company || 'this contact')
+        +   '</strong> &mdash; changes update the shared PF contact directory (everywhere this contact is used).</div>'
+        + '<div class="pr-crow-edit-grid">'
+        +   fld('name',  'Name',         name)
+        +   fld('title', 'Title',        c.title || '')
+        +   fld('officePhone', 'Office Phone', c.officePhone || '')
+        +   fld('cellPhone',   'Cell Phone',   c.cellPhone || '')
+        +   fld('email', 'Email',        c.email || '')
+        +   fld('notes', 'Notes',        c.notes || '', true)
+        + '</div>'
+        + '<div class="pr-crow-edit-err"></div>'
+        + '<div class="pr-crow-edit-actions">'
+        +   '<button type="button" class="pr-save-btn" onclick="window.pfCrmSaveContactRow(this)">Save</button>'
+        +   '<button type="button" class="pr-cancel-btn" onclick="window.pfCrmCancelContactRow(this)">Cancel</button>'
+        + '</div>';
+      // Stash the original row markup + the resolved cid so Cancel can restore it.
+      ed._origRow = row;
+      ed._cid = cid;
+      row.style.display = 'none';
+      row.insertAdjacentElement('afterend', ed);
+    };
+
+    // Cancel an inline directory-row edit: drop the editor, restore the row.
+    window.pfCrmCancelContactRow = function(btn){
+      var ed = btn.closest ? btn.closest('.pr-crow-edit') : null;
+      if (!ed) return;
+      var row = ed._origRow;
+      if (row) { row.style.display = ''; row.removeAttribute('data-crm-editing'); }
+      ed.remove();
+    };
+
+    // Save an inline directory-row edit -> /api/contacts action:'update'. On success
+    // refresh the local directory cache and re-render the whole record so the new
+    // values show everywhere this contact is used. FAIL CLOSED on any error.
+    window.pfCrmSaveContactRow = function(btn){
+      var ed = btn.closest ? btn.closest('.pr-crow-edit') : null;
+      if (!ed) return;
+      var cid = String(ed._cid || ed.getAttribute('data-crm-cid') || '').toUpperCase();
+      if (!cid) return;
+      var errEl = ed.querySelector('.pr-crow-edit-err');
+      function showErr(m){ if (errEl){ errEl.textContent = m; errEl.style.display = 'block'; } }
+      function busy(b){ btn.disabled = b; btn.textContent = b ? 'Saving...' : 'Save'; }
+      // Pull the CURRENT record (for company/category/address/website we carry through).
+      var cur = null;
+      (PF_CONTACTS || []).forEach(function(x){ if (x && String(x.contactId||'').toUpperCase() === cid) cur = x; });
+      if (!cur) { showErr('Contact went missing; refresh and retry.'); return; }
+      var vals = {};
+      ed.querySelectorAll('[data-cf]').forEach(function(el){ vals[el.getAttribute('data-cf')] = el.value; });
+      var nm = pfSplitContactName(vals.name || '');
+      var payload = {
+        action: 'update',
+        contact: {
+          contactId: cid,
+          firstName: nm.firstName, lastName: nm.lastName,
+          title: vals.title || '',
+          company: cur.company || '',            // carry through (update overwrites whole row)
+          category: cur.category || '',
+          officePhone: vals.officePhone || '',
+          cellPhone: vals.cellPhone || '',
+          email: vals.email || '',
+          companyAddress: cur.companyAddress || '',
+          companyWebsite: cur.companyWebsite || '',
+          notes: vals.notes || ''
+        }
+      };
+      if (errEl) errEl.style.display = 'none';
+      busy(true);
+      fetch('/api/contacts', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(function(res){
+        return res.json().then(function(j){ return { ok: res.ok, status: res.status, body: j }; })
+          .catch(function(){ return { ok: res.ok, status: res.status, body: null }; });
+      }).then(function(r){
+        // FAIL CLOSED: only a clean {ok:true, saved:true} is success.
+        if (!r.ok || !r.body || r.body.ok !== true || r.body.saved !== true) {
+          busy(false);
+          showErr((r.body && r.body.message) ? r.body.message
+            : (r.status === 403 ? 'You do not have permission to edit contacts.'
+               : 'Save failed (' + r.status + '). Your changes were NOT saved - please retry.'));
+          return; // stay in edit mode
+        }
+        // Update the in-memory directory cache with the server's authoritative row
+        // so the re-render shows the new values immediately (no refetch race). Also
+        // clear the promise so the next cold load re-pulls from the server.
+        var saved = r.body.contact || null;
+        if (saved && Array.isArray(PF_CONTACTS)) {
+          var found = false;
+          for (var i = 0; i < PF_CONTACTS.length; i++) {
+            if (String(PF_CONTACTS[i].contactId||'').toUpperCase() === cid) { PF_CONTACTS[i] = saved; found = true; break; }
+          }
+          if (!found) PF_CONTACTS.push(saved);
+        } else {
+          PF_CONTACTS = null;
+        }
+        _pfContactsPromise = null;
+        // Re-render the whole record so every group using this contact refreshes.
+        var card = ed.closest ? ed.closest('.pr-card') : null;
+        var num = _curNum || '';
+        var root = (card && (card.closest('.pr-root') || card.parentElement)) || document.getElementById('prGenericRoot');
+        if (num && window.renderProjectRecord) window.renderProjectRecord(num, root);
+        else if (window.pfCrmRenderCards) window.pfCrmRenderCards(document);
+      }).catch(function(){
+        busy(false);
+        showErr('Save failed: could not reach the server. Your changes were NOT saved - please retry.');
+      });
+    };
 
     // The label prefix of a contact-name field, e.g.
     //   "Owner Contact 1 - Contact Name"  ->  "Owner Contact 1 "

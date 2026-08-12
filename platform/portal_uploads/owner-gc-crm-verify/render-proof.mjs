@@ -251,7 +251,9 @@ await (async function(){
     !!gcHost.querySelector('.pr-role-tag') && /General Contractor/.test(gcHost.querySelector('.pr-role-tag').textContent));
   ok('D Owner header row is the 6-field order',
     !!ownerHost.querySelector('.pr-crow-head') &&
-    [...ownerHost.querySelector('.pr-crow-head').querySelectorAll('span')].map(s=>s.textContent).join('|') ===
+    // exclude the optional .pr-crow-act edit-affordance span (office/CRM only)
+    [...ownerHost.querySelector('.pr-crow-head').querySelectorAll('span')]
+      .filter(s=>!s.classList.contains('pr-crow-act')).map(s=>s.textContent).join('|') ===
     'Name|Title|Office Phone|Cell Phone|Email|Notes');
 })();
 

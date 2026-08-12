@@ -268,13 +268,20 @@ await (async function(){
     ownerHost.querySelectorAll('.pr-crow').length >= 3 && // header + 2 contacts
     !ownerHost.querySelector('.pr-ccard-head, .pr-ccard'));
   const hdr = ownerHost.querySelector('.pr-crow.pr-crow-head');
+  // Header carries the 6 FIELD columns in order; an optional 7th .pr-crow-act span
+  // (edit affordance, office/CRM only) is present but not a data column, so assert
+  // the six field-class spans rather than the raw span count (Brad 2026-08-11:
+  // per-row Edit added for directory contacts).
+  const hdrFieldSpans = hdr ? [...hdr.querySelectorAll('span')].filter(s=>!s.classList.contains('pr-crow-act')) : [];
   ok('D header row = Name|Title|Office Phone|Cell Phone|Email|Notes', !!hdr &&
-    [...hdr.querySelectorAll('span')].map(s=>s.textContent).join('|') ===
+    hdrFieldSpans.map(s=>s.textContent).join('|') ===
     'Name|Title|Office Phone|Cell Phone|Email|Notes');
-  // The first data row (Nathan) exposes all six columns incl Notes.
+  // The first data row (Nathan) exposes all six columns incl Notes (plus an optional
+  // .pr-crow-act edit span for office/CRM users — excluded from the field count).
   const dataRows = [...ownerHost.querySelectorAll('.pr-crow:not(.pr-crow-head)')];
   const nathan = dataRows.find(r=>/Nathan Westhoff/.test(r.textContent));
-  ok('D data row has 6 column spans', !!nathan && nathan.querySelectorAll(':scope > span').length === 6);
+  ok('D data row has 6 field column spans', !!nathan &&
+    [...nathan.querySelectorAll(':scope > span')].filter(s=>!s.classList.contains('pr-crow-act')).length === 6);
   ok('D Notes column populated from contact record', !!nathan && /Primary decision maker/.test(nathan.textContent));
   ok('D office + cell phone both render in row', !!nathan &&
     /2604130000/.test(nathan.querySelector('.pr-crow-off').innerHTML) &&
