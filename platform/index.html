@@ -14105,20 +14105,28 @@ try {
     // ignores them (the wrap owns its OWN editor + the reserved __submittal_cycles key,
     // exactly like the prereqs checklist owns __submittal_prereqs). dsf = the Approved
     // Shop Dwgs folder record for the folder link (shared across all cycles).
+    // Cycle-nav tab bar HTML: Original | Rev1 | Rev2 ... The active tab is highlighted; each
+    // tab carries data-swf-rev so pfSwfView switches the view. Empty string when there is
+    // only ONE cycle (no tabs needed). Shared by submittalWorkflowBlock AND the in-place
+    // refresh so both emit an identical bar.
+    function pfSwfNavHtml(cycles, activeRev){
+      if (!cycles || cycles.length <= 1) return '';
+      var tabs = cycles.map(function(c){
+        var on = (c.rev === activeRev) ? ' pf-swf-tab-on' : '';
+        return '<button type="button" class="pf-swf-tab'+on+'" data-swf-rev="'+E(String(c.rev))+'" '
+          + 'onclick="event.stopPropagation();window.pfSwfView(this)">'+E(pfCycleLabel(c.rev))+'</button>';
+      }).join('');
+      return '<div class="pf-swf-nav" role="tablist" aria-label="Submittal revision cycles">'+tabs+'</div>';
+    }
     function submittalWorkflowBlock(dsf){
       var cycles = pfSubmittalCycles();
       var activeRev = pfActiveCycleRev(cycles);
       var active = null;
       for (var i = 0; i < cycles.length; i++) if (cycles[i].rev === activeRev) { active = cycles[i]; break; }
       if (!active) active = cycles[cycles.length - 1] || { rev:0, prereqs_sent:'', actual_completion:'', pf_submits_gc:'', status:'' };
-      // Cycle-nav bar: Original | Rev1 | Rev2 ... The active tab is highlighted; each
-      // tab carries data-swf-rev so the click handler switches the view.
-      var tabs = cycles.map(function(c){
-        var on = (c.rev === active.rev) ? ' pf-swf-tab-on' : '';
-        return '<button type="button" class="pf-swf-tab'+on+'" data-swf-rev="'+E(String(c.rev))+'" '
-          + 'onclick="event.stopPropagation();window.pfSwfView(this)">'+E(pfCycleLabel(c.rev))+'</button>';
-      }).join('');
-      var navBar = '<div class="pf-swf-nav" role="tablist" aria-label="Submittal revision cycles">'+tabs+'</div>';
+      // Cycle-nav bar: Original | Rev1 | Rev2 ... (shared helper so the in-place refresh
+      // rebuilds an identical bar). Only shown when there is more than one cycle.
+      var navBar = pfSwfNavHtml(cycles, active.rev);
       // Read view of the active cycle's field chain + computed dates + status note.
       var body = pfSwfCycleReadHtml(active);
       // #7 Approved Shop Dwgs Folder link (SharePoint) — shared across cycles.
@@ -14142,7 +14150,7 @@ try {
       // is NOT its own E&D subgroup. Rendered after the folder links, before the actions.
       var sgeInline = siteGradeElevationsInline();
       return '<div class="pf-swf-wrap" data-swf-num="'+E(_curNum)+'" data-swf-rev="'+E(String(active.rev))+'">'
-        + (cycles.length > 1 ? navBar : '')
+        + navBar
         + '<div class="pf-swf-body">' + body + '</div>'
         + fields([ stampedRow, folderRow ])
         + sgeInline
@@ -14224,8 +14232,8 @@ try {
       return '<div class="pf-swf-grid">'
         + drow('Files Sent to GGG', dateCtl('prereqs_sent', cy.prereqs_sent))
         + drow('Shop Drawings Due from Garbin', shopCtl, shopExtra)
-        + drow('Actual Submittal Completion', dateCtl('actual_completion', cy.actual_completion))
-        + drow('Date PF Submits to GC', dateCtl('pf_submits_gc', cy.pf_submits_gc), ' ' + gcHint)
+        + drow('Shop Drawings Received from Garbin', dateCtl('actual_completion', cy.actual_completion))
+        + drow('PF Submitted to GC', dateCtl('pf_submits_gc', cy.pf_submits_gc), ' ' + gcHint)
         + drow('Submittal Status', statusCtl)
         + '</div>'
         + statusNote;
@@ -20283,9 +20291,10 @@ try {
         if (!window.confirm('Discard your unsaved edits to this cycle and switch view?')) return;
       }
       _pfCycleView[num] = rev;
-      var card = wrap.closest('.pr-card');
-      var root = (card && card.closest('.pr-root')) || (card && card.parentElement) || document.getElementById('prGenericRoot');
-      window.renderProjectRecord(num, root);
+      // IN-PLACE (Brad 2026-08-12): switching the viewed cycle refreshes ONLY the submittal
+      // block (nav highlight + body) — no full record re-render, so the E&D card stays open
+      // and scroll is preserved.
+      pfSwfRefreshInPlace(wrap, num);
     };
     // Convert a stored date (ISO or MM/DD/YYYY) to an <input type=date> value (YYYY-MM-DD).
     function pfSwfToInputDate(v){
@@ -20368,7 +20377,26 @@ try {
         if (!active) active = cycles[cycles.length - 1] || { rev:0, prereqs_sent:'', actual_completion:'', pf_submits_gc:'', status:'', shop_due_override:'' };
         // Keep the wrap's active-rev attribute honest (used by field-change + reset).
         wrap.setAttribute('data-swf-rev', String(active.rev));
+        // Rebuild the cycle-nav tab bar in place (a Start Rev adds a cycle => the bar
+        // appears/grows; a tab switch moves the active highlight). Insert it as the FIRST
+        // child of the wrap (before .pf-swf-body), matching submittalWorkflowBlock's order.
+        var navHtml = pfSwfNavHtml(cycles, active.rev);
+        var navEl = wrap.querySelector('.pf-swf-nav');
         var bodyEl = wrap.querySelector('.pf-swf-body');
+        if (navHtml) {
+          if (navEl) {
+            navEl.outerHTML = navHtml;   // replace existing bar (active tab moved)
+          } else {
+            var tmpNav = document.createElement('div');
+            tmpNav.innerHTML = navHtml;
+            var newNav = tmpNav.firstChild;
+            if (bodyEl && newNav) wrap.insertBefore(newNav, bodyEl);
+          }
+        } else if (navEl) {
+          navEl.parentNode.removeChild(navEl); // dropped back to a single cycle
+        }
+        // .pf-swf-body may have been re-fetched if the nav replace touched siblings; re-query.
+        bodyEl = wrap.querySelector('.pf-swf-body');
         if (bodyEl) bodyEl.innerHTML = pfSwfCycleReadHtml(active);
         // Refresh the Start Rev action row: it shows only when the active (latest) cycle is
         // Revise & Resubmit. Recompute + replace just that bar so a status change reflects
@@ -20463,7 +20491,10 @@ try {
                  pf_submits_gc: c.pf_submits_gc, status: c.status, shop_due_override: c.shop_due_override || '' };
       });
       arr.push({ rev: nextRev, prereqs_sent: '', actual_completion: '', pf_submits_gc: '', status: '', shop_due_override: '' });
-      pfSwfPersist(wrap, num, arr, nextRev, null, function(msg){ pfSwfMsg(wrap, msg, true); });
+      // IN-PLACE (Brad 2026-08-12): starting a revision persists the new cycle and refreshes
+      // ONLY the submittal block (nav bar gains the new tab, body switches to the new cycle),
+      // keeping the E&D card open + scroll preserved. No full record re-render / bounce.
+      pfSwfPersist(wrap, num, arr, nextRev, null, function(msg){ pfSwfMsg(wrap, msg, true); }, wrap);
     };
 
     // =======================================================================
