@@ -2586,6 +2586,15 @@ tr.pf-dragging { opacity: 0.45; }
   margin: 12px 0 6px 10px; padding: 2px 0 3px 8px;
   border-left: 3px solid var(--accent);
 }
+/* Child-level sub-header: one level deeper than a top-level .pr-subgroup. Extra
+   left indent + lighter weight/color + thinner rule so it reads as a CHILD of the
+   subgroup above it (Brad 2026-08-12: keep As Built Drawings a peer of PF Design
+   Submittal, with each subgroup's own sub-headers nested under it). */
+.pr-subgroup-sub {
+  font-weight: 600; font-size: 0.72rem; color: var(--text-2);
+  margin-left: 28px; border-left-width: 2px;
+  border-left-color: var(--text-3, var(--text-2));
+}
 .pr-subgroup-note {
   font-size: 0.72rem; color: var(--text-2); font-style: italic;
   margin: 0 0 6px 18px;
@@ -13293,6 +13302,17 @@ try {
     // descendants of the same card and the pfEditSection/pfSaveSection scan is
     // unaffected. subgroupNote(t): an optional italic helper line under a subgroup.
     function subgroup(t){ return '<div class="pr-subgroup">'+E(t)+'</div>'; }
+    // Child-level sub-header (Brad 2026-08-12): a subgroup that sits UNDER a top-level
+    // subgroup() header. Same divider idiom (pure display, NOT a wrapper — every field
+    // stays a direct .pr-field child of the ONE section card, so override keys still
+    // round-trip), just indented + lighter so the hierarchy reads correctly. Used for
+    // the sub-headers that belong to a parent subgroup (e.g. "GGG Design Notes" under
+    // "PF Design Submittal"; "Field As-Built Drawings" / "Stamped Final As-Built
+    // Drawings" under "As Built Drawings"). This keeps the three top-level Engineering
+    // & Design subgroups (Prelim Design / PF Design Submittal / As Built Drawings) as
+    // visual PEERS, and their sub-headers one level deeper — so As Built Drawings no
+    // longer reads as if it lives under PF Design Submittal.
+    function subgroupSub(t){ return '<div class="pr-subgroup pr-subgroup-sub">'+E(t)+'</div>'; }
     function subgroupNote(t){ return '<div class="pr-subgroup-note">'+E(t)+'</div>'; }
 
     // ---- Garbin Prelim (Engineering & Design) --------------------------------
@@ -13340,7 +13360,7 @@ try {
       // to the display-only "Garbin Prelim Workbook" field in the Prelim Design subsection
       // (see garbinPrelimWorkbookField). This block now shows the DATA READOUT only
       // (LF / Total Columns / Column Diameter (in) / Bearing).
-      return subgroup('GGG Design Notes')
+      return subgroupSub('GGG Design Notes')
         + subgroupNote('Values pulled from the Garbin Prelim workbook (Prelim Design Summary tab). Workbook link: see "Garbin Prelim Workbook" above.')
         + fields(rows);
     }
@@ -15606,14 +15626,14 @@ try {
           // Sub-sub-group A: Field As-Built Drawings (daily field uploads). UI shell
           // only — an editable link/list field for now. Rendered as its own subgroup()
           // header so it reads as a distinct group beneath "As Built Drawings".
-        + subgroup('Field As-Built Drawings')
+        + subgroupSub('Field As-Built Drawings')
         + subgroupNote('FUTURE (not yet built): each daily-report upload saves a dated file per day; Peter compares installed vs the Approved Shop Drawing and posts a daily summary (LF, columns, start/end from rig data).')
         + fields([
             fieldLinked('Field As-Built Drawings Link', '', '', 'website'),
             field('Field As-Built Notes', '')
           ])
           // Sub-sub-group B: Stamped Final As-Built Drawings.
-        + subgroup('Stamped Final As-Built Drawings')
+        + subgroupSub('Stamped Final As-Built Drawings')
         + fields([
             fieldLinked('Stamped Final As-Built Link', '', '', 'website')
           ])
