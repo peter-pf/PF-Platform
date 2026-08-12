@@ -16700,15 +16700,11 @@ try {
             field('Demob Date', ''),
             field('Demob Transport Company', '')
           ])
-        + subhead('Rental Equipment')
-        + fields([
-            field('Rental Equipment', ''),
-            field('Rental Company', ''),
-            field('Rental Date Rented/Active', ''),
-            field('Rental Anticipated Days Needed', ''),
-            field('Rental Anticipated Return Date', ''),
-            field('Rental Actual Date Called Off Rent', '')
-          ])
+        // Rental Equipment fields MOVED OUT (Brad 2026-08-12) into their own "7. Rental
+        // Equipment" subsection below (rendered right after this "6. Mobilization to Site"
+        // block). They stay PLAIN siteReadiness fields (same override key + save flow), so
+        // existing rental data + editability are preserved — only their placement + header
+        // changed. See the '7. Rental Equipment' subgroup at the end of srBody.
         + subhead('Materials (Stone, if Aggregate Pier)')
         + subgroupNote('Helical -> piling form (TBD); Rigid Inclusions -> other items.')
         + fields([
@@ -16724,6 +16720,21 @@ try {
             field('Fuel Vendor', ''),
             field('Fuel Contact', ''),
             field('Fuel Delivery Dates', '')
+          ])
+
+        // ---- Subsection 7: Rental Equipment (Brad 2026-08-12) ----
+        // Pulled OUT of "6. Mobilization to Site" into its own numbered subsection directly
+        // after section 6. These stay PLAIN siteReadiness field() rows (SAME override key +
+        // Edit/Save as before), so existing rental data still displays and editability is
+        // unchanged — only the placement + the promoted "7." header changed.
+        + subgroup('7. Rental Equipment')
+        + fields([
+            field('Rental Equipment', ''),
+            field('Rental Company', ''),
+            field('Rental Date Rented/Active', ''),
+            field('Rental Anticipated Days Needed', ''),
+            field('Rental Anticipated Return Date', ''),
+            field('Rental Actual Date Called Off Rent', '')
           ]);
       html += card(5, 'Site Readiness / Project Setup', null,
         srBody + linkRow(L.site), false, 'siteReadiness');
