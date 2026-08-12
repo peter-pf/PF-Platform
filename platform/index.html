@@ -2212,6 +2212,32 @@ tr.pf-dragging { opacity: 0.45; }
 .pr-field-src { font-size: 0.66rem; color: var(--text-3); font-style: italic; }
 .pr-field-edited { margin-left: 5px; color: var(--accent); font-size: 0.7rem; }
 
+/* ---- SharePoint folder-link button (Brad 2026-08-12) ----------------------
+   REUSABLE style for every project-detail SharePoint folder/file link (Submittal
+   Design Files, Stamped Drawings, Approved Shop Drawings, Garbin Prelim Folder,
+   Garbin Prelim Workbook). A REAL anchor (accessibility + target _blank), styled
+   as a small blue button with an inline SVG folder icon so it stands out. The SVG
+   is emitted by pfFolderLink() in the renderer; these rules give it the button look.
+   Kept generic (not tied to any one link) so all folder links read identically. */
+.pf-folder-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px; border-radius: 6px;
+  font-size: 0.82rem; font-weight: 600; line-height: 1.3;
+  color: var(--accent);
+  background: rgba(0,123,196,0.07);
+  border: 1px solid rgba(0,123,196,0.35);
+  text-decoration: none; word-break: normal;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.pf-folder-link:hover, .pf-folder-link:focus {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+  text-decoration: none;
+}
+.pf-folder-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* The inline SVG folder icon inherits currentColor so it flips to white on hover. */
+.pf-folder-link .pf-folder-ico { width: 15px; height: 15px; flex: 0 0 auto; display: block; }
+.pf-folder-link .pf-folder-txt { word-break: break-word; }
+
 /* ---- General Info rework (Brad 2026-08-06 / PDF-grouping 2026-08-07) ------ */
 /* FIXED 2-column grouping that matches Brad's spec PDFs: fields are grouped    */
 /* LEFT vs RIGHT (see twoCol() in the renderer) so fields that belong together  */
@@ -13503,6 +13529,24 @@ try {
       if (isNaN(n)) return '';
       return String(window.pfFmtQty(n * 12));
     }
+    // ---- REUSABLE SharePoint folder/file link (Brad 2026-08-12) --------------
+    // Emits ONE styled anchor (.pf-folder-link) for every project-detail SharePoint
+    // folder/file link: an inline SVG folder icon + the given text, rendered as a small
+    // blue button. url is normalized to an absolute https href (same guard used by every
+    // folder-link helper). text is the visible label. A REAL anchor (target _blank,
+    // rel=noopener) for accessibility. Callers only pass this when a url exists; the
+    // blank-graceful path stays with each caller (yellow "-" placeholder, no anchor).
+    function pfFolderLink(url, text){
+      var raw = String(url == null ? '' : url).trim();
+      var href = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : ('https://' + raw.replace(/^\/+/, ''));
+      // Inline SVG folder glyph (currentColor so it flips to white on hover). aria-hidden:
+      // the anchor text is the accessible name.
+      var ico = '<svg class="pf-folder-ico" viewBox="0 0 24 24" fill="none" '
+        + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+        + '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>';
+      return '<a class="pf-folder-link" href="'+E(href)+'" target="_blank" rel="noopener noreferrer">'
+        + ico + '<span class="pf-folder-txt">'+E(text)+'</span></a>';
+    }
     // "Garbin Prelim Workbook" field (Brad 2026-08-12): DISPLAY-ONLY, auto-from-Garbin
     // clickable link to the Garbin Prelim workbook file. This REPLACES the former
     // fillable "Link to Prelim Design" field — Brad: that field is not fillable; keep the
@@ -13517,11 +13561,9 @@ try {
       var label = 'Garbin Prelim Workbook';
       var url = (gp && gp.webUrl != null) ? String(gp.webUrl).trim() : '';
       if (url) {
-        var href = /^[a-z][a-z0-9+.-]*:\/\//i.test(url) ? url : ('https://' + url.replace(/^\/+/, ''));
         var lbl = gp.source_file ? String(gp.source_file) : 'Open workbook';
-        var linkHtml = '<a href="'+E(href)+'" target="_blank" rel="noopener noreferrer">'+E(lbl)+'</a>';
         return '<div class="pr-field"><span class="pr-field-label">'+E(label)+'</span>'
-             + '<span class="pr-field-value">'+linkHtml+'</span>'
+             + '<span class="pr-field-value">'+pfFolderLink(url, lbl)+'</span>'
              + '<span class="pr-field-src">Garbin Prelim</span></div>';
       }
       // No webUrl -> graceful blank (yellow, no link), same look as an empty field().
@@ -13541,10 +13583,8 @@ try {
       var label = 'Garbin Prelim Folder';
       var url = (gp && gp.folder_url != null) ? String(gp.folder_url).trim() : '';
       if (url) {
-        var href = /^[a-z][a-z0-9+.-]*:\/\//i.test(url) ? url : ('https://' + url.replace(/^\/+/, ''));
-        var linkHtml = '<a href="'+E(href)+'" target="_blank" rel="noopener noreferrer">Garbin Prelim Folder</a>';
         return '<div class="pr-field"><span class="pr-field-label">'+E(label)+'</span>'
-             + '<span class="pr-field-value">'+linkHtml+'</span>'
+             + '<span class="pr-field-value">'+pfFolderLink(url, 'Garbin Prelim Folder')+'</span>'
              + '<span class="pr-field-src">Garbin Prelim</span></div>';
       }
       // No folder_url -> graceful blank (yellow, no link), same look as an empty field().
@@ -13769,9 +13809,8 @@ try {
       var label = 'Submittal Design Files';
       var url = (sdi && sdi.folder_url != null) ? String(sdi.folder_url).trim() : '';
       if (url) {
-        var href = /^[a-z][a-z0-9+.-]*:\/\//i.test(url) ? url : ('https://' + url.replace(/^\/+/, ''));
         return '<div class="pr-field"><span class="pr-field-label">'+E(label)+'</span>'
-             + '<span class="pr-field-value"><a href="'+E(href)+'" target="_blank" rel="noopener noreferrer">Submittal Design Files</a></span>'
+             + '<span class="pr-field-value">'+pfFolderLink(url, 'Submittal Design Files')+'</span>'
              + '<span class="pr-field-src">SharePoint</span></div>';
       }
       return '<div class="pr-field"><span class="pr-field-label">'+E(label)+'</span>'
@@ -14005,6 +14044,9 @@ try {
       var body = pfSwfCycleReadHtml(active);
       // #7 Approved Shop Dwgs Folder link (SharePoint) — shared across cycles.
       var folderRow = pfDesignSubmittalFolderRow(dsf);
+      // Stamped Drawings folder link (submitted to GC) — rendered BEFORE the Approved
+      // Shop Drawings link (stamped = submitted, approved = after). Same shared record.
+      var stampedRow = pfStampedDrawingsFolderRow(dsf);
       // Office actions: Edit this cycle (always, office); Start Rev N (only when the
       // ACTIVE cycle's status is Revise & Resubmit AND it is the LATEST cycle, so a
       // revision only spawns off the newest Revise decision — never off an older one).
@@ -14022,7 +14064,7 @@ try {
         + subgroupNote('Submittal workflow: dates flow top-to-bottom. The two grey lines are auto-computed (business days, weekends skipped) and are not editable. Each revision (Original, Rev1, Rev2...) keeps its own full history — click a tab above to view it.')
         + navBar
         + '<div class="pf-swf-body">' + body + '</div>'
-        + fields([ folderRow ])
+        + fields([ stampedRow, folderRow ])
         + actions
         + '<div class="pf-swf-msg" style="display:none"></div>'
         + '</div>';
@@ -14169,12 +14211,31 @@ try {
     // auto link, like garbinPrelimFolderField / shopDwgInfoLinkRow). Opens the folder
     // where approved/reviewed submittals are saved (TASK B, Brad 2026-08-12).
     function pfDesignSubmittalFolderRow(dsf){
-      var label = 'Approved Shop Dwgs Folder';
+      var label = 'Approved Shop Drawings';
       var url = (dsf && dsf.folder_url != null) ? String(dsf.folder_url).trim() : '';
       if (url) {
-        var href = /^[a-z][a-z0-9+.-]*:\/\//i.test(url) ? url : ('https://' + url.replace(/^\/+/, ''));
         return '<div class="pr-field"><span class="pr-field-label">'+E(label)+'</span>'
-             + '<span class="pr-field-value"><a href="'+E(href)+'" target="_blank" rel="noopener noreferrer">Open folder</a></span>'
+             + '<span class="pr-field-value">'+pfFolderLink(url, 'Approved Shop Drawings')+'</span>'
+             + '<span class="pr-field-src">SharePoint</span></div>';
+      }
+      return '<div class="pr-field"><span class="pr-field-label">'+E(label)+'</span>'
+           + '<span class="pr-field-value empty blank">-</span></div>';
+    }
+    // Stamped Drawings SharePoint folder link row (Brad 2026-08-12). The stamped drawings
+    // submitted to the GC for review/approval — the step BEFORE approval. Reads the new
+    // `stamped_folder_url` field on the SAME pf-design-submittal record (built by
+    // sync/build-pf-design-submittal-folder.py, which now also locates each project's
+    // "03 - Engineering & Design/Stamped Drawings" folder). Same blank-graceful idiom as
+    // pfDesignSubmittalFolderRow: a styled button link where the folder exists, a yellow
+    // "-" placeholder otherwise (never a broken href). Display-only (no override
+    // round-trip). Rendered BEFORE the Approved Shop Drawings link in the workflow
+    // (stamped = submitted, approved = after).
+    function pfStampedDrawingsFolderRow(dsf){
+      var label = 'Stamped Drawings';
+      var url = (dsf && dsf.stamped_folder_url != null) ? String(dsf.stamped_folder_url).trim() : '';
+      if (url) {
+        return '<div class="pr-field"><span class="pr-field-label">'+E(label)+'</span>'
+             + '<span class="pr-field-value">'+pfFolderLink(url, 'Stamped Drawings')+'</span>'
              + '<span class="pr-field-src">SharePoint</span></div>';
       }
       return '<div class="pr-field"><span class="pr-field-label">'+E(label)+'</span>'

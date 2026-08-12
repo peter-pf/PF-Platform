@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""Build data/pf-design-submittal.js -- the SharePoint "Approved Shop Dwgs" folder webUrl per project.
+"""Build data/pf-design-submittal.js -- per-project SharePoint submittal folder webUrls.
 
-WHY (Brad 2026-08-12, TASK B repoint): once submittals are approved/reviewed, the file is
-saved to the project's "Approved Shop Dwgs" folder under "03 - Engineering & Design". The
-portal's Engineering & Design > PF Design Submittal subsection needs a clickable link that
-opens that folder from SharePoint. This sync finds the "Approved Shop Dwgs" folder under
-each project's "03 - Engineering & Design" and captures its webUrl so the portal can render
-a clickable "Approved Shop Dwgs Folder" link. A project with no such folder simply gets NO
-entry, and the portal renders the link gracefully blank (never a broken href).
+WHY (Brad 2026-08-12): the portal's Engineering & Design > PF Design Submittal subsection
+needs clickable links that open the project's submittal folders from SharePoint. This sync
+finds, under each project's "03 - Engineering & Design":
+  - "Approved Shop Dwgs"  -> folder_url          (where approved/reviewed submittals save)
+  - "Stamped Drawings"    -> stamped_folder_url  (stamped drawings submitted to the GC for
+                                                  review/approval -- the step BEFORE approval)
+and captures each folder's webUrl. Both are matched from a SINGLE E&D-children listing per
+project (same folder-webUrl technique, reused). A project with NEITHER folder gets NO entry;
+a project missing just one folder gets '' for that url. The portal renders each link
+gracefully blank when its url is absent (never a broken href).
 
 REPOINT NOTE: Stage 1 originally targeted a "PF Design Submittal" folder that does NOT exist
 under any project (0 populated). The real, existing target folder is "Approved Shop Dwgs"
@@ -65,6 +68,10 @@ ENG_BASE = "03 - Engineering & Design"
 # "Approved Shop Dwgs" that projects actually use). "Dwg"/"Dwgs"/"Drawing"/"Drawings"
 # all accepted; optional trailing 's'.
 PFDS_FOLDER_RE = re.compile(r"approved\s*shop\s*(dwgs?|drawings?)\b", re.I)
+# The "Stamped Drawings" folder under "03 - Engineering & Design" (Brad 2026-08-12): the
+# stamped drawings submitted to the GC for review/approval — the step BEFORE approval.
+# Matched case-insensitively; tolerant of "Stamped Dwg(s)" / "Stamped Drawing(s)".
+STAMPED_FOLDER_RE = re.compile(r"stamped\s*(dwgs?|drawings?)\b", re.I)
 
 # Only real project folders start with an "NN-NNN" number. Skip the completed-projects
 # roll-up folder, the template placeholder, and any non-project folders.
@@ -119,13 +126,25 @@ def resolve_projects(token, only=None):
 
 
 def resolve_pfds_folder(token, folder):
-    """For one project folder, find the "Approved Shop Dwgs" folder under
-    '03 - Engineering & Design' and return its webUrl (or None if absent).
+    """For one project folder, find BOTH the "Approved Shop Dwgs" folder AND the
+    "Stamped Drawings" folder under '03 - Engineering & Design' and return their webUrls.
 
-    Returns a dict: {found: bool, webUrl, folder_name, path} -- found=False when the
-    project has no Engineering & Design folder OR no Approved Shop Dwgs subfolder.
+    The E&D children are listed ONCE and both folders matched from that single listing
+    (same folder-webUrl technique, reused). Returns a dict:
+        {
+          found: bool,          # True if the Approved Shop Dwgs folder was found
+          webUrl, folder_name, path,                # Approved Shop Dwgs
+          stamped_found: bool,
+          stamped_webUrl, stamped_folder_name, stamped_path,   # Stamped Drawings
+        }
+    found=False when the project has no Engineering & Design folder OR no Approved Shop
+    Dwgs subfolder; stamped_found is independent (a project may have one but not the
+    other). The portal renders each link gracefully blank when its url is absent.
     """
-    result = {"found": False, "webUrl": "", "folder_name": "", "path": ""}
+    result = {
+        "found": False, "webUrl": "", "folder_name": "", "path": "",
+        "stamped_found": False, "stamped_webUrl": "", "stamped_folder_name": "", "stamped_path": "",
+    }
     eng_kids = try_list_children_by_path(token, f"{PROJECTS_BASE}/{folder}/{ENG_BASE}")
     if eng_kids is None:
         return result  # no Engineering & Design folder at all
@@ -133,14 +152,20 @@ def resolve_pfds_folder(token, folder):
         if not c.get("folder"):
             continue
         name = str(c.get("name", ""))
-        if PFDS_FOLDER_RE.search(name):
+        if not result["found"] and PFDS_FOLDER_RE.search(name):
             result.update(
                 found=True,
                 webUrl=c.get("webUrl", "") or "",
                 folder_name=name,
                 path=f"{folder}/{ENG_BASE}/{name}",
             )
-            return result
+        elif not result["stamped_found"] and STAMPED_FOLDER_RE.search(name):
+            result.update(
+                stamped_found=True,
+                stamped_webUrl=c.get("webUrl", "") or "",
+                stamped_folder_name=name,
+                stamped_path=f"{folder}/{ENG_BASE}/{name}",
+            )
     return result
 
 
@@ -149,27 +174,33 @@ def build(token, only=None, verbose=True):
     report = []  # (projnum, status, detail)
     for projnum, folder in resolve_projects(token, only=only):
         res = resolve_pfds_folder(token, folder)
-        if not res["found"]:
-            report.append((projnum, "no-approved-shop-dwgs-folder", "no 'Approved Shop Dwgs' folder under E&D"))
+        # A project earns an entry if it has EITHER the Approved Shop Dwgs folder OR the
+        # Stamped Drawings folder (each link renders independently + blank-graceful).
+        if not res["found"] and not res["stamped_found"]:
+            report.append((projnum, "no-submittal-folders", "no 'Approved Shop Dwgs' or 'Stamped Drawings' folder under E&D"))
             continue
         projects[projnum] = {
             "folder_url": res["webUrl"],
             "folder_name": res["folder_name"],
             "source_path": res["path"],
+            "stamped_folder_url": res["stamped_webUrl"],
+            "stamped_folder_name": res["stamped_folder_name"],
+            "stamped_source_path": res["stamped_path"],
         }
-        report.append((projnum, "ok", res["path"]))
+        detail = "approved=" + ("y" if res["found"] else "n") + " stamped=" + ("y" if res["stamped_found"] else "n")
+        report.append((projnum, "ok", detail + "  " + (res["path"] or res["stamped_path"])))
 
     data = {
         "projects": projects,
         "meta": {
             "generated": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-            "source": "SharePoint 04 - Project Management/02 - Projects/<project>/03 - Engineering & Design/Approved Shop Dwgs (folder webUrl)",
-            "note": "folder_url is the driveItem webUrl of the project's 'Approved Shop Dwgs' folder; projects without one get no entry (portal renders the link gracefully blank).",
+            "source": "SharePoint 04 - Project Management/02 - Projects/<project>/03 - Engineering & Design/{Approved Shop Dwgs, Stamped Drawings} (folder webUrls)",
+            "note": "folder_url = the driveItem webUrl of the project's 'Approved Shop Dwgs' folder; stamped_folder_url = the 'Stamped Drawings' folder webUrl (submitted to the GC, the step before approval). A project with neither folder gets no entry; a missing individual url is '' (portal renders that link gracefully blank).",
             "project_count": len(projects),
         },
     }
     if verbose:
-        print("Approved Shop Dwgs folder sync:")
+        print("Submittal folders sync (Approved Shop Dwgs + Stamped Drawings):")
         for projnum, status, detail in report:
             print(f"  {projnum}: {status}  {detail}")
         print(f"  -> {len(projects)} project(s) populated")
@@ -180,9 +211,10 @@ def write_js(data):
     os.makedirs(DATA_DIR, exist_ok=True)
     with open(OUT_JS, "w") as f:
         f.write("// AUTO-GENERATED by sync/build-pf-design-submittal-folder.py -- do not edit by hand.\n")
-        f.write("// Per-project SharePoint 'Approved Shop Dwgs' folder webUrl (Engineering & Design).\n")
-        f.write("// Source: '03 - Engineering & Design/Approved Shop Dwgs' driveItem webUrl.\n")
-        f.write("// Read by the Engineering & Design 'Approved Shop Dwgs Folder' link (window.PF_DESIGN_SUBMITTAL global kept for RBAC/feed plumbing continuity).\n")
+        f.write("// Per-project SharePoint submittal folder webUrls (Engineering & Design):\n")
+        f.write("//   folder_url          = '03 - Engineering & Design/Approved Shop Dwgs' driveItem webUrl.\n")
+        f.write("//   stamped_folder_url  = '03 - Engineering & Design/Stamped Drawings'  driveItem webUrl (submitted to GC, before approval).\n")
+        f.write("// Read by the Engineering & Design 'Approved Shop Drawings' + 'Stamped Drawings' links (window.PF_DESIGN_SUBMITTAL global kept for RBAC/feed plumbing continuity).\n")
         f.write("window.PF_DESIGN_SUBMITTAL = ")
         json.dump(data, f, indent=2)
         f.write(";\n")
