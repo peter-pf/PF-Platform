@@ -15787,6 +15787,11 @@ try {
       _curOverrides = (_ovStore && _ovStore.sections) ? _ovStore.sections : {};
       _curMeta = (_ovStore && _ovStore._meta) || null;
       _curSection = '';
+      // Reset the always-live edit flag at the TOP of every render (Brad 2026-08-12): it is
+      // turned ON only around the Site Readiness section (+nested cards) and OFF right after.
+      // Resetting it here too guarantees a mid-render throw inside that window can never leak
+      // the flag into the NEXT render (which would wrongly render other sections as live).
+      _srLiveEdit = false;
       // Activate the per-project BUDGET overlay for the Financials Budget vs Actual
       // table. If not loaded yet (e.g. a code path that renders before openProject),
       // load it now (fail closed). _curBudget = { rows, _meta, loaded, error }.
