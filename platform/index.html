@@ -14125,10 +14125,14 @@ try {
       var navBar = pfSwfNavHtml(cycles, active.rev);
       // Read view of the active cycle's field chain + computed dates + status note.
       var body = pfSwfCycleReadHtml(active);
-      // #7 Approved Shop Dwgs Folder link (SharePoint) — shared across cycles.
+      // Approved Shop Drawings folder link (SharePoint) — RELOCATED (Brad 2026-08-12) to
+      // render JUST BELOW the Submittal Summary table (see the return order). It is the
+      // "field and folder" = one .pr-field row (label "Approved Shop Drawings" + the blue
+      // folder button); href/binding/style unchanged, position only.
       var folderRow = pfDesignSubmittalFolderRow(dsf);
-      // Stamped Drawings folder link (submitted to GC) — rendered BEFORE the Approved
-      // Shop Drawings link (stamped = submitted, approved = after). Same shared record.
+      // Stamped Drawings folder link (submitted to GC). STAYS in the folder-links row above
+      // the Submittal Summary table (alongside where Submittal Design Files renders in the
+      // prereqs block). Same shared pf-design-submittal record.
       var stampedRow = pfStampedDrawingsFolderRow(dsf);
       // Office actions: Start Rev N ONLY (the per-field Edit button is gone — dates are now
       // always-live inputs that save on change). Start Rev shows only when the ACTIVE cycle
@@ -14148,8 +14152,11 @@ try {
       return '<div class="pf-swf-wrap" data-swf-num="'+E(_curNum)+'" data-swf-rev="'+E(String(active.rev))+'">'
         + navBar
         + '<div class="pf-swf-body">' + body + '</div>'
-        + fields([ stampedRow, folderRow ])
+        + fields([ stampedRow ])
         + sgeInline
+        // Approved Shop Drawings folder link — moved to JUST BELOW the Submittal Summary
+        // table (Brad 2026-08-12).
+        + fields([ folderRow ])
         + actions
         + '<div class="pf-swf-msg" style="display:none"></div>'
         + '</div>';
