@@ -2610,6 +2610,9 @@ tr.pf-dragging { opacity: 0.45; }
 }
 .pr-computed-hint .pr-computed-val { font-style: normal; font-weight: 600; color: var(--text-1); }
 .pr-computed-hint.pr-computed-flag { color: #c0392b; font-style: normal; font-weight: 600; }
+/* PF Design Submittal WORKFLOW (Stage 1, Brad 2026-08-12): the "email to Garbin
+   needed" flag on the AAN / Revise status notes. Stands out on the red flag hint. */
+.pf-wf-flag { color: #c0392b; font-weight: 700; white-space: nowrap; }
 /* GC Prerequisites checklist (PF Design Submittal, Brad 2026-08-12). A table at the
    TOP of the subsection: Item | Responsible Party | Date Received (+ Reminder for office).
    Received rows read green/checked, outstanding rows amber. NOT .pr-field rows, so the
@@ -3256,6 +3259,7 @@ tr.pf-dragging { opacity: 0.45; }
     feeds.push('/data/project-record-poet.js', '/data/project-records.js',
                '/data/garbin-prelim.js',
                '/data/shop-dwg-info.js',
+               '/data/pf-design-submittal.js',
                '/data/budget-actual-poet.js', '/data/cost-code-template.js',
                '/data/budget-actuals.js', '/data/invoice-ledger.js',
                '/data/awarded-projects.js', '/data/project-history.js',
@@ -3288,6 +3292,10 @@ tr.pf-dragging { opacity: 0.45; }
     // it needs the folder link too. admin/partner already loaded it in the privileged
     // block above; add it for the BD-only case here (guarded so it is not double-pushed).
     if (!isPrivileged) feeds.push('/data/shop-dwg-info.js');
+    // PF Design Submittal folder link (Stage 1 submittal workflow, Brad 2026-08-12):
+    // same posture as shop-dwg-info (folder webUrls only, no $, office-only). admin/
+    // partner loaded it in the privileged block above; add it for BD here (guarded).
+    if (!isPrivileged) feeds.push('/data/pf-design-submittal.js');
   }
   // SEC-12: privileged roles get the raw schedule (value/gc_name); field_ops
   // gets the $/GC-stripped derivative. The raw file is server-DENIED to field_ops.
@@ -13431,6 +13439,19 @@ try {
         return g.projects[String(num)] || null;
       } catch (e) { return null; }
     }
+    // Read the current project's "PF Design Submittal" SharePoint folder record
+    // (window.PF_DESIGN_SUBMITTAL, from data/pf-design-submittal.js, built by
+    // sync/build-pf-design-submittal-folder.py). This is where the FINAL
+    // for-construction submittal is saved. Fail-closed: any missing global / project /
+    // value returns null (the link renders gracefully blank). Same idiom as
+    // pfShopDwgInfo (Stage 1 PF Design Submittal workflow, Brad 2026-08-12).
+    function pfDesignSubmittalFolder(num){
+      try {
+        var g = window.PF_DESIGN_SUBMITTAL;
+        if (!g || !g.projects || !num) return null;
+        return g.projects[String(num)] || null;
+      } catch (e) { return null; }
+    }
     // Read the stored __submittal_prereqs items map for the current project (from the
     // engineering override). Returns an object keyed by item key -> {responsible_name,
     // responsible_email, date_received}. Empty object when none stored. Never throws.
@@ -13721,6 +13742,100 @@ try {
         + '<div class="pf-prq-msg" style="display:none"></div>'
         + '</div>';
     }
+    // ---- PF Design Submittal WORKFLOW (Stage 1, Brad 2026-08-12) --------------
+    // A linear date chain + status dropdown + folder link rendered directly BELOW
+    // the PF Prerequisites checklist inside the PF Design Submittal subsection. The
+    // field order (Brad-confirmed):
+    //   1. Date Submittal Prereqs Sent to GGG   MANUAL date (was "Design Status")
+    //   2. Shop Drawings Due from Garbin        AUTO = #1 + 15 BUSINESS days (hint)
+    //   3. Actual Submittal Completion Date     MANUAL date (Garbin returns to PF)
+    //   4. Date PF Submits to GC                MANUAL date (new)
+    //   5. Submittal Due Back from GC By        AUTO = #4 + 10 BUSINESS days (hint)
+    //   6. Submittal Status                     DROPDOWN (3 options) + next-step note
+    //   7. PF Design Submittal Folder           SharePoint folder link
+    //
+    // PERSISTENCE: #1, #3, #4 and #6 are ordinary field()/dropdown rows under the
+    // `engineering` section — they round-trip through the SAME section editor +
+    // /api/project-override flat-field save (no reserved key needed; cleanFields
+    // carries them and preserves the sibling __submittal_prereqs checklist object).
+    // The two AUTO dates (#2, #5) are DERIVED at render as .pr-computed-hint divs
+    // (NOT .pr-field[data-pr-label]) so the editor's save-scan ignores them and they
+    // are never stored. Business-day math reuses pfAddBusinessDays (Mon-Fri, weekends
+    // skipped; holidays NOT handled per the phase-2 helper) + pfParseDate/pfFmtDateObj.
+    //
+    // STAGE 1 SCOPE: on "AAN"/"Revise" the note FLAGS "email to Garbin needed" only —
+    // no email is sent (Stage 3 wires the send). The Rev1/Rev2 revision-cycle
+    // mechanism is Stage 2 and is only FLAGGED here, never built.
+    function submittalWorkflowBlock(dsf){
+      // Effective (override-wins) value of each manual date, matching field()'s
+      // display resolution so the computed dates see exactly what the user sees.
+      var d1 = effVal('engineering', 'Date Submittal Prereqs Sent to GGG', '');
+      var d4 = effVal('engineering', 'Date PF Submits to GC', '');
+      var status = effVal('engineering', 'Submittal Status', '');
+      // #2 Shop Drawings Due from Garbin = #1 + 15 business days (blank if #1 empty).
+      var shopDue = pfAddBusinessDays(pfParseDate(d1), 15);
+      var shopDueTxt = shopDue ? pfFmtDateObj(shopDue) : '';
+      var hint2 = shopDueTxt
+        ? computedHint('Shop Drawings Due from Garbin: <span class="pr-computed-val">'
+            + E(shopDueTxt) + '</span> <span style="font-style:italic">(15 business days after prereqs sent to GGG)</span>')
+        : computedHint('<span style="font-style:italic">Shop Drawings Due from Garbin: computed as 15 business days after the prereqs-sent date above.</span>');
+      // #5 Submittal Due Back from GC By = #4 + 10 business days (blank if #4 empty).
+      var gcDue = pfAddBusinessDays(pfParseDate(d4), 10);
+      var gcDueTxt = gcDue ? pfFmtDateObj(gcDue) : '';
+      var hint5 = gcDueTxt
+        ? computedHint('Submittal Due Back from GC By: <span class="pr-computed-val">'
+            + E(gcDueTxt) + '</span> <span style="font-style:italic">(10 business days after PF submits to GC)</span>')
+        : computedHint('<span style="font-style:italic">Submittal Due Back from GC By: computed as 10 business days after the "Date PF Submits to GC" above.</span>');
+      // #6 next-step note per Submittal Status selection. AAN/Revise carry the
+      // "email to Garbin needed" FLAG (Stage 1 = flag only). Revise also notes the
+      // FUTURE Rev1/Rev2 cycle (Stage 2, NOT built here).
+      var statusNote = '';
+      var s = String(status || '').trim();
+      if (s === 'Approved / Reviewed') {
+        statusNote = computedHint('Save to the PF Design Submittal Folder as the final for-construction submittal. No further action.');
+      } else if (s === 'AAN (Approved as Noted)') {
+        statusNote = computedHint('Save as final, and return to Garbin (GGG) to pick up the notes on the final as-built. '
+          + '<span class="pf-wf-flag">&#9873; Email to Garbin needed.</span>', true);
+      } else if (s === 'Revise & Resubmit') {
+        statusNote = computedHint('Save, and send back to Garbin for revisions. '
+          + '<span class="pf-wf-flag">&#9873; Email to Garbin needed.</span> '
+          + '<span style="font-style:italic">A new revision cycle (Rev1, Rev2...) will start.</span>', true);
+      }
+      // #7 PF Design Submittal Folder link (SharePoint). Graceful blank when the
+      // folder was not found for this project.
+      var folderRow = pfDesignSubmittalFolderRow(dsf);
+      // Interleave: each manual field renders in its OWN fields([...]) grid so a
+      // computed hint (a sibling div, NOT inside .pr-fields) can sit directly beneath
+      // the field it derives from — reading top-to-bottom as the linear chain.
+      return ''
+        + subgroupNote('Submittal workflow: dates flow top-to-bottom. The two grey lines are auto-computed (business days, weekends skipped) and are not editable.')
+        + fields([ field('Date Submittal Prereqs Sent to GGG', '') ])
+        + hint2
+        + fields([ field('Actual Submittal Completion Date', '') ])
+        + fields([ field('Date PF Submits to GC', '') ])
+        + hint5
+        + fields([ field('Submittal Status', '') ])
+        + statusNote
+        + fields([ folderRow ]);
+    }
+    // #7 link row for the PF Design Submittal SharePoint folder (read view). dsf =
+    // pf-design-submittal record ({folder_url,...}) or null. Same idiom as
+    // shopDwgInfoLinkRow: valid href where the folder exists, gracefully blank (yellow,
+    // no link) otherwise. NOT a .pr-field[data-pr-label] editable field (display-only
+    // auto link, like garbinPrelimFolderField / shopDwgInfoLinkRow).
+    function pfDesignSubmittalFolderRow(dsf){
+      var label = 'PF Design Submittal Folder';
+      var url = (dsf && dsf.folder_url != null) ? String(dsf.folder_url).trim() : '';
+      if (url) {
+        var href = /^[a-z][a-z0-9+.-]*:\/\//i.test(url) ? url : ('https://' + url.replace(/^\/+/, ''));
+        return '<div class="pr-field"><span class="pr-field-label">'+E(label)+'</span>'
+             + '<span class="pr-field-value"><a href="'+E(href)+'" target="_blank" rel="noopener noreferrer">PF Design Submittal Folder</a></span>'
+             + '<span class="pr-field-src">SharePoint</span></div>';
+      }
+      return '<div class="pr-field"><span class="pr-field-label">'+E(label)+'</span>'
+           + '<span class="pr-field-value empty blank">-</span></div>';
+    }
+
     // Re-render the prereq READ view once the contact directory (PF_CONTACTS) has
     // loaded async, so directory-tied responsible parties resolve to their live
     // name/email and the editor datalist has the project's contacts (Brad 2026-08-12).
@@ -15467,21 +15582,17 @@ try {
           // editor + reserved __submittal_prereqs override key (NOT a .pr-field, so the
           // engineering section editor's save-scan ignores it). See submittalPrereqsBlock.
         + submittalPrereqsBlock(pfShopDwgInfo(_curNum))
-        + subgroupNote('FUTURE (not yet built): on Approved, the submittal auto-saves to SharePoint, feeds Site Readiness / Project Setup, and becomes the source of truth vs the field as-builts.')
-        + fields([
-            // DROPDOWN (Design Status).
-            field('Design Status', ''),
-            // DROPDOWN (Submittal Stage). Single item-tracking group for now; a
-            // repeatable per-item set is a FUTURE refinement.
-            field('Submittal Stage', ''),
-            // DATE PICKER (PF_FIELD_DATE_LABELS).
-            field('Response Date Due from GC', ''),
-            // DATE PICKER (PF_FIELD_DATE_LABELS).
-            field('Actual Response Date from GC', ''),
-            // DROPDOWN (Submittal Disposition).
-            field('Submittal Disposition', ''),
-            fieldLinked('Approved Submittal Link', '', '', 'website')
-          ])
+          // PF DESIGN SUBMITTAL WORKFLOW (Stage 1, Brad 2026-08-12): the linear date
+          // chain + status dropdown + folder link, rendered directly BELOW the PF
+          // Prerequisites checklist. See submittalWorkflowBlock for the full field
+          // order + business-day computations. This REPLACES the earlier flat
+          // Design Status / Submittal Stage / Response-date / Submittal Disposition /
+          // Approved Submittal Link fields (Brad-confirmed reorg): "Design Status" is
+          // renamed to the "Date Submittal Prereqs Sent to GGG" date, "Actual Response
+          // Date from GC" is renamed to "Actual Submittal Completion Date", and the
+          // remaining legacy fields are superseded by the linear chain. Stage 2
+          // (Rev1/Rev2 cycle) is only FLAGGED here, not built.
+        + submittalWorkflowBlock(pfDesignSubmittalFolder(_curNum))
           // "GGG Design Notes" block UNDER PF Design Submittal (Brad): LF / Total
           // Columns / Column Diameter (in) / Bearing Capacity (psf) pulled from the
           // Garbin Prelim, plus a clickable link to the workbook + its two tab names.
@@ -17770,6 +17881,12 @@ try {
       'Design Status': ['Released to Start Design', 'Awaiting Docs for Design'],
       'Submittal Stage': ['In Design', 'Received', 'Submitted', 'Returned'],
       'Submittal Disposition': ['Approved', 'Approved as Noted', 'For Record', 'Revise & Resubmit'],
+      // PF Design Submittal WORKFLOW (Stage 1, Brad 2026-08-12): the final GC
+      // disposition of PF's submittal. Exactly these 3 options; each drives a
+      // next-step note (submittalWorkflowBlock). "AAN"/"Revise" also FLAG that an
+      // email back to Garbin (GGG) is needed (flag only in Stage 1; Stage 3 wires
+      // the actual send).
+      'Submittal Status': ['Approved / Reviewed', 'AAN (Approved as Noted)', 'Revise & Resubmit'],
       // ===== Site Readiness / Project Setup 6-subsection build (Brad 2026-08-07, batch-13) =====
       // Subsection 2: Testing
       'Modulus Load Test Required?': ['Yes', 'No'],
@@ -17832,6 +17949,14 @@ try {
       // response-date milestones get the native date picker + MM/DD/YYYY display.
       'Response Date Due from GC': true,
       'Actual Response Date from GC': true,
+      // PF Design Submittal WORKFLOW (Stage 1, Brad 2026-08-12): the three MANUAL
+      // dates in the linear submittal chain get the native date picker + MM/DD/YYYY
+      // display. (The two AUTO-computed dates — Shop Drawings Due from Garbin = #1 +
+      // 15 business days, Submittal Due Back from GC By = #4 + 10 business days — are
+      // DERIVED at render as computed hints, NOT stored fields, so they are NOT here.)
+      'Date Submittal Prereqs Sent to GGG': true,
+      'Actual Submittal Completion Date': true,
+      'Date PF Submits to GC': true,
       // ===== Site Readiness / Project Setup 6-subsection build (Brad 2026-08-07, batch-13) =====
       // Subsection 1: Shop Drawings
       'Date Ready for Pickup': true,
