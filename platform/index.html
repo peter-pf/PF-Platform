@@ -2180,10 +2180,13 @@ tr.pf-dragging { opacity: 0.45; }
    Muted/secondary weight so the title still reads as the title; % in PF azure. */
 .pr-genstatus-head {
   flex: 0 1 auto; min-width: 0;
-  /* Centered within the General Info header bar (Brad 2026-08-12): margin auto on
-     BOTH sides shares the free space so the badge centers between the (non-growing)
-     title and the Edit button, sitting to the LEFT of Edit. */
-  margin-left: auto; margin-right: auto;
+  /* RIGHT-ANCHORED just LEFT of the Edit button (Brad 2026-08-12): margin-left:auto
+     ONLY (dropped margin-right:auto) pushes the badge hard-right so it sits
+     immediately left of the right-aligned, same-width Edit button. Because Edit is
+     right-anchored and uniform across sections, the badges line up in a clean
+     VERTICAL LINE down the page instead of scattering by title width. A small
+     right gutter keeps it off the Edit button. */
+  margin-left: auto; margin-right: 12px;
   font-size: 0.78rem; font-weight: 600; color: var(--text-3);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
@@ -2878,14 +2881,23 @@ tr.pf-dragging { opacity: 0.45; }
   border-bottom: 1px solid var(--border-light); padding-bottom: 3px;
 }
 .pr-crow > span { min-width: 0; overflow-wrap: anywhere; }
-.pr-crow-name  { flex: 1 1 130px; font-weight: 600; color: var(--text-0); }
-.pr-crow-title { flex: 1 1 120px; color: var(--text-1, #444); }
-.pr-crow-off   { flex: 0 1 120px; }
-.pr-crow-cell  { flex: 0 1 120px; }
-.pr-crow-email { flex: 1 1 170px; }
-.pr-crow-notes { flex: 2 1 180px; color: var(--text-1, #444); white-space: normal; }
+/* Every column: the HEADER cell and its DATA cell share the SAME class, so they
+   share the SAME flex-basis AND the SAME text-align — headers sit squarely over
+   their data column (Brad 2026-08-12). Text-heavy columns (Name/Title/Email/Notes)
+   are LEFT-aligned; the two fixed-width PHONE columns are CENTER-aligned so the
+   short numbers sit centered under the "Office Phone"/"Cell Phone" headers instead
+   of appearing offset. Uniform 130px basis on both phone cols = even spacing. */
+.pr-crow-name  { flex: 1 1 130px; font-weight: 600; color: var(--text-0); text-align: left; }
+.pr-crow-title { flex: 1 1 120px; color: var(--text-1, #444); text-align: left; }
+.pr-crow-off   { flex: 0 0 130px; text-align: center; }
+.pr-crow-cell  { flex: 0 0 130px; text-align: center; }
+.pr-crow-email { flex: 1 1 170px; text-align: left; }
+.pr-crow-notes { flex: 2 1 180px; color: var(--text-1, #444); white-space: normal; text-align: left; }
+/* Header cells inherit the SAME per-column text-align above; only weight/color differ. */
 .pr-crow-head .pr-crow-name,
 .pr-crow-head .pr-crow-title,
+.pr-crow-head .pr-crow-off,
+.pr-crow-head .pr-crow-cell,
 .pr-crow-head .pr-crow-email,
 .pr-crow-head .pr-crow-notes { font-weight: 700; color: var(--muted, #55606d); }
 .pr-crow a { color: var(--accent); text-decoration: none; word-break: break-all; }
@@ -17489,11 +17501,13 @@ try {
         + E(done + ' of ' + total + ' ' + titleTxt + ' fields complete, ' + pct + ' percent') + '">'
         +   readout
         + '</span>';
-      // Placement (Brad 2026-08-12): the readout sits to the LEFT of the Edit button and
-      // is CENTERED within the section header bar. Insert it just BEFORE the Edit button
-      // (fallback: before the chevron; final fallback: header end). The pr-head-hasstatus
-      // marker lets scoped CSS center it (title stops growing so the badge gets shared
-      // free space + margin auto centers it between title and Edit btn). `badge` is an
+      // Placement (Brad 2026-08-12): the readout is RIGHT-ANCHORED, sitting immediately
+      // to the LEFT of the Edit button. Insert it just BEFORE the Edit button (fallback:
+      // before the chevron; final fallback: header end). The pr-head-hasstatus marker
+      // lets scoped CSS stop the title growing so the badge's margin-left:auto pushes it
+      // hard-right against Edit — and because Edit is right-aligned + uniform across
+      // sections, every badge's right edge lands on the same x = a clean VERTICAL LINE
+      // down the page. `badge` is an
       // HTML string, so use insertAdjacentHTML (Node-typed insertBefore rejects a
       // string). NO onclick on the badge -> a click still bubbles to the .pr-card-head
       // collapse-toggle handler (collapse intact).
