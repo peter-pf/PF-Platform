@@ -2247,6 +2247,20 @@ tr.pf-dragging { opacity: 0.45; }
 .pf-apdf-msg { font-size: 0.74rem; }
 .pf-apdf-msg-ok { color: #2e7d32; }
 .pf-apdf-msg-err { color: #c0392b; font-weight: 600; }
+/* ALWAYS-LIVE Site Readiness fields (Brad 2026-08-12): the value cell holds a save-on-change
+   input/select/date/textarea. Sized to read compactly inline like the read-only value. */
+.pr-field-live { display: block; }
+.pr-live-input {
+  font-size: 0.9rem; padding: 3px 7px; line-height: 1.3;
+  border: 1px solid var(--border-light); border-radius: 4px;
+  color: var(--text-1); background: var(--bg-0); width: 100%; max-width: 340px;
+}
+.pr-live-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0,109,176,0.12); }
+.pr-live-select { max-width: 260px; }
+.pr-live-textarea { max-width: 100%; width: 100%; resize: vertical; }
+.pr-live-msg { font-size: 0.72rem; margin-left: 8px; }
+.pr-live-msg-ok { color: #2e7d32; }
+.pr-live-msg-err { color: #c0392b; font-weight: 600; }
 
 /* ---- General Info rework (Brad 2026-08-06 / PDF-grouping 2026-08-07) ------ */
 /* FIXED 2-column grouping that matches Brad's spec PDFs: fields are grouped    */
@@ -13240,6 +13254,13 @@ try {
     var _curNum = '';        // project number currently being rendered
     var _curSection = '';    // section key of the card currently being built
     var _curOverrides = {};  // sections map for the current project ({} if none)
+    // ALWAYS-LIVE edit mode (Brad 2026-08-12): when true, field()/fieldLinked() render each
+    // editable field as a save-on-change control (office) instead of a read-only span. Set
+    // ON only while building the Site Readiness section + its nested Safety/Equipment/Material
+    // cards, then reset OFF, so no OTHER section is affected. The field's section key is
+    // resolved from the DOM (.pr-card[data-pr-section]) at change time, so multi-key routing
+    // is automatic. Non-office never gets a live control (canEdit gate in field()).
+    var _srLiveEdit = false;
     var _curMeta = null;     // _meta of the current project's overrides
 
     // Reserved structured override key (CRM cascading selector, Brad 2026-08-11).
@@ -13486,6 +13507,19 @@ try {
       var shown = v ? E(v) : "-";
       var srcHtml = (src && v) ? '<span class="pr-field-src">'+E(src)+'</span>' : '';
       var editMark = edited ? '<span class="pr-field-edited" title="Manually edited">&#9998;</span>' : '';
+      // ALWAYS-LIVE mode (Site Readiness): office roles get a save-on-change control in the
+      // value cell instead of the read-only span. Seeds from the RAW effective value (the
+      // pre-format `v` would already be display-formatted for dates/qty; the control needs
+      // the raw override/synced value so the picker/number round-trips). Non-office + non-live
+      // fall through to the read-only span exactly as before. The .pr-field[data-pr-label]
+      // wrapper is unchanged so the read structure + any label lookups are identical.
+      if (_srLiveEdit && canEdit()) {
+        // Raw value for the control = the non-empty override, else the synced/computed val.
+        var rawForCtl = ovHasValue ? String(ov.value) : ((val === undefined || val === null) ? '' : String(val));
+        return '<div class="pr-field" data-pr-label="'+E(label)+'"><span class="pr-field-label">'+E(label)+editMark+'</span>'
+             + '<span class="pr-field-value pr-field-live">'+pfLiveControl(label, rawForCtl)+'</span>'
+             + (src ? '<span class="pr-field-src">'+E(src)+'</span>' : '') + '</div>';
+      }
       // data-pr-label lets the section editor read every field's label back out
       // of the DOM without re-deriving it from the source expressions.
       return '<div class="pr-field" data-pr-label="'+E(label)+'"><span class="pr-field-label">'+E(label)+editMark+'</span>'
@@ -13547,6 +13581,18 @@ try {
       else inner = E(raw);
       var srcHtml = (src && raw) ? '<span class="pr-field-src">'+E(src)+'</span>' : '';
       var editMark = edited ? '<span class="pr-field-edited" title="Manually edited">&#9998;</span>' : '';
+      // ALWAYS-LIVE mode (Site Readiness): office roles get a save-on-change TEXT input for
+      // the link's URL (paste a URL -> saves on change; the read view shows it as a clickable
+      // link on the next render). Seeds from the RAW (unformatted) override/synced value.
+      if (_srLiveEdit && canEdit()) {
+        var rawUrl = ovHasValue ? String(ov.value) : ((val === undefined || val === null) ? '' : String(val));
+        return '<div class="pr-field" data-pr-label="'+E(label)+'"><span class="pr-field-label">'+E(label)+editMark+'</span>'
+             + '<span class="pr-field-value pr-field-live">'
+             +   '<input type="text" class="pr-live-input" data-pr-field-label="'+E(label)+'" '
+             +     'data-pr-live-prev="'+esc2(String(rawUrl||''))+'" placeholder="Paste a URL" '
+             +     'value="'+esc2(String(rawUrl||''))+'" onchange="event.stopPropagation();window.pfLiveFieldChange(this)">'
+             + '</span>' + (src ? '<span class="pr-field-src">'+E(src)+'</span>' : '') + '</div>';
+      }
       return '<div class="pr-field" data-pr-label="'+E(label)+'"><span class="pr-field-label">'+E(label)+editMark+'</span>'
            + '<span class="'+cls+'">'+inner+'</span>'+srcHtml+'</div>';
     }
@@ -14889,7 +14935,11 @@ try {
           + E(_curMeta.updatedBy) + (when ? ' · ' + E(when) : '') + '</span>';
       }
       var metaHtml = (meta ? '<span class="pr-card-meta">'+E(meta)+'</span>' : '') + editedNote;
-      var editBtn = (sectionKey && canEdit())
+      // ALWAYS-LIVE (Brad 2026-08-12): while _srLiveEdit is on (Site Readiness + its nested
+      // Safety/Equipment/Material cards), every field is a save-on-change control, so the
+      // section Edit button is suppressed (no Edit/Save flow). All OTHER cards keep their
+      // Edit button exactly as before.
+      var editBtn = (sectionKey && canEdit() && !_srLiveEdit)
         ? '<button type="button" class="pr-edit-btn" data-pr-section="'+E(sectionKey)+'" '
           + 'onclick="event.stopPropagation();window.pfEditSection(this)">Edit</button>'
         : '';
@@ -16636,6 +16686,11 @@ try {
       // AUTOMATION IS FUTURE: every subgroupNote describing extraction / reminders /
       // notify / upload-integration is a NOTE only — no logic is wired in this build.
       _curSection = 'siteReadiness';
+      // ALWAYS-LIVE (Brad 2026-08-12): every editable field in Site Readiness + its nested
+      // Safety/Equipment/Material cards renders as a save-on-change control for office roles.
+      // Turned ON here and OFF right after the nested-card injection block below; the field's
+      // section key is resolved from its .pr-card[data-pr-section] at change time (multi-key).
+      _srLiveEdit = true;
       var _fedexPrint = 'https://www.office.fedex.com/default/architecture-construction-engineering.html';
       var _pipefySSSP = 'https://app.pipefy.com/public/form/7j9G40Zp';
       // Site Readiness workflow ACTIVATION (Brad 2026-08-12): a banner at the top of this
@@ -17852,6 +17907,9 @@ try {
           + card('', 'Material', null, matBody, true, 'material')
           + '</div>');
       }
+      // ALWAYS-LIVE mode OFF (Brad 2026-08-12): everything after this (orphan _surfaceExtras,
+      // other sections) renders in the normal read/Edit-Save mode again.
+      _srLiveEdit = false;
 
       // Surface any manual overrides for a section that don't already have a rendered
       // field row (e.g. an Owner/engineer/PF-team contact ADDED via "+ Add ... contact"
@@ -18915,6 +18973,109 @@ try {
           + 'value="' + esc2(value == null ? '' : value) + '">';
       }
       return '<div class="pr-edit-row"><label class="pr-edit-label">' + esc2(label) + '</label>' + control + '</div>';
+    }
+
+    // ---- ALWAYS-LIVE (save-on-change) field control (Brad 2026-08-12, Site Readiness) ----
+    // Reuses pfEditInputRow's EXACT input-type selection (textarea / date / dropdown / text
+    // via PF_FIELD_TEXTAREA_LABELS / PF_FIELD_DATE_LABELS / PF_FIELD_DROPDOWNS) but emits a
+    // control that SAVES ON CHANGE (onchange -> window.pfLiveFieldChange) instead of living
+    // inside an Edit-mode editor. The control carries data-pr-field-label + data-pr-live-prev
+    // (the pre-change value for fail-closed revert). The SECTION KEY is NOT baked in here —
+    // pfLiveFieldChange resolves it from the field's containing .pr-card[data-pr-section] at
+    // change time (same resolution pfSaveSection uses), so a siteReadiness field saves to
+    // siteReadiness, a safety field to safety, equipment/material to their keys — automatic
+    // multi-key routing with zero per-field wiring.
+    function pfLiveControl(label, value){
+      var v = (value == null ? '' : String(value));
+      var common = 'class="pr-live-input" data-pr-field-label="'+esc2(label)+'" '
+        + 'data-pr-live-prev="'+esc2(v)+'" onchange="event.stopPropagation();window.pfLiveFieldChange(this)"';
+      if (PF_FIELD_TEXTAREA_LABELS[label]) {
+        return '<textarea '+common+' rows="3" class="pr-live-input pr-live-textarea" '
+          + 'data-pr-field-label="'+esc2(label)+'" data-pr-live-prev="'+esc2(v)+'" '
+          + 'onchange="event.stopPropagation();window.pfLiveFieldChange(this)">'+esc2(v)+'</textarea>';
+      }
+      if (PF_FIELD_DATE_LABELS[label]) {
+        return '<input type="date" '+common+' value="'+esc2(pfToDateInputValue(v))+'">';
+      }
+      var opts = PF_FIELD_DROPDOWNS[label];
+      if (opts) {
+        var cur = v;
+        var o = '<option value=""'+(cur===''?' selected':'')+'>— select —</option>';
+        var known = opts.indexOf(cur) !== -1;
+        if (cur && !known) o += '<option value="'+esc2(cur)+'" selected>'+esc2(cur)+' (current)</option>';
+        opts.forEach(function(op){ o += '<option value="'+esc2(op)+'"'+(op===cur?' selected':'')+'>'+esc2(op)+'</option>'; });
+        return '<select '+common+' class="pr-live-input pr-live-select" data-pr-field-label="'+esc2(label)+'" '
+          + 'data-pr-live-prev="'+esc2(v)+'" onchange="event.stopPropagation();window.pfLiveFieldChange(this)">'+o+'</select>';
+      }
+      return '<input type="text" '+common+' value="'+esc2(v)+'">';
+    }
+    // Save-on-change for any always-live Site Readiness field. Resolves the field's SECTION
+    // KEY from its containing .pr-card[data-pr-section] (multi-key: siteReadiness / safety /
+    // equipment / material). POSTs {section, fields:{[label]:value}} to /api/project-override.
+    // FAIL CLOSED: on any non-{ok:true,saved:true} REVERT the control to data-pr-live-prev +
+    // inline error; never a false save. On success adopt server truth into
+    // PF_PROJECT_OVERRIDES + _curOverrides and update data-pr-live-prev — NO renderProjectRecord
+    // (surgical; the control already shows the new value, so no re-render / no page bounce).
+    // Office-gated (canEdit + server requireArea('financials')); field_ops never sees a control.
+    window.pfLiveFieldChange = function(el){
+      if (!canEdit()) return;                          // defense-in-depth (server also 403s)
+      var card = el && el.closest ? el.closest('.pr-card') : null;
+      var section = card ? card.getAttribute('data-pr-section') : '';
+      var label = el.getAttribute('data-pr-field-label') || '';
+      var num = _curNum || '';
+      var prev = el.getAttribute('data-pr-live-prev');
+      prev = (prev == null ? '' : prev);
+      function revert(){ if (el.type === 'checkbox') { el.checked = (prev === 'Yes'); } else { el.value = prev; } }
+      function msg(t, isErr){ pfLiveMsg(el, t, isErr); }
+      if (!section || !label || !num) { revert(); msg('Could not save that change; please retry.', true); return; }
+      var value = String(el.value == null ? '' : el.value).trim();
+      var fields = {}; fields[label] = value;
+      el.disabled = true;
+      fetch('/api/project-override', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ num: num, section: section, fields: fields })
+      }).then(function(res){
+        return res.json().then(function(b){ return { ok: res.ok, status: res.status, body: b }; })
+          .catch(function(){ return { ok: res.ok, status: res.status, body: null }; });
+      }).then(function(r){
+        el.disabled = false;
+        // FAIL CLOSED: only a clean {ok:true, saved:true} is success.
+        if (!r.ok || !r.body || r.body.ok !== true || r.body.saved !== true) {
+          revert();
+          var m = (r.body && r.body.message) ? r.body.message
+            : (r.status === 403 ? 'You do not have permission to edit this project.'
+                                 : 'Save failed (' + r.status + '). Not saved — please retry.');
+          msg(m, true);
+          return;
+        }
+        // Adopt server truth so a later render + cross-reads reflect the save. NO
+        // renderProjectRecord — the control already holds the new value.
+        window.PF_PROJECT_OVERRIDES[num] = { sections: (r.body.sections) || {}, _meta: (r.body._meta) || null };
+        try {
+          if (String(num) === String(_curNum) && r.body.sections && typeof r.body.sections === 'object') {
+            _curOverrides = r.body.sections;
+          }
+        } catch (e) {}
+        el.setAttribute('data-pr-live-prev', value);   // new baseline for the next revert
+        msg('Saved', false);
+      }).catch(function(){
+        el.disabled = false; revert();
+        msg('Save failed: could not reach the server. Not saved — please retry.', true);
+      });
+    };
+    // Tiny inline saved/error toast next to a live control (fades via the .pr-live-msg span
+    // injected into the field row). Reuses the row's own message span, or appends one.
+    function pfLiveMsg(el, text, isErr){
+      try {
+        var row = el.closest ? el.closest('.pr-field') : null;
+        if (!row) return;
+        var m = row.querySelector('.pr-live-msg');
+        if (!m) { m = document.createElement('span'); m.className = 'pr-live-msg'; row.appendChild(m); }
+        m.textContent = text || '';
+        m.className = 'pr-live-msg ' + (isErr ? 'pr-live-msg-err' : 'pr-live-msg-ok');
+        m.style.display = text ? 'inline' : 'none';
+      } catch (e) {}
     }
 
     window.pfEditSection = function(btn){
