@@ -363,6 +363,7 @@ const DATA_FILE_AREAS = {
   '/data/project-master.json':     'financials',      // PROJECT: per-job contract_value/margin/profit
   '/data/project-dashboard.js':    'financials',      // PROJECT: per-project tracked items (Financials section OMITTED) - admin/partner/business_dev, field_ops BLOCKED
   '/data/pm-overlay.js':           'financials',      // PROJECT: KV-mirror placeholder (PM overlay read via /api/pm-project) - reserved
+  '/data/shop-dwg-info.js':        'financials',      // PROJECT: 'Shop Dwg Info' SharePoint folder webUrl per project (PF Design Submittal GC-prerequisites checklist link) — no $, office-only (admin/partner/business_dev), field_ops BLOCKED
   '/data/project-history.js':      'financials',      // PROJECT: per-job ContractValue/totalContractValue
   '/data/precon-pipeline.js':      'preconstruction', // PROJECT/BD: opportunity pipeline ($ per opp) — BD domain
   '/data/feasibility-history.js':  'preconstruction', // PROJECT/BD: completed feasibility studies (verdict/drivers), no $; precon analysis, field_ops BLOCKED
@@ -579,6 +580,12 @@ export function areaForPath(pathname) {
     // data -> financials area (admin + partner + business_dev; field_ops BLOCKED by
     // direct URL too). The handler ALSO calls requireArea(session, 'financials').
     if (pathname.startsWith('/api/invoice-ledger')) return 'financials';
+    // GC prerequisites REMINDER email (Engineering & Design > PF Design Submittal
+    // checklist). Office action -> financials area (admin + partner + business_dev;
+    // field_ops BLOCKED by direct URL too). The handler ALSO calls
+    // requireArea(session, 'financials') AND requires a CONFIRM step client-side
+    // before it will send (the responsible party is often an EXTERNAL GC).
+    if (pathname.startsWith('/api/submittal-reminder')) return 'financials';
     // BD CRM write-back (companies/contacts overlay + interactions log). BD's
     // own tool: admin + partner + business_dev allowed; field_ops BLOCKED by
     // direct URL too. Each endpoint ALSO calls requireArea('business_dev').

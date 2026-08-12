@@ -2602,6 +2602,67 @@ tr.pf-dragging { opacity: 0.45; }
 }
 .pr-computed-hint .pr-computed-val { font-style: normal; font-weight: 600; color: var(--text-1); }
 .pr-computed-hint.pr-computed-flag { color: #c0392b; font-style: normal; font-weight: 600; }
+/* GC Prerequisites checklist (PF Design Submittal, Brad 2026-08-12). A table at the
+   TOP of the subsection: Item | Responsible Party | Date Received (+ Reminder for office).
+   Received rows read green/checked, outstanding rows amber. NOT .pr-field rows, so the
+   engineering section editor's save-scan ignores them (its own inline editor + reserved
+   __submittal_prereqs override key handle persistence). */
+.pf-prq-wrap { margin: 4px 0 10px 10px; }
+.pf-prq-status {
+  font-size: 0.78rem; margin: 6px 0 8px 8px; color: var(--text-1);
+  padding: 5px 10px; border-left: 3px solid #d98a00; background: rgba(217,138,0,0.06);
+  border-radius: 4px;
+}
+.pf-prq-status-ready { border-left-color: #2e7d32; background: rgba(46,125,50,0.08); }
+.pf-prq-ready-txt { color: #2e7d32; font-weight: 600; }
+.pf-prq-wait-txt { color: var(--text-2); }
+.pf-prq-table {
+  width: 100%; border-collapse: collapse; margin: 4px 0 6px 0;
+  background: var(--bg-0); font-size: 0.8rem;
+}
+.pf-prq-table th {
+  text-align: left; font-size: 0.7rem; font-weight: 600; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: 0.02em;
+  padding: 6px 10px; border-bottom: 1px solid var(--border-light);
+}
+.pf-prq-table td {
+  padding: 7px 10px; border-bottom: 1px solid var(--border-light);
+  vertical-align: middle; color: var(--text-1);
+}
+.pf-prq-row-recd td { background: rgba(46,125,50,0.05); }
+.pf-prq-row-out  td.pf-prq-item { }
+.pf-prq-item { font-weight: 500; }
+.pf-prq-email { color: var(--text-2); font-size: 0.74rem; }
+.pf-prq-muted { color: var(--text-3); font-style: italic; }
+.pf-prq-badge {
+  display: inline-block; font-size: 0.66rem; font-weight: 700; border-radius: 4px;
+  padding: 1px 6px; margin-right: 4px; text-transform: uppercase; letter-spacing: 0.02em;
+  vertical-align: middle;
+}
+.pf-prq-recd { color: #fff; background: #2e7d32; }
+.pf-prq-out  { color: #fff; background: #d98a00; }
+.pf-prq-remind, .pf-prq-remind-all, .pf-prq-edit,
+.pf-prq-save, .pf-prq-cancel {
+  font-size: 0.72rem; font-weight: 600; cursor: pointer; line-height: 1.2;
+  border-radius: 6px; padding: 4px 10px; border: 1px solid var(--border-light);
+  background: var(--bg-1); color: var(--text-1);
+}
+.pf-prq-remind:hover, .pf-prq-remind-all:hover, .pf-prq-edit:hover,
+.pf-prq-save:hover, .pf-prq-cancel:hover { filter: brightness(0.97); }
+.pf-prq-save { color: #fff; background: var(--accent); border-color: var(--accent); }
+.pf-prq-bar { margin: 6px 0 2px 0; display: flex; gap: 8px; flex-wrap: wrap; }
+.pf-prq-edit-note, .pf-prq-msg, .pf-prq-edit-err {
+  font-size: 0.74rem; margin: 4px 0; line-height: 1.3;
+}
+.pf-prq-edit-note { color: var(--text-2); font-style: italic; }
+.pf-prq-msg-ok  { color: #2e7d32; font-weight: 600; }
+.pf-prq-msg-err, .pf-prq-edit-err { color: #c0392b; font-weight: 600; }
+.pf-prq-in {
+  width: 100%; box-sizing: border-box; font-size: 0.78rem;
+  padding: 4px 6px; border: 1px solid var(--border-light); border-radius: 5px;
+  background: var(--bg-0); color: var(--text-1);
+}
+.pf-prq-edit-actions { margin-top: 8px; display: flex; gap: 8px; }
 .pr-computed-hint.pr-computed-flag .pr-computed-val { color: #c0392b; }
 
 .pr-contact {
@@ -3175,6 +3236,7 @@ tr.pf-dragging { opacity: 0.45; }
   if (isPrivileged) {
     feeds.push('/data/project-record-poet.js', '/data/project-records.js',
                '/data/garbin-prelim.js',
+               '/data/shop-dwg-info.js',
                '/data/budget-actual-poet.js', '/data/cost-code-template.js',
                '/data/budget-actuals.js', '/data/invoice-ledger.js',
                '/data/awarded-projects.js', '/data/project-history.js',
@@ -3202,6 +3264,11 @@ tr.pf-dragging { opacity: 0.45; }
     // (preconstruction area) - previously only injected for admin/partner; BD is
     // allowed them server-side.
     if (!isPrivileged) feeds.push('/data/precon-pipeline.js', '/data/feasibility-history.js');
+    // Shop Dwg Info folder links (PF Design Submittal GC-prerequisites checklist).
+    // Folder webUrls only, no $ -- BD (business_dev) can edit the engineering card so
+    // it needs the folder link too. admin/partner already loaded it in the privileged
+    // block above; add it for the BD-only case here (guarded so it is not double-pushed).
+    if (!isPrivileged) feeds.push('/data/shop-dwg-info.js');
   }
   // SEC-12: privileged roles get the raw schedule (value/gc_name); field_ops
   // gets the $/GC-stripped derivative. The raw file is server-DENIED to field_ops.
@@ -13303,6 +13370,137 @@ try {
            + '<span class="pr-field-value empty blank">-</span></div>';
     }
 
+    // ---- GC Prerequisites checklist (PF Design Submittal, Brad 2026-08-12) ------
+    // The 7 items PF needs from the GC BEFORE starting the full Submittal Design. All
+    // must be RECEIVED (a Date Received filled) before PF begins. Each row: Item |
+    // Responsible Party (name + email, for the reminder email) | Date Received (filled
+    // = received). Persisted under the reserved `__submittal_prereqs` structured key
+    // inside the `engineering` section override (see /api/project-override), keyed by
+    // the STABLE item key below (never the label, so a label reword never orphans data).
+    // FIXED order + exact labels per Brad.
+    var PF_SUBMITTAL_PREREQ_ITEMS = [
+      { key: 'struct_foundation_cad', label: 'Structural Foundation Plan (CAD)' },
+      { key: 'civil_grading_cad',     label: 'Civil Grading Plan (CAD)' },
+      { key: 'full_structural_pdf',   label: 'Full Structural (PDF)' },
+      { key: 'full_civil_pdf',        label: 'Full Civil (PDF)' },
+      { key: 'design_service_loads',  label: 'Design Service Loads (DL+LL)' },
+      { key: 'geotech_reports',       label: 'Geotech Reports (if any done after bid date)' },
+      { key: 'site_grade_elev',       label: 'Site Grade Elevation During PF Install (to be within 3" +/-)' }
+    ];
+    // Read the current project's Shop Dwg Info folder record (window.PF_SHOP_DWG_INFO,
+    // from data/shop-dwg-info.js, built by sync/build-shop-dwg-info.py). Fail-closed:
+    // any missing global / project / value returns null (link renders blank).
+    function pfShopDwgInfo(num){
+      try {
+        var g = window.PF_SHOP_DWG_INFO;
+        if (!g || !g.projects || !num) return null;
+        return g.projects[String(num)] || null;
+      } catch (e) { return null; }
+    }
+    // Read the stored __submittal_prereqs items map for the current project (from the
+    // engineering override). Returns an object keyed by item key -> {responsible_name,
+    // responsible_email, date_received}. Empty object when none stored. Never throws.
+    function pfPrereqData(){
+      try {
+        var eng = _curOverrides && _curOverrides.engineering;
+        var pr = eng && eng.__submittal_prereqs;
+        var items = pr && pr.items;
+        return (items && typeof items === 'object') ? items : {};
+      } catch (e) { return {}; }
+    }
+    // A "Shop Dwg Info folder" link row (read view). gp = shop-dwg-info record. Renders
+    // a clickable "Open folder" link when folder_url is present; graceful blank otherwise
+    // (no broken href). Display-only (no override round-trip).
+    function shopDwgInfoLinkRow(sdi){
+      var label = 'Shop Dwg Info Folder';
+      var url = (sdi && sdi.folder_url != null) ? String(sdi.folder_url).trim() : '';
+      if (url) {
+        var href = /^[a-z][a-z0-9+.-]*:\/\//i.test(url) ? url : ('https://' + url.replace(/^\/+/, ''));
+        return '<div class="pr-field"><span class="pr-field-label">'+E(label)+'</span>'
+             + '<span class="pr-field-value"><a href="'+E(href)+'" target="_blank" rel="noopener noreferrer">Open folder</a></span>'
+             + '<span class="pr-field-src">SharePoint</span></div>';
+      }
+      return '<div class="pr-field"><span class="pr-field-label">'+E(label)+'</span>'
+           + '<span class="pr-field-value empty blank">-</span></div>';
+    }
+    // Render the GC Prerequisites checklist READ view (a table) at the TOP of PF Design
+    // Submittal. Shows each item's Responsible Party + Date Received; a received item
+    // (date filled) is visually marked (green/checked), an outstanding one amber. A
+    // status line reads "X of 7 received" and, when all 7 are received, a clear
+    // "Ready to start Submittal Design" state. Office roles get an Edit button + per-row
+    // "Send Reminder" action for OUTSTANDING items (both behind canEdit()); read-only
+    // roles see the table only. The Shop Dwg Info folder link renders above the table.
+    function submittalPrereqsBlock(sdi){
+      var data = pfPrereqData();
+      var total = PF_SUBMITTAL_PREREQ_ITEMS.length;
+      var received = 0;
+      var rowsHtml = PF_SUBMITTAL_PREREQ_ITEMS.map(function(it){
+        var d = data[it.key] || {};
+        var name = (d.responsible_name == null ? '' : String(d.responsible_name)).trim();
+        var email = (d.responsible_email == null ? '' : String(d.responsible_email)).trim();
+        var dr = (d.date_received == null ? '' : String(d.date_received)).trim();
+        var isReceived = !!dr;
+        if (isReceived) received++;
+        // Responsible party display: name (email) when both, else whichever exists.
+        var party = '';
+        if (name && email) party = E(name) + ' <span class="pf-prq-email">&lt;'+E(email)+'&gt;</span>';
+        else if (name) party = E(name);
+        else if (email) party = '<span class="pf-prq-email">'+E(email)+'</span>';
+        else party = '<span class="pf-prq-muted">Unassigned</span>';
+        var drShown = isReceived ? E(pfFmtDate(dr)) : '<span class="pf-prq-muted">Outstanding</span>';
+        var statusCell = isReceived
+          ? '<span class="pf-prq-badge pf-prq-recd">&#10003; Received</span>'
+          : '<span class="pf-prq-badge pf-prq-out">Outstanding</span>';
+        // Per-row "Send Reminder" (office + outstanding + has email). Disabled/omitted
+        // otherwise. The confirm + send is handled by pfPrereqRemind (window fn).
+        var remindCell = '';
+        if (canEdit()) {
+          if (isReceived) {
+            remindCell = '';
+          } else if (email) {
+            remindCell = '<button type="button" class="pf-prq-remind" '
+              + 'onclick="event.stopPropagation();window.pfPrereqRemind(this)" '
+              + 'data-prq-item="'+E(it.key)+'">Send Reminder</button>';
+          } else {
+            remindCell = '<span class="pf-prq-muted" title="Set a responsible-party email (Edit) to enable a reminder">no email</span>';
+          }
+        }
+        return '<tr class="pf-prq-row'+(isReceived?' pf-prq-row-recd':' pf-prq-row-out')+'" data-prq-item="'+E(it.key)+'" data-prq-label="'+E(it.label)+'" data-prq-email="'+E(email)+'" data-prq-name="'+E(name)+'">'
+          + '<td class="pf-prq-item">'+statusCell+' '+E(it.label)+'</td>'
+          + '<td class="pf-prq-party">'+party+'</td>'
+          + '<td class="pf-prq-date">'+drShown+'</td>'
+          + (canEdit() ? '<td class="pf-prq-action">'+remindCell+'</td>' : '')
+          + '</tr>';
+      }).join('');
+      var allReceived = (received === total);
+      var statusLine = '<div class="pf-prq-status'+(allReceived?' pf-prq-status-ready':'')+'">'
+        + '<strong>'+received+' of '+total+' received.</strong> '
+        + (allReceived
+            ? '<span class="pf-prq-ready-txt">&#10003; Ready to start Submittal Design.</span>'
+            : '<span class="pf-prq-wait-txt">Full Submittal Design starts once all '+total+' are received.</span>')
+        + '</div>';
+      // "Remind all outstanding" (office only) — one button that fires a confirm listing
+      // every outstanding item grouped by responsible email. Omitted when nothing is
+      // outstanding or the user cannot edit.
+      var remindAll = (canEdit() && !allReceived)
+        ? '<button type="button" class="pf-prq-remind-all" onclick="event.stopPropagation();window.pfPrereqRemindAll(this)">Remind all outstanding</button>'
+        : '';
+      var editBtn = canEdit()
+        ? '<button type="button" class="pf-prq-edit" onclick="event.stopPropagation();window.pfPrereqEdit(this)">Edit checklist</button>'
+        : '';
+      var headCols = '<th>Item</th><th>Responsible Party</th><th>Date Received</th>'
+        + (canEdit() ? '<th>Reminder</th>' : '');
+      return '<div class="pf-prq-wrap" data-prq-num="'+E(_curNum)+'">'
+        + subgroup('GC Prerequisites for Submittal Design')
+        + subgroupNote('Items PF needs from the GC before starting the full Submittal Design. Fill a Date Received to mark an item received; PF begins once all are received.')
+        + shopDwgInfoLinkRow(sdi)
+        + statusLine
+        + '<table class="pf-prq-table"><thead><tr>'+headCols+'</tr></thead><tbody>'+rowsHtml+'</tbody></table>'
+        + ((editBtn || remindAll) ? '<div class="pf-prq-bar">'+editBtn+' '+remindAll+'</div>' : '')
+        + '<div class="pf-prq-msg" style="display:none"></div>'
+        + '</div>';
+    }
+
     // ---- computed automations (phase 2, Brad 2026-08-07) ---------------------
     // DISPLAY-ONLY computed HINTS layered next to existing manual fields. These
     // read existing field values (synced value or manual override, override wins
@@ -15004,6 +15202,13 @@ try {
           ))
           // --- Subsection 2: PF Design Submittal ---
         + subgroup('PF Design Submittal')
+          // GC PREREQUISITES CHECKLIST (Brad 2026-08-12): rendered AHEAD of all the
+          // PF Design Submittal fields — the items PF needs from the GC before starting
+          // the full Submittal Design (responsible party + Date Received per item, a
+          // Shop Dwg Info folder link, and a reminder-email action). Its own inline
+          // editor + reserved __submittal_prereqs override key (NOT a .pr-field, so the
+          // engineering section editor's save-scan ignores it). See submittalPrereqsBlock.
+        + submittalPrereqsBlock(pfShopDwgInfo(_curNum))
         + subgroupNote('FUTURE (not yet built): on Approved, the submittal auto-saves to SharePoint, feeds Site Readiness / Project Setup, and becomes the source of truth vs the field as-builts.')
         + fields([
             // DROPDOWN (Design Status).
@@ -18778,6 +18983,239 @@ try {
       }).catch(function(){
         setBusy(false);
         showErr('Save failed: could not reach the server. Your changes were NOT saved - please retry.');
+      });
+    };
+
+    // =======================================================================
+    // GC PREREQUISITES checklist editor + reminder (PF Design Submittal) — office only
+    // =======================================================================
+    // The checklist has its OWN inline editor (name + email + Date Received per row),
+    // separate from the generic section editor, because it persists STRUCTURED per-item
+    // data under the reserved __submittal_prereqs key (not flat label->value strings). It
+    // saves via /api/project-override { section:'engineering', fields:{ __submittal_prereqs:
+    // { items:{...} } } } — the backend validates + whole-object-replaces that key while
+    // preserving the flat engineering fields (and vice-versa). Office-gated: field_ops
+    // never sees these controls (canEdit() gates the buttons) AND the server 403s a
+    // field_ops POST regardless. Reminders REQUIRE an explicit confirm before sending.
+    var PF_PRQ_ITEMS = PF_SUBMITTAL_PREREQ_ITEMS; // shared ordered item defs (key+label)
+
+    function pfPrqWrap(btn){
+      return btn && btn.closest ? btn.closest('.pf-prq-wrap') : null;
+    }
+    function pfPrqMsg(wrap, text, isErr){
+      var m = wrap && wrap.querySelector('.pf-prq-msg');
+      if (!m) return;
+      m.textContent = text || '';
+      m.style.display = text ? 'block' : 'none';
+      m.className = 'pf-prq-msg' + (isErr ? ' pf-prq-msg-err' : ' pf-prq-msg-ok');
+    }
+    function pfPrqEmailValid(e){
+      var s = (e == null ? '' : String(e)).trim();
+      return /^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/.test(s);
+    }
+    // Convert a stored date (ISO or MM/DD/YYYY) to an <input type=date> value (YYYY-MM-DD).
+    function pfPrqToInputDate(v){
+      var s = (v == null ? '' : String(v)).trim();
+      if (!s) return '';
+      var m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); // ISO
+      if (m) return m[1] + '-' + ('0'+m[2]).slice(-2) + '-' + ('0'+m[3]).slice(-2);
+      m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);    // MM/DD/YYYY
+      if (m) return m[3] + '-' + ('0'+m[1]).slice(-2) + '-' + ('0'+m[2]).slice(-2);
+      return ''; // unknown shape -> leave the date input empty (never a bogus value)
+    }
+
+    // Edit: replace the read-view table with an inline editor (name + email + date per row).
+    window.pfPrereqEdit = function(btn){
+      if (!canEdit()) return; // defense-in-depth (server also 403s)
+      var wrap = pfPrqWrap(btn);
+      if (!wrap) return;
+      var data = (typeof pfPrereqData === 'function') ? pfPrereqData() : {};
+      var rows = PF_PRQ_ITEMS.map(function(it){
+        var d = data[it.key] || {};
+        var name = esc2(d.responsible_name || '');
+        var email = esc2(d.responsible_email || '');
+        var dval = esc2(pfPrqToInputDate(d.date_received || ''));
+        return '<tr data-prq-item="'+esc2(it.key)+'">'
+          + '<td class="pf-prq-item">'+esc2(it.label)+'</td>'
+          + '<td><input type="text" class="pf-prq-in pf-prq-in-name" placeholder="Responsible party" value="'+name+'"></td>'
+          + '<td><input type="email" class="pf-prq-in pf-prq-in-email" placeholder="email@company.com" value="'+email+'"></td>'
+          + '<td><input type="date" class="pf-prq-in pf-prq-in-date" value="'+dval+'"></td>'
+          + '</tr>';
+      }).join('');
+      var editorHtml = '<div class="pf-prq-editor">'
+        + '<div class="pf-prq-edit-note">Assign a responsible party (name + email for reminders) and set a Date Received when each item arrives. A filled date marks the item received.</div>'
+        + '<table class="pf-prq-table pf-prq-table-edit"><thead><tr>'
+        +   '<th>Item</th><th>Responsible Party</th><th>Email</th><th>Date Received</th>'
+        + '</tr></thead><tbody>'+rows+'</tbody></table>'
+        + '<div class="pf-prq-edit-err" style="display:none"></div>'
+        + '<div class="pf-prq-edit-actions">'
+        +   '<button type="button" class="pf-prq-save" onclick="event.stopPropagation();window.pfPrereqSave(this)">Save checklist</button>'
+        +   '<button type="button" class="pf-prq-cancel" onclick="event.stopPropagation();window.pfPrereqCancel(this)">Cancel</button>'
+        + '</div>'
+        + '</div>';
+      // Stash the original wrap HTML so Cancel restores it verbatim.
+      wrap.setAttribute('data-prq-orig', wrap.innerHTML);
+      wrap.innerHTML = editorHtml;
+    };
+
+    window.pfPrereqCancel = function(btn){
+      var wrap = pfPrqWrap(btn);
+      if (!wrap) return;
+      var orig = wrap.getAttribute('data-prq-orig');
+      if (orig != null) { wrap.innerHTML = orig; wrap.removeAttribute('data-prq-orig'); }
+    };
+
+    window.pfPrereqSave = function(btn){
+      if (!canEdit()) return;
+      var wrap = pfPrqWrap(btn);
+      if (!wrap) return;
+      var num = wrap.getAttribute('data-prq-num') || _curNum || '';
+      var errEl = wrap.querySelector('.pf-prq-edit-err');
+      function showErr(msg){ if (errEl) { errEl.textContent = msg; errEl.style.display='block'; } }
+      if (!num) { showErr('Missing project number; nothing was saved.'); return; }
+      // Gather each row's inputs into the items map keyed by the stable item key.
+      var items = {};
+      var bad = '';
+      wrap.querySelectorAll('.pf-prq-table-edit tbody tr[data-prq-item]').forEach(function(tr){
+        var key = tr.getAttribute('data-prq-item') || '';
+        if (!key) return;
+        var nameEl = tr.querySelector('.pf-prq-in-name');
+        var emailEl = tr.querySelector('.pf-prq-in-email');
+        var dateEl = tr.querySelector('.pf-prq-in-date');
+        var name = nameEl ? String(nameEl.value || '').trim() : '';
+        var email = emailEl ? String(emailEl.value || '').trim() : '';
+        var dr = dateEl ? String(dateEl.value || '').trim() : '';
+        if (email && !pfPrqEmailValid(email)) bad = bad || email;
+        items[key] = { responsible_name: name, responsible_email: email, date_received: dr };
+      });
+      if (bad) { showErr('That email address does not look valid: ' + bad + '. Fix it or clear it, then save.'); return; }
+      if (errEl) errEl.style.display = 'none';
+      var saveBtn = wrap.querySelector('.pf-prq-save');
+      if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
+      fetch('/api/project-override', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ num: num, section: 'engineering', fields: { __submittal_prereqs: { items: items } } })
+      }).then(function(res){
+        return res.json().then(function(b){ return { ok: res.ok, status: res.status, body: b }; })
+          .catch(function(){ return { ok: res.ok, status: res.status, body: null }; });
+      }).then(function(r){
+        // FAIL CLOSED: only a clean {ok:true, saved:true} is success; else stay in edit.
+        if (!r.ok || !r.body || r.body.ok !== true || r.body.saved !== true) {
+          var msg = (r.body && r.body.message) ? r.body.message
+            : (r.status === 403 ? 'You do not have permission to edit this project.'
+                                 : 'Save failed (' + r.status + '). Your changes were NOT saved - please retry.');
+          if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save checklist'; }
+          showErr(msg);
+          return;
+        }
+        // Adopt server truth + re-render the whole record so the checklist reflects it.
+        window.PF_PROJECT_OVERRIDES[num] = { sections: (r.body.sections) || {}, _meta: (r.body._meta) || null };
+        var card = wrap.closest('.pr-card');
+        var root = (card && card.closest('.pr-root')) || (card && card.parentElement) || document.getElementById('prGenericRoot');
+        window.renderProjectRecord(num, root);
+      }).catch(function(){
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save checklist'; }
+        showErr('Save failed: could not reach the server. Your changes were NOT saved - please retry.');
+      });
+    };
+
+    // Shared reminder sender: POST /api/submittal-reminder AFTER an explicit confirm.
+    // recipientEmail/recipientName + the outstanding item labels are passed in. NEVER
+    // auto-sends: the caller has already shown a confirm() naming who + which items.
+    function pfPrqSendReminder(wrap, recipientName, recipientEmail, itemLabels){
+      var num = wrap.getAttribute('data-prq-num') || _curNum || '';
+      var projName = '';
+      try {
+        var pr = window.PF_PROJECT_RECORDS && window.PF_PROJECT_RECORDS.records;
+        var rec = pr && pr[num];
+        projName = (rec && rec.project_name) || '';
+      } catch (e) {}
+      pfPrqMsg(wrap, 'Sending reminder...', false);
+      fetch('/api/submittal-reminder', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ num: num, projectName: projName, recipientName: recipientName, recipientEmail: recipientEmail, items: itemLabels })
+      }).then(function(res){
+        return res.json().then(function(b){ return { ok: res.ok, status: res.status, body: b }; })
+          .catch(function(){ return { ok: res.ok, status: res.status, body: null }; });
+      }).then(function(r){
+        if (!r.ok || !r.body || r.body.ok !== true || r.body.sent !== true) {
+          var msg = (r.body && r.body.message) ? r.body.message
+            : (r.status === 403 ? 'You do not have permission to send reminders.'
+                                 : 'Reminder NOT sent (' + r.status + '). Please retry.');
+          pfPrqMsg(wrap, msg, true);
+          return;
+        }
+        pfPrqMsg(wrap, 'Reminder sent to ' + recipientEmail + '.', false);
+      }).catch(function(){
+        pfPrqMsg(wrap, 'Reminder NOT sent: could not reach the server. Please retry.', true);
+      });
+    }
+
+    // Per-row "Send Reminder": confirm (who + item) then send. Outstanding rows only.
+    window.pfPrereqRemind = function(btn){
+      if (!canEdit()) return;
+      var wrap = pfPrqWrap(btn);
+      var tr = btn && btn.closest ? btn.closest('tr') : null;
+      if (!wrap || !tr) return;
+      var label = tr.getAttribute('data-prq-label') || '';
+      var email = tr.getAttribute('data-prq-email') || '';
+      var name = tr.getAttribute('data-prq-name') || '';
+      if (!email) { pfPrqMsg(wrap, 'No email set for this item. Use Edit checklist to add one.', true); return; }
+      var who = name ? (name + ' <' + email + '>') : email;
+      // CONFIRM before sending (the responsible party is often an EXTERNAL GC).
+      var ok = window.confirm('Send a reminder email to ' + who + ' requesting:\n\n  - ' + label + '\n\nfor the Submittal Design? This emails an external contact.');
+      if (!ok) return;
+      pfPrqSendReminder(wrap, name, email, [label]);
+    };
+
+    // "Remind all outstanding": group outstanding items by responsible email, confirm the
+    // full plan (every recipient + their items), then send one email per recipient. Items
+    // with no email are listed as skipped in the confirm.
+    window.pfPrereqRemindAll = function(btn){
+      if (!canEdit()) return;
+      var wrap = pfPrqWrap(btn);
+      if (!wrap) return;
+      var byEmail = {};   // email -> { name, labels:[] }
+      var noEmail = [];   // labels with no responsible email
+      wrap.querySelectorAll('.pf-prq-table tbody tr.pf-prq-row-out').forEach(function(tr){
+        var label = tr.getAttribute('data-prq-label') || '';
+        var email = tr.getAttribute('data-prq-email') || '';
+        var name = tr.getAttribute('data-prq-name') || '';
+        if (!label) return;
+        if (!email) { noEmail.push(label); return; }
+        if (!byEmail[email]) byEmail[email] = { name: name, labels: [] };
+        if (name && !byEmail[email].name) byEmail[email].name = name;
+        byEmail[email].labels.push(label);
+      });
+      var emails = Object.keys(byEmail);
+      if (!emails.length) {
+        pfPrqMsg(wrap, noEmail.length
+          ? 'No outstanding item has a responsible-party email set. Use Edit checklist to add one.'
+          : 'Nothing outstanding — all items are received.', true);
+        return;
+      }
+      // Build a human-readable confirm plan.
+      var lines = ['Send reminder emails for outstanding Submittal Design items?', ''];
+      emails.forEach(function(em){
+        var g = byEmail[em];
+        lines.push((g.name ? g.name + ' <' + em + '>' : em) + ':');
+        g.labels.forEach(function(l){ lines.push('   - ' + l); });
+      });
+      if (noEmail.length) {
+        lines.push('');
+        lines.push('SKIPPED (no email set): ' + noEmail.join('; '));
+      }
+      lines.push('');
+      lines.push('These email external contacts. Continue?');
+      if (!window.confirm(lines.join('\n'))) return;
+      // Send sequentially per recipient (each shows/overwrites the status line).
+      emails.forEach(function(em){
+        var g = byEmail[em];
+        pfPrqSendReminder(wrap, g.name, em, g.labels);
       });
     };
 

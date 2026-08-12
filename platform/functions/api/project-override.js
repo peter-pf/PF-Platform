@@ -98,6 +98,62 @@ const CRM_MAX_COMPANY = 200;         // a company name length cap
 const CRM_MAX_SUBKEY = 60;           // a firm-section label length cap
 const CRM_ID_RE = /^C\d+$/;          // contact id shape (C#### minted by /api/contacts)
 
+// ---- __submittal_prereqs reserved structured key (Brad 2026-08-12) -----------
+// The Engineering & Design > PF Design Submittal subsection gains a "GC prerequisites"
+// checklist ABOVE its fields: the 7 items PF needs from the GC before starting the full
+// Submittal Design. Each item carries a responsible party (name + email, for the reminder
+// email) and a Date Received (filled = received). That per-item state is stored under ONE
+// reserved, object-valued key `__submittal_prereqs` INSIDE the `engineering` section:
+//   sections.engineering.__submittal_prereqs = {
+//     items: { "<itemKey>": { responsible_name, responsible_email, date_received }, ... }
+//   }
+// itemKey is a short stable slug the client mints per row (e.g. "struct_foundation_cad").
+// Every OTHER key in the engineering section stays a plain string (the existing overlay).
+// This is the SECOND reserved object key (alongside __crm) and rides the SAME merge:
+// Object.assign(existing, fields) preserves it when a normal field save omits it, so
+// editing the engineering tracking fields never wipes the checklist and vice-versa.
+// STRICTLY validated (cleanPrereqs below); a malformed body fails the WHOLE save closed.
+// Allowed ONLY under the `engineering` section (rejected 400 anywhere else).
+const PREREQ_KEY = '__submittal_prereqs';
+const PREREQ_ALLOWED_SECTIONS = { engineering: 1 };
+const PREREQ_MAX_ITEMS = 40;         // 7 real items today; generous headroom, bounds abuse
+const PREREQ_MAX_ITEMKEY = 60;       // an item slug length cap
+const PREREQ_MAX_NAME = 200;         // responsible-party name cap
+const PREREQ_MAX_EMAIL = 254;        // RFC max email length
+const PREREQ_MAX_DATE = 40;          // a date string (ISO YYYY-MM-DD or MM/DD/YYYY)
+
+// Validate + normalize an incoming __submittal_prereqs object into a clean, bounded
+// structure. Returns a SAFE object, or null if present-but-malformed (caller fails the
+// whole save closed). Rules mirror cleanCrm's defensive posture:
+//   - top-level must be a plain object; its `items` (if present) must be a plain object.
+//   - each item value must be a plain object; responsible_name / responsible_email /
+//     date_received are strings, length-capped and angle-bracket stripped (via s()).
+//   - unknown item keys are length-capped; a bad email is DROPPED to '' (never rejects
+//     the whole save — a name-only assignment is legitimate); NO email-format gate here
+//     (the reminder endpoint validates format before it ever sends).
+//   - bounded on item count; over the cap => reject (null) so nothing is silently lost.
+function cleanPrereqs(input) {
+  if (input == null) return { items: {} };            // absent => empty
+  if (typeof input !== 'object' || Array.isArray(input)) return null; // present but not object => reject
+  const itemsIn = (input.items && typeof input.items === 'object' && !Array.isArray(input.items))
+    ? input.items : {};
+  const keys = Object.keys(itemsIn);
+  if (keys.length > PREREQ_MAX_ITEMS) return null;
+  const items = {};
+  for (const rawKey of keys) {
+    const key = s(rawKey, PREREQ_MAX_ITEMKEY);
+    if (!key) continue;
+    const entry = itemsIn[rawKey];
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
+    items[key] = {
+      responsible_name:  s(entry.responsible_name, PREREQ_MAX_NAME),
+      responsible_email: s(entry.responsible_email, PREREQ_MAX_EMAIL),
+      date_received:     s(entry.date_received, PREREQ_MAX_DATE),
+    };
+  }
+  return { items };
+}
+
 // Validate + normalize an incoming __crm object into a clean, bounded structure.
 // Returns a SAFE object (possibly {}), or null if the input is present but so
 // malformed it must be rejected (caller fails the whole save closed). Rules:
@@ -206,7 +262,7 @@ function cleanFields(input) {
   if (!input || typeof input !== 'object') return out;
   const keys = Object.keys(input).slice(0, MAX_FIELDS_PER_SECTION);
   for (const k of keys) {
-    if (k === CRM_KEY) continue; // reserved structured key; handled separately, never string-flattened
+    if (k === CRM_KEY || k === PREREQ_KEY) continue; // reserved structured keys; handled separately, never string-flattened
     const label = s(k, MAX_LABEL);
     if (!label) continue;
     out[label] = s(input[k], MAX_VALUE);
@@ -287,6 +343,25 @@ export async function onRequestPost(context) {
       }
     }
 
+    // Reserved __submittal_prereqs structured key (Brad 2026-08-12): the GC prerequisites
+    // checklist on the Engineering & Design > PF Design Submittal subsection. Allowed ONLY
+    // under `engineering`. Same posture as __crm: absent => untouched (preserve prior),
+    // present => strictly validated, malformed => reject the WHOLE save closed. A checklist
+    // save from the client sends this key WITHOUT the flat engineering fields, so cleanFields
+    // yields {} and only the checklist is replaced; a normal engineering field save omits
+    // this key so the stored checklist is preserved by the merge below.
+    const hasPrereqInBody = Object.prototype.hasOwnProperty.call(rawFieldsObj, PREREQ_KEY);
+    let prereqUpdate; // undefined => untouched
+    if (hasPrereqInBody) {
+      if (!PREREQ_ALLOWED_SECTIONS[section]) {
+        return json({ status: 'error', message: 'Submittal prerequisites are not valid on this section.' }, 400);
+      }
+      prereqUpdate = cleanPrereqs(rawFieldsObj[PREREQ_KEY]);
+      if (prereqUpdate === null) {
+        return json({ status: 'error', message: 'Invalid submittal prerequisites; nothing was saved.' }, 400);
+      }
+    }
+
     // FAIL CLOSED: no KV -> we cannot persist. Do NOT report success.
     if (!env.PF_SCHEDULE) {
       return json({ status: 'error',
@@ -304,12 +379,20 @@ export async function onRequestPost(context) {
     // from `fields`, so a normal string-field save never disturbs it.
     const prevCrm = (existing[CRM_KEY] && typeof existing[CRM_KEY] === 'object' && !Array.isArray(existing[CRM_KEY]))
       ? existing[CRM_KEY] : undefined;
+    // Carry forward any existing structured __submittal_prereqs the same way.
+    const prevPrereq = (existing[PREREQ_KEY] && typeof existing[PREREQ_KEY] === 'object' && !Array.isArray(existing[PREREQ_KEY]))
+      ? existing[PREREQ_KEY] : undefined;
     const merged = Object.assign({}, existing, fields);
     // Whole-object replace of __crm when the request supplied one (the client sends
     // the complete per-firm selection each time); otherwise preserve the prior value.
     if (crmUpdate !== undefined) merged[CRM_KEY] = crmUpdate;
     else if (prevCrm !== undefined) merged[CRM_KEY] = prevCrm;
     else delete merged[CRM_KEY]; // never leave a stray/non-object __crm behind
+    // Same whole-object replace/preserve for __submittal_prereqs (the client sends the
+    // complete 7-item checklist each save); otherwise preserve the prior value.
+    if (prereqUpdate !== undefined) merged[PREREQ_KEY] = prereqUpdate;
+    else if (prevPrereq !== undefined) merged[PREREQ_KEY] = prevPrereq;
+    else delete merged[PREREQ_KEY]; // never leave a stray/non-object key behind
     rec.sections[section] = merged;
 
     // Bound the number of sections (defense against a crafted flood of junk keys;
