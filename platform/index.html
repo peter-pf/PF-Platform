@@ -3569,7 +3569,6 @@ tr.pf-dragging { opacity: 0.45; }
     '/data/project-record-poet.js',
     '/data/project-records.js',
     '/data/garbin-prelim.js',
-    '/data/budget-actual-poet.js',
     '/data/awarded-projects.js',
     '/data/precon-pipeline.js',
     '/data/feasibility-history.js',
@@ -3641,7 +3640,7 @@ tr.pf-dragging { opacity: 0.45; }
                '/data/shop-dwg-info.js',
                '/data/pf-design-submittal.js',
                '/data/safety-folder.js',
-               '/data/budget-actual-poet.js', '/data/cost-code-template.js',
+               '/data/cost-code-template.js',
                '/data/budget-actuals.js', '/data/invoice-ledger.js',
                '/data/awarded-projects.js', '/data/project-history.js',
                '/data/precon-pipeline.js', '/data/feasibility-history.js',
@@ -4170,11 +4169,11 @@ window.progress = (function () {
       <!-- 5a1) PF Project Schedule (standalone; field-ops keep access via data-fo-safe) -->
       <a class="nav-item" data-fo-safe="1" data-module="schedule" onclick="showModule('schedule')" style="color:#d64545"><span class="nav-icon">&#128197;</span> PF Project Schedule</a>
 
-      <!-- 5a2) Financials (per-project) - INTERNAL job-cost tracking. NOT field-facing. -->
-      <div class="nav-sub collapsed">
-        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Financials</div>
-        <a class="nav-item" data-module="budget-actual-poet" onclick="showModule('budget-actual-poet')" style="color:#d64545">Budget vs Actual - 26-002 POET</a>
-      </div>
+      <!-- 5a2) Financials nav-sub with the standalone "Budget vs Actual - 26-002 POET"
+           sheet REMOVED (Brad 2026-08-13): redundant — Budget vs Actual now lives
+           inside each project's Financials section (per-project cost-code template +
+           saved budgets + synced actuals). A company-wide side-by-side financials
+           spreadsheet is a FUTURE build, not yet. -->
 
       <!-- 5c) Subcontracts (standalone review tool) REMOVED (Brad 2026-08-13): now
            redundant — Subcontract Analysis lives nested inside each project's
@@ -4937,12 +4936,11 @@ document.addEventListener('click', function(e) {
     <div id="prGenericRoot" class="pr-root"></div>
   </div>
 
-  <!-- BUDGET vs ACTUAL (Project Management -> Financials) - INTERNAL job-cost tracker. -->
-  <!-- Populated client-side by initBudgetActual() from window.PF_BUDGET_ACTUAL_POET     -->
-  <!-- (data/budget-actual-poet.js). FINANCIAL data - NOT reachable from fo-projects.     -->
-  <div class="module-view" id="mod-budget-actual-poet">
-    <div id="baRoot" class="pr-root"></div>
-  </div>
+  <!-- Standalone BUDGET vs ACTUAL module (#mod-budget-actual-poet, #baRoot) REMOVED
+       (Brad 2026-08-13): the per-project Financials -> "Project Costs (Budget vs
+       Actual)" section replaces it. Per-project financials use a DIFFERENT data
+       path (PF_COST_CODE_TEMPLATE + PF_PROJECT_BUDGETS + PF_PROJECT_INVOICING) and
+       are untouched. -->
 
   <!-- FIELD OPERATIONS: PROJECTS (FIELD VIEW) - operational info only, NO FINANCIALS. -->
   <!-- List (window.PF_AWARDED + window.PF_PROGRESS) -> field detail (window.PF_PROJECT_POET, financials stripped). -->
@@ -5518,7 +5516,6 @@ const moduleTitles = {
   'field-lists': 'Field Lists (Fleet & Crew)',
   'pf-coi': 'PF COI - Standard Coverages',
   'project-poet': '26-002 POET Biosciences',
-  'budget-actual-poet': 'Budget vs Actual - 26-002 POET',
   'financials-wip': 'WIP & Cashflow',
   'pf-dashboard': 'PF Dashboard',
   'precon-overview': 'Preconstruction Overview',
@@ -24185,124 +24182,13 @@ try {
 </script>
 
 <!-- ============================================================ -->
-<!-- BUDGET vs ACTUAL - renders window.PF_BUDGET_ACTUAL_POET into   -->
-<!-- #baRoot as a grouped job-cost table. INTERNAL financial data.  -->
-<!-- Cost Code | Description | Budget | Actual | Variance | Vendor  -->
-<!-- | Notes, with category subtotals + grand total. Variance is    -->
-<!-- the only colored column (green favorable / amber over).         -->
-<!-- ALL data-derived strings rendered via window.esc.              -->
+<!-- Standalone BUDGET vs ACTUAL renderer (PF_BUDGET_ACTUAL_POET -> -->
+<!-- #baRoot) REMOVED (Brad 2026-08-13) together with its nav item, -->
+<!-- module view, and label-map entry. Superseded by the per-       -->
+<!-- project Financials 'Project Costs (Budget vs Actual)' section,  -->
+<!-- which uses a separate data path (PF_COST_CODE_TEMPLATE +        -->
+<!-- PF_PROJECT_BUDGETS + PF_PROJECT_INVOICING) and is untouched.    -->
 <!-- ============================================================ -->
-<script>
-(function(){
-  try {
-    var D = window.PF_BUDGET_ACTUAL_POET;
-    if (!D) return;
-    var E = window.esc;
-
-    // Money formatter: blank stays blank (never "$0.00" for a missing value).
-    function money(v){
-      if (v === null || v === undefined || v === '') return '';
-      var n = Number(v);
-      if (isNaN(n)) return '';
-      return '$' + n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
-    }
-    function moneyCell(v){
-      var m = money(v);
-      return m ? E(m) : '<span class="ba-blank">-</span>';
-    }
-    // Variance cell - the ONLY colored column. favorable (under budget) = green,
-    // over budget = amber. Zero / blank = neutral.
-    function varCell(v){
-      if (v === null || v === undefined || v === '') return '<span class="ba-blank">-</span>';
-      var n = Number(v);
-      if (isNaN(n)) return '<span class="ba-blank">-</span>';
-      var cls = n < 0 ? 'over' : (n > 0 ? 'fav' : '');
-      var m = money(Math.abs(n));
-      var sign = n < 0 ? '(' + E(m) + ')' : E(m);
-      return '<span class="ba-var ' + cls + '">' + sign + '</span>';
-    }
-    function invCell(inv){
-      if (!inv || !inv.url) return '';
-      var icon = inv.match === 'file' ? 'ba-inv-file' : 'ba-inv-folder';
-      return '<div class="ba-inv"><a class="' + icon + '" href="' + E(inv.url)
-           + '" target="_blank" rel="noopener">' + E(inv.label || 'Invoice') + '</a></div>';
-    }
-
-    function render(){
-      var root = document.getElementById('baRoot');
-      if (!root) return;
-      var gt = D.grand_total || {};
-      var h = '<div class="ba-wrap">';
-
-      // header / KPIs
-      h += '<div class="ba-summary">'
-        + '<div class="ba-kpi"><div class="ba-kpi-label">Project</div><div class="ba-kpi-value">'
-        + E(D.name || '') + ' &middot; ' + E(D.job || '') + '</div></div>'
-        + '<div class="ba-kpi"><div class="ba-kpi-label">Budget</div><div class="ba-kpi-value">'
-        + (money(gt.budget) ? E(money(gt.budget)) : '-') + '</div></div>'
-        + '<div class="ba-kpi"><div class="ba-kpi-label">Actual to Date</div><div class="ba-kpi-value">'
-        + (money(gt.actual) ? E(money(gt.actual)) : '-') + '</div></div>'
-        + '<div class="ba-kpi"><div class="ba-kpi-label">Variance (Remaining)</div><div class="ba-kpi-value">'
-        + varCell(gt.variance) + '</div></div>'
-        + '</div>';
-
-      if (D.data_note) h += '<p class="ba-note">' + E(D.data_note) + '</p>';
-
-      h += '<table class="ba-table"><thead><tr>'
-        + '<th>Cost Code</th><th>Description</th>'
-        + '<th class="num">Budget</th><th class="num">Actual</th><th class="num">Variance</th>'
-        + '<th>Vendor / Supplier</th><th>Notes</th>'
-        + '</tr></thead><tbody>';
-
-      (D.groups || []).forEach(function(g){
-        var st = g.subtotal || {};
-        // category header row (carries the category subtotal)
-        h += '<tr class="ba-grp-row">'
-          + '<td class="ba-code"></td>'
-          + '<td class="ba-desc">' + E(g.title || '') + '</td>'
-          + '<td class="num">' + moneyCell(st.budget) + '</td>'
-          + '<td class="num">' + moneyCell(st.actual) + '</td>'
-          + '<td class="num">' + varCell(st.variance) + '</td>'
-          + '<td></td><td></td>'
-          + '</tr>';
-        (g.rows || []).forEach(function(row){
-          var isSub = !!row.is_subtotal;
-          var rowCls = isSub ? 'ba-sub-row' : 'ba-leaf-row';
-          var notesHtml = row.notes ? '<span class="ba-rownotes">' + E(row.notes) + '</span>' : '';
-          h += '<tr class="' + rowCls + '">'
-            + '<td class="ba-code">' + E(row.cost_code || '') + '</td>'
-            + '<td class="ba-desc">' + E(row.description || '')
-            +   (isSub ? '' : invCell(row.invoice)) + '</td>'
-            + '<td class="num">' + moneyCell(row.budget) + '</td>'
-            + '<td class="num">' + moneyCell(row.actual) + '</td>'
-            + '<td class="num">' + varCell(row.variance) + '</td>'
-            + '<td class="ba-vendor">' + E(row.vendor || '') + '</td>'
-            + '<td>' + notesHtml + '</td>'
-            + '</tr>';
-        });
-      });
-
-      // grand total row
-      h += '<tr class="ba-grand">'
-        + '<td class="ba-code"></td>'
-        + '<td class="ba-desc">' + E(gt.label || 'Total') + '</td>'
-        + '<td class="num">' + moneyCell(gt.budget) + '</td>'
-        + '<td class="num">' + moneyCell(gt.actual) + '</td>'
-        + '<td class="num">' + varCell(gt.variance) + '</td>'
-        + '<td></td><td></td>'
-        + '</tr>';
-
-      h += '</tbody></table></div>';
-      root.innerHTML = h;
-    }
-
-    document.addEventListener('DOMContentLoaded', render);
-    if (document.readyState !== 'loading') render();
-  } catch(e) {
-    console.error("Budget vs Actual view failed to load:", e);
-  }
-})();
-</script>
 
 <!-- ============================================================ -->
 <!-- AWARDED PROJECTS INDEX - renders window.PF_AWARDED into        -->
