@@ -15166,6 +15166,21 @@ try {
       if (!(d instanceof Date) || isNaN(d.getTime())) return '';
       return _pf2(d.getMonth()+1) + '/' + _pf2(d.getDate()) + '/' + d.getFullYear();
     }
+    // Add (or subtract, if n<0) N CALENDAR days to a Date (weekends INCLUDED),
+    // returning a NEW Date at local midnight. Used for the General Info "Project
+    // Completion" auto-calc (= Anticipated Project Start + Projected Duration (Days),
+    // counted as calendar days, consistent with how PF counts schedule durations).
+    // Relies on Date.setDate() for correct month/year rollover (e.g. 08/20/2026 + 18
+    // -> 09/07/2026; 12/25 + 10 -> 01/04 next year). Guards a non-Date / NaN / non-
+    // finite n -> null (no compute, never a bogus date). n is floored to an integer
+    // so a duration like "18.0"/"18" behaves identically.
+    function pfAddCalendarDays(date, n){
+      if (!(date instanceof Date) || isNaN(date.getTime())) return null;
+      if (n === null || n === undefined || !isFinite(n)) return null;
+      var d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      d.setDate(d.getDate() + Math.trunc(n));
+      return isNaN(d.getTime()) ? null : d;
+    }
 
     // twoCol(left, right, leftGroup?, rightGroup?): render a FIXED two-column
     // grouping that mirrors Brad's spec PDFs (specific fields grouped left vs
@@ -16421,7 +16436,29 @@ try {
           field('Site Size (Acres)', bid.site_acres, 'Bid Log'),
           field('Anticipated Project Start', bid.projected_start, 'Bid Log'),
           field('Projected Duration (Days)', bid.duration_days, 'Bid Log'),
-          field('Project Completion', '')
+          // AUTO-CALC (Brad 2026-08-13): "Project Completion" = "Anticipated Project
+          // Start" + "Projected Duration (Days)" counted as CALENDAR days. Mirrors the
+          // Site Readiness "Call locate by" computed pattern: read the EFFECTIVE
+          // (override-wins) start + duration via effVal so the compute sees exactly
+          // what the user sees (a hand-edited start/duration flows straight through).
+          // The computed Date is passed AS the synced value into field(), which:
+          //   * formats it MM/DD/YYYY (label matches pfIsDateLabel -> pfFmtDate),
+          //   * lets a NON-empty manual override WIN (field()'s override precedence)
+          //     => this is computed-as-default-WITH-manual-override for free: the
+          //     auto-calc is the visible default, but a hand-entered completion date
+          //     still takes over if someone types one (documented choice).
+          // FAIL-CLOSED: if start OR duration is missing / unparseable, the compute
+          // yields null -> we pass '' -> field() renders the amber blank "-" (never a
+          // guessed date). NOTE: this is a DIFFERENT field from the Subcontract
+          // Agreement "Project Substantial Completion Date" (contract override key,
+          // FE/subcontract-sourced) — no interaction / no clobber (see report).
+          field('Project Completion', (function(){
+              var _cStart = pfParseDate(effVal('general', 'Anticipated Project Start', bid.projected_start));
+              var _cDur   = pfParseNum(effVal('general', 'Projected Duration (Days)', bid.duration_days));
+              if (!_cStart || _cDur === null) return '';
+              var _cEnd = pfAddCalendarDays(_cStart, _cDur);
+              return _cEnd || '';
+            })(), 'Auto (start + duration)')
         ], [
           // DROPDOWN (SOW). Value seeds from the confirmed subcontract scope where present.
           field('Project Scope of Work (SOW)', SF.confirmed_scope, SF.confirmed_scope ? SS : ''),
