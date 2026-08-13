@@ -1,19 +1,28 @@
-// jsdom render-proof for CHANGE A (Responsible Party = dropdown/typeahead of the
-// project's contacts, tied to email) + CHANGE B (SOW moved to bottom of Prelim Design).
-// Loads the REAL project-record IIFE from platform/index.html (no reimplementation).
+// jsdom render-proof for the ALWAYS-LIVE prereqs checklist (Brad 2026-08-13) + the
+// still-valid read-view resolution (Change A) + SOW ordering (Change B). Loads the REAL
+// project-record IIFE from platform/index.html (no reimplementation).
 //
-// CHANGE A assertions:
-//   A1 Read view resolves a directory-tied responsible party (responsible_contact_id)
-//      to the LIVE directory name + email (directory email wins over stored copy).
-//   A2 Editor renders a <datalist> of THIS project's contacts (from __crm selections +
-//      legacy stored parties); the name input is list-bound + has a hidden contactId.
-//   A3 Typing/selecting a project contact NAME auto-associates its email + contactId
-//      (pfPrqOnPartyInput); a non-matching name clears the tie but keeps a typed email.
-//   A4 Save POSTs responsible_contact_id + responsible_name + responsible_email.
-//   A5 A NOT-in-project free name+email still saves (graceful path), cid empty.
+// UPDATED 2026-08-13: the "PF Info Needed for Submittal Design" table is now ALWAYS-LIVE
+// (no Edit/Save/Cancel). The old A2/A3/A4/A5 editor-flow assertions are replaced by
+// in-DOM always-live assertions (L*). A1/A6/A7 (read-view resolution + count) and B1/B2
+// (SOW ordering) still hold and are retained.
+//
+// READ-VIEW (retained):
+//   A1 A directory-tied responsible party (responsible_contact_id) resolves to the LIVE
+//      directory name + email (directory email wins over stored copy).
 //   A6 Existing stored responsible data is PRESERVED/shown (legacy free name/email).
-//   A7 "X of 9 received" count + Required For checkboxes unaffected by the change.
-//   A8 field_ops sees NO editor controls on the checklist.
+//   A7 "X of 9 received" count reflects stored date_received.
+//
+// ALWAYS-LIVE (new):
+//   L1 Office renders IN-CELL live controls (name typeahead + email + date + rf checkboxes),
+//      NO "Edit checklist" button, and a datalist of THIS project's contacts.
+//   L2 Typing/selecting a project contact NAME auto-associates its email + contactId
+//      (pfPrqOnPartyLive); a non-matching name clears the tie but keeps a typed email.
+//   L3 Changing a control fires pfPrqLiveSave -> ONE POST of __submittal_prereqs.items,
+//      carrying the changed row (read-merge-write) while PRESERVING sibling items.
+//   L4 A checkbox (required_for) change saves + preserves that row's party + date.
+//   L5 field_ops sees NO live controls (read-only cells) + no Reminder column.
+//   L6 A failed save REVERTS the control (fail-closed) — no fabricated "saved".
 //
 // CHANGE B assertions:
 //   B1 In Prelim Design, SOW renders BELOW Total Stone (TN) (SOW is the LAST field).
@@ -81,7 +90,8 @@ function makeDom(role){
   return dom;
 }
 
-function fetchImpl(posts){
+function fetchImpl(posts, opts){
+  opts = opts || {};
   return (url, init)=>{
     const u = String(url);
     if (u.includes('/api/contacts')) {
@@ -90,6 +100,10 @@ function fetchImpl(posts){
     if (u.includes('/api/project-override') && init && init.method === 'POST') {
       const body = JSON.parse(init.body);
       if (posts) posts.push(body);
+      // Fail-closed test mode: return a non-saved response so the client must revert.
+      if (opts.failPost) {
+        return Promise.resolve({ ok:false, status:500, json:()=>Promise.resolve({ status:'error', message:'boom' }) });
+      }
       return Promise.resolve({ ok:true, status:200, json:()=>Promise.resolve({
         ok:true, saved:true, num:body.num, section:body.section,
         sections:{ [body.section]: body.fields }, _meta:{updatedBy:'Tester',updatedAt:'2026-08-12T12:00:00Z'} }) });
@@ -134,7 +148,7 @@ function findCard(root, title){
   return found;
 }
 
-// ---- A1 + A6 + A7: read view resolves tie, preserves legacy, count intact ----
+// ---- A1 + A6 + A7 + L1: office always-live read resolution + in-cell controls ----
 await (async function(){
   const dom = makeDom('partner');
   const w = boot(dom, { overrideGet: ovWith(OVERRIDES), fetchI: fetchImpl(null) });
@@ -143,83 +157,39 @@ await (async function(){
   const root = w.document.getElementById('prGenericRoot');
   const wrap = root.querySelector('.pf-prq-wrap');
   ok('A1 prereq wrap present', !!wrap);
-  const rowStruct = wrap.querySelector('tr[data-prq-item="struct_foundation_cad"]');
-  ok('A1 tied row resolves directory NAME (not stored OLD NAME)',
-    /Nathan Westhoff/.test(rowStruct.textContent) && !/OLD NAME/.test(rowStruct.textContent));
-  ok('A1 tied row resolves directory EMAIL (wins over stale)',
-    rowStruct.getAttribute('data-prq-email') === 'nathan@westhoff.com');
-  ok('A1 tied row carries contactId', rowStruct.getAttribute('data-prq-cid') === 'C0009');
-  const rowCivil = wrap.querySelector('tr[data-prq-item="civil_grading_cad"]');
-  ok('A6 legacy free party name shown', /Free Person/.test(rowCivil.textContent));
-  ok('A6 legacy free email preserved', rowCivil.getAttribute('data-prq-email') === 'free@one.com');
-  ok('A6 legacy free party has no cid', (rowCivil.getAttribute('data-prq-cid')||'') === '');
-  // count: only civil_grading_cad has a date_received -> "1 of 9 received"
-  ok('A7 received count = 1 of 9', /1 of 9 received/.test(wrap.textContent));
-  // Required For read-view checkboxes reflect stored flags
-  const rfBoxes = rowStruct.querySelectorAll('.pf-prq-rf-box');
-  ok('A7 struct Required-For: submittal checked, staking unchecked',
-    rfBoxes.length===2 && rfBoxes[0].checked===true && rfBoxes[1].checked===false);
-})();
-
-// ---- A2 + A3 + A4: editor datalist + typeahead tie + save payload ----
-await (async function(){
-  const dom = makeDom('partner');
-  const posts = [];
-  const w = boot(dom, { overrideGet: ovWith(OVERRIDES), fetchI: fetchImpl(posts) });
-  w.openProjectRecord('26-002');
-  await new Promise(r=>setTimeout(r,80));
-  const root = w.document.getElementById('prGenericRoot');
-  const wrap = root.querySelector('.pf-prq-wrap');
-  const editBtn = wrap.querySelector('.pf-prq-edit');
-  ok('A2 office sees Edit checklist button', !!editBtn);
-  w.pfPrereqEdit(editBtn);
-  const editor = wrap.querySelector('.pf-prq-editor');
-  ok('A2 editor opened', !!editor);
-  const dl = editor.querySelector('datalist#pf-prq-contacts-dl');
-  ok('A2 datalist present', !!dl);
+  // L1: NO Edit button; in-cell live controls present.
+  ok('L1 office has NO Edit checklist button', !wrap.querySelector('.pf-prq-edit') && !/Edit checklist/.test(wrap.innerHTML));
+  ok('L1 office renders live name/email/date inputs',
+    !!wrap.querySelector('.pf-prq-live-name') && !!wrap.querySelector('.pf-prq-live-email') && !!wrap.querySelector('.pf-prq-live-date'));
+  ok('L1 office renders live required-for checkboxes',
+    !!wrap.querySelector('.pf-prq-live-rf-sub') && !!wrap.querySelector('.pf-prq-live-rf-stk'));
+  const dl = wrap.querySelector('datalist#pf-prq-contacts-dl');
+  ok('L1 datalist present', !!dl);
   const dlNames = [...dl.querySelectorAll('option')].map(o=>o.value);
-  // Project contacts = C0009 (Owner) + C0020 (Geo DP) + legacy "Free Person" (from item)
-  ok('A2 datalist includes directory contact Nathan Westhoff', dlNames.includes('Nathan Westhoff'));
-  ok('A2 datalist includes DP contact Ed Garbin', dlNames.includes('Ed Garbin'));
-  ok('A2 datalist includes legacy free party', dlNames.includes('Free Person'));
-  ok('A2 datalist EXCLUDES a non-project contact (Tanner)', !dlNames.includes('Tanner Schweer'));
-  const rowStruct = editor.querySelector('tr[data-prq-item="struct_foundation_cad"]');
-  const nameEl = rowStruct.querySelector('.pf-prq-in-name');
-  const emailEl = rowStruct.querySelector('.pf-prq-in-email');
-  const cidEl = rowStruct.querySelector('.pf-prq-in-cid');
-  ok('A2 name input is list-bound', nameEl.getAttribute('list') === 'pf-prq-contacts-dl');
-  ok('A2 tied row prefilled with directory name/email/cid',
-    nameEl.value==='Nathan Westhoff' && emailEl.value==='nathan@westhoff.com' && cidEl.value==='C0009');
-  // A3: change the party of the CIVIL row (currently free) to a project contact Ed Garbin
-  const rowCivil = editor.querySelector('tr[data-prq-item="civil_grading_cad"]');
-  const cNameEl = rowCivil.querySelector('.pf-prq-in-name');
-  const cEmailEl = rowCivil.querySelector('.pf-prq-in-email');
-  const cCidEl = rowCivil.querySelector('.pf-prq-in-cid');
-  cNameEl.value = 'Ed Garbin';
-  w.pfPrqOnPartyInput(cNameEl);
-  ok('A3 selecting project contact auto-fills email', cEmailEl.value === 'ed@garbin.com');
-  ok('A3 selecting project contact ties contactId', cCidEl.value === 'C0020');
-  // A3b: a partial / non-matching name clears the tie but keeps typed email
-  cNameEl.value = 'Someone Else';
-  cEmailEl.value = 'someone@else.com';
-  w.pfPrqOnPartyInput(cNameEl);
-  ok('A3 non-matching name clears cid', (cCidEl.value||'') === '');
-  ok('A3 non-matching name keeps typed email', cEmailEl.value === 'someone@else.com');
-  // Reset civil to Ed for the save assertion
-  cNameEl.value = 'Ed Garbin'; w.pfPrqOnPartyInput(cNameEl);
-  // A4: Save -> POST carries responsible_contact_id
-  const saveBtn = editor.querySelector('.pf-prq-save');
-  w.pfPrereqSave(saveBtn);
-  await new Promise(r=>setTimeout(r,40));
-  ok('A4 one override POST fired', posts.length === 1);
-  const items = posts[0] && posts[0].fields && posts[0].fields.__submittal_prereqs && posts[0].fields.__submittal_prereqs.items;
-  ok('A4 struct item saves tied cid C0009', items && items.struct_foundation_cad.responsible_contact_id === 'C0009');
-  ok('A4 struct item saves resolved name+email',
-    items && items.struct_foundation_cad.responsible_name==='Nathan Westhoff' && items.struct_foundation_cad.responsible_email==='nathan@westhoff.com');
-  ok('A4 civil item re-tied to C0020', items && items.civil_grading_cad.responsible_contact_id === 'C0020');
+  ok('L1 datalist includes directory Owner (Nathan)', dlNames.includes('Nathan Westhoff'));
+  ok('L1 datalist includes legacy stored party (Free Person)', dlNames.includes('Free Person'));
+  // pfProjectContacts is scoped to Owner+GC (+ legacy + stored parties); a DP-only contact
+  // and an unrelated directory contact are BOTH excluded.
+  ok('L1 datalist EXCLUDES a DP-only contact (Ed Garbin)', !dlNames.includes('Ed Garbin'));
+  ok('L1 datalist EXCLUDES a non-project contact (Tanner)', !dlNames.includes('Tanner Schweer'));
+  // A1: tied row resolves directory name/email/cid (INTO the live inputs + data attrs).
+  const rowStruct = wrap.querySelector('tr[data-prq-item="struct_foundation_cad"]');
+  const sName = rowStruct.querySelector('.pf-prq-live-name');
+  const sEmail = rowStruct.querySelector('.pf-prq-live-email');
+  const sCid = rowStruct.querySelector('.pf-prq-live-cid');
+  ok('A1 tied row resolves directory NAME (not stored OLD NAME)', sName.value === 'Nathan Westhoff');
+  ok('A1 tied row resolves directory EMAIL (wins over stale)', sEmail.value === 'nathan@westhoff.com');
+  ok('A1 tied row carries contactId', sCid.value === 'C0009' && rowStruct.getAttribute('data-prq-cid') === 'C0009');
+  // A6: legacy free party preserved.
+  const rowCivil = wrap.querySelector('tr[data-prq-item="civil_grading_cad"]');
+  ok('A6 legacy free party name shown', rowCivil.querySelector('.pf-prq-live-name').value === 'Free Person');
+  ok('A6 legacy free email preserved', rowCivil.querySelector('.pf-prq-live-email').value === 'free@one.com');
+  ok('A6 legacy free party has no cid', (rowCivil.querySelector('.pf-prq-live-cid').value||'') === '');
+  // A7: count reflects the one stored date_received.
+  ok('A7 received count = 1 of 9', /1 of 9 received/.test(wrap.textContent));
 })();
 
-// ---- A5: NOT-in-project free name+email still saves (graceful path) ----
+// ---- L2 + L3: typeahead tie + save-on-change POST (read-merge-write) ----
 await (async function(){
   const dom = makeDom('partner');
   const posts = [];
@@ -228,22 +198,59 @@ await (async function(){
   await new Promise(r=>setTimeout(r,80));
   const root = w.document.getElementById('prGenericRoot');
   const wrap = root.querySelector('.pf-prq-wrap');
-  w.pfPrereqEdit(wrap.querySelector('.pf-prq-edit'));
-  const editor = wrap.querySelector('.pf-prq-editor');
-  const row = editor.querySelector('tr[data-prq-item="full_civil_pdf"]');
-  const nameEl = row.querySelector('.pf-prq-in-name');
-  const emailEl = row.querySelector('.pf-prq-in-email');
-  nameEl.value = 'One Off Person';
-  w.pfPrqOnPartyInput(nameEl);        // no match -> cid stays empty
-  emailEl.value = 'oneoff@ext.com';
-  w.pfPrereqSave(editor.querySelector('.pf-prq-save'));
+  // L2: change the CIVIL row party (currently free) to project contact Nathan Westhoff
+  // (the Owner, C0009 — a real member of pfProjectContacts).
+  const rowCivil = wrap.querySelector('tr[data-prq-item="civil_grading_cad"]');
+  const cName = rowCivil.querySelector('.pf-prq-live-name');
+  const cEmail = rowCivil.querySelector('.pf-prq-live-email');
+  const cCid = rowCivil.querySelector('.pf-prq-live-cid');
+  cName.value = 'Nathan Westhoff';
+  w.pfPrqOnPartyLive(cName);
+  ok('L2 selecting project contact auto-fills email', cEmail.value === 'nathan@westhoff.com');
+  ok('L2 selecting project contact ties contactId', cCid.value === 'C0009');
+  // Non-matching name clears the tie but keeps a typed email.
+  cName.value = 'Someone Else'; cEmail.value = 'someone@else.com';
+  w.pfPrqOnPartyLive(cName);
+  ok('L2 non-matching name clears cid', (cCid.value||'') === '');
+  ok('L2 non-matching name keeps typed email', cEmail.value === 'someone@else.com');
+  // Reset to Nathan, then fire the name control's onchange -> pfPrqLiveSave.
+  cName.value = 'Nathan Westhoff'; w.pfPrqOnPartyLive(cName);
+  w.pfPrqLiveSave(cName);
+  await new Promise(r=>setTimeout(r,40));
+  ok('L3 exactly ONE override POST fired', posts.length === 1);
+  const p0 = posts[0];
+  ok('L3 POST targets engineering', p0.section === 'engineering');
+  const items = p0.fields && p0.fields.__submittal_prereqs && p0.fields.__submittal_prereqs.items;
+  ok('L3 civil row re-tied to Nathan (cid C0009, email)',
+    items && items.civil_grading_cad.responsible_contact_id === 'C0009' && items.civil_grading_cad.responsible_email === 'nathan@westhoff.com');
+  // read-merge-write: the OTHER (struct) item is preserved in the same payload.
+  ok('L3 sibling struct item preserved (cid C0009)',
+    items && items.struct_foundation_cad && items.struct_foundation_cad.responsible_contact_id === 'C0009');
+  ok('L3 civil row date_received preserved (2026-08-01)',
+    items && items.civil_grading_cad.date_received === '2026-08-01');
+})();
+
+// ---- L4: required_for checkbox change saves + preserves party/date ----
+await (async function(){
+  const dom = makeDom('partner');
+  const posts = [];
+  const w = boot(dom, { overrideGet: ovWith(OVERRIDES), fetchI: fetchImpl(posts) });
+  w.openProjectRecord('26-002');
+  await new Promise(r=>setTimeout(r,80));
+  const root = w.document.getElementById('prGenericRoot');
+  const wrap = root.querySelector('.pf-prq-wrap');
+  const rowCivil = wrap.querySelector('tr[data-prq-item="civil_grading_cad"]');
+  const stk = rowCivil.querySelector('.pf-prq-live-rf-stk'); // stored true -> toggle off
+  stk.checked = false;
+  w.pfPrqLiveSave(stk);
   await new Promise(r=>setTimeout(r,40));
   const items = posts[0].fields.__submittal_prereqs.items;
-  ok('A5 free party saves with empty cid', items.full_civil_pdf.responsible_contact_id === '');
-  ok('A5 free party saves name+email', items.full_civil_pdf.responsible_name==='One Off Person' && items.full_civil_pdf.responsible_email==='oneoff@ext.com');
+  ok('L4 rf staking toggled off', items.civil_grading_cad.required_for.staking_layout === false);
+  ok('L4 party preserved on checkbox save', items.civil_grading_cad.responsible_email === 'free@one.com');
+  ok('L4 date preserved on checkbox save', items.civil_grading_cad.date_received === '2026-08-01');
 })();
 
-// ---- A8: field_ops sees NO editor controls ----
+// ---- L5: field_ops sees NO live controls (read-only) ----
 await (async function(){
   const dom = makeDom('field_ops');
   const w = boot(dom, { overrideGet: ovWith(OVERRIDES), fetchI: fetchImpl(null) });
@@ -251,9 +258,36 @@ await (async function(){
   await new Promise(r=>setTimeout(r,80));
   const root = w.document.getElementById('prGenericRoot');
   const wrap = root.querySelector('.pf-prq-wrap');
-  ok('A8 prereq wrap still renders for field_ops', !!wrap);
-  ok('A8 field_ops has NO Edit checklist button', !wrap.querySelector('.pf-prq-edit'));
-  ok('A8 field_ops has NO Reminder column', !wrap.querySelector('.pf-prq-remind') && !/>Reminder</.test(wrap.innerHTML));
+  ok('L5 prereq wrap still renders for field_ops', !!wrap);
+  ok('L5 field_ops has NO live inputs',
+    !wrap.querySelector('.pf-prq-live') && !wrap.querySelector('.pf-prq-live-name') && !wrap.querySelector('.pf-prq-live-date'));
+  ok('L5 field_ops has NO Edit checklist button', !wrap.querySelector('.pf-prq-edit'));
+  ok('L5 field_ops has NO Reminder column', !wrap.querySelector('.pf-prq-remind') && !/>Reminder</.test(wrap.innerHTML));
+  // Read-only value cells still resolve the tied party name (in cell text, not an input).
+  const rowStruct = wrap.querySelector('tr[data-prq-item="struct_foundation_cad"]');
+  ok('L5 field_ops read-only cell shows resolved party name', /Nathan Westhoff/.test(rowStruct.textContent));
+})();
+
+// ---- L6: failed save REVERTS the control (fail-closed) ----
+await (async function(){
+  const dom = makeDom('partner');
+  const posts = [];
+  const w = boot(dom, { overrideGet: ovWith(OVERRIDES), fetchI: fetchImpl(posts, { failPost:true }) });
+  w.openProjectRecord('26-002');
+  await new Promise(r=>setTimeout(r,80));
+  const root = w.document.getElementById('prGenericRoot');
+  const wrap = root.querySelector('.pf-prq-wrap');
+  const rowStruct = wrap.querySelector('tr[data-prq-item="struct_foundation_cad"]');
+  const dateEl = rowStruct.querySelector('.pf-prq-live-date');
+  const before = dateEl.value;                 // '' (struct has no date_received)
+  dateEl.value = '2026-08-13';
+  w.pfPrqLiveSave(dateEl);
+  await new Promise(r=>setTimeout(r,40));
+  ok('L6 POST was attempted', posts.length === 1);
+  ok('L6 control REVERTED to prior value after failed save', dateEl.value === before);
+  const msgEl = wrap.querySelector('.pf-prq-msg');
+  ok('L6 an error message is shown (non-empty, error-styled)',
+    !!msgEl && msgEl.textContent.trim() !== '' && /pf-prq-msg-err/.test(msgEl.className) && msgEl.style.display !== 'none');
 })();
 
 // ---- B1 + B2: Change B — SOW at bottom of Prelim Design; bindings intact ----
