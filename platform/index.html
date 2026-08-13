@@ -34331,9 +34331,15 @@ try {
 (function () {
   'use strict';
   var E = window.esc || function (s) { return s == null ? '' : String(s); };
-  // overrides: { "<locationId>::<itemId>": <number|null> } merged over the seed.
+  // overrides: { "<locationId>::<itemId>": <number|null> } (Actual Qty) merged over seed.
   var overrides = {};
-  var canEdit = false;
+  // fieldOverrides: { "<itemId>": { description, manufacturer, mfrPart, altSources,
+  //   notes, reqTrailer, reqHome } } per-ITEM corrections (CHANGE B). Merged over the
+  // seed item BEFORE render so a corrected value shows everywhere the item appears.
+  var fieldOverrides = {};
+  var canEdit = false;          // office (admin/partner/business_dev)?
+  var editMode = false;         // CHANGE B: full-row edit toggle (office-only). OFF by default.
+  var collapsed = {};           // CHANGE C: { "<locationId>": true } => that location collapsed.
 
   function api(path, opts) {
     return fetch(path, Object.assign({ credentials: 'same-origin',
@@ -34342,6 +34348,23 @@ try {
   }
 
   function invKey(locId, itemId) { return locId + '::' + itemId; }
+
+  // Editable per-item text/number fields for CHANGE B (must match the server allowlist).
+  var TEXT_FIELDS = ['description', 'manufacturer', 'mfrPart', 'altSources', 'notes'];
+  var NUM_FIELDS  = ['reqTrailer', 'reqHome'];
+
+  // Return an item MERGED with its per-item field override (CHANGE B). The seed item
+  // is never mutated; a shallow copy carries the office's corrections.
+  function mergedItem(item) {
+    var ov = fieldOverrides[item.id];
+    if (!ov) return item;
+    var out = {}, k;
+    for (k in item) { if (Object.prototype.hasOwnProperty.call(item, k)) out[k] = item[k]; }
+    TEXT_FIELDS.concat(NUM_FIELDS).forEach(function (f) {
+      if (Object.prototype.hasOwnProperty.call(ov, f)) out[f] = ov[f];
+    });
+    return out;
+  }
 
   // Live actual qty for (location,item): the KV override if set, else '' (blank).
   // v1 stores ONE editable actual per (location,item); the seed's actualOnHand is a
@@ -34389,6 +34412,7 @@ try {
     }
     var me = window.PF_ME || {};
     canEdit = (me.role === 'admin' || me.role === 'partner' || me.role === 'business_dev');
+    if (!canEdit) editMode = false; // safety: never leave edit mode on for a non-office role.
 
     var locations = data.locations.slice().sort(function (a, b) { return (a.order || 0) - (b.order || 0); });
     var categories = Array.isArray(data.categories) ? data.categories : [];
@@ -34396,19 +34420,42 @@ try {
 
     var h = '';
     h += '<div class="inv-head">';
+    h += '<div class="inv-title-row">';
     h += '<div class="inv-title">Inventory</div>';
+    // CHANGE B: office-only Edit toggle. It may be removed later (Derek), so it is a
+    // single self-contained control. field_ops never sees it (server ALSO gates POST).
+    if (canEdit) {
+      h += '<button type="button" id="invEditBtn" class="inv-editbtn'
+         + (editMode ? ' inv-editbtn-on' : '') + '">'
+         + (editMode ? 'Done editing' : 'Edit rows') + '</button>';
+    }
+    h += '</div>';
     h += '<div class="inv-sub">Stock levels by location &middot; Farm (Home/stockyard) + field trailers'
-       + (canEdit ? ' &middot; edit <b>Actual Qty</b> to update' : ' &middot; view only') + '</div>';
+       + (canEdit
+            ? (editMode
+                 ? ' &middot; <b>Edit mode ON</b> — correct any field; changes save on blur'
+                 : ' &middot; edit <b>Actual Qty</b>, or click <b>Edit rows</b> to correct all fields')
+            : ' &middot; view only') + '</div>';
     h += '<div id="invMsg" class="inv-msg"></div>';
     h += '</div>';
 
     locations.forEach(function (loc) {
-      h += '<div class="inv-loc">';
-      h += '<div class="inv-loc-h">' + E(loc.label)
-         + ' <span class="inv-loc-type">' + E(loc.type === 'farm' ? 'Home / Stockyard' : 'Trailer') + '</span></div>';
+      var isOpen = !collapsed[loc.id]; // CHANGE C: default expanded unless collapsed.
+      // Count items shown for this location (all seed items appear in every location).
+      var locCount = items.length;
+      h += '<div class="inv-loc' + (isOpen ? ' inv-open' : '') + '" data-loc="' + E(loc.id) + '">';
+      // CHANGE A + C: the dark-blue header band is also the collapse toggle (light text).
+      h += '<div class="inv-loc-h" data-loc-toggle="' + E(loc.id) + '" role="button" tabindex="0" '
+         + 'aria-expanded="' + (isOpen ? 'true' : 'false') + '">';
+      h += '<span class="inv-loc-toggle" aria-hidden="true">&#9656;</span>';
+      h += '<span class="inv-loc-label">' + E(loc.label)
+         + ' <span class="inv-loc-type">' + E(loc.type === 'farm' ? 'Home / Stockyard' : 'Trailer') + '</span></span>';
+      h += '<span class="inv-loc-count">' + locCount + (locCount === 1 ? ' item' : ' items') + '</span>';
+      h += '</div>';
 
+      h += '<div class="inv-loc-body">';
       categories.forEach(function (cat) {
-        var catItems = items.filter(function (it) { return it.category === cat; });
+        var catItems = items.filter(function (it) { return it.category === cat; }).map(mergedItem);
         h += '<div class="inv-cat">';
         h += '<div class="inv-cat-h">' + E(cat)
            + ' <span class="inv-ct">' + catItems.length + (catItems.length === 1 ? ' item' : ' items') + '</span></div>';
@@ -34422,36 +34469,73 @@ try {
             var req = reqFor(loc, it);
             var low = isLow(loc, it);
             var qv = liveQty(loc.id, it.id);
-            h += '<tr' + (low ? ' class="inv-low"' : '') + '>';
-            h += '<td class="inv-desc">' + E(it.description)
-               + (low ? ' <span class="inv-lowtag">LOW</span>' : '') + '</td>';
-            h += '<td>' + E(it.manufacturer || '—') + '</td>';
-            h += '<td>' + E(it.mfrPart || '—') + '</td>';
-            h += '<td class="num">' + E(fmtReq(req)) + '</td>';
-            // Actual Qty: the ONLY editable field. Office = editable input; field_ops
-            // (canEdit false) = read-only text (server ALSO blocks the POST).
-            if (canEdit) {
+            // Which per-location required field this location edits (CHANGE B).
+            var reqField = (loc.type === 'farm') ? 'reqHome' : 'reqTrailer';
+            h += '<tr' + (low ? ' class="inv-low"' : '') + ' data-item="' + E(it.id) + '">';
+            if (editMode) {
+              // CHANGE B: full-row edit. Text fields = text inputs; Req = number input.
+              h += '<td class="inv-desc">'
+                 + fieldInput('description', it, 'inv-fin')
+                 + (low ? ' <span class="inv-lowtag">LOW</span>' : '') + '</td>';
+              h += '<td>' + fieldInput('manufacturer', it, 'inv-fin') + '</td>';
+              h += '<td>' + fieldInput('mfrPart', it, 'inv-fin') + '</td>';
+              h += '<td class="num"><input class="inv-fin inv-fin-num" type="number" min="0" step="1" '
+                 + 'value="' + E(req == null ? '' : req) + '" '
+                 + 'data-item="' + E(it.id) + '" data-field="' + E(reqField) + '" '
+                 + 'placeholder="TBD" aria-label="Required stock"></td>';
+              // Actual Qty stays a per-LOCATION edit (its own action).
               h += '<td class="num"><input class="inv-qty" type="number" min="0" step="1" '
                  + 'value="' + E(qv) + '" '
                  + 'data-loc="' + E(loc.id) + '" data-item="' + E(it.id) + '" '
                  + 'aria-label="Actual quantity on hand"></td>';
+              h += '<td>' + fieldInput('altSources', it, 'inv-fin') + '</td>';
+              h += '<td class="inv-notes">' + fieldInput('notes', it, 'inv-fin') + '</td>';
             } else {
-              h += '<td class="num inv-qty-ro">' + (qv === '' ? '—' : E(qv)) + '</td>';
+              h += '<td class="inv-desc">' + E(it.description)
+                 + (low ? ' <span class="inv-lowtag">LOW</span>' : '') + '</td>';
+              h += '<td>' + E(it.manufacturer || '—') + '</td>';
+              h += '<td>' + E(it.mfrPart || '—') + '</td>';
+              h += '<td class="num">' + E(fmtReq(req)) + '</td>';
+              // Actual Qty: office = editable input; field_ops = read-only text.
+              if (canEdit) {
+                h += '<td class="num"><input class="inv-qty" type="number" min="0" step="1" '
+                   + 'value="' + E(qv) + '" '
+                   + 'data-loc="' + E(loc.id) + '" data-item="' + E(it.id) + '" '
+                   + 'aria-label="Actual quantity on hand"></td>';
+              } else {
+                h += '<td class="num inv-qty-ro">' + (qv === '' ? '—' : E(qv)) + '</td>';
+              }
+              h += '<td>' + E(it.altSources || '—') + '</td>';
+              h += '<td class="inv-notes">' + E(it.notes || '') + '</td>';
             }
-            h += '<td>' + E(it.altSources || '—') + '</td>';
-            h += '<td class="inv-notes">' + E(it.notes || '') + '</td>';
             h += '</tr>';
           });
           h += '</tbody></table>';
         }
         h += '</div>'; // .inv-cat
       });
+      h += '</div>'; // .inv-loc-body
 
       h += '</div>'; // .inv-loc
     });
 
     host.innerHTML = h;
-    if (canEdit) wireEdits(host);
+    wireLocToggles(host);           // CHANGE C: always (view-only can collapse too).
+    if (canEdit) {
+      wireEditToggle(host);         // CHANGE B: the Edit-rows button.
+      wireEdits(host);              // Actual Qty save-on-change.
+      if (editMode) wireFieldEdits(host); // CHANGE B: field save-on-change.
+    }
+  }
+
+  // CHANGE B helper: a text input for an editable per-item field, value from the
+  // MERGED item (seed <- override). data-item + data-field drive save-on-change.
+  function fieldInput(field, item, cls) {
+    var v = item[field];
+    return '<input class="' + cls + '" type="text" '
+      + 'value="' + E(v == null ? '' : v) + '" '
+      + 'data-item="' + E(item.id) + '" data-field="' + E(field) + '" '
+      + 'aria-label="' + E(field) + '">';
   }
 
   // Save-on-change (fail-closed): on blur/change of an Actual Qty input, POST the
@@ -34493,6 +34577,100 @@ try {
     });
   }
 
+  // CHANGE C: per-location collapse. Clicking (or Enter/Space on) the dark-blue
+  // header band toggles that location's body. State lives in `collapsed` so it
+  // survives a re-render (e.g. toggling edit mode). Locations are independent.
+  function wireLocToggles(host) {
+    var heads = host.querySelectorAll('.inv-loc-h[data-loc-toggle]');
+    heads.forEach(function (head) {
+      var locId = head.getAttribute('data-loc-toggle');
+      function toggle() {
+        var loc = head.closest('.inv-loc');
+        if (!loc) return;
+        var nowOpen = !loc.classList.contains('inv-open');
+        loc.classList.toggle('inv-open', nowOpen);
+        head.setAttribute('aria-expanded', nowOpen ? 'true' : 'false');
+        collapsed[locId] = !nowOpen;
+      }
+      head.addEventListener('click', toggle);
+      head.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); toggle(); }
+      });
+    });
+  }
+
+  // CHANGE B: the office-only "Edit rows" toggle. Flips editMode + re-renders so all
+  // fields become inputs (or revert to text). Server still gates every save.
+  function wireEditToggle(host) {
+    var btn = host.querySelector('#invEditBtn');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      editMode = !editMode;
+      render(); // preserves collapsed[] + overrides + fieldOverrides
+    });
+  }
+
+  // CHANGE B: save-on-change for the per-item field inputs. On blur/change, POST the
+  // single changed field to /api/inventory (action:'setFields'). Optimistic local
+  // merge with revert-on-error. Empty text -> clears that field (reverts to seed).
+  function wireFieldEdits(host) {
+    var inputs = host.querySelectorAll('input.inv-fin');
+    inputs.forEach(function (inp) {
+      inp.addEventListener('change', function () {
+        var itemId = inp.getAttribute('data-item');
+        var field = inp.getAttribute('data-field');
+        if (!itemId || !field) return;
+        var isNum = inp.classList.contains('inv-fin-num');
+        var raw = inp.value.trim();
+        var val;
+        if (raw === '') { val = null; }
+        else if (isNum) {
+          var n = Number(raw);
+          if (!Number.isFinite(n) || n < 0 || Math.floor(n) !== n) {
+            msg('Required stock must be a whole number 0 or greater.', false);
+            return;
+          }
+          val = n;
+        } else { val = raw; }
+
+        var payloadFields = {}; payloadFields[field] = (val === null ? '' : val);
+        inp.disabled = true;
+        api('/api/inventory', { method: 'POST',
+          body: JSON.stringify({ action: 'setFields', item: itemId, fields: payloadFields }) })
+          .then(function (res) {
+            inp.disabled = false;
+            if (!res.ok || !(res.body && res.body.ok)) {
+              msg((res.body && res.body.message) || 'Save failed. Not saved.', false);
+              return;
+            }
+            // Update the local per-item override map to match the server result.
+            var rec = fieldOverrides[itemId] || {};
+            if (val === null) { delete rec[field]; }
+            else { rec[field] = val; }
+            if (Object.keys(rec).length) { fieldOverrides[itemId] = rec; }
+            else { delete fieldOverrides[itemId]; }
+            // If a Req field changed, the low-stock highlight may change too.
+            if (field === 'reqTrailer' || field === 'reqHome') recalcRowByItem(host, itemId);
+            msg('Saved.', true);
+            setTimeout(function () { msg(''); }, 1500);
+          })
+          .catch(function () {
+            inp.disabled = false;
+            msg('Save failed (network). Not saved.', false); // FAIL CLOSED
+          });
+      });
+    });
+  }
+
+  // Recalc low-stock for every rendered row of a given item (both locations).
+  function recalcRowByItem(host, itemId) {
+    var rows = host.querySelectorAll('tr[data-item="' + (window.CSS && CSS.escape ? CSS.escape(itemId) : itemId) + '"]');
+    rows.forEach(function (tr) {
+      var qtyInp = tr.querySelector('input.inv-qty');
+      if (qtyInp) recalcRow(qtyInp);
+    });
+  }
+
   // Recompute the low-stock highlight for the edited row in place.
   function recalcRow(inp) {
     var tr = inp.closest('tr');
@@ -34501,8 +34679,9 @@ try {
     var locId = inp.getAttribute('data-loc');
     var itemId = inp.getAttribute('data-item');
     var loc = (data.locations || []).filter(function (l) { return l.id === locId; })[0];
-    var item = (data.items || []).filter(function (i) { return i.id === itemId; })[0];
-    if (!loc || !item) return;
+    var baseItem = (data.items || []).filter(function (i) { return i.id === itemId; })[0];
+    if (!loc || !baseItem) return;
+    var item = mergedItem(baseItem); // use corrected reqTrailer/reqHome for low calc
     var low = isLow(loc, item);
     tr.classList.toggle('inv-low', low);
     var descCell = tr.querySelector('.inv-desc');
@@ -34518,15 +34697,29 @@ try {
     // if the overlay fetch fails we still render the seed (honest, no fabrication).
     api('/api/inventory').then(function (res) {
       overrides = {};
+      fieldOverrides = {};
       if (res.ok && res.body && res.body.qty && typeof res.body.qty === 'object') {
         Object.keys(res.body.qty).forEach(function (k) {
           var rec = res.body.qty[k];
           overrides[k] = (rec && typeof rec === 'object') ? rec.qty : rec;
         });
       }
+      // CHANGE B: per-item field overrides { "<itemId>": { field: value, ... } }.
+      if (res.ok && res.body && res.body.fields && typeof res.body.fields === 'object') {
+        Object.keys(res.body.fields).forEach(function (itemId) {
+          var rec = res.body.fields[itemId];
+          if (!rec || typeof rec !== 'object') return;
+          var clean = {};
+          TEXT_FIELDS.concat(NUM_FIELDS).forEach(function (f) {
+            if (Object.prototype.hasOwnProperty.call(rec, f)) clean[f] = rec[f];
+          });
+          if (Object.keys(clean).length) fieldOverrides[itemId] = clean;
+        });
+      }
       render();
     }).catch(function () {
       overrides = {};
+      fieldOverrides = {};
       render();
     });
   }
@@ -34542,17 +34735,46 @@ try {
 <style>
 /* Inventory module (dense per Brad's minimize-scroll directive). */
 #mod-inventory .inv-head { margin-bottom: 12px; }
+#mod-inventory .inv-title-row { display: flex; align-items: center; gap: 12px; }
 #mod-inventory .inv-title { font-size: 20px; font-weight: 600; color: var(--text-0,#000); }
 #mod-inventory .inv-sub { font-size: 12px; color: var(--text-2,#5A6370); margin-top: 2px; }
+/* CHANGE B: office-only Edit-rows toggle button. */
+#mod-inventory .inv-editbtn { font-size: 12px; font-weight: 600; cursor: pointer; padding: 5px 12px;
+  border-radius: 6px; border: 1px solid var(--accent,#006DB0); color: var(--accent,#006DB0);
+  background: #fff; transition: all .12s ease; }
+#mod-inventory .inv-editbtn:hover { background: var(--accent-light,#E0F0FF); }
+#mod-inventory .inv-editbtn-on { background: var(--accent,#006DB0); color: #fff; border-color: var(--accent,#006DB0); }
+#mod-inventory .inv-editbtn-on:hover { background: var(--accent-dark,#005A91); }
+/* CHANGE B: full-row field-edit inputs (text + numeric Req). Light bg, black text. */
+#mod-inventory .inv-fin { width: 100%; font-size: 12px; color: var(--text-0,#000);
+  background: var(--bg-2,#F3F5F8); border: 1px solid var(--border,#C8D5DC); border-radius: 5px;
+  padding: 3px 6px; box-sizing: border-box; }
+#mod-inventory .inv-fin:disabled { opacity: .5; }
+#mod-inventory .inv-fin-num { width: 62px; text-align: right; }
 #mod-inventory .inv-msg { font-size: 12px; margin-top: 6px; min-height: 14px; }
 #mod-inventory .inv-msg.inv-ok { color: #1a7f37; }
 #mod-inventory .inv-msg.inv-err { color: #cf222e; }
 #mod-inventory .inv-loc { margin-bottom: 16px; }
+/* CHANGE A (Brad 8/13): the dark-blue location header band. Text ON this dark-blue
+   background must be LIGHT (white/off-white) for readability. Body rows below stay
+   black-on-white (from the earlier contrast fix) — only THIS band is dark-blue. */
 #mod-inventory .inv-loc-h { position: sticky; top: 0; z-index: 2; font-size: 14px; font-weight: 600;
-  color: var(--text-0,#000); background: var(--bg-2,#F3F5F8); border: 1px solid var(--border,#C8D5DC);
-  border-radius: 8px; padding: 8px 14px; margin-bottom: 8px; }
+  color: #ffffff; background: #1E2A38; border: 1px solid #1E2A38;
+  border-radius: 8px; padding: 8px 14px; margin-bottom: 8px;
+  display: flex; align-items: center; gap: 8px; cursor: pointer; }
+/* location "type" pill on the dark-blue band -> off-white text + translucent-white border */
 #mod-inventory .inv-loc-type { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
-  color: var(--text-2,#5A6370); border: 1px solid var(--border,#C8D5DC); border-radius: 9px; padding: 0 6px; margin-left: 8px; }
+  color: rgba(255,255,255,0.72); border: 1px solid rgba(255,255,255,0.28); border-radius: 9px; padding: 0 6px; }
+/* CHANGE C (Derek 8/13): per-location collapse chevron, lives ON the dark-blue band
+   so it is also light for contrast. Rotates when the section is expanded. */
+#mod-inventory .inv-loc-toggle { font-size: 11px; color: rgba(255,255,255,0.85); width: 12px;
+  display: inline-block; text-align: center; transition: transform .15s ease; flex: 0 0 auto; }
+#mod-inventory .inv-loc.inv-open .inv-loc-toggle { transform: rotate(90deg); }
+#mod-inventory .inv-loc-label { flex: 1 1 auto; }
+#mod-inventory .inv-loc-count { font-size: 10px; font-weight: 500; color: rgba(255,255,255,0.6); }
+/* Collapsed: hide the location's category blocks (the header band stays). */
+#mod-inventory .inv-loc-body { margin-top: 0; }
+#mod-inventory .inv-loc:not(.inv-open) .inv-loc-body { display: none; }
 #mod-inventory .inv-cat { margin-bottom: 10px; }
 #mod-inventory .inv-cat-h { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
   color: #d64545; padding: 4px 2px; }

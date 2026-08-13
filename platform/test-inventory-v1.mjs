@@ -181,5 +181,193 @@ r = await inv.onRequestPost(ctx({ role: 'admin', kv,
 ok('malformed key (no ::) rejected -> 400', r.status === 400);
 
 // ---------------------------------------------------------------------------
+// 5) CHANGE A -- READABILITY: the dark-blue location header band uses LIGHT text.
+//    Assert the #mod-inventory CSS: .inv-loc-h has a dark-blue background (#1E2A38)
+//    AND a light (#fff) text color; the location "type" pill + collapse chevron on
+//    that band are also light. Body rows stay dark-on-white (unchanged).
+// ---------------------------------------------------------------------------
+console.log('\n[5] CHANGE A readability (dark-blue header, light text)');
+const html = readFileSync('./index.html', 'utf8');
+// Isolate the inventory <style> block region for the header band rule.
+function cssRule(selector) {
+  // crude: find "selector {" ... "}" within the #mod-inventory styles.
+  const idx = html.indexOf(selector + ' {');
+  if (idx < 0) return '';
+  const close = html.indexOf('}', idx);
+  return html.slice(idx, close + 1);
+}
+const locH = cssRule('#mod-inventory .inv-loc-h');
+ok('.inv-loc-h background is dark-blue (#1E2A38)', /background:\s*#1E2A38/i.test(locH));
+ok('.inv-loc-h text color is light (#fff / #ffffff)', /color:\s*#(?:fff|ffffff)\b/i.test(locH));
+// The type pill on the dark band uses translucent WHITE (rgba(255,255,255,...)).
+const locType = cssRule('#mod-inventory .inv-loc-type');
+ok('.inv-loc-type text is light (rgba white) on the dark band',
+  /color:\s*rgba\(255,\s*255,\s*255/i.test(locType));
+// The collapse chevron on the dark band is light too.
+const locToggle = cssRule('#mod-inventory .inv-loc-toggle');
+ok('.inv-loc-toggle chevron is light (rgba white)',
+  /color:\s*rgba\(255,\s*255,\s*255/i.test(locToggle));
+// Body cells remain DARK-on-white (regression guard from the earlier contrast fix).
+const tdRule = cssRule('#mod-inventory .inv-tbl td');
+ok('body table cells stay dark text (var(--text-1) not white)',
+  /color:\s*var\(--text-1/i.test(tdRule) && !/color:\s*#fff/i.test(tdRule));
+
+// ---------------------------------------------------------------------------
+// 6) CHANGE B -- FULL-ROW EDIT persistence (action:'setFields').
+//    Office can set/clear per-item field overrides; field_ops + no-session blocked;
+//    only allowlisted fields honored; validation on numeric Req; GET returns fields.
+// ---------------------------------------------------------------------------
+console.log('\n[6] CHANGE B full-row edit (setFields overlay)');
+const kv2 = makeKV();
+
+// 6a) office sets several text fields on an item.
+r = await inv.onRequestPost(ctx({ role: 'partner', kv: kv2,
+  body: JSON.stringify({ action: 'setFields', item: 'drill-2',
+    fields: { description: '18" Auger (corrected)', manufacturer: 'ProDig Inc', mfrPart: 'PD-18' } }) }));
+j = await r.json();
+ok('office setFields saves (200 ok)', r.status === 200 && j.ok && j.saved);
+ok('response echoes the corrected fields',
+  j.fields && j.fields.description === '18" Auger (corrected)' && j.fields.manufacturer === 'ProDig Inc');
+
+// 6b) GET returns the field overrides for merge.
+r = await inv.onRequestGet(ctx({ role: 'field_ops', kv: kv2, method: 'GET' }));
+j = await r.json();
+ok('GET returns a fields override map', j.ok && j.fields && typeof j.fields === 'object');
+ok('field override present + correct (drill-2 description)',
+  j.fields['drill-2'] && j.fields['drill-2'].description === '18" Auger (corrected)');
+ok('updatedBy is SERVER-SET (partner-user)', j.fields['drill-2'].updatedBy === 'partner-user');
+
+// 6c) numeric Req field: valid whole number stored; negative + non-integer rejected.
+r = await inv.onRequestPost(ctx({ role: 'admin', kv: kv2,
+  body: JSON.stringify({ action: 'setFields', item: 'drill-2', fields: { reqHome: 12 } }) }));
+j = await r.json();
+ok('numeric reqHome=12 saved', r.status === 200 && j.fields.reqHome === 12);
+r = await inv.onRequestPost(ctx({ role: 'admin', kv: kv2,
+  body: JSON.stringify({ action: 'setFields', item: 'drill-2', fields: { reqHome: -3 } }) }));
+ok('negative Req rejected -> 400', r.status === 400);
+r = await inv.onRequestPost(ctx({ role: 'admin', kv: kv2,
+  body: JSON.stringify({ action: 'setFields', item: 'drill-2', fields: { reqTrailer: 2.5 } }) }));
+ok('non-integer Req rejected -> 400', r.status === 400);
+
+// 6d) allowlist: unknown fields ignored (no error), never persisted.
+r = await inv.onRequestPost(ctx({ role: 'admin', kv: kv2,
+  body: JSON.stringify({ action: 'setFields', item: 'drill-2',
+    fields: { category: 'HACKED', id: 'evil', notes: 'ok note' } }) }));
+j = await r.json();
+ok('unknown fields (category/id) ignored, allowlisted note saved',
+  r.status === 200 && j.fields.notes === 'ok note'
+  && !('category' in j.fields) && !('id' in j.fields));
+r = await inv.onRequestGet(ctx({ role: 'admin', kv: kv2, method: 'GET' }));
+j = await r.json();
+ok('server never persisted a non-allowlisted field',
+  !('category' in j.fields['drill-2']) && !('id' in j.fields['drill-2']));
+
+// 6e) field_ops CANNOT edit fields (fail closed).
+r = await inv.onRequestPost(ctx({ role: 'field_ops', kv: kv2,
+  body: JSON.stringify({ action: 'setFields', item: 'drill-2', fields: { description: 'crew edit' } }) }));
+ok('field_ops setFields BLOCKED -> 403', r.status === 403);
+r = await inv.onRequestGet(ctx({ role: 'admin', kv: kv2, method: 'GET' }));
+j = await r.json();
+ok('blocked crew edit did NOT mutate the field',
+  j.fields['drill-2'].description === '18" Auger (corrected)');
+
+// 6f) no-session CANNOT edit fields (fail closed).
+r = await inv.onRequestPost(ctx({ role: null, kv: kv2,
+  body: JSON.stringify({ action: 'setFields', item: 'drill-2', fields: { description: 'anon' } }) }));
+ok('no-session setFields BLOCKED -> 403 (fail closed)', r.status === 403);
+
+// 6g) clearing all overridden fields removes the item key entirely.
+r = await inv.onRequestPost(ctx({ role: 'admin', kv: kv2,
+  body: JSON.stringify({ action: 'setFields', item: 'drill-2',
+    fields: { description: '', manufacturer: '', mfrPart: '', notes: '', reqHome: '' } }) }));
+j = await r.json();
+ok('clearing every field succeeds', r.status === 200 && j.ok);
+r = await inv.onRequestGet(ctx({ role: 'admin', kv: kv2, method: 'GET' }));
+j = await r.json();
+ok('item with no remaining overrides removed from fields map', !j.fields['drill-2']);
+
+// 6h) qty + fields coexist in the SAME store (qty overlay not broken by fields).
+r = await inv.onRequestPost(ctx({ role: 'admin', kv: kv2,
+  body: JSON.stringify({ action: 'set', key: 'farm::drill-1', qty: 5 }) }));
+ok('qty save still works alongside fields', r.status === 200);
+r = await inv.onRequestPost(ctx({ role: 'admin', kv: kv2,
+  body: JSON.stringify({ action: 'setFields', item: 'drill-1', fields: { notes: 'coexist' } }) }));
+ok('fields save still works alongside qty', r.status === 200);
+r = await inv.onRequestGet(ctx({ role: 'admin', kv: kv2, method: 'GET' }));
+j = await r.json();
+ok('both qty AND fields persisted together',
+  j.qty['farm::drill-1'] && j.qty['farm::drill-1'].qty === 5
+  && j.fields['drill-1'] && j.fields['drill-1'].notes === 'coexist');
+
+// 6i) bad action + proto-pollution item + missing fields obj rejected.
+r = await inv.onRequestPost(ctx({ role: 'admin', kv: kv2,
+  body: JSON.stringify({ action: 'bogus', item: 'drill-1', fields: { notes: 'x' } }) }));
+ok('unknown action rejected -> 400', r.status === 400);
+r = await inv.onRequestPost(ctx({ role: 'admin', kv: kv2,
+  body: JSON.stringify({ action: 'setFields', item: '__proto__', fields: { notes: 'x' } }) }));
+ok('proto-pollution item id rejected -> 400', r.status === 400);
+r = await inv.onRequestPost(ctx({ role: 'admin', kv: kv2,
+  body: JSON.stringify({ action: 'setFields', item: 'drill-1', fields: {} }) }));
+ok('empty/no editable fields rejected -> 400', r.status === 400);
+
+// ---------------------------------------------------------------------------
+// 7) CHANGE B (UI) -- the office-only Edit toggle + field inputs exist in markup.
+//    Assert the module JS wires an Edit button (office gate) + renders inv-fin
+//    inputs in edit mode, guarded so a non-office role can never enter edit mode.
+// ---------------------------------------------------------------------------
+console.log('\n[7] CHANGE B UI wiring (Edit toggle, office-gated)');
+ok('module renders an office Edit button (invEditBtn)', /id="invEditBtn"/.test(html));
+ok('Edit button gated behind canEdit (office only)',
+  /if \(canEdit\) \{[\s\S]{0,200}invEditBtn/.test(html) || /canEdit[\s\S]{0,120}invEditBtn/.test(html));
+ok('non-office role forced out of edit mode',
+  /if \(!canEdit\) editMode = false/.test(html));
+ok('edit mode renders per-item field inputs (inv-fin) with data-field',
+  /class="inv-fin/.test(html) && /data-field="/.test(html) && /function fieldInput\(/.test(html));
+ok('field edits POST action:setFields', /action['"]?:\s*['"]setFields['"]/.test(html)
+  || /'setFields'/.test(html));
+ok('field save wiring only runs for office (wireFieldEdits under canEdit)',
+  /if \(canEdit\)[\s\S]{0,400}wireFieldEdits/.test(html));
+
+// ---------------------------------------------------------------------------
+// 8) CHANGE C -- COLLAPSIBLE per-location sections (independent accordion).
+//    Assert the markup + CSS + JS: each location has a toggle header + a body that
+//    is hidden when the location is NOT .inv-open; toggles are per-location; default
+//    state is EXPANDED (first render adds inv-open unless collapsed[loc.id]).
+// ---------------------------------------------------------------------------
+console.log('\n[8] CHANGE C per-location collapse');
+ok('each location wraps its categories in a collapsible body (.inv-loc-body)',
+  /class="inv-loc-body"/.test(html));
+ok('collapsed body hidden via CSS (:not(.inv-open) .inv-loc-body { display:none })',
+  /\.inv-loc:not\(\.inv-open\)\s*\.inv-loc-body\s*\{\s*display:\s*none/.test(html));
+ok('per-location toggle header carries data-loc-toggle', /data-loc-toggle="/.test(html));
+ok('toggle keyed PER location (collapsed[locId], independent state)',
+  /collapsed\[locId\]/.test(html));
+ok('default state EXPANDED (isOpen = !collapsed[loc.id] -> inv-open)',
+  /var isOpen = !collapsed\[loc\.id\]/.test(html)
+  && /\(isOpen \? ' inv-open' : ''\)/.test(html));
+ok('collapse toggle is wired for ALL roles (view-only can collapse too)',
+  /wireLocToggles\(host\);/.test(html) && !/if \(canEdit\)[\s\S]{0,60}wireLocToggles/.test(html));
+ok('keyboard accessible (Enter/Space toggles the header)',
+  /e\.key === 'Enter'/.test(html) && /toggle\(\)/.test(html));
+
+// Simulate the per-location collapse STATE machine (mirror the client toggle logic).
+(function () {
+  const collapsedState = {}; // { locId: true } => collapsed
+  const locs = DATA.locations.map(l => l.id);
+  function isOpen(id) { return !collapsedState[id]; }
+  // default: all expanded.
+  ok('default: every location expanded', locs.every(isOpen));
+  // collapse ONLY the farm.
+  collapsedState['farm'] = true;
+  ok('collapsing Farm hides Farm only', !isOpen('farm') && isOpen('trailer-1'));
+  // collapse trailer too; farm independent.
+  collapsedState['trailer-1'] = true;
+  ok('each location collapses independently', !isOpen('farm') && !isOpen('trailer-1'));
+  // re-open farm.
+  delete collapsedState['farm'];
+  ok('re-opening Farm leaves Trailer collapsed', isOpen('farm') && !isOpen('trailer-1'));
+})();
+
+// ---------------------------------------------------------------------------
 console.log('\n==== RESULT: ' + pass + ' passed, ' + fail + ' failed ====');
 process.exit(fail ? 1 : 0);
