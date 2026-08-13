@@ -14648,6 +14648,63 @@ try {
       }
       return any ? total : 0;
     }
+    // ---- GENERAL-INFO AUTO-PULL FROM THE SUBMITTAL SUMMARY (Brad 2026-08-13) -------------
+    // Three General Info "Project Info / Scope" fields are COMPUTED (auto-pulled) from the
+    // E&D Submittal Summary (the reserved __site_elevations area rows on the `engineering`
+    // override) rather than hand-entered:
+    //   "Total Pier Qty (Approved Submittal)" <- SUM of pierQty across areas (the same value
+    //                                            the Submittal Summary TOTAL row shows).
+    //   "Total LF (Approved Submittal)"       <- SUM of totalLf across areas (ditto).
+    //   "Column Diameter"                     <- the columnDiameter column value; UNIFORM
+    //                                            (all rows agree) -> that single value; MIXED
+    //                                            (distinct values differ) -> the distinct set
+    //                                            joined " / " (e.g. "24 / 30") so we NEVER
+    //                                            silently pick one diameter. Non-numeric /
+    //                                            unit-bearing diameters ("30\"" ) are shown
+    //                                            verbatim per distinct raw string.
+    // Returns display strings ('' = blank when there is nothing to pull). BLANK-GRACEFUL /
+    // FAIL-CLOSED: no areas, or a column with no usable value, yields '' -> field() renders
+    // the amber blank "-" (NEVER a fabricated 0 / guessed diameter). These are passed AS the
+    // synced value into field(), so field()'s existing precedence applies: a NON-empty manual
+    // override on the General Info field WINS over the auto-pull (same computed-default-with-
+    // manual-override contract as "Project Completion"); an empty/absent override -> the
+    // auto-pull shows. Numeric qty labels (pier / LF) are comma-grouped by field()'s own
+    // pfIsQtyLabel gate, matching the Submittal Summary (2,062 / 19,781). "Column Diameter"
+    // is NOT a qty label, so its value passes through verbatim (single number or the set).
+    // Recomputed every render from the live __site_elevations (no stored copy), mirroring the
+    // Submittal Summary TOTAL row — edits there flow straight through here. Reads-only; does
+    // NOT mutate __site_elevations or the Submittal Summary.
+    function pfSubmittalGeneralInfoPull(){
+      var out = { pierQty: '', totalLf: '', columnDiameter: '' };
+      var areas = pfSiteElevations();
+      if (!areas.length) return out;  // no Submittal Summary -> all blank (fail-closed)
+      // Pier Qty + Total LF: sum ONLY if at least one area carries a numeric cell (mirrors
+      // pfSgeSumField's `any` gate). No numeric cells at all -> leave blank (never "0").
+      function sumOrBlank(fieldName){
+        var total = 0, any = false;
+        for (var i = 0; i < areas.length; i++) {
+          var n = pfSgeCellNum(areas[i] && areas[i][fieldName]);
+          if (!isNaN(n)) { total += n; any = true; }
+        }
+        // field() comma-formats these (qty labels); pass the plain number string so its
+        // pfIsQtyLabel gate groups it (avoids double-grouping — pass raw, not pre-fmt).
+        return any ? String(total) : '';
+      }
+      out.pierQty = sumOrBlank('pierQty');
+      out.totalLf = sumOrBlank('totalLf');
+      // Column Diameter: collect DISTINCT non-empty raw column-diameter strings (preserve
+      // first-seen order). One distinct value -> that value (uniform). Multiple -> join the
+      // distinct set with " / " so mixed diameters are surfaced, never silently reduced to
+      // one. All-blank -> '' (fail-closed).
+      var seen = {}, distinct = [];
+      for (var j = 0; j < areas.length; j++) {
+        var raw = (areas[j] && areas[j].columnDiameter != null) ? String(areas[j].columnDiameter).trim() : '';
+        if (!raw) continue;
+        if (!Object.prototype.hasOwnProperty.call(seen, raw)) { seen[raw] = true; distinct.push(raw); }
+      }
+      out.columnDiameter = distinct.length ? distinct.join(' / ') : '';
+      return out;
+    }
     // Read the stored __submittal_pull metadata object for the current project (from the
     // engineering override). Returns a NORMALIZED object (never throws): the provenance +
     // reconciliation of the last "Pull from Approved Drawings" extraction. When nothing has
@@ -16517,6 +16574,11 @@ try {
       var _gcSup = _gcRole(/super/i);
       var _gcPE = _gcRole(/project eng|proj eng|\bpe\b/i);
       _curSection = 'general';
+      // Auto-pull the three Submittal-Summary-derived General Info values ONCE per render
+      // (Total Pier Qty + Total LF sums, Column Diameter uniform/set). Reads the E&D
+      // __site_elevations rows; blank strings when there is nothing to pull. Used by the
+      // three field() calls in the Scope column below (Brad 2026-08-13).
+      var _gsePull = pfSubmittalGeneralInfoPull();
       html += card(1, 'General Info', null,
         // ---- Project Info: FIXED 2-column grouping matching Brad's ProjectInfo
         // PDF (portal_20260807_022742_ProjectInfo.pdf). LEFT = identity/site/
@@ -16575,10 +16637,28 @@ try {
           field('SOW Notes', ''),
           field('Total Pier Qty (Prelim)', bid.total_columns, 'Bid Log'),
           field('Total LF (Prelim)', bid.total_lf, 'Bid Log'),
-          field('Total Pier Qty (Approved Submittal)', ''),
-          field('Total LF (Approved Submittal)', ''),
-          // DROPDOWN (Column Diameter: 24" / 30").
-          field('Column Diameter', ''),
+          // AUTO-PULL FROM THE SUBMITTAL SUMMARY (Brad 2026-08-13). These three fields are
+          // COMPUTED from the E&D Submittal Summary (__site_elevations area rows):
+          //   Total Pier Qty (Approved Submittal) = SUM of the Total Pier Qty column,
+          //   Total LF (Approved Submittal)       = SUM of the Total LF column,
+          //   Column Diameter                     = the Column Diameter (IN) column value
+          //                                         (uniform -> single value; mixed -> the
+          //                                         distinct set "24 / 30").
+          // The computed value is passed AS the synced value into field(); a NON-empty manual
+          // override on the field still WINS (field()'s precedence => auto-pull is the visible
+          // default WITH manual override, like Project Completion). Blank-graceful: no areas /
+          // no usable value -> '' -> amber blank (fail-closed, never fabricated). Pier/LF are
+          // comma-grouped by field()'s pfIsQtyLabel gate; Column Diameter passes through
+          // verbatim. Recomputed once per render, reused for all three fields.
+          field('Total Pier Qty (Approved Submittal)', _gsePull.pierQty,
+                 _gsePull.pierQty ? 'Auto (Submittal Summary)' : ''),
+          field('Total LF (Approved Submittal)', _gsePull.totalLf,
+                 _gsePull.totalLf ? 'Auto (Submittal Summary)' : ''),
+          // Column Diameter: auto-pulled from the Submittal Summary "Column Diameter (IN)"
+          // column (uniform value or the distinct set). Manual override (24" / 30" dropdown)
+          // still wins when present.
+          field('Column Diameter', _gsePull.columnDiameter,
+                 _gsePull.columnDiameter ? 'Auto (Submittal Summary)' : ''),
           field('Estimated Stone (TN)', bid.total_stone_tn, 'Bid Log'),
           field('Estimated Spoils (CY)', '')
         ])
