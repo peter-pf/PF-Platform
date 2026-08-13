@@ -3654,6 +3654,13 @@ tr.pf-dragging { opacity: 0.45; }
   // full project-record-poet.js stays privileged-only (it carries contract $).
   feeds.push('/data/fo-detail-index.js');
 
+  // Inventory seed feed (Derek's Inventory module, v1). EVERYONE-VIEWABLE: pushed
+  // for ALL roles (no isPrivileged/isBdOrAbove guard) so the field crew loads it
+  // too. Classified 'general' server-side (auth.js DATA_FILE_AREAS) so a direct
+  // GET is allowed for every role. Carries ZERO $ (part #s + quantities + supplier
+  // names only).
+  feeds.push('/data/inventory.js');
+
   // Inject synchronously and IN ORDER via document.write so they execute before
   // the inline module scripts that follow (same semantics as static tags).
   for (var i = 0; i < feeds.length; i++) {
@@ -4179,6 +4186,15 @@ window.progress = (function () {
         <span class="nav-icon">&#128295;</span> Maintenance
       </a>
 
+      <!-- Inventory (Derek's module, v1). EVERYONE-VIEWABLE: data-fo-safe keeps it
+           visible to the field crew (it lives in the data-fo-safe Field Operations
+           section, so it also shows for office/admin). Read-only stock levels across
+           Farm + trailers; the only editable field (Actual Qty on Hand) is
+           office-gated server-side. -->
+      <a class="nav-item" data-fo-safe="1" data-module="inventory" onclick="showModule('inventory')" style="color:#d64545">
+        <span class="nav-icon">&#128230;</span> Inventory
+      </a>
+
       <!-- Daily Reports -->
       <div class="nav-sub collapsed">
         <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Daily Reports</div>
@@ -4554,6 +4570,9 @@ document.addEventListener('click', function(e) {
   </div>
 
   <!-- CHANGE ORDERS -->
+  <!-- INVENTORY (Derek's module, v1). Read-only stock grouped by location (Farm +
+       trailers); Actual Qty on Hand is the only editable field (office-gated). -->
+  <div class="module-view" id="mod-inventory"><div id="inventory-app"></div></div>
   <!-- EQUIPMENT -->
   <div class="module-view" id="mod-equipment"><div id="equipment-app"></div></div>
   <!-- SAFETY -->
@@ -5438,6 +5457,7 @@ const moduleTitles = {
   cheatsheet: 'Meet Peter (One-Pager)',
   onboarding: 'Role Onboarding',
   hr: 'Human Resources',
+  inventory: 'Inventory',
   // ---- Phase 1 placeholders ----
   pfadmin: 'PF Admin',
   'bd-targets': 'Business Development - Target Accounts',
@@ -33220,6 +33240,271 @@ try {
   console.error('Module maintenance failed to load:', e);
 }
 </script>
+
+<script>
+// ============================================================
+// MODULE: inventory (Derek's Inventory Tracking Module, v1 — read-only base +
+// ONE editable field). Renders window.PF_INVENTORY (data/inventory.js) grouped by
+// LOCATION (Farm + trailers), then by category, as dense tables. "Actual Qty on
+// Hand" is the only editable field in v1 (office only), saved on-change via
+// /api/inventory (KV override merged on top of the seed). field_ops VIEWS but
+// cannot edit (server-enforced; the input is also disabled in the UI). All
+// data-derived values rendered via window.esc (stored-XSS defense). Dense layout
+// per Brad's minimize-scroll directive: sticky per-location headers + compact rows.
+//
+// v2 SEAMS (documented, NOT built): actualOnHand becomes a per-location COMPUTED
+// value from a consumption ledger (daily-report auto-deduct) + a farm->trailer
+// transfer ledger. The read merge (seed <- /api/inventory override) is the seam:
+// v2 swaps the flat override for a ledger-derived map behind the same GET.
+// ============================================================
+try {
+(function () {
+  'use strict';
+  var E = window.esc || function (s) { return s == null ? '' : String(s); };
+  // overrides: { "<locationId>::<itemId>": <number|null> } merged over the seed.
+  var overrides = {};
+  var canEdit = false;
+
+  function api(path, opts) {
+    return fetch(path, Object.assign({ credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' } }, opts || {}))
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); });
+  }
+
+  function invKey(locId, itemId) { return locId + '::' + itemId; }
+
+  // Live actual qty for (location,item): the KV override if set, else '' (blank).
+  // v1 stores ONE editable actual per (location,item); the seed's actualOnHand is a
+  // company-wide baseline (usually null), so the live value is override-driven.
+  function liveQty(locId, itemId) {
+    var k = invKey(locId, itemId);
+    if (Object.prototype.hasOwnProperty.call(overrides, k)) {
+      var v = overrides[k];
+      return (v == null) ? '' : v;
+    }
+    return '';
+  }
+
+  // Required stock for a location: trailers use reqTrailer; the farm uses reqHome.
+  function reqFor(loc, item) {
+    var v = (loc.type === 'farm') ? item.reqHome : item.reqTrailer;
+    return (v == null) ? null : v;
+  }
+
+  function fmtReq(v) { return (v == null) ? 'TBD' : String(v); }
+
+  // Low-stock flag: live actual is a number AND below the required stock.
+  function isLow(loc, item) {
+    var req = reqFor(loc, item);
+    if (req == null) return false;
+    var q = liveQty(loc.id, item.id);
+    if (q === '' || q == null) return false;
+    return Number(q) < Number(req);
+  }
+
+  function msg(t, ok) {
+    var m = document.getElementById('invMsg');
+    if (m) { m.textContent = t || ''; m.className = 'inv-msg ' + (ok ? 'inv-ok' : (t ? 'inv-err' : '')); }
+  }
+
+  function render() {
+    var host = document.getElementById('inventory-app');
+    if (!host) return;
+    var data = window.PF_INVENTORY;
+    if (!data || !Array.isArray(data.locations) || !Array.isArray(data.items)) {
+      // FAIL CLOSED: honest empty state, never fabricate.
+      host.innerHTML = '<div class="inv-empty">Inventory data is unavailable. '
+        + 'Please refresh the platform and sign in again.</div>';
+      return;
+    }
+    var me = window.PF_ME || {};
+    canEdit = (me.role === 'admin' || me.role === 'partner' || me.role === 'business_dev');
+
+    var locations = data.locations.slice().sort(function (a, b) { return (a.order || 0) - (b.order || 0); });
+    var categories = Array.isArray(data.categories) ? data.categories : [];
+    var items = data.items;
+
+    var h = '';
+    h += '<div class="inv-head">';
+    h += '<div class="inv-title">Inventory</div>';
+    h += '<div class="inv-sub">Stock levels by location &middot; Farm (Home/stockyard) + field trailers'
+       + (canEdit ? ' &middot; edit <b>Actual Qty</b> to update' : ' &middot; view only') + '</div>';
+    h += '<div id="invMsg" class="inv-msg"></div>';
+    h += '</div>';
+
+    locations.forEach(function (loc) {
+      h += '<div class="inv-loc">';
+      h += '<div class="inv-loc-h">' + E(loc.label)
+         + ' <span class="inv-loc-type">' + E(loc.type === 'farm' ? 'Home / Stockyard' : 'Trailer') + '</span></div>';
+
+      categories.forEach(function (cat) {
+        var catItems = items.filter(function (it) { return it.category === cat; });
+        h += '<div class="inv-cat">';
+        h += '<div class="inv-cat-h">' + E(cat)
+           + ' <span class="inv-ct">' + catItems.length + (catItems.length === 1 ? ' item' : ' items') + '</span></div>';
+        if (!catItems.length) {
+          h += '<div class="inv-cat-empty">No items yet. (Placeholder category — list pending.)</div>';
+        } else {
+          h += '<table class="inv-tbl"><thead><tr>'
+             + '<th>Product</th><th>Mfr</th><th>Part #</th><th class="num">Req</th>'
+             + '<th class="num">Actual</th><th>Alt Sources</th><th>Notes</th></tr></thead><tbody>';
+          catItems.forEach(function (it) {
+            var req = reqFor(loc, it);
+            var low = isLow(loc, it);
+            var qv = liveQty(loc.id, it.id);
+            h += '<tr' + (low ? ' class="inv-low"' : '') + '>';
+            h += '<td class="inv-desc">' + E(it.description)
+               + (low ? ' <span class="inv-lowtag">LOW</span>' : '') + '</td>';
+            h += '<td>' + E(it.manufacturer || '—') + '</td>';
+            h += '<td>' + E(it.mfrPart || '—') + '</td>';
+            h += '<td class="num">' + E(fmtReq(req)) + '</td>';
+            // Actual Qty: the ONLY editable field. Office = editable input; field_ops
+            // (canEdit false) = read-only text (server ALSO blocks the POST).
+            if (canEdit) {
+              h += '<td class="num"><input class="inv-qty" type="number" min="0" step="1" '
+                 + 'value="' + E(qv) + '" '
+                 + 'data-loc="' + E(loc.id) + '" data-item="' + E(it.id) + '" '
+                 + 'aria-label="Actual quantity on hand"></td>';
+            } else {
+              h += '<td class="num inv-qty-ro">' + (qv === '' ? '—' : E(qv)) + '</td>';
+            }
+            h += '<td>' + E(it.altSources || '—') + '</td>';
+            h += '<td class="inv-notes">' + E(it.notes || '') + '</td>';
+            h += '</tr>';
+          });
+          h += '</tbody></table>';
+        }
+        h += '</div>'; // .inv-cat
+      });
+
+      h += '</div>'; // .inv-loc
+    });
+
+    host.innerHTML = h;
+    if (canEdit) wireEdits(host);
+  }
+
+  // Save-on-change (fail-closed): on blur/change of an Actual Qty input, POST the
+  // new value to /api/inventory. Empty -> clear (revert to baseline). Optimistic UI
+  // with revert-on-error.
+  function wireEdits(host) {
+    var inputs = host.querySelectorAll('input.inv-qty');
+    inputs.forEach(function (inp) {
+      inp.addEventListener('change', function () {
+        var locId = inp.getAttribute('data-loc');
+        var itemId = inp.getAttribute('data-item');
+        var k = invKey(locId, itemId);
+        var raw = inp.value.trim();
+        var qty = (raw === '') ? null : Number(raw);
+        if (qty != null && (!Number.isFinite(qty) || qty < 0)) {
+          msg('Quantity must be 0 or greater.', false);
+          return;
+        }
+        inp.disabled = true;
+        api('/api/inventory', { method: 'POST',
+          body: JSON.stringify({ action: 'set', key: k, qty: qty }) })
+          .then(function (res) {
+            inp.disabled = false;
+            if (!res.ok || !(res.body && res.body.ok)) {
+              msg((res.body && res.body.message) || 'Save failed. Not saved.', false);
+              return;
+            }
+            // Update local override map + low-stock highlight without a full re-render.
+            if (qty == null) { delete overrides[k]; } else { overrides[k] = qty; }
+            recalcRow(inp);
+            msg('Saved.', true);
+            setTimeout(function () { msg(''); }, 1500);
+          })
+          .catch(function () {
+            inp.disabled = false;
+            msg('Save failed (network). Not saved.', false); // FAIL CLOSED: honest error
+          });
+      });
+    });
+  }
+
+  // Recompute the low-stock highlight for the edited row in place.
+  function recalcRow(inp) {
+    var tr = inp.closest('tr');
+    if (!tr) return;
+    var data = window.PF_INVENTORY;
+    var locId = inp.getAttribute('data-loc');
+    var itemId = inp.getAttribute('data-item');
+    var loc = (data.locations || []).filter(function (l) { return l.id === locId; })[0];
+    var item = (data.items || []).filter(function (i) { return i.id === itemId; })[0];
+    if (!loc || !item) return;
+    var low = isLow(loc, item);
+    tr.classList.toggle('inv-low', low);
+    var descCell = tr.querySelector('.inv-desc');
+    if (descCell) {
+      var tag = descCell.querySelector('.inv-lowtag');
+      if (low && !tag) descCell.insertAdjacentHTML('beforeend', ' <span class="inv-lowtag">LOW</span>');
+      else if (!low && tag) tag.remove();
+    }
+  }
+
+  function load() {
+    // Read the override map, then render (merge seed <- overrides). Best-effort:
+    // if the overlay fetch fails we still render the seed (honest, no fabrication).
+    api('/api/inventory').then(function (res) {
+      overrides = {};
+      if (res.ok && res.body && res.body.qty && typeof res.body.qty === 'object') {
+        Object.keys(res.body.qty).forEach(function (k) {
+          var rec = res.body.qty[k];
+          overrides[k] = (rec && typeof rec === 'object') ? rec.qty : rec;
+        });
+      }
+      render();
+    }).catch(function () {
+      overrides = {};
+      render();
+    });
+  }
+
+  var prev = window.showModule;
+  window.showModule = function (id) { if (typeof prev === 'function') prev(id); if (id === 'inventory') { load(); } };
+})();
+} catch (e) {
+  console.error('Module inventory failed to load:', e);
+}
+</script>
+
+<style>
+/* Inventory module (dense per Brad's minimize-scroll directive). */
+#mod-inventory .inv-head { margin-bottom: 12px; }
+#mod-inventory .inv-title { font-size: 20px; font-weight: 600; color: var(--text,#e6e9ef); }
+#mod-inventory .inv-sub { font-size: 12px; color: var(--text-3,#8a93a6); margin-top: 2px; }
+#mod-inventory .inv-msg { font-size: 12px; margin-top: 6px; min-height: 14px; }
+#mod-inventory .inv-msg.inv-ok { color: #3fb950; }
+#mod-inventory .inv-msg.inv-err { color: #f85149; }
+#mod-inventory .inv-loc { margin-bottom: 16px; }
+#mod-inventory .inv-loc-h { position: sticky; top: 0; z-index: 2; font-size: 14px; font-weight: 600;
+  color: var(--text,#e6e9ef); background: var(--surface-2,#1b212c); border: 1px solid var(--border,#2a2f3a);
+  border-radius: 8px; padding: 8px 14px; margin-bottom: 8px; }
+#mod-inventory .inv-loc-type { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--text-3,#8a93a6); border: 1px solid var(--border,#2a2f3a); border-radius: 9px; padding: 0 6px; margin-left: 8px; }
+#mod-inventory .inv-cat { margin-bottom: 10px; }
+#mod-inventory .inv-cat-h { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+  color: #d64545; padding: 4px 2px; }
+#mod-inventory .inv-cat-h .inv-ct { color: var(--text-3,#8a93a6); font-weight: 400; text-transform: none; letter-spacing: 0; }
+#mod-inventory .inv-cat-empty { font-size: 12px; color: var(--text-3,#8a93a6); font-style: italic; padding: 2px 4px 6px; }
+#mod-inventory .inv-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+#mod-inventory .inv-tbl th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--text-3,#8a93a6); font-weight: 600; padding: 4px 8px; border-bottom: 1px solid var(--border,#2a2f3a); }
+#mod-inventory .inv-tbl th.num, #mod-inventory .inv-tbl td.num { text-align: right; }
+#mod-inventory .inv-tbl td { padding: 5px 8px; border-bottom: 1px solid var(--border,#2a2f3a); color: var(--text,#e6e9ef); vertical-align: top; }
+#mod-inventory .inv-desc { font-weight: 500; }
+#mod-inventory .inv-notes { color: var(--text-3,#8a93a6); font-size: 11.5px; }
+#mod-inventory .inv-qty { width: 62px; text-align: right; font-size: 12.5px; color: var(--text,#e6e9ef);
+  background: var(--surface,#11161f); border: 1px solid var(--border,#2a2f3a); border-radius: 5px; padding: 3px 6px; box-sizing: border-box; }
+#mod-inventory .inv-qty:disabled { opacity: .5; }
+#mod-inventory .inv-qty-ro { color: var(--text,#e6e9ef); }
+#mod-inventory tr.inv-low td { background: rgba(210,153,34,.08); }
+#mod-inventory .inv-lowtag { display: inline-block; font-size: 9px; font-weight: 700; color: #d29922;
+  background: rgba(210,153,34,.15); border-radius: 8px; padding: 0 6px; margin-left: 6px; vertical-align: middle; }
+#mod-inventory .inv-empty { border: 1px dashed var(--border,#2a2f3a); border-radius: 8px; padding: 22px 16px;
+  text-align: center; color: var(--text-3,#8a93a6); font-size: 13px; }
+</style>
 
 <script>
 // ============================================================

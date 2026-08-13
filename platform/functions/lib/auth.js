@@ -351,6 +351,14 @@ const DATA_FILE_AREAS = {
   '/data/fo-projects-field.js':      'field_ops', // SEC-09 field-safe project list (no $/GC/contract)
   '/data/fo-detail-index.js':        'field_ops', // Field Ops smart-search detail index (vendors/contacts/materials/schedule/QAQC) — money-scrubbed, no $/contract/gc_name
   '/data/schedule-field.js':         'schedule',  // SEC-12 field-safe schedule derivative (no value/gc_name)
+  // Inventory tab seed feed (Derek's Inventory module, v1). EVERYONE-VIEWABLE:
+  // 'general' area = admin/partner/business_dev/field_ops so the WHOLE company can
+  // READ inventory. Carries ZERO financials (part #s + quantities + supplier NAMES
+  // only; no $/pricing/margins). EDITING (Actual Qty) is separately gated OFFICE-only
+  // in the /api/inventory POST handler (financials area). Without this explicit
+  // entry the file would fall through to default-deny (admin-only) and the crew
+  // could not load the tab.
+  '/data/inventory.js':              'general',    // Inventory seed: part#s + quantities + supplier names — no $, everyone-viewable
 
   // ---- PROJECT-LEVEL financials (admin/partner/business_dev — field_ops BLOCKED) ----
   // Item E: per-job financial records. BD needs these to work opportunities &
@@ -626,6 +634,14 @@ export function areaForPath(pathname) {
     if (pathname.startsWith('/api/hr'))            return 'hr';
     // /api/me returns ONLY the caller's own {name, role} (no business data).
     // Reachable by any authenticated role so the SPA can tailor its UI.
+    // Inventory overlay (Derek's Inventory module, v1): the editable "Actual Qty
+    // on Hand" override. The PATH is classified 'general' so the whole company can
+    // GET (read) live quantities (SPEC: everyone-viewable). The POST (edit) is
+    // TIGHTENED to OFFICE-only IN the handler via requireArea(session,'financials')
+    // -- field_ops can read but NOT edit. ZERO financials (a quantity + timestamp +
+    // user name). Without this line the path would fall through to default-deny
+    // (admin-only) and the crew could not READ live quantities.
+    if (pathname.startsWith('/api/inventory'))     return 'general';
     if (pathname.startsWith('/api/me'))            return 'general';
     if (pathname.startsWith('/api/reset-password')) return 'reset'; // restricted-session only
     // Any other/new API route is admin-only until deliberately classified.
