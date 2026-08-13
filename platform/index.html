@@ -2886,6 +2886,41 @@ tr.pf-dragging { opacity: 0.45; }
 .pf-sge-msg { font-size: 0.76rem; margin: 6px 0 0 8px; }
 .pf-sge-msg-ok { color: #2e7d32; }
 .pf-sge-msg-err { color: #c0392b; font-weight: 600; }
+/* "Pull from Approved Drawings" (Stage 2, Brad 2026-08-13). The Submittal Summary table
+   populates its Area / Pier Qty / LF rows from a vision-read extraction (Peter's engine),
+   with a reconciliation flag on the TOTAL row + a structural/civil source indicator + an
+   office-only Pull button. NONE of these are .pr-field rows — the section editor never scans. */
+.pf-sge-pull-btn {
+  font-size: 0.72rem; font-weight: 600; cursor: pointer; line-height: 1.2;
+  padding: 4px 10px; border-radius: 6px; border: 1px solid var(--accent);
+  color: var(--accent); background: #fff; white-space: nowrap;
+}
+.pf-sge-pull-btn:hover { background: rgba(0,123,196,0.06); }
+.pf-sge-pull-btn:disabled { opacity: 0.55; cursor: default; }
+/* Reconciliation note ON the TOTAL row (spans the table). Green = matches the pier schedule;
+   amber = mismatch (with an UNVERIFIED stamp on the table). */
+.pf-sge-recon { font-size: 0.74rem; font-weight: 600; padding: 4px 10px; }
+.pf-sge-recon-ok { color: #2e7d32; background: rgba(46,125,50,0.06); }
+.pf-sge-recon-bad { color: #b23c17; background: rgba(217,83,23,0.09); }
+/* UNVERIFIED stamp — a visible badge next to the Submittal Summary title when a pull did
+   NOT reconcile to the pier schedule (the rows still render, but flagged not-verified). */
+.pf-sge-unverified {
+  display: inline-block; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.04em;
+  text-transform: uppercase; color: #fff; background: #b23c17;
+  padding: 1px 7px; border-radius: 3px; margin-left: 8px; vertical-align: middle;
+}
+/* Structural/Civil source indicator + FFE pending note — small inline status chips under
+   the Submittal Summary title row. found=green dot, pending=grey dot. */
+.pf-sge-srcline { font-size: 0.72rem; margin: 1px 0 4px 0; display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; }
+.pf-sge-src { display: inline-flex; align-items: center; gap: 5px; color: var(--text-2); }
+.pf-sge-src-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--text-3); }
+.pf-sge-src-found .pf-sge-src-dot { background: #2e7d32; }
+.pf-sge-src-found { color: #2e7d32; font-weight: 600; }
+.pf-sge-src-pending { color: var(--text-3); }
+.pf-sge-ffe-note { font-size: 0.7rem; color: #b06a00; font-style: italic; }
+/* Source PDF provenance line — which sealed set the pull read (name/rev/date). */
+.pf-sge-pull-src { font-size: 0.68rem; color: var(--text-3); margin: 0 0 3px 0; }
+.pf-sge-pull-src strong { color: var(--text-2); font-weight: 600; }
 /* GC Prerequisites checklist (PF Design Submittal, Brad 2026-08-12). A table at the
    TOP of the subsection: Item | Responsible Party | Date Received (+ Reminder for office).
    Received rows read green/checked, outstanding rows amber. NOT .pr-field rows, so the
@@ -14463,6 +14498,41 @@ try {
       }
       return any ? total : 0;
     }
+    // Read the stored __submittal_pull metadata object for the current project (from the
+    // engineering override). Returns a NORMALIZED object (never throws): the provenance +
+    // reconciliation of the last "Pull from Approved Drawings" extraction. When nothing has
+    // been pulled, returns null (blank-graceful; the Submittal Summary renders with no pull
+    // chrome). The per-area Pier Qty / LF live in __site_elevations rows (populated by the
+    // pull); THIS object drives the reconciliation flag, the structural/civil indicator, the
+    // FFE note, and the UNVERIFIED stamp. See /api/project-override cleanSubmittalPull.
+    function pfSubmittalPull(){
+      try {
+        var eng = _curOverrides && _curOverrides.engineering;
+        var p = eng && eng.__submittal_pull;
+        if (!p || typeof p !== 'object' || Array.isArray(p)) return null;
+        var sp = (p.source_pdf && typeof p.source_pdf === 'object') ? p.source_pdf : {};
+        function pair(o){
+          o = (o && typeof o === 'object') ? o : {};
+          return { piers: String(o.piers == null ? '' : o.piers), lf: String(o.lf == null ? '' : o.lf) };
+        }
+        // Tri-state booleans preserved as-is (true / false / null = "not yet known").
+        var recon = (p.reconciled === true) ? true : (p.reconciled === false ? false : null);
+        var struc = (p.structural_found === true) ? true : (p.structural_found === false ? false : null);
+        return {
+          source_pdf: { name: String(sp.name || ''), revision: String(sp.revision || ''), date: String(sp.date || '') },
+          pulled_at:    String(p.pulled_at || ''),
+          requested_at: String(p.requested_at || ''),
+          status:       String(p.status || ''),
+          reconciled:   recon,
+          extracted_total:     pair(p.extracted_total),
+          pier_schedule_total: pair(p.pier_schedule_total),
+          delta:               pair(p.delta),
+          structural_found:    struc,
+          ffe_status:   String(p.ffe_status || ''),
+          notes: Array.isArray(p.notes) ? p.notes.map(function(n){ return String(n == null ? '' : n); }) : []
+        };
+      } catch (e) { return null; }
+    }
     // Read-view of ONE area as a COMPACT single row (Brad 2026-08-12 density pass): a small
     // table-like row — Area | Site Grade Elev | FFE — NOT a collapsible card. Blank values
     // show a yellow placeholder; a blank area name falls back to "Untitled Area".
@@ -14496,8 +14566,72 @@ try {
     // Edit affordance. Own inline editor + reserved __site_elevations key (unchanged). The
     // .pf-sge-wrap host + data-sge-num + the editor handlers stay identical, so add/save/
     // remove behavior is preserved; only the read presentation + placement changed.
+    // Build the reconciliation note (Stage 2, Brad 2026-08-13) rendered ON the TOTAL row of
+    // the Submittal Summary. Driven by the __submittal_pull metadata:
+    //   reconciled === true  -> a quiet green line confirming the per-area sums match the
+    //                           pier-schedule grand total.
+    //   reconciled === false -> a prominent amber note stating the mismatch with the exact
+    //                           extracted vs schedule counts + deltas ("review, not verified").
+    //   reconciled === null / no pull -> no note (the TOTAL row keeps its plain footer).
+    // Returns the <td> HTML that spans the value columns (colspan across the 7-col table), or
+    // '' when there is nothing to flag. NEVER fabricates numbers — only echoes what the pull
+    // recorded. The whole-table UNVERIFIED stamp (separate, on the title) is driven by the
+    // same reconciled===false condition (see the title row below).
+    function pfSgeReconNote(pull){
+      if (!pull || pull.reconciled == null) return '';
+      if (pull.reconciled === true) {
+        var sp = pull.pier_schedule_total || {};
+        var pi = (sp.piers != null && sp.piers !== '') ? window.pfFmtQty(sp.piers) : '';
+        var lf = (sp.lf != null && sp.lf !== '') ? window.pfFmtQty(sp.lf) : '';
+        var txt = pi || lf
+          ? ('✓ Reconciled to pier schedule: ' + E(String(pi)) + ' piers / ' + E(String(lf)) + ' LF.')
+          : '✓ Reconciled to pier schedule.';
+        return '<tr class="pf-sge-recon-row"><td colspan="7" class="pf-sge-recon pf-sge-recon-ok">' + txt + '</td></tr>';
+      }
+      // reconciled === false: show extracted vs schedule + deltas.
+      var ex = pull.extracted_total || {}, sc = pull.pier_schedule_total || {}, dl = pull.delta || {};
+      function q(v){ return (v != null && v !== '') ? E(String(window.pfFmtQty(v))) : '-'; }
+      var msg = '⚠ Does NOT match pier schedule. Extracted ' + q(ex.piers) + '/' + q(ex.lf)
+        + ', schedule ' + q(sc.piers) + '/' + q(sc.lf)
+        + ', off by ' + q(dl.piers) + ' piers / ' + q(dl.lf) + ' LF — review, not verified.';
+      return '<tr class="pf-sge-recon-row"><td colspan="7" class="pf-sge-recon pf-sge-recon-bad">' + msg + '</td></tr>';
+    }
+    // Structural/Civil source indicator + FFE note (Stage 2, Brad 2026-08-13). A small chip
+    // line UNDER the Submittal Summary title showing whether the structural/civil source (the
+    // "Shop Drawing Info" folder) was found at pull time (structural_found), plus an FFE-pending
+    // note when ffe_status==='pending'. Returns '' when there is no pull metadata (nothing to
+    // show). structural_found===null (not yet pulled / unknown) shows a neutral "pending".
+    function pfSgeSourceIndicator(pull){
+      if (!pull) return '';
+      var found = pull.structural_found;
+      var strucChip;
+      if (found === true) {
+        strucChip = '<span class="pf-sge-src pf-sge-src-found"><span class="pf-sge-src-dot"></span>Structural/Civil drawings: found</span>';
+      } else {
+        // false OR null both render as pending (grey) — we never claim "found" without proof.
+        strucChip = '<span class="pf-sge-src pf-sge-src-pending"><span class="pf-sge-src-dot"></span>Structural/Civil drawings: pending</span>';
+      }
+      var ffeChip = (pull.ffe_status === 'pending')
+        ? '<span class="pf-sge-ffe-note">FFE pending structural/civil drawings</span>'
+        : '';
+      return '<div class="pf-sge-srcline">' + strucChip + ffeChip + '</div>';
+    }
+    // Source-PDF provenance line (Stage 2): which sealed set the pull read (name / rev / date).
+    // '' when no pull or no source name.
+    function pfSgePullSrcLine(pull){
+      if (!pull || !pull.source_pdf || !pull.source_pdf.name) return '';
+      var sp = pull.source_pdf;
+      var meta = [];
+      if (sp.revision) meta.push(E(String(sp.revision)));
+      if (sp.date) meta.push(E(String(sp.date)));
+      var suffix = meta.length ? ' (' + meta.join(', ') + ')' : '';
+      return '<div class="pf-sge-pull-src">Pulled from <strong>' + E(String(sp.name)) + '</strong>' + suffix + '</div>';
+    }
     function siteGradeElevationsInline(){
       var areas = pfSiteElevations();
+      // Stage-2 pull metadata (reconciliation / structural indicator / FFE note / UNVERIFIED).
+      var pull = pfSubmittalPull();
+      var reconNote = pfSgeReconNote(pull);
       var listHtml;
       if (areas.length) {
         // Totals row (Brad 2026-08-12): sum Pier Qty + Total LF across all areas, comma-
@@ -14512,7 +14646,10 @@ try {
           + '<td class="pf-sge-c-total">'+E(String(window.pfFmtQty(pierTotal)))+'</td>'
           + '<td class="pf-sge-c-total">'+E(String(window.pfFmtQty(lfTotal)))+'</td>'
           + '<td></td><td></td>'
-          + '</tr></tfoot>';
+          + '</tr>'
+          // Stage-2 reconciliation note spanning the table, directly under the TOTAL row.
+          + reconNote
+          + '</tfoot>';
         listHtml = '<table class="pf-sge-table"><thead><tr>'
           + '<th>Area</th><th>Site Grade Elev (PF Install)</th><th>FFE</th><th>Total Pier Qty</th><th>Total LF</th><th>Column Diameter</th><th>Bearing Capacity (PSF)</th>'
           + '</tr></thead><tbody>'
@@ -14522,16 +14659,40 @@ try {
           + '</table>';
       } else {
         listHtml = '<div class="pf-sge-empty">No areas recorded.'
-          + (canEdit() ? ' <strong>Edit</strong> &rarr; <strong>+ Add Area</strong> to capture site grade + FFE per building.' : '')
+          + (canEdit() ? ' <strong>Edit</strong> &rarr; <strong>+ Add Area</strong> to capture site grade + FFE per building, or <strong>Pull from Approved Drawings</strong> to extract them from the sealed set.' : '')
           + '</div>';
       }
+      // UNVERIFIED stamp on the whole table when a pull did NOT reconcile (rows still show).
+      var unverified = (pull && pull.reconciled === false)
+        ? '<span class="pf-sge-unverified" title="Pull did not reconcile to the pier schedule">Unverified</span>'
+        : '';
       var editBtn = canEdit()
         ? '<button type="button" class="pf-sge-edit" onclick="event.stopPropagation();window.pfSgeEdit(this)">Edit</button>'
         : '';
+      // "Pull from Approved Drawings" button (Stage 2, Brad 2026-08-13). OFFICE-ONLY. The
+      // vision read runs in Peter's ENGINE (build-submittal-summary-from-drawings.py), NOT in
+      // the CF Worker — so clicking only RECORDS a request marker (__submittal_pull.status =
+      // 'requested') and flips to a "Pull requested — Peter is extracting..." state. Peter's
+      // engine later writes the FULL payload (rows into __site_elevations + reconciliation
+      // metadata here) out-of-band. Disabled + relabeled while a request is pending.
+      var pullPending = pull && pull.status === 'requested';
+      var pullBtn = canEdit()
+        ? '<button type="button" class="pf-sge-pull-btn"'
+          + (pullPending ? ' disabled' : '')
+          + ' onclick="event.stopPropagation();window.pfSgePullFromDrawings(this)">'
+          + (pullPending ? 'Pull requested…' : 'Pull from Approved Drawings')
+          + '</button>'
+        : '';
+      var pendingNote = pullPending
+        ? '<div class="pf-sge-pull-src">⏳ Pull requested — Peter is extracting from the approved drawings. The Submittal Summary will populate when the read completes.</div>'
+        : '';
       return '<div class="pf-sge-wrap" data-sge-num="'+E(_curNum)+'">'
-        + '<div class="pf-sge-inline-head"><span class="pf-sge-inline-title">Submittal Summary</span>'
-        +   (editBtn ? '<span class="pf-sge-inline-actions">'+editBtn+'</span>' : '')
+        + '<div class="pf-sge-inline-head"><span class="pf-sge-inline-title">Submittal Summary'+unverified+'</span>'
+        +   (editBtn || pullBtn ? '<span class="pf-sge-inline-actions">'+pullBtn+editBtn+'</span>' : '')
         + '</div>'
+        + pfSgeSourceIndicator(pull)
+        + pfSgePullSrcLine(pull)
+        + pendingNote
         + '<div class="pf-sge-body">' + listHtml + '</div>'
         + '<div class="pf-sge-msg" style="display:none"></div>'
         + '</div>';
@@ -21469,6 +21630,93 @@ try {
         if (onErr) onErr('Save failed: could not reach the server. Your changes were NOT saved - please retry.');
       });
     }
+
+    // "Pull from Approved Drawings" click handler (Stage 2, Brad 2026-08-13). OFFICE-ONLY.
+    //
+    // IMPORTANT — the vision read does NOT run here. Reading the sealed GI-3xx layout totals
+    // + the GI-4xx pier-schedule grand total is done by Peter's ENGINE
+    // (platform/sync/build-submittal-summary-from-drawings.py), OUT OF BAND. A Cloudflare
+    // Worker cannot (and must not) run vision or reach into SharePoint drawings. So this
+    // button's MVP behavior is a lightweight REQUEST MARKER: it writes __submittal_pull with
+    // status:'requested' + a requested_at timestamp, then shows a "Pull requested — Peter is
+    // extracting…" state. Peter's engine later writes the FULL payload (per-area rows into
+    // __site_elevations + reconciliation metadata into __submittal_pull) which repopulates the
+    // Submittal Summary on the next load. The request marker preserves any EXISTING pull
+    // metadata fields it does not set, because it sends the complete object (merged from the
+    // current pull, if any). FAIL CLOSED + office-gated (canEdit + server requireArea).
+    window.pfSgePullFromDrawings = function(btn){
+      if (!canEdit()) return;                          // defense-in-depth (server also 403s)
+      var wrap = pfSgeWrap(btn);
+      if (!wrap) return;
+      var num = wrap.getAttribute('data-sge-num') || _curNum || '';
+      if (!num) { pfSgeMsg(wrap, 'Missing project number; no pull was requested.', true); return; }
+      if (!window.confirm('Request a Pull from the Approved Drawings for ' + num + '?\n\n'
+        + 'This flags the project for extraction. Peter vision-reads the sealed AP shop '
+        + 'drawings and populates the Submittal Summary (Area / Pier Qty / LF) with a '
+        + 'reconciliation check. The table updates when that read completes.')) return;
+      // Build the request marker, preserving any prior pull fields so a re-request never
+      // wipes a previously-populated reconciliation (status flips back to 'requested').
+      var prior = pfSubmittalPull() || {};
+      var reqAt = new Date().toISOString();
+      var pull = {
+        source_pdf: prior.source_pdf || { name: '', revision: '', date: '' },
+        pulled_at: prior.pulled_at || '',
+        requested_at: reqAt,
+        status: 'requested',
+        // Preserve prior tri-state; a fresh request does not fabricate a reconciliation.
+        reconciled: (prior.reconciled === true || prior.reconciled === false) ? prior.reconciled : null,
+        extracted_total: prior.extracted_total || { piers: '', lf: '' },
+        pier_schedule_total: prior.pier_schedule_total || { piers: '', lf: '' },
+        delta: prior.delta || { piers: '', lf: '' },
+        structural_found: (prior.structural_found === true || prior.structural_found === false) ? prior.structural_found : null,
+        ffe_status: prior.ffe_status || '',
+        notes: Array.isArray(prior.notes) ? prior.notes : []
+      };
+      if (btn) { btn.disabled = true; btn.textContent = 'Requesting…'; }
+      fetch('/api/project-override', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ num: num, section: 'engineering', fields: { __submittal_pull: pull } })
+      }).then(function(res){
+        return res.json().then(function(b){ return { ok: res.ok, status: res.status, body: b }; })
+          .catch(function(){ return { ok: res.ok, status: res.status, body: null }; });
+      }).then(function(r){
+        // FAIL CLOSED: only a clean {ok:true, saved:true} is success.
+        if (!r.ok || !r.body || r.body.ok !== true || r.body.saved !== true) {
+          var msg = (r.body && r.body.message) ? r.body.message
+            : (r.status === 403 ? 'You do not have permission to request a pull for this project.'
+                                 : 'Pull request failed (' + r.status + '). Nothing was recorded — please retry.');
+          if (btn) { btn.disabled = false; btn.textContent = 'Pull from Approved Drawings'; }
+          pfSgeMsg(wrap, msg, true);
+          return;
+        }
+        // Adopt server truth into the store + module-local overrides, then re-render the SGE
+        // block in place (same surgical refresh the save path uses; no full re-render).
+        window.PF_PROJECT_OVERRIDES[num] = { sections: (r.body.sections) || {}, _meta: (r.body._meta) || null };
+        try {
+          if (String(num) === String(_curNum) && r.body.sections && typeof r.body.sections === 'object') {
+            _curOverrides = r.body.sections;
+          }
+        } catch (e) {}
+        try {
+          var freshInner = siteGradeElevationsInline();
+          var tmp = document.createElement('div');
+          tmp.innerHTML = freshInner;
+          // Replace the whole wrap's inner content (title row + indicators + body) so the
+          // "Pull requested…" state + disabled button appear immediately.
+          var freshWrap = tmp.querySelector('.pf-sge-wrap');
+          if (freshWrap) wrap.innerHTML = freshWrap.innerHTML;
+          pfSgeMsg(wrap, 'Pull requested. Peter will extract from the approved drawings.', false);
+        } catch (e) {
+          if (btn) { btn.disabled = false; btn.textContent = 'Pull from Approved Drawings'; }
+          pfSgeMsg(wrap, 'Pull requested (reload to see the updated state).', false);
+        }
+      }).catch(function(){
+        if (btn) { btn.disabled = false; btn.textContent = 'Pull from Approved Drawings'; }
+        pfSgeMsg(wrap, 'Pull request failed: could not reach the server. Nothing was recorded — please retry.', true);
+      });
+    };
 
     // =======================================================================
     // BUDGET vs ACTUAL editor (Financials Phase 1) — office only

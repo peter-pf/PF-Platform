@@ -309,6 +309,97 @@ function cleanSiteElevations(input) {
   return out;
 }
 
+// ---- __submittal_pull reserved structured key (Brad 2026-08-13, Stage 2) ------
+// "Pull from Approved Drawings" writes the METADATA of a vision-read extraction (the
+// per-area Pier Qty / Total LF land in __site_elevations rows; this key records the
+// provenance + reconciliation of that pull). Stored as ONE reserved, OBJECT-valued key
+// `__submittal_pull` INSIDE the `engineering` section:
+//   sections.engineering.__submittal_pull = {
+//     source_pdf: { name, revision, date },
+//     pulled_at, requested_at, status ('requested'|'pulled'|''),
+//     reconciled (bool|null),
+//     extracted_total: { piers, lf },       // strings (client formats)
+//     pier_schedule_total: { piers, lf },   // strings
+//     delta: { piers, lf },                 // strings
+//     structural_found (bool|null),         // was the Shop Drawing Info folder found
+//     ffe_status ('sourced'|'pending'|''),  // FFE sourcing state
+//     notes: [ "..." ]                      // provenance notes (capped list of strings)
+//   }
+// This is the FIFTH reserved key (alongside __crm, __submittal_prereqs, __submittal_cycles,
+// __site_elevations) and rides the SAME merge: Object.assign(existing, fields) preserves it
+// when a normal field save omits it. Two write paths use it: (1) the OFFICE "Pull" BUTTON
+// writes a lightweight request marker { status:'requested', requested_at } — the CF Worker
+// NEVER runs vision; Peter's engine does the extraction out-of-band. (2) Peter's engine (or a
+// seed) writes the FULL payload { status:'pulled', reconciled, totals, ... } after the read.
+// STRICTLY validated (cleanSubmittalPull below); a malformed body fails the WHOLE save closed.
+// Allowed ONLY under the `engineering` section (rejected 400 anywhere else).
+const PULL_KEY = '__submittal_pull';
+const PULL_ALLOWED_SECTIONS = { engineering: 1 };
+const PULL_MAX_STR = 300;            // a source_pdf name / status / date string cap
+const PULL_MAX_NUM = 40;             // a piers/lf value (stored as a string) cap
+const PULL_MAX_NOTES = 40;           // provenance notes, bounds abuse
+const PULL_MAX_NOTE_LEN = 1000;      // one note line cap
+const PULL_STATUSES = { requested: 1, pulled: 1, '': 1 };
+const PULL_FFE_STATUSES = { sourced: 1, pending: 1, '': 1 };
+
+// Coerce an incoming value to a strict boolean OR null (tri-state). true/false pass
+// through; everything else (absent, string, number) => null. Used for reconciled /
+// structural_found where "not yet known" is a meaningful, distinct state from false.
+function pullTriBool(v) {
+  if (v === true) return true;
+  if (v === false) return false;
+  return null;
+}
+
+// A {piers, lf} sub-object -> two capped STRINGS (the client owns comma/number
+// formatting; we never do math). Absent/malformed => { piers:'', lf:'' }.
+function pullPair(o) {
+  const src = (o && typeof o === 'object' && !Array.isArray(o)) ? o : {};
+  return { piers: s(src.piers, PULL_MAX_NUM), lf: s(src.lf, PULL_MAX_NUM) };
+}
+
+// Validate + normalize an incoming __submittal_pull object into a clean, bounded
+// structure. Returns a SAFE object, or null if present-but-malformed (caller fails the
+// whole save closed). Rules mirror cleanPrereqs' defensive posture:
+//   - top-level must be a plain object (not array).
+//   - status / ffe_status are constrained to their small enums (unknown => reject).
+//   - reconciled / structural_found are tri-state booleans (true/false/null).
+//   - source_pdf + the three totals are shape-normalized (strings only, never math).
+//   - notes must be an array of strings (capped in count + length); over the cap => reject.
+function cleanSubmittalPull(input) {
+  if (input == null) return {};                        // absent => empty (caller preserves prior)
+  if (typeof input !== 'object' || Array.isArray(input)) return null; // present but not object => reject
+  const status = s(input.status, PULL_MAX_STR);
+  if (!(status in PULL_STATUSES)) return null;         // unknown status => reject
+  const ffe = s(input.ffe_status, PULL_MAX_STR);
+  if (!(ffe in PULL_FFE_STATUSES)) return null;        // unknown ffe_status => reject
+  const spIn = (input.source_pdf && typeof input.source_pdf === 'object' && !Array.isArray(input.source_pdf))
+    ? input.source_pdf : {};
+  let notes = [];
+  if (input.notes != null) {
+    if (!Array.isArray(input.notes)) return null;      // present but not an array => reject
+    if (input.notes.length > PULL_MAX_NOTES) return null;
+    notes = input.notes.map((n) => s(n, PULL_MAX_NOTE_LEN)).filter((n) => n !== '');
+  }
+  return {
+    source_pdf: {
+      name:     s(spIn.name, PULL_MAX_STR),
+      revision: s(spIn.revision, PULL_MAX_STR),
+      date:     s(spIn.date, PULL_MAX_STR),
+    },
+    pulled_at:    s(input.pulled_at, PULL_MAX_STR),
+    requested_at: s(input.requested_at, PULL_MAX_STR),
+    status: status,
+    reconciled: pullTriBool(input.reconciled),
+    extracted_total:     pullPair(input.extracted_total),
+    pier_schedule_total: pullPair(input.pier_schedule_total),
+    delta:               pullPair(input.delta),
+    structural_found: pullTriBool(input.structural_found),
+    ffe_status: ffe,
+    notes: notes,
+  };
+}
+
 // Validate + normalize an incoming __crm object into a clean, bounded structure.
 // Returns a SAFE object (possibly {}), or null if the input is present but so
 // malformed it must be rejected (caller fails the whole save closed). Rules:
@@ -417,7 +508,7 @@ function cleanFields(input) {
   if (!input || typeof input !== 'object') return out;
   const keys = Object.keys(input).slice(0, MAX_FIELDS_PER_SECTION);
   for (const k of keys) {
-    if (k === CRM_KEY || k === PREREQ_KEY || k === CYCLES_KEY || k === SITE_ELEV_KEY) continue; // reserved structured keys; handled separately, never string-flattened
+    if (k === CRM_KEY || k === PREREQ_KEY || k === CYCLES_KEY || k === SITE_ELEV_KEY || k === PULL_KEY) continue; // reserved structured keys; handled separately, never string-flattened
     const label = s(k, MAX_LABEL);
     if (!label) continue;
     out[label] = s(input[k], MAX_VALUE);
@@ -557,6 +648,26 @@ export async function onRequestPost(context) {
       }
     }
 
+    // Reserved __submittal_pull structured key (Brad 2026-08-13, Stage 2): the "Pull from
+    // Approved Drawings" provenance/reconciliation metadata on the Engineering & Design
+    // section. Allowed ONLY under `engineering`. Same posture as the other reserved keys:
+    // absent => untouched (preserve prior), present => strictly validated, malformed =>
+    // reject the WHOLE save closed. Two writers use it — the office Pull BUTTON (a small
+    // request marker) and Peter's out-of-band engine (the full payload). Both send this key
+    // WITHOUT the flat engineering fields, so cleanFields yields {} and only this key is
+    // replaced; a normal engineering field save omits it so the stored pull is preserved.
+    const hasPullInBody = Object.prototype.hasOwnProperty.call(rawFieldsObj, PULL_KEY);
+    let pullUpdate; // undefined => untouched
+    if (hasPullInBody) {
+      if (!PULL_ALLOWED_SECTIONS[section]) {
+        return json({ status: 'error', message: 'Submittal pull is not valid on this section.' }, 400);
+      }
+      pullUpdate = cleanSubmittalPull(rawFieldsObj[PULL_KEY]);
+      if (pullUpdate === null) {
+        return json({ status: 'error', message: 'Invalid submittal pull metadata; nothing was saved.' }, 400);
+      }
+    }
+
     // FAIL CLOSED: no KV -> we cannot persist. Do NOT report success.
     if (!env.PF_SCHEDULE) {
       return json({ status: 'error',
@@ -582,6 +693,9 @@ export async function onRequestPost(context) {
     const prevCycles = Array.isArray(existing[CYCLES_KEY]) ? existing[CYCLES_KEY] : undefined;
     // Carry forward any existing structured __site_elevations (also an ARRAY).
     const prevSiteElev = Array.isArray(existing[SITE_ELEV_KEY]) ? existing[SITE_ELEV_KEY] : undefined;
+    // Carry forward any existing structured __submittal_pull (an OBJECT, like __crm).
+    const prevPull = (existing[PULL_KEY] && typeof existing[PULL_KEY] === 'object' && !Array.isArray(existing[PULL_KEY]))
+      ? existing[PULL_KEY] : undefined;
     const merged = Object.assign({}, existing, fields);
     // Whole-object replace of __crm when the request supplied one (the client sends
     // the complete per-firm selection each time); otherwise preserve the prior value.
@@ -603,6 +717,11 @@ export async function onRequestPost(context) {
     if (siteElevUpdate !== undefined) merged[SITE_ELEV_KEY] = siteElevUpdate;
     else if (prevSiteElev !== undefined) merged[SITE_ELEV_KEY] = prevSiteElev;
     else delete merged[SITE_ELEV_KEY]; // never leave a stray/non-array key behind
+    // Same whole-object replace/preserve for __submittal_pull (the writer sends the COMPLETE
+    // metadata object each save); otherwise preserve the prior.
+    if (pullUpdate !== undefined) merged[PULL_KEY] = pullUpdate;
+    else if (prevPull !== undefined) merged[PULL_KEY] = prevPull;
+    else delete merged[PULL_KEY]; // never leave a stray/non-object key behind
     rec.sections[section] = merged;
 
     // Bound the number of sections (defense against a crafted flood of junk keys;
