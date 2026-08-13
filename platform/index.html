@@ -6869,7 +6869,7 @@ try {
           '</div>' +
           '<div style="text-align:right;white-space:nowrap">' +
             '<span class="badge-status ' + cls + '">' + esc(s.verdict || '--') + '</span>' +
-            '<div style="font-size:0.78rem;color:var(--text-3);margin-top:4px">' + esc(s.date || '') + '</div>' +
+            '<div style="font-size:0.78rem;color:var(--text-3);margin-top:4px">' + esc(window.pfFmtDate(s.date) || '') + '</div>' +
           '</div>' +
         '</div>';
 
@@ -6942,7 +6942,7 @@ try {
       var h = history[i];
       var rec = getRecommendation(h.score, h.disqualifiers || []);
       html += '<tr>' +
-        '<td style="white-space:nowrap">' + (h.date || '--') + '</td>' +
+        '<td style="white-space:nowrap">' + (h.date ? esc(window.pfFmtDate(h.date)) : '--') + '</td>' +
         '<td style="font-weight:500">' + (h.projectName || '--') + '</td>' +
         '<td>' + (h.gcName || '--') + '</td>' +
         '<td><div class="score-ring ' + rec.color + '" style="width:36px;height:36px;font-size:0.78rem">' + h.score + '</div></td>' +
@@ -8741,7 +8741,7 @@ try {
 
       html += '<tr style="cursor:pointer" onclick="window._guhmaExpand(' + p.id + ')">' +
         '<td style="font-weight:600">' + p.id + '</td>' +
-        '<td>' + p.date + '</td>' +
+        '<td>' + (window.pfFmtDate(p.date) || '') + '</td>' +
         '<td>' + p.durationFormatted + '</td>' +
         '<td>' + p.maxDepthFt + '</td>' +
         '<td>' + p.maxPressureBar + '</td>' +
@@ -9674,9 +9674,14 @@ try {
   }
 
   // ---- UTILITY ----
+  // Modulus load-test "Test Date" DISPLAY (Brad 2026-08-13: EVERY portal date =
+  // MM/DD/YYYY). Route through the single canonical formatter (window.pfFmtDate,
+  // defined near window.esc) instead of the month-abbrev toLocaleDateString this
+  // used to emit ("Apr 15, 2026"). pfFmtDate is blank-graceful (empty on
+  // empty/invalid) and handles the stored YYYY-MM-DD / M-D-Y shapes by pure string
+  // split (no timezone off-by-one). DISPLAY-ONLY: t.date is untouched.
   function formatDate(dateStr) {
-    const d = new Date(dateStr + 'T00:00:00');
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return window.pfFmtDate(dateStr) || '';
   }
 
   // ---- INIT ----
@@ -10630,7 +10635,7 @@ try {
                   <td>${esc(p.project)}</td>
                   <td>${esc(p.gc)}</td>
                   <td>${esc(p.location)}</td>
-                  <td>${p.date}</td>
+                  <td>${esc(window.pfFmtDate(p.date) || '')}</td>
                   <td>${fmt(p.value)}</td>
                   <td><span class="badge-status ${statusClass(p.status)}">${esc(p.status)}</span></td>
                   <td>
@@ -11112,7 +11117,7 @@ try {
       eq.serviceHistory.forEach(function (h) {
         var typeClass = h.type === 'Repair' ? 'review' : h.type === 'Calibration' ? 'pending' : 'bid';
         html += '<tr>';
-        html += '<td>' + h.date + '</td>';
+        html += '<td>' + esc(window.pfFmtDate(h.date) || '') + '</td>';
         html += '<td><span class="badge-status ' + typeClass + '">' + h.type + '</span></td>';
         html += '<td>' + esc(h.desc) + '</td>';
         html += '<td style="font-weight:600">' + fmt(h.cost) + '</td>';
@@ -13598,6 +13603,16 @@ try {
       var ovHasValue = ov.has && !(ov.value === undefined || ov.value === null || String(ov.value).trim() === "");
       var edited = ovHasValue;
       if (ovHasValue) { val = ov.value; src = 'Manual override'; }
+      // Date OBJECT guard (Brad 2026-08-13): a computed value passed in as a Date
+      // (e.g. the "Project Completion" auto-calc = start + duration) must be routed
+      // through the MM/DD/YYYY formatter BEFORE the blanket String(val) coercion.
+      // Otherwise String(aDate) yields the raw JS toString ("Wed Apr 15 2026 ...
+      // GMT-0400 (Eastern Daylight Time)"), which pfFmtDate below can't recognize as
+      // a date shape and passes through unchanged -> the bug. Formatting the Date
+      // here (pfFmtDate handles Date objects, blank on invalid) makes the value a
+      // clean MM/DD/YYYY string that the rest of field() treats normally. FAIL-CLOSED:
+      // an invalid Date -> '' -> amber blank "-".
+      if (val instanceof Date) { val = String(pfFmtDate(val)); }
       var v = (val === undefined || val === null || String(val).trim() === "") ? "" : String(val);
       // DISPLAY-ONLY: normalize date fields to MM/DD/YYYY. The underlying data /
       // override value is untouched; only the shown text changes.
@@ -14992,7 +15007,7 @@ try {
       var sp = pull.source_pdf;
       var meta = [];
       if (sp.revision) meta.push(E(String(sp.revision)));
-      if (sp.date) meta.push(E(String(sp.date)));
+      if (sp.date) meta.push(E(String(window.pfFmtDate(sp.date))));
       var suffix = meta.length ? ' (' + meta.join(', ') + ')' : '';
       return '<div class="pf-sge-pull-src">Pulled from <strong>' + E(String(sp.name)) + '</strong>' + suffix + '</div>';
     }
@@ -17758,7 +17773,7 @@ try {
             + (locked ? 'Export PDF' : 'Print (Draft)') + '</button>';
           return '<tr class="fin-inv-payapp-row' + (isSel ? ' selected' : '') + (locked ? ' locked' : '') + '" data-payapp-num="' + E(String(a.num)) + '" onclick="window.pfInvShowG702(this)" title="Show G702 cover">'
             + '<td>' + E(String(a.num)) + '</td>'
-            + '<td>' + (a.date ? E(a.date) : finDash) + '</td>'
+            + '<td>' + (a.date ? E(window.pfFmtDate(a.date)) : finDash) + '</td>'
             + '<td>' + (a.period ? E(a.period) : finDash) + '</td>'
             + '<td>' + E(typeLabel) + '</td>'
             + '<td class="num">' + E(baMoney(a.amount)) + '</td>'
@@ -23016,7 +23031,7 @@ try {
             : '<span class="ba-blank">-</span>';
           rows += '<tr>'
             + '<td>' + E(iv.vendor || '') + (iv.note ? '<div class="bid-note">' + E(iv.note) + '</div>' : '') + '</td>'
-            + '<td>' + E(iv.date || '') + '</td>'
+            + '<td>' + E(window.pfFmtDate(iv.date) || '') + '</td>'
             + '<td>' + E(iv.invoice_no || '') + '</td>'
             + '<td class="num">' + bidMoney(iv.amount) + '</td>'
             + '<td class="num">' + link + '</td>'
@@ -28528,7 +28543,7 @@ try {
       var list = items.length ? items.map(function(it){
         return '<div style="border-top:1px dashed var(--border,#2a2f3a);padding:6px 0;font-size:13px">'
           + '<div><strong>' + E(it.kind) + '</strong> ' + E(it.note) + '</div>'
-          + '<div class="pf-record-muted" style="font-size:11px">' + E(it.date)
+          + '<div class="pf-record-muted" style="font-size:11px">' + E(window.pfFmtDate(it.date) || '')
           + (it.channel ? ' • ' + E(it.channel) : '')
           + (it.who ? ' • ' + E(it.who) : '')
           + (it.fileRef ? ' • ref ' + E(it.fileRef) : '')
@@ -29780,7 +29795,7 @@ try {
           ? '<span class="ts-pd-y">Y</span>' : E(d.per_diem || '');
         html += '<tr' + (empty ? ' class="is-empty"' : '') + '>'
           + '<td>' + E(d.day) + '</td>'
-          + '<td>' + E(d.date) + '</td>'
+          + '<td>' + E(window.pfFmtDate(d.date) || '') + '</td>'
           + '<td>' + E(d.job) + '</td>'
           + '<td>' + E(d.cost_code) + '</td>'
           + '<td class="ts-activity">' + E(d.activity) + '</td>'
@@ -31163,7 +31178,7 @@ try {
     mountEl.innerHTML = items.map(function (it) {
       return '<div class="bdc-ix">'
         + '<div>' + E(it.note) + '</div>'
-        + '<div class="meta">' + E(it.date) + ' &middot; ' + E(it.channel || 'other')
+        + '<div class="meta">' + E(window.pfFmtDate(it.date) || '') + ' &middot; ' + E(it.channel || 'other')
         + (it.who ? ' &middot; ' + E(it.who) : '')
         + (it.addedBy ? ' &middot; logged by ' + E(it.addedBy) : '') + '</div>'
         + '</div>';
@@ -32411,10 +32426,10 @@ try {
     var prio = priorityOf(a.dueDate);
     var done = a.status === 'done';
     var meta = [];
-    if (a.dueDate) meta.push('due ' + E(a.dueDate));
+    if (a.dueDate) meta.push('due ' + E(window.pfFmtDate(a.dueDate) || ''));
     if (a.assignee) meta.push(E(a.assignee));
     if (a.linkedBidId) meta.push('bid ' + E(a.linkedBidId));
-    if (done && a.completedBy) meta.push('done by ' + E(a.completedBy) + ' ' + E((a.completedAt || '').slice(0, 10)));
+    if (done && a.completedBy) meta.push('done by ' + E(a.completedBy) + ' ' + E(window.pfFmtDate((a.completedAt || '').slice(0, 10)) || ''));
     var buttons = done
       ? '<button type="button" class="btn pa-btn-sm" data-reopen="' + E(a.id) + '">Reopen</button>'
       : '<button type="button" class="btn pa-btn-sm" data-complete="' + E(a.id) + '">Complete</button>';
@@ -32504,7 +32519,7 @@ try {
     });
     function rowsFor(list) {
       return list.length ? list.map(function (e) {
-        return '<div class="pa-cal-row"><span class="date">' + E(e.date) + '</span>'
+        return '<div class="pa-cal-row"><span class="date">' + E(window.pfFmtDate(e.date) || '') + '</span>'
           + '<span class="kind pa-prio ' + (e.kind === 'bid' ? 'upcoming' : 'none') + '">' + E(e.kind) + '</span>'
           + '<span>' + E(e.label) + (e.sub ? ' <span class="pa-muted">' + E(e.sub) + '</span>' : '') + '</span></div>';
       }).join('') : '<div class="pa-muted" style="font-size:13px">Nothing here.</div>';
@@ -33574,7 +33589,7 @@ try {
     upMsg('handlogs', '', null); upMsg('guhma', '', null);
     updateUploadEnabled();
     updateEditBanner();
-    msg('Editing report ' + (r.date || '') + ' - ' + (r.projectName || r.projectId || '') + '. Update the fields and re-send, or start a new report to cancel.', true);
+    msg('Editing report ' + (window.pfFmtDate(r.date) || '') + ' - ' + (r.projectName || r.projectId || '') + '. Update the fields and re-send, or start a new report to cancel.', true);
     var wrap = document.getElementById('drWrap') || document.getElementById('mod-daily-reports');
     if (wrap && wrap.scrollIntoView) wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -33694,7 +33709,7 @@ try {
         return safeFileLink(a.webUrl, nm) + b;
       }).join(', ');
       return '<div class="dr-item">'
-        + '<div><strong>' + E(r.date) + ' - ' + E(r.projectName || r.projectId || '') + '</strong> ' + statusChip(r.status) + '</div>'
+        + '<div><strong>' + E(window.pfFmtDate(r.date) || '') + ' - ' + E(r.projectName || r.projectId || '') + '</strong> ' + statusChip(r.status) + '</div>'
         + '<div class="dr-muted" style="font-size:12px">Foreman ' + E(r.foreman || '-') + (crewH ? ' - crew ' + crewH : '') + (prod.length ? ' - ' + prod.join(', ') : '') + (weatherH.length ? ' - ' + weatherH.join(' ') : '') + '</div>'
         + (r.workCompleted ? '<div style="font-size:13px">' + E(r.workCompleted) + '</div>' : '')
         + (ownedH ? '<div class="dr-muted" style="font-size:12px">Owned: ' + ownedH + '</div>' : '')
