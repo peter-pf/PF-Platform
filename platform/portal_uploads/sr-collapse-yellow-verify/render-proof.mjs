@@ -6,8 +6,10 @@ import { JSDOM } from 'jsdom';
 //     the same .pr-cgroup collapse idiom (collapsibleSubgroup) as Engineering & Design.
 //     - Each of the 7 numbered subsections renders as a .pr-cgroup with a clickable
 //       .pr-cgroup-head + .pr-cgroup-chev + .pr-cgroup-body.
-//     - Default state is EXPANDED (.open), matching E&D.
-//     - Clicking the header toggles .open (collapse works).
+//     - Default state is COLLAPSED (no .open), matching E&D. [UPDATED 2026-08-13, Brad:
+//       ALL roll-up subsections now default rolled up — collapsibleSubgroup default flipped
+//       from expanded to collapsed. Was: "Default state is EXPANDED (.open)".]
+//     - Clicking the header toggles .open (expand works).
 //     - The injected nested cards (Safety / Equipment / Material) land INSIDE their
 //       subsection's collapsible body (so they collapse with it).
 //  F) Empty Site Readiness fields get the .blank (yellow) class in LIVE-EDIT mode (office),
@@ -88,8 +90,9 @@ const EXPECTED = ['1. Shop Drawings', '2. Testing', '3. Staking & Layout', '4. S
   const titles = cgroups.map(g => { const t = g.querySelector('.pr-cgroup-title'); return t ? t.textContent.trim() : '(none)'; });
   EXPECTED.forEach((exp, i) => ok(titles[i] === exp, 'E: subsection ' + (i + 1) + ' title = "' + exp + '" (got "' + (titles[i] || '') + '")'));
 
-  // Each subsection: has a clickable head, a chevron, a body; DEFAULT EXPANDED (.open);
+  // Each subsection: has a clickable head, a chevron, a body; DEFAULT COLLAPSED (no .open);
   // reuses the SAME classes as E&D (.pr-cgroup / .pr-cgroup-head / .pr-cgroup-chev / .pr-cgroup-body).
+  // [UPDATED 2026-08-13: default flipped to collapsed — every roll-up starts rolled up.]
   cgroups.forEach((g, i) => {
     const head = g.querySelector(':scope > .pr-cgroup-head');
     const chev = g.querySelector('.pr-cgroup-chev');
@@ -98,17 +101,17 @@ const EXPECTED = ['1. Shop Drawings', '2. Testing', '3. Staking & Layout', '4. S
     ok(head && /classList\.toggle\('open'\)/.test(head.getAttribute('onclick') || ''), 'E: subsection ' + (i + 1) + ' head toggles .open (same idiom as E&D)');
     ok(!!chev, 'E: subsection ' + (i + 1) + ' has a chevron (.pr-cgroup-chev)');
     ok(!!body, 'E: subsection ' + (i + 1) + ' has a .pr-cgroup-body');
-    ok(g.classList.contains('open'), 'E: subsection ' + (i + 1) + ' DEFAULT expanded (.open), matching E&D');
+    ok(!g.classList.contains('open'), 'E: subsection ' + (i + 1) + ' DEFAULT collapsed (no .open), matching E&D');
   });
 
-  // The collapse actually works: simulate the header onclick toggling .open off then on.
+  // The expand actually works: simulate the header onclick toggling .open on then off.
   {
     const g = cgroups[0];
-    ok(g.classList.contains('open'), 'E(toggle): subsection 1 starts open');
+    ok(!g.classList.contains('open'), 'E(toggle): subsection 1 starts collapsed (rolled up)');
     g.classList.toggle('open'); // simulate a click
-    ok(!g.classList.contains('open'), 'E(toggle): after click subsection 1 is collapsed (.open removed)');
+    ok(g.classList.contains('open'), 'E(toggle): after click subsection 1 is expanded (.open added)');
     g.classList.toggle('open');
-    ok(g.classList.contains('open'), 'E(toggle): after second click subsection 1 is expanded again');
+    ok(!g.classList.contains('open'), 'E(toggle): after second click subsection 1 is collapsed again');
   }
 
   // Compare against E&D so we KNOW the same pattern is reused (identical class contract).

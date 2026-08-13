@@ -4176,11 +4176,9 @@ window.progress = (function () {
         <a class="nav-item" data-module="budget-actual-poet" onclick="showModule('budget-actual-poet')" style="color:#d64545">Budget vs Actual - 26-002 POET</a>
       </div>
 
-      <!-- 5c) Subcontracts -->
-      <div class="nav-sub collapsed">
-        <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Subcontracts</div>
-        <a class="nav-item" data-module="subcontracts" onclick="showModule('subcontracts')" style="color:#d64545">Subcontracts</a>
-      </div>
+      <!-- 5c) Subcontracts (standalone review tool) REMOVED (Brad 2026-08-13): now
+           redundant — Subcontract Analysis lives nested inside each project's
+           Subcontract Agreement section (Section 3, pfSubcontractAnalysisSub). -->
 
       <!-- 5c2) Insurance -->
       <div class="nav-sub collapsed">
@@ -4555,7 +4553,8 @@ document.addEventListener('click', function(e) {
   <div class="module-view" id="mod-sopadditions"><iframe class="doc-frame" data-src="https://pf-sop-additions.pages.dev" title="SOP Additions"></iframe></div>
   <div class="module-view" id="mod-alphareview"><iframe class="doc-frame" data-src="https://pf-alpha-review.pages.dev" title="Alpha Review"></iframe></div>
   <div class="module-view" id="mod-sprintreports"><iframe class="doc-frame" data-src="https://pf-sprint-reports.pages.dev" title="Sprint Reports"></iframe></div>
-  <div class="module-view" id="mod-subcontracts"><iframe class="doc-frame" data-src="/subcontracts.html" title="Subcontracts"></iframe></div>
+  <!-- mod-subcontracts (standalone Subcontracts review tool) REMOVED (Brad 2026-08-13):
+       superseded by the nested Subcontract Analysis subsection in Section 3. -->
   <div class="module-view" id="mod-dailyproduction"><iframe class="doc-frame" data-src="/daily-production.html" title="Daily Production"></iframe></div>
   <!-- Completed Projects index - populated client-side by the COMPLETED PROJECTS INDEX -->
   <!-- script from window.PF_PROJECT_HISTORY (data/project-history.js). Mirrors the      -->
@@ -5492,7 +5491,6 @@ const moduleTitles = {
   alphareview: 'Alpha Review',
   sprintreports: 'Sprint Reports',
   coochecklist: 'COO Knowledge Checklist',
-  subcontracts: 'Subcontracts',
   cheatsheet: 'Meet Peter (One-Pager)',
   onboarding: 'Role Onboarding',
   hr: 'Human Resources',
@@ -13756,13 +13754,16 @@ try {
     // COLLAPSIBLE subgroup (Brad 2026-08-12): a top-level subgroup whose ENTIRE body rolls
     // up / expands. Reuses the EXISTING .pr-card collapse idiom (a clickable header that
     // toggles the sibling body via classList.toggle('open') + a .pr-chev caret), so it looks
-    // and behaves like every other collapsible in the portal. DEFAULT = expanded (open).
+    // and behaves like every other collapsible in the portal. DEFAULT = collapsed (rolled up).
     // The body is a plain wrapper div INSIDE the section card, so every .pr-field[data-pr-label]
     // inside is still a descendant of data-pr-section — the section editor's save-scan +
     // the .pf-swf-/.pf-sge- blocks' closest('.pr-card') lookups are unaffected. In-session
     // toggle only (no persisted open-state), matching the other collapsibles.
+    // DEFAULT = COLLAPSED (Brad 2026-08-13): every roll-up subsection starts rolled up when a
+    // project record opens; the user clicks to expand. Only an EXPLICIT `open === true` starts
+    // expanded — a 2-arg call (open undefined) OR `open === false` renders collapsed.
     function collapsibleSubgroup(title, innerHtml, open){
-      var isOpen = (open !== false); // default expanded
+      var isOpen = (open === true); // default collapsed (rolled up)
       return '<div class="pr-cgroup'+(isOpen ? ' open' : '')+'">'
         + '<div class="pr-cgroup-head pr-subgroup" onclick="this.parentElement.classList.toggle(\'open\')">'
         +   '<span class="pr-cgroup-title">'+E(title)+'</span>'
@@ -16937,9 +16938,9 @@ try {
             fieldLinked('Stamped Final As-Built Link', '', '', 'website')
           ])
         + linkRow((L.engineering || []).concat(L.general || []));
-      // Assemble the 3 COLLAPSIBLE subsections (default expanded). Each rolls up/expands
-      // independently via the shared .pr-card collapse idiom (collapsibleSubgroup). E&D
-      // stays exactly 3 top-level subsections.
+      // Assemble the 3 COLLAPSIBLE subsections (default collapsed / rolled up — Brad 2026-08-13).
+      // Each rolls up/expands independently via the shared .pr-card collapse idiom
+      // (collapsibleSubgroup). E&D stays exactly 3 top-level subsections.
       var engBody =
           collapsibleSubgroup('Prelim Design', prelimInner)
         + collapsibleSubgroup('PF Submittal Design', submittalInner)
