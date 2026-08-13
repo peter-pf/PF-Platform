@@ -16741,6 +16741,36 @@ try {
 
         // ---- Subsection 3: Staking & Layout ----
         + subgroup('3. Staking & Layout')
+        // CHANGE B (Brad 2026-08-13): "Staking & Layout PF's responsibility?" Yes/No
+        // toggle — the NEW source of truth for whether staking is PF's job (Brad chose
+        // this over reading the contract). Renders as a live save-on-change select
+        // (siteReadiness key, PF_FIELD_DROPDOWNS Yes/No -> pfLiveControl). When = Yes,
+        // the conditional Staking & Layout company/contact CRM selector below is shown
+        // (WE stake -> pick who); when = No, the GC has it and the selector is hidden.
+        // Visibility is set at render time from the effective toggle value and toggled
+        // live by pfStakingToggleVisibility (a document 'change' listener) WITHOUT a
+        // re-render — the field's own onchange still saves via pfLiveFieldChange.
+        + fields([
+            field('Staking & Layout PF\'s responsibility?', '')
+          ])
+        + (function(){
+            // Effective toggle value (override-wins). Blank/No -> hidden; Yes -> shown.
+            var _stk = String(effVal('siteReadiness', 'Staking & Layout PF\'s responsibility?', '') || '').trim();
+            var _isPf = /^yes$/i.test(_stk);
+            // GC-has-it note (only meaningful when explicitly No; blank = undecided).
+            var _gcNote = (/^no$/i.test(_stk))
+              ? subgroupNote('Staking &amp; Layout is the GC’s responsibility.')
+              : '';
+            // Conditional CRM selector wrapper. Office roles get the live picker + a
+            // save button; non-office see only the resolved read cards (host). Hidden
+            // via inline display when the toggle is not Yes (pfStakingToggleVisibility
+            // flips it live). data-pf-staking-selector marks it for the toggle handler.
+            var _sel = pfStakingSelectorBlock();
+            return _gcNote
+              + '<div data-pf-staking-selector style="' + (_isPf ? '' : 'display:none;') + '">'
+              +   _sel
+              + '</div>';
+          })()
         + fields([
             field('CAD & PDF Sent to Surveyor (MLS)?', ''),
             field('Date Sent to MLS', '')
@@ -17976,10 +18006,15 @@ try {
       _surfaceExtras(root.querySelector('.pr-card[data-pr-section="design_professionals"] .pr-card-body'),
         'design_professionals', 'Additional Design Professional Contacts / Fields', null);
       // CRM: resolve every group's __crm[...].contactIds into live cards. Scoped to the
-      // whole Project Contacts card body so ALL hosts (Owner / GC / the 4 DP firms / the
-      // new groups 8-13) render in one pass; each host's data-crm-cards-key selects its
-      // own override map. No selection -> hosts stay empty (renders as before).
-      pfCrmRenderCards(pcHost || root);
+      // whole record root so ALL hosts render in one pass — the Project Contacts hosts
+      // (Owner / GC / the 4 DP firms / the new groups 8-13) AND the inline Staking &
+      // Layout read host in Site Readiness subsection 3 (CHANGE B, Brad 2026-08-13),
+      // which lives OUTSIDE pcHost. Each host's data-crm-cards-key selects its own
+      // override map; no selection -> hosts stay empty (renders as before). Idempotent.
+      pfCrmRenderCards(root || pcHost);
+      // CHANGE B: hydrate the inline Staking & Layout picker (company dropdown +
+      // contact checkboxes) when it rendered (office + toggle=Yes). Fail-soft.
+      if (typeof pfStakingHydrate === 'function') pfStakingHydrate(root);
 
       // Prereq checklist: once the contact directory loads, re-render the read view so
       // directory-tied responsible parties resolve to live name/email and the editor
@@ -18059,18 +18094,18 @@ try {
       // Material nested card ("material" key — added stone/fuel vendors + manual fields).
       _surfaceExtras(_srScoped('material'),
         'material', 'Additional Material Vendors / Fields', 'Stone / Fuel Vendor');
-      // Safety nested card ("safety" key — MIGRATED from the former standalone Project
-      // Safety section). Scoped to the Site Readiness card (not the Project Contacts
-      // Safety Consultant CRM card).
-      _surfaceExtras(_srScoped('safety'),
-        'safety', 'To Be Placed (pending Brad\'s direction)', null);
-      // Site Readiness top-level card ("siteReadiness" key). This IS the top-level Site
-      // Readiness card (resolved by title), NOT the Project Contacts Staking & Layout
-      // CRM card (which also carries data-pr-section="siteReadiness"). Surfaces any
-      // stored siteReadiness override whose OLD label no longer maps to a rendered field
-      // into a "To Be Placed" group so NO stored data is orphaned.
-      _surfaceExtras(srCardEl ? srCardEl.querySelector('.pr-card-body') : null,
-        'siteReadiness', 'To Be Placed (pending Brad\'s direction)', null);
+      // CHANGE A (Brad 2026-08-13): the "To Be Placed (pending Brad's direction)"
+      // catch-all subsection was REMOVED from Site Readiness — both the safety-keyed
+      // and the siteReadiness-keyed _surfaceExtras calls that rendered it are deleted.
+      // Same treatment Brad applied to the engineering "Additional Engineer Contacts /
+      // Fields" (2026-08-12) and the pfTeam "Additional Team Members / Fields"
+      // (2026-08-11) catch-alls: these were display+re-save groups for ORPHANED overrides
+      // (labels not matched by a rendered field row). Brad: those are captured elsewhere/
+      // above, so stop showing this section. NO KV DATA IS DELETED — any pre-existing
+      // safety / siteReadiness override under an unmapped label simply no longer surfaces
+      // OR round-trips through re-save; it stays in KV untouched. The real safety /
+      // siteReadiness field rows + their save paths are UNAFFECTED (they render via the
+      // subgroups above / the nested Safety card, not via this catch-all).
 
       // Project Closeout top-level card ("closeout" key). Brad 2026-08-07 (batch-14):
       // the placeholder's 7 flat labels (Final As Built Dwgs to Garbin Geo, Column Logs
@@ -18783,6 +18818,12 @@ try {
       'Test Document Status': ['Not Started', 'In Progress', 'Complete'],
       // Subsection 3: Staking & Layout
       'CAD & PDF Sent to Surveyor (MLS)?': ['Yes', 'No'],
+      // CHANGE B (Brad 2026-08-13): is staking & layout PF's responsibility? NEW plain
+      // siteReadiness toggle Brad chose (source of truth for "is staking PF's job" —
+      // NOT read from the contract). Yes -> show the Staking & Layout company/contact
+      // CRM selector (filtered to the "Staking & Layout" trade); No -> GC has it, hide
+      // the selector. Live save-on-change via pfLiveFieldChange (siteReadiness key).
+      'Staking & Layout PF\'s responsibility?': ['Yes', 'No'],
       // Subsection 4: Safety
       'MSDS Sent?': ['Yes', 'No'],
       // Subsection 5: Mobilization Preparation
@@ -19354,6 +19395,118 @@ try {
         +   '</div>'
         + '</div>';
     }
+
+    // ---- CHANGE B (Brad 2026-08-13): inline Staking & Layout company/contact selector
+    // for Site Readiness subsection 3 (shown only when the "PF's responsibility?" toggle
+    // = Yes). Reuses the SAME __crm cascading selector every Project Contacts group uses,
+    // filtered to the "Staking & Layout" trade, stored under the reserved __crm key of
+    // the `siteReadiness` section (the exact same map the Project Contacts "Staking &
+    // Layout" card reads/writes — one source of truth, both stay in sync).
+    //
+    // Site Readiness is edit-on-the-fly (no Edit/Save button on the card), and the CRM
+    // selector never writes the store on its own (persistence happens on an explicit
+    // save — the "explicit CRM save button" the CRM machinery already anticipates). So
+    // this block carries its OWN small Save button (office-only) that harvests the
+    // picked company + checked contactIds via pfCollectCrm and POSTs the whole __crm map
+    // under siteReadiness — the SAME endpoint/shape/validation the section editor uses.
+    // The siteReadiness __crm map only ever holds "Staking & Layout" (its sole entry in
+    // PF_CRM_NEWGROUP_TRADE), so the backend's whole-object __crm replace loses nothing.
+    // Read cards render into a .pr-crm-cards host via pfCrmRenderCards (same as elsewhere).
+    var PF_STAKING_TRADE = (PF_CRM_NEWGROUP_TRADE.siteReadiness && PF_CRM_NEWGROUP_TRADE.siteReadiness['Staking & Layout']) || 'Staking & Layout';
+    function pfStakingSelectorBlock(){
+      var _office = (typeof canEdit === 'function') ? canEdit() : false;
+      // Always render the read-view host (so non-office see resolved contact cards);
+      // pfCrmRenderCards fills it from siteReadiness.__crm['Staking & Layout'].
+      var host = '<div class="pr-crm-cards" data-crm-cards="Staking & Layout" '
+        + 'data-crm-cards-key="siteReadiness" data-role-tag="Staking & Layout"></div>';
+      if (!_office) return host;
+      // Office: the cascading picker + an explicit save button for this ONE group.
+      return '<div class="pr-crm-wrap" data-pf-staking-picker>'
+        + '<div class="pr-edit-note">Select the staking &amp; layout company &amp; contacts from the master directory. '
+        + 'Use &ldquo;+ Add company / contact&rdquo; to grow the directory, then Save.</div>'
+        + pfCrmSelectorBlock('Staking & Layout', PF_STAKING_TRADE, 'siteReadiness')
+        + '<div class="pr-add-contact-bar">'
+        +   '<button type="button" class="pr-save-btn pf-staking-save" '
+        +     'onclick="window.pfStakingSaveSelection(this)">&#128190; Save staking company / contact</button>'
+        + '</div>'
+        + '<div class="pr-dir-msg pf-staking-msg" style="display:none;font-size:0.76rem;margin:2px 0;"></div>'
+        + host
+        + '</div>';
+    }
+
+    // Hydrate the inline staking picker's company dropdown + contact checkboxes after
+    // render (mirrors pfCrmHydrate over the whole staking picker container).
+    function pfStakingHydrate(root){
+      if (!root || !root.querySelectorAll) return;
+      root.querySelectorAll('[data-pf-staking-picker]').forEach(function(p){ pfCrmHydrate(p); });
+    }
+
+    // Explicit save for the inline staking selector. Harvests the picked company +
+    // checked contactIds from THIS picker (pfCollectCrm) and POSTs the whole __crm map
+    // under siteReadiness (whole-object replace; the map only holds "Staking & Layout").
+    // FAIL CLOSED: any non-{ok:true,saved:true} shows an inline error + leaves the
+    // picker as-is (nothing fabricated). On success adopt server truth into
+    // PF_PROJECT_OVERRIDES + _curOverrides and re-render just the read host — NO
+    // renderProjectRecord (no page bounce; the picker stays open, scroll preserved).
+    window.pfStakingSaveSelection = function(btn){
+      if (typeof canEdit === 'function' && !canEdit()) return; // server also 403s
+      var wrap = btn && btn.closest ? btn.closest('[data-pf-staking-picker]') : null;
+      var msgEl = wrap ? wrap.querySelector('.pf-staking-msg') : null;
+      function say(t, isErr){
+        if (!msgEl) return;
+        msgEl.textContent = t || '';
+        msgEl.style.display = t ? 'block' : 'none';
+        msgEl.style.color = isErr ? '#b91c1c' : '#166534';
+      }
+      var num = _curNum || '';
+      if (!wrap || !num) { say('Could not save; please retry.', true); return; }
+      var crm = pfCollectCrm(wrap); // { 'Staking & Layout': { company, contactIds } } or {}
+      btn.disabled = true; say('Saving…', false);
+      fetch('/api/project-override', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ num: num, section: 'siteReadiness', fields: (function(){ var f = {}; f[PF_CRM_KEY] = crm; return f; })() })
+      }).then(function(res){
+        return res.json().then(function(b){ return { ok: res.ok, status: res.status, body: b }; })
+          .catch(function(){ return { ok: res.ok, status: res.status, body: null }; });
+      }).then(function(r){
+        btn.disabled = false;
+        if (!r.ok || !r.body || r.body.ok !== true || r.body.saved !== true) {
+          say((r.body && r.body.message) ? r.body.message
+              : (r.status === 403 ? 'You do not have permission to edit this project.'
+                                   : 'Save failed (' + r.status + '). Not saved — please retry.'), true);
+          return;
+        }
+        window.PF_PROJECT_OVERRIDES[num] = { sections: (r.body.sections) || {}, _meta: (r.body._meta) || null };
+        try {
+          if (String(num) === String(_curNum) && r.body.sections && typeof r.body.sections === 'object') _curOverrides = r.body.sections;
+        } catch (e) {}
+        // Re-render the resolved read cards for this group (both this inline host AND
+        // the Project Contacts "Staking & Layout" host share the same key/name).
+        if (window.pfCrmRenderCards) window.pfCrmRenderCards(document);
+        say('Saved', false);
+      }).catch(function(){
+        btn.disabled = false; say('Save failed: could not reach the server. Not saved — please retry.', true);
+      });
+    };
+
+    // Live visibility toggle for the inline staking selector. Bound once (document-level
+    // 'change'): when the "Staking & Layout PF's responsibility?" live select changes,
+    // show the selector wrapper on Yes / hide on anything else. Runs ALONGSIDE
+    // pfLiveFieldChange (which saves the toggle value) on the same change event — it only
+    // flips visibility, never saves. Scoped to the toggle's own Site Readiness card so a
+    // like-named control elsewhere can't cross-trigger.
+    document.addEventListener('change', function(ev){
+      var el = ev.target;
+      if (!el || !el.getAttribute) return;
+      if (el.getAttribute('data-pr-field-label') !== 'Staking & Layout PF\'s responsibility?') return;
+      var card = el.closest ? el.closest('.pr-card[data-pr-section="siteReadiness"]') : null;
+      if (!card) return;
+      var wrap = card.querySelector('[data-pf-staking-selector]');
+      if (!wrap) return;
+      var isYes = /^yes$/i.test(String(el.value || '').trim());
+      wrap.style.display = isYes ? '' : 'none';
+    });
 
     // Populate the company dropdown + (if a company is selected) its contact checkboxes
     // for every .pr-crm block in an editor. Idempotent; safe to call after insert and
