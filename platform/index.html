@@ -20459,55 +20459,54 @@ try {
           // Notes is present). Blank fields render clean (no yellow highlight — these
           // are display-only, not editable field() rows).
           var roleTag = host.getAttribute('data-role-tag') || '';
-          // INLINE CRUD (Brad 2026-08-13 REWORK): office/CRM users edit every field
-          // IN PLACE with NO Edit button — each cell is a contenteditable span that
-          // SAVES ON blur/Enter to the shared directory (/api/contacts update), so the
-          // change reflects on every project using that contact. A Remove (×) per row
-          // unassigns from THIS project only, and an "+ Add contact" button per group
-          // adds a new directory contact + assigns it here. Read-only roles (field_ops)
-          // get static links + no controls (and the server 403s any write regardless).
+          // FORMAT (Brad 2026-08-13): the "Safety Consultant / Material Vendor" look Brad
+          // approved — every group renders its contacts as a horizontal .pr-crow table
+          // (Name | Title | Office | Cell | Email | Notes) with, on the RIGHT of each row,
+          // a [✎ Edit] button then a red [✕] delete. This REPLACES the rejected inline-
+          // contenteditable-cell approach: fields are STATIC display; editing a contact
+          // happens via the Edit button, which opens an inline editor (pfCrmEditContactRow)
+          // that SAVES to the shared directory (/api/contacts update) so the change reflects
+          // on every project using that contact. The red ✕ UNASSIGNS from THIS project only
+          // (pfCrmRemoveContactRow -> confirm -> /api/project-override), never a directory
+          // delete. The COMPANY name stays inline-editable (Brad's "how do I edit company
+          // names" question). "+ Add contact" mints a new directory contact + assigns here.
+          // Read-only roles (field_ops) get static linkified rows + NO controls (and the
+          // server 403s any write regardless). This one function feeds EVERY Project
+          // Contacts group, so the format is uniform across GC / Geotech / Structural /
+          // Ground Improvement / Owner / PF Team / Safety Consultant / Material Vendor /
+          // Staking / Equipment / Fuel — all of them.
           var _rowEditable = (typeof canEdit === 'function') ? canEdit() : false;
-          // Group/host routing carried on each editable cell so a save can rebuild the
-          // section's full __crm map (for a delete) and re-render in place.
+          // Group/host routing (used by the company-edit + add-contact affordances).
           var _prefix = pfx;
           var _skey = host.getAttribute('data-crm-cards-key') || 'design_professionals';
-          // An editable cell: contenteditable span carrying the field key + contactId +
-          // the pre-edit value (for a fail-closed revert). All values escaped via esc2.
-          function ecell(cls, fkey, val, cid){
-            return '<span class="pr-crow-' + cls + ' pr-pc-inline" contenteditable="true" '
-              + 'data-cf="' + esc2(fkey) + '" data-crm-cid="' + esc2(cid) + '" '
-              + 'data-pf-prev="' + esc2(val || '') + '" spellcheck="false">'
-              + esc2(val || '') + '</span>';
-          }
           var rows = e.contactIds.map(function(id){
             var c = byId[String(id).toUpperCase()];
             if (!c) return ''; // stale/removed id: skip, never crash
             var name = (c.name || ((c.firstName||'') + ' ' + (c.lastName||''))).trim();
             var cid = String(c.contactId || '').toUpperCase();
-            if (_rowEditable) {
-              // Editable row: inline cells (save-on-change to the directory) + Remove.
-              var rmBtn = cid
-                ? '<span class="pr-crow-act"><button type="button" class="pr-crow-rmbtn" '
-                  + 'data-crm-cid="' + esc2(cid) + '" title="Remove this contact from THIS project (keeps them in the directory)" '
-                  + 'onclick="window.pfCrmRemoveContactRow(this)">&#10005;</button></span>'
-                : '<span class="pr-crow-act"></span>';
-              return '<div class="pr-crow" data-crm-cid="' + esc2(cid) + '">'
-                + ecell('name',  'name',        name,          cid)
-                + ecell('title', 'title',       c.title || '', cid)
-                + ecell('off',   'officePhone', c.officePhone || '', cid)
-                + ecell('cell',  'cellPhone',   c.cellPhone || '',   cid)
-                + ecell('email', 'email',       c.email || '', cid)
-                + ecell('notes', 'notes',       c.notes || '', cid)
-                + rmBtn
-                + '</div>';
-            }
-            // Read-only row (field_ops): static, linkified, no controls.
+            // Display cells (static, linkified) — same for office + read-only. The only
+            // difference is office rows carry the [✎ Edit] + [✕] action buttons.
             var off = c.officePhone
               ? '<a href="tel:' + esc2(c.officePhone) + '">' + esc2(pfFmtPhone(c.officePhone)) + '</a>' : '';
             var cell = c.cellPhone
               ? '<a href="tel:' + esc2(c.cellPhone) + '">' + esc2(pfFmtPhone(c.cellPhone)) + '</a>' : '';
             var email = c.email
               ? '<a href="mailto:' + esc2(c.email) + '">' + esc2(c.email) + '</a>' : '';
+            // Actions (office only): Edit (updates the shared directory) then red ✕
+            // (unassigns from THIS project). Both office/CRM-gated; server 403s regardless.
+            var actHtml = '';
+            if (_rowEditable) {
+              actHtml = cid
+                ? '<span class="pr-crow-act">'
+                  + '<button type="button" class="pr-crow-editbtn" '
+                  +   'data-crm-cid="' + esc2(cid) + '" title="Edit this contact (updates the shared directory)" '
+                  +   'onclick="window.pfCrmEditContactRow(this)">&#9998; Edit</button>'
+                  + '<button type="button" class="pr-crow-rmbtn" '
+                  +   'data-crm-cid="' + esc2(cid) + '" title="Remove this contact from THIS project (keeps them in the directory)" '
+                  +   'onclick="window.pfCrmRemoveContactRow(this)">&#10005;</button>'
+                  + '</span>'
+                : '<span class="pr-crow-act"></span>';
+            }
             return '<div class="pr-crow" data-crm-cid="' + esc2(cid) + '">'
               + '<span class="pr-crow-name">'  + esc2(name || (c.contactId || '')) + '</span>'
               + '<span class="pr-crow-title">' + esc2(c.title || '') + '</span>'
@@ -20515,6 +20514,7 @@ try {
               + '<span class="pr-crow-cell">'  + cell + '</span>'
               + '<span class="pr-crow-email">' + email + '</span>'
               + '<span class="pr-crow-notes">' + esc2(c.notes || '') + '</span>'
+              + actHtml
               + '</div>';
           }).filter(Boolean);
           // Office users can add even to a group whose ids all resolved stale (rows

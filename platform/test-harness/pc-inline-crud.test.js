@@ -1,21 +1,40 @@
 // ============================================================================
-// Project Contacts — INLINE CRUD  (Brad 2026-08-13 REWORK)
+// Project Contacts — SAFETY-CONSULTANT / MATERIAL-VENDOR FORMAT  (Brad 2026-08-13)
+// ----------------------------------------------------------------------------
+// SUPERSEDES the earlier inline-contenteditable-cell approach. Brad rejected that
+// twice; he wants the "Safety Consultant / Material Vendor" look applied to EVERY
+// Project Contacts group:
+//   [role tag]  Company (inline-editable)
+//   Name | Title | Office | Cell | Email | Notes   ... [✎ Edit] [red ✕]
+// Fields are STATIC display. Editing a contact happens via the [✎ Edit] button,
+// which opens an inline editor form that SAVES to the shared directory
+// (/api/contacts update) -> reflects on every project using that contact. The red
+// ✕ UNASSIGNS from THIS project only (project-override), never a directory delete.
+// The COMPANY name stays inline-editable (Brad's "how do I edit company names"
+// question). "+ Add contact" mints a directory contact + assigns it here.
+//
 // Proves, end-to-end in a jsdom DOM using the REAL functions extracted verbatim
 // from index.html, that:
-//   (a) editing a contact FIELD saves + updates the shared DIRECTORY record
-//       (/api/contacts update) -> reusable everywhere
-//   (b) "+ Add contact" mints a directory contact AND assigns it to the project group
-//   (c) Remove (×) unassigns from THIS project group only (drops the id from __crm),
-//       and does NOT hard-delete the directory record
-//   (d) shared-directory reuse: a field edited via the directory record shows updated
-//       when the SAME contact renders on ANOTHER project's group
-//   (e) NO Edit buttons rendered in Project Contacts (no pr-crow-editbtn); the cells
-//       are contenteditable save-on-change
-//   (f) field_ops is read-only (no contenteditable cells, no add/remove controls)
-//   (g) fail-closed revert (server + network error -> cell reverts, no cache change)
-//   (h) NO renderProjectRecord in any save/add/remove path (in-place refresh only)
-//   (i) reserved keys preserved: an add/remove/company-rename resends the section's
-//       FULL __crm map (every sibling group) and never touches other reserved keys
+//   (fmt) EVERY group renders .pr-crow rows with a [✎ Edit] button + red [✕] on
+//         the right, and NO contenteditable field cells (the rejected approach is
+//         gone). Uniform across Safety Consultant / Material Vendor / Structural /
+//         GC / PF Team hosts (this ONE render fn feeds every group).
+//   (edit) [✎ Edit] opens the inline editor; Save -> /api/contacts update writes to
+//          the shared DIRECTORY, carries through un-edited columns, updates cache.
+//   (reuse) the same contact edited via the directory shows updated on ANOTHER
+//          project's group (single source of truth / reusability).
+//   (company) company name is inline-editable; a rename updates every directory
+//          contact in the group + repoints __crm[group].company + preserves siblings
+//          and reserved keys (full-map resend).
+//   (add)  "+ Add contact" mints a directory contact AND assigns it to the group;
+//          siblings + reserved keys preserved.
+//   (del)  red ✕ -> confirm -> project-override UNASSIGN only (no /api/contacts
+//          delete); directory record intact; siblings + reserved keys preserved;
+//          in-place refresh, no page bounce.
+//   (ro)   field_ops is read-only: no Edit/✕/Add controls, no editable company,
+//          static rows still render.
+//   (fail) Edit-save server error + network error keep the editor OPEN (fail-closed),
+//          directory cache unchanged, never fabricate a saved state.
 // ============================================================================
 const fs = require('fs');
 const path = require('path');
@@ -48,19 +67,22 @@ function extractWinFn(src, name) {
     if (c === '{') depth++;
     else if (c === '}') { depth--; if (depth === 0) { j++; break; } }
   }
-  // include the trailing ';'
   let end = j;
   if (src[end] === ';') end++;
   return src.slice(m.index, end);
 }
 
-// Assert the production render EMITS contenteditable cells + NO edit button, and the
-// mount hook is called after render. These verbatim substrings keep the harness honest.
-const CELL_SIG = "class=\"pr-crow-' + cls + ' pr-pc-inline\" contenteditable=\"true\"";
-const NO_EDITBTN = html.indexOf("pfCrmEditContactRow(this)\">&#9998; Edit") ; // must NOT be emitted in render
-const MOUNT_HOOK = "if (typeof pfPcMountInline === 'function') pfPcMountInline(root);";
-if (html.indexOf(CELL_SIG) < 0) throw new Error('inline cell signature missing from index.html');
-if (html.indexOf(MOUNT_HOOK) < 0) throw new Error('pfPcMountInline hook missing from render');
+// ---- source-level guards keep this harness honest against index.html --------
+// The render MUST emit the [✎ Edit] button + red ✕ (the approved format), and must
+// NOT emit the rejected contenteditable field cells for contact fields.
+const EDITBTN_SIG = "onclick=\"window.pfCrmEditContactRow(this)\">&#9998; Edit</button>";
+const RMBTN_SIG   = "onclick=\"window.pfCrmRemoveContactRow(this)\">&#10005;</button>";
+const NO_FIELD_CE = "class=\"pr-crow-' + cls + ' pr-pc-inline\" contenteditable=\"true\""; // the retired approach
+const COMPANY_CE  = "pr-pc-company-name pr-pc-inline pr-pc-company-edit\" contenteditable=\"true\"";
+if (html.indexOf(EDITBTN_SIG) < 0) throw new Error('Edit button signature missing from render (index.html)');
+if (html.indexOf(RMBTN_SIG)   < 0) throw new Error('red X remove button signature missing from render (index.html)');
+if (html.indexOf(NO_FIELD_CE) >= 0) throw new Error('retired inline contenteditable field-cell approach still present in render');
+if (html.indexOf(COMPANY_CE)  < 0) throw new Error('company-name inline-edit signature missing from render (index.html)');
 
 let pass = 0, fail = 0; const fails = [];
 function ok(n, c) { if (c) pass++; else { fail++; fails.push(n); console.log('  FAIL: ' + n); } }
@@ -71,7 +93,7 @@ function build(opts) {
   const role = opts.role || 'admin';
   const overrides = opts.overrides || {};
   const directory = opts.directory || [];
-  const dom = new JSDOM('<!DOCTYPE html><body><div id="root"></div></body>', { runScripts: 'outside-only' });
+  const dom = new JSDOM('<!DOCTYPE html><body><div id="prGenericRoot" class="pr-root"><div id="root"></div></div></body>', { runScripts: 'outside-only' });
   const win = dom.window;
   const doc = win.document;
   const captured = { posts: [], renderProjectRecordCalls: 0, crmRenderCardsCalls: 0 };
@@ -80,7 +102,6 @@ function build(opts) {
   win.fetch = function (url, init) {
     const body = init && init.body ? JSON.parse(init.body) : {};
     captured.posts.push({ url, body });
-    // allow a test to force an error response
     if (typeof opts.respond === 'function') {
       const forced = opts.respond(url, body);
       if (forced) return forced.__network
@@ -102,7 +123,6 @@ function build(opts) {
       return Promise.resolve({ ok: false, status: 400, json: () => Promise.resolve({ status: 'error' }) });
     }
     if (String(url).indexOf('/api/project-override') === 0) {
-      // mimic server Object.assign(existing, fields) at section level
       const out = JSON.parse(JSON.stringify(overrides));
       const sk = body.section;
       out[sk] = Object.assign({}, out[sk] || {}, body.fields || {});
@@ -140,11 +160,10 @@ function build(opts) {
     if (parts.length === 1) return { firstName: parts[0], lastName: '' };
     return { firstName: parts.slice(0, -1).join(' '), lastName: parts[parts.length-1] };
   };
-  // Directory cache (PF_CONTACTS) + pfLoadContacts resolve from the same array.
   g.PF_CONTACTS = JSON.parse(JSON.stringify(directory));
   g._pfContactsPromise = null;
   g.pfLoadContacts = function () { return Promise.resolve(g.PF_CONTACTS); };
-  // instrument renderProjectRecord to prove it's never called
+  // instrument renderProjectRecord (the Edit-save path uses it as its refresh)
   g.renderProjectRecord = function () { captured.renderProjectRecordCalls++; };
   g.window.renderProjectRecord = g.renderProjectRecord;
 
@@ -163,12 +182,14 @@ function build(opts) {
     extractWinFn(html, 'pfPcAddContact'),
     extractWinFn(html, 'pfPcAddContactCancel'),
     extractWinFn(html, 'pfPcAddContactSave'),
+    extractWinFn(html, 'pfCrmEditContactRow'),
+    extractWinFn(html, 'pfCrmCancelContactRow'),
+    extractWinFn(html, 'pfCrmSaveContactRow'),
     extractWinFn(html, 'pfCrmRemoveContactRow'),
     extractWinFn(html, 'pfCrmRemoveContactCancel'),
     extractWinFn(html, 'pfCrmRemoveContactConfirm'),
   ].join('\n\n');
   win.eval(src);
-  // count in-place refreshes AFTER real fn is defined (wrap it)
   const realRender = win.pfCrmRenderCards;
   win.pfCrmRenderCards = function (r) { captured.crmRenderCardsCalls++; return realRender(r); };
   win.window.pfCrmRenderCards = win.pfCrmRenderCards;
@@ -191,11 +212,11 @@ const wait = () => new Promise(r => setTimeout(r, 0));
 
 // ===========================================================================
 (async function run() {
-  console.log('\n==== Project Contacts INLINE CRUD (save-on-change, shared directory) ====\n');
+  console.log('\n==== Project Contacts — Safety-Consultant / Material-Vendor format ====\n');
 
   const DIR = [
-    { contactId:'C0001', firstName:'Alice', lastName:'Ng', name:'Alice Ng', title:'PE', company:'Acme Structural', category:'Structural Engineer', officePhone:'2601111111', cellPhone:'2602222222', email:'alice@acme.com', notes:'lead' },
-    { contactId:'C0002', firstName:'Bob', lastName:'Lee', name:'Bob Lee', title:'PM', company:'Acme Structural', category:'Structural Engineer', officePhone:'', cellPhone:'', email:'bob@acme.com', notes:'' },
+    { contactId:'C0001', firstName:'Alice', lastName:'Ng', name:'Alice Ng', title:'PE', company:'Acme Structural', category:'Structural Engineer', officePhone:'2601111111', cellPhone:'2602222222', email:'alice@acme.com', companyAddress:'1 Main', companyWebsite:'acme.com', notes:'lead' },
+    { contactId:'C0002', firstName:'Bob', lastName:'Lee', name:'Bob Lee', title:'PM', company:'Acme Structural', category:'Structural Engineer', officePhone:'', cellPhone:'', email:'bob@acme.com', companyAddress:'1 Main', companyWebsite:'acme.com', notes:'' },
   ];
   const OVERRIDES = {
     design_professionals: {
@@ -209,69 +230,111 @@ const wait = () => new Promise(r => setTimeout(r, 0));
     }
   };
 
-  // ---- (e) render: NO Edit button, cells are contenteditable ----
+  // ---- (fmt) render: Edit button + red X on each row; NO field contenteditable cells ----
   {
-    const { win, doc, captured } = build({ overrides: OVERRIDES, directory: DIR });
+    const { win, doc } = build({ overrides: OVERRIDES, directory: DIR });
     const host = makeHost(doc, 'Structural', 'design_professionals', 'Structural Engineer');
     win.pfCrmRenderCards(doc);
     await wait(); await wait();
-    const editBtns = doc.querySelectorAll('.pr-crow-editbtn');
-    ok('(e) no Edit buttons rendered in Project Contacts', editBtns.length === 0);
-    const cells = host.querySelectorAll('.pr-pc-inline[contenteditable="true"]');
-    ok('(e) contenteditable inline cells rendered (>=6 for one contact)', cells.length >= 6);
-    const addBtn = host.querySelector('.pr-pc-addbtn');
-    ok('(b-pre) "+ Add contact" button rendered per group', !!addBtn);
-    const rmBtn = host.querySelector('.pr-crow-rmbtn');
-    ok('(c-pre) Remove (×) button rendered per row', !!rmBtn);
-    const coEdit = host.querySelector('.pr-pc-company-edit[contenteditable="true"]');
-    ok('(e) company name is inline-editable', !!coEdit);
+    const rows = host.querySelectorAll('.pr-crow:not(.pr-crow-head)');
+    ok('(fmt) two contact rows render for the group', rows.length === 2);
+    const editBtns = host.querySelectorAll('.pr-crow-editbtn');
+    ok('(fmt) an [✎ Edit] button per contact row (2)', editBtns.length === 2);
+    ok('(fmt) Edit button shows the pencil + "Edit" label', /Edit/.test(editBtns[0].textContent) && editBtns[0].textContent.indexOf('✎') !== -1);
+    const rmBtns = host.querySelectorAll('.pr-crow-rmbtn');
+    ok('(fmt) a red [✕] delete per contact row (2)', rmBtns.length === 2);
+    ok('(fmt) delete glyph is ✕ (U+2715)', rmBtns[0].textContent.indexOf('✕') !== -1);
+    // Edit + X live together in the RIGHT-anchored .pr-crow-act, Edit before X.
+    const act = rows[0].querySelector('.pr-crow-act');
+    ok('(fmt) actions live in right-anchored .pr-crow-act', !!act && act.querySelector('.pr-crow-editbtn') && act.querySelector('.pr-crow-rmbtn'));
+    ok('(fmt) Edit button precedes the red ✕ in the DOM', act.querySelector('.pr-crow-editbtn').compareDocumentPosition(act.querySelector('.pr-crow-rmbtn')) & 4);
+    // The rejected inline field-cell approach is GONE from the rendered rows.
+    ok('(fmt) NO contenteditable field cells (retired approach gone)', host.querySelectorAll('.pr-crow-name.pr-pc-inline, .pr-crow-title.pr-pc-inline, .pr-crow-email.pr-pc-inline').length === 0);
+    // Fields still display (static).
+    ok('(fmt) name/title still display statically', rows[0].querySelector('.pr-crow-name').textContent === 'Alice Ng' && rows[0].querySelector('.pr-crow-title').textContent === 'PE');
+    ok('(fmt) phones linkified (tel:)', /tel:/.test(rows[0].querySelector('.pr-crow-off').innerHTML));
+    ok('(fmt) email linkified (mailto:)', /mailto:/.test(rows[0].querySelector('.pr-crow-email').innerHTML));
+    // Company inline-editable + Add present.
+    ok('(fmt) company name is inline-editable', !!host.querySelector('.pr-pc-company-edit[contenteditable="true"]'));
+    ok('(fmt) "+ Add contact" button present', !!host.querySelector('.pr-pc-addbtn'));
+    ok('(fmt) header row present with action column', !!host.querySelector('.pr-crow-head') && !!host.querySelector('.pr-crow-head .pr-crow-act'));
   }
 
-  // ---- (f) field_ops read-only: no editable cells / controls ----
+  // ---- (fmt-uniform) the SAME format renders for EVERY group key ----
+  {
+    const groups = [
+      { pfx:'Safety Consultant', key:'safety',   tag:'Safety Consultant', ov:{ safety:{ __crm:{ 'Safety Consultant':{ company:'SafeCo', contactIds:['C0001'] } } } } },
+      { pfx:'Material Vendor(s)',key:'material', tag:'Material Vendor(s)', ov:{ material:{ __crm:{ 'Material Vendor(s)':{ company:'StoneCo', contactIds:['C0001'] } } } } },
+      { pfx:'GC',                key:'general',  tag:'General Contractor', ov:{ general:{ __crm:{ 'GC':{ company:'BuildCo', contactIds:['C0001'] } } } } },
+      { pfx:'PF Project Team',   key:'pfTeam',   tag:'PF Project Team',    ov:{ pfTeam:{ __crm:{ 'PF Project Team':{ company:'Pier Foundations', contactIds:['C0001'] } } } } },
+      { pfx:'Structural',        key:'design_professionals', tag:'Structural Engineer', ov:OVERRIDES },
+    ];
+    for (const grp of groups) {
+      const { win, doc } = build({ overrides: grp.ov, directory: DIR });
+      const host = makeHost(doc, grp.pfx, grp.key, grp.tag);
+      win.pfCrmRenderCards(doc); await wait(); await wait();
+      ok('(uniform:' + grp.tag + ') has [✎ Edit] button', !!host.querySelector('.pr-crow-editbtn'));
+      ok('(uniform:' + grp.tag + ') has red [✕] delete', !!host.querySelector('.pr-crow-rmbtn'));
+      ok('(uniform:' + grp.tag + ') company inline-editable', !!host.querySelector('.pr-pc-company-edit[contenteditable="true"]'));
+      ok('(uniform:' + grp.tag + ') NO retired field cells', host.querySelectorAll('.pr-crow-name.pr-pc-inline').length === 0);
+      ok('(uniform:' + grp.tag + ') role tag rendered', (host.querySelector('.pr-role-tag') || {}).textContent === grp.tag);
+    }
+  }
+
+  // ---- (ro) field_ops read-only: no controls, static rows, no editable company ----
   {
     const { win, doc } = build({ overrides: OVERRIDES, directory: DIR, role: 'field_ops' });
     const host = makeHost(doc, 'Structural', 'design_professionals', 'Structural Engineer');
-    win.pfCrmRenderCards(doc);
-    await wait(); await wait();
-    ok('(f) field_ops: no contenteditable cells', host.querySelectorAll('.pr-pc-inline').length === 0);
-    ok('(f) field_ops: no add button', !host.querySelector('.pr-pc-addbtn'));
-    ok('(f) field_ops: no remove button', !host.querySelector('.pr-crow-rmbtn'));
-    ok('(f) field_ops: still shows read rows', host.querySelectorAll('.pr-crow').length >= 2);
+    win.pfCrmRenderCards(doc); await wait(); await wait();
+    ok('(ro) field_ops: no Edit button', !host.querySelector('.pr-crow-editbtn'));
+    ok('(ro) field_ops: no red ✕ button', !host.querySelector('.pr-crow-rmbtn'));
+    ok('(ro) field_ops: no Add button', !host.querySelector('.pr-pc-addbtn'));
+    ok('(ro) field_ops: company NOT editable', !host.querySelector('.pr-pc-company-edit'));
+    ok('(ro) field_ops: static rows still render', host.querySelectorAll('.pr-crow:not(.pr-crow-head)').length === 2);
+    ok('(ro) field_ops: email still linkified', /mailto:/.test(host.querySelector('.pr-crow:not(.pr-crow-head) .pr-crow-email').innerHTML));
   }
 
-  // ---- (a) edit a field -> /api/contacts update (directory), in-place refresh, no bounce ----
-  {
-    const { win, doc, captured } = build({ overrides: OVERRIDES, directory: DIR });
-    const host = makeHost(doc, 'Structural', 'design_professionals', 'Structural Engineer');
-    win.pfPcMountInline(doc);
-    win.pfCrmRenderCards(doc);
-    await wait(); await wait();
-    const titleCell = host.querySelector('.pr-crow .pr-crow-title.pr-pc-inline');
-    ok('(a) title cell present + resolves C0001', titleCell && titleCell.getAttribute('data-crm-cid') === 'C0001');
-    titleCell.textContent = 'Senior PE';
-    win.pfPcInlineFieldSave(titleCell);
-    await wait(); await wait(); await wait();
-    const upd = captured.posts.find(p => String(p.url).indexOf('/api/contacts') === 0 && p.body.action === 'update');
-    ok('(a) POST /api/contacts action:update fired', !!upd);
-    ok('(a) update targets C0001', upd && upd.body.contact.contactId === 'C0001');
-    ok('(a) update sets new title', upd && upd.body.contact.title === 'Senior PE');
-    ok('(a) update carries through email (not blanked)', upd && upd.body.contact.email === 'alice@acme.com');
-    ok('(a) directory cache updated (reusable)', win.PF_CONTACTS.find(c => c.contactId === 'C0001').title === 'Senior PE');
-    ok('(a) no renderProjectRecord bounce', captured.renderProjectRecordCalls === 0);
-    ok('(a) in-place refresh happened', captured.crmRenderCardsCalls >= 2);
-  }
-
-  // ---- (a/g) no-op when unchanged; fail-closed revert on server error ----
+  // ---- (edit) [✎ Edit] opens the inline editor; Save -> /api/contacts update (directory) ----
   {
     const { win, doc, captured } = build({ overrides: OVERRIDES, directory: DIR });
     const host = makeHost(doc, 'Structural', 'design_professionals', 'Structural Engineer');
     win.pfCrmRenderCards(doc); await wait(); await wait();
-    const emailCell = host.querySelector('.pr-crow .pr-crow-email.pr-pc-inline');
-    // unchanged -> no POST
-    win.pfPcInlineFieldSave(emailCell);
-    await wait();
-    ok('(a) unchanged field triggers no POST', !captured.posts.some(p => p.body.action === 'update'));
+    const editBtn = host.querySelector('.pr-crow .pr-crow-editbtn');  // first row = C0001
+    ok('(edit) Edit button carries the contactId', editBtn.getAttribute('data-crm-cid') === 'C0001');
+    win.pfCrmEditContactRow(editBtn);
+    const ed = host.querySelector('.pr-crow-edit');
+    ok('(edit) inline editor form opens', !!ed);
+    ok('(edit) editor has all six fields', ed.querySelectorAll('[data-cf]').length === 6);
+    ok('(edit) original row hidden while editing', host.querySelector('.pr-crow[data-crm-cid="C0001"]').style.display === 'none');
+    // change the title, save
+    ed.querySelector('[data-cf="title"]').value = 'Senior PE';
+    const saveBtn = ed.querySelector('.pr-save-btn');
+    win.pfCrmSaveContactRow(saveBtn);
+    await wait(); await wait(); await wait();
+    const upd = captured.posts.find(p => String(p.url).indexOf('/api/contacts') === 0 && p.body.action === 'update');
+    ok('(edit) POST /api/contacts action:update fired', !!upd);
+    ok('(edit) update targets C0001', upd && upd.body.contact.contactId === 'C0001');
+    ok('(edit) update sets new title', upd && upd.body.contact.title === 'Senior PE');
+    ok('(edit) carries through email (not blanked)', upd && upd.body.contact.email === 'alice@acme.com');
+    ok('(edit) carries through companyAddress/website (not blanked)', upd && upd.body.contact.companyAddress === '1 Main' && upd.body.contact.companyWebsite === 'acme.com');
+    ok('(edit) directory cache updated (reusable everywhere)', win.PF_CONTACTS.find(c => c.contactId === 'C0001').title === 'Senior PE');
+    ok('(edit) Edit-save refreshes the record (renderProjectRecord)', captured.renderProjectRecordCalls >= 1);
   }
+
+  // ---- (edit/cancel) Cancel restores the row without saving ----
+  {
+    const { win, doc, captured } = build({ overrides: OVERRIDES, directory: DIR });
+    const host = makeHost(doc, 'Structural', 'design_professionals', 'Structural Engineer');
+    win.pfCrmRenderCards(doc); await wait(); await wait();
+    win.pfCrmEditContactRow(host.querySelector('.pr-crow .pr-crow-editbtn'));
+    const cancel = host.querySelector('.pr-crow-edit .pr-cancel-btn');
+    win.pfCrmCancelContactRow(cancel);
+    ok('(edit) Cancel removes the editor', !host.querySelector('.pr-crow-edit'));
+    ok('(edit) Cancel restores the row', host.querySelector('.pr-crow[data-crm-cid="C0001"]').style.display === '');
+    ok('(edit) Cancel writes nothing', !captured.posts.some(p => p.body.action === 'update'));
+  }
+
+  // ---- (fail) Edit-save server error keeps the editor OPEN + directory unchanged ----
   {
     const { win, doc, captured } = build({
       overrides: OVERRIDES, directory: DIR,
@@ -280,13 +343,15 @@ const wait = () => new Promise(r => setTimeout(r, 0));
     });
     const host = makeHost(doc, 'Structural', 'design_professionals', 'Structural Engineer');
     win.pfCrmRenderCards(doc); await wait(); await wait();
-    const cell = host.querySelector('.pr-crow .pr-crow-title.pr-pc-inline');
-    const prev = cell.getAttribute('data-pf-prev');
-    cell.textContent = 'Changed But Fails';
-    win.pfPcInlineFieldSave(cell);
+    win.pfCrmEditContactRow(host.querySelector('.pr-crow .pr-crow-editbtn'));
+    const ed = host.querySelector('.pr-crow-edit');
+    ed.querySelector('[data-cf="title"]').value = 'Will Fail';
+    win.pfCrmSaveContactRow(ed.querySelector('.pr-save-btn'));
     await wait(); await wait(); await wait();
-    ok('(g) server error reverts the cell text', cell.textContent === prev);
-    ok('(g) server error: directory cache unchanged', win.PF_CONTACTS.find(c=>c.contactId==='C0001').title === 'PE');
+    ok('(fail) server error: editor stays open (fail-closed)', !!host.querySelector('.pr-crow-edit'));
+    ok('(fail) server error: honest error surfaced', host.querySelector('.pr-crow-edit-err').style.display === 'block');
+    ok('(fail) server error: directory cache unchanged', win.PF_CONTACTS.find(c=>c.contactId==='C0001').title === 'PE');
+    ok('(fail) server error: no record refresh (nothing changed)', captured.renderProjectRecordCalls === 0);
   }
   {
     const { win, doc } = build({
@@ -295,42 +360,94 @@ const wait = () => new Promise(r => setTimeout(r, 0));
     });
     const host = makeHost(doc, 'Structural', 'design_professionals', 'Structural Engineer');
     win.pfCrmRenderCards(doc); await wait(); await wait();
-    const cell = host.querySelector('.pr-crow .pr-crow-title.pr-pc-inline');
-    const prev = cell.getAttribute('data-pf-prev');
-    cell.textContent = 'Network Dies';
-    win.pfPcInlineFieldSave(cell);
+    win.pfCrmEditContactRow(host.querySelector('.pr-crow .pr-crow-editbtn'));
+    const ed = host.querySelector('.pr-crow-edit');
+    ed.querySelector('[data-cf="title"]').value = 'Network Dies';
+    win.pfCrmSaveContactRow(ed.querySelector('.pr-save-btn'));
     await wait(); await wait(); await wait();
-    ok('(g) network error reverts the cell text', cell.textContent === prev);
+    ok('(fail) network error: editor stays open (fail-closed)', !!host.querySelector('.pr-crow-edit'));
+    ok('(fail) network error: honest error surfaced', host.querySelector('.pr-crow-edit-err').style.display === 'block');
+    ok('(fail) network error: directory cache unchanged', win.PF_CONTACTS.find(c=>c.contactId==='C0001').title === 'PE');
   }
 
-  // ---- (b/i) Add contact -> directory add + assign to project group; preserves siblings ----
+  // ---- (reuse) an Edit reflects on ANOTHER project's group (shared directory) ----
+  {
+    const { win, doc } = build({ overrides: OVERRIDES, directory: DIR });
+    const host = makeHost(doc, 'Structural', 'design_professionals', 'Structural Engineer');
+    win.pfCrmRenderCards(doc); await wait(); await wait();
+    win.pfCrmEditContactRow(host.querySelector('.pr-crow .pr-crow-editbtn'));
+    const ed = host.querySelector('.pr-crow-edit');
+    ed.querySelector('[data-cf="title"]').value = 'Principal PE';
+    win.pfCrmSaveContactRow(ed.querySelector('.pr-save-btn'));
+    await wait(); await wait(); await wait();
+    const updatedRecord = win.PF_CONTACTS.find(c => c.contactId === 'C0001');
+    ok('(reuse) directory record now Principal PE', updatedRecord.title === 'Principal PE');
+    // Project B: different project/override, SAME shared directory record.
+    const OVERRIDES_B = { general: { __crm: { 'GC': { company:'Acme Structural', contactIds:['C0001'] } } } };
+    const { win: winB, doc: docB } = build({ overrides: OVERRIDES_B, directory: [updatedRecord], num: '88-888' });
+    const hostB = makeHost(docB, 'GC', 'general', 'General Contractor');
+    winB.pfCrmRenderCards(docB); await wait(); await wait();
+    const titleB = hostB.querySelector('.pr-crow:not(.pr-crow-head) .pr-crow-title');
+    ok('(reuse) same contact on another project shows updated title', titleB && titleB.textContent === 'Principal PE');
+  }
+
+  // ---- (company) inline company rename -> updates directory + repoints __crm + preserves ----
   {
     const { win, doc, captured } = build({ overrides: OVERRIDES, directory: DIR });
     const host = makeHost(doc, 'Structural', 'design_professionals', 'Structural Engineer');
     win.pfCrmRenderCards(doc); await wait(); await wait();
-    const addBtn = host.querySelector('.pr-pc-addbtn');
-    win.pfPcAddContact(addBtn);
-    const form = host.querySelector('.pr-crm-addform');
-    ok('(b) add form opens', !!form);
-    form.querySelector('[data-af="name"]').value = 'Carol Fox';
-    form.querySelector('[data-af="email"]').value = 'carol@acme.com';
-    const save = form.querySelector('.pr-save-btn');
-    win.pfPcAddContactSave(save);
+    const co = host.querySelector('.pr-pc-company-edit');
+    ok('(company) company cell carries group routing', co.getAttribute('data-crm-cards') === 'Structural' && co.getAttribute('data-crm-cards-key') === 'design_professionals');
+    co.textContent = 'Acme Structural Engineers LLC';
+    win.pfPcInlineCompanySave(co);
     await wait(); await wait(); await wait(); await wait();
-    const addPost = captured.posts.find(p => p.body.action === 'add');
-    ok('(b) POST /api/contacts action:add fired', !!addPost);
-    ok('(b) new contact tagged with group trade (Category)', addPost && addPost.body.contact.category === 'Structural Engineer');
-    ok('(b) new contact carries group company', addPost && addPost.body.contact.company === 'Acme Structural');
+    const dirUpdates = captured.posts.filter(p => String(p.url).indexOf('/api/contacts')===0 && p.body.action==='update');
+    ok('(company) rename updates every directory contact in group (2)', dirUpdates.length === 2);
+    ok('(company) directory contacts got new company', dirUpdates.every(u => u.body.contact.company === 'Acme Structural Engineers LLC'));
     const ovPost = captured.posts.find(p => String(p.url).indexOf('/api/project-override') === 0);
-    ok('(b) project-override POST fired to assign new id', !!ovPost);
-    const crm = ovPost.body.fields.__crm;
-    ok('(b) new id appended to Structural group', crm.Structural.contactIds.length === 3 && crm.Structural.contactIds[2].startsWith('C9'));
-    ok('(i) sibling group Geotechnical preserved', crm.Geotechnical && crm.Geotechnical.contactIds[0] === 'C0003');
-    ok('(i) add uses correct section key', ovPost.body.section === 'design_professionals');
-    ok('(h) add: no renderProjectRecord bounce', captured.renderProjectRecordCalls === 0);
+    ok('(company) rename repoints __crm[Structural].company', ovPost && ovPost.body.fields.__crm.Structural.company === 'Acme Structural Engineers LLC');
+    ok('(company) rename preserves sibling group', ovPost && ovPost.body.fields.__crm.Geotechnical.contactIds[0] === 'C0003');
+    ok('(company) rename keeps Structural contactIds', ovPost && ovPost.body.fields.__crm.Structural.contactIds.length === 2);
+    ok('(company) rename: no page bounce (in-place)', captured.renderProjectRecordCalls === 0);
+  }
+  {
+    // blank company rejected (fail-closed revert)
+    const { win, doc, captured } = build({ overrides: OVERRIDES, directory: DIR });
+    const host = makeHost(doc, 'Structural', 'design_professionals', 'Structural Engineer');
+    win.pfCrmRenderCards(doc); await wait(); await wait();
+    const co = host.querySelector('.pr-pc-company-edit');
+    co.textContent = '';
+    win.pfPcInlineCompanySave(co);
+    await wait(); await wait();
+    ok('(company) blank rename rejected + reverted', co.textContent === 'Acme Structural' && !captured.posts.some(p=>p.body.action==='update'));
   }
 
-  // ---- (c/i) Remove (×) -> unassign from project group only; directory intact; in-place ----
+  // ---- (add) "+ Add contact" -> directory add + assign to group; siblings/reserved kept ----
+  {
+    const { win, doc, captured } = build({ overrides: OVERRIDES, directory: DIR });
+    const host = makeHost(doc, 'Structural', 'design_professionals', 'Structural Engineer');
+    win.pfCrmRenderCards(doc); await wait(); await wait();
+    win.pfPcAddContact(host.querySelector('.pr-pc-addbtn'));
+    const form = host.querySelector('.pr-crm-addform');
+    ok('(add) add form opens', !!form);
+    form.querySelector('[data-af="name"]').value = 'Carol Fox';
+    form.querySelector('[data-af="email"]').value = 'carol@acme.com';
+    win.pfPcAddContactSave(form.querySelector('.pr-save-btn'));
+    await wait(); await wait(); await wait(); await wait();
+    const addPost = captured.posts.find(p => p.body.action === 'add');
+    ok('(add) POST /api/contacts action:add fired', !!addPost);
+    ok('(add) new contact tagged with group trade (Category)', addPost && addPost.body.contact.category === 'Structural Engineer');
+    ok('(add) new contact carries group company', addPost && addPost.body.contact.company === 'Acme Structural');
+    const ovPost = captured.posts.find(p => String(p.url).indexOf('/api/project-override') === 0);
+    ok('(add) project-override POST assigns new id', !!ovPost);
+    const crm = ovPost.body.fields.__crm;
+    ok('(add) new id appended to Structural group', crm.Structural.contactIds.length === 3 && crm.Structural.contactIds[2].startsWith('C9'));
+    ok('(add) sibling group Geotechnical preserved', crm.Geotechnical && crm.Geotechnical.contactIds[0] === 'C0003');
+    ok('(add) correct section key', ovPost.body.section === 'design_professionals');
+    ok('(add) no page bounce', captured.renderProjectRecordCalls === 0);
+  }
+
+  // ---- (del) red ✕ -> confirm -> project-override UNASSIGN only; directory intact ----
   {
     const { win, doc, captured } = build({ overrides: OVERRIDES, directory: DIR });
     const host = makeHost(doc, 'Structural', 'design_professionals', 'Structural Engineer');
@@ -338,74 +455,18 @@ const wait = () => new Promise(r => setTimeout(r, 0));
     const rmBtn = host.querySelector('.pr-crow .pr-crow-rmbtn');  // first row = C0001
     win.pfCrmRemoveContactRow(rmBtn);
     const confirm = host.querySelector('.pr-crow-rmconfirm .pr-rm-yes');
-    ok('(c) remove confirm bar appears', !!confirm);
+    ok('(del) remove confirm bar appears', !!confirm);
     win.pfCrmRemoveContactConfirm(confirm);
     await wait(); await wait(); await wait();
     const ovPost = captured.posts.find(p => String(p.url).indexOf('/api/project-override') === 0);
-    ok('(c) remove POSTs project-override (not /api/contacts delete)', !!ovPost && !captured.posts.some(p => p.body.action === 'delete'));
+    ok('(del) removes via project-override (not /api/contacts delete)', !!ovPost && !captured.posts.some(p => p.body.action === 'delete'));
     const crm = ovPost.body.fields.__crm;
-    ok('(c) C0001 dropped from Structural group', crm.Structural.contactIds.indexOf('C0001') === -1);
-    ok('(c) C0002 kept in Structural group', crm.Structural.contactIds.indexOf('C0002') !== -1);
-    ok('(c) directory record NOT hard-deleted (still in cache)', !!win.PF_CONTACTS.find(c => c.contactId === 'C0001'));
-    ok('(i) sibling Geotechnical preserved on remove', crm.Geotechnical.contactIds[0] === 'C0003');
-    ok('(h) remove: no renderProjectRecord bounce', captured.renderProjectRecordCalls === 0);
-    ok('(h) remove: in-place refresh happened', captured.crmRenderCardsCalls >= 2);
-  }
-
-  // ---- (d) shared-directory reuse: edit reflects on ANOTHER project's group ----
-  {
-    // project A edits C0001's title via the directory record; project B (separate build,
-    // same directory record shape) renders C0001 and shows the updated title.
-    const { win, doc } = build({ overrides: OVERRIDES, directory: DIR });
-    const host = makeHost(doc, 'Structural', 'design_professionals', 'Structural Engineer');
-    win.pfCrmRenderCards(doc); await wait(); await wait();
-    const cell = host.querySelector('.pr-crow .pr-crow-title.pr-pc-inline');
-    cell.textContent = 'Principal PE';
-    win.pfPcInlineFieldSave(cell);
-    await wait(); await wait(); await wait();
-    const updatedRecord = win.PF_CONTACTS.find(c => c.contactId === 'C0001');
-    ok('(d) directory record now Principal PE', updatedRecord.title === 'Principal PE');
-
-    // Project B: a DIFFERENT project/override, but the SAME shared directory record.
-    const OVERRIDES_B = { general: { __crm: { 'GC': { company:'Acme Structural', contactIds:['C0001'] } } } };
-    const { win: winB, doc: docB } = build({ overrides: OVERRIDES_B, directory: [updatedRecord], num: '88-888' });
-    const hostB = makeHost(docB, 'GC', 'general', 'General Contractor');
-    winB.pfCrmRenderCards(docB); await wait(); await wait();
-    const titleB = hostB.querySelector('.pr-crow .pr-crow-title.pr-pc-inline');
-    ok('(d) same contact on another project shows updated title', titleB && titleB.textContent === 'Principal PE');
-  }
-
-  // ---- (i) company rename resends FULL __crm + preserves reserved keys; updates directory ----
-  {
-    const { win, doc, captured } = build({ overrides: OVERRIDES, directory: DIR });
-    const host = makeHost(doc, 'Structural', 'design_professionals', 'Structural Engineer');
-    win.pfCrmRenderCards(doc); await wait(); await wait();
-    const co = host.querySelector('.pr-pc-company-edit');
-    co.textContent = 'Acme Structural Engineers LLC';
-    win.pfPcInlineCompanySave(co);
-    await wait(); await wait(); await wait(); await wait();
-    const dirUpdates = captured.posts.filter(p => String(p.url).indexOf('/api/contacts')===0 && p.body.action==='update');
-    ok('(i) company rename updates every directory contact in group (2)', dirUpdates.length === 2);
-    ok('(i) directory contacts got new company', dirUpdates.every(u => u.body.contact.company === 'Acme Structural Engineers LLC'));
-    const ovPost = captured.posts.find(p => String(p.url).indexOf('/api/project-override') === 0);
-    ok('(i) company rename repoints __crm[Structural].company', ovPost && ovPost.body.fields.__crm.Structural.company === 'Acme Structural Engineers LLC');
-    ok('(i) company rename preserves sibling group', ovPost && ovPost.body.fields.__crm.Geotechnical.contactIds[0] === 'C0003');
-    ok('(i) company rename keeps Structural contactIds', ovPost && ovPost.body.fields.__crm.Structural.contactIds.length === 2);
-    ok('(h) company rename: no renderProjectRecord bounce', captured.renderProjectRecordCalls === 0);
-  }
-
-  // ---- listener wiring: focusout on an inline cell triggers a save ----
-  {
-    const { win, doc, captured } = build({ overrides: OVERRIDES, directory: DIR });
-    const host = makeHost(doc, 'Structural', 'design_professionals', 'Structural Engineer');
-    win.pfPcMountInline(doc);
-    win.pfCrmRenderCards(doc); await wait(); await wait();
-    const cell = host.querySelector('.pr-crow .pr-crow-title.pr-pc-inline');
-    cell.textContent = 'Via Blur';
-    const ev = new win.Event('focusout', { bubbles: true });
-    cell.dispatchEvent(ev);
-    await wait(); await wait(); await wait();
-    ok('(wiring) focusout on inline cell fires an update POST', captured.posts.some(p => p.body.action === 'update' && p.body.contact.title === 'Via Blur'));
+    ok('(del) C0001 dropped from Structural group', crm.Structural.contactIds.indexOf('C0001') === -1);
+    ok('(del) C0002 kept in Structural group', crm.Structural.contactIds.indexOf('C0002') !== -1);
+    ok('(del) directory record NOT hard-deleted (still in cache)', !!win.PF_CONTACTS.find(c => c.contactId === 'C0001'));
+    ok('(del) sibling Geotechnical preserved', crm.Geotechnical.contactIds[0] === 'C0003');
+    ok('(del) no page bounce', captured.renderProjectRecordCalls === 0);
+    ok('(del) in-place refresh happened', captured.crmRenderCardsCalls >= 2);
   }
 
   console.log('\nPASS: ' + pass + '  FAIL: ' + fail + '\n');
