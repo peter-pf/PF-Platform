@@ -67,7 +67,7 @@ window.PF_INVENTORY = {
     { id: 'mast-1', category: 'Mast Components', description: 'Sheave', manufacturer: 'ProDig', mfrPart: '', reqTrailer: 1, reqHome: 1, altSources: '', actualOnHand: null, notes: '' },
     { id: 'mast-2', category: 'Mast Components', description: 'Tilt Cylinder', manufacturer: 'ProDig', mfrPart: '', reqTrailer: 1, reqHome: 1, altSources: '', actualOnHand: null, notes: '' },
     { id: 'mast-3', category: 'Mast Components', description: 'Sheave Tensioner Cylinder', manufacturer: 'ProDig', mfrPart: '', reqTrailer: 1, reqHome: 1, altSources: '', actualOnHand: null, notes: '' },
-    { id: 'mast-4', category: 'Mast Components', description: 'Sheave Bearings', manufacturer: 'ProDig / Timken', mfrPart: '', reqTrailer: null, reqHome: null, altSources: 'Timken', actualOnHand: null, notes: 'Required stock TBD.' },
+    { id: 'mast-4', category: 'Mast Components', description: 'Double-Row Steel Cylindrical Bearing (Sheave Bearing)', manufacturer: 'SKF', mfrPart: 'NNF 5014 ADB-2LSV', reqTrailer: null, reqHome: null, altSources: 'Applied.com (Applied Industrial Technologies) stock# 100743300 — https://www.applied.com/c-brands/c-skf-corp/c-skf/nnf-5014-adb-2lsv/Double-Row-Steel-Cylindrical-Bearing/p/100743300', actualOnHand: null, notes: 'Required stock TBD. Applied Industrial Technologies stock# 100743300.' },
     { id: 'mast-5', category: 'Mast Components', description: 'Mast Cable 89 ft', manufacturer: 'TBD', mfrPart: '', reqTrailer: 2, reqHome: 4, altSources: '', actualOnHand: null, notes: '' },
 
     // ---- Vibroflot Parts ----
