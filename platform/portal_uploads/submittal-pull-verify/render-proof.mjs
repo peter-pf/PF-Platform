@@ -106,6 +106,12 @@ function sgeWrapFrom(root) {
   const totalRow = sge.querySelector('.pf-sge-total-row');
   ok(!!totalRow && /1,804/.test(totalRow.textContent) && /16,576/.test(totalRow.textContent), 's1(a): TOTAL row sums correct');
 
+  // (a2) header text: "Column Diameter (in)" (Brad 2026-08-13, branch
+  // submittal-summary-wrap-20260813). The (in) suffix is now on the header, not the row data.
+  const ths = Array.prototype.map.call(sge.querySelectorAll('thead th'), function(t){ return t.textContent.trim(); });
+  ok(ths.indexOf('Column Diameter (in)') !== -1, 's1(a2): header reads "Column Diameter (in)" (got: ' + ths.join(' | ') + ')');
+  ok(ths.indexOf('Column Diameter') === -1, 's1(a2): bare "Column Diameter" header replaced');
+
   // (b) reconciled=true -> green note
   const recon = sge.querySelector('.pf-sge-recon');
   ok(!!recon && recon.classList.contains('pf-sge-recon-ok'), 's1(b): reconciliation note is GREEN (recon-ok)');
