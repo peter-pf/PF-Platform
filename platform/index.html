@@ -14644,6 +14644,49 @@ try {
         + '<div class="pf-cpull-msg" style="display:none"></div>'
         + '</div>';
     }
+
+    // ---- Feature 1 (Brad 2026-08-13): County + Township auto-fill from address ----
+    // A small OFFICE-ONLY control rendered directly under the Project Info subhead in
+    // the General Info card. When the project has an ADDRESS, the office can look up the
+    // COUNTY + civil TOWNSHIP from the free US Census Geocoder (/api/geocode) and PERSIST
+    // them to the two General Info fields (County / Township) via the SAME /api/project-
+    // override save path every other General Info field uses (section 'general'). We chose
+    // the ONE-CLICK BUTTON pattern (mirrors "Pull from Executed Subcontract") over auto-on-
+    // render: auto-on-render would fire a fetch + a KV WRITE on every project open (side-
+    // effecty, racy, and writes on read), whereas the button is an explicit, idempotent,
+    // office-gated action — and County/Township stay plainly editable overrides afterward.
+    // The button hides once BOTH fields are already populated (nothing to look up), and is
+    // disabled with a note when there is no address. FAILS CLOSED: on no match / API error /
+    // ambiguity the endpoint returns matched:false and we leave the fields blank + show an
+    // honest note; we NEVER guess a county/township.
+    //
+    // `addr` = the effective project address (bid.address || SF.project_address); `curCounty`
+    // / `curTownship` = the current effective values (non-empty override else synced/blank).
+    function pfCountyTownshipControl(addr, curCounty, curTownship){
+      if (!canEdit()) return '';                       // office-only affordance (server also 403s the write)
+      var hasAddr = addr && String(addr).trim() !== '';
+      var haveCounty   = curCounty   && String(curCounty).trim()   !== '';
+      var haveTownship = curTownship && String(curTownship).trim() !== '';
+      // Both already filled -> nothing to offer (the fields render + edit normally).
+      if (haveCounty && haveTownship) return '';
+      var label = (haveCounty || haveTownship)
+        ? 'Re-look up County &amp; Township from address'
+        : 'Look up County &amp; Township from address';
+      var btn = hasAddr
+        ? '<button type="button" class="pf-cpull-btn"'
+            + ' onclick="event.stopPropagation();window.pfLookupCountyTownship(this)">'
+            + label + '</button>'
+        : '<button type="button" class="pf-cpull-btn" disabled title="Enter a Project Address first">'
+            + label + '</button>';
+      var note = hasAddr ? '' :
+        '<div class="pf-cpull-note">Enter a Project Address to look up the County &amp; Township.</div>';
+      return '<div class="pf-ctlk-wrap" data-ctlk-num="'+E(_curNum)+'" data-ctlk-addr="'+E(String(addr||''))+'">'
+        + '<div class="pf-cpull-head"><span class="pf-cpull-actions">'+btn+'</span></div>'
+        + note
+        + '<div class="pf-ctlk-msg" style="display:none"></div>'
+        + '</div>';
+    }
+
     // Read the current project's Subcontract Analysis (Brad 2026-08-13). DUAL SOURCE,
     // legacy-safe: the reserved `__subcontract_analysis` override under the `contract`
     // section WINS; when absent, fall back to the legacy synced `D.analysis` block (so Indy
@@ -16357,6 +16400,17 @@ try {
         // fields that belong together read together, instead of a grid that flows
         // them left-to-right in the wrong order.
         subhead('Project Info')
+        // Feature 1 (Brad 2026-08-13): office-only "Look up County & Township from
+        // address" control. Reads the effective address + current County/Township
+        // override values so it hides once both are filled and disables with no address.
+        + (function(){
+            var _addr = bid.address || SF.project_address || '';
+            var _ovC = ovLookup('general', 'County');
+            var _ovT = ovLookup('general', 'Township');
+            var _curCounty   = (_ovC.has && _ovC.value != null) ? String(_ovC.value) : '';
+            var _curTownship = (_ovT.has && _ovT.value != null) ? String(_ovT.value) : '';
+            return pfCountyTownshipControl(_addr, _curCounty, _curTownship);
+          })()
         + twoCol([
           field('PF Project #', D.project_number, 'Record'),
           field('Project Name', D.project_name, 'Record'),
@@ -21982,6 +22036,100 @@ try {
       }).catch(function(){
         if (btn) { btn.disabled = false; btn.textContent = 'Pull from Executed Subcontract'; }
         pfCpullMsg(wrap, 'Pull request failed: could not reach the server. Nothing was recorded — please retry.', true);
+      });
+    };
+
+    // ---- Feature 1 click handler (Brad 2026-08-13): look up County + Township ----
+    // OFFICE-ONLY. Reads the project address off the control's data attr, calls the
+    // same-origin /api/geocode (free US Census Geocoder, server-side), and — ONLY on a
+    // real match — PERSISTS the returned County/Township to the record via the SAME
+    // /api/project-override save path every General Info field uses (section 'general').
+    // FAILS CLOSED at every hop: a non-2xx geocode, matched:false, or a failed save all
+    // leave the fields untouched and show an honest inline note. On success it re-renders
+    // the whole project record so the two fields show their new persisted values.
+    function pfCtlkWrap(el){ while (el && el !== document.body){ if (el.classList && el.classList.contains('pf-ctlk-wrap')) return el; el = el.parentNode; } return null; }
+    function pfCtlkMsg(wrap, text, isErr){
+      if (!wrap) return;
+      var m = wrap.querySelector('.pf-ctlk-msg');
+      if (!m) return;
+      m.textContent = text;
+      m.style.display = text ? 'block' : 'none';
+      m.style.color = isErr ? '#b91c1c' : '#166534';
+    }
+    window.pfLookupCountyTownship = function(btn){
+      if (!canEdit()) return;                          // defense-in-depth (server also 403s)
+      var wrap = pfCtlkWrap(btn);
+      if (!wrap) return;
+      var num  = wrap.getAttribute('data-ctlk-num')  || _curNum || '';
+      var addr = wrap.getAttribute('data-ctlk-addr') || '';
+      if (!num)  { pfCtlkMsg(wrap, 'Missing project number; nothing was looked up.', true); return; }
+      if (!addr || !String(addr).trim()) { pfCtlkMsg(wrap, 'No project address to look up.', true); return; }
+      var origLabel = btn ? btn.innerHTML : '';
+      if (btn) { btn.disabled = true; btn.textContent = 'Looking up…'; }
+      pfCtlkMsg(wrap, '', false);
+      fetch('/api/geocode?address=' + encodeURIComponent(String(addr)), {
+        method: 'GET', credentials: 'same-origin', headers: { 'Accept': 'application/json' }
+      }).then(function(res){
+        return res.json().then(function(b){ return { ok: res.ok, status: res.status, body: b }; })
+          .catch(function(){ return { ok: res.ok, status: res.status, body: null }; });
+      }).then(function(r){
+        // FAIL CLOSED: require a clean {matched:true} with a county. Never guess.
+        if (!r.ok || !r.body || r.body.matched !== true || !r.body.county) {
+          var msg = (r.body && r.body.note) ? r.body.note
+            : (r.status === 403 ? 'You do not have permission to look up this project.'
+                                 : 'No county/township match. Enter County/Township manually.');
+          if (btn) { btn.disabled = false; btn.innerHTML = origLabel; }
+          pfCtlkMsg(wrap, msg, true);
+          return;
+        }
+        // We have a real match. Persist County (+ Township when present) to the
+        // 'general' override, then re-render from server truth. Township may be blank
+        // when the address is an incorporated place with no civil township — in that
+        // case we save ONLY County and surface the endpoint's note.
+        var fields = { 'County': String(r.body.county) };
+        if (r.body.township && String(r.body.township).trim()) fields['Township'] = String(r.body.township);
+        var note = r.body.note ? String(r.body.note) : '';
+        fetch('/api/project-override', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ num: num, section: 'general', fields: fields })
+        }).then(function(res){
+          return res.json().then(function(b){ return { ok: res.ok, status: res.status, body: b }; })
+            .catch(function(){ return { ok: res.ok, status: res.status, body: null }; });
+        }).then(function(sr){
+          if (!sr.ok || !sr.body || sr.body.ok !== true || sr.body.saved !== true) {
+            var m2 = (sr.body && sr.body.message) ? sr.body.message
+              : (sr.status === 403 ? 'You do not have permission to save for this project.'
+                                    : 'Save failed (' + sr.status + '). Nothing was recorded — please retry.');
+            if (btn) { btn.disabled = false; btn.innerHTML = origLabel; }
+            pfCtlkMsg(wrap, m2, true);
+            return;
+          }
+          // Adopt server truth, then re-render the project record so the two fields show.
+          window.PF_PROJECT_OVERRIDES[num] = { sections: (sr.body.sections) || {}, _meta: (sr.body._meta) || null };
+          try {
+            if (String(num) === String(_curNum) && sr.body.sections && typeof sr.body.sections === 'object') {
+              _curOverrides = sr.body.sections;
+            }
+          } catch (e) {}
+          var okMsg = 'County' + (fields['Township'] ? ' & Township' : '') + ' filled from the US Census Geocoder.'
+            + (note ? ' ' + note : '');
+          pfCtlkMsg(wrap, okMsg, false);
+          // Re-render the whole record from server truth (fields now populated). If the
+          // re-render helper is unavailable, the inline note tells the user to reload.
+          try {
+            if (typeof openProjectRecord === 'function' && String(num) === String(_curNum)) openProjectRecord(num);
+            else pfCtlkMsg(wrap, okMsg + ' Reload to see the values.', false);
+          } catch (e) {
+            pfCtlkMsg(wrap, okMsg + ' Reload to see the values.', false);
+          }
+        }).catch(function(){
+          if (btn) { btn.disabled = false; btn.innerHTML = origLabel; }
+          pfCtlkMsg(wrap, 'Save failed: could not reach the server. Nothing was recorded — please retry.', true);
+        });
+      }).catch(function(){
+        if (btn) { btn.disabled = false; btn.innerHTML = origLabel; }
+        pfCtlkMsg(wrap, 'Lookup failed: could not reach the server. Please retry.', true);
       });
     };
 
@@ -31768,10 +31916,59 @@ try {
       var aw = window.PF_AWARDED;
       if (aw && Array.isArray(aw.projects)) aw.projects.forEach(function (p) { if (p.number) nums.push(p.number); });
     } catch (e) {}
+    // precon feed numbers (bids that already carry a Project Number)
+    try {
+      var D = window.PF_PRECON;
+      if (D) ['ap', 'hp'].forEach(function (disc) {
+        if (!D[disc]) return;
+        Object.keys(D[disc]).forEach(function (bucket) {
+          (D[disc][bucket] || []).forEach(function (p) {
+            var f = (p && p.fields) || {};
+            var n = p.number || f['Project Number'];
+            if (n) nums.push(n);
+          });
+        });
+      });
+    } catch (e) {}
     // pm overlay numbers
     state.pm.forEach(function (p) { if (p.projectNumber) nums.push(p.projectNumber); });
     return nums;
   }
+
+  // ---- Feature 2 (Brad 2026-08-13): next-project-number SUGGESTION -----------
+  // Compute the NEXT "YY-NNN" for `yy` (2-digit year) from a set of existing
+  // project numbers: the highest existing NNN for that year prefix, plus one,
+  // zero-padded to 3 digits. Gaps are IGNORED (sequence = max+1, NOT gap-fill).
+  // Numbers for OTHER years are ignored. If NO number exists for `yy` yet, start
+  // at 001. This MIRRORS the server's nextNumber() in pm-project.js so the
+  // prefilled suggestion matches what the server will assign (the server remains
+  // the authority + collision guard; this is the editable suggestion the user
+  // confirms). Exported on window.pfNextProjectNumber for the harness + reuse.
+  function _pfCurrentYY() {
+    // PF's local (Eastern/Indiana) 2-digit year — a job number follows Brad's
+    // calendar, not UTC (a UTC clock would roll to next year on Dec 31 evening).
+    try {
+      var y = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric' }).format(new Date());
+      return String(y).slice(-2);
+    } catch (e) {
+      return String(new Date().getFullYear()).slice(-2);
+    }
+  }
+  function pfNextProjectNumber(numbers, yy) {
+    var year = /^\d{2}$/.test(String(yy || '')) ? String(yy) : _pfCurrentYY();
+    var max = 0;
+    (Array.isArray(numbers) ? numbers : []).forEach(function (pn) {
+      var m = String(pn == null ? '' : pn).trim().match(/^(\d{2})-(\d{1,4})$/);
+      if (!m) return;
+      if (m[1] !== year) return;              // only THIS year's prefix counts
+      var n = parseInt(m[2], 10);
+      if (isFinite(n) && n > max) max = n;     // max+1, gaps ignored
+    });
+    return year + '-' + String(max + 1).padStart(3, '0');
+  }
+  // Expose for the harness + any other view that wants the suggestion.
+  window.pfNextProjectNumber = pfNextProjectNumber;
+  window.pfSuggestNextProjectNumber = function () { return pfNextProjectNumber(existingNumbers()); };
 
   // Awarded bids = the precon awarded bucket + any override marked awarded.
   // The override map is keyed by bidId() (= the precon resolveKey/bidLogId scheme:
@@ -31824,6 +32021,28 @@ try {
         }
       }
     } catch (e) {}
+    // Feature 2 (Brad 2026-08-13): PREFILL the suggested next project number and let
+    // the user CONFIRM or OVERRIDE it (never silently assign). The suggestion is the
+    // client-side max+1 for the current year (pfNextProjectNumber), which mirrors the
+    // server's derivation. window.prompt seeds the input WITH the suggestion so the
+    // user just presses OK to accept, edits it to override, or Cancels to abort the
+    // handoff (the award itself is already saved either way). A blank/invalid entry is
+    // treated as "use the server's derivation" (existingNumbers is still sent), so we
+    // never assign a malformed number. The chosen number is passed as projectNumber;
+    // pm-project.js validates it, and on collision falls back to its own next number.
+    var _existing = existingNumbers();
+    var _suggested = pfNextProjectNumber(_existing);
+    var _chosen = '';
+    try {
+      var entered = window.prompt(
+        'Assign the PF Project Number for this awarded job.\n\n'
+        + 'Suggested next number: ' + _suggested + '\n'
+        + '(Press OK to accept, or edit to override.)',
+        _suggested
+      );
+      if (entered === null) return;            // user cancelled -> do not create a PM project now
+      _chosen = String(entered).trim();
+    } catch (e) { _chosen = _suggested; }      // no prompt available -> use the suggestion
     var payload = {
       action: 'create',
       name: b.name || f['Project Name'] || '',
@@ -31836,8 +32055,11 @@ try {
         + (cols ? '. Columns ' + cols : '')
         + '. Invite ' + (f['Invite Date'] || 'n/a') + ', submitted ' + (f['Date Submitted'] || 'n/a') + '.'
         + otherGcs,
-      existingNumbers: existingNumbers(),
+      existingNumbers: _existing,
     };
+    // Only send an explicit projectNumber when the user gave a VALID YY-NNN. Otherwise
+    // let the server derive it from existingNumbers (fail safe — never a bad number).
+    if (/^\d{2}-\d{1,4}$/.test(_chosen)) payload.projectNumber = _chosen;
     api('/api/pm-project', { method: 'POST', body: JSON.stringify(payload) }).then(function (res) {
       if (!res.ok || !res.body || (!res.body.saved && !res.body.alreadyLinked)) return;
       // refresh overlay so dependent views pick up the new number

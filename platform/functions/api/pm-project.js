@@ -197,7 +197,19 @@ export async function onRequestPost(context) {
       }
       // numbers this overlay already assigned (so re-runs never collide)
       list.projects.forEach((p) => { const pp = parseNum(p.projectNumber); if (pp && pp.yy === yy) takenNs.push(pp.n); });
-      const projectNumber = nextNumber(yy, takenNs);
+
+      // Feature 2 (Brad 2026-08-13): the client may pass an EXPLICIT projectNumber
+      // (the office CONFIRMED or OVERRODE the prefilled suggestion). Honor it when it
+      // is a valid YY-NNN AND not already taken in the overlay; otherwise FAIL SAFE to
+      // the server's derived next number (never assign a malformed/duplicate number).
+      let projectNumber;
+      const requested = parseNum(parsed.projectNumber);
+      const overlayHas = (pn) => list.projects.some((p) => String(p.projectNumber || '') === String(pn));
+      if (requested && String(parsed.projectNumber).trim() && !overlayHas(String(parsed.projectNumber).trim())) {
+        projectNumber = String(parsed.projectNumber).trim();
+      } else {
+        projectNumber = nextNumber(yy, takenNs);
+      }
 
       const rec = {
         id: rid(),

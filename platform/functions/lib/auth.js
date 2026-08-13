@@ -642,6 +642,16 @@ export function areaForPath(pathname) {
     // user name). Without this line the path would fall through to default-deny
     // (admin-only) and the crew could not READ live quantities.
     if (pathname.startsWith('/api/inventory'))     return 'general';
+    // County + Township resolver for a project address (General Info, Feature 1).
+    // 'general' area = admin/partner/business_dev/field_ops (any logged-in user):
+    // the lookup is NON-sensitive (a public street address -> a county/township
+    // name via the free US Census Geocoder). The WRITE that PERSISTS the result to
+    // the project record is separately OFFICE-gated by /api/project-override
+    // (financials area). The handler ALSO calls requireArea(session,'general') and
+    // FAILS CLOSED (matched:false + empty values) on any error. Without this line it
+    // would fall through to default-deny (admin-only) and non-admins could not look
+    // up. ZERO KV write, single outbound GET to a FIXED government host.
+    if (pathname.startsWith('/api/geocode'))       return 'general';
     if (pathname.startsWith('/api/me'))            return 'general';
     if (pathname.startsWith('/api/reset-password')) return 'reset'; // restricted-session only
     // Any other/new API route is admin-only until deliberately classified.
