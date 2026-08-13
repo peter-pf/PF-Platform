@@ -170,8 +170,12 @@ function build(opts) {
   // ---- load the REAL functions ----
   const src = [
     'var _pfPcInlineBound = false;',   // module-scoped guard referenced by pfPcMountInline
+    extractFn(html, 'pfCrmDecodeLegacySeed'),
+    extractFn(html, 'pfCrmRenderOneHost'),
     extractFn(html, 'pfCrmRenderCards'),
     'window.pfCrmRenderCards = pfCrmRenderCards;',
+    extractFn(html, 'pfCrmMigrateLegacyRow'),
+    extractFn(html, 'pfCrmHostCompanyTrade'),
     extractFn(html, 'pfPcDirRecord'),
     extractFn(html, 'pfPcAdoptDirRow'),
     extractFn(html, 'pfPcSay'),
