@@ -71,7 +71,7 @@ function loadWorker() {
     // export -> attach to module.exports for CommonJS eval
     .replace(/export async function onRequestGet/, 'async function onRequestGet')
     .replace(/export async function onRequestPost/, 'async function onRequestPost')
-    + '\nmodule.exports = { onRequestGet, onRequestPost, cleanSubcontractAnalysis };';
+    + '\nmodule.exports = { onRequestGet, onRequestPost, cleanSubcontractAnalysis, cleanContractPull };';
   const mod = { exports: {} };
   const fn = new Function('module', 'exports', 'console', 'URL', 'Response', 'Date', stubbed);
   // Minimal Response shim capturing status + json body.

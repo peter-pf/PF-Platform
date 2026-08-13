@@ -1,7 +1,9 @@
-// No-regression: reserved-key MERGE across ALL 6 keys (extends the prior submittal-pull
-// merge 24/0 harness to include the new __subcontract_analysis). Proves that writing ANY
-// one reserved key never clobbers the other five, in either direction, and that plain
-// string fields coexist. Also confirms VALID_SECTIONS + per-section allow-lists unchanged.
+// No-regression: reserved-key MERGE across ALL 7 keys (extends the prior 6-key harness to
+// include the new __contract_pull, which shares the `contract` section with
+// __subcontract_analysis). Proves that writing ANY one reserved key never clobbers the other
+// six, in either direction, and that plain string fields coexist. Also confirms VALID_SECTIONS
+// + per-section allow-lists unchanged. Special focus: on the `contract` section, writing
+// __contract_pull (or a flat contract field) preserves __subcontract_analysis and vice-versa.
 const { loadWorker, makeKV } = require('./extract.js');
 const W = loadWorker();
 const S = { area: 'financials', name: 'Peter' };
@@ -31,6 +33,7 @@ async function post(env, body) {
     ['engineering', { __site_elevations: [{ id: 'a1', area: 'Bldg A' }] }],
     ['engineering', { __submittal_pull: { status: 'requested', requested_at: 't0' } }],
     ['contract', { __subcontract_analysis: { verdict: 'GREEN', summary: 's' }, 'Subcontract Value': '$1M' }],
+    ['contract', { __contract_pull: { status: 'pulled', source_doc: 'POET FE.pdf', fully_executed_date: '3/31/2026' } }],
   ];
   for (const [sec, f] of writes) { await post(env, { num, section: sec, fields: f }); }
 
@@ -44,6 +47,7 @@ async function post(env, body) {
       pull: secs.engineering && secs.engineering.__submittal_pull && secs.engineering.__submittal_pull.status,
       suban: secs.contract && secs.contract.__subcontract_analysis && secs.contract.__subcontract_analysis.verdict,
       subanFld: secs.contract && secs.contract['Subcontract Value'],
+      cpull: secs.contract && secs.contract.__contract_pull && secs.contract.__contract_pull.status,
       ownerFld: secs.general && secs.general['Owner'],
     };
   }
@@ -59,11 +63,14 @@ async function post(env, body) {
   ok('baseline pull', s.pull === 'requested');
   ok('baseline suban', s.suban === 'GREEN');
   ok('baseline suban plain field', s.subanFld === '$1M');
+  ok('baseline cpull', s.cpull === 'pulled');
   ok('baseline owner plain field', s.ownerFld === 'Acme Inc');
 
   // Now re-write EACH reserved key once more; after each, ALL others must survive.
   const rewrites = [
     ['contract', { __subcontract_analysis: { verdict: 'RED', summary: 's2' } }, 'suban→RED'],
+    ['contract', { __contract_pull: { status: 'requested', requested_at: 't2' } }, 'cpull→requested'],
+    ['contract', { 'Subcontract Value': '$2M' }, 'contractFld→$2M'],
     ['engineering', { __submittal_pull: { status: 'pulled', pulled_at: 't1' } }, 'pull→pulled'],
     ['engineering', { __submittal_cycles: [{ rev: 0, status: 'Original' }, { rev: 1, status: 'Rev1' }] }, 'cycles→2'],
     ['engineering', { __site_elevations: [{ id: 'a1', area: 'A' }, { id: 'a2', area: 'B' }] }, 'elev→2'],
@@ -73,17 +80,18 @@ async function post(env, body) {
   for (const [sec, f, label] of rewrites) {
     r = await post(env, { num, section: sec, fields: f });
     s = snap(r.body.sections);
-    // After ANY rewrite the six keys are all still present (values may have changed for the one written).
+    // After ANY rewrite the seven keys are all still present (values may have changed for the one written).
     ok(label + ': crm/dp survives', s.crmDP === 'Garbin');
     ok(label + ': prereq survives', s.prereq);
     ok(label + ': cycles survives', s.cycles >= 1);
     ok(label + ': elev survives', !!s.elev);
     ok(label + ': pull survives', !!s.pull);
     ok(label + ': suban survives', !!s.suban);
-    ok(label + ': suban plain field survives', s.subanFld === '$1M');
+    ok(label + ': cpull survives', !!s.cpull);
+    ok(label + ': suban plain field survives', s.subanFld !== undefined && s.subanFld !== '');
   }
 
-  console.log('\n==== Reserved-keys merge regression (6 keys) ====');
+  console.log('\n==== Reserved-keys merge regression (7 keys) ====');
   console.log('PASS: ' + pass + '  FAIL: ' + fail);
   if (fail) { console.log('FAILURES: ' + fails.join('; ')); process.exit(1); }
   process.exit(0);

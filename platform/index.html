@@ -2931,6 +2931,21 @@ tr.pf-dragging { opacity: 0.45; }
 /* Source PDF provenance line — which sealed set the pull read (name/rev/date). */
 .pf-sge-pull-src { font-size: 0.68rem; color: var(--text-3); margin: 0 0 3px 0; }
 .pf-sge-pull-src strong { color: var(--text-2); font-weight: 600; }
+/* "Pull from Executed Subcontract" (Stage 2, Brad 2026-08-13). Office-only button +
+   provenance line at the top of the Contract Recap. Not a .pr-field row — the section
+   editor never scans it; the flat contract fields it populates ARE .pr-field rows. */
+.pf-cpull-wrap { margin: 2px 0 8px 0; }
+.pf-cpull-head { display: flex; justify-content: flex-end; }
+.pf-cpull-btn {
+  font-size: 0.72rem; font-weight: 600; cursor: pointer; line-height: 1.2;
+  padding: 4px 10px; border-radius: 6px; border: 1px solid var(--accent);
+  color: var(--accent); background: #fff; white-space: nowrap;
+}
+.pf-cpull-btn:hover { background: rgba(0,123,196,0.06); }
+.pf-cpull-btn:disabled { opacity: 0.55; cursor: default; }
+.pf-cpull-src { font-size: 0.7rem; color: var(--text-3); margin: 3px 0; }
+.pf-cpull-note { font-size: 0.72rem; color: #b06a00; font-style: italic; margin: 3px 0; }
+.pf-cpull-msg { font-size: 0.72rem; margin: 3px 0; }
 /* GC Prerequisites checklist (PF Design Submittal, Brad 2026-08-12). A table at the
    TOP of the subsection: Item | Responsible Party | Date Received (+ Reminder for office).
    Received rows read green/checked, outstanding rows amber. NOT .pr-field rows, so the
@@ -14563,6 +14578,72 @@ try {
         };
       } catch (e) { return null; }
     }
+    // Read the stored __contract_pull provenance object for the current project (from the
+    // contract override). Returns a NORMALIZED object (never throws) or null when nothing has
+    // been pulled/requested. Records ONLY provenance — the actual contract-field VALUES live as
+    // flat editable fields on the `contract` section (Subcontract Value / Liquidated Damages /
+    // etc., pulled from the fully-executed subcontract by Peter's engine out-of-band). This
+    // object drives the "Pull from Executed Subcontract" button state + the provenance line.
+    // See /api/project-override cleanContractPull. (Brad 2026-08-13, Stage 2.)
+    function pfContractPull(){
+      try {
+        var c = _curOverrides && _curOverrides.contract;
+        var p = c && c.__contract_pull;
+        if (!p || typeof p !== 'object' || Array.isArray(p)) return null;
+        return {
+          source_doc:          String(p.source_doc || ''),
+          fully_executed_date: String(p.fully_executed_date || ''),
+          contract_status:     String(p.contract_status || ''),
+          pulled_at:           String(p.pulled_at || ''),
+          requested_at:        String(p.requested_at || ''),
+          status:              String(p.status || '')
+        };
+      } catch (e) { return null; }
+    }
+    // Build the "Pull from Executed Subcontract" control block (Stage 2, Brad 2026-08-13).
+    // Rendered at the TOP of the Subcontract Agreement card's Contract Recap. OFFICE-ONLY
+    // (canEdit(); field_ops never reach this renderer). MVP: the vision read runs in Peter's
+    // ENGINE (build-contract-fields-from-fe-subcontract.py), NOT the CF Worker — clicking only
+    // records a request marker (__contract_pull.status='requested') and flips to a "Pull
+    // requested…" state. Peter's engine later writes the flat contract fields + provenance
+    // out-of-band. Provenance line renders whenever a pull has populated the fields (status
+    // 'pulled' with a source_doc). Every rendered value goes through E() (document-derived).
+    function pfContractPullControl(){
+      if (!canEdit()) {
+        // Non-office: no button, but still surface the provenance line when a pull populated
+        // the fields (read-only visibility of where the contract terms came from).
+        var pr0 = pfContractPull();
+        if (pr0 && pr0.status === 'pulled' && pr0.source_doc) {
+          return '<div class="pf-cpull-src">📄 Contract fields pulled from '
+            + E(pr0.source_doc)
+            + (pr0.fully_executed_date ? ', fully executed ' + E(pr0.fully_executed_date) : '')
+            + '.</div>';
+        }
+        return '';
+      }
+      var pr = pfContractPull();
+      var pending = pr && pr.status === 'requested';
+      var btn = '<button type="button" class="pf-cpull-btn"'
+        + (pending ? ' disabled' : '')
+        + ' onclick="event.stopPropagation();window.pfContractPullFromSubcontract(this)">'
+        + (pending ? 'Pull requested…' : 'Pull from Executed Subcontract')
+        + '</button>';
+      var pendingNote = pending
+        ? '<div class="pf-cpull-note">⏳ Pull requested — Peter is extracting from the executed subcontract. The contract fields will populate when the read completes.</div>'
+        : '';
+      var srcLine = (pr && pr.status === 'pulled' && pr.source_doc)
+        ? '<div class="pf-cpull-src">📄 Contract fields pulled from '
+            + E(pr.source_doc)
+            + (pr.fully_executed_date ? ', fully executed ' + E(pr.fully_executed_date) : '')
+            + '.</div>'
+        : '';
+      return '<div class="pf-cpull-wrap" data-cpull-num="'+E(_curNum)+'">'
+        + '<div class="pf-cpull-head"><span class="pf-cpull-actions">'+btn+'</span></div>'
+        + srcLine
+        + pendingNote
+        + '<div class="pf-cpull-msg" style="display:none"></div>'
+        + '</div>';
+    }
     // Read the current project's Subcontract Analysis (Brad 2026-08-13). DUAL SOURCE,
     // legacy-safe: the reserved `__subcontract_analysis` override under the `contract`
     // section WINS; when absent, fall back to the legacy synced `D.analysis` block (so Indy
@@ -16380,6 +16461,11 @@ try {
           field('Released to Start Submittals', '')
         ])
         + subhead('Contract Recap')
+        // "Pull from Executed Subcontract" control (Stage 2, Brad 2026-08-13). OFFICE-ONLY
+        // button + provenance line, rendered at the top of Contract Recap. Clicking records a
+        // request; Peter's engine writes the flat contract fields (Subcontract Value /
+        // Liquidated Damages / Retainage / Payment Terms / ...) + provenance out-of-band.
+        + pfContractPullControl()
         // RESTRUCTURED (Brad 2026-08-07) from a single twoCol grouping into FOUR
         // nested sub-groups under the Contract Recap subhead: Contract Info,
         // Invoicing & Payment Terms, Scope of Work, and Needed for Contract
@@ -21807,6 +21893,95 @@ try {
       }).catch(function(){
         if (btn) { btn.disabled = false; btn.textContent = 'Pull from Approved Drawings'; }
         pfSgeMsg(wrap, 'Pull request failed: could not reach the server. Nothing was recorded — please retry.', true);
+      });
+    };
+
+    // "Pull from Executed Subcontract" click handler (Stage 2, Brad 2026-08-13). OFFICE-ONLY.
+    //
+    // IMPORTANT — the vision read does NOT run here. Reading the fully-executed subcontract
+    // (Subcontract Value / Liquidated Damages / Retainage / Payment Terms / Insurance / dates)
+    // is done by Peter's ENGINE (platform/sync/build-contract-fields-from-fe-subcontract.py),
+    // OUT OF BAND. A Cloudflare Worker cannot (and must not) run vision or reach into SharePoint.
+    // So this button's MVP behavior is a lightweight REQUEST MARKER: it writes __contract_pull
+    // with status:'requested' + a requested_at timestamp, then shows a "Pull requested — Peter is
+    // extracting…" state. Peter's engine later writes the flat contract fields + the full
+    // provenance (status:'pulled', source_doc, fully_executed_date). The request marker sends
+    // ONLY __contract_pull, so cleanFields yields {} and NO contract field is touched; the merge
+    // preserves the sibling __subcontract_analysis on the same `contract` section. It also
+    // preserves any prior provenance fields it does not set (sends the complete object, merged
+    // from the current pull). FAIL CLOSED + office-gated (canEdit + server requireArea).
+    function pfCpullWrap(el){ while (el && el !== document.body){ if (el.classList && el.classList.contains('pf-cpull-wrap')) return el; el = el.parentNode; } return null; }
+    function pfCpullMsg(wrap, text, isErr){
+      if (!wrap) return;
+      var m = wrap.querySelector('.pf-cpull-msg');
+      if (!m) return;
+      m.textContent = text;
+      m.style.display = text ? 'block' : 'none';
+      m.style.color = isErr ? '#b91c1c' : '#166534';
+    }
+    window.pfContractPullFromSubcontract = function(btn){
+      if (!canEdit()) return;                          // defense-in-depth (server also 403s)
+      var wrap = pfCpullWrap(btn);
+      if (!wrap) return;
+      var num = wrap.getAttribute('data-cpull-num') || _curNum || '';
+      if (!num) { pfCpullMsg(wrap, 'Missing project number; no pull was requested.', true); return; }
+      if (!window.confirm('Request a Pull from the Executed Subcontract for ' + num + '?\n\n'
+        + 'This flags the project for extraction. Peter reads the fully-executed subcontract '
+        + '(Subcontract Value, Liquidated Damages, Retainage, Payment Terms, Insurance, '
+        + 'completion dates) and populates the contract fields. They update when the read completes.')) return;
+      // Build the request marker, preserving any prior provenance so a re-request never wipes a
+      // previously-populated source_doc/date (status flips back to 'requested').
+      var prior = pfContractPull() || {};
+      var reqAt = new Date().toISOString();
+      var pull = {
+        source_doc:          prior.source_doc || '',
+        fully_executed_date: prior.fully_executed_date || '',
+        contract_status:     prior.contract_status || '',
+        pulled_at:           prior.pulled_at || '',
+        requested_at:        reqAt,
+        status:              'requested'
+      };
+      if (btn) { btn.disabled = true; btn.textContent = 'Requesting…'; }
+      fetch('/api/project-override', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ num: num, section: 'contract', fields: { __contract_pull: pull } })
+      }).then(function(res){
+        return res.json().then(function(b){ return { ok: res.ok, status: res.status, body: b }; })
+          .catch(function(){ return { ok: res.ok, status: res.status, body: null }; });
+      }).then(function(r){
+        // FAIL CLOSED: only a clean {ok:true, saved:true} is success.
+        if (!r.ok || !r.body || r.body.ok !== true || r.body.saved !== true) {
+          var msg = (r.body && r.body.message) ? r.body.message
+            : (r.status === 403 ? 'You do not have permission to request a pull for this project.'
+                                 : 'Pull request failed (' + r.status + '). Nothing was recorded — please retry.');
+          if (btn) { btn.disabled = false; btn.textContent = 'Pull from Executed Subcontract'; }
+          pfCpullMsg(wrap, msg, true);
+          return;
+        }
+        // Adopt server truth into the store + module-local overrides, then re-render the control
+        // block in place so the "Pull requested…" state + disabled button appear immediately.
+        window.PF_PROJECT_OVERRIDES[num] = { sections: (r.body.sections) || {}, _meta: (r.body._meta) || null };
+        try {
+          if (String(num) === String(_curNum) && r.body.sections && typeof r.body.sections === 'object') {
+            _curOverrides = r.body.sections;
+          }
+        } catch (e) {}
+        try {
+          var freshInner = pfContractPullControl();
+          var tmp = document.createElement('div');
+          tmp.innerHTML = freshInner;
+          var freshWrap = tmp.querySelector('.pf-cpull-wrap');
+          if (freshWrap) wrap.innerHTML = freshWrap.innerHTML;
+          pfCpullMsg(wrap, 'Pull requested. Peter will extract from the executed subcontract.', false);
+        } catch (e) {
+          if (btn) { btn.disabled = false; btn.textContent = 'Pull from Executed Subcontract'; }
+          pfCpullMsg(wrap, 'Pull requested (reload to see the updated state).', false);
+        }
+      }).catch(function(){
+        if (btn) { btn.disabled = false; btn.textContent = 'Pull from Executed Subcontract'; }
+        pfCpullMsg(wrap, 'Pull request failed: could not reach the server. Nothing was recorded — please retry.', true);
       });
     };
 

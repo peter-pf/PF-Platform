@@ -491,6 +491,57 @@ function cleanSubcontractAnalysis(input) {
   };
 }
 
+// ---- __contract_pull reserved structured key (Brad 2026-08-13, Stage 2) -------
+// "Pull from Executed Subcontract" writes the flat contract-field VALUES (Subcontract
+// Value / Liquidated Damages / Retainage / Payment Terms / ... keyed by their EXACT portal
+// labels) as REGULAR editable fields on the `contract` section (handled by cleanFields —
+// they are NOT a reserved key). THIS key records only the lightweight PROVENANCE of that
+// pull (source FE document name, the fully-executed date, and when the pull ran/was
+// requested) so the render can show a "Contract fields pulled from {doc}, fully executed
+// {date}" line. Stored as ONE reserved, OBJECT-valued key `__contract_pull` INSIDE the
+// `contract` section:
+//   sections.contract.__contract_pull = {
+//     source_doc, fully_executed_date, contract_status,  // strings (bounded)
+//     pulled_at, requested_at, status ('requested'|'pulled'|'')
+//   }
+// This is the SEVENTH reserved key (alongside __crm, __submittal_prereqs, __submittal_cycles,
+// __site_elevations, __submittal_pull, __subcontract_analysis) and rides the SAME merge:
+// Object.assign(existing, fields) preserves it when a normal field save omits it. Critically
+// it lives on the SAME `contract` section as __subcontract_analysis, so the merge must
+// preserve __subcontract_analysis when __contract_pull (or a contract field) is written, and
+// vice-versa — proven by the harness. Two write paths use it: (1) the OFFICE "Pull" BUTTON
+// writes a lightweight request marker { status:'requested', requested_at } — the CF Worker
+// NEVER runs vision; Peter's engine does the extraction out-of-band. (2) Peter's engine (or a
+// seed) writes the flat contract fields PLUS this provenance { status:'pulled', source_doc,
+// fully_executed_date, pulled_at } in one save. STRICTLY validated (cleanContractPull below);
+// a malformed body fails the WHOLE save closed. Allowed ONLY under `contract` (400 elsewhere).
+const CPULL_KEY = '__contract_pull';
+const CPULL_ALLOWED_SECTIONS = { contract: 1 };
+const CPULL_MAX_STR = 300;            // source_doc / date / status string cap
+const CPULL_STATUSES = { requested: 1, pulled: 1, '': 1 };
+
+// Validate + normalize an incoming __contract_pull object into a clean, bounded structure.
+// Returns a SAFE object, or null if present-but-malformed (caller fails the whole save
+// closed). Rules mirror cleanSubmittalPull's defensive posture:
+//   - top-level must be a plain object (not array).
+//   - status is constrained to its small enum (unknown => reject).
+//   - source_doc / fully_executed_date / contract_status / pulled_at / requested_at are
+//     strings, length-capped + angle-bracket stripped (s()).
+function cleanContractPull(input) {
+  if (input == null) return {};                        // absent => empty (caller preserves prior)
+  if (typeof input !== 'object' || Array.isArray(input)) return null; // present but not object => reject
+  const status = s(input.status, CPULL_MAX_STR);
+  if (!(status in CPULL_STATUSES)) return null;        // unknown status => reject
+  return {
+    source_doc:          s(input.source_doc, CPULL_MAX_STR),
+    fully_executed_date: s(input.fully_executed_date, CPULL_MAX_STR),
+    contract_status:     s(input.contract_status, CPULL_MAX_STR),
+    pulled_at:           s(input.pulled_at, CPULL_MAX_STR),
+    requested_at:        s(input.requested_at, CPULL_MAX_STR),
+    status:              status,
+  };
+}
+
 // Validate + normalize an incoming __crm object into a clean, bounded structure.
 // Returns a SAFE object (possibly {}), or null if the input is present but so
 // malformed it must be rejected (caller fails the whole save closed). Rules:
@@ -599,7 +650,7 @@ function cleanFields(input) {
   if (!input || typeof input !== 'object') return out;
   const keys = Object.keys(input).slice(0, MAX_FIELDS_PER_SECTION);
   for (const k of keys) {
-    if (k === CRM_KEY || k === PREREQ_KEY || k === CYCLES_KEY || k === SITE_ELEV_KEY || k === PULL_KEY || k === SUBAN_KEY) continue; // reserved structured keys; handled separately, never string-flattened
+    if (k === CRM_KEY || k === PREREQ_KEY || k === CYCLES_KEY || k === SITE_ELEV_KEY || k === PULL_KEY || k === SUBAN_KEY || k === CPULL_KEY) continue; // reserved structured keys; handled separately, never string-flattened
     const label = s(k, MAX_LABEL);
     if (!label) continue;
     out[label] = s(input[k], MAX_VALUE);
@@ -778,6 +829,27 @@ export async function onRequestPost(context) {
       }
     }
 
+    // Reserved __contract_pull structured key (Brad 2026-08-13, Stage 2): the "Pull from
+    // Executed Subcontract" provenance metadata on the Subcontract Agreement card (Section 3).
+    // Allowed ONLY under `contract`. Same posture as the other reserved keys: absent =>
+    // untouched (preserve prior), present => strictly validated, malformed => reject the WHOLE
+    // save closed. Two writers use it — the office Pull BUTTON (a small request marker) and
+    // Peter's out-of-band engine (the full provenance alongside the flat contract fields). The
+    // button send carries ONLY this key (cleanFields yields {} so no contract field is touched);
+    // the engine/seed send carries this key PLUS the flat contract fields. Either way the merge
+    // preserves the sibling __subcontract_analysis on this same section (and vice-versa).
+    const hasCpullInBody = Object.prototype.hasOwnProperty.call(rawFieldsObj, CPULL_KEY);
+    let cpullUpdate; // undefined => untouched
+    if (hasCpullInBody) {
+      if (!CPULL_ALLOWED_SECTIONS[section]) {
+        return json({ status: 'error', message: 'Contract pull is not valid on this section.' }, 400);
+      }
+      cpullUpdate = cleanContractPull(rawFieldsObj[CPULL_KEY]);
+      if (cpullUpdate === null) {
+        return json({ status: 'error', message: 'Invalid contract pull metadata; nothing was saved.' }, 400);
+      }
+    }
+
     // FAIL CLOSED: no KV -> we cannot persist. Do NOT report success.
     if (!env.PF_SCHEDULE) {
       return json({ status: 'error',
@@ -809,6 +881,10 @@ export async function onRequestPost(context) {
     // Carry forward any existing structured __subcontract_analysis (an OBJECT, like __crm).
     const prevSuban = (existing[SUBAN_KEY] && typeof existing[SUBAN_KEY] === 'object' && !Array.isArray(existing[SUBAN_KEY]))
       ? existing[SUBAN_KEY] : undefined;
+    // Carry forward any existing structured __contract_pull (an OBJECT, like __crm). Lives on
+    // the SAME `contract` section as __subcontract_analysis — both are preserved independently.
+    const prevCpull = (existing[CPULL_KEY] && typeof existing[CPULL_KEY] === 'object' && !Array.isArray(existing[CPULL_KEY]))
+      ? existing[CPULL_KEY] : undefined;
     const merged = Object.assign({}, existing, fields);
     // Whole-object replace of __crm when the request supplied one (the client sends
     // the complete per-firm selection each time); otherwise preserve the prior value.
@@ -840,6 +916,13 @@ export async function onRequestPost(context) {
     if (subanUpdate !== undefined) merged[SUBAN_KEY] = subanUpdate;
     else if (prevSuban !== undefined) merged[SUBAN_KEY] = prevSuban;
     else delete merged[SUBAN_KEY]; // never leave a stray/non-object key behind
+    // Same whole-object replace/preserve for __contract_pull (the writer sends the COMPLETE
+    // provenance object each save); otherwise preserve the prior. Because this rides the SAME
+    // section as __subcontract_analysis, writing one never touches the other (each has its own
+    // prev/replace branch keyed off its own hasXInBody flag).
+    if (cpullUpdate !== undefined) merged[CPULL_KEY] = cpullUpdate;
+    else if (prevCpull !== undefined) merged[CPULL_KEY] = prevCpull;
+    else delete merged[CPULL_KEY]; // never leave a stray/non-object key behind
     rec.sections[section] = merged;
 
     // Bound the number of sections (defense against a crafted flood of junk keys;
