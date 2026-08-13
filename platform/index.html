@@ -16786,8 +16786,9 @@ try {
         // the conditional Staking & Layout company/contact CRM selector below is shown
         // (WE stake -> pick who); when = No, the GC has it and the selector is hidden.
         // Visibility is set at render time from the effective toggle value and toggled
-        // live by pfStakingToggleVisibility (a document 'change' listener) WITHOUT a
-        // re-render — the field's own onchange still saves via pfLiveFieldChange.
+        // live by a document CAPTURE-phase 'change' listener (~19574) WITHOUT a re-render
+        // — the field's own onchange still saves via pfLiveFieldChange. Capture phase is
+        // required because that inline onchange calls stopPropagation (kills bubble).
           fields([
             field('Staking & Layout PF\'s responsibility?', '')
           ])
@@ -16795,14 +16796,21 @@ try {
             // Effective toggle value (override-wins). Blank/No -> hidden; Yes -> shown.
             var _stk = String(effVal('siteReadiness', 'Staking & Layout PF\'s responsibility?', '') || '').trim();
             var _isPf = /^yes$/i.test(_stk);
+            var _isNo = /^no$/i.test(_stk);
             // GC-has-it note (only meaningful when explicitly No; blank = undecided).
-            var _gcNote = (/^no$/i.test(_stk))
-              ? subgroupNote('Staking &amp; Layout is the GC’s responsibility.')
-              : '';
+            // ALWAYS rendered inside a data-pf-staking-gcnote wrapper (hidden unless No)
+            // so the live 'change' listener can flip it on/off WITHOUT a re-render —
+            // symmetric with the selector wrapper (Brad 2026-08-13, staking-toggle-
+            // visibility-fix). Prior version emitted the note only when effVal===No, so
+            // live-switching to No never surfaced it until the next page load.
+            var _gcNote = '<div data-pf-staking-gcnote style="' + (_isNo ? '' : 'display:none;') + '">'
+              + subgroupNote('Staking &amp; Layout is the GC’s responsibility.')
+              + '</div>';
             // Conditional CRM selector wrapper. Office roles get the live picker + a
             // save button; non-office see only the resolved read cards (host). Hidden
-            // via inline display when the toggle is not Yes (pfStakingToggleVisibility
-            // flips it live). data-pf-staking-selector marks it for the toggle handler.
+            // via inline display when the toggle is not Yes; the document capture-phase
+            // 'change' listener (~19574) flips it live. data-pf-staking-selector marks it
+            // for the toggle handler.
             var _sel = pfStakingSelectorBlock();
             return _gcNote
               + '<div data-pf-staking-selector style="' + (_isPf ? '' : 'display:none;') + '">'
@@ -19567,10 +19575,21 @@ try {
 
     // Live visibility toggle for the inline staking selector. Bound once (document-level
     // 'change'): when the "Staking & Layout PF's responsibility?" live select changes,
-    // show the selector wrapper on Yes / hide on anything else. Runs ALONGSIDE
-    // pfLiveFieldChange (which saves the toggle value) on the same change event — it only
-    // flips visibility, never saves. Scoped to the toggle's own Site Readiness card so a
-    // like-named control elsewhere can't cross-trigger.
+    // show the selector wrapper on Yes / show the GC note on No / hide the other. Runs
+    // ALONGSIDE pfLiveFieldChange (which saves the toggle value) on the same change event
+    // — it only flips visibility, never saves. Scoped to the toggle's own Site Readiness
+    // card so a like-named control elsewhere can't cross-trigger.
+    //
+    // CAPTURE PHASE (Brad 2026-08-13, staking-toggle-visibility-fix): the live select's
+    // own inline onchange is `event.stopPropagation();window.pfLiveFieldChange(this)`
+    // (pfLiveControl ~19102/19106/19119 — stopPropagation is REQUIRED there so the shared
+    // live-field change doesn't cross-fire other document 'change' listeners). That
+    // stopPropagation kills the BUBBLE phase, so a bubble-phase document listener here
+    // NEVER received the event — the toggle saved ("Saved") but nothing showed/hid. The
+    // 3rd arg `true` registers this in the CAPTURE phase, which runs top-down BEFORE the
+    // target's own inline handler executes stopPropagation, so it always fires. Reading
+    // el.value in capture is correct for a <select> — the value is already committed when
+    // the 'change' event dispatches.
     document.addEventListener('change', function(ev){
       var el = ev.target;
       if (!el || !el.getAttribute) return;
@@ -19578,10 +19597,16 @@ try {
       var card = el.closest ? el.closest('.pr-card[data-pr-section="siteReadiness"]') : null;
       if (!card) return;
       var wrap = card.querySelector('[data-pf-staking-selector]');
-      if (!wrap) return;
-      var isYes = /^yes$/i.test(String(el.value || '').trim());
-      wrap.style.display = isYes ? '' : 'none';
-    });
+      var gcnote = card.querySelector('[data-pf-staking-gcnote]');
+      var val = String(el.value || '').trim();
+      var isYes = /^yes$/i.test(val);
+      var isNo  = /^no$/i.test(val);
+      // Yes -> picker shown. Anything not-Yes (No or blank) -> picker hidden.
+      if (wrap) wrap.style.display = isYes ? '' : 'none';
+      // No -> GC note shown. Anything not-No (Yes or blank) -> GC note hidden. Symmetric
+      // live behavior so switching to No surfaces the note WITHOUT a re-render.
+      if (gcnote) gcnote.style.display = isNo ? '' : 'none';
+    }, true);
 
     // Populate the company dropdown + (if a company is selected) its contact checkboxes
     // for every .pr-crm block in an editor. Idempotent; safe to call after insert and

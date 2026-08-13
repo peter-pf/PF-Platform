@@ -129,6 +129,94 @@ function srCardOf(root) {
   const wrap = sr && sr.querySelector('[data-pf-staking-selector]');
   ok(wrap && /display:\s*none/.test(wrap.getAttribute('style') || ''), 'B(no): selector HIDDEN when toggle=No');
   ok(/GC/i.test(sr.textContent) && /responsibility/i.test(sr.textContent), 'B(no): GC-responsibility note shown');
+  // GC note now lives in a live-toggled wrapper; on render=No it is VISIBLE (not display:none).
+  const gcw = sr && sr.querySelector('[data-pf-staking-gcnote]');
+  ok(!!gcw, 'B(no): GC-note wrapper present');
+  ok(gcw && !/display:\s*none/.test(gcw.getAttribute('style') || ''), 'B(no): GC-note wrapper SHOWN when toggle=No');
+}
+
+// ---------- SCENARIO 3b: render=Yes -> GC note wrapper present but HIDDEN ----------
+{
+  const { w } = makeWindow('admin');
+  try { w.eval(block); } catch (e) { console.log('EVAL ERROR (admin/yes-gcnote): ' + e.message); process.exit(2); }
+  const root = w.document.getElementById('root');
+  w.PF_PROJECT_OVERRIDES = { '26-999': { sections: { siteReadiness: { "Staking & Layout PF's responsibility?": 'Yes' } } } };
+  try { w.__renderInto(D, root); } catch (e) { console.log('RENDER ERROR (admin/yes-gcnote): ' + e.message); }
+  const sr = srCardOf(root);
+  const gcw = sr && sr.querySelector('[data-pf-staking-gcnote]');
+  ok(!!gcw, 'B(yes): GC-note wrapper present (always rendered for live toggling)');
+  ok(gcw && /display:\s*none/.test(gcw.getAttribute('style') || ''), 'B(yes): GC-note wrapper HIDDEN when toggle=Yes');
+}
+
+// ---------- SCENARIO 5: LIVE capture-phase toggle (THE BUG FIX) ----------
+// Root cause was: the toggle's inline onchange calls event.stopPropagation() (required
+// so the shared live-field change doesn't cross-fire), which killed the BUBBLE phase, so
+// a bubble-phase document 'change' listener never flipped the selector. The fix registers
+// the visibility listener in CAPTURE phase (3rd arg true), which runs BEFORE the target's
+// inline stopPropagation. Here we (a) render with toggle unset (selector hidden), then
+// dispatch a 'change' whose handler ALSO calls stopPropagation — simulating the live
+// inline behavior — and assert the capture listener still fires and flips visibility.
+{
+  const { w } = makeWindow('admin');
+  try { w.eval(block); } catch (e) { console.log('EVAL ERROR (live-toggle): ' + e.message); process.exit(2); }
+  const root = w.document.getElementById('root');
+  try { w.__renderInto(D, root); } catch (e) { console.log('RENDER ERROR (live-toggle): ' + e.message); }
+  const sr = srCardOf(root);
+  const toggle = [...sr.querySelectorAll('[data-pr-field-label]')].find(e => e.getAttribute('data-pr-field-label') === "Staking & Layout PF's responsibility?");
+  ok(!!toggle && toggle.tagName === 'SELECT', 'S5: live toggle select present');
+  const wrap = sr.querySelector('[data-pf-staking-selector]');
+  const gcw = sr.querySelector('[data-pf-staking-gcnote]');
+  ok(wrap && /display:\s*none/.test(wrap.getAttribute('style') || ''), 'S5: selector hidden at start (toggle unset)');
+
+  // NOTE on jsdom limits: with runScripts:'outside-only', jsdom does NOT compile/execute
+  // an inline onchange="event.stopPropagation();..." attribute, so we cannot fully
+  // reproduce the target-phase stopPropagation ordering that caused the live bug. S5
+  // therefore proves the POSITIVE behavior — a real dispatched 'change' captured by the
+  // document listener flips visibility live (Yes/No/blank) with no re-render. The
+  // capture-vs-bubble regression guard is SCENARIO 6 (source-level, and it does fail if
+  // the listener reverts to bubble phase — verified as a negative control).
+
+  // Set value to Yes and dispatch a real 'change' event.
+  toggle.value = 'Yes';
+  let evt = new w.Event('change', { bubbles: true, cancelable: true });
+  toggle.dispatchEvent(evt);
+  ok(wrap && !/display:\s*none/.test(wrap.getAttribute('style') || ''), 'S5: selector SHOWN after change->Yes (capture listener fired despite stopPropagation)');
+  ok(gcw && /display:\s*none/.test(gcw.getAttribute('style') || ''), 'S5: GC-note HIDDEN after change->Yes');
+
+  // Switch to No: selector hides, GC note shows — live, no re-render.
+  toggle.value = 'No';
+  evt = new w.Event('change', { bubbles: true, cancelable: true });
+  toggle.dispatchEvent(evt);
+  ok(wrap && /display:\s*none/.test(wrap.getAttribute('style') || ''), 'S5: selector HIDDEN after change->No');
+  ok(gcw && !/display:\s*none/.test(gcw.getAttribute('style') || ''), 'S5: GC-note SHOWN after change->No (symmetric live behavior)');
+
+  // Switch to blank: both hidden.
+  toggle.value = '';
+  evt = new w.Event('change', { bubbles: true, cancelable: true });
+  toggle.dispatchEvent(evt);
+  ok(wrap && /display:\s*none/.test(wrap.getAttribute('style') || ''), 'S5: selector HIDDEN after change->blank');
+  ok(gcw && /display:\s*none/.test(gcw.getAttribute('style') || ''), 'S5: GC-note HIDDEN after change->blank');
+}
+
+// ---------- SCENARIO 6: capture-phase registration proof (source-level) ----------
+// Guards against a regression that silently reverts the listener to bubble phase. The
+// staking visibility listener must be registered with the 3rd arg `true`.
+{
+  const src = fs.readFileSync('index.html', 'utf8');
+  // Find the listener body (its unique field-label guard) then confirm the enclosing
+  // addEventListener('change', ..., true) capture registration.
+  const guard = "if (el.getAttribute('data-pr-field-label') !== 'Staking & Layout PF\\'s responsibility?') return;";
+  const gi = src.indexOf(guard);
+  ok(gi !== -1, 'S6: staking visibility listener body found in source');
+  if (gi !== -1) {
+    const openBefore = src.lastIndexOf("document.addEventListener('change'", gi);
+    ok(openBefore !== -1, 'S6: enclosing document change listener found');
+    // The closing of this registration is the first "}, true);" after the guard.
+    const closeCapture = src.indexOf('}, true);', gi);
+    const closeBubble  = src.indexOf('});', gi);
+    ok(closeCapture !== -1 && (closeBubble === -1 || closeCapture <= closeBubble),
+      'S6: listener registered in CAPTURE phase (3rd arg true), NOT bubble');
+  }
 }
 
 // ---------- SCENARIO 4: NON-OFFICE (field_ops) read-only ----------
