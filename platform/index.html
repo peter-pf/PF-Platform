@@ -2259,6 +2259,19 @@ tr.pf-dragging { opacity: 0.45; }
 .pr-live-select { max-width: 260px; }
 .pr-live-textarea { max-width: 100%; width: 100%; resize: vertical; }
 .pr-live-msg { font-size: 0.72rem; margin-left: 8px; }
+/* Blank live-edit field (Brad 2026-08-13, TASK F): an EMPTY editable Site Readiness field
+   carries .blank (same convention as the read view). The generic .pr-field-value.blank rule
+   is tuned for a short text placeholder (inline-block, centered, min-width) which would
+   distort a full-width form control — so when .blank sits on a live cell we neutralize that
+   and instead tint the CONTROL itself amber so the unfilled field is obvious. Cleared the
+   instant a value is entered (pfLiveFieldChange toggles .blank live, no re-render). */
+.pr-field-value.pr-field-live.blank {
+  background: transparent; color: inherit; display: block;
+  padding: 0; min-width: 0; text-align: left; border-radius: 0;
+}
+.pr-field-value.pr-field-live.blank .pr-live-input {
+  background: var(--amber-light); border-color: #f1d18a;
+}
 .pr-live-msg-ok { color: #2e7d32; }
 .pr-live-msg-err { color: #c0392b; font-weight: 600; }
 
@@ -13516,8 +13529,16 @@ try {
       if (_srLiveEdit && canEdit()) {
         // Raw value for the control = the non-empty override, else the synced/computed val.
         var rawForCtl = ovHasValue ? String(ov.value) : ((val === undefined || val === null) ? '' : String(val));
+        // Blank -> yellow highlight in LIVE-EDIT mode too (Brad 2026-08-13, TASK F). An
+        // empty editable field carries the SAME .blank amber-placeholder class as the read
+        // view (field()/fieldLinked() emit it there), so an unfilled Site Readiness field
+        // stands out until a value is entered. pfLiveFieldChange toggles the class live on
+        // save (no re-render). Reuses the EXISTING .pr-field-value.blank convention — no new
+        // class. The completion status bar counts the same .blank spans, so the count now
+        // matches the highlighting in live mode too.
+        var liveBlank = (rawForCtl == null || String(rawForCtl).trim() === '') ? ' blank' : '';
         return '<div class="pr-field" data-pr-label="'+E(label)+'"><span class="pr-field-label">'+E(label)+editMark+'</span>'
-             + '<span class="pr-field-value pr-field-live">'+pfLiveControl(label, rawForCtl)+'</span>'
+             + '<span class="pr-field-value pr-field-live'+liveBlank+'">'+pfLiveControl(label, rawForCtl)+'</span>'
              + (src ? '<span class="pr-field-src">'+E(src)+'</span>' : '') + '</div>';
       }
       // data-pr-label lets the section editor read every field's label back out
@@ -13586,8 +13607,11 @@ try {
       // link on the next render). Seeds from the RAW (unformatted) override/synced value.
       if (_srLiveEdit && canEdit()) {
         var rawUrl = ovHasValue ? String(ov.value) : ((val === undefined || val === null) ? '' : String(val));
+        // Blank -> yellow highlight in LIVE-EDIT mode (Brad 2026-08-13, TASK F), same rule +
+        // same .blank convention as field(). Cleared live by pfLiveFieldChange on save.
+        var liveBlank = (rawUrl == null || String(rawUrl).trim() === '') ? ' blank' : '';
         return '<div class="pr-field" data-pr-label="'+E(label)+'"><span class="pr-field-label">'+E(label)+editMark+'</span>'
-             + '<span class="pr-field-value pr-field-live">'
+             + '<span class="pr-field-value pr-field-live'+liveBlank+'">'
              +   '<input type="text" class="pr-live-input" data-pr-field-label="'+E(label)+'" '
              +     'data-pr-live-prev="'+esc2(String(rawUrl||''))+'" placeholder="Paste a URL" '
              +     'value="'+esc2(String(rawUrl||''))+'" onchange="event.stopPropagation();window.pfLiveFieldChange(this)">'
@@ -16704,11 +16728,25 @@ try {
       // (see pfApprovedPdfConfirmRow / pfApprovedPdfToggle); the banner reads that checkbox's
       // engineering value now (see siteReadinessActivationBanner). No Gate C field renders
       // here anymore.
-      var srBody =
-          siteReadinessActivationBanner()
-        // ---- Subsection 1: Shop Drawings ----
-        + subgroup('1. Shop Drawings')
-        + '<div class="pr-subgroup-actions"><a class="pr-action-link" href="' + E(_fedexPrint) + '" target="_blank" rel="noopener noreferrer">&#128424; Sent to Print (FedEx Office)</a></div>'
+      // COLLAPSIBLE SUBSECTIONS (Brad 2026-08-13, TASK E): each numbered Site Readiness
+      // subsection is now an INDEPENDENTLY collapsible group, reusing the SAME
+      // collapsibleSubgroup() helper + .pr-cgroup collapse idiom that Engineering & Design
+      // uses for Prelim Design / PF Submittal Design / As Built Drawings. Each subsection's
+      // content is built into an *Inner string, then wrapped with collapsibleSubgroup(title,
+      // inner) — DEFAULT EXPANDED (matching E&D). The collapsible body is a plain wrapper
+      // div INSIDE the ONE siteReadiness card, so every .pr-field[data-pr-label] stays a
+      // descendant of data-pr-section="siteReadiness" (save-scan + completion count
+      // unaffected). Inner dividers (subhead()/"Field Ops Manager Jobsite Visit") stay as
+      // plain sub-dividers within a subsection, exactly like subgroupSub() inside E&D.
+      //
+      // Subsection 4 (Safety) and subsection 6 (Mobilization to Site) receive post-render
+      // NESTED cards (safety / equipment / material keys). Those cards are now injected
+      // INTO the respective collapsible body via anchor markers (data-sr-safety-anchor /
+      // data-sr-eqmat-anchor) so they collapse WITH their subsection.
+
+      // ---- Subsection 1: Shop Drawings ----
+      var sub1Inner =
+          '<div class="pr-subgroup-actions"><a class="pr-action-link" href="' + E(_fedexPrint) + '" target="_blank" rel="noopener noreferrer">&#128424; Sent to Print (FedEx Office)</a></div>'
         + subgroupNote('Print spec: B&W, 24x36 Standard White, 1-sided, 3 copies, horizontal orientation, bind on left. Login credentials are stored securely (not shown here).')
         + fields([
             fieldLinked('Shop Drawings Print Order Link', '', '', 'website')
@@ -16716,11 +16754,11 @@ try {
         + subgroupNote('Date Ready for Pickup = anticipated date; email pickup person with order details.')
         + fields([
             field('Date Ready for Pickup', '')
-          ])
+          ]);
 
-        // ---- Subsection 2: Testing ----
-        + subgroup('2. Testing')
-        + fields([
+      // ---- Subsection 2: Testing ----
+      var sub2Inner =
+          fields([
             field('Modulus Load Test Required?', ''),
             field('# of Load Tests', ''),
             field('AP Design Diameter (ft)', ''),
@@ -16737,10 +16775,10 @@ try {
             fieldLinked('Test Document Link', '', '', 'website'),
             fieldLinked('Mod Test Jack Calibration Report', '', '', 'website')
           ])
-        + subgroupNote('Threshold ~85 kip determines testing equipment vs rig. FUTURE automation: Peter extracts test data from approved shop drawings + generates the test doc in SharePoint on Garbin approval. Annual jack recalibration reminder every Dec/Jan.')
+        + subgroupNote('Threshold ~85 kip determines testing equipment vs rig. FUTURE automation: Peter extracts test data from approved shop drawings + generates the test doc in SharePoint on Garbin approval. Annual jack recalibration reminder every Dec/Jan.');
 
-        // ---- Subsection 3: Staking & Layout ----
-        + subgroup('3. Staking & Layout')
+      // ---- Subsection 3: Staking & Layout ----
+      var sub3Inner =
         // CHANGE B (Brad 2026-08-13): "Staking & Layout PF's responsibility?" Yes/No
         // toggle — the NEW source of truth for whether staking is PF's job (Brad chose
         // this over reading the contract). Renders as a live save-on-change select
@@ -16750,7 +16788,7 @@ try {
         // Visibility is set at render time from the effective toggle value and toggled
         // live by pfStakingToggleVisibility (a document 'change' listener) WITHOUT a
         // re-render — the field's own onchange still saves via pfLiveFieldChange.
-        + fields([
+          fields([
             field('Staking & Layout PF\'s responsibility?', '')
           ])
         + (function(){
@@ -16777,18 +16815,18 @@ try {
           ])
         + fields([
             fieldLinked('Email to MLS Link', '', '', 'website')
-          ])
+          ]);
 
-        // ---- Subsection 4: Safety ----
-        // The Safety fields render in their OWN nested `safety`-keyed card injected
-        // post-render (below) so the existing safety override data is preserved. Here we
-        // place only the blue header + a pointer note; the nested card lands right under it
-        // in DOM order (both are children of this card body, appended in sequence).
-        + subgroup('4. Safety')
+      // ---- Subsection 4: Safety ----
+      // The Safety fields render in their OWN nested `safety`-keyed card injected
+      // post-render (below) INTO this subsection's collapsible body via the
+      // data-sr-safety-anchor marker, so the existing safety override data is preserved
+      // AND the card collapses together with the "4. Safety" subsection.
+      var sub4Inner = '<div data-sr-safety-anchor></div>';
 
-        // ---- Subsection 5: Mobilization Preparation ----
-        + subgroup('5. Mobilization Preparation')
-        + subgroupNote('Proof roll: obtain from GC on geotech letterhead before mobilizing.')
+      // ---- Subsection 5: Mobilization Preparation ----
+      var sub5Inner =
+          subgroupNote('Proof roll: obtain from GC on geotech letterhead before mobilizing.')
         + fields([
             field('Building Pad Passed Proof Roll', ''),
             field('Date Proof Roll Received', '')
@@ -16835,20 +16873,22 @@ try {
             fieldLinked('Site Readiness Checklist Link', '', '', 'website'),
             field('Checklist Notes', '')
           ])
+        // Inner sub-divider (stays a plain subgroup, like subgroupSub inside E&D).
         + subgroup('Field Ops Manager Jobsite Visit')
         + fields([
             field('Field Ops Manager Visit - Scheduled Date', ''),
             field('Field Ops Manager Visit - Actual Date Visited', ''),
             field('Field Ops Manager Visit - Comments / Recap', '')
-          ])
+          ]);
 
-        // ---- Subsection 6: Mobilization to Site (siteReadiness-owned rows) ----
-        // The PF Equipment MOB / DEMOB, Rental, Materials, and Fuel fields owned by the
-        // siteReadiness key render here. The existing Equipment + Material NESTED cards
-        // (their own equipment/material keys) are also folded into this subsection,
-        // injected post-render below in DOM order right after these rows.
-        + subgroup('6. Mobilization to Site')
-        + subhead('PF Equipment MOB')
+      // ---- Subsection 6: Mobilization to Site (siteReadiness-owned rows) ----
+      // The PF Equipment MOB / DEMOB, Materials, and Fuel fields owned by the
+      // siteReadiness key render here. The existing Equipment + Material NESTED cards
+      // (their own equipment/material keys) are injected post-render into this
+      // subsection's collapsible body at the data-sr-eqmat-anchor marker (end of inner),
+      // so they collapse together with "6. Mobilization to Site".
+      var sub6Inner =
+          subhead('PF Equipment MOB')
         + fields([
             field('Equipment Needed - VSC Rig', ''),
             field('Equipment Needed - Predrill Rig', ''),
@@ -16862,10 +16902,7 @@ try {
             field('Demob Transport Company', '')
           ])
         // Rental Equipment fields MOVED OUT (Brad 2026-08-12) into their own "7. Rental
-        // Equipment" subsection below (rendered right after this "6. Mobilization to Site"
-        // block). They stay PLAIN siteReadiness fields (same override key + save flow), so
-        // existing rental data + editability are preserved — only their placement + header
-        // changed. See the '7. Rental Equipment' subgroup at the end of srBody.
+        // Equipment" subsection below. See the '7. Rental Equipment' collapsible below.
         + subhead('Materials (Stone, if Aggregate Pier)')
         + subgroupNote('Helical -> piling form (TBD); Rigid Inclusions -> other items.')
         + fields([
@@ -16882,14 +16919,12 @@ try {
             field('Fuel Contact', ''),
             field('Fuel Delivery Dates', '')
           ])
+        // Anchor for the post-render Equipment + Material nested cards (injected below).
+        + '<div data-sr-eqmat-anchor></div>';
 
-        // ---- Subsection 7: Rental Equipment (Brad 2026-08-12) ----
-        // Pulled OUT of "6. Mobilization to Site" into its own numbered subsection directly
-        // after section 6. These stay PLAIN siteReadiness field() rows (SAME override key +
-        // Edit/Save as before), so existing rental data still displays and editability is
-        // unchanged — only the placement + the promoted "7." header changed.
-        + subgroup('7. Rental Equipment')
-        + fields([
+      // ---- Subsection 7: Rental Equipment (Brad 2026-08-12) ----
+      var sub7Inner =
+          fields([
             field('Rental Equipment', ''),
             field('Rental Company', ''),
             field('Rental Date Rented/Active', ''),
@@ -16897,6 +16932,19 @@ try {
             field('Rental Anticipated Return Date', ''),
             field('Rental Actual Date Called Off Rent', '')
           ]);
+
+      // Assemble the 7 COLLAPSIBLE subsections (default expanded, mirroring E&D). The
+      // activation banner stays ABOVE the collapsibles (section-level status, not a
+      // subsection). Each collapsibleSubgroup() rolls up/expands independently.
+      var srBody =
+          siteReadinessActivationBanner()
+        + collapsibleSubgroup('1. Shop Drawings', sub1Inner)
+        + collapsibleSubgroup('2. Testing', sub2Inner)
+        + collapsibleSubgroup('3. Staking & Layout', sub3Inner)
+        + collapsibleSubgroup('4. Safety', sub4Inner)
+        + collapsibleSubgroup('5. Mobilization Preparation', sub5Inner)
+        + collapsibleSubgroup('6. Mobilization to Site', sub6Inner)
+        + collapsibleSubgroup('7. Rental Equipment', sub7Inner);
       html += card(5, 'Site Readiness / Project Setup', null,
         srBody + linkRow(L.site), false, 'siteReadiness');
 
@@ -17864,13 +17912,15 @@ try {
         var safetyCardHtml = '<div class="pr-nested-card-wrap pr-safety-inline">'
           + card('', 'Safety', safetyMeta, safetyBody + linkRow(L.safety), true, 'safety')
           + '</div>';
-        // Insert BEFORE the "5. Mobilization Preparation" subgroup so Safety lands under
-        // the "4. Safety" header. Find that subgroup by text; fall back to beforeend.
-        var _mobPrepHdr = Array.prototype.find.call(
-          srCardForSafety.querySelectorAll('.pr-subgroup'),
-          function(el){ return /^5\.\s*Mobilization Preparation/.test((el.textContent||'').trim()); });
-        if (_mobPrepHdr) {
-          _mobPrepHdr.insertAdjacentHTML('beforebegin', safetyCardHtml);
+        // Insert INTO the "4. Safety" collapsible subsection body at its anchor marker
+        // (Brad 2026-08-13, TASK E) so the Safety nested card collapses WITH subsection 4.
+        // The anchor (data-sr-safety-anchor) lives inside the "4. Safety" collapsibleSubgroup
+        // body. Replace the anchor with the card (beforebegin then remove) so nothing else in
+        // the subsection shifts. Fallback: beforeend of the Site Readiness body (never lost).
+        var _safetyAnchor = srCardForSafety.querySelector('[data-sr-safety-anchor]');
+        if (_safetyAnchor) {
+          _safetyAnchor.insertAdjacentHTML('beforebegin', safetyCardHtml);
+          _safetyAnchor.parentNode.removeChild(_safetyAnchor);
         } else {
           srCardForSafety.insertAdjacentHTML('beforeend', safetyCardHtml);
         }
@@ -17894,6 +17944,19 @@ try {
       // Material.
       var srCard = _srTopBody; // top-level Site Readiness body (see _srTopBody note above)
       if (srCard) {
+        // Anchor for the Equipment + Material nested cards: the marker inside the
+        // "6. Mobilization to Site" collapsible body (Brad 2026-08-13, TASK E) so both
+        // cards collapse WITH subsection 6. Injects each card beforebegin of the anchor
+        // (preserving order), then removes the anchor. Fallback: beforeend of the Site
+        // Readiness body (never lost) if the anchor is somehow absent.
+        var _eqmatAnchor = srCard.querySelector('[data-sr-eqmat-anchor]');
+        var _injectNested = function(cardHtml){
+          if (_eqmatAnchor && _eqmatAnchor.parentNode) {
+            _eqmatAnchor.insertAdjacentHTML('beforebegin', cardHtml);
+          } else {
+            srCard.insertAdjacentHTML('beforeend', cardHtml);
+          }
+        };
         // --- Equipment nested card ('equipment' key) ---
         // VENDOR CONTACTS DELETED (Brad 2026-08-12): the "Rental Equipment & Transport
         // (vendors)" contact grid was REMOVED from this section — that vendor contact
@@ -17912,7 +17975,7 @@ try {
               field('Fall Off Load', '')
             ]);
         _curSection = _prevEq;
-        srCard.insertAdjacentHTML('beforeend',
+        _injectNested(
           '<div class="pr-nested-card-wrap">'
           + card('', 'Equipment', null, eqBody, true, 'equipment')
           + '</div>');
@@ -17937,10 +18000,12 @@ try {
               field('Fuel Delivery', '')
             ]) + linkRow(L.material);
         _curSection = _prevMat;
-        srCard.insertAdjacentHTML('beforeend',
+        _injectNested(
           '<div class="pr-nested-card-wrap">'
           + card('', 'Material', null, matBody, true, 'material')
           + '</div>');
+        // Remove the now-consumed anchor (both cards injected before it).
+        if (_eqmatAnchor && _eqmatAnchor.parentNode) _eqmatAnchor.parentNode.removeChild(_eqmatAnchor);
       }
       // ALWAYS-LIVE mode OFF (Brad 2026-08-12): everything after this (orphan _surfaceExtras,
       // other sections) renders in the normal read/Edit-Save mode again.
@@ -19071,7 +19136,16 @@ try {
       var num = _curNum || '';
       var prev = el.getAttribute('data-pr-live-prev');
       prev = (prev == null ? '' : prev);
-      function revert(){ if (el.type === 'checkbox') { el.checked = (prev === 'Yes'); } else { el.value = prev; } }
+      // Toggle the .blank yellow highlight on the containing value cell to match the
+      // control's emptiness (Brad 2026-08-13, TASK F). Reuses the EXISTING .blank
+      // convention; no re-render needed. Only touches live cells (.pr-field-live).
+      function syncBlank(v){
+        var cell = el && el.closest ? el.closest('.pr-field-value.pr-field-live') : null;
+        if (!cell) return;
+        var empty = (v == null || String(v).trim() === '');
+        if (empty) cell.classList.add('blank'); else cell.classList.remove('blank');
+      }
+      function revert(){ if (el.type === 'checkbox') { el.checked = (prev === 'Yes'); } else { el.value = prev; } syncBlank(prev); }
       function msg(t, isErr){ pfLiveMsg(el, t, isErr); }
       if (!section || !label || !num) { revert(); msg('Could not save that change; please retry.', true); return; }
       var value = String(el.value == null ? '' : el.value).trim();
@@ -19104,6 +19178,7 @@ try {
           }
         } catch (e) {}
         el.setAttribute('data-pr-live-prev', value);   // new baseline for the next revert
+        syncBlank(value);                               // clear/apply yellow to match new value
         msg('Saved', false);
       }).catch(function(){
         el.disabled = false; revert();
