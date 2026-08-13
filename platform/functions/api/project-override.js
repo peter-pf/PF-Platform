@@ -400,6 +400,97 @@ function cleanSubmittalPull(input) {
   };
 }
 
+// ---- __subcontract_analysis reserved structured key (Brad 2026-08-13) ---------
+// The Subcontract Agreement card (Section 3, override key `contract`) gains a
+// "Subcontract Analysis" SUBSECTION: a business-level review of the executed/draft
+// subcontract (colored verdict, execution status, key terms, insurance + scope
+// summaries, and PF's risk exposure). Historically this lived only as a legacy
+// `D.analysis` block on the synced record (migrated from the standalone Subcontracts
+// tool -- Indy Housing Hub only). This reserved key lets the SAME analysis be stored
+// per-project as an override, and it takes precedence over the legacy `D.analysis`.
+// Stored as ONE reserved, OBJECT-valued key `__subcontract_analysis` INSIDE the
+// `contract` section:
+//   sections.contract.__subcontract_analysis = {
+//     verdict ('GREEN'|'YELLOW'|'RED'|'REVIEW'),
+//     execution_status (string, bounded),
+//     amount, counterparty, review_date (strings),
+//     summary (string),
+//     key_terms: [ { k, v }, ... ]         // bounded count + length
+//     insurance_summary, scope_summary (strings),
+//     risks: [ "...", ... ],               // bounded count + length
+//     source (string)
+//   }
+// This is the SIXTH reserved key (alongside __crm, __submittal_prereqs,
+// __submittal_cycles, __site_elevations, __submittal_pull) and rides the SAME merge:
+// Object.assign(existing, fields) preserves it when a normal flat field save omits it,
+// so editing the flat contract fields never wipes the analysis and vice-versa. The
+// payload ORIGINATES FROM DOCUMENT REVIEW (untrusted): every string is length-capped +
+// angle-bracket stripped here (defense-in-depth; the UI also escapes). verdict is
+// ENUM-GATED. STRICTLY validated (cleanSubcontractAnalysis below); a malformed body
+// fails the WHOLE save closed. Allowed ONLY under the `contract` section (400 elsewhere).
+const SUBAN_KEY = '__subcontract_analysis';
+const SUBAN_ALLOWED_SECTIONS = { contract: 1 };
+const SUBAN_VERDICTS = { GREEN: 1, YELLOW: 1, RED: 1, REVIEW: 1 };
+const SUBAN_MAX_EXEC = 200;           // execution_status string cap
+const SUBAN_MAX_META = 200;           // amount / counterparty / review_date cap
+const SUBAN_MAX_SUMMARY = 4000;       // summary / insurance / scope block cap
+const SUBAN_MAX_SOURCE = 500;         // footer source-note cap
+const SUBAN_MAX_TERMS = 40;           // key_terms rows; bounds abuse
+const SUBAN_MAX_TERM_K = 200;         // a key_terms label cap
+const SUBAN_MAX_TERM_V = 1000;        // a key_terms value cap
+const SUBAN_MAX_RISKS = 60;           // flagged risks; bounds abuse
+const SUBAN_MAX_RISK_LEN = 1000;      // one risk line cap
+
+// Validate + normalize an incoming __subcontract_analysis object into a clean, bounded
+// structure. Returns a SAFE object, or null if present-but-malformed (caller fails the
+// whole save closed). Rules mirror cleanSubmittalPull's defensive posture:
+//   - top-level must be a plain object (not array).
+//   - verdict is ENUM-gated (upper-cased); anything outside GREEN/YELLOW/RED/REVIEW =>
+//     coerced to 'REVIEW' (never rejects on a stray verdict -- the review is still valid).
+//   - execution_status / amount / counterparty / review_date / summary / insurance_summary
+//     / scope_summary / source are strings, length-capped + angle-bracket stripped (s()).
+//   - key_terms must be an array of {k,v} objects (capped in count + length); over the
+//     count cap => reject (null) so nothing is silently truncated.
+//   - risks must be an array of strings (capped in count + length); over the count cap =>
+//     reject. Empty risk lines are dropped.
+function cleanSubcontractAnalysis(input) {
+  if (input == null) return {};                        // absent => empty (caller preserves prior)
+  if (typeof input !== 'object' || Array.isArray(input)) return null; // present but not object => reject
+  const vraw = s(input.verdict, 20).toUpperCase();
+  const verdict = (vraw in SUBAN_VERDICTS) ? vraw : 'REVIEW';   // enum-gate; stray => REVIEW
+  let key_terms = [];
+  if (input.key_terms != null) {
+    if (!Array.isArray(input.key_terms)) return null;  // present but not an array => reject
+    if (input.key_terms.length > SUBAN_MAX_TERMS) return null;
+    for (const t of input.key_terms) {
+      if (!t || typeof t !== 'object' || Array.isArray(t)) return null; // bad row => reject whole save
+      const k = s(t.k, SUBAN_MAX_TERM_K);
+      const v = s(t.v, SUBAN_MAX_TERM_V);
+      if (k === '' && v === '') continue;              // drop fully-empty rows
+      key_terms.push({ k, v });
+    }
+  }
+  let risks = [];
+  if (input.risks != null) {
+    if (!Array.isArray(input.risks)) return null;      // present but not an array => reject
+    if (input.risks.length > SUBAN_MAX_RISKS) return null;
+    risks = input.risks.map((r) => s(r, SUBAN_MAX_RISK_LEN)).filter((r) => r !== '');
+  }
+  return {
+    verdict: verdict,
+    execution_status: s(input.execution_status, SUBAN_MAX_EXEC),
+    amount:           s(input.amount, SUBAN_MAX_META),
+    counterparty:     s(input.counterparty, SUBAN_MAX_META),
+    review_date:      s(input.review_date, SUBAN_MAX_META),
+    summary:          s(input.summary, SUBAN_MAX_SUMMARY),
+    key_terms:        key_terms,
+    insurance_summary: s(input.insurance_summary, SUBAN_MAX_SUMMARY),
+    scope_summary:     s(input.scope_summary, SUBAN_MAX_SUMMARY),
+    risks:            risks,
+    source:           s(input.source, SUBAN_MAX_SOURCE),
+  };
+}
+
 // Validate + normalize an incoming __crm object into a clean, bounded structure.
 // Returns a SAFE object (possibly {}), or null if the input is present but so
 // malformed it must be rejected (caller fails the whole save closed). Rules:
@@ -508,7 +599,7 @@ function cleanFields(input) {
   if (!input || typeof input !== 'object') return out;
   const keys = Object.keys(input).slice(0, MAX_FIELDS_PER_SECTION);
   for (const k of keys) {
-    if (k === CRM_KEY || k === PREREQ_KEY || k === CYCLES_KEY || k === SITE_ELEV_KEY || k === PULL_KEY) continue; // reserved structured keys; handled separately, never string-flattened
+    if (k === CRM_KEY || k === PREREQ_KEY || k === CYCLES_KEY || k === SITE_ELEV_KEY || k === PULL_KEY || k === SUBAN_KEY) continue; // reserved structured keys; handled separately, never string-flattened
     const label = s(k, MAX_LABEL);
     if (!label) continue;
     out[label] = s(input[k], MAX_VALUE);
@@ -668,6 +759,25 @@ export async function onRequestPost(context) {
       }
     }
 
+    // Reserved __subcontract_analysis structured key (Brad 2026-08-13): the Subcontract
+    // Analysis subsection on the Subcontract Agreement card (Section 3). Allowed ONLY under
+    // `contract`. Same posture as the other reserved keys: absent => untouched (preserve
+    // prior), present => strictly validated, malformed => reject the WHOLE save closed. The
+    // writer (Peter's review engine or a seed) sends this key WITHOUT the flat contract
+    // fields, so cleanFields yields {} and only this key is replaced; a normal contract field
+    // save omits it so the stored analysis is preserved by the merge below.
+    const hasSubanInBody = Object.prototype.hasOwnProperty.call(rawFieldsObj, SUBAN_KEY);
+    let subanUpdate; // undefined => untouched
+    if (hasSubanInBody) {
+      if (!SUBAN_ALLOWED_SECTIONS[section]) {
+        return json({ status: 'error', message: 'Subcontract analysis is not valid on this section.' }, 400);
+      }
+      subanUpdate = cleanSubcontractAnalysis(rawFieldsObj[SUBAN_KEY]);
+      if (subanUpdate === null) {
+        return json({ status: 'error', message: 'Invalid subcontract analysis; nothing was saved.' }, 400);
+      }
+    }
+
     // FAIL CLOSED: no KV -> we cannot persist. Do NOT report success.
     if (!env.PF_SCHEDULE) {
       return json({ status: 'error',
@@ -696,6 +806,9 @@ export async function onRequestPost(context) {
     // Carry forward any existing structured __submittal_pull (an OBJECT, like __crm).
     const prevPull = (existing[PULL_KEY] && typeof existing[PULL_KEY] === 'object' && !Array.isArray(existing[PULL_KEY]))
       ? existing[PULL_KEY] : undefined;
+    // Carry forward any existing structured __subcontract_analysis (an OBJECT, like __crm).
+    const prevSuban = (existing[SUBAN_KEY] && typeof existing[SUBAN_KEY] === 'object' && !Array.isArray(existing[SUBAN_KEY]))
+      ? existing[SUBAN_KEY] : undefined;
     const merged = Object.assign({}, existing, fields);
     // Whole-object replace of __crm when the request supplied one (the client sends
     // the complete per-firm selection each time); otherwise preserve the prior value.
@@ -722,6 +835,11 @@ export async function onRequestPost(context) {
     if (pullUpdate !== undefined) merged[PULL_KEY] = pullUpdate;
     else if (prevPull !== undefined) merged[PULL_KEY] = prevPull;
     else delete merged[PULL_KEY]; // never leave a stray/non-object key behind
+    // Same whole-object replace/preserve for __subcontract_analysis (the writer sends the
+    // COMPLETE analysis object each save); otherwise preserve the prior.
+    if (subanUpdate !== undefined) merged[SUBAN_KEY] = subanUpdate;
+    else if (prevSuban !== undefined) merged[SUBAN_KEY] = prevSuban;
+    else delete merged[SUBAN_KEY]; // never leave a stray/non-object key behind
     rec.sections[section] = merged;
 
     // Bound the number of sections (defense against a crafted flood of junk keys;

@@ -14533,6 +14533,119 @@ try {
         };
       } catch (e) { return null; }
     }
+    // Read the current project's Subcontract Analysis (Brad 2026-08-13). DUAL SOURCE,
+    // legacy-safe: the reserved `__subcontract_analysis` override under the `contract`
+    // section WINS; when absent, fall back to the legacy synced `D.analysis` block (so Indy
+    // Housing Hub, migrated from the standalone Subcontracts tool, keeps rendering). Returns
+    // a NORMALIZED object (never throws) or null when NEITHER source carries analysis (the
+    // subsection then shows its compact empty state). `d` = the current project record (D).
+    // Every string here is still passed through E() at render (payload is document-derived,
+    // treated as untrusted); this reader only normalizes shape, not escaping.
+    function pfSubcontractAnalysis(d){
+      try {
+        var ov = _curOverrides && _curOverrides.contract && _curOverrides.contract.__subcontract_analysis;
+        var A = (ov && typeof ov === 'object' && !Array.isArray(ov)) ? ov
+              : (d && d.analysis && typeof d.analysis === 'object' && !Array.isArray(d.analysis)) ? d.analysis
+              : null;
+        if (!A) return null;
+        function str(v){ return v == null ? '' : String(v); }
+        var terms = [];
+        if (Array.isArray(A.key_terms)) {
+          A.key_terms.forEach(function(t){
+            if (t && typeof t === 'object' && !Array.isArray(t)) terms.push({ k: str(t.k), v: str(t.v) });
+          });
+        }
+        var risks = Array.isArray(A.risks) ? A.risks.map(str).filter(function(r){ return r !== ''; }) : [];
+        return {
+          verdict:          str(A.verdict),
+          execution_status: str(A.execution_status),
+          amount:           str(A.amount),
+          counterparty:     str(A.counterparty),
+          review_date:      str(A.review_date),
+          summary:          str(A.summary),
+          key_terms:        terms,
+          insurance_summary: str(A.insurance_summary),
+          scope_summary:     str(A.scope_summary),
+          risks:            risks,
+          source:           str(A.source)
+        };
+      } catch (e) { return null; }
+    }
+    // Build the Subcontract Analysis SUBSECTION markup (Brad 2026-08-13). Rendered INSIDE the
+    // Subcontract Agreement card (Section 3) as a "Subcontract Analysis" subhead + content —
+    // NOT a standalone card. `A` = the normalized object from pfSubcontractAnalysis(D), or
+    // null. When null → a compact ONE-LINE empty state (density: no bulky placeholder). Office
+    // users (canEdit()) get a short hint that a review can be run; field_ops never reach this
+    // renderer at all (PM-view only). Every field goes through E() (document-derived = untrusted).
+    function pfSubcontractAnalysisSub(A){
+      var out = subhead('Subcontract Analysis');
+      if (!A) {
+        // Compact empty state — one line. Office users see the run hint; the subsection
+        // ALWAYS appears (Brad 2026-08-13: renders for every job).
+        out += '<div class="pr-empty-note">No subcontract analysis on file yet.'
+             + (canEdit() ? ' A review can be run once the subcontract is uploaded.' : '')
+             + '</div>';
+        return out;
+      }
+      var vraw = String(A.verdict || '').toUpperCase();
+      var vcls = vraw === 'GREEN' ? 'green' : (vraw === 'RED' ? 'red' : 'yellow');
+
+      // Prominent execution-status banner. green = fully executed, amber = draft/unsigned,
+      // grey = unknown/unverified.
+      if (A.execution_status) {
+        var esRaw = String(A.execution_status);
+        var esUp = esRaw.toUpperCase();
+        var esCls = /FULLY EXECUTED|EXECUTED/.test(esUp) ? 'green'
+                  : /DRAFT|NEEDS SIGNATURE|UNSIGNED|PENDING/.test(esUp) ? 'amber'
+                  : 'grey';
+        out += '<div class="pr-exec '+esCls+'">'
+             +   '<span class="pr-exec-dot"></span>'
+             +   '<span class="pr-exec-label">Execution Status</span>'
+             +   '<span class="pr-exec-val">'+E(esRaw)+'</span>'
+             + '</div>';
+      }
+
+      out += '<div class="pr-an-head">'
+           +   '<span class="pr-verdict '+vcls+'">'+E(vraw || 'REVIEW')+'</span>';
+      if (A.amount) out += '<span class="pr-an-meta">'+E(A.amount)+'</span>';
+      if (A.counterparty) out += '<span class="pr-an-meta">'+E(A.counterparty)+'</span>';
+      if (A.review_date) out += '<span class="pr-an-meta">Reviewed '+E(A.review_date)+'</span>';
+      out += '</div>';
+
+      if (A.summary) out += '<div class="pr-an-summary">'+E(A.summary)+'</div>';
+
+      if (A.key_terms && A.key_terms.length) {
+        out += subhead('Key Terms');
+        out += '<div class="pr-an-terms">';
+        A.key_terms.forEach(function(t){
+          out += '<div class="pr-an-term"><span class="k">'+E(t.k)+'</span>'
+               + '<span class="v">'+E(t.v)+'</span></div>';
+        });
+        out += '</div>';
+      }
+
+      if (A.insurance_summary) {
+        out += subhead('Insurance');
+        out += '<div class="pr-an-block">'+E(A.insurance_summary)+'</div>';
+      }
+      if (A.scope_summary) {
+        out += subhead('Scope of Work');
+        out += '<div class="pr-an-block">'+E(A.scope_summary)+'</div>';
+      }
+
+      if (A.risks && A.risks.length) {
+        out += subhead('Risk Exposure to PF');
+        out += '<ul class="pr-an-risks">';
+        A.risks.forEach(function(r){ out += '<li class="pr-an-risk">'+E(r)+'</li>'; });
+        out += '</ul>';
+      }
+
+      out += '<div class="pr-an-foot">'
+           + E((A.source || 'Migrated from the standalone Subcontracts review.')
+               + ' Business-level summary, not legal advice.')
+           + '</div>';
+      return out;
+    }
     // Read-view of ONE area as a COMPACT single row (Brad 2026-08-12 density pass): a small
     // table-like row — Area | Site Grade Elev | FFE — NOT a collapsible card. Blank values
     // show a yellow placeholder; a blank area name falls back to "Untitled Area".
@@ -16354,81 +16467,17 @@ try {
               return '<span class="pr-link missing" title="Folder not found in SharePoint">'+pfFolderIcoSvg()+'<span class="pf-folder-txt">'+E(l.label)+'</span></span>';
             }).join('');
             return '<div class="pr-subhead">Subcontract Agreement</div><div class="pr-links">'+out+'</div>';
-          })(), false, 'contract');
-
-      // ----- 3b. Subcontract Analysis (migrated from the standalone Subcontracts tool) -----
-      // PM-view only. Renders when the record carries an analysis block. Same content the
-      // standalone subcontracts.html presents: colored verdict, summary, key terms, insurance
-      // + scope summaries, and the flagged risks list. The fo-projects field view uses a
-      // separate renderer and never reads D.analysis, so this stays out of the field view.
-      var A = D.analysis;
-      if (A) {
-        var vraw = String(A.verdict || '').toUpperCase();
-        var vcls = vraw === 'GREEN' ? 'green' : (vraw === 'RED' ? 'red' : 'yellow');
-        var redCount = (A.risks || []).filter(function(r){ return /^\s*RED\b/i.test(String(r)); }).length;
-        var riskMeta = (A.risks ? A.risks.length : 0) + ' flagged'
-          + (redCount ? ' · ' + redCount + ' RED' : '');
-
-        var ab = '';
-
-        // Prominent execution-status banner (top of card). Auto-determined from the
-        // contract's signature / DocuSign completion during extraction; set manually for now.
-        // green = fully executed, amber = draft/unsigned, grey = unknown/unverified.
-        if (A.execution_status) {
-          var esRaw = String(A.execution_status);
-          var esUp = esRaw.toUpperCase();
-          var esCls = /FULLY EXECUTED|EXECUTED/.test(esUp) ? 'green'
-                    : /DRAFT|NEEDS SIGNATURE|UNSIGNED|PENDING/.test(esUp) ? 'amber'
-                    : 'grey';
-          ab += '<div class="pr-exec '+esCls+'">'
-              +   '<span class="pr-exec-dot"></span>'
-              +   '<span class="pr-exec-label">Execution Status</span>'
-              +   '<span class="pr-exec-val">'+E(esRaw)+'</span>'
-              + '</div>';
-        }
-
-        ab += '<div class="pr-an-head">'
-            +   '<span class="pr-verdict '+vcls+'">'+E(vraw || 'REVIEW')+'</span>';
-        if (A.amount) ab += '<span class="pr-an-meta">'+E(A.amount)+'</span>';
-        if (A.counterparty) ab += '<span class="pr-an-meta">'+E(A.counterparty)+'</span>';
-        if (A.review_date) ab += '<span class="pr-an-meta">Reviewed '+E(A.review_date)+'</span>';
-        ab += '</div>';
-
-        if (A.summary) ab += '<div class="pr-an-summary">'+E(A.summary)+'</div>';
-
-        if (A.key_terms && A.key_terms.length) {
-          ab += subhead('Key Terms');
-          ab += '<div class="pr-an-terms">';
-          A.key_terms.forEach(function(t){
-            ab += '<div class="pr-an-term"><span class="k">'+E(t.k)+'</span>'
-                + '<span class="v">'+E(t.v)+'</span></div>';
-          });
-          ab += '</div>';
-        }
-
-        if (A.insurance_summary) {
-          ab += subhead('Insurance');
-          ab += '<div class="pr-an-block">'+E(A.insurance_summary)+'</div>';
-        }
-        if (A.scope_summary) {
-          ab += subhead('Scope of Work');
-          ab += '<div class="pr-an-block">'+E(A.scope_summary)+'</div>';
-        }
-
-        if (A.risks && A.risks.length) {
-          ab += subhead('Risk Exposure to PF');
-          ab += '<ul class="pr-an-risks">';
-          A.risks.forEach(function(r){ ab += '<li class="pr-an-risk">'+E(r)+'</li>'; });
-          ab += '</ul>';
-        }
-
-        ab += '<div class="pr-an-foot">'
-            + E((A.source || 'Migrated from the standalone Subcontracts review.')
-                + ' Business-level summary, not legal advice.')
-            + '</div>';
-
-        html += card('3b', 'Subcontract Analysis', riskMeta, ab, false);
-      }
+          })()
+        // ----- Subcontract Analysis SUBSECTION (Brad 2026-08-13) -----
+        // NESTED into this Subcontract Agreement card as a "Subcontract Analysis" subhead +
+        // content, rendered AFTER the Subcontract Agreement links (formerly a standalone
+        // "3b. Subcontract Analysis" card — now removed). ALWAYS appears (every job): full
+        // render when analysis data exists, a compact one-line empty state otherwise. DUAL
+        // SOURCE: the reserved `__subcontract_analysis` override under `contract` WINS, else
+        // the legacy synced `D.analysis` block (Indy Housing Hub) — see pfSubcontractAnalysis().
+        // PM-view only: the fo-projects field view uses a separate renderer and never calls
+        // this. Every field is escaped via E() (document-derived payload = untrusted).
+        + pfSubcontractAnalysisSub(pfSubcontractAnalysis(D)), false, 'contract');
 
       // ----- 3. Engineering & Design (RESTORED standalone top-level section) -----
       // Brad (2026-08-07, batch-8 CORRECTION): batch-4 wrongly ELIMINATED this
@@ -18481,8 +18530,9 @@ try {
       // Top-level cards are direct children of root. Some are wrapped only for nested
       // cards; the numbered section cards themselves are direct root children. Select
       // direct-child .pr-cards only, so we never treat a nested card as a top-level
-      // section. (The '3b' Subcontract Analysis card is a computed summary with no
-      // data fields -> total 0 -> omitted automatically.)
+      // section. (The Subcontract Analysis SUBSECTION now lives INSIDE the Subcontract
+      // Agreement card (Brad 2026-08-13); it has no editable .pr-field rows of its own,
+      // so the parent card's status count is unaffected.)
       var cards = root.querySelectorAll(':scope > .pr-card');
       for (var i = 0; i < cards.length; i++){
         try { pfRenderSectionStatusBar(cards[i]); } catch (e) {}
