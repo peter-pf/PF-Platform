@@ -8,7 +8,9 @@ import { JSDOM } from 'jsdom';
 //   (b) __submittal_pull reconciled=true -> quiet GREEN note on the TOTAL row.
 //   (c) __submittal_pull reconciled=false -> AMBER note + whole-table UNVERIFIED stamp.
 //   (d) structural_found=true -> "Structural/Civil drawings: found" (green);
-//       structural_found=false/null -> "pending" (grey). ffe_status=pending -> FFE note.
+//       structural_found=false/null -> "pending" (grey). ffe_status=pending -> FFE note;
+//       ffe_status=sourced -> green "FFE: sourced" chip (mirrors structural-found);
+//       ffe_status='' -> neither chip nor note.
 //   (e) office (canEdit) sees the "Pull from Approved Drawings" button; field_ops does NOT.
 //   (f) status='requested' -> button disabled + "Pull requested…" state.
 // Run from platform/ dir (reads index.html).
@@ -172,8 +174,48 @@ function sgeWrapFrom(root) {
   ok(!sge.querySelector('.pf-sge-src-found'), 's2(d): NOT "found" when structural_found=false');
   const pend = sge.querySelector('.pf-sge-src-pending');
   ok(!!pend && /pending/i.test(pend.textContent), 's2(d): "pending" shown when structural_found=false');
-  // ffe_status '' -> no FFE-pending note
+  // ffe_status '' -> neither the FFE-pending note NOR a "FFE: sourced" chip
   ok(!/FFE pending/i.test(sge.textContent), 's2(d): no FFE note when ffe_status is empty');
+  ok(!/FFE:/.test(sge.textContent), 's2(d): no "FFE: sourced" chip when ffe_status is empty');
+}
+
+// ---------- SCENARIO 6: ffe_status='sourced' -> green "FFE: sourced" chip ----------
+{
+  const { w } = makeWindow('admin');
+  try { w.eval(block); } catch (e) { console.log('EVAL ERROR (s6): ' + e.message); process.exit(2); }
+  w.PF_PROJECT_OVERRIDES = { '26-999': { sections: { engineering: {
+    __site_elevations: AREAS,
+    __submittal_pull: {
+      source_pdf: { name: 'set.pdf', revision: 'R3', date: '2026-07-23' },
+      pulled_at: '2026-08-13T00:00:00Z', requested_at: '', status: 'pulled',
+      reconciled: true, extracted_total: { piers: '1804', lf: '16576' },
+      pier_schedule_total: { piers: '1804', lf: '16576' }, delta: { piers: '0', lf: '0' },
+      structural_found: true, ffe_status: 'sourced', notes: []
+    }
+  } } } };
+  const root = w.document.getElementById('root');
+  try { w.__renderInto(D, root); } catch (e) { console.log('RENDER ERROR (s6): ' + e.message); }
+  const sge = sgeWrapFrom(root);
+  ok(!!sge, 's6: block present');
+  const src = sge.querySelector('.pf-sge-srcline');
+  ok(!!src, 's6(d): source-indicator line present');
+  // TWO green found-chips on the row: structural + FFE (both use pf-sge-src-found)
+  const founds = src.querySelectorAll('.pf-sge-src-found');
+  ok(founds.length === 2, 's6(d): 2 green found chips on the srcline (structural + FFE), got ' + founds.length);
+  // The FFE chip: green, dotted, labeled "FFE: sourced"
+  const ffeChip = Array.prototype.filter.call(src.querySelectorAll('.pf-sge-src-found'), function(el){ return /FFE:/.test(el.textContent); })[0];
+  ok(!!ffeChip, 's6(d): green "FFE:" chip present (pf-sge-src-found)');
+  ok(ffeChip && ffeChip.classList.contains('pf-sge-src-found'), 's6(d): FFE chip reuses pf-sge-src-found (green + bold)');
+  ok(ffeChip && !!ffeChip.querySelector('.pf-sge-src-dot'), 's6(d): FFE chip has the green pf-sge-src-dot');
+  ok(ffeChip && /FFE:\s*sourced/i.test(ffeChip.textContent), 's6(d): FFE chip reads "FFE: sourced"');
+  // structural chip still present + independent
+  ok(!!Array.prototype.filter.call(src.querySelectorAll('.pf-sge-src-found'), function(el){ return /Structural\/Civil/.test(el.textContent); })[0],
+     's6(d): structural-found chip still present + unchanged');
+  // no pending FFE note when sourced
+  ok(!/FFE pending/i.test(sge.textContent), 's6(d): NO FFE-pending note when ffe_status=sourced');
+  // structural chip renders BEFORE the FFE chip on the row (order check)
+  ok(/Structural\/Civil/.test(founds[0].textContent) && /FFE:/.test(founds[1].textContent),
+     's6(d): structural chip first, FFE chip second on the row');
 }
 
 // ---------- SCENARIO 3: status='requested' -> disabled + requested state ----------

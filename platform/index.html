@@ -14724,9 +14724,21 @@ try {
         // false OR null both render as pending (grey) — we never claim "found" without proof.
         strucChip = '<span class="pf-sge-src pf-sge-src-pending"><span class="pf-sge-src-dot"></span>Structural/Civil drawings: pending</span>';
       }
-      var ffeChip = (pull.ffe_status === 'pending')
-        ? '<span class="pf-sge-ffe-note">FFE pending structural/civil drawings</span>'
-        : '';
+      // FFE state (Brad 2026-08-13): positive GREEN "FFE: sourced" chip when sourced (mirrors
+      // the structural-found chip: same pf-sge-src-found green dot + bold green text). 'pending'
+      // keeps the existing amber/grey note. Empty/unknown -> nothing. Canonical enum
+      // (project-override.js PULL_FFE_STATUSES) is {sourced, pending, ''}; anything non-empty and
+      // non-'pending' is treated as sourced-positive for robustness. Chip sits on the same
+      // .pf-sge-srcline row, AFTER the structural chip.
+      var ffeVal = String(pull.ffe_status || '');
+      var ffeChip;
+      if (ffeVal === 'pending') {
+        ffeChip = '<span class="pf-sge-ffe-note">FFE pending structural/civil drawings</span>';
+      } else if (ffeVal !== '') {
+        ffeChip = '<span class="pf-sge-src pf-sge-src-found"><span class="pf-sge-src-dot"></span>FFE: ' + E(ffeVal) + '</span>';
+      } else {
+        ffeChip = '';
+      }
       return '<div class="pf-sge-srcline">' + strucChip + ffeChip + '</div>';
     }
     // Source-PDF provenance line (Stage 2): which sealed set the pull read (name / rev / date).
