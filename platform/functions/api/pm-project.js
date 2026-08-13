@@ -199,14 +199,26 @@ export async function onRequestPost(context) {
       list.projects.forEach((p) => { const pp = parseNum(p.projectNumber); if (pp && pp.yy === yy) takenNs.push(pp.n); });
 
       // Feature 2 (Brad 2026-08-13): the client may pass an EXPLICIT projectNumber
-      // (the office CONFIRMED or OVERRODE the prefilled suggestion). Honor it when it
-      // is a valid YY-NNN AND not already taken in the overlay; otherwise FAIL SAFE to
-      // the server's derived next number (never assign a malformed/duplicate number).
+      // (the office CONFIRMED or OVERRODE the prefilled suggestion). The SERVER stays
+      // the authority + collision guard. Honor the explicit number ONLY when it is a
+      // well-formed, current-year, genuinely-unused YY-NNN. Otherwise FAIL SAFE to the
+      // server's derived next number (never assign a malformed / duplicate /
+      // cross-year number).
+      //
+      // parseNum() normalizes format BEFORE comparison, so a format-variant like
+      // "26-4" is treated as 26-004 for the duplicate check and caught as a duplicate
+      // of an existing "26-004". takenNs already includes the base `existingNumbers`
+      // the client sent (project-master / awarded feed) PLUS this overlay's own
+      // numbers, so a base-feed collision is rejected too — not just overlay dupes.
       let projectNumber;
-      const requested = parseNum(parsed.projectNumber);
-      const overlayHas = (pn) => list.projects.some((p) => String(p.projectNumber || '') === String(pn));
-      if (requested && String(parsed.projectNumber).trim() && !overlayHas(String(parsed.projectNumber).trim())) {
-        projectNumber = String(parsed.projectNumber).trim();
+      const requested = parseNum(parsed.projectNumber);           // null if malformed / not YY-NNN
+      const explicitAccepted =
+        requested &&                    // (c) strict YY-NNN format (parseNum returns null otherwise)
+        requested.yy === yy &&          // (b) year prefix must equal the award/derivation year
+        !takenNs.includes(requested.n); // (a) numeric part not already taken (base feed + overlay)
+      if (explicitAccepted) {
+        // Re-emit in canonical zero-padded form so "26-4" persists as "26-004".
+        projectNumber = requested.yy + '-' + String(requested.n).padStart(3, '0');
       } else {
         projectNumber = nextNumber(yy, takenNs);
       }

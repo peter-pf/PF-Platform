@@ -152,6 +152,40 @@ async function runServerCases() {
     const b = await res.json();
     ok('(h4) no number -> derived 26-012', b.ok === true && b.record.projectNumber === '26-012');
   }
+  // (h6) BASE-COLLISION: explicit number equals a base `existingNumbers` entry that is
+  // NOT in the overlay. The server must reject it (base feed is authoritative) and
+  // derive instead. Overlay is empty; 26-004 lives only in existingNumbers.
+  {
+    const kv = makeKV();
+    const res = await PM.onRequestPost(ctx(kv, { action: 'create', name: 'Base Collide Job', projectNumber: '26-004', existingNumbers: ['26-001', '26-004'] }));
+    const b = await res.json();
+    ok('(h6) base-collision -> derived 26-005 (not 26-004)', b.ok === true && b.record.projectNumber !== '26-004' && b.record.projectNumber === '26-005');
+  }
+  // (h7) FORMAT-VARIANT duplicate: explicit "26-4" against an existing "26-004" must be
+  // caught as a duplicate (normalized before compare) -> derive.
+  {
+    const kv = makeKV();
+    const res = await PM.onRequestPost(ctx(kv, { action: 'create', name: 'Variant Dup Job', projectNumber: '26-4', existingNumbers: ['26-004', '26-009'] }));
+    const b = await res.json();
+    ok('(h7) format-variant 26-4 vs 26-004 -> derived 26-010', b.ok === true && b.record.projectNumber !== '26-4' && b.record.projectNumber !== '26-004' && b.record.projectNumber === '26-010');
+  }
+  // (h8) YY-MISMATCH: explicit "99-001" when the award/derivation year is "26" -> reject
+  // (no cross-year explicit numbers) and derive in the current year.
+  {
+    const kv = makeKV();
+    const res = await PM.onRequestPost(ctx(kv, { action: 'create', name: 'Wrong Year Job', year: '26', projectNumber: '99-001', existingNumbers: ['26-007'] }));
+    const b = await res.json();
+    ok('(h8) yy-mismatch 99-001 (year=26) -> derived 26-008', b.ok === true && b.record.projectNumber === '26-008');
+  }
+  // (h9) FORMAT-VARIANT that is genuinely UNUSED is still honored (canonical zero-pad):
+  // "26-7" with no 26-007 taken -> accepted, persisted as "26-007".
+  {
+    const kv = makeKV();
+    const res = await PM.onRequestPost(ctx(kv, { action: 'create', name: 'Variant OK Job', projectNumber: '26-7', existingNumbers: ['26-001', '26-002'] }));
+    const b = await res.json();
+    ok('(h9) unused variant 26-7 honored as 26-007', b.ok === true && b.record.projectNumber === '26-007');
+  }
+
   // (h5) field_ops (wrong area) -> denied (no record).
   {
     const kv = makeKV();
