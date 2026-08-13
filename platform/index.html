@@ -3189,6 +3189,30 @@ tr.pf-dragging { opacity: 0.45; }
 }
 .pr-crow-editbtn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
 .pr-crow-head .pr-crow-act { visibility: hidden; } /* keep header columns aligned */
+/* Inline-editable contact cells (Brad 2026-08-13 REWORK): every field is live-editable */
+/* with NO Edit button — a subtle dotted underline signals editability; focus lifts a    */
+/* light box; empty cells show a faint dash so an empty field is still clickable.         */
+.pr-pc-inline {
+  border-bottom: 1px dashed var(--border-light);
+  cursor: text; border-radius: 2px; padding: 1px 2px;
+  transition: background 0.1s, box-shadow 0.1s;
+}
+.pr-pc-inline:hover { background: var(--bg-2, #eef2f6); }
+.pr-pc-inline:focus {
+  outline: none; background: #fffdf5;
+  box-shadow: 0 0 0 2px var(--accent, #2a7ab0); border-bottom-color: transparent;
+}
+.pr-pc-inline:empty::before { content: '—'; color: var(--muted, #9aa4b0); }
+.pr-pc-company-edit { display: inline-block; min-width: 120px; }
+.pr-pc-addbtn { margin-top: 6px; }
+.pf-pc-inline-msg { margin-top: 4px; }
+/* Remove (×) button per inline row: compact, red on hover. */
+.pr-crow-rmbtn {
+  border: 1px solid var(--border-light); background: var(--bg-2, #eef2f6);
+  color: #b91c1c; border-radius: 4px;
+  font-size: 0.72rem; line-height: 1; padding: 3px 7px; cursor: pointer;
+}
+.pr-crow-rmbtn:hover { background: #b91c1c; color: #fff; border-color: #b91c1c; }
 /* Inline directory-row editor (swaps in place of the .pr-crow row). */
 .pr-crow-edit {
   padding: 8px; margin: 4px 0; border: 1px solid var(--border-light);
@@ -18587,14 +18611,14 @@ try {
       // CHANGE B: hydrate the inline Staking & Layout picker (company dropdown +
       // contact checkboxes) when it rendered (office + toggle=Yes). Fail-soft.
       if (typeof pfStakingHydrate === 'function') pfStakingHydrate(root);
-      // ALWAYS-LIVE Project Contacts (Brad 2026-08-13): for office users, inject a
-      // cascading picker above EVERY Project Contacts CRM cards host + hydrate it, so
-      // companies/contacts are editable with NO Edit/Save (save-on-change via the
-      // delegated 'change' listener -> pfPcSaveGroup). field_ops: nothing injected
-      // (read-only cards only). Runs AFTER pfCrmRenderCards so both the read cards and
-      // the picker reflect the same saved selection. Fail-soft.
-      if (typeof pfPcInjectLiveSelectors === 'function') pfPcInjectLiveSelectors(root);
-      if (typeof pfPcHydrateLiveSelectors === 'function') pfPcHydrateLiveSelectors(root);
+      // ALWAYS-LIVE Project Contacts INLINE CRUD (Brad 2026-08-13, REWORK): for office
+      // users, mount inline-editable contact rows (no Edit button — save-on-change) and
+      // an "+ Add contact" button per group on top of the resolved read cards that
+      // pfCrmRenderCards already rendered. field_ops: read-only cards only (nothing
+      // mounted). Runs AFTER pfCrmRenderCards. Fail-soft. Replaces the withdrawn
+      // pfPc* live-selector-injection approach (company dropdown/checkbox save-on-change),
+      // which did not match Brad's spec.
+      if (typeof pfPcMountInline === 'function') pfPcMountInline(root);
 
       // ALWAYS-LIVE prereq controls (Brad 2026-08-13): seed each live text/date control's
       // pre-change baseline so a fail-closed revert has the true prior value. Fail-soft.
@@ -20085,223 +20109,6 @@ try {
       });
     };
 
-    // ==== PROJECT CONTACTS — ALWAYS-LIVE CRM selectors (Brad 2026-08-13) ==========
-    // Brad is actively swapping companies/contacts on Project Contacts and wants it
-    // FRICTIONLESS: no Edit button, no Save button — the same always-live model that
-    // Site Readiness fields (_srLiveEdit) and the inline Staking selector already use.
-    //
-    // MODEL: this GENERALIZES pfStakingSaveSelection to EVERY Project Contacts CRM
-    // group. Each group already renders a read-only cards host
-    // (.pr-crm-cards[data-crm-cards="<Section>"][data-crm-cards-key="<key>"]) that
-    // pfCrmRenderCards fills. For OFFICE users we inject the SAME cascading picker
-    // (pfCrmSelectorBlock) directly ABOVE that host and auto-persist on every company
-    // dropdown / contact checkbox change — no explicit Save. field_ops sees only the
-    // resolved read cards (no picker injected).
-    //
-    // SECTION-KEY ROUTING: the override section for a group is the host's
-    // data-crm-cards-key (design_professionals / general / pfTeam / safety /
-    // siteReadiness / equipment / material). The group name is data-crm-cards. We
-    // resolve the trade (Category filter) from the matching trade map so the injected
-    // picker filters the directory exactly like the section editor did. Each group
-    // writes ONLY to <key>.__crm[<group>] and NEVER touches another section/group.
-    //
-    // MERGE-PRESERVE (critical): the server does Object.assign(existing, fields) at the
-    // SECTION level, so POSTing {__crm:<map>} REPLACES the whole __crm object. Keys that
-    // share a section (general=Owner+GC, design_professionals=4 firms, equipment=2,
-    // material=2) would clobber their siblings if we sent only one group. So on every
-    // save we READ the current full __crm map for that section (pfCrmMap(key)), SET only
-    // THIS group, and write the merged map back. All other reserved keys in the section
-    // (__submittal_pull / __site_elevations / __subcontract_analysis / __contract_pull /
-    // __submittal_cycles / __submittal_prereqs / flat string fields) are untouched
-    // because they are DIFFERENT keys under the section object, and Object.assign only
-    // replaces the single __crm key we send.
-
-    // Trade (master-list Category) for a (crmKey, groupName). Mirrors the exact maps the
-    // section editor used (pfEditSection): design_professionals -> PF_CRM_SECTION_TRADE;
-    // general -> PF_CRM_GENERAL_TRADE; everything else -> PF_CRM_NEWGROUP_TRADE[key].
-    // Falls back to the group name itself (a greenfield trade filter) if unmapped, which
-    // is harmless (an unknown Category just yields an empty company dropdown + Add).
-    function pfPcGroupTrade(crmKey, groupName){
-      if (crmKey === 'design_professionals') return PF_CRM_SECTION_TRADE[groupName] || groupName;
-      if (crmKey === 'general') return PF_CRM_GENERAL_TRADE[groupName] || groupName;
-      var m = PF_CRM_NEWGROUP_TRADE[crmKey];
-      return (m && m[groupName]) ? m[groupName] : groupName;
-    }
-
-    // Inject an always-live cascading picker above every Project Contacts CRM cards
-    // host, for OFFICE users only. Idempotent (skips a host that already has one). The
-    // read host itself is left untouched (pfCrmRenderCards still fills it in place).
-    // The inline Staking selector in Site Readiness (data-pf-staking-picker) keeps its
-    // OWN save button and is OUTSIDE .pr-pc-section, so it is not touched here.
-    function pfPcInjectLiveSelectors(root){
-      if (!root || !root.querySelector) return;
-      var office = (typeof canEdit === 'function') ? canEdit() : false;
-      if (!office) return; // field_ops: read-only cards only, no controls injected
-      var pc = root.querySelector('.pr-pc-section');
-      if (!pc) return;
-      pc.querySelectorAll('.pr-crm-cards[data-crm-cards]').forEach(function(host){
-        var groupName = host.getAttribute('data-crm-cards') || '';
-        var crmKey = host.getAttribute('data-crm-cards-key') || 'design_professionals';
-        if (!groupName) return;
-        // Skip if a live picker for this group already sits right before the host.
-        var prev = host.previousElementSibling;
-        if (prev && prev.getAttribute && prev.getAttribute('data-pf-pc-picker') === groupName) return;
-        var trade = pfPcGroupTrade(crmKey, groupName);
-        var wrap = document.createElement('div');
-        wrap.className = 'pr-crm-wrap';
-        wrap.setAttribute('data-pf-pc-picker', groupName);
-        wrap.setAttribute('data-pf-pc-key', crmKey);
-        wrap.innerHTML = ''
-          + '<div class="pr-edit-note">Change the company or contacts anytime — saved automatically for the whole office.</div>'
-          + pfCrmSelectorBlock(groupName, trade, crmKey)
-          + '<div class="pr-dir-msg pf-pc-msg" style="display:none;font-size:0.76rem;margin:2px 0;"></div>';
-        host.parentNode.insertBefore(wrap, host);
-      });
-    }
-
-    // Hydrate every injected Project Contacts live picker (company dropdown + contact
-    // checkboxes) after render. Mirrors pfStakingHydrate; fail-soft.
-    function pfPcHydrateLiveSelectors(root){
-      if (!root || !root.querySelectorAll) return;
-      root.querySelectorAll('[data-pf-pc-picker]').forEach(function(p){ pfCrmHydrate(p); });
-    }
-
-    // SAVE-ON-CHANGE for one Project Contacts live picker. Called when a group's company
-    // dropdown or a contact checkbox changes (document-level 'change' delegation below).
-    // Harvests THIS group's chosen company + checked contactIds via pfCollectCrm (scoped
-    // to the picker's .pr-crm block), MERGES it into the section's current __crm map
-    // (preserving sibling groups), and POSTs {num, section:<key>, fields:{__crm:<merged>}}.
-    // FAIL CLOSED: on any non-{ok:true,saved:true} response, revert the changed control
-    // to its prior value + inline error; NO renderProjectRecord (no page bounce) — just
-    // re-render the resolved read cards in place (pfCrmRenderCards) like the staking save.
-    function pfPcSaveGroup(block, changedEl){
-      if (typeof canEdit === 'function' && !canEdit()) return; // server also 403s
-      var wrap = block && block.closest ? block.closest('[data-pf-pc-picker]') : null;
-      if (!wrap) return;
-      var msgEl = wrap.querySelector('.pf-pc-msg');
-      function say(t, isErr){
-        if (!msgEl) return;
-        msgEl.textContent = t || '';
-        msgEl.style.display = t ? 'block' : 'none';
-        msgEl.style.color = isErr ? '#b91c1c' : '#166534';
-      }
-      var num = _curNum || '';
-      var groupName = wrap.getAttribute('data-pf-pc-picker') || '';
-      var crmKey = wrap.getAttribute('data-pf-pc-key') || 'design_professionals';
-      if (!num || !groupName) { say('Could not save; please retry.', true); return; }
-
-      // Snapshot the changed control's prior value so a failed save can revert it. The
-      // 'change' event has ALREADY applied the new value, so the prior checkbox state is
-      // simply the opposite of its current checked state; the prior company is the value
-      // stashed in data-crm-selected (updated only on a SUCCESSFUL save, below).
-      var revert = null;
-      if (changedEl) {
-        if (changedEl.type === 'checkbox') {
-          var wasChecked = !changedEl.checked; // pre-change state
-          revert = function(){ changedEl.checked = wasChecked; };
-        } else {
-          var prevVal = changedEl.getAttribute('data-crm-selected') || '';
-          revert = function(){
-            changedEl.value = prevVal;
-            // Re-load the reverted company's contacts so the checkbox list matches.
-            pfCrmLoadContacts(block, prevVal);
-          };
-        }
-      }
-
-      // Build THIS group's selection { company, contactIds[] }.
-      //
-      // RACE NOTE: the shared .pr-crm-company change listener (~pfCrmLoadContacts) that
-      // rebuilds the checkbox list for the new company is a SEPARATE listener that runs
-      // AFTER this one, so on a company CHANGE the checkboxes in the DOM are still the
-      // OLD company's at this instant. Harvesting them via pfCollectCrm would pair the
-      // NEW company with STALE contactIds. So we branch by change type:
-      //   - company change  -> derive contactIds deterministically (NOT from the DOM):
-      //       re-selecting the SAME saved company keeps its saved ids (pfCrmLoadContacts
-      //       will pre-check exactly those); switching to a DIFFERENT company starts with
-      //       an empty selection (a deliberate swap). Either way this matches what the
-      //       reloaded checkbox list will show.
-      //   - checkbox change -> harvest the picker normally (company + current checks are
-      //       both correct in the DOM at this instant).
-      var one;
-      var isCompanyChange = !!(changedEl && changedEl.classList && changedEl.classList.contains('pr-crm-company'));
-      if (isCompanyChange) {
-        var newCompany = (changedEl.value || '').trim();
-        var saved = pfCrmMap(crmKey)[groupName] || {};
-        var keepIds = (saved.company === newCompany && Array.isArray(saved.contactIds)) ? saved.contactIds.slice() : [];
-        one = {};
-        if (newCompany || keepIds.length) one[groupName] = { company: newCompany, contactIds: keepIds };
-      } else {
-        // Harvest ONLY this group's picker -> { '<group>': { company, contactIds[] } } (or {}).
-        one = pfCollectCrm(wrap); // scoped to this wrap's single .pr-crm block
-      }
-      // MERGE into the section's current full __crm map, replacing only this group.
-      var merged = {};
-      var cur = pfCrmMap(crmKey);
-      Object.keys(cur).forEach(function(k){ merged[k] = cur[k]; });
-      if (Object.prototype.hasOwnProperty.call(one, groupName)) {
-        merged[groupName] = one[groupName];
-      } else {
-        // No company + no checks for this group -> explicit clear of just this group.
-        delete merged[groupName];
-      }
-
-      say('Saving…', false);
-      fetch('/api/project-override', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ num: num, section: crmKey, fields: (function(){ var f = {}; f[PF_CRM_KEY] = merged; return f; })() })
-      }).then(function(res){
-        return res.json().then(function(b){ return { ok: res.ok, status: res.status, body: b }; })
-          .catch(function(){ return { ok: res.ok, status: res.status, body: null }; });
-      }).then(function(r){
-        if (!r.ok || !r.body || r.body.ok !== true || r.body.saved !== true) {
-          if (revert) revert();
-          say((r.body && r.body.message) ? r.body.message
-              : (r.status === 403 ? 'You do not have permission to edit this project.'
-                                   : 'Save failed (' + r.status + '). Not saved — reverted.'), true);
-          return;
-        }
-        window.PF_PROJECT_OVERRIDES[num] = { sections: (r.body.sections) || {}, _meta: (r.body._meta) || null };
-        try {
-          if (String(num) === String(_curNum) && r.body.sections && typeof r.body.sections === 'object') _curOverrides = r.body.sections;
-        } catch (e) {}
-        // Adopt server truth on the company control so a later revert compares correctly
-        // (the company dropdown's data-crm-selected is the committed baseline).
-        if (changedEl && changedEl.classList && changedEl.classList.contains('pr-crm-company')) {
-          changedEl.setAttribute('data-crm-selected', changedEl.value || '');
-        }
-        // Re-render the resolved read cards in place — NO renderProjectRecord (no bounce).
-        if (window.pfCrmRenderCards) window.pfCrmRenderCards(document);
-        say('Saved', false);
-      }).catch(function(){
-        if (revert) revert();
-        say('Save failed: could not reach the server. Not saved — reverted.', true);
-      });
-    }
-
-    // Delegated live-save wiring for the Project Contacts pickers. A single document
-    // 'change' listener covers BOTH the company dropdown (.pr-crm-company) and each
-    // contact checkbox (.pr-crm-cb) inside a [data-pf-pc-picker] wrap. The existing
-    // .pr-crm-company change listener (~20107) reloads the contact list; this fires
-    // AFTER it (registration order) but that only reloads checkboxes — the SAVE reads
-    // the company value + checkboxes, both correct at change time. For a company change
-    // the contact list is freshly (re)built, so we save the company with whatever
-    // contacts are currently checked (re-selecting the same company pre-checks the saved
-    // ids; switching companies starts empty — a deliberate company swap).
-    document.addEventListener('change', function(ev){
-      var el = ev.target;
-      if (!el || !el.classList) return;
-      var isCompany = el.classList.contains('pr-crm-company');
-      var isCb = el.classList.contains('pr-crm-cb');
-      if (!isCompany && !isCb) return;
-      var wrap = el.closest ? el.closest('[data-pf-pc-picker]') : null;
-      if (!wrap) return; // not a Project Contacts live picker (e.g. staking / an editor)
-      var block = el.closest('.pr-crm');
-      if (!block) return;
-      pfPcSaveGroup(block, el);
-    });
-
     // Live visibility toggle for the inline staking selector. Bound once (document-level
     // 'change'): when the "Staking & Layout PF's responsibility?" live select changes,
     // show the selector wrapper on Yes / show the GC note on No / hide the other. Runs
@@ -20636,34 +20443,55 @@ try {
           // Notes is present). Blank fields render clean (no yellow highlight — these
           // are display-only, not editable field() rows).
           var roleTag = host.getAttribute('data-role-tag') || '';
-          // Office/CRM users get a per-row Edit pencil that opens an inline editor
-          // writing back to the MASTER directory (/api/contacts update) — so every
-          // field of a directory contact (Name/Title/Office/Cell/Email/Notes) is
-          // editable from the project view (Brad 2026-08-11). Read-only roles get
-          // no button (and the server 403s the write regardless).
+          // INLINE CRUD (Brad 2026-08-13 REWORK): office/CRM users edit every field
+          // IN PLACE with NO Edit button — each cell is a contenteditable span that
+          // SAVES ON blur/Enter to the shared directory (/api/contacts update), so the
+          // change reflects on every project using that contact. A Remove (×) per row
+          // unassigns from THIS project only, and an "+ Add contact" button per group
+          // adds a new directory contact + assigns it here. Read-only roles (field_ops)
+          // get static links + no controls (and the server 403s any write regardless).
           var _rowEditable = (typeof canEdit === 'function') ? canEdit() : false;
+          // Group/host routing carried on each editable cell so a save can rebuild the
+          // section's full __crm map (for a delete) and re-render in place.
+          var _prefix = pfx;
+          var _skey = host.getAttribute('data-crm-cards-key') || 'design_professionals';
+          // An editable cell: contenteditable span carrying the field key + contactId +
+          // the pre-edit value (for a fail-closed revert). All values escaped via esc2.
+          function ecell(cls, fkey, val, cid){
+            return '<span class="pr-crow-' + cls + ' pr-pc-inline" contenteditable="true" '
+              + 'data-cf="' + esc2(fkey) + '" data-crm-cid="' + esc2(cid) + '" '
+              + 'data-pf-prev="' + esc2(val || '') + '" spellcheck="false">'
+              + esc2(val || '') + '</span>';
+          }
           var rows = e.contactIds.map(function(id){
             var c = byId[String(id).toUpperCase()];
             if (!c) return ''; // stale/removed id: skip, never crash
             var name = (c.name || ((c.firstName||'') + ' ' + (c.lastName||''))).trim();
+            var cid = String(c.contactId || '').toUpperCase();
+            if (_rowEditable) {
+              // Editable row: inline cells (save-on-change to the directory) + Remove.
+              var rmBtn = cid
+                ? '<span class="pr-crow-act"><button type="button" class="pr-crow-rmbtn" '
+                  + 'data-crm-cid="' + esc2(cid) + '" title="Remove this contact from THIS project (keeps them in the directory)" '
+                  + 'onclick="window.pfCrmRemoveContactRow(this)">&#10005;</button></span>'
+                : '<span class="pr-crow-act"></span>';
+              return '<div class="pr-crow" data-crm-cid="' + esc2(cid) + '">'
+                + ecell('name',  'name',        name,          cid)
+                + ecell('title', 'title',       c.title || '', cid)
+                + ecell('off',   'officePhone', c.officePhone || '', cid)
+                + ecell('cell',  'cellPhone',   c.cellPhone || '',   cid)
+                + ecell('email', 'email',       c.email || '', cid)
+                + ecell('notes', 'notes',       c.notes || '', cid)
+                + rmBtn
+                + '</div>';
+            }
+            // Read-only row (field_ops): static, linkified, no controls.
             var off = c.officePhone
               ? '<a href="tel:' + esc2(c.officePhone) + '">' + esc2(pfFmtPhone(c.officePhone)) + '</a>' : '';
             var cell = c.cellPhone
               ? '<a href="tel:' + esc2(c.cellPhone) + '">' + esc2(pfFmtPhone(c.cellPhone)) + '</a>' : '';
             var email = c.email
               ? '<a href="mailto:' + esc2(c.email) + '">' + esc2(c.email) + '</a>' : '';
-            var cid = String(c.contactId || '').toUpperCase();
-            // Edit (updates the shared directory) + Remove (unassigns from THIS project
-            // only — drops the id from this section's __crm list; the master directory
-            // record is untouched). Both office/CRM-gated (server 403s writes regardless).
-            var editBtn = (_rowEditable && cid)
-              ? '<span class="pr-crow-act"><button type="button" class="pr-crow-editbtn" '
-                + 'data-crm-cid="' + esc2(cid) + '" title="Edit this contact (updates the shared directory)" '
-                + 'onclick="window.pfCrmEditContactRow(this)">&#9998; Edit</button>'
-                + '<button type="button" class="pr-crow-rmbtn" '
-                + 'data-crm-cid="' + esc2(cid) + '" title="Remove this contact from THIS project (keeps them in the directory)" '
-                + 'onclick="window.pfCrmRemoveContactRow(this)">&#10005; Remove</button></span>'
-              : (_rowEditable ? '<span class="pr-crow-act"></span>' : '');
             return '<div class="pr-crow" data-crm-cid="' + esc2(cid) + '">'
               + '<span class="pr-crow-name">'  + esc2(name || (c.contactId || '')) + '</span>'
               + '<span class="pr-crow-title">' + esc2(c.title || '') + '</span>'
@@ -20671,10 +20499,11 @@ try {
               + '<span class="pr-crow-cell">'  + cell + '</span>'
               + '<span class="pr-crow-email">' + email + '</span>'
               + '<span class="pr-crow-notes">' + esc2(c.notes || '') + '</span>'
-              + editBtn
               + '</div>';
           }).filter(Boolean);
-          if (!rows.length) { host.innerHTML = ''; return; }
+          // Office users can add even to a group whose ids all resolved stale (rows
+          // empty) — so DON'T bail on !rows.length for them; show the company + Add.
+          if (!rows.length && !_rowEditable) { host.innerHTML = ''; return; }
           var headRow = '<div class="pr-crow pr-crow-head">'
             + '<span class="pr-crow-name">Name</span>'
             + '<span class="pr-crow-title">Title</span>'
@@ -20684,16 +20513,423 @@ try {
             + '<span class="pr-crow-notes">Notes</span>'
             + (_rowEditable ? '<span class="pr-crow-act"></span>' : '')
             + '</div>';
+          // Company name: inline-editable for office (edits the shared directory
+          // company for THIS group's contacts); static for read-only.
+          var companyHtml = _rowEditable
+            ? '<div class="pr-pc-company-name pr-pc-inline pr-pc-company-edit" contenteditable="true" '
+              + 'data-pf-company="1" data-crm-cards="' + esc2(_prefix) + '" '
+              + 'data-crm-cards-key="' + esc2(_skey) + '" '
+              + 'data-pf-prev="' + esc2(e.company || '') + '" spellcheck="false" '
+              + 'title="Edit the company name (updates the shared directory everywhere it is used)">'
+              + esc2(e.company || '') + '</div>'
+            : '<div class="pr-pc-company-name">' + esc2(e.company || '') + '</div>';
+          // "+ Add contact" per group (office only) — adds a new directory contact for
+          // this group's company/trade AND assigns it to this project's group.
+          var addBtn = _rowEditable
+            ? '<button type="button" class="pr-add-contact-btn pr-pc-addbtn" '
+              + 'data-crm-cards="' + esc2(_prefix) + '" data-crm-cards-key="' + esc2(_skey) + '" '
+              + 'data-crm-company="' + esc2(e.company || '') + '" '
+              + 'onclick="window.pfPcAddContact(this)">+ Add contact</button>'
+            : '';
           host.innerHTML =
               (roleTag ? '<div class="pr-role-tag">' + esc2(roleTag) + '</div>' : '')
             + '<div class="pr-pc-company">'
-            +   '<div class="pr-pc-company-name">' + esc2(e.company || '') + '</div>'
+            +   companyHtml
             +   '<div class="pr-crow-table">' + headRow + rows.join('') + '</div>'
+            +   addBtn
             + '</div>';
         });
       }).catch(function(){ /* fail soft: leave hosts empty */ });
     }
     window.pfCrmRenderCards = pfCrmRenderCards;
+
+    // =======================================================================
+    // PROJECT CONTACTS — INLINE CRUD  (Brad 2026-08-13 REWORK)
+    // =======================================================================
+    // Brad's spec: "All contacts already in there become live and changeable without
+    // edit buttons, and add new by clicking an add button, delete by a delete button.
+    // We want the same company and same people in each company to be able to be reusable
+    // on any project." => Companies + people are ONE SHARED DIRECTORY (/api/contacts).
+    //
+    // MODEL (single source of truth):
+    //   - Every contact FIELD on a group renders as a contenteditable cell that SAVES ON
+    //     blur/Enter to the shared directory via /api/contacts action:'update'. Because
+    //     the directory record is the single source, the edit reflects on EVERY project
+    //     that uses that contact (reusability).
+    //   - The COMPANY name is inline-editable at the group level; editing it renames the
+    //     shared company across the directory records used by this group (and updates the
+    //     project's __crm[group].company so the group keeps pointing at the same people).
+    //   - "+ Add contact" per group -> mints a NEW directory contact (reusable) AND
+    //     assigns it to THIS project's __crm[group].
+    //   - Remove (×) per contact -> UNASSIGNS from THIS project's group only (drops the id
+    //     from __crm[group].contactIds). The directory record is NEVER hard-deleted, so
+    //     the person stays available on other projects. (A destructive "remove from the
+    //     directory entirely" affordance is intentionally NOT wired — see the report;
+    //     flagged for Brad.)
+    //
+    // NO Edit/Save buttons. Save-on-change, fail-closed (revert the cell + inline error on
+    // any non-{ok,saved} response). In-place refresh (pfCrmRenderCards) — NEVER
+    // renderProjectRecord (no page bounce). Office-gated on the client (canEdit) AND the
+    // server (requireArea 'crm' on /api/contacts + /api/project-override). All rendered
+    // values escaped via esc2 (=> window.esc). Reserved keys preserved because a company
+    // rename resends the section's FULL __crm map (every group), editing only this group.
+
+    // Resolve the full directory record for a contactId from the loaded cache.
+    function pfPcDirRecord(cid){
+      var want = String(cid || '').toUpperCase();
+      var found = null;
+      (PF_CONTACTS || []).forEach(function(x){ if (x && String(x.contactId||'').toUpperCase() === want) found = x; });
+      return found;
+    }
+    // Adopt a saved directory row into the local cache so an in-place re-render shows it
+    // immediately (no refetch race); clear the promise so the next cold load re-pulls.
+    function pfPcAdoptDirRow(saved){
+      if (saved && Array.isArray(PF_CONTACTS)) {
+        var cid = String(saved.contactId||'').toUpperCase(), hit = false;
+        for (var i = 0; i < PF_CONTACTS.length; i++) {
+          if (String(PF_CONTACTS[i].contactId||'').toUpperCase() === cid) { PF_CONTACTS[i] = saved; hit = true; break; }
+        }
+        if (!hit) PF_CONTACTS.push(saved);
+      } else {
+        PF_CONTACTS = null;
+      }
+      _pfContactsPromise = null;
+    }
+    // Small inline message under a Project Contacts group (transient save state).
+    function pfPcSay(host, text, isErr){
+      if (!host) return;
+      var msg = host.querySelector('.pf-pc-inline-msg');
+      if (!msg) {
+        msg = document.createElement('div');
+        msg.className = 'pf-pc-inline-msg';
+        msg.style.cssText = 'font-size:0.76rem;margin:2px 0;';
+        host.appendChild(msg);
+      }
+      msg.textContent = text || '';
+      msg.style.display = text ? 'block' : 'none';
+      msg.style.color = isErr ? '#b91c1c' : '#166534';
+    }
+
+    // SAVE ONE inline field -> /api/contacts action:'update'. Carries through every OTHER
+    // directory column (the backend overwrites the whole row) so nothing is blanked.
+    // FAIL CLOSED: revert the cell text to its pre-edit value + inline error; no cache
+    // change, no re-render. On success: adopt the saved row, refresh in place.
+    function pfPcInlineFieldSave(cell){
+      if (!cell) return;
+      if (typeof canEdit === 'function' && !canEdit()) return; // server also 403s
+      var cid = String(cell.getAttribute('data-crm-cid') || '').toUpperCase();
+      var fkey = cell.getAttribute('data-cf') || '';
+      if (!cid || !fkey) return;
+      var prev = cell.getAttribute('data-pf-prev') || '';
+      var nowVal = (cell.textContent == null ? '' : cell.textContent).trim();
+      if (nowVal === prev) return; // no change -> no save
+      var host = cell.closest ? cell.closest('.pr-crm-cards') : null;
+      var cur = pfPcDirRecord(cid);
+      if (!cur) {
+        // Cache went cold; revert + tell the user to retry (never fabricate a save).
+        cell.textContent = prev; pfPcSay(host, 'Could not load this contact to save; refresh and retry.', true);
+        return;
+      }
+      // Build the full update payload from the current record, replacing the one field.
+      var name = (cur.name || ((cur.firstName||'') + ' ' + (cur.lastName||''))).trim();
+      var fields = {
+        name: name, title: cur.title || '', officePhone: cur.officePhone || '',
+        cellPhone: cur.cellPhone || '', email: cur.email || '', notes: cur.notes || ''
+      };
+      fields[fkey] = nowVal;
+      var nm = pfSplitContactName(fields.name || '');
+      var payload = { action: 'update', contact: {
+        contactId: cid, firstName: nm.firstName, lastName: nm.lastName,
+        title: fields.title, company: cur.company || '', category: cur.category || '',
+        officePhone: fields.officePhone, cellPhone: fields.cellPhone, email: fields.email,
+        companyAddress: cur.companyAddress || '', companyWebsite: cur.companyWebsite || '',
+        notes: fields.notes
+      } };
+      pfPcSay(host, 'Saving…', false);
+      fetch('/api/contacts', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(function(res){
+        return res.json().then(function(b){ return { ok: res.ok, status: res.status, body: b }; })
+          .catch(function(){ return { ok: res.ok, status: res.status, body: null }; });
+      }).then(function(r){
+        if (!r.ok || !r.body || r.body.ok !== true || r.body.saved !== true) {
+          cell.textContent = prev; // fail-closed revert
+          pfPcSay(host, (r.body && r.body.message) ? r.body.message
+            : (r.status === 403 ? 'You do not have permission to edit contacts.'
+               : 'Save failed (' + r.status + '). Not saved — reverted.'), true);
+          return;
+        }
+        pfPcAdoptDirRow(r.body.contact || null);
+        cell.setAttribute('data-pf-prev', nowVal); // new committed baseline
+        pfPcSay(host, 'Saved', false);
+        // Refresh resolved read cards in place (shows the change everywhere). No bounce.
+        if (window.pfCrmRenderCards) window.pfCrmRenderCards(document);
+      }).catch(function(){
+        cell.textContent = prev;
+        pfPcSay(host, 'Save failed: could not reach the server. Not saved — reverted.', true);
+      });
+    }
+
+    // SAVE an inline COMPANY rename for a group -> update every directory contact in this
+    // group whose company matches the OLD name, then repoint the project's __crm[group]
+    // company to the NEW name. Reusability: renaming the shared company changes it for all
+    // those people. FAIL CLOSED: any directory update or override write failure reverts
+    // the cell + inline error (a best-effort partial is avoided by writing the override
+    // ONLY after all directory updates succeed).
+    function pfPcInlineCompanySave(cell){
+      if (!cell) return;
+      if (typeof canEdit === 'function' && !canEdit()) return;
+      var prefix = cell.getAttribute('data-crm-cards') || '';
+      var skey = cell.getAttribute('data-crm-cards-key') || 'design_professionals';
+      var prev = cell.getAttribute('data-pf-prev') || '';
+      var nowVal = (cell.textContent == null ? '' : cell.textContent).trim();
+      var host = cell.closest ? cell.closest('.pr-crm-cards') : null;
+      if (!prefix) { cell.textContent = prev; return; }
+      if (nowVal === prev) return;
+      if (!nowVal) { cell.textContent = prev; pfPcSay(host, 'Company name cannot be blank.', true); return; }
+      var num = _curNum || '';
+      var entry = (pfCrmMap(skey)[prefix]) || {};
+      var ids = Array.isArray(entry.contactIds) ? entry.contactIds.slice() : [];
+      // Directory contacts in this group to rename (those matching the old company).
+      var toRename = [];
+      ids.forEach(function(id){
+        var c = pfPcDirRecord(id);
+        if (c && String(c.company||'').trim().toLowerCase() === String(prev).trim().toLowerCase()) toRename.push(c);
+      });
+      pfPcSay(host, 'Saving…', false);
+      var updates = toRename.map(function(c){
+        var nm = pfSplitContactName((c.name || ((c.firstName||'')+' '+(c.lastName||''))).trim());
+        return fetch('/api/contacts', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'update', contact: {
+            contactId: String(c.contactId||'').toUpperCase(), firstName: nm.firstName, lastName: nm.lastName,
+            title: c.title || '', company: nowVal, category: c.category || '',
+            officePhone: c.officePhone || '', cellPhone: c.cellPhone || '', email: c.email || '',
+            companyAddress: c.companyAddress || '', companyWebsite: c.companyWebsite || '', notes: c.notes || ''
+          } })
+        }).then(function(res){ return res.json().then(function(b){ return { ok: res.ok, body: b }; })
+            .catch(function(){ return { ok: res.ok, body: null }; }); });
+      });
+      Promise.all(updates).then(function(results){
+        var allOk = results.every(function(r){ return r.ok && r.body && r.body.ok === true && r.body.saved === true; });
+        if (!allOk) {
+          cell.textContent = prev;
+          pfPcSay(host, 'Company rename failed — not saved (reverted). Please retry.', true);
+          return;
+        }
+        results.forEach(function(r){ pfPcAdoptDirRow(r.body && r.body.contact); });
+        // Repoint the project's __crm[group].company to the new name. Resend the section's
+        // FULL __crm map (preserves sibling groups + all other reserved section keys).
+        var curMap = pfCrmMap(skey) || {};
+        var out = {};
+        Object.keys(curMap).forEach(function(k){
+          var en = curMap[k] || {};
+          out[k] = { company: (k === prefix ? nowVal : (en.company || '')),
+                     contactIds: Array.isArray(en.contactIds) ? en.contactIds.slice() : [] };
+        });
+        if (!Object.prototype.hasOwnProperty.call(out, prefix)) out[prefix] = { company: nowVal, contactIds: ids };
+        var body = {}; body[PF_CRM_KEY] = out;
+        return fetch('/api/project-override', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ num: num, section: skey, fields: body })
+        }).then(function(res){ return res.json().then(function(b){ return { ok: res.ok, status: res.status, body: b }; })
+            .catch(function(){ return { ok: res.ok, status: res.status, body: null }; }); })
+          .then(function(r){
+            if (!r.ok || !r.body || r.body.ok !== true || r.body.saved !== true) {
+              // Directory already renamed but the project pointer failed. Revert the cell
+              // text; the read cards still resolve by contactId so nothing is lost.
+              cell.textContent = prev;
+              pfPcSay(host, (r.body && r.body.message) ? r.body.message
+                : 'Company saved to the directory but the project link failed (' + r.status + '). Reverted the label — please retry.', true);
+              return;
+            }
+            window.PF_PROJECT_OVERRIDES[num] = { sections: (r.body.sections) || {}, _meta: (r.body._meta) || null };
+            try { if (String(num) === String(_curNum) && r.body.sections) _curOverrides = r.body.sections; } catch(e){}
+            cell.setAttribute('data-pf-prev', nowVal);
+            pfPcSay(host, 'Saved', false);
+            if (window.pfCrmRenderCards) window.pfCrmRenderCards(document);
+          });
+      }).catch(function(){
+        cell.textContent = prev;
+        pfPcSay(host, 'Company rename failed: could not reach the server. Not saved — reverted.', true);
+      });
+    }
+
+    // Delegated save-on-change wiring for the inline Project Contacts cells. Bound ONCE
+    // (guarded). Saves on blur (focusout) and on Enter (which also blurs). Enter never
+    // inserts a newline in these single-line cells. Only fires for cells inside a Project
+    // Contacts CRM cards host (.pr-crm-cards) — the section editor + staking picker use
+    // different controls and are untouched.
+    var _pfPcInlineBound = false;
+    function pfPcMountInline(root){
+      // Idempotent one-time delegated binding. The render itself (pfCrmRenderCards) emits
+      // the editable cells; this only ensures the listeners exist. Fail-soft.
+      if (_pfPcInlineBound) return;
+      _pfPcInlineBound = true;
+      document.addEventListener('focusout', function(ev){
+        var el = ev.target;
+        if (!el || !el.classList || !el.classList.contains('pr-pc-inline')) return;
+        if (!el.closest || !el.closest('.pr-crm-cards')) return;
+        if (el.getAttribute('data-pf-company') === '1') pfPcInlineCompanySave(el);
+        else pfPcInlineFieldSave(el);
+      }, true);
+      document.addEventListener('keydown', function(ev){
+        var el = ev.target;
+        if (!el || !el.classList || !el.classList.contains('pr-pc-inline')) return;
+        if (!el.closest || !el.closest('.pr-crm-cards')) return;
+        if (ev.key === 'Enter') { ev.preventDefault(); el.blur(); }       // commit on Enter
+        else if (ev.key === 'Escape') {                                    // revert on Esc
+          el.textContent = el.getAttribute('data-pf-prev') || '';
+          el.blur();
+        }
+      }, true);
+    }
+
+    // "+ Add contact" for a Project Contacts group (Brad 2026-08-13). Opens an inline add
+    // form (all six fields) under the group. Submit -> POST /api/contacts action:'add'
+    // (mint C#### in the shared directory, dup-guarded) THEN assign the new id to this
+    // project's __crm[group] (resend the section's FULL __crm map -> preserves siblings +
+    // reserved keys). FAIL CLOSED at each step; in-place refresh on success (no bounce).
+    window.pfPcAddContact = function(btn){
+      if (!btn) return;
+      if (typeof canEdit === 'function' && !canEdit()) return;
+      var prefix = btn.getAttribute('data-crm-cards') || '';
+      var skey = btn.getAttribute('data-crm-cards-key') || 'design_professionals';
+      var company = btn.getAttribute('data-crm-company') || '';
+      var trade = (typeof pfPcGroupTradeSafe === 'function') ? pfPcGroupTradeSafe(skey, prefix) : '';
+      var host = btn.closest ? btn.closest('.pr-crm-cards') : null;
+      var wrap = btn.closest ? btn.closest('.pr-pc-company') : null;
+      if (!prefix || !wrap) return;
+      if (wrap.querySelector('.pr-crm-addform')) { var o = wrap.querySelector('.pr-crm-addform input'); if (o) o.focus(); return; }
+      function fld(key, label, wide){
+        return '<div class="pr-crm-addform-field' + (wide ? ' pr-crm-addform-notes' : '') + '">'
+          + '<label>' + esc2(label) + '</label>'
+          + (wide ? '<textarea data-af="' + esc2(key) + '"></textarea>'
+                  : '<input type="text" data-af="' + esc2(key) + '">')
+          + '</div>';
+      }
+      var form = document.createElement('div');
+      form.className = 'pr-crm-addform';
+      form.setAttribute('data-crm-cards', prefix);
+      form.setAttribute('data-crm-cards-key', skey);
+      form.setAttribute('data-crm-company', company);
+      form.setAttribute('data-crm-trade', trade || '');
+      form.innerHTML = ''
+        + '<div class="pr-crm-addform-note">New contact for <strong>' + esc2(company || 'this group')
+        +   '</strong> &mdash; added to the shared PF directory and assigned to this project.</div>'
+        + '<div class="pr-crm-addform-grid">'
+        +   fld('name',  'Name') + fld('title', 'Title')
+        +   fld('officePhone', 'Office Phone') + fld('cellPhone', 'Cell Phone')
+        +   fld('email', 'Email') + fld('notes', 'Notes', true)
+        + '</div>'
+        + '<div class="pr-crm-addform-err"></div>'
+        + '<div class="pr-crm-addform-actions">'
+        +   '<button type="button" class="pr-save-btn" onclick="window.pfPcAddContactSave(this)">Add contact</button>'
+        +   '<button type="button" class="pr-cancel-btn" onclick="window.pfPcAddContactCancel(this)">Cancel</button>'
+        + '</div>';
+      btn.insertAdjacentElement('beforebegin', form);
+      btn.style.display = 'none';
+      form._addBtn = btn;
+      var first = form.querySelector('input'); if (first) first.focus();
+    };
+    window.pfPcAddContactCancel = function(btn){
+      var form = btn.closest ? btn.closest('.pr-crm-addform') : null;
+      if (!form) return;
+      if (form._addBtn) form._addBtn.style.display = '';
+      form.remove();
+    };
+    window.pfPcAddContactSave = function(btn){
+      var form = btn.closest ? btn.closest('.pr-crm-addform') : null;
+      if (!form) return;
+      var prefix = form.getAttribute('data-crm-cards') || '';
+      var skey = form.getAttribute('data-crm-cards-key') || 'design_professionals';
+      var company = form.getAttribute('data-crm-company') || '';
+      var trade = form.getAttribute('data-crm-trade') || '';
+      var errEl = form.querySelector('.pr-crm-addform-err');
+      function showErr(m){ if (errEl){ errEl.textContent = m; errEl.style.display = 'block'; } }
+      function busy(b){ btn.disabled = b; btn.textContent = b ? 'Adding…' : 'Add contact'; }
+      var vals = {};
+      form.querySelectorAll('[data-af]').forEach(function(el){ vals[el.getAttribute('data-af')] = (el.value == null ? '' : el.value).trim(); });
+      var name = (vals.name || '').trim();
+      if (!name) { showErr('Please enter the contact name.'); var ni = form.querySelector('[data-af="name"]'); if (ni) ni.focus(); return; }
+      var num = _curNum || '';
+      if (!num || !prefix) { showErr('Could not resolve the project or group; refresh and retry.'); return; }
+      var nm = pfSplitContactName(name);
+      if (errEl) errEl.style.display = 'none';
+      busy(true);
+      // STEP 1: mint the directory contact.
+      fetch('/api/contacts', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'add', contact: {
+          firstName: nm.firstName, lastName: nm.lastName, title: vals.title || '',
+          company: company, category: trade || '',
+          officePhone: vals.officePhone || '', cellPhone: vals.cellPhone || '',
+          email: vals.email || '', notes: vals.notes || ''
+        } })
+      }).then(function(res){ return res.json().then(function(b){ return { ok: res.ok && b && b.ok, body: b, status: res.status }; })
+          .catch(function(){ return { ok: false, body: null, status: res.status }; }); })
+        .then(function(r){
+          if (!r.ok || !r.body || !r.body.contact) {
+            busy(false);
+            showErr((r.body && r.body.message) ? r.body.message
+              : (r.status === 403 ? 'You do not have permission to add contacts.'
+                 : 'Could not add the contact (' + r.status + '). Please retry.'));
+            return null;
+          }
+          pfPcAdoptDirRow(r.body.contact);
+          var newId = String(r.body.contact.contactId || '').toUpperCase();
+          // STEP 2: assign the new id to this project's __crm[group] (full-map resend).
+          var curMap = pfCrmMap(skey) || {};
+          var out = {};
+          Object.keys(curMap).forEach(function(k){
+            var en = curMap[k] || {};
+            out[k] = { company: en.company || '', contactIds: Array.isArray(en.contactIds) ? en.contactIds.slice() : [] };
+          });
+          var mine = out[prefix] || { company: company || '', contactIds: [] };
+          if (!mine.company && company) mine.company = company;
+          if (mine.contactIds.indexOf(newId) === -1) mine.contactIds.push(newId);
+          out[prefix] = mine;
+          var body = {}; body[PF_CRM_KEY] = out;
+          return fetch('/api/project-override', {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ num: num, section: skey, fields: body })
+          }).then(function(res){ return res.json().then(function(b){ return { ok: res.ok, status: res.status, body: b }; })
+              .catch(function(){ return { ok: res.ok, status: res.status, body: null }; }); });
+        })
+        .then(function(r){
+          if (r == null) return; // add-step already failed + surfaced
+          if (!r.ok || !r.body || r.body.ok !== true || r.body.saved !== true) {
+            busy(false);
+            showErr((r.body && r.body.message) ? r.body.message
+              : 'Contact added to the directory but assigning it to this project failed (' + r.status + '). Please retry.');
+            return;
+          }
+          window.PF_PROJECT_OVERRIDES[num] = { sections: (r.body.sections) || {}, _meta: (r.body._meta) || null };
+          try { if (String(num) === String(_curNum) && r.body.sections) _curOverrides = r.body.sections; } catch(e){}
+          if (form._addBtn) form._addBtn.style.display = '';
+          form.remove();
+          if (window.pfCrmRenderCards) window.pfCrmRenderCards(document);
+        })
+        .catch(function(){ busy(false); showErr('Could not reach the server. The contact was NOT added — please retry.'); });
+    };
+
+    // Trade (master-list Category) for a (crmKey, groupName) — used to tag a NEW contact's
+    // Category so it filters into the right company/trade bucket. Mirrors the maps the
+    // section editor uses. Fail-soft: unknown -> '' (an empty Category still adds cleanly).
+    function pfPcGroupTradeSafe(crmKey, groupName){
+      try {
+        if (crmKey === 'design_professionals') return PF_CRM_SECTION_TRADE[groupName] || '';
+        if (crmKey === 'general') return PF_CRM_GENERAL_TRADE[groupName] || '';
+        var m = PF_CRM_NEWGROUP_TRADE[crmKey];
+        return (m && m[groupName]) ? m[groupName] : '';
+      } catch (e) { return ''; }
+    }
 
     // ---- DIRECTORY-CONTACT ROW EDITOR (Brad 2026-08-11) ----------------------
     // Make every field of a DIRECTORY contact editable straight from the project
@@ -20950,15 +21186,16 @@ try {
                : 'Remove failed (' + r.status + '). Nothing was changed — please retry.'));
           return; // stay in confirm mode
         }
-        // Adopt the server's authoritative override object, then re-render so the row
-        // disappears (the id is no longer in __crm) — mirrors pfSaveSection success.
+        // Adopt the server's authoritative override object, update the live _curOverrides
+        // so pfCrmMap reads the new state, then refresh the resolved read cards IN PLACE —
+        // NO renderProjectRecord (no page bounce), per Brad's inline-CRUD spec. The row
+        // disappears because the id is no longer in __crm.
         window.PF_PROJECT_OVERRIDES[num] = {
           sections: (r.body.sections) || {},
           _meta: (r.body._meta) || null
         };
-        var card = bar.closest ? bar.closest('.pr-card') : null;
-        var root = (card && (card.closest('.pr-root') || card.parentElement)) || document.getElementById('prGenericRoot');
-        if (window.renderProjectRecord) window.renderProjectRecord(num, root);
+        try { if (String(num) === String(_curNum) && r.body.sections) _curOverrides = r.body.sections; } catch(e){}
+        if (window.pfCrmRenderCards) window.pfCrmRenderCards(document);
       }).catch(function(){
         busy(false);
         showErr('Remove failed: could not reach the server. Nothing was changed — please retry.');
