@@ -560,6 +560,15 @@ export function areaForPath(pathname) {
     // Same readership as the project record it overlays (project-records.js is
     // classified 'financials'). Without this line it would fall through to the
     // default 'user_admin' (admin-only) and the office (partner/BD) could not edit.
+    // Peter's COO Knowledge Checklist server-persisted state (checkoffs +
+    // optional notes; ONE global KV key). COMPANY OVERSIGHT data -> classified
+    // 'financials_global' to MATCH the page gate already set for
+    // '/coo-checklist.html' (admin + partner ONLY). business_dev AND field_ops
+    // are BLOCKED from reading or writing checkoffs by direct URL too. The handler
+    // ALSO calls requireArea(session, 'financials_global') on GET + POST. Without
+    // this line it would fall through to the default 'user_admin' (admin-only) and
+    // a partner (e.g. Jonathan/Derek as partner) could not read the checklist state.
+    if (pathname.startsWith('/api/coo-checklist')) return 'financials_global';
     if (pathname.startsWith('/api/project-override')) return 'financials';
     // Project lifecycle STATUS overrides for the office summary drag-and-drop
     // (Active -> Completed / Dead, and back). PROJECT-level financials area:

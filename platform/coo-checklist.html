@@ -62,6 +62,12 @@ h1{font-size:1.5rem;font-weight:700;letter-spacing:-.01em}
 
 footer{text-align:center;color:var(--muted);font-size:.8rem;margin-top:28px}
 .note-top{background:var(--accent-soft);border:1px solid #f6dca8;border-radius:10px;padding:12px 16px;font-size:.88rem;color:#7a5800;margin:16px 0}
+.sync-note{border-radius:8px;padding:8px 14px;font-size:.8rem;margin:10px 0 0;display:flex;align-items:center;gap:8px}
+.sync-note.warn{background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
+.sync-note.ok{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534}
+.sync-note .who{color:var(--muted);font-weight:400}
+.item .meta{color:var(--muted);font-size:.74rem;margin-top:3px;display:none}
+.item.done .meta{display:block}
 @media(max-width:560px){.tag{display:none}.wrap{padding:20px 14px 70px}}
 </style>
 </head>
@@ -69,8 +75,10 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;margin-top:28px}
 <div class="wrap">
   <header>
     <h1>Peter's COO Knowledge Checklist</h1>
-    <p class="sub">Everything I should know about Pier Foundations to serve as COO in earnest. Each item is marked with my current status - what I already have, what's partial, and what I still need from the team. Click any item to mark it complete; your progress is saved on this device.</p>
+    <p class="sub">Everything I should know about Pier Foundations to serve as COO in earnest. Each item is marked with my current status - what I already have, what's partial, and what I still need from the team. Click any item to mark it complete; checkoffs are saved to the server so Brad sees them too.</p>
   </header>
+
+  <div id="syncNote" class="sync-note" hidden></div>
 
   <div class="note-top">I've pre-marked each item: <b>Known</b> = I have solid grounding already &nbsp;•&nbsp; <b>Partial</b> = I know some, need more &nbsp;•&nbsp; <b>Need</b> = I need this from the team. Check items off as they're confirmed or provided.</div>
 
@@ -223,30 +231,93 @@ var DATA = [
 ];
 
 var list=document.getElementById('list');
-var KEY='pf_coo_checklist_v1';
-var saved=JSON.parse(localStorage.getItem(KEY)||'{}');
-var idc=0;
+// Legacy per-browser key (ORDINAL i0..i86). Retained ONLY for a best-effort
+// migration read; the server is now the source of truth. Never written again.
+var LEGACY_KEY='pf_coo_checklist_v1';
+var API='/api/coo-checklist';
 
-DATA.forEach(function(cat,ci){
-  var sec=document.createElement('div'); sec.className='cat'; sec.dataset.ci=ci;
-  var done=0;
-  var bodyHtml='';
-  cat.items.forEach(function(it){
-    var id='i'+(idc++);
-    it._id=id;
-    var checked = saved[id] != null ? saved[id] : (it.s==='k'); // Known items default to checked
-    if(checked) done++;
-    var tagLabel = it.s==='k'?'Known':(it.s==='p'?'Partial':'Need');
-    bodyHtml += '<div class="item'+(checked?' done':'')+'" data-id="'+id+'" data-s="'+it.s+'">'
-      + '<div class="box"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5"><path d="M20 6L9 17l-5-5"/></svg></div>'
-      + '<div class="item-txt"><div class="t">'+it.t+'</div><div class="n">'+it.n+'</div></div>'
-      + '<div class="tag '+it.s+'">'+tagLabel+'</div></div>';
+// ---- helpers ---------------------------------------------------------------
+// Escape untrusted-ish strings before innerHTML (defense-in-depth; DATA is our
+// own content, but the render also injects server-sourced note/date/who).
+function esc(v){
+  return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+// MM/DD/YYYY display (standing rule). Mirrors window.pfFmtDate; this page is a
+// standalone iframe with no shared bundle, so it carries its own small copy.
+function fmtDate(v){
+  if(v==null||v==='') return '';
+  function p2(n){ n=Number(n); return (n<10?'0':'')+n; }
+  var d = v instanceof Date ? v : new Date(String(v));
+  if(isNaN(d.getTime())) return '';
+  return p2(d.getMonth()+1)+'/'+p2(d.getDate())+'/'+d.getFullYear();
+}
+// STABLE, content-derived id: slugify the section title + item text into
+// "section-slug.item-slug". Stable across reorder/insert (unlike ordinal i0..i86)
+// and matches the server's ID_RE (^[a-z0-9](-[a-z0-9])*(\.[a-z0-9](-[a-z0-9])*)?$).
+function slug(str){
+  return String(str||'').toLowerCase()
+    .replace(/[^a-z0-9]+/g,'-')      // non-alnum runs -> single hyphen
+    .replace(/^-+|-+$/g,'');         // trim leading/trailing hyphens
+}
+function stableId(catTitle, itemText){
+  var sec=slug(catTitle), it=slug(itemText);
+  return it ? (sec+'.'+it) : sec;
+}
+
+// server checkoff state: { id: {checked, checkedBy, checkedAt, note} }
+var serverState={};
+// best-effort legacy migration map: legacy ordinal id -> bool (browser-only, low stakes)
+var legacy={};
+try{ legacy=JSON.parse(localStorage.getItem(LEGACY_KEY)||'{}')||{}; }catch(e){ legacy={}; }
+
+function syncNote(kind,msg,who){
+  var el=document.getElementById('syncNote');
+  if(!el) return;
+  el.className='sync-note '+(kind||'');
+  el.innerHTML=esc(msg)+(who?' <span class="who">'+esc(who)+'</span>':'');
+  el.hidden=false;
+}
+
+var idc=0; // parallel ordinal counter ONLY to read the legacy localStorage map
+
+function render(){
+  list.innerHTML='';
+  idc=0;
+  DATA.forEach(function(cat,ci){
+    var sec=document.createElement('div'); sec.className='cat'; sec.dataset.ci=ci;
+    var done=0;
+    var bodyHtml='';
+    cat.items.forEach(function(it){
+      var id=stableId(cat.cat,it.t);
+      it._id=id;
+      var legacyId='i'+(idc++);
+      // Precedence: SERVER state wins. Else legacy localStorage (best-effort
+      // migration). Else default (Known items pre-checked). Never fabricate.
+      var checked;
+      if(serverState[id]!=null && typeof serverState[id].checked==='boolean') checked=serverState[id].checked;
+      else if(legacy[legacyId]!=null) checked=!!legacy[legacyId];
+      else checked=(it.s==='k');
+      if(checked) done++;
+      var tagLabel = it.s==='k'?'Known':(it.s==='p'?'Partial':'Need');
+      var st=serverState[id];
+      var metaHtml='';
+      if(st && st.checked && st.checkedBy){
+        metaHtml='<div class="meta">Checked by '+esc(st.checkedBy)
+          +(st.checkedAt?' · '+esc(fmtDate(st.checkedAt)):'')+'</div>';
+      }
+      bodyHtml += '<div class="item'+(checked?' done':'')+'" data-id="'+esc(id)+'" data-s="'+esc(it.s)+'">'
+        + '<div class="box"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5"><path d="M20 6L9 17l-5-5"/></svg></div>'
+        + '<div class="item-txt"><div class="t">'+esc(it.t)+'</div><div class="n">'+esc(it.n)+'</div>'+metaHtml+'</div>'
+        + '<div class="tag '+esc(it.s)+'">'+tagLabel+'</div></div>';
+    });
+    sec.innerHTML='<div class="cat-head"><h2><span class="ci">'+esc(cat.icon)+'</span> '+esc(cat.cat)+'</h2>'
+      + '<div class="cat-meta"><span class="cat-count">'+done+'/'+cat.items.length+'</span><span class="chev">▾</span></div></div>'
+      + '<div class="cat-body">'+bodyHtml+'</div>';
+    list.appendChild(sec);
   });
-  sec.innerHTML='<div class="cat-head"><h2><span class="ci">'+cat.icon+'</span> '+cat.cat+'</h2>'
-    + '<div class="cat-meta"><span class="cat-count">'+done+'/'+cat.items.length+'</span><span class="chev">▾</span></div></div>'
-    + '<div class="cat-body">'+bodyHtml+'</div>';
-  list.appendChild(sec);
-});
+  refresh();
+}
 
 function refresh(){
   var items=document.querySelectorAll('.item');
@@ -270,13 +341,43 @@ function refresh(){
   });
 }
 
+var saving=false;
+
 list.addEventListener('click',function(e){
   var item=e.target.closest('.item');
   if(item){
-    item.classList.toggle('done');
-    saved[item.dataset.id]=item.classList.contains('done');
-    localStorage.setItem(KEY,JSON.stringify(saved));
+    if(saving) return;                       // one write in flight at a time
+    var id=item.dataset.id;
+    var was=item.classList.contains('done');
+    var now=!was;
+    // optimistic UI
+    item.classList.toggle('done',now);
     refresh();
+    saving=true;
+    fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},
+      credentials:'same-origin',body:JSON.stringify({id:id,checked:now})})
+      .then(function(r){ return r.json().catch(function(){return {};}).then(function(j){return {ok:r.ok,j:j};}); })
+      .then(function(res){
+        saving=false;
+        if(res.ok && res.j && res.j.saved){
+          serverState=res.j.items||serverState;
+          render();                          // re-render from server truth (shows checkedBy/date)
+          var who=(res.j._meta&&res.j._meta.updatedBy)?res.j._meta.updatedBy:'';
+          syncNote('ok','Saved to server.'+(who?' Last update by':''),who);
+        }else{
+          // FAIL CLOSED: revert the optimistic toggle, keep last-known state.
+          item.classList.toggle('done',was);
+          refresh();
+          var msg=(res.j&&res.j.message)?res.j.message:'Could not save to the server. Your checkoff was NOT saved.';
+          syncNote('warn',msg);
+        }
+      })
+      .catch(function(){
+        saving=false;
+        item.classList.toggle('done',was); // revert; never claim a save we did not get
+        refresh();
+        syncNote('warn','Network error. Your checkoff was NOT saved to the server.');
+      });
     return;
   }
   var head=e.target.closest('.cat-head');
@@ -300,12 +401,57 @@ document.querySelectorAll('.filters button').forEach(function(btn){
 });
 
 document.getElementById('reset').addEventListener('click',function(){
-  if(confirm('Reset all checks to the default (Known items checked)?')){
-    localStorage.removeItem(KEY); location.reload();
-  }
+  if(saving) return;
+  if(!confirm('Reset all checks to the default (Known items pre-checked) on the SERVER for everyone?')) return;
+  // Build a bulk upsert that sets every KNOWN item's default (checked) and every
+  // other item unchecked, so the server reflects the defaults. Clears legacy too.
+  var items={};
+  DATA.forEach(function(cat){ cat.items.forEach(function(it){
+    items[stableId(cat.cat,it.t)]={checked:(it.s==='k'),note:''};
+  }); });
+  saving=true;
+  fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},
+    credentials:'same-origin',body:JSON.stringify({items:items})})
+    .then(function(r){ return r.json().catch(function(){return {};}).then(function(j){return {ok:r.ok,j:j};}); })
+    .then(function(res){
+      saving=false;
+      if(res.ok && res.j && res.j.saved){
+        serverState=res.j.items||{};
+        try{ localStorage.removeItem(LEGACY_KEY); }catch(e){}
+        legacy={};
+        render();
+        syncNote('ok','Reset to defaults on the server.');
+      }else{
+        syncNote('warn',(res.j&&res.j.message)||'Reset failed; nothing was changed on the server.');
+      }
+    })
+    .catch(function(){ saving=false; syncNote('warn','Network error; reset did NOT save.'); });
 });
 
-refresh();
+// ---- bootstrap: fetch server state, then render (merge server over defaults) --
+// FAIL CLOSED: on any error render the DEFAULTS + legacy (never fabricated checks)
+// and show an honest indicator that the server state could not be loaded.
+render(); // paint defaults immediately (no flash of empty)
+fetch(API,{credentials:'same-origin',headers:{'Accept':'application/json'}})
+  .then(function(r){ return r.json().catch(function(){return {};}).then(function(j){return {ok:r.ok,j:j};}); })
+  .then(function(res){
+    if(res.ok && res.j && res.j.ok && res.j.items){
+      serverState=res.j.items;
+      render();
+      if(res.j.fallback){
+        syncNote('warn','Server persistence is unavailable — showing local/default state only (not saved).');
+      }else{
+        var who=(res.j._meta&&res.j._meta.updatedBy)?res.j._meta.updatedBy:'';
+        var when=(res.j._meta&&res.j._meta.updatedAt)?fmtDate(res.j._meta.updatedAt):'';
+        if(who) syncNote('ok','Loaded saved checkoffs · last update by '+who+(when?' '+when:''));
+      }
+    }else{
+      syncNote('warn','Could not load saved checkoffs — showing defaults only (nothing was changed).');
+    }
+  })
+  .catch(function(){
+    syncNote('warn','Could not reach the server — showing defaults only (nothing was changed).');
+  });
 </script>
 </body>
 </html>
