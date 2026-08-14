@@ -542,6 +542,75 @@ function cleanContractPull(input) {
   };
 }
 
+// ---- __change_orders reserved structured key (Brad 2026-08-14) ----------------
+// The Subcontract Agreement card (Section 3, override key `contract`) gains a
+// "Change Orders" subsection at the BOTTOM: a repeatable list of change orders on the
+// executed subcontract (CO number, date, description, amount, status). This is a
+// first-pass tracker Brad will refine; the shape is intentionally simple. The whole
+// list is stored as ONE reserved, ARRAY-valued key `__change_orders` INSIDE the
+// `contract` section:
+//   sections.contract.__change_orders = [
+//     { id, co_number, date, description, amount, status }, ...
+//   ]
+// id is a stable client-minted key (like the CRM contact ids / cycle rows / site-elev
+// rows). co_number / date / description / amount are FREE-TEXT strings (amount is a
+// money string the client formats -- no math happens here). status is one of the small
+// dropdown enum values (validated loosely as a capped string -- the client owns the
+// option list; a stray free string never corrupts the store). This is the EIGHTH
+// reserved key (alongside __crm, __submittal_prereqs, __submittal_cycles,
+// __site_elevations, __submittal_pull, __subcontract_analysis, __contract_pull) and
+// rides the SAME merge: Object.assign(existing, fields) preserves it when a normal flat
+// field save omits it, so editing the flat contract fields never wipes the change orders
+// and vice-versa. Critically it lives on the SAME `contract` section as
+// __subcontract_analysis and __contract_pull, so each is preserved independently (own
+// prev/replace branch keyed off its own hasXInBody flag). STRICTLY validated
+// (cleanChangeOrders below); a malformed body fails the WHOLE save closed. Allowed ONLY
+// under the `contract` section (rejected 400 anywhere else). MANUAL-ENTRY only -- no
+// external sync feed writes this key.
+const CO_KEY = '__change_orders';
+const CO_ALLOWED_SECTIONS = { contract: 1 };
+const CO_MAX = 200;                   // change orders on one project; bounds abuse
+const CO_MAX_ID = 60;                 // a client-minted row id length cap
+const CO_MAX_NUM = 60;                // a CO number string cap (e.g. "CO-001")
+const CO_MAX_DATE = 40;               // a date string (ISO YYYY-MM-DD or MM/DD/YYYY)
+const CO_MAX_DESC = 2000;             // a change-order description cap
+const CO_MAX_AMOUNT = 40;             // a money string (client formats the commas)
+const CO_MAX_STATUS = 60;             // a status dropdown value
+
+// Validate + normalize an incoming __change_orders ARRAY into a clean, bounded
+// structure. Returns a SAFE array, or null if present-but-malformed (caller fails the
+// whole save closed). Rules mirror cleanSiteElevations' defensive posture:
+//   - top-level must be an ARRAY; over the cap => reject (null) so nothing is silently
+//     lost.
+//   - each entry must be a plain object; co_number / date / description / amount /
+//     status are strings, trimmed, length-capped, and angle-bracket stripped (via s()).
+//   - id is a client-minted stable key; kept if it is a non-empty capped string, else a
+//     positional fallback ("co-<index>") is minted so every row always has a stable id.
+//   - unknown keys on an entry are DROPPED (only id/co_number/date/description/amount/
+//     status survive). Fully-empty rows (no number/date/desc/amount) are dropped so a
+//     stray blank editor row never persists.
+function cleanChangeOrders(input) {
+  if (input == null) return [];                        // absent => empty
+  if (!Array.isArray(input)) return null;              // present but not an array => reject
+  if (input.length > CO_MAX) return null;
+  const out = [];
+  for (let i = 0; i < input.length; i++) {
+    const entry = input[i];
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
+    let id = s(entry.id, CO_MAX_ID).trim();
+    if (!id) id = 'co-' + i;                            // positional fallback: always have a stable id
+    const co_number   = s(entry.co_number, CO_MAX_NUM).trim();
+    const date        = s(entry.date, CO_MAX_DATE).trim();
+    const description = s(entry.description, CO_MAX_DESC).trim();
+    const amount      = s(entry.amount, CO_MAX_AMOUNT).trim();
+    const status      = s(entry.status, CO_MAX_STATUS).trim();
+    // Drop a fully-empty row (nothing but an id) so a blank add-row never persists.
+    if (!co_number && !date && !description && !amount && !status) continue;
+    out.push({ id, co_number, date, description, amount, status });
+  }
+  return out;
+}
+
 // Validate + normalize an incoming __crm object into a clean, bounded structure.
 // Returns a SAFE object (possibly {}), or null if the input is present but so
 // malformed it must be rejected (caller fails the whole save closed). Rules:
@@ -650,7 +719,7 @@ function cleanFields(input) {
   if (!input || typeof input !== 'object') return out;
   const keys = Object.keys(input).slice(0, MAX_FIELDS_PER_SECTION);
   for (const k of keys) {
-    if (k === CRM_KEY || k === PREREQ_KEY || k === CYCLES_KEY || k === SITE_ELEV_KEY || k === PULL_KEY || k === SUBAN_KEY || k === CPULL_KEY) continue; // reserved structured keys; handled separately, never string-flattened
+    if (k === CRM_KEY || k === PREREQ_KEY || k === CYCLES_KEY || k === SITE_ELEV_KEY || k === PULL_KEY || k === SUBAN_KEY || k === CPULL_KEY || k === CO_KEY) continue; // reserved structured keys; handled separately, never string-flattened
     const label = s(k, MAX_LABEL);
     if (!label) continue;
     out[label] = s(input[k], MAX_VALUE);
@@ -850,6 +919,26 @@ export async function onRequestPost(context) {
       }
     }
 
+    // Reserved __change_orders structured key (Brad 2026-08-14): the Change Orders
+    // subsection array at the bottom of the Subcontract Agreement card (Section 3).
+    // Allowed ONLY under `contract`. Same posture as the other reserved keys: absent =>
+    // untouched (preserve prior), present => strictly validated, malformed => reject the
+    // WHOLE save closed. A change-orders save from the client sends this key WITHOUT the
+    // flat contract fields, so cleanFields yields {} and only the array is replaced; a
+    // normal contract field save (or a __subcontract_analysis / __contract_pull save)
+    // omits this key so the stored change orders are preserved by the merge below.
+    const hasCoInBody = Object.prototype.hasOwnProperty.call(rawFieldsObj, CO_KEY);
+    let coUpdate; // undefined => untouched
+    if (hasCoInBody) {
+      if (!CO_ALLOWED_SECTIONS[section]) {
+        return json({ status: 'error', message: 'Change orders are not valid on this section.' }, 400);
+      }
+      coUpdate = cleanChangeOrders(rawFieldsObj[CO_KEY]);
+      if (coUpdate === null) {
+        return json({ status: 'error', message: 'Invalid change orders; nothing was saved.' }, 400);
+      }
+    }
+
     // FAIL CLOSED: no KV -> we cannot persist. Do NOT report success.
     if (!env.PF_SCHEDULE) {
       return json({ status: 'error',
@@ -885,6 +974,10 @@ export async function onRequestPost(context) {
     // the SAME `contract` section as __subcontract_analysis — both are preserved independently.
     const prevCpull = (existing[CPULL_KEY] && typeof existing[CPULL_KEY] === 'object' && !Array.isArray(existing[CPULL_KEY]))
       ? existing[CPULL_KEY] : undefined;
+    // Carry forward any existing structured __change_orders (an ARRAY, like __site_elevations).
+    // Lives on the SAME `contract` section as __subcontract_analysis + __contract_pull — all
+    // three are preserved independently (each has its own prev/replace branch).
+    const prevCo = Array.isArray(existing[CO_KEY]) ? existing[CO_KEY] : undefined;
     const merged = Object.assign({}, existing, fields);
     // Whole-object replace of __crm when the request supplied one (the client sends
     // the complete per-firm selection each time); otherwise preserve the prior value.
@@ -923,6 +1016,12 @@ export async function onRequestPost(context) {
     if (cpullUpdate !== undefined) merged[CPULL_KEY] = cpullUpdate;
     else if (prevCpull !== undefined) merged[CPULL_KEY] = prevCpull;
     else delete merged[CPULL_KEY]; // never leave a stray/non-object key behind
+    // Same whole-array replace/preserve for __change_orders (the client sends the COMPLETE
+    // change-orders array each save); otherwise preserve the prior. Rides the SAME `contract`
+    // section as __subcontract_analysis + __contract_pull; writing one never touches the others.
+    if (coUpdate !== undefined) merged[CO_KEY] = coUpdate;
+    else if (prevCo !== undefined) merged[CO_KEY] = prevCo;
+    else delete merged[CO_KEY]; // never leave a stray/non-array key behind
     rec.sections[section] = merged;
 
     // Bound the number of sections (defense against a crafted flood of junk keys;

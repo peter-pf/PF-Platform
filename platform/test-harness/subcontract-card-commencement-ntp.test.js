@@ -126,11 +126,17 @@ ok('(d2) card renders Commencement (NTP) from SF.commencement_date',
 // It sits in the Subcontract Agreement card (Section 3, _curSection='contract') —
 // prove it appears AFTER the "Fully Executed Contract Date" line and BEFORE the
 // "Project Substantial Completion Date" line, i.e. inside Contract Info.
-const iCard = html.indexOf("card(3, 'Subcontract Agreement'");
+// NOTE (Brad 2026-08-14 collapsible restructure): the Bid/Contract Recap fields are now
+// built into `var bidRecapInner`/`var contractRecapInner` ABOVE the `card(3,...)` call
+// (each subcategory is wrapped in collapsibleSubgroup), so the field definitions precede
+// the card() invocation. Anchor the ordering scan on the `_curSection = 'contract'` marker
+// (which opens the contract card build block) rather than the card() call, which now sits
+// AFTER the field defs. Ordering itself is UNCHANGED.
+const iCard = html.indexOf("_curSection = 'contract';");
 const iFEC = html.indexOf("field('Fully Executed Contract Date', SF.fully_executed_date, SS)", iCard);
 const iCommence = html.indexOf("field('Commencement Date (NTP)', SF.commencement_date, SS)", iCard);
 const iSubCompl = html.indexOf("field('Project Substantial Completion Date', SF.completion_dates, SS)", iCard);
-ok('(d3) commencement line is inside the Subcontract Agreement card', iCard !== -1 && iCommence > iCard);
+ok('(d3) commencement line is inside the Subcontract Agreement card build block', iCard !== -1 && iCommence > iCard);
 ok('(d4) ordered: Fully Executed -> Commencement(NTP) -> Substantial Completion',
   iFEC !== -1 && iCommence > iFEC && iSubCompl > iCommence);
 // Same source feed proven for both card renders of the field (General + this card).

@@ -2862,6 +2862,12 @@ tr.pf-dragging { opacity: 0.45; }
 .pf-sge-c-val { color: var(--text-1); }
 .pf-sge-untitled { color: var(--text-3); font-style: italic; font-weight: 500; }
 .pf-sge-blank { color: #b06a00; background: rgba(217,138,0,0.10); padding: 0 5px; border-radius: 3px; }
+/* Change Orders status chip (Brad 2026-08-14). Small pill in the Status column of the
+   __change_orders table. Pending=amber, Approved=green, Rejected=red. */
+.pf-co-status { display: inline-block; font-size: 0.7rem; font-weight: 600; padding: 1px 7px; border-radius: 10px; line-height: 1.5; }
+.pf-co-st-pending  { color: #b06a00; background: rgba(217,138,0,0.12); }
+.pf-co-st-approved { color: #2e7d32; background: rgba(46,125,50,0.12); }
+.pf-co-st-rejected { color: #c0392b; background: rgba(192,57,43,0.12); }
 /* Editor */
 .pf-sge-editor { margin: 6px 0 4px 8px; }
 .pf-sge-rows { display: flex; flex-direction: column; gap: 10px; }
@@ -14986,8 +14992,11 @@ try {
     // null. When null → a compact ONE-LINE empty state (density: no bulky placeholder). Office
     // users (canEdit()) get a short hint that a review can be run; field_ops never reach this
     // renderer at all (PM-view only). Every field goes through E() (document-derived = untrusted).
-    function pfSubcontractAnalysisSub(A){
-      var out = subhead('Subcontract Analysis');
+    function pfSubcontractAnalysisSub(A, noHead){
+      // noHead=true: skip the internal "Subcontract Analysis" subhead (the caller's
+      // collapsibleSubgroup already supplies the clickable header). Default false =
+      // legacy behavior (own subhead) so any other caller is unaffected.
+      var out = noHead === true ? '' : subhead('Subcontract Analysis');
       if (!A) {
         // Compact empty state — one line. Office users see the run hint; the subsection
         // ALWAYS appears (Brad 2026-08-13: renders for every job).
@@ -15054,6 +15063,125 @@ try {
                + ' Business-level summary, not legal advice.')
            + '</div>';
       return out;
+    }
+
+    // ===== Change Orders (reserved __change_orders ARRAY under `contract`) =========
+    // First-pass CO tracker (Brad 2026-08-14). Mirrors the __site_elevations pattern: a
+    // read table (CO # / Date / Description / Amount / Status + Totals row) with an inline
+    // editor (Edit -> per-row editor + "+ Add Change Order" + "× Delete", Save POSTs the
+    // COMPLETE array to /api/project-override under fields:{__change_orders:[...]}). Office
+    // -gated: canEdit() hides all controls; the server also 403s field_ops. Dates render
+    // MM/DD/YYYY (pfFmtDate); Amount comma-formatted (pfFmtQty); every cell escaped via E().
+    var PF_CO_STATUSES = ['Pending', 'Approved', 'Rejected'];
+    // Read the stored __change_orders ARRAY from the contract override. Returns a NORMALIZED
+    // array of {id, co_number, date, description, amount, status}. None stored => empty array
+    // (blank-graceful; NEVER a fabricated default row). Never throws.
+    function pfChangeOrders(){
+      try {
+        var c = _curOverrides && _curOverrides.contract;
+        var arr = c && c.__change_orders;
+        if (Array.isArray(arr)) {
+          return arr.map(function(o, i){
+            o = (o && typeof o === 'object') ? o : {};
+            var id = String(o.id == null ? '' : o.id).trim() || ('co-' + i);
+            return {
+              id: id,
+              co_number:   String(o.co_number == null ? '' : o.co_number),
+              date:        String(o.date == null ? '' : o.date),
+              description: String(o.description == null ? '' : o.description),
+              amount:      String(o.amount == null ? '' : o.amount),
+              status:      String(o.status == null ? '' : o.status)
+            };
+          });
+        }
+      } catch (e) {}
+      return [];
+    }
+    // Mint a stable client-side id for a new CO row (same idiom as pfSiteElevNewId).
+    function pfCoNewId(){
+      return 'co_' + Date.now().toString(36) + '_' + Math.floor(Math.random() * 1e6).toString(36);
+    }
+    // Parse ONE amount cell to a number for totalling: strip $/commas/whitespace, keep
+    // digits/dot/minus, parseFloat. Blank/non-numeric => NaN (ignored by the sum). Handles
+    // "$12,500", "-1,000", "1200.50", "".
+    function pfCoAmtNum(v){
+      var s = (v == null ? '' : String(v)).trim();
+      if (!s) return NaN;
+      var cleaned = s.replace(/,/g, '').replace(/[^0-9.\-]/g, '');
+      if (!/\d/.test(cleaned)) return NaN;
+      var n = parseFloat(cleaned);
+      return isNaN(n) ? NaN : n;
+    }
+    // Sum the amount column across all COs (NaN cells ignored). Returns a Number.
+    function pfCoSumAmount(cos){
+      var t = 0;
+      for (var i = 0; i < cos.length; i++){
+        var n = pfCoAmtNum(cos[i].amount);
+        if (!isNaN(n)) t += n;
+      }
+      return t;
+    }
+    // Read-view of ONE change order as a table row. Blank cells show a yellow placeholder;
+    // date is MM/DD/YYYY (pfFmtDate); amount is comma-formatted (pfFmtQty).
+    function pfCoReadRow(o){
+      function val(v){
+        var s = (v == null ? '' : String(v)).trim();
+        return s ? E(s) : '<span class="pf-sge-blank">-</span>';
+      }
+      var dateTxt = (o.date && String(o.date).trim())
+        ? E(String(window.pfFmtDate(o.date))) : '<span class="pf-sge-blank">-</span>';
+      var amtTxt = (o.amount && String(o.amount).trim())
+        ? E(String(window.pfFmtQty(o.amount))) : '<span class="pf-sge-blank">-</span>';
+      var st = (o.status && String(o.status).trim()) ? String(o.status).trim() : '';
+      var stCls = st === 'Approved' ? 'pf-co-st-approved'
+                : st === 'Rejected' ? 'pf-co-st-rejected'
+                : st === 'Pending'  ? 'pf-co-st-pending' : '';
+      var stTxt = st ? '<span class="pf-co-status '+stCls+'">'+E(st)+'</span>'
+                     : '<span class="pf-sge-blank">-</span>';
+      return '<tr>'
+        + '<td class="pf-sge-c-area">'+val(o.co_number)+'</td>'
+        + '<td class="pf-sge-c-val">'+dateTxt+'</td>'
+        + '<td class="pf-sge-c-val">'+val(o.description)+'</td>'
+        + '<td class="pf-sge-c-val">'+amtTxt+'</td>'
+        + '<td class="pf-sge-c-val">'+stTxt+'</td>'
+        + '</tr>';
+    }
+    // Build the whole Change Orders subgroup content: a .pf-co-wrap host (data-co-num) with a
+    // read-view body (table + Totals, or empty hint) + an inline Edit affordance (office only).
+    function pfChangeOrdersInline(){
+      var cos = pfChangeOrders();
+      var listHtml;
+      if (cos.length) {
+        var total = pfCoSumAmount(cos);
+        var tfoot = '<tfoot><tr class="pf-sge-total-row">'
+          + '<td class="pf-sge-c-total-label">Total</td>'
+          + '<td></td><td></td>'
+          + '<td class="pf-sge-c-total">'+E(String(window.pfFmtQty(total)))+'</td>'
+          + '<td></td>'
+          + '</tr></tfoot>';
+        listHtml = '<table class="pf-sge-table"><thead><tr>'
+          + '<th>CO #</th><th>Date</th><th>Description</th><th>Amount ($)</th><th>Status</th>'
+          + '</tr></thead><tbody>'
+          + cos.map(pfCoReadRow).join('')
+          + '</tbody>'
+          + tfoot
+          + '</table>';
+      } else {
+        listHtml = '<div class="pf-sge-empty">No change orders recorded.'
+          + (canEdit() ? ' <strong>Edit</strong> &rarr; <strong>+ Add Change Order</strong> to log one.' : '')
+          + '</div>';
+      }
+      var editBtn = canEdit()
+        ? '<button type="button" class="pf-sge-edit" onclick="event.stopPropagation();window.pfCoEdit(this)">Edit</button>'
+        : '';
+      return '<div class="pf-co-wrap pf-sge-wrap" data-co-num="'+E(String(_curNum || ''))+'">'
+        + '<div class="pf-sge-inline-head">'
+        +   '<span class="pf-sge-inline-title">Change Orders</span>'
+        +   '<span class="pf-sge-inline-actions">'+editBtn+'</span>'
+        + '</div>'
+        + '<div class="pf-sge-body pf-co-body">'+listHtml+'</div>'
+        + '<div class="pf-sge-msg" style="display:none"></div>'
+        + '</div>';
     }
     // Read-view of ONE area as a COMPACT single row (Brad 2026-08-12 density pass): a small
     // table-like row — Area | Site Grade Elev | FFE — NOT a collapsible card. Blank values
@@ -16825,9 +16953,21 @@ try {
       // + saveable via the same override mechanism. (Fields are intended to be populated
       // by later extraction from the GC's subcontract; this round is formatting only.)
       _curSection = 'contract';
-      html += card(3, 'Subcontract Agreement', null,
-        subhead('Bid Recap')
-        + fields([
+      // COLLAPSIBLE RESTRUCTURE (Brad 2026-08-14): the three subcategories (Bid Recap,
+      // Contract Recap, Subcontract Analysis) each roll up/expand independently via the
+      // shared collapsibleSubgroup() helper (same .pr-card collapse idiom E&D uses), plus
+      // a NEW "Change Orders" collapsible at the BOTTOM. Each subcategory's content is
+      // built into an *Inner string first, then wrapped. DEFAULT EXPANDED (open=true) — the
+      // three existing subcategories stay open on load (Brad: "make the subcategories able
+      // to roll up", not "start collapsed"); the E&D subsections default collapsed, this is
+      // the deliberate difference. PRESERVATION: every field stays a direct
+      // .pr-field[data-pr-label] descendant of the ONE `contract` card (collapsibleSubgroup
+      // only adds a wrapper div — the pfEditSection/pfSaveSection scan is
+      // closest('.pr-card')===card, wrapper-agnostic), so the `contract` override key +
+      // edit/save behavior round-trip UNCHANGED. The reserved keys (__contract_pull /
+      // __subcontract_analysis / __change_orders) all live on the same `contract` section.
+      var bidRecapInner =
+        fields([
           field('Bid Invite Date', bid.invite_date, 'Bid Log'),
           field('Bid Due Date', bid.due_date, 'Bid Log'),
           field('Prelim Completed By', bid.design_completed_date, 'Bid Log'),
@@ -16850,13 +16990,14 @@ try {
           // Released to Start Submittals is now the LAST field in Bid Recap.
           // ("Bid Sent to GC" link field removed per Brad 2026-08-07.)
           field('Released to Start Submittals', '')
-        ])
-        + subhead('Contract Recap')
+        ]);
+      // ---- Contract Recap (INNER content; wrapped collapsible below) ----
+      var contractRecapInner =
         // "Pull from Executed Subcontract" control (Stage 2, Brad 2026-08-13). OFFICE-ONLY
         // button + provenance line, rendered at the top of Contract Recap. Clicking records a
         // request; Peter's engine writes the flat contract fields (Subcontract Value /
         // Liquidated Damages / Retainage / Payment Terms / ...) + provenance out-of-band.
-        + pfContractPullControl()
+        pfContractPullControl()
         // RESTRUCTURED (Brad 2026-08-07) from a single twoCol grouping into FOUR
         // nested sub-groups under the Contract Recap subhead: Contract Info,
         // Invoicing & Payment Terms, Scope of Work, and Needed for Contract
@@ -16999,17 +17140,34 @@ try {
               return '<span class="pr-link missing" title="Folder not found in SharePoint">'+pfFolderIcoSvg()+'<span class="pf-folder-txt">'+E(l.label)+'</span></span>';
             }).join('');
             return '<div class="pr-subhead">Subcontract Agreement</div><div class="pr-links">'+out+'</div>';
-          })()
-        // ----- Subcontract Analysis SUBSECTION (Brad 2026-08-13) -----
-        // NESTED into this Subcontract Agreement card as a "Subcontract Analysis" subhead +
-        // content, rendered AFTER the Subcontract Agreement links (formerly a standalone
-        // "3b. Subcontract Analysis" card — now removed). ALWAYS appears (every job): full
-        // render when analysis data exists, a compact one-line empty state otherwise. DUAL
-        // SOURCE: the reserved `__subcontract_analysis` override under `contract` WINS, else
-        // the legacy synced `D.analysis` block (Indy Housing Hub) — see pfSubcontractAnalysis().
-        // PM-view only: the fo-projects field view uses a separate renderer and never calls
-        // this. Every field is escaped via E() (document-derived payload = untrusted).
-        + pfSubcontractAnalysisSub(pfSubcontractAnalysis(D)), false, 'contract');
+          })();
+      // ---- Subcontract Analysis (INNER content; wrapped collapsible below) ----
+      // NESTED into this Subcontract Agreement card (formerly a standalone "3b. Subcontract
+      // Analysis" card — now removed). ALWAYS renders (every job): full render when analysis
+      // data exists, a compact one-line empty state otherwise. DUAL SOURCE: the reserved
+      // `__subcontract_analysis` override under `contract` WINS, else the legacy synced
+      // `D.analysis` block (Indy Housing Hub) — see pfSubcontractAnalysis(). PM-view only:
+      // the fo-projects field view uses a separate renderer and never calls this. Every field
+      // is escaped via E() (document-derived payload = untrusted). noHead=true suppresses the
+      // renderer's own "Subcontract Analysis" subhead since collapsibleSubgroup supplies the
+      // clickable header (avoids a double label).
+      var subAnalysisInner = pfSubcontractAnalysisSub(pfSubcontractAnalysis(D), true);
+      // ---- Change Orders (INNER content; wrapped collapsible below, LAST subgroup) ----
+      // NEW first-pass change-order tracker (Brad 2026-08-14). Reserved `__change_orders`
+      // ARRAY under `contract`. Own inline editor (mirrors the __site_elevations pattern):
+      // Edit -> per-row editor (CO # / Date / Description / Amount / Status) with + Add /
+      // × Delete, Save POSTs the COMPLETE array. Office-gated (canEdit()); server 403s
+      // field_ops. Dates render MM/DD/YYYY via pfFmtDate; Amount comma-formatted via pfFmtQty.
+      var changeOrdersInner = pfChangeOrdersInline();
+      // Assemble the FOUR collapsible subgroups. First three DEFAULT EXPANDED (open=true);
+      // Change Orders also expanded so its empty-state hint is visible. Each rolls up/expands
+      // independently via the shared .pr-card collapse idiom.
+      html += card(3, 'Subcontract Agreement', null,
+          collapsibleSubgroup('Bid Recap', bidRecapInner, true)
+        + collapsibleSubgroup('Contract Recap', contractRecapInner, true)
+        + collapsibleSubgroup('Subcontract Analysis', subAnalysisInner, true)
+        + collapsibleSubgroup('Change Orders', changeOrdersInner, true),
+        false, 'contract');
 
       // ----- 3. Engineering & Design (RESTORED standalone top-level section) -----
       // Brad (2026-08-07, batch-8 CORRECTION): batch-4 wrongly ELIMINATED this
@@ -23126,6 +23284,200 @@ try {
         }
       }).catch(function(){
         if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.getAttribute('data-sge-t') || 'Save'; }
+        if (onErr) onErr('Save failed: could not reach the server. Your changes were NOT saved - please retry.');
+      });
+    }
+
+    // ===== Change Orders inline editor (reserved __change_orders under `contract`) =====
+    // Mirrors the site-elevations editor 1:1 (own .pf-co-wrap host + data-co-num). Edit reveals
+    // a per-CO row editor (CO # / Date (native picker) / Description / Amount / Status
+    // dropdown) with a "× Delete" (confirm) per row and a "+ Add Change Order" affordance.
+    // Save gathers all rows, POSTs the COMPLETE array to /api/project-override
+    // (section:'contract', fields:{__change_orders:[...]}), and on a clean {ok:true,saved:true}
+    // adopts server truth + surgically refreshes ONLY this block (no full renderProjectRecord
+    // bounce). FAIL CLOSED: any non-clean response keeps the editor open + shows an honest inline
+    // error, NEVER "saved". field_ops never sees these controls (canEdit()); the server 403s too.
+    function pfCoWrap(btn){ return btn && btn.closest ? btn.closest('.pf-co-wrap') : null; }
+    function pfCoMsg(wrap, msg, isErr){
+      var el = wrap && wrap.querySelector('.pf-sge-msg');
+      if (!el) return;
+      el.textContent = msg;
+      el.className = 'pf-sge-msg ' + (isErr ? 'pf-sge-msg-err' : 'pf-sge-msg-ok');
+      el.style.display = 'block';
+    }
+    // Build the editor HTML for one CO row. o = {id, co_number, date, description, amount, status}.
+    // Date is a native <input type="date"> (value MUST be YYYY-MM-DD internally; MM/DD/YYYY is
+    // display-only). Status is a <select> over PF_CO_STATUSES (blank default allowed).
+    function pfCoRowEditorHtml(o){
+      // Normalize any stored date (MM/DD/YYYY or ISO) to YYYY-MM-DD for the native picker.
+      var dIso = (window.pfDateToIso ? window.pfDateToIso(o.date) : '') || '';
+      if (!dIso && o.date){
+        var m = String(o.date).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (m) dIso = m[0];
+        else {
+          var m2 = String(o.date).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+          if (m2){ dIso = m2[3] + '-' + ('0'+m2[1]).slice(-2) + '-' + ('0'+m2[2]).slice(-2); }
+        }
+      }
+      var opts = '<option value="">—</option>' + PF_CO_STATUSES.map(function(sv){
+        var sel = (String(o.status||'') === sv) ? ' selected' : '';
+        return '<option value="'+esc2(sv)+'"'+sel+'>'+esc2(sv)+'</option>';
+      }).join('');
+      return '<div class="pf-sge-erow pf-co-erow" data-co-id="'+esc2(o.id)+'">'
+        + '<div class="pf-sge-erow-head">'
+        +   '<input type="text" class="pf-sge-in pf-co-in-num" placeholder="e.g. CO-001" value="'+esc2(o.co_number||'')+'" aria-label="CO Number">'
+        +   '<button type="button" class="pf-sge-remove" onclick="event.stopPropagation();window.pfCoRemove(this)" title="Delete this change order">&times; Delete</button>'
+        + '</div>'
+        + '<div class="pf-sge-erow-fields">'
+        +   '<label class="pf-sge-elabel">Date'
+        +     '<input type="date" class="pf-sge-in pf-co-in-date" value="'+esc2(dIso)+'"></label>'
+        +   '<label class="pf-sge-elabel">Description'
+        +     '<input type="text" class="pf-sge-in pf-co-in-desc" placeholder="e.g. Added piers at Grid C" value="'+esc2(o.description||'')+'"></label>'
+        +   '<label class="pf-sge-elabel">Amount ($)'
+        +     '<input type="text" class="pf-sge-in pf-co-in-amt" placeholder="e.g. 12,500" value="'+esc2(o.amount||'')+'"></label>'
+        +   '<label class="pf-sge-elabel">Status'
+        +     '<select class="pf-sge-in pf-co-in-status">'+opts+'</select></label>'
+        + '</div>'
+        + '</div>';
+    }
+    // Enter edit mode: replace the read-view body with the row editor + "+ Add Change Order".
+    window.pfCoEdit = function(btn){
+      if (!canEdit()) return; // defense-in-depth (server also 403s)
+      var wrap = pfCoWrap(btn);
+      if (!wrap) return;
+      var bodyEl = wrap.querySelector('.pf-co-body');
+      if (!bodyEl) return;
+      var cos = pfChangeOrders();
+      var rowsHtml = cos.map(pfCoRowEditorHtml).join('');
+      var editorHtml = '<div class="pf-sge-editor pf-co-editor">'
+        + '<div class="pf-sge-rows pf-co-rows">' + rowsHtml + '</div>'
+        + '<button type="button" class="pf-sge-add" onclick="event.stopPropagation();window.pfCoAdd(this)">+ Add Change Order</button>'
+        + '<div class="pf-sge-edit-err" style="display:none"></div>'
+        + '<div class="pf-sge-edit-actions">'
+        +   '<button type="button" class="pf-sge-save" onclick="event.stopPropagation();window.pfCoSave(this)">Save</button>'
+        +   '<button type="button" class="pf-sge-cancel" onclick="event.stopPropagation();window.pfCoCancel(this)">Cancel</button>'
+        + '</div>'
+        + '</div>';
+      wrap.setAttribute('data-co-orig', bodyEl.innerHTML);
+      bodyEl.innerHTML = editorHtml;
+      var bar = wrap.querySelector('.pf-sge-inline-actions');
+      if (bar) bar.style.display = 'none';
+    };
+    // Append a fresh empty CO row to the editor.
+    window.pfCoAdd = function(btn){
+      if (!canEdit()) return;
+      var wrap = pfCoWrap(btn);
+      if (!wrap) return;
+      var rows = wrap.querySelector('.pf-co-rows');
+      if (!rows) return;
+      var tmp = document.createElement('div');
+      tmp.innerHTML = pfCoRowEditorHtml({ id: pfCoNewId(), co_number: '', date: '', description: '', amount: '', status: '' });
+      var node = tmp.firstChild;
+      rows.appendChild(node);
+      var numInput = node.querySelector('.pf-co-in-num');
+      if (numInput) numInput.focus();
+    };
+    // Delete one CO row (with a confirm). Only removes from the editor DOM; Save persists it.
+    window.pfCoRemove = function(btn){
+      if (!canEdit()) return;
+      var row = btn && btn.closest ? btn.closest('.pf-co-erow') : null;
+      if (!row) return;
+      var numInput = row.querySelector('.pf-co-in-num');
+      var name = (numInput && numInput.value && numInput.value.trim()) ? numInput.value.trim() : 'this change order';
+      if (!window.confirm('Delete ' + name + '? This is not saved until you click Save.')) return;
+      row.parentNode.removeChild(row);
+    };
+    // Cancel: restore the read-view body verbatim, re-show the Edit affordance.
+    window.pfCoCancel = function(btn){
+      var wrap = pfCoWrap(btn);
+      if (!wrap) return;
+      var orig = wrap.getAttribute('data-co-orig');
+      var bodyEl = wrap.querySelector('.pf-co-body');
+      if (orig != null && bodyEl) { bodyEl.innerHTML = orig; wrap.removeAttribute('data-co-orig'); }
+      var bar = wrap.querySelector('.pf-sge-inline-actions');
+      if (bar) bar.style.display = '';
+    };
+    // Save: gather every editor row into the COMPLETE array + POST it. The client always
+    // sends the whole array; the backend whole-array-replaces __change_orders. The Date value
+    // is the native picker's YYYY-MM-DD (stored as-is; display re-formats to MM/DD/YYYY).
+    window.pfCoSave = function(btn){
+      if (!canEdit()) return;
+      var wrap = pfCoWrap(btn);
+      if (!wrap) return;
+      var num = wrap.getAttribute('data-co-num') || _curNum || '';
+      var editor = wrap.querySelector('.pf-co-editor');
+      var errEl = wrap.querySelector('.pf-sge-edit-err');
+      function showErr(msg){ if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; } }
+      if (!num || !editor) { showErr('Missing project number; nothing was saved.'); return; }
+      if (errEl) errEl.style.display = 'none';
+      var arr = [];
+      var rowEls = editor.querySelectorAll('.pf-co-erow');
+      for (var i = 0; i < rowEls.length; i++) {
+        var r = rowEls[i];
+        var id = r.getAttribute('data-co-id') || pfCoNewId();
+        var co_number   = String((r.querySelector('.pf-co-in-num')    || {}).value || '').trim();
+        var date        = String((r.querySelector('.pf-co-in-date')   || {}).value || '').trim();
+        var description = String((r.querySelector('.pf-co-in-desc')   || {}).value || '').trim();
+        var amount      = String((r.querySelector('.pf-co-in-amt')    || {}).value || '').trim();
+        var status      = String((r.querySelector('.pf-co-in-status') || {}).value || '').trim();
+        arr.push({ id: id, co_number: co_number, date: date, description: description, amount: amount, status: status });
+      }
+      var saveBtn = wrap.querySelector('.pf-sge-save');
+      pfCoPersist(wrap, num, arr, saveBtn, showErr);
+    };
+    // Shared POST helper: persist the change-orders array, adopt server truth, surgically
+    // refresh ONLY this block (no full renderProjectRecord bounce). Same fail-closed contract
+    // as pfSgePersist.
+    function pfCoPersist(wrap, num, arr, saveBtn, onErr){
+      if (saveBtn) { saveBtn.disabled = true; saveBtn.setAttribute('data-co-t', saveBtn.textContent); saveBtn.textContent = 'Saving...'; }
+      fetch('/api/project-override', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ num: num, section: 'contract', fields: { __change_orders: arr } })
+      }).then(function(res){
+        return res.json().then(function(b){ return { ok: res.ok, status: res.status, body: b }; })
+          .catch(function(){ return { ok: res.ok, status: res.status, body: null }; });
+      }).then(function(r){
+        // FAIL CLOSED: only a clean {ok:true, saved:true} is success.
+        if (!r.ok || !r.body || r.body.ok !== true || r.body.saved !== true) {
+          var msg = (r.body && r.body.message) ? r.body.message
+            : (r.status === 403 ? 'You do not have permission to edit this project.'
+                                 : 'Save failed (' + r.status + '). Your changes were NOT saved - please retry.');
+          if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.getAttribute('data-co-t') || 'Save'; }
+          if (onErr) onErr(msg);
+          return;
+        }
+        // Adopt server truth into the store + module-local overrides.
+        window.PF_PROJECT_OVERRIDES[num] = { sections: (r.body.sections) || {}, _meta: (r.body._meta) || null };
+        try {
+          if (String(num) === String(_curNum) && r.body.sections && typeof r.body.sections === 'object') {
+            _curOverrides = r.body.sections;
+          }
+        } catch (e) {}
+        // SURGICAL in-place refresh of ONLY the CO block (no full renderProjectRecord — that
+        // would collapse the Subcontract card + reset scroll, same regression class as SGE).
+        try {
+          var bodyEl = wrap.querySelector('.pf-co-body');
+          if (bodyEl) {
+            var freshInner = pfChangeOrdersInline();
+            var tmp = document.createElement('div');
+            tmp.innerHTML = freshInner;
+            var freshBody = tmp.querySelector('.pf-co-body');
+            bodyEl.innerHTML = freshBody ? freshBody.innerHTML : '';
+          }
+          wrap.removeAttribute('data-co-orig');
+          var acts = wrap.querySelector('.pf-sge-inline-actions');
+          if (acts) acts.style.display = '';
+          pfCoMsg(wrap, 'Saved.', false);
+        } catch (e) {
+          // Fail-soft: fall back to a full re-render (still correct data) rather than a stale editor.
+          var card = wrap.closest('.pr-card');
+          var root = (card && card.closest('.pr-root')) || (card && card.parentElement) || document.getElementById('prGenericRoot');
+          window.renderProjectRecord(num, root);
+        }
+      }).catch(function(){
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.getAttribute('data-co-t') || 'Save'; }
         if (onErr) onErr('Save failed: could not reach the server. Your changes were NOT saved - please retry.');
       });
     }
