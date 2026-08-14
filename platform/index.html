@@ -3792,6 +3792,62 @@ window.pfFmtQty = function(v){
   return sign + grouped + dec;
 };
 
+// ---- CANONICAL SUBMITTAL-SUMMARY TOTALS, KEYED BY PROJECT NUMBER (global) -----
+// Brad 2026-08-14: Total LF and # of Piers must come from ONE source — the E&D
+// Submittal Summary (the per-area __site_elevations table, Pier Qty + Total LF
+// columns) — so every surface that shows them is consistent:
+//   1) General Info auto-pull (pfSubmittalGeneralInfoPull, current project) — the
+//      already-shipped reference implementation.
+//   2) The Project Summary header strip (.pr-qty) in the project-detail view.
+//   3) The Active Projects "Summary" page columns (totalLfFor / piersFor).
+// This global reads the SAME storage the General Info pull reads, but keyed BY
+// project number (window.PF_PROJECT_OVERRIDES[num].sections.engineering
+// .__site_elevations) so the two IIFEs that render (2) and (3) — which do NOT
+// share _curOverrides scope — resolve to the identical value as (1).
+//   FAIL-CLOSED: no Submittal Summary data (missing override / empty array / no
+//   numeric cells) -> the field is '' (blank). Callers render their own empty
+//   state (DASH / "-"); this NEVER fabricates or falls back to a different number
+//   (bid_log / PF_PROGRESS) — an honest blank beats a fiction (standing rule).
+// Returns { pierQty: <raw number string or ''>, totalLf: <raw number string or ''> }.
+// Raw (ungrouped) strings so callers pass them through window.pfFmtQty for the
+// portal-standard comma formatting exactly like the General Info pull does.
+window.pfSubmittalSummaryTotalsFor = function(num){
+  var out = { pierQty: '', totalLf: '' };
+  try {
+    num = String(num == null ? '' : num);
+    if (!num) return out;
+    var store = window.PF_PROJECT_OVERRIDES && window.PF_PROJECT_OVERRIDES[num];
+    var eng = store && store.sections && store.sections.engineering;
+    var arr = eng && eng.__site_elevations;
+    if (!Array.isArray(arr) || !arr.length) return out;  // no data -> fail-closed blank
+    // Parse ONE cell to a number (identical rule to pfSgeCellNum): strip commas +
+    // any non-numeric (units), keep digits/dot/minus, parseFloat. Blank / no-digit
+    // / non-numeric -> NaN (ignored by the sum, so it can never coerce to 0).
+    function cellNum(v){
+      var s = (v == null ? '' : String(v)).trim();
+      if (!s) return NaN;
+      var cleaned = s.replace(/,/g, '').replace(/[^0-9.\-]/g, '');
+      if (!/\d/.test(cleaned)) return NaN;
+      var n = parseFloat(cleaned);
+      return isFinite(n) ? n : NaN;
+    }
+    // Sum ONLY when at least one area carries a numeric cell (mirrors the
+    // pfSgeSumField / pfSubmittalGeneralInfoPull `any` gate) — all-blank stays ''.
+    function sumOrBlank(fieldName){
+      var total = 0, any = false;
+      for (var i = 0; i < arr.length; i++) {
+        var a = arr[i];
+        var n = cellNum(a && a[fieldName]);
+        if (!isNaN(n)) { total += n; any = true; }
+      }
+      return any ? String(total) : '';
+    }
+    out.pierQty = sumOrBlank('pierQty');
+    out.totalLf = sumOrBlank('totalLf');
+  } catch (e) {}
+  return out;
+};
+
 // ---- CANONICAL DATE-DISPLAY NORMALIZER (global, Brad 2026-08-07/2026-08-11) --
 // Defined at global scope so EVERY inlined module can call window.pfFmtDate()
 // and the whole portal reads dates as MM/DD/YYYY (Brad's standing rule). This is
@@ -16499,52 +16555,25 @@ try {
       // the separate .pr-loc element was redundant. Also removed the descriptive
       // data_note text that rendered directly below the header card.
       //
-      // CRITICAL: Total LF and # of Piers MUST equal the values on the Active
-      // Projects SUMMARY page. That page computes them via totalLfFor(num) /
-      // piersFor(num) (Awarded-index IIFE, ~L18016 / ~L18034), keyed by project
-      // number, from window.PF_PROGRESS then window.PF_PROJECT_RECORDS bid_log.
-      // Those helpers live in a SEPARATE IIFE and are out of scope here, so the
-      // IDENTICAL lookup is replicated inline below (same sources, same fallback
-      // order, same "—" for missing) so the two views can never disagree.
+      // CRITICAL: Total LF and # of Piers MUST equal (a) the Active Projects
+      // SUMMARY page columns AND (b) the General Info auto-pull. Brad 2026-08-14:
+      // ALL THREE now read the ONE source — the E&D Submittal Summary
+      // (window.PF_PROJECT_OVERRIDES[num].sections.engineering.__site_elevations,
+      // Pier Qty + Total LF columns summed), via the global
+      // window.pfSubmittalSummaryTotalsFor(num). This is the SAME storage
+      // pfSubmittalGeneralInfoPull() reads for the current project, so the header
+      // strip, the Summary page, and General Info can never disagree. Formatting
+      // goes through window.pfFmtQty (portal comma standard). FAIL-CLOSED: no
+      // Submittal Summary data -> "—" (never a stale bid_log / PF_PROGRESS number).
       var _hnum = String(D.project_number || '');
       var _hdash = '—'; // matches summary DASH
-      function _hIntOrDash(v){
-        if (v == null || v === '') return _hdash;
-        var n = +v; if (!isFinite(n)) return _hdash;
-        return Math.round(n).toLocaleString();
+      function _hQtyOrDash(raw){
+        if (raw == null || raw === '') return _hdash;   // fail-closed empty state
+        return String(window.pfFmtQty(raw));
       }
-      // Total LF: PF_PROGRESS.design_lf -> PF_PROJECT_RECORDS bid_log.total_lf
-      // (identical to totalLfFor()).
-      function _hTotalLf(num){
-        if (!num) return _hdash;
-        try {
-          var pp = window.PF_PROGRESS && window.PF_PROGRESS.projects;
-          if (pp && pp[num] && pp[num].design_lf != null && pp[num].design_lf !== '')
-            return _hIntOrDash(pp[num].design_lf);
-          var pr = window.PF_PROJECT_RECORDS && window.PF_PROJECT_RECORDS.records;
-          var rec = pr && pr[num];
-          if (rec && rec.bid_log && rec.bid_log.total_lf != null && rec.bid_log.total_lf !== '')
-            return _hIntOrDash(rec.bid_log.total_lf);
-        } catch(e) {}
-        return _hdash;
-      }
-      // # of Piers: PF_PROGRESS.design_columns -> PF_PROJECT_RECORDS bid_log.total_columns
-      // (identical to piersFor()).
-      function _hPiers(num){
-        if (!num) return _hdash;
-        try {
-          var pp = window.PF_PROGRESS && window.PF_PROGRESS.projects;
-          if (pp && pp[num] && pp[num].design_columns != null && pp[num].design_columns !== '')
-            return _hIntOrDash(pp[num].design_columns);
-          var pr = window.PF_PROJECT_RECORDS && window.PF_PROJECT_RECORDS.records;
-          var rec = pr && pr[num];
-          if (rec && rec.bid_log && rec.bid_log.total_columns != null && rec.bid_log.total_columns !== '')
-            return _hIntOrDash(rec.bid_log.total_columns);
-        } catch(e) {}
-        return _hdash;
-      }
-      var _hTotalLfVal = _hTotalLf(_hnum);
-      var _hPiersVal   = _hPiers(_hnum);
+      var _hSub = window.pfSubmittalSummaryTotalsFor(_hnum);
+      var _hTotalLfVal = _hQtyOrDash(_hSub.totalLf);
+      var _hPiersVal   = _hQtyOrDash(_hSub.pierQty);
       // Address for the summary block: Bid Log address, else subcontract address.
       // Same provenance as the General Info > Project Address field below.
       var _hAddr = bid.address || SF.project_address || '';
@@ -24648,38 +24677,32 @@ try {
       var n = +v; if (!isFinite(n)) return DASH;
       return Math.round(n).toLocaleString();
     }
-    // Total LF for a project number:
-    //   1) window.PF_PROGRESS.projects[num].design_lf (primary)
-    //   2) window.PF_PROJECT_RECORDS.records[num].bid_log.total_lf (fallback)
-    //   else DASH. Never fabricated.
+    // Total LF for a project number — ONE source (Brad 2026-08-14): the E&D
+    // Submittal Summary (__site_elevations Total LF column summed), via the global
+    // window.pfSubmittalSummaryTotalsFor(num). IDENTICAL source + value as the
+    // General Info auto-pull and the project-detail header strip, so the three
+    // views can never disagree. Formatting via window.pfFmtQty (portal comma
+    // standard). FAIL-CLOSED: no Submittal Summary data -> DASH (never fabricated,
+    // never a stale bid_log / PF_PROGRESS number).
     function totalLfFor(num){
       if (!num) return DASH;
       try {
-        var pp = window.PF_PROGRESS && window.PF_PROGRESS.projects;
-        if (pp && pp[num] && pp[num].design_lf != null && pp[num].design_lf !== '')
-          return intOrDash(pp[num].design_lf);
-        var pr = window.PF_PROJECT_RECORDS && window.PF_PROJECT_RECORDS.records;
-        var rec = pr && pr[num];
-        if (rec && rec.bid_log && rec.bid_log.total_lf != null && rec.bid_log.total_lf !== '')
-          return intOrDash(rec.bid_log.total_lf);
+        var raw = window.pfSubmittalSummaryTotalsFor(num).totalLf;
+        if (raw == null || raw === '') return DASH;
+        return String(window.pfFmtQty(raw));
       } catch(e) {}
       return DASH;
     }
-    // # of Piers for a project number:
-    //   1) window.PF_PROGRESS.projects[num].design_columns (primary)
-    //   2) window.PF_PROJECT_RECORDS.records[num].bid_log.total_columns (fallback,
-    //      same provenance as the Total LF bid_log.total_lf fallback)
-    //   else DASH. Never fabricated.
+    // # of Piers for a project number — ONE source (Brad 2026-08-14): the E&D
+    // Submittal Summary (__site_elevations Pier Qty column summed), via the global
+    // window.pfSubmittalSummaryTotalsFor(num). Same source/value as General Info +
+    // the header strip. FAIL-CLOSED: no data -> DASH (never fabricated).
     function piersFor(num){
       if (!num) return DASH;
       try {
-        var pp = window.PF_PROGRESS && window.PF_PROGRESS.projects;
-        if (pp && pp[num] && pp[num].design_columns != null && pp[num].design_columns !== '')
-          return intOrDash(pp[num].design_columns);
-        var pr = window.PF_PROJECT_RECORDS && window.PF_PROJECT_RECORDS.records;
-        var rec = pr && pr[num];
-        if (rec && rec.bid_log && rec.bid_log.total_columns != null && rec.bid_log.total_columns !== '')
-          return intOrDash(rec.bid_log.total_columns);
+        var raw = window.pfSubmittalSummaryTotalsFor(num).pierQty;
+        if (raw == null || raw === '') return DASH;
+        return String(window.pfFmtQty(raw));
       } catch(e) {}
       return DASH;
     }
