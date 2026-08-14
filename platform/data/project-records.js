@@ -353,7 +353,38 @@ window.PF_PROJECT_RECORDS = {
         "design_completed_date": "2025-07-11",
         "design_paid_date": "2025-07-01"
       },
-      "subcontract": null,
+      "subcontract": {
+        "fields": {
+          "subcontract_number": "GNC-233-107",
+          "subcontract_value": "$320,200.00",
+          "fully_executed_date": "07/15/2026",
+          "commencement_date": "NTP-triggered — PF may not commence the Work until it receives a written Notice to Proceed (or other written notification) from Flaherty & Collins (§5.1). No fixed commencement date; time is of the essence.",
+          "completion_dates": "Schedule-defined — no fixed calendar completion date in the subcontract body. PF's Subcontract Time = the Project Schedule attached as Exhibit C (§5.1); time is of the essence; Substantial Completion governed by the Punch List / Owner-acceptance process (§4.5). F&C may modify the schedule at its discretion.",
+          "liquidated_damages": "$75.00 per calendar day — flows down from the Prime Contract for PF-caused delay; withheld from payment or reimbursed by PF ('Days' = calendar days, §1.17). Same LD rate as PF's Warrick F&C job. (§5.4)",
+          "retainage_pct": "10% withheld from each progress payment (§4.4)",
+          "retainage_release": "Released with final payment after Punch List completion and Owner acceptance (§4.5 / §4.6).",
+          "payment_terms": "Application for Payment due by the 25th of each month (§4.2); Contractor pays after it receives payment from the Owner for PF's Work (§4.3). PAY-IF-PAID: Final Payment is conditioned on the Contractor having received payment from the Owner (§4.6) — Owner payment is an express condition precedent (§4.7). Owner-default risk sits on PF."
+        },
+        "snippets": {
+          "subcontract_number": "Cover page INFORMATION block — 'Subcontract No.: GNC-233-107' (rendered p002)",
+          "subcontract_value": "§4.1 Subcontract Sum — 'Contractor will pay Subcontractor for the Work in the amount of $320,200.00' (rendered p006, footer 'Page 5 of 15')",
+          "fully_executed_date": "Signature page — both parties dated 7/15/2026: Richard Lapenta (VP Construction Operations, F&C) and Brad Reinking (Principal Member, Pier Foundations LLC) (rendered sig_p016, footer 'Page 15 of 15'). DocuSign envelope 4E679728-EB43-86D3-8294-FE618D9A7DC5.",
+          "commencement_date": "§5.1 Project Schedule & Subcontract Time (rendered p007, footer 'Page 6 of 15')",
+          "completion_dates": "§5.1 Project Schedule & Subcontract Time (rendered p007, footer 'Page 6 of 15') + §4.5 Substantial Completion (rendered p007)",
+          "liquidated_damages": "§5.4 Liquidated Damages (rendered p008, footer 'Page 7 of 15') + §1.17 Days definition (rendered p005, footer 'Page 4 of 15')",
+          "retainage_pct": "§4.4 Retainage (rendered p006, footer 'Page 5 of 15')",
+          "retainage_release": "§4.5 Substantial Completion / §4.6 Final Payment (rendered p007)",
+          "payment_terms": "§4.2 Applications for Payment + §4.3 Progress Payments (rendered p006) + §4.6/§4.7 Final Payment & Conditions (rendered p007)"
+        },
+        "source_file": "26-0715 - The Granary Sub Agmt FE.pdf",
+        "pages": 15,
+        "scanned_pages": [],
+        "docusign_completed": true,
+        "docusign_envelope_id": "4E679728-EB43-86D3-8294-FE618D9A7DC5",
+        "extracted_at": "2026-08-14T00:00:00Z",
+        "extractor": "hand-extract (vision-read of rendered PNGs — obfuscated-font core pages; reviewed & approved by Brad)",
+        "confidential": "PF-INTERNAL — office/financials gate only"
+      },
       "discrepancies": []
     },
     "26-001": {
@@ -3066,7 +3097,7 @@ window.PF_PROJECT_RECORDS = {
       "sp_folder": "04 - Project Management/02 - Projects/26-013 - Park & Poplar - OldTown",
       "folder_found": true,
       "generated": "2026-06-18T02:35:18.472537+00:00Z",
-      "data_note": "DRAFT subcontract (not executed). READ-ONLY. Bulk-populated from data we already hold (Bid Log metrics/dates/award, Project Info contacts, folder doc links, auto-progress QA/QC) AND deepened to POET level with a fresh per-job subcontract extraction (dates, parties, value, scope, retainage, payment terms incl. pay-when/if-paid, liquidated damages, bonds, certified payroll/labor, insurance, working hours, surveying, tax) \u2014 each with a verbatim PDF snippet. Bid Log wins on shared fields; the subcontract only fills blanks or confirms, and any disagreement is noted, never silently overwritten. The migrated subcontract analysis (verdict + risks) is preserved. Fields with no confirmed source render blank \u2014 never fabricated.",
+      "data_note": "Executed subcontract (Fully Executed FE). READ-ONLY. Bulk-populated from data we already hold (Bid Log metrics/dates/award, Project Info contacts, folder doc links, auto-progress QA/QC) AND deepened to POET level with a fresh per-job subcontract extraction (dates, parties, value, scope, retainage, payment terms incl. pay-when/if-paid, liquidated damages, bonds, certified payroll/labor, insurance, working hours, surveying, tax) \u2014 each with a verbatim PDF snippet. Bid Log wins on shared fields; the subcontract only fills blanks or confirms, and any disagreement is noted, never silently overwritten. The migrated subcontract analysis (verdict + risks) is preserved. Fields with no confirmed source render blank \u2014 never fabricated.",
       "contacts": {
         "title": "Park & Poplar - Pier Foundations Contact Log",
         "groups": {
@@ -3429,59 +3460,45 @@ window.PF_PROJECT_RECORDS = {
       },
       "subcontract": {
         "fields": {
-          "agreement_date": "2026-06-11",
-          "fully_executed_date": "Not executed \u2014 DRAFT (signature page blank; \u00a71.2 Subcontractor reps blank)",
-          "gc_party": "Old Town Construction, LLC (Contractor/GC), 525 North End Dr., Suite 100, Carmel, IN 46032 \u2014 Rep: Patrick Groogan / VP Construction Joel Scheele",
-          "owner_party": "Park & Poplar Residential LLC (Owner), 525 North End Drive, Suite 100, Carmel, IN 46032 \u2014 AFFILIATE of Contractor (\u00a71.4)",
-          "project_address": "Westfield Blvd / Park Street, Westfield, IN",
           "subcontract_value": "$398,500.00",
-          "confirmed_scope": "Vibratory Stone Columns (VSC) + Galvanized Helical Piers \u2014 full design-build scope: submittals signed/sealed by licensed engineer, VSC & helical layout, furnish & install at design locations, move spoils outside building footprint, verification testing. All-inclusive of labor, material, taxes, insurance, supervision, equipment (Exhibit B Scope of Work).",
-          "retainage_pct": "10% withheld on completed Work AND on stored materials (\u00a74.4)",
-          "retainage_release": "Final payment (which releases retainage) is contingent on, among other conditions, Contractor receiving final payment from Owner for the Subcontractor's Work (\u00a74.8(d)) \u2014 Owner is Contractor's affiliate. Retainage may be held until final payment.",
-          "payment_terms": "PAY-WHEN-PAID \u2014 Application for Payment due by the 15th of each month (\u00a74.3); Contractor makes progress payments within 10 days of Contractor's RECEIPT of payment from the Owner (\u00a74.4). Final payment expressly conditioned on Contractor receiving final Owner payment (\u00a74.8(d)). Owner is Contractor's affiliate (\u00a71.4). If undisputed amounts unpaid 30 days past due, Subcontractor may stop work on 7 days' notice (\u00a74.9).",
-          "liquidated_damages": "Proportional flow-down \u2014 if the Prime Contract provides LDs against Contractor and they are assessed, Contractor may assess LDs against Subcontractor in proportion to its share of delay responsibility (capped at the amount assessed against Contractor). PLUS Contractor may separately assess its OWN actual delay damages (extended general conditions, acceleration costs, other actual damages) \u2014 these are uncapped. (LDs / Delay sections). COUNSEL-FLAGGED: ask for an aggregate cap.",
-          "bonds_required": "No \u2014 payment & performance bonds NOT required (\u00a73.5 'No [X]' checked).",
-          "insurance_requirements": "Heavier than PF baseline. CGL (ISO occurrence): $2,000,000 BI/PD per occurrence, $5,000,000 general aggregate PER PROJECT (CG 25 03 endorsement), $2,000,000 products & completed operations aggregate. Employer's Liability $1,000,000 each accident / $1,000,000 disease. Excess/Umbrella $5,000,000. Contractors Pollution Liability $1,000,000/occurrence & $2,000,000 aggregate (triggered by excavation/earthwork; 3-yr tail if claims-made). Professional Liability $2,000,000 per claim / $4,000,000 aggregate (structural/design-build) or $1,000,000 / $2,000,000 for other trades (\u00a714.9). Best A- or better; additional-insured, primary & noncontributory, waiver of subrogation; deductibles/SIRs borne by Subcontractor.",
-          "certified_payroll": "No certified-payroll requirement found on the agreement face. Labor compliance is E-Verify + Form I-9 employment-eligibility verification (records produced within 24 hours of request), flowed down to lower-tier subs.",
-          "working_hours": "No fixed clock-hours clause on the face. Subcontractor must furnish (in writing, for Contractor approval) an English-speaking superintendent/foreman/site supervisor ONSITE whenever Subcontractor is performing Work; rep must attend all jobsite safety, production and coordination meetings starting two weeks before commencement through final completion (\u00a73.7).",
-          "surveying_staking": "Subcontractor (PF) provides VSC and Helical Pier layout for its scope (Exhibit B item 3). Subcontractor must also maintain an authorized onsite superintendent/foreman (\u00a73.7).",
-          "tax_note": "Subcontract Sum is all-inclusive and INCLUDES all applicable federal, state, county, municipal and local taxes (sales, consumer, use and similar) plus all tariffs and all price escalation (\u00a74.1 / Scope). No tax-exempt certificate or exemption clause appears on the agreement face."
+          "fully_executed_date": "07/01/2026",
+          "commencement_date": "NTP-triggered \u2014 PF must not start any design or material procurement until it receives a written Notice to Proceed from the Contractor's Project Manager; any pre-NTP design/material/overhead cost is at PF's expense (Scope item 25). PF also may not commence the Work until notified in writing / via the GC's electronic scheduling software (\u00a76.2). No fixed commencement date; time is of the essence.",
+          "completion_dates": "Schedule-defined \u2014 no fixed calendar completion date in the subcontract body. Time is of the essence; PF completes per the Contractor's Project Schedule, which the GC may modify at its discretion (\u00a76.1). PF must submit its own detailed schedule (start/completion dates per activity) within 5 days of executing the Agreement (\u00a76.2). Substantial Completion governed by the Owner Punch List process (\u00a74.7).",
+          "retainage_pct": "10% (ten percent) withheld from each progress payment (\u00a74)",
+          "retainage_release": "Released to PF only when the Owner releases that retainage to the Contractor per the Prime Contract (\u00a74.9) \u2014 not on a fixed PF milestone. Retainage-if-paid.",
+          "payment_terms": "Progress payment to PF within ten (10) days of the Contractor's RECEIPT OF PAYMENT FROM THE OWNER (\u00a74.4); Application for Payment due by the 15th, a late app bumps to the next month's cycle (\u00a74.3c). Final payment within 10 days after PF completes punch + submits final lien waiver/closeout AND the Contractor receives final payment from the Owner (\u00a74.8d). PAY-IF-PAID flavor \u2014 Owner-default/slow-pay risk sits on PF (note: Owner and GC may be affiliated, \u00a71.4).",
+          "liquidated_damages": "No fixed $/day in the subcontract. Prime-Contract LDs flow down PROPORTIONALLY to PF's share of delay, capped at the amount assessed against the GC (\u00a72.3 flowdown). Separately, PF owes the GC's actual delay damages \u2014 extended general conditions, acceleration \u2014 under \u00a76.3. (Prime Contract not provided with the FE, so the underlying LD rate is unverified.)"
         },
         "snippets": {
-          "agreement_date": "PROJECT DATE: 6/11/2026 (page-1 block). Draft footer: 'Last updated 5/27/2026 (BAR)'.",
-          "fully_executed_date": "This Subcontract is effective as of the day and year first written above. CONTRACTOR: SUBCONTRACTOR: (Signature) (Signature) (Printed name and title) (Printed name and title) Date: Date: (signature page left blank \u2014 unsigned DRAFT)",
-          "gc_party": "CONTRACTOR Name: Old Town Construction Street: 525 North End Dr., Suite 100 City/State/Zip: Carmel, IN, 46032. Contractor's Project Representative(s) are Vice President of Construction Joel Scheele and: Name: Patrick Groogan (\u00a71.1, page 1)",
-          "owner_party": "OWNER Name: Park & Poplar Residential LLC Street: 525 North End Drive, Suite 100 Carmel, IN 46032. \u00a71.4 Owner Affiliation: Contractor and Owner may be affiliated entities ... Subcontractor waives any claim or defense based upon the relationship.",
-          "project_address": "Project Name: Park & Poplar Project Address: Westfield Blvd/Park Street, Westfield IN (page-1 block)",
-          "subcontract_value": "SUBCONTRACT SUM: $398,500.00 (page-1 block). 'The Subcontract Sum is a fixed, firm, and all-inclusive price ... includes all applicable federal, state, county, municipal and local taxes ... All price escalation is included.'",
-          "confirmed_scope": "complete professional execution of Agg and Helical Pier scopes ... 3. Provide VSC and Helical Pier Layout ... 4. Furnish and install Vibratory Stone Columns (VSC) at design locations. 5. Furnish and install Galvanized Helical Piers at design locations. 6. Spoils will be moved outside of building footprint by this subcontractor. 7. Provide verification testing as required (Exhibit B)",
-          "retainage_pct": "Take that portion of the Subcontract Sum properly allocable to completed Work ... less retainage of ten percent (10%); (b) ... materials and equipment delivered and suitably stored ... less retainage of ten percent (10%) (\u00a74.4)",
-          "retainage_release": "(d) Contractor receives final payment from Owner for Subcontractor's Work. (\u00a74.8 final payment conditions \u2014 preceded by close-out submissions: warranties, O&M manuals, As-Builts, keys and other close-out submissions)",
-          "payment_terms": "On or before the 15th day of each month ('Invoice Due Date'), the Subcontractor shall ... submit ... an Application for Payment (\u00a74.3). ... Contractor shall make progress payments to the Subcontractor within ten (10) days of Contractor's receipt of payment from the Owner. (\u00a74.4)",
-          "liquidated_damages": "If the Prime Contract provides for liquidated damages against Contractor, and such damages are assessed, Contractor may assess liquidated damages against the Subcontractor in proportion to the Subcontractor's share of responsibility for the delay, not to exceed the amount assessed against Contractor. ... Contractor may suffer its own damages ... including without limitation, extended general condi",
-          "bonds_required": "\u00a7 3.5 Bonds: Is Subcontractor required to provide payment and performance bonds? [Check One] Yes [____] No [__X__] (bonds not required)",
-          "insurance_requirements": "Comprehensive General Liability insurance written on an ISO occurrence form ... $2,000,000 Bodily Injury/Personal Injury per person and Property Damage per occurrence, and $5,000,000 general aggregate per project and $2,000,000 products and completed operations aggregate. ... Excess/umbrella liability ... at least $5,000,000. ... Contractors Pollution Liability ... $1,000,000 per occurrence and $2",
-          "certified_payroll": "Subcontractor shall verify the employment eligibility of all workers through proper completion and retention of Form I-9s and participation in the E-Verify program, and shall make such records available for inspection within 24 hours of request by Contractor.",
-          "working_hours": "\u00a7 3.7 Superintendent: The Subcontractor shall ... furnish in writing to Contractor the name and qualifications of a proposed English-speaking superintendent, foreman, or other site supervisor who shall be onsite whenever Subcontractor is performing Work.",
-          "surveying_staking": "3. Provide VSC and Helical Pier Layout for the Scope of Work. (Exhibit B, Scope of Work)",
-          "tax_note": "The Subcontract Sum is a fixed, firm, and all-inclusive price ... includes all applicable federal, state, county, municipal and local taxes including but not limited to all applicable sales, consumer, use and similar taxes, and all tariffs applicable to the Work. All price escalation is included in the Subcontract Sum."
+          "subcontract_value": "Cover PROJECT block \u2014 'SUBCONTRACT SUM: $398,500.00'. Confirmed against \u00a74 Subcontract Sum (fixed, firm, all-inclusive lump sum).",
+          "fully_executed_date": "Signature page \u2014 SUBCONTRACTOR Brad Reinking, Member 6/26/2026; CONTRACTOR Patrick Groogan, Project Manager digitally signed 7/1/2026 (Adobe/PKI DN + timestamp 2026.07.01 12:19:54-04'00') (rendered sig_p018). NOT a DocuSign envelope \u2014 executed via Adobe/PKI digital signature; Brad confirmed this is the definitive executed FE copy.",
+          "commencement_date": "Scope of Work item 25 + \u00a76.2",
+          "completion_dates": "\u00a76.1 Project Schedule + \u00a76.2 Subcontractor's Schedule + \u00a74.7 Substantial Completion & Final Punch Out",
+          "retainage_pct": "\u00a74 progress-payment retainage 'less retainage of ten percent (10%)'",
+          "retainage_release": "\u00a74.9 Release of Retainage",
+          "payment_terms": "\u00a74.4 Progress Payments + \u00a74.3 + \u00a74.8 Final Payment + \u00a71.4 Owner Affiliation",
+          "liquidated_damages": "\u00a72.3 Flowdown + \u00a76.3 Delay Caused by Subcontractor (Prime Contract NOT provided with the FE, so the underlying LD rate is unverified)"
         },
-        "source_file": "Pier Foundations - Park and Poplar Subcontract (6-11-26) DRAFT.pdf",
+        "source_file": "Pier Foundations - Park and Poplar Subcontract (6-11-26) FE.pdf",
         "pages": 56,
         "scanned_pages": [],
-        "item_id": "016ISVH63O4Z5QSFM4Z5C2SAT4ZMB6YGC5"
+        "docusign_completed": false,
+        "docusign_envelope_id": null,
+        "extracted_at": "2026-08-14T00:00:00Z",
+        "extractor": "hand-extract (text-clean clause parse + vision-read of signature/header pages; executed via Adobe/PKI, superseding the prior unexecuted block; reviewed & approved by Brad)",
+        "confidential": "PF-INTERNAL \u2014 office/financials gate only"
       },
       "analysis": {
         "source": "Standalone Subcontracts review (subcontracts.html). Migrated into the project record.",
         "review_label": "Park & Poplar (Westfield, IN)",
-        "subcontract_number": "DRAFT (not yet numbered)",
-        "review_date": "06/11/2026 (DRAFT)",
+        "subcontract_number": "",
+        "review_date": "07/01/2026",
         "counterparty": "Old Town Construction, LLC (Contractor)",
         "amount": "$398,500.00",
         "doc_url": "https://pierfoundations.sharepoint.com/:b:/s/pf/IQBu5nsJFZzPRakCfMsD7BhdAamSC7PLK6cmLztyzDwwVVc",
-        "execution_status": "DRAFT \u2014 needs signature",
+        "execution_status": "Fully Executed \u2014 executed via Adobe/PKI digital signature 07/01/2026 (not DocuSign); Brad-confirmed definitive FE copy. Risk assessment below reflects the negotiated terms (still applicable).",
         "verdict": "RED",
-        "summary": "DRAFT lump-sum design-build subcontract with Old Town Construction for VSC + helical piers on a 6-story apartment + garage. Highest-dollar of the reviewed jobs ($398,500) and the highest-risk. Multiple RED items: contingent / pay-when-paid payment with an affiliate owner (Owner is Contractor's affiliate), subsurface risk shifted to PF, design-build professional-liability exposure, liquidated damages PLUS Contractor's own uncapped actual delay costs on a tight 23-day critical-path window, and flow-down of an un-attached Prime Contract. Insurance stack is heavier than PF baseline (CGL $2M/$5M, CPL $1M/$2M, PL $2M/$4M). Indiana construction-attorney review recommended before signing.",
+        "summary": "Lump-sum design-build subcontract with Old Town Construction for VSC + helical piers on a 6-story apartment + garage. Highest-dollar of the reviewed jobs ($398,500) and the highest-risk. Multiple RED items: contingent / pay-when-paid payment with an affiliate owner (Owner is Contractor's affiliate), subsurface risk shifted to PF, design-build professional-liability exposure, liquidated damages PLUS Contractor's own uncapped actual delay costs on a tight 23-day critical-path window, and flow-down of an un-attached Prime Contract. Insurance stack is heavier than PF baseline (CGL $2M/$5M, CPL $1M/$2M, PL $2M/$4M). Indiana construction-attorney review recommended before signing.",
         "key_terms": [
           {
             "k": "Subcontract Amount",
@@ -3537,7 +3554,7 @@ window.PF_PROJECT_RECORDS = {
         ]
       },
       "discrepancies": [],
-      "execution_status": "DRAFT \u2014 needs signature"
+      "execution_status": "Fully Executed \u2014 Adobe/PKI digital signature 07/01/2026 (Brad-confirmed FE copy)"
     },
     "26-014": {
       "project_number": "26-014",
