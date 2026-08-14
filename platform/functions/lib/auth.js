@@ -375,6 +375,15 @@ const DATA_FILE_AREAS = {
   '/data/pf-design-submittal.js':  'financials',      // PROJECT: 'Approved Shop Dwgs' SharePoint folder webUrl per project (Engineering & Design folder link; file name/global kept from Stage 1) — no $, office-only (admin/partner/business_dev), field_ops BLOCKED
   '/data/safety-folder.js':        'financials',      // PROJECT: '06 - Safety' SharePoint folder webUrl per project (Site Specific Safety Plan (SSSP) link, Field Ops area) — no $, office-only (admin/partner/business_dev), field_ops BLOCKED
   '/data/project-history.js':      'financials',      // PROJECT: per-job ContractValue/totalContractValue
+  // Estimated Stone tonnage per turnover project (Brad 2026-08-14: "Derek can see
+  // that as well ... everything I and Jonathan can both see"). PROJECT-level
+  // estimating figure -> classified 'financials' = admin + partner + business_dev,
+  // so BOTH partners (Jonathan + Derek-as-partner) see the value instead of the
+  // amber blank; field_ops STILL BLOCKED (not in the financials area). Previously
+  // unclassified -> fell through to default-deny (admin-only), which is why only
+  // Brad saw it. This entry matches how the other partner-visible per-job financial
+  // feeds (project-records / awarded-projects / bid-log) are gated.
+  '/data/turnover-stone.js':       'financials',      // PROJECT: Estimated Stone tonnage per turnover job — partner+BD visible, field_ops BLOCKED
   '/data/precon-pipeline.js':      'preconstruction', // PROJECT/BD: opportunity pipeline ($ per opp) — BD domain
   '/data/feasibility-history.js':  'preconstruction', // PROJECT/BD: completed feasibility studies (verdict/drivers), no $; precon analysis, field_ops BLOCKED
   '/data/project-master.js':       'preconstruction', // PROJECT/BD: PF Project Master (number/name/diameter/true award date) — no $; precon awarded surface
