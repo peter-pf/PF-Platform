@@ -16883,6 +16883,19 @@ try {
           // Existing executed-date field (label unchanged = data preserved); now a
           // native date picker via PF_FIELD_DATE_LABELS + MM/DD/YYYY display.
           field('Fully Executed Contract Date', SF.fully_executed_date, SS),
+          // Commencement / Notice to Proceed (Brad 2026-08-13, Part A): surface the
+          // Commencement Date (NTP) IN this Subcontract Agreement card too (it also renders
+          // on the General Info card ~L30000). Same `subcontract.fields.commencement_date`
+          // source (SF.commencement_date) that Peter's FE-contract auto-fill populates, so
+          // the two views always agree. In the FE data model Commencement and Notice-to-
+          // Proceed are ONE field: the value is either a real NTP-fixed date (rendered
+          // MM/DD/YYYY — the label matches PF_DATE_LABEL_RE via "Date", so field() routes it
+          // through pfFmtDate) OR the NTP-trigger statement when the date is set by a later
+          // written Notice to Proceed. FAIL CLOSED: no FE extraction / no NTP => blank ("-"
+          // amber), never fabricated. Placed directly under Fully Executed Contract Date so
+          // the executed-date + commencement/NTP read together; stays a plain `contract`
+          // override field (label IS the key), editable + saveable like its siblings.
+          field('Commencement Date (NTP)', SF.commencement_date, SS),
           field('Project Substantial Completion Date', SF.completion_dates, SS),
           // Sales Tax (Brad 2026-08-07): a Yes / No-Exempt selector (dropdown via
           // PF_FIELD_DROPDOWNS) with an ADJACENT "Sales Tax %" field for the state/
