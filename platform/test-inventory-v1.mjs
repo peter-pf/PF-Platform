@@ -51,8 +51,17 @@ const teeth = DATA.items.find(i => /Auger Teeth/.test(i.description));
 ok('seed value: Auger Teeth = 8 trailer / 10 home', teeth && teeth.reqTrailer === 8 && teeth.reqHome === 10);
 const isolators = DATA.items.find(i => i.description === 'Isolators');
 ok('seed value: Isolators = 0 trailer / 4 home', isolators && isolators.reqTrailer === 0 && isolators.reqHome === 4);
-ok('Hardware is a placeholder stub (0 seed items)',
-  DATA.items.filter(i => i.category === 'Hardware').length === 0 && DATA.categories.includes('Hardware'));
+// Hardware category is now LOADED from Derek's Mast & Vibro hardware list (the
+// green-highlighted PRO-DIG MMS3 mast-manual fasteners, pages 24/28/33/34).
+const hardware = DATA.items.filter(i => i.category === 'Hardware');
+ok('Hardware category present', DATA.categories.includes('Hardware'));
+ok('Hardware loaded with 31 items', hardware.length === 31);
+ok('every Hardware item mfr = PRO-DIG', hardware.length === 31 && hardware.every(i => i.manufacturer === 'PRO-DIG'));
+ok('every Hardware item has a PRO-DIG part number', hardware.every(i => /^[0-9]-[0-9]{3}-[0-9]{3}$/.test(i.mfrPart)));
+// No fabricated required-stock: reqTrailer/reqHome are the office's spares target,
+// left null (TBD) rather than passing off the manual's installed count as a target.
+ok('Hardware required-qty NOT fabricated (reqTrailer/reqHome null)',
+  hardware.every(i => i.reqTrailer === null && i.reqHome === null));
 
 // ---------------------------------------------------------------------------
 // 2) AUTH classification: everyone-viewable feed + api; office-only edit.
