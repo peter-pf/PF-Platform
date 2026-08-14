@@ -3580,6 +3580,7 @@ tr.pf-dragging { opacity: 0.45; }
     '/data/project-record-poet.js',
     '/data/project-records.js',
     '/data/garbin-prelim.js',
+    '/data/turnover-stone.js',
     '/data/awarded-projects.js',
     '/data/precon-pipeline.js',
     '/data/feasibility-history.js',
@@ -3648,6 +3649,7 @@ tr.pf-dragging { opacity: 0.45; }
   if (isPrivileged) {
     feeds.push('/data/project-record-poet.js', '/data/project-records.js',
                '/data/garbin-prelim.js',
+               '/data/turnover-stone.js',
                '/data/shop-dwg-info.js',
                '/data/pf-design-submittal.js',
                '/data/safety-folder.js',
@@ -13895,6 +13897,25 @@ try {
       if (isNaN(n)) return '';
       return String(window.pfFmtQty(n * 12));
     }
+    // ---- Turnover-Stone (General Info "Estimated Stone (TN)") ----------------
+    // Reads window.PF_TURNOVER_STONE.projects[num] (from data/turnover-stone.js, built
+    // by sync/build-turnover-stone.py off each project's Turnover Budget '.xlsm',
+    // 'Detailed Budget' tab, 'Tons of Stone' line). Brad 2026-08-14: General Info
+    // "Estimated Stone (TN)" pulls from the turnover doc (NOT the Bid Log). Fail-closed:
+    // any missing global / project / non-'ok' status / null value -> null (the field()
+    // caller then renders the honest amber blank; NEVER a fabricated number). The
+    // 'formula-no-cache' status (Tons-of-Stone formula whose Excel cache was dropped)
+    // also returns null here -- an honest blank beats a wrong/stale number.
+    function pfTurnoverStone(num){
+      try {
+        var g = window.PF_TURNOVER_STONE;
+        if (!g || !g.projects || !num) return null;
+        var e = g.projects[String(num)];
+        if (!e || e.status !== 'ok') return null;
+        if (e.stone_tn == null || e.stone_tn === '') return null;
+        return e.stone_tn;
+      } catch (e) { return null; }
+    }
     // ---- REUSABLE SharePoint folder/file link (Brad 2026-08-12) --------------
     // Emits ONE styled anchor (.pf-folder-link) for every project-detail SharePoint
     // folder/file link: an inline SVG folder icon + the given text, rendered as a small
@@ -16728,7 +16749,19 @@ try {
           // still wins when present.
           field('Column Diameter', _gsePull.columnDiameter,
                  _gsePull.columnDiameter ? 'Auto (Submittal Summary)' : ''),
-          field('Estimated Stone (TN)', bid.total_stone_tn, 'Bid Log'),
+          // AUTO-PULL FROM THE TURNOVER DOC (Brad 2026-08-14). Estimated Stone (TN) pulls
+          // the "Tons of Stone" line from this project's Turnover Budget '.xlsm' ('Detailed
+          // Budget' tab) via data/turnover-stone.js (built by sync/build-turnover-stone.py),
+          // NOT the Bid Log. Same auto-with-manual-override mechanism as the Submittal
+          // Summary / Garbin pulls: the turnover value is passed AS the synced value, so a
+          // NON-empty manual override still WINS (field() precedence). FAIL-CLOSED: no
+          // turnover doc / no line / null / stale-formula-cache -> pfTurnoverStone() returns
+          // null -> we pass '' -> field() renders the amber blank "-" (NEVER a fabricated or
+          // Bid-Log-substituted number — an honest empty beats a wrong value).
+          field('Estimated Stone (TN)', (function(){
+              var _ts = pfTurnoverStone(_curNum);
+              return (_ts == null) ? '' : _ts;
+            })(), (pfTurnoverStone(_curNum) != null) ? 'Turnover Budget' : ''),
           field('Estimated Spoils (CY)', '')
         ])
         // ---- CONTACT GROUPS MOVED OUT (Brad 2026-08-11): the General Contractor Info
