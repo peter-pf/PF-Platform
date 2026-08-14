@@ -168,6 +168,10 @@ function build(opts) {
     extractWinFn(html, 'pfCrmRemoveContactRow'),
     extractWinFn(html, 'pfCrmRemoveContactCancel'),
     extractWinFn(html, 'pfCrmRemoveContactConfirm'),
+    // Add-button placement (Brad 2026-08-14): the per-group "+ Add contact" handler + its
+    // cancel, so the harness can prove the header-row placement + the form opens below.
+    extractWinFn(html, 'pfPcAddContact'),
+    extractWinFn(html, 'pfPcAddContactCancel'),
   ].join('\n\n');
   win.eval(src);
   return { win, doc, captured, g };
@@ -339,6 +343,165 @@ function pfTeamSeed(role) { return { name:'Jonathan Reinking', title:role, offic
     win.pfCrmEditContactRow(host.querySelector('.pr-crow-editbtn'));
     await wait(); await wait(); await wait();
     ok('(fail-net) network error surfaces + seed intact', /reach the server|NOT added/.test(alerted) && !!host.querySelector('.pr-crow[data-crm-legacy="1"]') && !captured.posts.some(p => String(p.url).indexOf('/api/project-override') === 0));
+  }
+
+  // =====================================================================================
+  // BRAD 2026-08-14 — (A) FULL UNIFORMITY ON LOAD + (B) ADD BUTTON IN THE COMPANY HEADER
+  // =====================================================================================
+  // Build a host WITH its sibling legacy static .pr-pc-horiz-block (exactly as the real
+  // emitters do: horizContactBlock(...) + crmHost) so we can prove the card render both
+  // (a) supersedes the legacy layout and (b) leaves ZERO visible legacy-layout nodes.
+  function makeLegacyHostWithBlock(doc, prefix, key, roleTag, company, contacts) {
+    // Sibling legacy static block (its own visible company + horizontal table).
+    const block = doc.createElement('div');
+    block.className = 'pr-pc-horiz-block';
+    const live = (contacts || []).filter(c => c && (c.name || c.title || c.office || c.cell || c.email || c.notes));
+    block.innerHTML =
+        '<div class="pr-role-tag">' + roleTag + '</div>'
+      + '<div class="pr-pc-company"><div class="pr-pc-company-name">' + company + '</div>'
+      +   (live.length ? '<div class="pr-crow-table"><div class="pr-crow pr-crow-head"></div>'
+            + live.map(c => '<div class="pr-crow"><span class="pr-crow-name">' + c.name + '</span></div>').join('')
+            + '</div>' : '')
+      + '</div>';
+    doc.getElementById('root').appendChild(block);
+    const host = makeLegacyHost(doc, prefix, key, roleTag, company, contacts);
+    return { block, host };
+  }
+
+  // ---- (A: full-uniform-on-load) EVERY group renders card-format immediately, 0 legacy nodes ----
+  for (const grp of GROUPS) {
+    const { win, doc } = build({ role:'admin', overrides:{}, directory:[] });
+    const { block, host } = makeLegacyHostWithBlock(doc, grp.pfx, grp.key, grp.tag, grp.company, grp.seed);
+    // FIRST synchronous pass only (no await): the seed-only host must already be uniform.
+    win.pfCrmRenderCards(doc);
+    ok('(A/' + grp.tag + ') card format present SYNCHRONOUSLY (no await) on load',
+       !!host.querySelector('.pr-crow-table') && host.querySelectorAll('.pr-crow:not(.pr-crow-head)').length === grp.seed.length);
+    ok('(A/' + grp.tag + ') sibling legacy .pr-pc-horiz-block is SUPERSEDED on load',
+       block.classList.contains('pr-pc-horiz-superseded'));
+    // The visible legacy company/table live under .pr-pc-company / .pr-role-tag, both hidden
+    // by the supersede CSS => zero VISIBLE legacy-layout contact nodes remain.
+    ok('(A/' + grp.tag + ') 0 legacy-layout nodes remain visible (superseded hides company+table)',
+       block.classList.contains('pr-pc-horiz-superseded'));
+    // And after the async directory settles it is STILL uniform (idempotent, no regress).
+    await wait(); await wait();
+    ok('(A/' + grp.tag + ') still uniform card format after async settle',
+       !!host.querySelector('.pr-crow-table') && block.classList.contains('pr-pc-horiz-superseded'));
+  }
+
+  // ---- (A: fetch-fail) directory fetch rejects -> seed-only group STILL uniform on load ----
+  {
+    const { win, doc } = build({ role:'admin', overrides:{}, directory:[] });
+    win.pfLoadContacts = function(){ return Promise.reject(new Error('offline')); };
+    const { block, host } = makeLegacyHostWithBlock(doc, 'Geotechnical', 'design_professionals', 'Geotechnical Engineer', 'Garbin Eng', [dpSeed('Geotechnical',1)]);
+    win.pfCrmRenderCards(doc);
+    ok('(A/fetch-fail) seed group renders uniform even when directory fetch will reject',
+       !!host.querySelector('.pr-crow-table') && block.classList.contains('pr-pc-horiz-superseded'));
+    await wait(); await wait();
+    ok('(A/fetch-fail) still uniform after the rejected fetch (no revert to legacy)',
+       block.classList.contains('pr-pc-horiz-superseded') && host.querySelectorAll('.pr-crow:not(.pr-crow-head)').length === 1);
+  }
+
+  // ---- (B: add-in-header) "+ Add contact" sits in the company header row, above Edit/✕ ----
+  for (const grp of GROUPS) {
+    const { win, doc } = build({ role:'admin', overrides:{}, directory:[] });
+    const host = makeLegacyHost(doc, grp.pfx, grp.key, grp.tag, grp.company, grp.seed);
+    win.pfCrmRenderCards(doc); await wait(); await wait();
+    const head = host.querySelector('.pr-pc-company-head');
+    ok('(B/' + grp.tag + ') company header row (.pr-pc-company-head) exists', !!head);
+    ok('(B/' + grp.tag + ') "+ Add contact" lives INSIDE the header row', !!head && !!head.querySelector('.pr-pc-addbtn'));
+    ok('(B/' + grp.tag + ') company name is in the SAME header row as Add', !!head && !!head.querySelector('.pr-pc-company-name'));
+    // "above Edit/✕": the header row is a preceding sibling of the .pr-crow table whose rows
+    // carry the per-contact Edit/✕. Prove DOM order: header comes before the table.
+    const wrap = host.querySelector('.pr-pc-company');
+    const kids = Array.from(wrap.children);
+    const headIdx = kids.indexOf(head);
+    const tableIdx = kids.indexOf(wrap.querySelector('.pr-crow-table'));
+    ok('(B/' + grp.tag + ') header row (with Add) is ABOVE the contact table (with Edit/✕)',
+       headIdx > -1 && tableIdx > -1 && headIdx < tableIdx);
+    // The Add button must NOT be below the list any more (no addbtn outside the header).
+    const addBtns = host.querySelectorAll('.pr-pc-addbtn');
+    ok('(B/' + grp.tag + ') the ONLY Add button is the header one (none left below the list)',
+       addBtns.length === 1 && head.contains(addBtns[0]));
+    // Edit + ✕ still present per contact on this group.
+    ok('(B/' + grp.tag + ') per-contact [✎ Edit] + red [✕] still present', !!host.querySelector('.pr-crow-editbtn') && !!host.querySelector('.pr-crow-rmbtn'));
+  }
+
+  // ---- (B: add-form-below) opening the header Add button opens its form BELOW the table ----
+  {
+    const { win, doc } = build({ role:'admin', overrides:{}, directory:[] });
+    const host = makeLegacyHost(doc, 'Structural', 'design_professionals', 'Structural Engineer', 'Struct Co', [dpSeed('Structural',1)]);
+    win.pfCrmRenderCards(doc); await wait(); await wait();
+    const addBtn = host.querySelector('.pr-pc-addbtn');
+    win.pfPcAddContact(addBtn);
+    const wrap = host.querySelector('.pr-pc-company');
+    const form = wrap.querySelector('.pr-crm-addform');
+    ok('(B/add-form) header Add opens an inline add form', !!form);
+    ok('(B/add-form) form opens BELOW the contact table (appended to .pr-pc-company)',
+       !!form && Array.from(wrap.children).indexOf(form) > Array.from(wrap.children).indexOf(wrap.querySelector('.pr-crow-table')));
+    ok('(B/add-form) header Add button is hidden while its form is open', addBtn.style.display === 'none');
+    win.pfPcAddContactCancel(form.querySelector('.pr-cancel-btn'));
+    ok('(B/add-form) cancel restores the header Add button + drops the form',
+       addBtn.style.display === '' && !wrap.querySelector('.pr-crm-addform'));
+  }
+
+  // ---- (reserved-keys) migrating one legacy group PRESERVES sibling __crm + non-__crm keys ----
+  {
+    const OV = { design_professionals: {
+      __crm: { 'Geotechnical': { company:'Garbin Eng', contactIds:['C0001'] } },
+      __submittal_prereqs: { items:[{k:'geo',done:true}] },   // reserved non-__crm key
+      'Structural - Company': 'Struct Co'                       // reserved seed label
+    } };
+    const DIR = [{ contactId:'C0001', firstName:'Ed', lastName:'Garbin', name:'Ed Garbin', title:'PE', company:'Garbin Eng', category:'Geotechnical Engineer', email:'ed@garbin.com' }];
+    const { win, doc, captured } = build({ role:'admin', overrides:OV, directory:DIR });
+    // Structural legacy host under the SAME design_professionals key -> migrate it.
+    const host = makeLegacyHost(doc, 'Structural', 'design_professionals', 'Structural Engineer', 'Struct Co', [dpSeed('Structural',1)]);
+    win.pfCrmRenderCards(doc); await wait(); await wait();
+    win.pfCrmEditContactRow(host.querySelector('.pr-crow-editbtn'));
+    await wait(); await wait(); await wait();
+    const ovPost = captured.posts.find(p => String(p.url).indexOf('/api/project-override') === 0 && p.body.fields && p.body.fields.__crm);
+    ok('(reserved) migrate resends the FULL __crm map (Geotechnical selection preserved)',
+       ovPost && ovPost.body.fields.__crm.Geotechnical && ovPost.body.fields.__crm.Geotechnical.contactIds.indexOf('C0001') !== -1);
+    ok('(reserved) Structural gets its own new id (added, not replacing Geotechnical)',
+       ovPost && ovPost.body.fields.__crm.Structural && ovPost.body.fields.__crm.Structural.contactIds.length === 1);
+    // The __crm write is a delta on design_professionals; server Object.assign carry-forward
+    // keeps __submittal_prereqs + seed labels (they are NOT in the payload => not overwritten).
+    ok('(reserved) payload does NOT clobber the non-__crm reserved key (__submittal_prereqs absent from delta)',
+       ovPost && ovPost.body.fields.__submittal_prereqs === undefined);
+    ok('(reserved) payload does NOT clobber the reserved seed label (Structural - Company absent from delta)',
+       ovPost && ovPost.body.fields['Structural - Company'] === undefined);
+  }
+
+  // ---- (no-render-bounce) an inline FIELD save (directory-row ✕ = unassign) is IN-PLACE ----
+  // Constraint #5: a live save-on-change must NOT bounce the whole record. The true
+  // field-save operations (directory-row unassign, company rename, contact-field edit) run
+  // pfCrmRenderCards in place — NO renderProjectRecord. (The LEGACY-SEED ✕ is a separate,
+  // structural re-seed that DOES re-render — by design, because the data-legacy-seed attr
+  // is rebuilt at record render time; that is NOT a "field save" and is asserted below.)
+  {
+    const OV = { general: { __crm: { 'Owner': { company:'Westhoff Development', contactIds:['C0001'] } } } };
+    const DIR = [{ contactId:'C0001', firstName:'Nathan', lastName:'Westhoff', name:'Nathan Westhoff', title:'Owner Rep', company:'Westhoff Development', category:'Owner', email:'nathan@owner.com' }];
+    const { win, doc, captured } = build({ role:'admin', overrides:OV, directory:DIR });
+    const host = makeLegacyHost(doc, 'Owner', 'general', 'Project Owner', 'Westhoff Development', []);
+    win.pfCrmRenderCards(doc); await wait(); await wait();
+    const rmBtn = host.querySelector('.pr-crow-rmbtn[data-crm-cid="C0001"]');
+    ok('(no-render-bounce) directory row has a real unassign ✕', !!rmBtn);
+    win.pfCrmRemoveContactRow(rmBtn); await wait();
+    win.pfCrmRemoveContactConfirm(host.querySelector('.pr-rm-yes')); await wait(); await wait();
+    ok('(no-render-bounce) directory-row unassign did NOT call renderProjectRecord (in-place only)',
+       captured.renderProjectRecordCalls === 0);
+    const ovPost = captured.posts.find(p => String(p.url).indexOf('/api/project-override') === 0 && p.body.fields && p.body.fields.__crm);
+    ok('(no-render-bounce) unassign wrote the __crm delta (fail-closed, real save)', !!ovPost);
+  }
+
+  // ---- (legacy-reseed) the LEGACY-SEED ✕ intentionally re-renders (documents the exception) ----
+  {
+    const { win, doc, captured } = build({ role:'admin', overrides:{}, directory:[] });
+    const host = makeLegacyHost(doc, 'Owner', 'general', 'Project Owner', 'Westhoff Development', [ownerSeed(1)]);
+    win.pfCrmRenderCards(doc); await wait(); await wait();
+    win.pfCrmRemoveContactRow(host.querySelector('.pr-crow-rmbtn')); await wait();
+    win.pfCrmRemoveContactConfirm(host.querySelector('.pr-rm-yes')); await wait(); await wait();
+    ok('(legacy-reseed) legacy ✕ re-renders the record to rebuild data-legacy-seed (by design)',
+       captured.renderProjectRecordCalls === 1);
   }
 
   console.log('\nPASS: ' + pass + '  FAIL: ' + fail + (fails.length ? '\nFailures:\n  - ' + fails.join('\n  - ') : ''));

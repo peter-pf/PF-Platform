@@ -3142,6 +3142,12 @@ tr.pf-dragging { opacity: 0.45; }
 /* Standalone company block: name line, then its horizontal contact rows.        */
 .pr-pc-company { margin: 0 0 10px; }
 .pr-pc-company-name { font-size: 0.9rem; font-weight: 700; color: var(--text-0); margin: 0 0 3px; }
+/* Company header row (Brad 2026-08-14): company name on the LEFT, "+ Add contact" on   */
+/* the RIGHT (margin-left:auto), sitting just above the per-contact [✎ Edit] + red [✕]. */
+/* Applies uniformly to every Project Contacts group.                                   */
+.pr-pc-company-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pr-pc-company-head .pr-pc-company-name { margin: 0; }
+.pr-pc-company-head .pr-pc-addbtn-head { margin: 0 0 0 auto; }
 /* (2) Horizontal contact rows. A lightweight table-like flex layout: header row */
 /* + one row per contact. Compact so more fits on screen; Notes wraps.           */
 .pr-crow-table { width: 100%; margin: 2px 0 0; }
@@ -20619,24 +20625,47 @@ try {
       var hosts = root.querySelectorAll ? root.querySelectorAll('.pr-crm-cards[data-crm-cards]') : [];
       if (!hosts.length) return;
       var _rowEditableGlobal = (typeof canEdit === 'function') ? canEdit() : false;
-      // Does ANY host have a real __crm selection OR a legacy seed we must render? If
-      // neither (and nothing to add), skip the directory fetch entirely. (Legacy-seed
-      // hosts DO need the fetch — Edit resolves the freshly-minted directory record.)
-      var anyWork = false;
-      hosts.forEach(function(h){
+      // ---- FULL UNIFORMITY ON LOAD (Brad 2026-08-14) --------------------------------
+      // Brad: "Make ALL sections the card-rendered groups so all contacts are exactly
+      // the same throughout — no 'new way' and 'old way'." => EVERY group must render in
+      // the uniform .pr-crow card format IMMEDIATELY on load, never flashing (or getting
+      // stuck in) the legacy static horizContactBlock layout.
+      //
+      // A host WITHOUT a __crm selection resolves purely from its data-legacy-seed — it
+      // needs NO directory lookup to display. So we render those SYNCHRONOUSLY here (an
+      // empty byId is safe: pfCrmRenderOneHost only reads byId inside the hasCrmSel
+      // branch). This supersedes the legacy block on the FIRST paint (zero FOUC) and does
+      // not depend on the async fetch succeeding. Hosts WITH a __crm selection still need
+      // the directory to resolve their contactIds, so they render in the async pass below
+      // (they never had a legacy layout to flash — they were already card-format).
+      var _classify = function(h){
         var pfx = h.getAttribute('data-crm-cards') || '';
         var e = mapFor(h.getAttribute('data-crm-cards-key'))[pfx];
-        if (e && Array.isArray(e.contactIds) && e.contactIds.length) { anyWork = true; return; }
-        // A legacy-seed host with contacts (or an office user who can add) is also work.
+        var hasCrm = !!(e && Array.isArray(e.contactIds) && e.contactIds.length);
         var seed = pfCrmDecodeLegacySeed(h);
-        if (seed && (seed.contacts.length || _rowEditableGlobal)) anyWork = true;
+        // Something to render/afford: a __crm selection, seed contacts, or an office user
+        // (who gets the company header + "+ Add contact" even on an empty group).
+        var work = hasCrm || (seed && (seed.contacts.length || _rowEditableGlobal)) || _rowEditableGlobal;
+        return { hasCrm: hasCrm, work: work };
+      };
+      var _emptyById = {};
+      var anyCrmWork = false;
+      hosts.forEach(function(h){
+        var c = _classify(h);
+        if (!c.work) return;
+        if (c.hasCrm) { anyCrmWork = true; return; } // needs directory -> async pass
+        // Seed-only / office-affordance host: render NOW from the seed (no fetch needed).
+        try { pfCrmRenderOneHost(h, _emptyById, mapFor); } catch(e){}
       });
-      if (!anyWork) return;
+      // Async pass: resolve the shared directory and (re)render EVERY working host. This
+      // fills in __crm-selected rows and lets legacy rows resolve their migrated records
+      // on Edit. Re-rendering the seed-only hosts is harmless (idempotent, same output).
+      if (!anyCrmWork && !_rowEditableGlobal) return; // nothing left needs the directory
       pfLoadContacts().then(function(list){
         var byId = {};
         (list || []).forEach(function(c){ if (c && c.contactId) byId[String(c.contactId).toUpperCase()] = c; });
-        hosts.forEach(function(host){ pfCrmRenderOneHost(host, byId, mapFor); });
-      }).catch(function(){ /* fail soft: leave hosts empty */ });
+        hosts.forEach(function(host){ if (_classify(host).work) pfCrmRenderOneHost(host, byId, mapFor); });
+      }).catch(function(){ /* fail soft: seed-only hosts already rendered above */ });
     }
 
     // Render ONE Project Contacts host into the uniform .pr-crow card format. Handles
@@ -20793,12 +20822,21 @@ try {
           + 'title="Edit the company name (updates the shared directory everywhere it is used)">'
           + esc2(company || '') + '</div>'
         : '<div class="pr-pc-company-name">' + esc2(company || '') + '</div>';
+      // "+ Add contact" — Brad 2026-08-14: MOVED to the right of the company name (in
+      // the company header row, above the per-contact [✎ Edit] + red [✕]), applied to
+      // EVERY group uniformly. The button still carries the same data-* + onclick; only
+      // its DOM position changed. pfPcAddContact appends its form to the .pr-pc-company
+      // wrap (below the table) so the header stays a single clean line.
       var addBtn = _rowEditable
-        ? '<button type="button" class="pr-add-contact-btn pr-pc-addbtn" '
+        ? '<button type="button" class="pr-add-contact-btn pr-pc-addbtn pr-pc-addbtn-head" '
           + 'data-crm-cards="' + esc2(_prefix) + '" data-crm-cards-key="' + esc2(_skey) + '" '
           + 'data-crm-company="' + esc2(company || '') + '" '
           + 'onclick="window.pfPcAddContact(this)">+ Add contact</button>'
         : '';
+      // Company header row: company name on the LEFT, "+ Add contact" on the RIGHT
+      // (margin-left:auto). This row sits ABOVE the .pr-crow table whose rows each carry
+      // their own [✎ Edit] + red [✕] — so Add is visually just above Edit/✕, per Brad.
+      var companyHeadRow = '<div class="pr-pc-company-head">' + companyHtml + addBtn + '</div>';
       // When the uniform card renders (rows OR office affordances), HIDE the sibling
       // legacy static horizContactBlock table so contacts do not appear twice. The
       // hidden .pr-field editor grid (.pr-pc-cofields / .pr-ccards) is already display:none
@@ -20814,9 +20852,8 @@ try {
       host.innerHTML =
           (roleTag ? '<div class="pr-role-tag">' + esc2(roleTag) + '</div>' : '')
         + '<div class="pr-pc-company">'
-        +   companyHtml
+        +   companyHeadRow
         +   '<div class="pr-crow-table">' + headRow + rowHtml.join('') + '</div>'
-        +   addBtn
         + '</div>';
     }
     window.pfCrmRenderCards = pfCrmRenderCards;
@@ -21109,7 +21146,12 @@ try {
         +   '<button type="button" class="pr-save-btn" onclick="window.pfPcAddContactSave(this)">Add contact</button>'
         +   '<button type="button" class="pr-cancel-btn" onclick="window.pfPcAddContactCancel(this)">Cancel</button>'
         + '</div>';
-      btn.insertAdjacentElement('beforebegin', form);
+      // Brad 2026-08-14: the Add button now lives in the company HEADER row (above the
+      // table), so inserting the form beforebegin(btn) would drop it into the header.
+      // Instead APPEND the form to the .pr-pc-company wrap so it opens BELOW the contact
+      // table, and hide the header button while the form is open. (Legacy layout — button
+      // below the list — is handled by the same append: wrap is still the container.)
+      wrap.appendChild(form);
       btn.style.display = 'none';
       form._addBtn = btn;
       var first = form.querySelector('input'); if (first) first.focus();
