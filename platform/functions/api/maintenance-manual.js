@@ -136,6 +136,12 @@ function cleanItem(it) {
     item: s(it.item, MAX_ITEM),
     subcategory: s(it.subcategory, MAX_SHORT),
     equipment: s(it.equipment, MAX_SHORT),
+    // Optional link to an Equipment Log rig (stable rig id, e.g. 'rig-deere-vibro').
+    // Plain identifier string -- carries ZERO financials, so it stays field_ops-safe.
+    // Enables the "recent service / open-task" cross-link and the completed-task ->
+    // service-log handoff. The equipment-log endpoint (financials) is where the
+    // dollar-bearing service entry actually lands; this field is just the join key.
+    rigId: s(it.rigId, MAX_ID),
     createdBy: s(it.createdBy, MAX_SHORT),
     createdAt: s(it.createdAt, 40),
     archived: !!it.archived,
@@ -219,6 +225,8 @@ export async function onRequestPost(context) {
         item: itemText,
         subcategory: s(parsed && parsed.subcategory, MAX_SHORT),
         equipment: s(parsed && parsed.equipment, MAX_SHORT),
+        // Optional Equipment Log rig link (plain id string; no financials).
+        rigId: s(parsed && parsed.rigId, MAX_ID),
         createdBy: (session && (session.name || session.uid)) ? s(session.name || session.uid) : 'unknown',
         createdAt: new Date().toISOString(),
         archived: false,

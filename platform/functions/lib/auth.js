@@ -534,6 +534,17 @@ export function areaForPath(pathname) {
     // validated against the 5 fixed categories. ZERO financials (category + type
     // + free-text + optional equipment/subcategory only).
     if (pathname.startsWith('/api/maintenance-manual')) return 'field_ops';
+    // Equipment Log (EDITABLE per-rig digital logbook: machine info, HOURS,
+    // dated service history). CARRIES DOLLARS (dailyRate per rig, cost per
+    // service entry) -> OFFICE-ONLY. financials area = admin/partner/business_dev;
+    // field_ops (the crew) is BLOCKED from reading OR writing. The handler ALSO
+    // calls requireArea(session, 'financials') on GET + POST. The maintenance
+    // completion handoff (append-service) is gated here too, so the crew's
+    // field_ops completion click NEVER writes a dollar figure -- the office
+    // cross-link does. Without this line it would fall through to the sensitive-
+    // name heuristic (which would also block field_ops, but this makes the office
+    // gate EXPLICIT rather than accidental). Dollars never reach a field surface.
+    if (pathname.startsWith('/api/equipment-log')) return 'financials';
     // Bid-resolution fork + Dead Set (item A): preconstruction action.
     // admin + partner + business_dev allowed; field_ops BLOCKED by direct URL.
     if (pathname.startsWith('/api/pipeline-state')) return 'preconstruction';

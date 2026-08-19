@@ -5267,6 +5267,16 @@ document.addEventListener('click', function(e) {
               <label for="mtAddSub">Subcategory (optional)</label>
               <input type="text" id="mtAddSub" maxlength="200" placeholder="e.g. Hydraulics">
             </div>
+            <!-- Optional link to an Equipment Log rig. Populated at open time from
+                 window.PF_EQUIP_RIGS (the 3 primary rigs), which only exists for
+                 office users (the Equipment Log module is office-only). When a
+                 rig-tied task is completed, the office reconcile appends a dated
+                 entry to that rig's service history. Field users see only the
+                 default "-- none --" option (harmless). -->
+            <div class="mt-field" id="mtAddRigField">
+              <label for="mtAddRig">Rig (optional)</label>
+              <select id="mtAddRig"><option value="">-- none --</option></select>
+            </div>
             <div class="mt-field wide">
               <label for="mtAddItem">Item description</label>
               <input type="text" id="mtAddItem" maxlength="1000" placeholder="What needs doing">
@@ -5280,6 +5290,10 @@ document.addEventListener('click', function(e) {
         </div>
       </div>
       <div class="mt-sum" id="mtSummary"></div>
+      <!-- Cross-link (office only): per-rig recent-service + open-task peek, wired
+           to the Equipment Log. Empty for field users (no rig service data crosses
+           the firewall). -->
+      <div id="mtRigPeek"></div>
       <!-- aria-live error slot for a failed Remove (mirrors the Add form's
            mtAddErr). Shown briefly when a remove POST fails, then the manual list
            is re-fetched so the UI reconciles with server truth. -->
@@ -10883,111 +10897,63 @@ try {
 (function () {
   'use strict';
 
-  // ---- EQUIPMENT ROSTER ----
-  // Real PF equipment from SOPs and Project Master
+  var E = window.esc || function (s) { return s == null ? '' : String(s); };
 
-  var EQUIPMENT = [
-    // OWNED - Heavy
-    { id: 'EQ-001', name: 'Deere 350G', type: 'Owned', category: 'Heavy', role: 'VSC Rig (mast + vibroflot assembly)', status: 'Deployed', project: 'Stellantis Lot Rehab', lastService: '2026-05-10', nextService: '2026-06-10', dailyRate: 500, hours: 4280, specs: 'Primary installation rig - 79,300 lbs operating weight, mast + vibroflot assembly mounted', serviceHistory: [
-      { date: '2026-05-10', type: 'Scheduled', desc: 'Hydraulic fluid change, filter replacement, track tension check', cost: 1850 },
-      { date: '2026-03-22', type: 'Repair', desc: 'Replaced hydraulic hose on mast cylinder', cost: 620 },
-      { date: '2026-01-15', type: 'Scheduled', desc: '4000-hr service - full fluid change, undercarriage inspection', cost: 4200 }
-    ]},
-    { id: 'EQ-002', name: 'Sany Predrill Rig', type: 'Owned', category: 'Heavy', role: 'Pre-drilling for bottom feed columns', status: 'Available', project: '', lastService: '2026-04-28', nextService: '2026-05-28', dailyRate: 400, hours: 2140, specs: 'Predrill rig for bottom-feed stone column installation - opens hole before vibroflot insertion', serviceHistory: [
-      { date: '2026-04-28', type: 'Scheduled', desc: 'Engine oil, hydraulic filter, air filter replacement', cost: 1400 },
-      { date: '2026-02-10', type: 'Repair', desc: 'Drill attachment bearing replacement', cost: 980 }
-    ]},
-    { id: 'EQ-003', name: 'CAT 308', type: 'Owned', category: 'Heavy', role: 'Support excavator with drill attachment', status: 'Deployed', project: 'Stellantis Lot Rehab', lastService: '2026-05-05', nextService: '2026-06-05', dailyRate: 250, hours: 3560, specs: '8-ton class mini excavator - support excavator with drill attachment for site prep', serviceHistory: [
-      { date: '2026-05-05', type: 'Scheduled', desc: 'Oil change, bucket pin inspection, track adjustment', cost: 850 },
-      { date: '2026-03-01', type: 'Scheduled', desc: 'Hydraulic system flush, new filters', cost: 1100 }
-    ]},
+  // ---- OFFICE-ONLY EQUIPMENT LOG (editable, server-backed) ----
+  // Data comes from /api/equipment-log (financials area = admin/partner/
+  // business_dev; field_ops BLOCKED). Carries DOLLARS (dailyRate, service cost)
+  // so the whole module + section is data-fo-hide -- it never renders on a field
+  // surface. Each rig is a digital logbook: general info, HOURS (first-class,
+  // editable), and a dated service history. Two-tab sibling of Maintenance Tasks
+  // (mod-maintenance); the two cross-link but stay separate modules.
 
-    // OWNED - Vehicles & Transport
-    { id: 'EQ-004', name: 'F450 Crew Truck', type: 'Owned', category: 'Vehicle', role: 'Crew transport', status: 'Deployed', project: 'Stellantis Lot Rehab', lastService: '2026-04-15', nextService: '2026-07-15', dailyRate: 0, hours: 0, specs: 'Ford F-450 - crew cab, diesel, crew transport to job sites', serviceHistory: [
-      { date: '2026-04-15', type: 'Scheduled', desc: 'Oil change, tire rotation, brake inspection', cost: 380 }
-    ]},
-    { id: 'EQ-005', name: 'F550 Hauler', type: 'Owned', category: 'Vehicle', role: 'Equipment hauling', status: 'Available', project: '', lastService: '2026-04-15', nextService: '2026-07-15', dailyRate: 0, hours: 0, specs: 'Ford F-550 - flatbed body, equipment hauling and parts transport', serviceHistory: [
-      { date: '2026-04-15', type: 'Scheduled', desc: 'Oil change, DEF fill, brake check', cost: 420 }
-    ]},
-    { id: 'EQ-006', name: 'Gooseneck Trailer', type: 'Owned', category: 'Transport', role: 'Parts and tooling transport', status: 'Available', project: '', lastService: '2026-03-01', nextService: '2026-09-01', dailyRate: 68, hours: 0, specs: 'Gooseneck flatbed trailer - parts, tooling, and small equipment transport', serviceHistory: [
-      { date: '2026-03-01', type: 'Scheduled', desc: 'Bearing repack, brake check, light inspection', cost: 350 }
-    ]},
-    { id: 'EQ-007', name: 'Flatbed Trailer', type: 'Owned', category: 'Transport', role: 'Equipment transport', status: 'Available', project: '', lastService: '2026-03-01', nextService: '2026-09-01', dailyRate: 68, hours: 0, specs: 'Flatbed equipment trailer - heavy equipment transport for mobilization', serviceHistory: [
-      { date: '2026-03-01', type: 'Scheduled', desc: 'Axle inspection, tire replacement (2), lights', cost: 780 }
-    ]},
-
-    // OWNED - Specialty
-    { id: 'EQ-008', name: 'Vibroflot (DFG)', type: 'Owned', category: 'Specialty', role: 'Vibrating probe for stone column installation', status: 'Deployed', project: 'Stellantis Lot Rehab', lastService: '2026-05-12', nextService: '2026-06-12', dailyRate: 0, hours: 3200, specs: 'Deep Foundation Group vibroflot - SerCPU 000016601886, ID STC_0003. Vibrating probe that densifies stone and surrounding soil', serviceHistory: [
-      { date: '2026-05-12', type: 'Scheduled', desc: 'Eccentric weight inspection, bearing check, nose cone measurement', cost: 2200 },
-      { date: '2026-04-01', type: 'Repair', desc: 'Replaced water swivel seal', cost: 450 },
-      { date: '2026-02-20', type: 'Scheduled', desc: 'Full teardown inspection - bearings, eccentric, motor windings', cost: 5800 }
-    ]},
-    { id: 'EQ-009', name: 'Chicago Jack (Small)', type: 'Owned', category: 'Testing', role: 'Modulus testing <175 kips', status: 'Available', project: '', lastService: '2026-04-01', nextService: '2026-10-01', dailyRate: 0, hours: 0, specs: 'Calibration factor: 49.84 psi/kip. For modulus tests under 175 kips capacity. Used with GUHMA QA/QC system', serviceHistory: [
-      { date: '2026-04-01', type: 'Calibration', desc: 'Annual calibration - cal factor verified 49.84 psi/kip', cost: 600 }
-    ]},
-    { id: 'EQ-010', name: 'Chicago Jack (Large)', type: 'Owned', category: 'Testing', role: 'Modulus testing >175 kips', status: 'Available', project: '', lastService: '2026-04-01', nextService: '2026-10-01', dailyRate: 0, hours: 0, specs: 'Calibration factor: 32.88 psi/kip. For modulus tests over 175 kips capacity. Used with GUHMA QA/QC system', serviceHistory: [
-      { date: '2026-04-01', type: 'Calibration', desc: 'Annual calibration - cal factor verified 32.88 psi/kip', cost: 600 }
-    ]},
-
-    // COMMONLY RENTED
-    { id: 'EQ-R01', name: 'CAT 289 Track Loader #1', type: 'Rental', category: 'Heavy', role: 'Stone placement on site', status: 'Deployed', project: 'Stellantis Lot Rehab', lastService: '2026-05-20', nextService: '', dailyRate: 203, hours: 0, specs: 'CAT 289D3 compact track loader - stone placement and site material handling. Rental ~$1,423/week. CAT dealer acct: 3200669', serviceHistory: [] },
-    { id: 'EQ-R02', name: 'CAT 289 Track Loader #2', type: 'Rental', category: 'Heavy', role: 'Stone placement on site', status: 'Deployed', project: 'Stellantis Lot Rehab', lastService: '2026-05-20', nextService: '', dailyRate: 203, hours: 0, specs: 'CAT 289D3 compact track loader - second unit for stone placement. Rental ~$1,423/week. CAT dealer acct: 3200669', serviceHistory: [] },
-    { id: 'EQ-R03', name: 'Air Compressor', type: 'Rental', category: 'Support', role: 'Pneumatic tools and cleaning', status: 'Not Rented', project: '', lastService: '', nextService: '', dailyRate: 85, hours: 0, specs: '185 CFM towable air compressor - pneumatic tool operation and equipment cleaning', serviceHistory: [] },
-    { id: 'EQ-R04', name: 'Telehandler', type: 'Rental', category: 'Support', role: 'Material handling', status: 'Not Rented', project: '', lastService: '', nextService: '', dailyRate: 175, hours: 0, specs: 'Telehandler/reach forklift - material handling, stone bag placement, equipment support', serviceHistory: [] },
-    { id: 'EQ-R05', name: 'Mini Excavator', type: 'Rental', category: 'Heavy', role: 'Site support excavation', status: 'Not Rented', project: '', lastService: '', nextService: '', dailyRate: 150, hours: 0, specs: 'Mini excavator (3-5 ton class) - site support, spoils management, utility work', serviceHistory: [] }
+  // The 3 primary rigs' stable ids (must match seedRigs() in equipment-log.js and
+  // the rigId option list in mod-maintenance). Exposed for the maintenance module.
+  var PRIMARY_RIGS = [
+    { id: 'rig-deere-vibro', name: 'Deere Vibro Rig' },
+    { id: 'rig-cat-vibro', name: 'Cat Vibro Rig' },
+    { id: 'rig-sany-drill', name: 'Sany Drill Rig' }
   ];
-
-  // ---- DAILY RATES (from POET estimate) ----
-  var DAILY_RATES = {
-    'VSC Rig': 500,
-    'CAT 308': 250,
-    'Trailer & Tooling': 68,
-    'Maintenance': 100, // per hour
-    'Fuel - VSC Rig': 275,
-    'Fuel - CAT 308': 275,
-    'Fuel - Loader': 80
-  };
-
-  // ---- TRANSPORT CONTACTS ----
-  var TRANSPORT = [
-    { company: 'Paddacks Trucking', contact: 'Miah', phone: '', role: 'Primary equipment transport - mobilization and demobilization', notes: 'Preferred hauler for heavy equipment moves' },
-    { company: 'Stephan Trucking', contact: 'Mark Maller', phone: '', role: 'Secondary transport and stone delivery coordination', notes: 'Backup hauler, also coordinates stone trucking logistics' }
-  ];
+  window.PF_EQUIP_RIGS = PRIMARY_RIGS; // read by mod-maintenance for the rig picker
 
   // ---- STATE ----
+  var RIGS = [];              // live rigs from the API
+  var loaded = false;
+  var loadErr = '';
   var activeTab = 'roster';
-  var expandedRow = null;
+  var expandedRow = null;     // rig id whose logbook is open
   var filterStatus = 'all';
   var filterType = 'all';
+  var editingRig = null;      // rig id being edited (or '__new__') or null
+  var addingServiceFor = null;// rig id we are adding a service entry to, or null
+
+  // Open-task counts per rig id, loaded from the maintenance status/manual feeds
+  // for the cross-link ("N open tasks" per rig). Best-effort; {} if unavailable.
+  var openTaskByRig = {};
+
+  function api(path, opts) {
+    return fetch(path, Object.assign({ credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' } }, opts || {}))
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }, function () { return { ok: r.ok, status: r.status, body: null }; }); });
+  }
 
   // ---- HELPERS ----
   function fmt(n) {
     if (n === undefined || n === null || isNaN(n)) return '$0';
-    return '$' + n.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return '$' + Number(n).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   }
-
-  function today() {
-    return new Date().toISOString().slice(0, 10);
+  function fdate(d) { return d ? (window.pfFmtDate ? window.pfFmtDate(d) : d) : ''; }
+  function today() { return new Date().toISOString().slice(0, 10); }
+  function daysBetween(a, b) {
+    if (!a || !b) return null;
+    return Math.round((new Date(b) - new Date(a)) / 86400000);
   }
-
-  function daysBetween(dateStr1, dateStr2) {
-    if (!dateStr1 || !dateStr2) return null;
-    var d1 = new Date(dateStr1);
-    var d2 = new Date(dateStr2);
-    return Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+  function isOverdue(next) { return next ? daysBetween(today(), next) < 0 : false; }
+  function isDueSoon(next) {
+    if (!next) return false;
+    var d = daysBetween(today(), next);
+    return d !== null && d >= 0 && d <= 14;
   }
-
-  function isOverdue(nextServiceDate) {
-    if (!nextServiceDate) return false;
-    return daysBetween(today(), nextServiceDate) < 0;
-  }
-
-  function isDueSoon(nextServiceDate) {
-    if (!nextServiceDate) return false;
-    var days = daysBetween(today(), nextServiceDate);
-    return days !== null && days >= 0 && days <= 14;
-  }
-
   function statusBadgeClass(status) {
     switch (status) {
       case 'Deployed': return 'active';
@@ -10997,38 +10963,32 @@ try {
       default: return 'pending';
     }
   }
-
   function maintenanceBadge(eq) {
     if (!eq.nextService) return '';
-    if (isOverdue(eq.nextService)) {
-      return '<span class="badge-status no-bid">OVERDUE</span>';
-    }
-    if (isDueSoon(eq.nextService)) {
-      return '<span class="badge-status review">Due Soon</span>';
-    }
+    if (isOverdue(eq.nextService)) return '<span class="badge-status no-bid">OVERDUE</span>';
+    if (isDueSoon(eq.nextService)) return '<span class="badge-status review">Due Soon</span>';
     return '';
   }
+  function rigById(id) {
+    for (var i = 0; i < RIGS.length; i++) { if (RIGS[i].id === id) return RIGS[i]; }
+    return null;
+  }
+  function openTasks(id) { return openTaskByRig[id] || 0; }
 
   // ---- COMPUTED STATS ----
   function getStats() {
-    var owned = EQUIPMENT.filter(function (e) { return e.type === 'Owned'; });
-    var deployed = EQUIPMENT.filter(function (e) { return e.status === 'Deployed'; });
-    var maintenance = EQUIPMENT.filter(function (e) { return e.status === 'Maintenance'; });
-    var rentalActive = EQUIPMENT.filter(function (e) { return e.type === 'Rental' && e.status === 'Deployed'; });
-    var overdue = EQUIPMENT.filter(function (e) { return isOverdue(e.nextService); });
-
+    var owned = RIGS.filter(function (e) { return e.type === 'Owned'; });
+    var deployed = RIGS.filter(function (e) { return e.status === 'Deployed'; });
+    var maintenance = RIGS.filter(function (e) { return e.status === 'Maintenance'; });
+    var rentalActive = RIGS.filter(function (e) { return e.type === 'Rental' && e.status === 'Deployed'; });
+    var overdue = RIGS.filter(function (e) { return isOverdue(e.nextService); });
     return {
-      totalOwned: owned.length,
-      deployed: deployed.length,
-      maintenance: maintenance.length,
-      rentalActive: rentalActive.length,
-      overdue: overdue.length
+      totalOwned: owned.length, deployed: deployed.length,
+      maintenance: maintenance.length, rentalActive: rentalActive.length, overdue: overdue.length
     };
   }
-
-  // ---- FILTER ----
   function getFiltered() {
-    return EQUIPMENT.filter(function (e) {
+    return RIGS.filter(function (e) {
       if (filterStatus !== 'all' && e.status !== filterStatus) return false;
       if (filterType !== 'all' && e.type !== filterType) return false;
       return true;
@@ -11040,248 +11000,222 @@ try {
     var root = document.getElementById('equipment-app');
     if (!root) return;
 
-    var stats = getStats();
-    var filtered = getFiltered();
+    if (!loaded) {
+      root.innerHTML = '<div class="eq-empty" style="border:1px dashed var(--border,#2a2f3a);border-radius:8px;padding:22px 16px;text-align:center;color:var(--text-3,#8a93a6);font-size:13px">Loading equipment log&hellip;</div>';
+      return;
+    }
+    if (loadErr) {
+      root.innerHTML = '<div class="eq-empty" style="border:1px solid #f85149;border-radius:8px;padding:22px 16px;text-align:center;color:#f85149;font-size:13px">' + E(loadErr) + '</div>';
+      return;
+    }
 
-    var html = window.sampleBadge('Equipment financials and service history are illustrative - not live SharePoint data');
+    var stats = getStats();
+    var html = '';
 
     // ---- STATS ROW ----
     html += '<div class="grid grid-4" style="margin-bottom:20px">';
     html += '<div class="stat-card"><div class="stat-label">Total Owned</div><div class="stat-value">' + stats.totalOwned + '</div></div>';
     html += '<div class="stat-card"><div class="stat-label">Currently Deployed</div><div class="stat-value">' + stats.deployed + '</div>';
-    if (stats.deployed > 0) {
-      html += '<div class="stat-change up">Active on job sites</div>';
-    }
+    if (stats.deployed > 0) html += '<div class="stat-change up">Active on job sites</div>';
     html += '</div>';
     html += '<div class="stat-card"><div class="stat-label">In Maintenance</div><div class="stat-value">' + stats.maintenance + '</div>';
-    if (stats.overdue > 0) {
-      html += '<div class="stat-change down">' + stats.overdue + ' service overdue</div>';
-    }
+    if (stats.overdue > 0) html += '<div class="stat-change down">' + stats.overdue + ' service overdue</div>';
     html += '</div>';
     html += '<div class="stat-card"><div class="stat-label">Rentals Active</div><div class="stat-value">' + stats.rentalActive + '</div></div>';
     html += '</div>';
 
     // ---- TABS ----
     html += '<div class="tabs">';
-    html += '<div class="tab' + (activeTab === 'roster' ? ' active' : '') + '" onclick="window._eqTab(\'roster\')">Equipment Roster</div>';
-    html += '<div class="tab' + (activeTab === 'rates' ? ' active' : '') + '" onclick="window._eqTab(\'rates\')">Daily Rates</div>';
-    html += '<div class="tab' + (activeTab === 'transport' ? ' active' : '') + '" onclick="window._eqTab(\'transport\')">Transport Coordination</div>';
+    html += '<div class="tab' + (activeTab === 'roster' ? ' active' : '') + '" onclick="window._eqTab(\'roster\')">Equipment Log</div>';
     html += '<div class="tab' + (activeTab === 'maintenance' ? ' active' : '') + '" onclick="window._eqTab(\'maintenance\')">Maintenance Alerts</div>';
     html += '</div>';
 
-    // ---- TAB CONTENT ----
-    if (activeTab === 'roster') {
-      html += renderRoster(filtered);
-    } else if (activeTab === 'rates') {
-      html += renderRates();
-    } else if (activeTab === 'transport') {
-      html += renderTransport();
-    } else if (activeTab === 'maintenance') {
-      html += renderMaintenance();
-    }
+    if (activeTab === 'roster') html += renderRoster(getFiltered());
+    else if (activeTab === 'maintenance') html += renderMaintenance();
 
     root.innerHTML = html;
   }
 
-  // ---- ROSTER TAB ----
+  // ---- ROSTER / LOGBOOK TAB ----
   function renderRoster(filtered) {
     var html = '';
-
-    // Filters
     html += '<div class="card">';
-    html += '<div class="card-header"><span class="card-title">Equipment Roster</span><span class="card-subtitle">' + EQUIPMENT.length + ' total items tracked</span></div>';
-    html += '<div class="grid grid-2" style="margin-bottom:16px">';
+    html += '<div class="card-header"><span class="card-title">Equipment Log</span><span class="card-subtitle">' + RIGS.length + ' rigs &middot; digital logbook</span></div>';
+
+    // Filters + Add rig
+    html += '<div class="grid grid-2" style="margin-bottom:12px">';
     html += '<div class="form-group" style="margin-bottom:0"><label class="form-label">Status</label>';
     html += '<select class="form-select" onchange="window._eqFilterStatus(this.value)">';
-    html += '<option value="all"' + (filterStatus === 'all' ? ' selected' : '') + '>All Statuses</option>';
-    html += '<option value="Available"' + (filterStatus === 'Available' ? ' selected' : '') + '>Available</option>';
-    html += '<option value="Deployed"' + (filterStatus === 'Deployed' ? ' selected' : '') + '>Deployed</option>';
-    html += '<option value="Maintenance"' + (filterStatus === 'Maintenance' ? ' selected' : '') + '>Maintenance</option>';
-    html += '<option value="Not Rented"' + (filterStatus === 'Not Rented' ? ' selected' : '') + '>Not Rented</option>';
+    ['all', 'Available', 'Deployed', 'Maintenance', 'Not Rented'].forEach(function (v) {
+      html += '<option value="' + v + '"' + (filterStatus === v ? ' selected' : '') + '>' + (v === 'all' ? 'All Statuses' : v) + '</option>';
+    });
     html += '</select></div>';
     html += '<div class="form-group" style="margin-bottom:0"><label class="form-label">Type</label>';
     html += '<select class="form-select" onchange="window._eqFilterType(this.value)">';
-    html += '<option value="all"' + (filterType === 'all' ? ' selected' : '') + '>All Types</option>';
-    html += '<option value="Owned"' + (filterType === 'Owned' ? ' selected' : '') + '>Owned</option>';
-    html += '<option value="Rental"' + (filterType === 'Rental' ? ' selected' : '') + '>Rental</option>';
+    ['all', 'Owned', 'Rental'].forEach(function (v) {
+      html += '<option value="' + v + '"' + (filterType === v ? ' selected' : '') + '>' + (v === 'all' ? 'All Types' : v) + '</option>';
+    });
     html += '</select></div>';
     html += '</div>';
+
+    html += '<div style="margin-bottom:10px"><button class="eq-addbtn" onclick="window._eqAddRig()" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text,#e6e9ef);background:var(--surface-2,#1b212c);border:1px solid var(--border,#2a2f3a);border-radius:7px;padding:7px 14px;cursor:pointer">+ Add Rig</button>';
+    html += '<span id="eqListErr" style="font-size:12px;color:#f85149;margin-left:10px"></span></div>';
+
+    if (editingRig === '__new__') html += renderRigForm(null);
 
     // Table
     html += '<div class="table-wrap">';
     html += '<table><thead><tr>';
-    html += '<th>Equipment</th><th>Type</th><th>Category</th><th>Status</th><th>Current Project</th><th>Next Service</th><th>Maintenance</th><th></th>';
+    html += '<th>Rig</th><th>Type</th><th>Status</th><th>Hours</th><th>Open Tasks</th><th>Next Service</th><th>Service</th><th></th>';
     html += '</tr></thead><tbody>';
 
     filtered.forEach(function (eq) {
       var isExpanded = expandedRow === eq.id;
-      html += '<tr style="cursor:pointer" onclick="window._eqExpand(\'' + eq.id + '\')">';
-      html += '<td style="font-weight:600;color:var(--text-0)">' + esc(eq.name) + '<div style="font-size:0.7rem;color:var(--text-3);font-weight:400">' + esc(eq.role) + '</div></td>';
-      html += '<td><span class="badge-status ' + (eq.type === 'Owned' ? 'active' : 'pending') + '">' + eq.type + '</span></td>';
-      html += '<td>' + eq.category + '</td>';
-      html += '<td><span class="badge-status ' + statusBadgeClass(eq.status) + '">' + esc(eq.status) + '</span></td>';
-      html += '<td>' + (esc(eq.project) || '<span style="color:var(--text-3)">--</span>') + '</td>';
-      html += '<td>' + (eq.nextService || '<span style="color:var(--text-3)">N/A</span>') + '</td>';
+      html += '<tr style="cursor:pointer" onclick="window._eqExpand(\'' + E(eq.id) + '\')">';
+      html += '<td style="font-weight:600;color:var(--text-0)">' + E(eq.name) + '<div style="font-size:0.7rem;color:var(--text-3);font-weight:400">' + E(eq.role) + '</div></td>';
+      html += '<td><span class="badge-status ' + (eq.type === 'Owned' ? 'active' : 'pending') + '">' + E(eq.type) + '</span></td>';
+      html += '<td><span class="badge-status ' + statusBadgeClass(eq.status) + '">' + E(eq.status) + '</span></td>';
+      html += '<td style="font-weight:600">' + (eq.hours ? Number(eq.hours).toLocaleString() : '<span style="color:var(--text-3)">--</span>') + '</td>';
+      var ot = openTasks(eq.id);
+      html += '<td>' + (ot > 0 ? '<span class="badge-status review">' + ot + ' open</span>' : '<span style="color:var(--text-3)">0</span>') + '</td>';
+      html += '<td>' + (fdate(eq.nextService) || '<span style="color:var(--text-3)">N/A</span>') + '</td>';
       html += '<td>' + maintenanceBadge(eq) + '</td>';
       html += '<td style="font-size:0.75rem;color:var(--text-3)">' + (isExpanded ? '&#9650;' : '&#9660;') + '</td>';
       html += '</tr>';
-
-      // Expanded detail row
       if (isExpanded) {
-        html += '<tr><td colspan="8" style="padding:0;background:var(--bg-1)">';
-        html += renderDetail(eq);
-        html += '</td></tr>';
+        html += '<tr><td colspan="8" style="padding:0;background:var(--bg-1)">' + renderLogbook(eq) + '</td></tr>';
       }
     });
-
     if (filtered.length === 0) {
-      html += '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-3)">No equipment matches the current filters.</td></tr>';
+      html += '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-3)">No rigs match the current filters.</td></tr>';
     }
-
     html += '</tbody></table></div></div>';
     return html;
   }
 
-  // ---- DETAIL PANEL ----
-  function renderDetail(eq) {
+  // ---- PER-RIG DIGITAL LOGBOOK ----
+  function renderLogbook(eq) {
+    if (editingRig === eq.id) {
+      return '<div style="padding:20px">' + renderRigForm(eq) + '</div>';
+    }
     var html = '<div style="padding:20px">';
 
-    // Specs + Info
-    html += '<div class="grid grid-3" style="margin-bottom:16px">';
-
-    // Specs card
-    html += '<div class="card" style="margin-bottom:0"><div class="card-title" style="margin-bottom:8px">Specifications</div>';
-    html += '<div style="font-size:0.82rem;color:var(--text-1)">' + eq.specs + '</div>';
-    if (eq.hours > 0) {
-      html += '<div style="margin-top:8px;font-size:0.78rem"><strong>Hours:</strong> ' + eq.hours.toLocaleString() + '</div>';
+    // Header actions
+    html += '<div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px">';
+    html += '<button onclick="window._eqEditRig(\'' + E(eq.id) + '\')" style="font-size:12px;font-weight:600;border-radius:6px;padding:6px 14px;cursor:pointer;border:1px solid var(--border,#2a2f3a);background:var(--surface-2,#1b212c);color:var(--text,#e6e9ef)">Edit Info</button>';
+    if (!eq.seed) {
+      html += '<button onclick="window._eqRemoveRig(\'' + E(eq.id) + '\',this)" style="font-size:12px;font-weight:600;border-radius:6px;padding:6px 14px;cursor:pointer;border:1px solid var(--border,#2a2f3a);background:transparent;color:#f85149">Remove Rig</button>';
     }
     html += '</div>';
 
-    // Financials card
+    html += '<div class="grid grid-3" style="margin-bottom:16px">';
+
+    // General machine info
+    html += '<div class="card" style="margin-bottom:0"><div class="card-title" style="margin-bottom:8px">Machine Info</div>';
+    html += '<div style="font-size:0.82rem;color:var(--text-1)">' + E(eq.specs || 'No details recorded.') + '</div>';
+    html += '<div style="margin-top:8px;font-size:0.78rem"><strong>Category:</strong> ' + (E(eq.category) || '--') + '</div>';
+    html += '<div style="font-size:0.78rem"><strong>Current Project:</strong> ' + (E(eq.project) || '--') + '</div>';
+    html += '<div style="margin-top:8px;font-size:0.85rem"><strong>Hours:</strong> ' + (eq.hours ? Number(eq.hours).toLocaleString() : '0') + '</div>';
+    html += '</div>';
+
+    // Financials (OFFICE-ONLY -- this module never renders on a field surface)
     html += '<div class="card" style="margin-bottom:0"><div class="card-title" style="margin-bottom:8px">Financials</div>';
     html += '<div style="font-size:0.82rem">';
-    if (eq.dailyRate > 0) {
-      html += '<div><span style="color:var(--text-3)">Daily Rate:</span> <strong>' + fmt(eq.dailyRate) + '/day</strong></div>';
-    }
-    var totalServiceCost = eq.serviceHistory.reduce(function (s, h) { return s + h.cost; }, 0);
-    html += '<div style="margin-top:4px"><span style="color:var(--text-3)">Total Service Cost:</span> <strong>' + fmt(totalServiceCost) + '</strong></div>';
-    html += '<div style="margin-top:4px"><span style="color:var(--text-3)">Service Events:</span> ' + eq.serviceHistory.length + '</div>';
+    if (eq.dailyRate > 0) html += '<div><span style="color:var(--text-3)">Daily Rate:</span> <strong>' + fmt(eq.dailyRate) + '/day</strong></div>';
+    var totalCost = (eq.serviceHistory || []).reduce(function (s, h) { return s + (Number(h.cost) || 0); }, 0);
+    html += '<div style="margin-top:4px"><span style="color:var(--text-3)">Total Service Cost:</span> <strong>' + fmt(totalCost) + '</strong></div>';
+    html += '<div style="margin-top:4px"><span style="color:var(--text-3)">Service Events:</span> ' + (eq.serviceHistory || []).length + '</div>';
     html += '</div></div>';
 
-    // Service status card
+    // Service status + link to open tasks
     html += '<div class="card" style="margin-bottom:0"><div class="card-title" style="margin-bottom:8px">Service Status</div>';
     html += '<div style="font-size:0.82rem">';
-    html += '<div><span style="color:var(--text-3)">Last Service:</span> ' + (eq.lastService || 'N/A') + '</div>';
-    html += '<div style="margin-top:4px"><span style="color:var(--text-3)">Next Service:</span> ' + (eq.nextService || 'N/A') + '</div>';
-    if (eq.nextService) {
-      var daysUntil = daysBetween(today(), eq.nextService);
-      if (daysUntil !== null) {
-        var urgencyColor = daysUntil < 0 ? 'var(--red)' : daysUntil <= 14 ? 'var(--amber)' : 'var(--green)';
-        var urgencyText = daysUntil < 0 ? (Math.abs(daysUntil) + ' days overdue') : (daysUntil + ' days remaining');
-        html += '<div style="margin-top:8px;font-weight:600;color:' + urgencyColor + '">' + urgencyText + '</div>';
-        // Progress bar for service interval
-        if (eq.lastService) {
-          var totalInterval = daysBetween(eq.lastService, eq.nextService);
-          var elapsed = daysBetween(eq.lastService, today());
-          var pct = totalInterval > 0 ? Math.min(Math.max((elapsed / totalInterval) * 100, 0), 100) : 0;
-          var barClass = pct >= 100 ? 'red' : pct >= 75 ? 'amber' : 'green';
-          html += '<div style="margin-top:6px"><div class="progress-bar"><div class="progress-fill ' + barClass + '" style="width:' + pct + '%"></div></div></div>';
-        }
-      }
-    }
+    html += '<div><span style="color:var(--text-3)">Last Service:</span> ' + (fdate(eq.lastService) || 'N/A') + '</div>';
+    html += '<div style="margin-top:4px"><span style="color:var(--text-3)">Next Service:</span> ' + (fdate(eq.nextService) || 'N/A') + '</div>';
+    var ot = openTasks(eq.id);
+    html += '<div style="margin-top:8px"><span style="color:var(--text-3)">Open Maintenance Tasks:</span> <strong>' + ot + '</strong>';
+    html += ' <a href="#" onclick="window._eqGotoMaint(event)" style="font-size:0.75rem;color:var(--accent)">view</a></div>';
     html += '</div></div>';
     html += '</div>'; // end grid
 
-    // Service history table
-    if (eq.serviceHistory.length > 0) {
-      html += '<div class="card" style="margin-bottom:0"><div class="card-title" style="margin-bottom:12px">Service History</div>';
-      html += '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Cost</th></tr></thead><tbody>';
+    // Service history + add entry
+    html += '<div class="card" style="margin-bottom:0"><div class="card-header" style="margin-bottom:8px"><span class="card-title">Service History</span>';
+    html += '<button onclick="window._eqAddService(\'' + E(eq.id) + '\')" style="font-size:11px;font-weight:600;border-radius:6px;padding:5px 12px;cursor:pointer;border:1px solid var(--border,#2a2f3a);background:var(--surface-2,#1b212c);color:var(--text,#e6e9ef)">+ Log Service</button></div>';
+    if (addingServiceFor === eq.id) html += renderServiceForm(eq);
+    if ((eq.serviceHistory || []).length > 0) {
+      html += '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Description</th><th>By</th><th>Cost</th><th></th></tr></thead><tbody>';
       eq.serviceHistory.forEach(function (h) {
-        var typeClass = h.type === 'Repair' ? 'review' : h.type === 'Calibration' ? 'pending' : 'bid';
+        var typeClass = h.type === 'Repair' ? 'review' : h.type === 'Calibration' ? 'pending' : h.type === 'Field' ? 'active' : 'bid';
         html += '<tr>';
-        html += '<td>' + esc(window.pfFmtDate(h.date) || '') + '</td>';
-        html += '<td><span class="badge-status ' + typeClass + '">' + h.type + '</span></td>';
-        html += '<td>' + esc(h.desc) + '</td>';
+        html += '<td>' + E(fdate(h.date) || '') + '</td>';
+        html += '<td><span class="badge-status ' + typeClass + '">' + E(h.type) + '</span>' + (h.source === 'maintenance-task' ? ' <span class="eq-src" style="font-size:10px;color:var(--text-3)">from task</span>' : '') + '</td>';
+        html += '<td>' + E(h.desc) + '</td>';
+        html += '<td style="font-size:0.75rem;color:var(--text-2)">' + (E(h.by) || '--') + '</td>';
         html += '<td style="font-weight:600">' + fmt(h.cost) + '</td>';
+        html += '<td><button onclick="window._eqRemoveService(\'' + E(eq.id) + '\',\'' + E(h.id) + '\',this)" title="Remove entry" style="background:transparent;border:none;color:var(--text-3);cursor:pointer;font-size:14px">&times;</button></td>';
         html += '</tr>';
       });
-      html += '</tbody></table></div></div>';
+      html += '</tbody></table></div>';
+    } else {
+      html += '<div style="text-align:center;padding:14px;color:var(--text-3);font-size:0.8rem">No service entries yet.</div>';
     }
-
-    html += '</div>'; // end padding wrapper
-    return html;
-  }
-
-  // ---- DAILY RATES TAB ----
-  function renderRates() {
-    var html = '';
-    html += '<div class="card">';
-    html += '<div class="card-header"><span class="card-title">Daily Equipment Rates</span><span class="card-subtitle">From POET Turnover Budget</span></div>';
-
-    html += '<div class="table-wrap"><table><thead><tr><th>Item</th><th>Daily Rate</th><th>Unit</th><th>Notes</th></tr></thead><tbody>';
-
-    var rates = [
-      { item: 'VSC Rig (Deere 350G)', rate: 500, unit: '/day', notes: 'Primary installation rig daily charge' },
-      { item: 'CAT 308 Support Excavator', rate: 250, unit: '/day', notes: 'Support excavator with drill attachment' },
-      { item: 'Trailer & Tooling', rate: 68, unit: '/day', notes: 'Gooseneck or flatbed trailer daily charge' },
-      { item: 'Maintenance Labor', rate: 100, unit: '/hour', notes: 'Budget 1 hr/working day for field maintenance' },
-      { item: 'Fuel - VSC Rig', rate: 275, unit: '/day', notes: 'Diesel fuel for Deere 350G during operation' },
-      { item: 'Fuel - CAT 308', rate: 275, unit: '/day', notes: 'Diesel fuel for CAT 308 during operation' },
-      { item: 'Fuel - Track Loader', rate: 80, unit: '/day', notes: 'Diesel fuel for rental CAT 289/299 loader' },
-      { item: 'CAT 289/299 Loader Rental', rate: 1423, unit: '/week', notes: 'Track loader for stone placement - usually rent 2 units. CAT acct: 3200669' }
-    ];
-
-    rates.forEach(function (r) {
-      html += '<tr>';
-      html += '<td style="font-weight:600;color:var(--text-0)">' + r.item + '</td>';
-      html += '<td style="font-weight:700;color:var(--accent)">' + fmt(r.rate) + '</td>';
-      html += '<td>' + esc(r.unit) + '</td>';
-      html += '<td style="font-size:0.78rem;color:var(--text-2)">' + esc(r.notes) + '</td>';
-      html += '</tr>';
-    });
-
-    html += '</tbody></table></div>';
-
-    // Daily burn summary
-    var dailyBurn = 500 + 250 + 68 + 100 + 275 + 275 + 80 + Math.round((1423 * 2) / 7);
-    html += '<div style="margin-top:16px;padding:12px 16px;background:var(--bg-1);border-radius:var(--radius);display:flex;justify-content:space-between;align-items:center">';
-    html += '<span style="font-size:0.82rem;font-weight:600">Estimated Daily Equipment Burn (full spread)</span>';
-    html += '<span style="font-size:1.1rem;font-weight:700;color:var(--accent)">' + fmt(dailyBurn) + '/day</span>';
     html += '</div>';
 
     html += '</div>';
     return html;
   }
 
-  // ---- TRANSPORT TAB ----
-  function renderTransport() {
-    var html = '';
-    html += '<div class="card">';
-    html += '<div class="card-header"><span class="card-title">Transport Coordination</span><span class="card-subtitle">Haulers and mobilization contacts</span></div>';
-
+  // ---- RIG ADD / EDIT FORM ----
+  function renderRigForm(eq) {
+    var isNew = !eq;
+    var v = eq || { name: '', type: 'Owned', category: '', role: '', status: 'Available', project: '', specs: '', hours: 0, dailyRate: 0, lastService: '', nextService: '' };
+    function inp(id, label, val, type) {
+      return '<div class="form-group" style="margin-bottom:10px"><label class="form-label">' + label + '</label>'
+        + '<input class="form-input" id="' + id + '" type="' + (type || 'text') + '" value="' + E(val == null ? '' : val) + '"></div>';
+    }
+    var html = '<div class="card" style="margin-bottom:12px;border:1px solid var(--accent)">';
+    html += '<div class="card-title" style="margin-bottom:10px">' + (isNew ? 'Add Rig' : 'Edit ' + E(v.name)) + '</div>';
     html += '<div class="grid grid-2">';
-    TRANSPORT.forEach(function (t) {
-      html += '<div class="card" style="margin-bottom:0">';
-      html += '<div style="font-weight:700;font-size:0.95rem;color:var(--text-0);margin-bottom:4px">' + esc(t.company) + '</div>';
-      html += '<div style="font-size:0.82rem;color:var(--text-2);margin-bottom:12px">' + esc(t.role) + '</div>';
-      html += '<div style="font-size:0.82rem"><strong>Contact:</strong> ' + esc(t.contact) + '</div>';
-      if (t.phone) {
-        html += '<div style="font-size:0.82rem;margin-top:4px"><strong>Phone:</strong> ' + esc(window.pfFmtPhone(t.phone)) + '</div>';
-      }
-      html += '<div style="font-size:0.78rem;color:var(--text-3);margin-top:8px;font-style:italic">' + esc(t.notes) + '</div>';
-      html += '</div>';
-    });
+    html += inp('eqfName', 'Name', v.name);
+    html += '<div class="form-group" style="margin-bottom:10px"><label class="form-label">Type</label><select class="form-select" id="eqfType">';
+    ['Owned', 'Rental'].forEach(function (t) { html += '<option value="' + t + '"' + (v.type === t ? ' selected' : '') + '>' + t + '</option>'; });
+    html += '</select></div>';
+    html += inp('eqfCategory', 'Category', v.category);
+    html += inp('eqfRole', 'Role', v.role);
+    html += '<div class="form-group" style="margin-bottom:10px"><label class="form-label">Status</label><select class="form-select" id="eqfStatus">';
+    ['Available', 'Deployed', 'Maintenance', 'Not Rented'].forEach(function (t) { html += '<option value="' + t + '"' + (v.status === t ? ' selected' : '') + '>' + t + '</option>'; });
+    html += '</select></div>';
+    html += inp('eqfProject', 'Current Project', v.project);
+    html += inp('eqfHours', 'Hours', v.hours, 'number');
+    html += inp('eqfRate', 'Daily Rate ($)', v.dailyRate, 'number');
+    html += inp('eqfLast', 'Last Service', v.lastService, 'date');
+    html += inp('eqfNext', 'Next Service', v.nextService, 'date');
     html += '</div>';
+    html += '<div class="form-group" style="margin-bottom:10px"><label class="form-label">Machine Info / Specs</label><textarea class="form-input" id="eqfSpecs" rows="2">' + E(v.specs) + '</textarea></div>';
+    html += '<div style="display:flex;gap:8px;align-items:center">';
+    html += '<button onclick="window._eqSaveRig(\'' + (isNew ? '__new__' : E(v.id)) + '\',this)" style="font-size:12px;font-weight:600;border-radius:6px;padding:7px 16px;cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:#fff">Save</button>';
+    html += '<button onclick="window._eqCancelForm()" style="font-size:12px;font-weight:600;border-radius:6px;padding:7px 16px;cursor:pointer;border:1px solid var(--border,#2a2f3a);background:transparent;color:var(--text-3)">Cancel</button>';
+    html += '<span id="eqFormErr" style="font-size:12px;color:#f85149;margin-left:4px"></span>';
+    html += '</div></div>';
+    return html;
+  }
 
-    // Mobilization rates
-    html += '<div style="margin-top:16px"><div class="card-title" style="margin-bottom:12px">Mobilization Rates (from POET)</div>';
-    html += '<div class="table-wrap"><table><thead><tr><th>Mobilization Item</th><th>Rate per Trip</th></tr></thead><tbody>';
-    html += '<tr><td>VSC Rig Mobilization</td><td style="font-weight:600">$2,310</td></tr>';
-    html += '<tr><td>Predrill Rig Mobilization</td><td style="font-weight:600">$1,685</td></tr>';
-    html += '<tr><td>Fall Off / Demob</td><td style="font-weight:600">$1,225</td></tr>';
-    html += '<tr><td>Misc Mob Items</td><td style="font-weight:600">$1,500 each</td></tr>';
-    html += '</tbody></table></div>';
-
+  // ---- SERVICE-ENTRY FORM ----
+  function renderServiceForm(eq) {
+    var html = '<div class="card" style="margin-bottom:12px;border:1px solid var(--accent)">';
+    html += '<div class="card-title" style="margin-bottom:10px">Log Service &mdash; ' + E(eq.name) + '</div>';
+    html += '<div class="grid grid-2">';
+    html += '<div class="form-group" style="margin-bottom:10px"><label class="form-label">Date</label><input class="form-input" id="eqsDate" type="date" value="' + today() + '"></div>';
+    html += '<div class="form-group" style="margin-bottom:10px"><label class="form-label">Type</label><select class="form-select" id="eqsType">';
+    ['Scheduled', 'Repair', 'Calibration', 'Field'].forEach(function (t) { html += '<option value="' + t + '">' + t + '</option>'; });
+    html += '</select></div>';
+    html += '<div class="form-group" style="margin-bottom:10px"><label class="form-label">Cost ($)</label><input class="form-input" id="eqsCost" type="number" value="0"></div>';
+    html += '</div>';
+    html += '<div class="form-group" style="margin-bottom:10px"><label class="form-label">Description</label><input class="form-input" id="eqsDesc" type="text" placeholder="What was done"></div>';
+    html += '<div style="display:flex;gap:8px;align-items:center">';
+    html += '<button onclick="window._eqSaveService(\'' + E(eq.id) + '\',this)" style="font-size:12px;font-weight:600;border-radius:6px;padding:7px 16px;cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:#fff">Save Entry</button>';
+    html += '<button onclick="window._eqCancelService()" style="font-size:12px;font-weight:600;border-radius:6px;padding:7px 16px;cursor:pointer;border:1px solid var(--border,#2a2f3a);background:transparent;color:var(--text-3)">Cancel</button>';
+    html += '<span id="eqSvcErr" style="font-size:12px;color:#f85149;margin-left:4px"></span>';
     html += '</div></div>';
     return html;
   }
@@ -11289,35 +11223,16 @@ try {
   // ---- MAINTENANCE ALERTS TAB ----
   function renderMaintenance() {
     var html = '';
-    var overdue = EQUIPMENT.filter(function (e) { return isOverdue(e.nextService); });
-    var dueSoon = EQUIPMENT.filter(function (e) { return isDueSoon(e.nextService) && !isOverdue(e.nextService); });
-    var upcoming = EQUIPMENT.filter(function (e) {
-      if (!e.nextService) return false;
-      var d = daysBetween(today(), e.nextService);
-      return d !== null && d > 14;
-    });
+    var overdue = RIGS.filter(function (e) { return isOverdue(e.nextService); });
+    var dueSoon = RIGS.filter(function (e) { return isDueSoon(e.nextService) && !isOverdue(e.nextService); });
 
-    // Overdue
-    html += '<div class="card">';
-    html += '<div class="card-header"><span class="card-title">Overdue Maintenance</span>';
-    if (overdue.length > 0) {
-      html += '<span class="badge-status no-bid">' + overdue.length + ' Overdue</span>';
-    } else {
-      html += '<span class="badge-status active">All Clear</span>';
-    }
+    html += '<div class="card"><div class="card-header"><span class="card-title">Overdue Maintenance</span>';
+    html += overdue.length > 0 ? '<span class="badge-status no-bid">' + overdue.length + ' Overdue</span>' : '<span class="badge-status active">All Clear</span>';
     html += '</div>';
-
     if (overdue.length > 0) {
-      html += '<div class="table-wrap"><table><thead><tr><th>Equipment</th><th>Due Date</th><th>Days Overdue</th><th>Last Service</th><th>Status</th></tr></thead><tbody>';
+      html += '<div class="table-wrap"><table><thead><tr><th>Rig</th><th>Due Date</th><th>Days Overdue</th><th>Last Service</th></tr></thead><tbody>';
       overdue.forEach(function (eq) {
-        var daysOver = Math.abs(daysBetween(today(), eq.nextService));
-        html += '<tr>';
-        html += '<td style="font-weight:600;color:var(--text-0)">' + esc(eq.name) + '</td>';
-        html += '<td>' + eq.nextService + '</td>';
-        html += '<td style="font-weight:700;color:var(--red)">' + daysOver + ' days</td>';
-        html += '<td>' + (eq.lastService || 'N/A') + '</td>';
-        html += '<td><span class="badge-status ' + statusBadgeClass(eq.status) + '">' + esc(eq.status) + '</span></td>';
-        html += '</tr>';
+        html += '<tr><td style="font-weight:600;color:var(--text-0)">' + E(eq.name) + '</td><td>' + fdate(eq.nextService) + '</td><td style="font-weight:700;color:var(--red)">' + Math.abs(daysBetween(today(), eq.nextService)) + ' days</td><td>' + (fdate(eq.lastService) || 'N/A') + '</td></tr>';
       });
       html += '</tbody></table></div>';
     } else {
@@ -11325,85 +11240,149 @@ try {
     }
     html += '</div>';
 
-    // Due Soon (within 14 days)
-    html += '<div class="card">';
-    html += '<div class="card-header"><span class="card-title">Due Within 14 Days</span>';
-    if (dueSoon.length > 0) {
-      html += '<span class="badge-status review">' + dueSoon.length + ' Upcoming</span>';
-    }
+    html += '<div class="card"><div class="card-header"><span class="card-title">Due Within 14 Days</span>';
+    if (dueSoon.length > 0) html += '<span class="badge-status review">' + dueSoon.length + ' Upcoming</span>';
     html += '</div>';
-
     if (dueSoon.length > 0) {
-      html += '<div class="table-wrap"><table><thead><tr><th>Equipment</th><th>Due Date</th><th>Days Remaining</th><th>Current Status</th></tr></thead><tbody>';
+      html += '<div class="table-wrap"><table><thead><tr><th>Rig</th><th>Due Date</th><th>Days Remaining</th></tr></thead><tbody>';
       dueSoon.forEach(function (eq) {
-        var daysLeft = daysBetween(today(), eq.nextService);
-        html += '<tr>';
-        html += '<td style="font-weight:600;color:var(--text-0)">' + esc(eq.name) + '</td>';
-        html += '<td>' + eq.nextService + '</td>';
-        html += '<td style="font-weight:600;color:var(--amber)">' + daysLeft + ' days</td>';
-        html += '<td><span class="badge-status ' + statusBadgeClass(eq.status) + '">' + esc(eq.status) + '</span></td>';
-        html += '</tr>';
+        html += '<tr><td style="font-weight:600;color:var(--text-0)">' + E(eq.name) + '</td><td>' + fdate(eq.nextService) + '</td><td style="font-weight:600;color:var(--amber)">' + daysBetween(today(), eq.nextService) + ' days</td></tr>';
       });
       html += '</tbody></table></div>';
     } else {
       html += '<div style="text-align:center;padding:20px;color:var(--text-3);font-size:0.82rem">No items due within the next 14 days.</div>';
     }
     html += '</div>';
-
-    // All scheduled
-    html += '<div class="card">';
-    html += '<div class="card-header"><span class="card-title">Full Maintenance Schedule</span><span class="card-subtitle">All equipment with scheduled service</span></div>';
-    html += '<div class="table-wrap"><table><thead><tr><th>Equipment</th><th>Last Service</th><th>Next Service</th><th>Interval Progress</th><th>Status</th></tr></thead><tbody>';
-
-    var allWithService = EQUIPMENT.filter(function (e) { return e.nextService; }).sort(function (a, b) {
-      return new Date(a.nextService) - new Date(b.nextService);
-    });
-
-    allWithService.forEach(function (eq) {
-      var daysLeft = daysBetween(today(), eq.nextService);
-      var totalInterval = eq.lastService ? daysBetween(eq.lastService, eq.nextService) : null;
-      var elapsed = eq.lastService ? daysBetween(eq.lastService, today()) : null;
-      var pct = (totalInterval && totalInterval > 0) ? Math.min(Math.max((elapsed / totalInterval) * 100, 0), 100) : 0;
-      var barClass = pct >= 100 ? 'red' : pct >= 75 ? 'amber' : 'green';
-
-      html += '<tr>';
-      html += '<td style="font-weight:600;color:var(--text-0)">' + esc(eq.name) + '</td>';
-      html += '<td>' + (eq.lastService || 'N/A') + '</td>';
-      html += '<td>' + eq.nextService + '</td>';
-      html += '<td style="min-width:120px"><div class="progress-bar"><div class="progress-fill ' + barClass + '" style="width:' + pct + '%"></div></div>';
-      html += '<div style="font-size:0.7rem;color:var(--text-3);margin-top:2px">' + Math.round(pct) + '% of interval elapsed</div></td>';
-      html += '<td>' + maintenanceBadge(eq) + '</td>';
-      html += '</tr>';
-    });
-
-    html += '</tbody></table></div></div>';
-
     return html;
   }
 
+  function setListErr(msg) { var el = document.getElementById('eqListErr'); if (el) el.textContent = msg || ''; }
+
+  // ---- API MUTATIONS ----
+  function post(payload, onDone) {
+    return api('/api/equipment-log', { method: 'POST', body: JSON.stringify(payload) }).then(function (res) {
+      if (res.ok && res.body && Array.isArray(res.body.rigs)) {
+        RIGS = res.body.rigs;
+        if (onDone) onDone(true, res);
+      } else {
+        if (onDone) onDone(false, res);
+      }
+      return res;
+    }, function (err) { if (onDone) onDone(false, null); throw err; });
+  }
+
   // ---- GLOBAL HANDLERS ----
-  window._eqTab = function (tab) {
-    activeTab = tab;
-    render();
+  window._eqTab = function (tab) { activeTab = tab; editingRig = null; addingServiceFor = null; render(); };
+  window._eqExpand = function (id) { expandedRow = (expandedRow === id ? null : id); editingRig = null; addingServiceFor = null; render(); };
+  window._eqFilterStatus = function (v) { filterStatus = v; render(); };
+  window._eqFilterType = function (v) { filterType = v; render(); };
+
+  window._eqAddRig = function () { editingRig = '__new__'; expandedRow = null; render(); };
+  window._eqEditRig = function (id) { editingRig = id; expandedRow = id; addingServiceFor = null; render(); };
+  window._eqCancelForm = function () { editingRig = null; render(); };
+
+  window._eqSaveRig = function (id, btn) {
+    var errEl = document.getElementById('eqFormErr');
+    function val(i) { var e = document.getElementById(i); return e ? e.value : ''; }
+    var name = String(val('eqfName') || '').trim();
+    if (!name) { if (errEl) errEl.textContent = 'Name is required.'; return; }
+    if (btn) btn.disabled = true;
+    var payload = {
+      action: id === '__new__' ? 'add-rig' : 'update-rig',
+      name: name, type: val('eqfType'), category: val('eqfCategory'), role: val('eqfRole'),
+      status: val('eqfStatus'), project: val('eqfProject'), specs: val('eqfSpecs'),
+      hours: Number(val('eqfHours')) || 0, dailyRate: Number(val('eqfRate')) || 0,
+      lastService: val('eqfLast'), nextService: val('eqfNext')
+    };
+    if (id !== '__new__') payload.id = id;
+    post(payload, function (ok, res) {
+      if (btn) btn.disabled = false;
+      if (ok) { editingRig = null; render(); }
+      else if (errEl) errEl.textContent = (res && res.body && res.body.message) ? res.body.message : 'Could not save.';
+    }).catch(function () { if (btn) btn.disabled = false; if (errEl) errEl.textContent = 'Could not save.'; });
   };
 
-  window._eqExpand = function (id) {
-    expandedRow = expandedRow === id ? null : id;
-    render();
+  window._eqRemoveRig = function (id, btn) {
+    if (btn) btn.disabled = true;
+    setListErr('');
+    post({ action: 'remove-rig', id: id }, function (ok, res) {
+      if (ok) { expandedRow = null; render(); }
+      else { setListErr((res && res.body && res.body.message) ? res.body.message : 'Could not remove the rig.'); if (btn) btn.disabled = false; }
+    }).catch(function () { setListErr('Could not remove the rig.'); if (btn) btn.disabled = false; });
   };
 
-  window._eqFilterStatus = function (val) {
-    filterStatus = val;
-    render();
+  window._eqAddService = function (id) { addingServiceFor = id; render(); };
+  window._eqCancelService = function () { addingServiceFor = null; render(); };
+  window._eqSaveService = function (id, btn) {
+    var errEl = document.getElementById('eqSvcErr');
+    function val(i) { var e = document.getElementById(i); return e ? e.value : ''; }
+    var desc = String(val('eqsDesc') || '').trim();
+    if (!desc) { if (errEl) errEl.textContent = 'Description is required.'; return; }
+    if (btn) btn.disabled = true;
+    post({ action: 'add-service', id: id, date: val('eqsDate'), type: val('eqsType'), desc: desc, cost: Number(val('eqsCost')) || 0 },
+      function (ok, res) {
+        if (btn) btn.disabled = false;
+        if (ok) { addingServiceFor = null; render(); }
+        else if (errEl) errEl.textContent = (res && res.body && res.body.message) ? res.body.message : 'Could not save.';
+      }).catch(function () { if (btn) btn.disabled = false; if (errEl) errEl.textContent = 'Could not save.'; });
+  };
+  window._eqRemoveService = function (id, svcId, btn) {
+    if (btn) btn.disabled = true;
+    post({ action: 'remove-service', id: id, svcId: svcId }, function (ok) { render(); })
+      .catch(function () { if (btn) btn.disabled = false; });
   };
 
-  window._eqFilterType = function (val) {
-    filterType = val;
-    render();
+  window._eqGotoMaint = function (ev) {
+    if (ev) ev.preventDefault();
+    if (typeof window.showModule === 'function') window.showModule('maintenance');
   };
 
-  // ---- INIT ----
-  render();
+  // ---- OPEN-TASK COUNTS (cross-link) ----
+  // Best-effort: reads the maintenance manual + status feeds to count OPEN
+  // (not-done) tasks tied to each rig. A manual maintenance item carries an
+  // optional rigId (added to /api/maintenance-manual as a free field); daily-
+  // report rows do not, so this counts manual+task rows assigned to a rig.
+  // Silent-fail (leaves counts at 0) if the feeds are unavailable.
+  function loadOpenTasks() {
+    return Promise.all([api('/api/maintenance-manual'), api('/api/maintenance-status')]).then(function (r) {
+      var mm = r[0], ms = r[1];
+      var status = (ms && ms.ok && ms.body && ms.body.status) ? ms.body.status : {};
+      var counts = {};
+      var items = (mm && mm.ok && mm.body && Array.isArray(mm.body.items)) ? mm.body.items : [];
+      items.forEach(function (it) {
+        var rig = it && it.rigId ? String(it.rigId) : '';
+        if (!rig) return;
+        var done = status[String(it.id)] && status[String(it.id)].done;
+        if (!done) counts[rig] = (counts[rig] || 0) + 1;
+      });
+      openTaskByRig = counts;
+    }).catch(function () { openTaskByRig = {}; });
+  }
+
+  // ---- LOAD ----
+  function load() {
+    loaded = false; loadErr = '';
+    render();
+    Promise.all([api('/api/equipment-log'), loadOpenTasks()]).then(function (r) {
+      var res = r[0];
+      if (res.status === 403) { loaded = true; loadErr = 'Equipment Log is office-only. You do not have access.'; render(); return; }
+      if (res.ok && res.body && Array.isArray(res.body.rigs)) {
+        RIGS = res.body.rigs; loaded = true; loadErr = '';
+      } else {
+        loaded = true; loadErr = 'Could not load the equipment log.';
+      }
+      render();
+    }).catch(function () { loaded = true; loadErr = 'Could not load the equipment log.'; render(); });
+  }
+
+  // Init hook: (re)load whenever the Equipment Log module is shown.
+  var prev = window.showModule;
+  window.showModule = function (id) { if (typeof prev === 'function') prev(id); if (id === 'equipment') { load(); } };
+
+  // If the module is already visible at parse time, load once.
+  if (document.getElementById('mod-equipment') && document.getElementById('mod-equipment').classList.contains('active')) {
+    load();
+  }
 
 })();
 
@@ -34603,6 +34582,11 @@ try {
   // is the only kind of row that can be removed (daily-report rows are immutable).
   var manualItems = [];
 
+  // Per-rig "recent service" peek for the cross-link, keyed by rig id ->
+  // { name, lastDate, lastDesc }. Loaded (office only) from /api/equipment-log;
+  // empty {} for field users (that endpoint 403s them -- no dollars ever cross).
+  var rigServicePeek = {};
+
   function api(path, opts) {
     return fetch(path, Object.assign({ credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' } }, opts || {}))
@@ -34719,6 +34703,7 @@ try {
         type: (it.type == null) ? '' : String(it.type).trim(),
         subcategory: (it.subcategory == null) ? '' : String(it.subcategory).trim(),
         equipment: (it.equipment == null) ? '' : String(it.equipment).trim(),
+        rigId: (it.rigId == null) ? '' : String(it.rigId).trim(),
         item: (it.item == null) ? '' : String(it.item).trim(),
         hourAtFailure: null,
         // Manual items have no project/date/foreman; show who added it + when.
@@ -34812,6 +34797,42 @@ try {
       html += '<div class="mt-stat"><div class="n">' + byCat[c] + '</div><div class="l">' + E(c) + '</div></div>';
     });
     host.innerHTML = html;
+
+    // ---- CROSS-LINK: per-rig "recent service" peek (office only) ----
+    // Appended below the stat chips. Shows each primary rig's most recent service
+    // entry + its open-task count, with a link to the Equipment Log. rigServicePeek
+    // is empty for field users (the equipment-log endpoint 403s them), so this
+    // whole block simply does not render on a field surface -- no dollars, no rig
+    // service data ever crosses the firewall. Open-task counts here are computed
+    // from the SAME rig-tied manual items already loaded (no extra fetch).
+    var peekHost = document.getElementById('mtRigPeek');
+    if (peekHost) {
+      var rigIds = Object.keys(rigServicePeek);
+      if (!rigIds.length) { peekHost.innerHTML = ''; }
+      else {
+        // Open (not-done) rig-tied manual tasks per rig.
+        var openByRig = {};
+        (Array.isArray(manualItems) ? manualItems : []).forEach(function (it) {
+          if (!it || !it.rigId) return;
+          var st = statusMap[String(it.id)];
+          if (!(st && st.done)) openByRig[String(it.rigId)] = (openByRig[String(it.rigId)] || 0) + 1;
+        });
+        var ph = '<div class="mt-section-h" style="margin-top:18px">Rig service &amp; open tasks '
+          + '<a href="#" onclick="window._mtGotoEquip(event)" style="font-size:11px;font-weight:400;color:var(--accent)">open Equipment Log &rarr;</a></div>';
+        ph += '<div style="display:flex;flex-wrap:wrap;gap:10px">';
+        rigIds.forEach(function (rid) {
+          var p = rigServicePeek[rid];
+          var ot = openByRig[rid] || 0;
+          ph += '<div class="mt-group" style="flex:1 1 220px;min-width:220px;margin-bottom:0"><div class="mt-group-h"><span>' + E(p.name) + '</span>'
+            + '<span class="ct">' + (ot > 0 ? ot + ' open' : 'no open tasks') + '</span></div>'
+            + '<div class="mt-row"><div class="mt-body"><div class="mt-item" style="font-size:12px">'
+            + (p.lastDate ? ('Last service ' + E(window.pfFmtDate ? window.pfFmtDate(p.lastDate) : p.lastDate)) : 'No service logged')
+            + '</div><div class="mt-meta">' + (p.lastDesc ? E(p.lastDesc) : '') + '</div></div></div></div>';
+        });
+        ph += '</div>';
+        peekHost.innerHTML = ph;
+      }
+    }
   }
 
   // Render one checklist row. `kind` ('m'|'f') + the row's itemKey ride on the
@@ -34913,6 +34934,58 @@ try {
     renderFuture(lastFuture);
   }
 
+  // ---- COMPLETED-TASK -> EQUIPMENT-LOG SERVICE HISTORY HANDOFF ----
+  // When a rig-tied MANUAL maintenance task is marked COMPLETE, a dated entry is
+  // appended to that rig's Equipment Log service history (date, what was done,
+  // who). Design constraints that shaped this:
+  //   * The completion click (/api/maintenance-status) is a FIELD_OPS surface --
+  //     the crew can complete tasks. But /api/equipment-log is OFFICE-ONLY
+  //     (financials) because the Equipment Log carries dollars. So the crew must
+  //     NOT be the one to write the service entry.
+  //   * Therefore the handoff is OFFICE-DRIVEN and IDEMPOTENT: any time an office
+  //     user has this module open (on load, and after they complete a task), we
+  //     scan for rig-tied manual tasks that are done-but-not-yet-mirrored and
+  //     POST append-service. The equipment-log endpoint dedupes by taskKey (the
+  //     itemKey), so running this repeatedly never double-appends, and a
+  //     field_ops user's call simply 403s and is ignored (the office reconciles
+  //     it the next time an office user opens the tab). Best-effort + silent.
+  //   * We only mirror MANUAL items (they carry rigId + a stable id == itemKey).
+  //     Daily-report rows have no rig link, so they are never mirrored.
+  var reconciling = false;
+  function reconcileServiceLog() {
+    if (reconciling) return;
+    // Only attempt when we actually know about rigs (office context). PF_EQUIP_RIGS
+    // is defined only by the office-only Equipment Log module.
+    if (!(window.PF_EQUIP_RIGS && window.PF_EQUIP_RIGS.length)) return;
+    var pending = [];
+    (Array.isArray(manualItems) ? manualItems : []).forEach(function (it) {
+      if (!it || !it.rigId) return;
+      var key = String(it.id || '');
+      var st = statusMap[key];
+      if (st && st.done) {
+        pending.push({
+          rigId: String(it.rigId),
+          taskKey: key,
+          date: (st.completedAt ? String(st.completedAt).slice(0, 10) : ''),
+          desc: String(it.item || 'Maintenance task').slice(0, 300),
+          by: st.completedBy || '',
+        });
+      }
+    });
+    if (!pending.length) return;
+    reconciling = true;
+    // Fire sequentially-ish (Promise.all is fine; each is idempotent via taskKey).
+    Promise.all(pending.map(function (p) {
+      return api('/api/equipment-log', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'append-service', id: p.rigId, taskKey: p.taskKey,
+          date: p.date, type: 'Field', desc: p.desc,
+        }),
+      }).catch(function () { /* 403 for field users / transient -> ignore */ });
+    })).then(function () { reconciling = false; }, function () { reconciling = false; });
+  }
+
   // Check / uncheck one item -> POST to /api/maintenance-status. Optimistic: we
   // update statusMap + re-render immediately, then reconcile from the server
   // response (server-set completedAt/completedBy). The checkbox is disabled while
@@ -34934,6 +35007,8 @@ try {
           if (prevState) statusMap[itemKey] = prevState; else delete statusMap[itemKey];
         }
         renderAll();
+        // Mirror any newly-completed rig-tied task to its Equipment Log (office only).
+        if (done) reconcileServiceLog();
       })
       .catch(function () {
         if (prevState) statusMap[itemKey] = prevState; else delete statusMap[itemKey];
@@ -35002,6 +35077,7 @@ try {
     var typeEl = document.getElementById('mtAddType');
     var equipEl = document.getElementById('mtAddEquipment');
     var subEl = document.getElementById('mtAddSub');
+    var rigEl = document.getElementById('mtAddRig');
     var itemEl = document.getElementById('mtAddItem');
     if (errEl) errEl.textContent = '';
     var category = catEl ? catEl.value : '';
@@ -35019,6 +35095,7 @@ try {
       item: itemText,
       subcategory: subEl ? String(subEl.value || '').trim() : '',
       equipment: equipEl ? String(equipEl.value || '').trim() : '',
+      rigId: rigEl ? String(rigEl.value || '').trim() : '',
     };
     api('/api/maintenance-manual', { method: 'POST', body: JSON.stringify(payload) })
       .then(function (res) {
@@ -35030,6 +35107,7 @@ try {
           if (itemEl) itemEl.value = '';
           if (equipEl) equipEl.value = '';
           if (subEl) subEl.value = '';
+          if (rigEl) rigEl.value = '';
           closeAddForm();
         } else {
           if (errEl) errEl.textContent = (res.body && res.body.message) ? String(res.body.message) : 'Could not add the item.';
@@ -35045,8 +35123,27 @@ try {
   function openAddForm() {
     var f = document.getElementById('mtAddForm');
     if (f) f.classList.add('open');
+    populateRigPicker();
     var itemEl = document.getElementById('mtAddItem');
     if (itemEl) itemEl.focus();
+  }
+
+  // Populate the "Rig (optional)" picker from window.PF_EQUIP_RIGS (the 3 primary
+  // rigs, defined by the OFFICE-ONLY Equipment Log module). For field users the
+  // Equipment Log module never loads, so PF_EQUIP_RIGS is undefined -> the picker
+  // stays "-- none --" only (rig-tied tasks are an office affordance). Hide the
+  // whole field when there are no rigs to keep the field form clean.
+  function populateRigPicker() {
+    var sel = document.getElementById('mtAddRig');
+    var field = document.getElementById('mtAddRigField');
+    if (!sel) return;
+    var rigs = (window.PF_EQUIP_RIGS && Array.isArray(window.PF_EQUIP_RIGS)) ? window.PF_EQUIP_RIGS : [];
+    var cur = sel.value;
+    var html = '<option value="">-- none --</option>';
+    rigs.forEach(function (r) { html += '<option value="' + E(r.id) + '">' + E(r.name) + '</option>'; });
+    sel.innerHTML = html;
+    if (cur) sel.value = cur;
+    if (field) field.style.display = rigs.length ? '' : 'none';
   }
   function closeAddForm() {
     var f = document.getElementById('mtAddForm');
@@ -35126,13 +35223,50 @@ try {
       lastFuture = collectFuture(reports);
       rebuildMaint();
       renderAll();
+      // Best-effort cross-link + reconcile (office only). Load the rig service
+      // peek (403s -> stays empty for field users), then reconcile any completed
+      // rig-tied tasks into the Equipment Log.
+      loadRigPeek().then(function () { renderAll(); reconcileServiceLog(); });
     }).catch(function () {
       if (wrap) wrap.style.display = '';
-      statusMap = {}; manualItems = []; dailyMaint = []; lastFuture = [];
+      statusMap = {}; manualItems = []; dailyMaint = []; lastFuture = []; rigServicePeek = {};
       rebuildMaint();
       renderAll();
     });
   }
+
+  // Load the per-rig recent-service peek from the OFFICE-ONLY Equipment Log.
+  // 403 (field users) or any error -> leave rigServicePeek empty (no rig service
+  // data, no dollars, ever cross to a field surface). We deliberately read ONLY
+  // rig id / name / most-recent service date + description here -- never dailyRate
+  // or a service cost -- so even the office peek stays money-free.
+  function loadRigPeek() {
+    return api('/api/equipment-log').then(function (res) {
+      var out = {};
+      if (res.ok && res.body && Array.isArray(res.body.rigs)) {
+        res.body.rigs.forEach(function (r) {
+          if (!r || !r.id) return;
+          var hist = Array.isArray(r.serviceHistory) ? r.serviceHistory : [];
+          var newest = null;
+          hist.forEach(function (h) {
+            if (!h || !h.date) return;
+            if (!newest || String(h.date) > String(newest.date)) newest = h;
+          });
+          out[String(r.id)] = {
+            name: r.name || r.id,
+            lastDate: newest ? newest.date : (r.lastService || ''),
+            lastDesc: newest ? newest.desc : '',
+          };
+        });
+      }
+      rigServicePeek = out;
+    }).catch(function () { rigServicePeek = {}; });
+  }
+
+  window._mtGotoEquip = function (ev) {
+    if (ev) ev.preventDefault();
+    if (typeof window.showModule === 'function') window.showModule('equipment');
+  };
 
   var prev = window.showModule;
   window.showModule = function (id) { if (typeof prev === 'function') prev(id); if (id === 'maintenance') { load(); } };
