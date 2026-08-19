@@ -4288,16 +4288,18 @@ window.progress = (function () {
     <div class="nav-section collapsed" data-fo-safe="1">
       <div class="nav-section-label" onclick="this.parentElement.classList.toggle('collapsed')">Field Operations</div>
 
-      <!-- Field Companion (AI field-search tool). Standalone page, so a real href
-           (NOT showModule). data-fo-safe keeps it visible to the field crew; it is
-           inside a data-fo-safe section so it also shows for admins/office. The
-           page + /api/field-companion are gated to the field_ops area (crew/BD/
-           partner/admin) with the money firewall enforced server-side.
-           NOTE: points at /field-companion.html (NEW filename). The old
-           /field-sample.html got cached in some browsers with the pre-echo-key
-           polling; a brand-new URL the browser has never requested CANNOT be
-           served from that stale cache, so every user gets the new front-end. -->
-      <a class="nav-item" data-fo-safe="1" href="/field-companion" target="_blank" rel="noopener" style="color:#d64545">
+      <!-- Field Companion (AI field-search tool). Repointed to the IN-SPA
+           "fo-projects" module (showModule, same-origin) instead of the standalone
+           /field-companion.html page. The standalone page carried a leftover DEMO
+           login (client-side, submit just showed the home view) that forced a
+           second sign-in; the in-SPA module runs under the existing portal session
+           cookie (no re-login) and calls /api/field-companion with the money
+           firewall enforced server-side. data-fo-safe keeps it visible to the field
+           crew; it is inside a data-fo-safe section so it also shows for
+           admins/office. The standalone platform/field-companion.html is left
+           intact as a fallback and is still reachable directly; it is simply no
+           longer the primary nav target. -->
+      <a class="nav-item" data-fo-safe="1" data-module="fo-projects" onclick="showModule('fo-projects')" style="color:#d64545">
         <span class="nav-icon">&#128172;</span> Field Companion
       </a>
 
@@ -4309,7 +4311,7 @@ window.progress = (function () {
       <!-- Maintenance (TOP-LEVEL, promoted out of Daily Reports). Interactive,
            completion-tracked checklist compiled from every daily report. -->
       <a class="nav-item" data-module="maintenance" onclick="showModule('maintenance')" style="color:#d64545">
-        <span class="nav-icon">&#128295;</span> Maintenance
+        <span class="nav-icon">&#128295;</span> Maintenance Tasks
       </a>
 
       <!-- Inventory (Derek's module, v1). EVERYONE-VIEWABLE: data-fo-safe keeps it
@@ -4345,7 +4347,7 @@ window.progress = (function () {
     <div class="nav-section collapsed" data-fo-hide="1">
       <div class="nav-section-label" onclick="this.parentElement.classList.toggle('collapsed')">Equipment</div>
       <a class="nav-item" data-fo-hide="1" data-module="equipment" onclick="showModule('equipment')" style="color:#d64545">
-        <span class="nav-icon">&#9881;</span> Equipment
+        <span class="nav-icon">&#9881;</span> Equipment Log
       </a>
     </div>
 
@@ -5558,7 +5560,7 @@ const moduleTitles = {
   pricing: 'Trucking Costs',
   proposals: 'Proposals',
   docs: 'Documentation',
-  equipment: 'Equipment & Fleet',
+  equipment: 'Equipment Log',
   safety: 'Safety',
   dailylogs: 'Daily Logs',
   subs: 'Vendors',
@@ -5595,7 +5597,7 @@ const moduleTitles = {
   'ts-summary': 'TimeSheets - Summary',
   'fo-projects': 'Projects - Field',
   'daily-reports': 'Daily Reports',
-  'maintenance': 'Maintenance',
+  'maintenance': 'Maintenance Tasks',
   'field-lists': 'Field Lists (Fleet & Crew)',
   'pf-coi': 'PF COI - Standard Coverages',
   'project-poet': '26-002 POET Biosciences',

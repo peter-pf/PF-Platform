@@ -659,6 +659,26 @@ function goInventory(){
   window.location.assign("/#inventory");
 }
 
+// ---- My Projects: open the REAL field projects module in the portal ----
+// The field-safe projects view lives in the main portal (index.html) as the
+// "fo-projects" module ("Projects - Field", field_ops-scoped, calls
+// /api/field-companion with the session cookie; NOT the office "Project
+// Summary"). applyHashRoute() calls showModule('fo-projects') on load when the
+// hash is #fo-projects and a matching [data-module="fo-projects"] nav +
+// #mod-fo-projects container exist (both do). Same-origin, session-authed.
+function goProjects(){
+  window.location.assign("/#fo-projects");
+}
+
+// ---- Maintenance: open the REAL maintenance module in the portal ----
+// NOTE the id mismatch: the tile/button uses data-go="maint" but the portal
+// module id is "maintenance". applyHashRoute() calls showModule('maintenance')
+// on load when the hash is #maintenance and a matching [data-module="maintenance"]
+// nav + #mod-maintenance container exist (both do). Same-origin, session-authed.
+function goMaint(){
+  window.location.assign("/#maintenance");
+}
+
 // ---- Other quick-action taps (module not wired yet): honest nudge ----
 function demoNudge(){
   // These modules are not wired yet; keep it honest and calm.
@@ -675,6 +695,8 @@ function handleGo(el){
   var target = el.getAttribute("data-go");
   if (target === "report") { goDaily(); return; }
   if (target === "inventory") { goInventory(); return; }
+  if (target === "projects") { goProjects(); return; }
+  if (target === "maint") { goMaint(); return; }
   demoNudge();
 }
 document.querySelectorAll("[data-go]").forEach(function(el){
