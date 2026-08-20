@@ -18634,7 +18634,19 @@ try {
           + fieldLinked('GC Website', (g.gc&&g.gc[0]?g.gc[0].website:''), 'Contacts', 'website')
           + '</div>';
         var _gcName = effVal('general', 'General Contractor', bid.gc_name || SF.gc_party || (g.gc&&g.gc[0]?g.gc[0].company:'')) || '';
-        var ownerGcBody =
+        // SPLIT (Brad 2026-08-20): Owner and General Contractor now render as TWO
+        // separate top-level nested cards ("Owner" then "General Contractor"), instead
+        // of the former single combined "Owner & General Contractor" card. Both groups
+        // still live under the SAME `general` override key; each is distinguished by its
+        // own CRM host prefix (data-crm-cards="Owner" vs "GC") + Owner*/GC* field labels,
+        // so the split is DISPLAY-ONLY — no data re-key. The live inline CRUD save path
+        // (pfPcInline*/pfPcAddContactSave) rebuilds the full general.__crm map from the
+        // STORED state keyed by prefix (pfCrmMap('general')), NOT from the DOM wrapper, so
+        // moving each host into its own card preserves the sibling group's selection.
+        // (The card() Edit button stays suppressed here because _srLiveEdit is on for the
+        // whole Project Contacts render, so the legacy DOM-scanning pfCollectCrm path that
+        // would have keyed off wrapper contents is never engaged for these cards.)
+        var ownerBody =
             horizContactBlock({
               roleTag: 'Project Owner',
               company: effVal('general', 'Owner', _own0.company || '') || '',
@@ -18646,8 +18658,9 @@ try {
               contacts: ownerHoriz,
               hiddenFields: _ownerCoFields + contactCardGrid(ownerCards, 'Owner Contact')
             })
-          + ownerCrmHost
-          + horizContactBlock({
+          + ownerCrmHost;
+        var gcBody =
+            horizContactBlock({
               roleTag: 'General Contractor',
               company: _gcName,
               meta: [
@@ -18662,7 +18675,10 @@ try {
         _curSection = _prevGen;
         pcHost.insertAdjacentHTML('beforeend',
           '<div class="pr-nested-card-wrap">'
-          + card('', 'Owner & General Contractor', null, ownerGcBody, true, 'general')
+          + card('', 'Owner', null, ownerBody, true, 'general')
+          + '</div>'
+          + '<div class="pr-nested-card-wrap">'
+          + card('', 'General Contractor', null, gcBody, true, 'general')
           + '</div>');
       }
 
@@ -19105,13 +19121,17 @@ try {
         }
         return null;
       };
-      var ownerGcBodyEl = _pcNested('Owner & General Contractor');
+      // SPLIT (Brad 2026-08-20): the former combined "Owner & General Contractor" card is
+      // now TWO cards ("Owner" + "General Contractor"). Locate both bodies.
+      var ownerBodyEl = _pcNested('Owner');
+      var gcBodyEl = _pcNested('General Contractor');
 
       // General "extras": added Owner Contacts + any manual general fields that don't
-      // map to a rendered row. Surface them in the Owner & GC card (where Owner/GC
-      // contacts live), deduping against BOTH general cards so nothing double-renders.
-      _surfaceExtras(ownerGcBodyEl || genCard, 'general', 'Additional Contacts / Fields',
-        'Owner Contact', [genCard]);
+      // map to a rendered row. Surface them in the OWNER card (where the Owner Contact
+      // add-token lives), deduping against BOTH the General Info card AND the GC card so
+      // a field already shown in either is never re-dumped as an Owner extra.
+      _surfaceExtras(ownerBodyEl || genCard, 'general', 'Additional Contacts / Fields',
+        'Owner Contact', [genCard, gcBodyEl]);
 
       // Design Professionals nested card ("design_professionals" key — added firm
       // contacts / manual fields). Now inside Project Contacts; its querySelector still
