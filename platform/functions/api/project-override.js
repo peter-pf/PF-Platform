@@ -58,8 +58,10 @@ const MAX_TOTAL_SECTIONS = 40;      // > the 11 cards, room to grow; bounds abus
 // contacts belong on THIS project. That selection is stored under ONE reserved,
 // object-valued key `__crm` INSIDE the `design_professionals` section:
 //   sections.design_professionals.__crm = {
-//     "<Section>": { company: "<name>", contactIds: ["C0005", ...] }, ...
+//     "<Section>": { company: "<name>", address: "<addr>", contactIds: ["C0005", ...] }, ...
 //   }
+// `address` (Brad 2026-08-20) is an OPTIONAL bounded string shown on one line to the
+// right of the company name in the Project Contacts group header — see cleanCrm.
 // Every OTHER key in every section stays a plain string (the existing overlay).
 // __crm is the SOLE exception, allowed under design_professionals AND general (the
 // General Info card's Owner + General Contractor selectors — Brad 2026-08-11), and
@@ -632,6 +634,13 @@ function cleanCrm(input) {
     const entry = input[rawKey];
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
     const company = s(entry.company, CRM_MAX_COMPANY);
+    // Brad 2026-08-20: OPTIONAL company `address` — one line shown to the right of the
+    // company name in the Project Contacts group header. Same defensive posture as
+    // `company`: a bounded string (reuse CRM_MAX_COMPANY as the cap), coerced + trimmed
+    // by s(). Absent/blank => '' (stored explicitly so a cleared address round-trips).
+    // WITHOUT this line cleanCrm silently dropped `address` (it rebuilt {company,contactIds}
+    // only), so the address would never persist. This is the minimal validator change.
+    const address = s(entry.address, CRM_MAX_COMPANY);
     const idsIn = Array.isArray(entry.contactIds) ? entry.contactIds : [];
     if (idsIn.length > CRM_MAX_IDS) return null;
     const seen = {};
@@ -645,7 +654,7 @@ function cleanCrm(input) {
     }
     // An entry with neither a company nor any ids is a cleared selection; keep it
     // as an explicit empty (so re-render shows the firm block with nothing picked).
-    out[key] = { company, contactIds };
+    out[key] = { company, address, contactIds };
   }
   return out;
 }

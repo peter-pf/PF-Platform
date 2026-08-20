@@ -3241,6 +3241,13 @@ tr.pf-dragging { opacity: 0.45; }
 /* Applies uniformly to every Project Contacts group.                                   */
 .pr-pc-company-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .pr-pc-company-head .pr-pc-company-name { margin: 0; }
+/* Company ADDRESS (Brad 2026-08-20): one line to the RIGHT of the company name, NOT     */
+/* bold — regular weight + muted secondary color to distinguish it from the bold name.   */
+/* Sits in the same flex header row, immediately after the name (before the auto-margin   */
+/* Add buttons). Editable variant reuses the inline contenteditable affordance.           */
+.pr-pc-company-addr { font-size: 0.82rem; font-weight: 400; color: var(--text-2, #6b7280); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46%; }
+.pr-pc-company-addr.pr-pc-inline { cursor: text; }
+.pr-pc-company-addr.pr-pc-inline:hover, .pr-pc-company-addr.pr-pc-inline:focus { color: var(--text-1, #374151); outline: none; }
 .pr-pc-company-head .pr-pc-addbtn-head { margin: 0 0 0 auto; }
 /* "+ Add company" (Brad 2026-08-20): read-view entry for an EMPTY sub-group. When it   */
 /* renders alongside "+ Add contact" both sit together on the right (the FIRST header    */
@@ -20593,7 +20600,7 @@ try {
       }
       var num = _curNum || '';
       if (!wrap || !num) { say('Could not save; please retry.', true); return; }
-      var crm = pfCollectCrm(wrap); // { 'Staking & Layout': { company, contactIds } } or {}
+      var crm = pfCollectCrm(wrap, 'siteReadiness'); // { 'Staking & Layout': { company, address, contactIds } } or {}
       btn.disabled = true; say('Saving…', false);
       fetch('/api/project-override', {
         method: 'POST', credentials: 'same-origin',
@@ -20893,9 +20900,15 @@ try {
     // Only firm blocks with a chosen company AND >=1 checked contact are stored;
     // a block with a company but no checks stores an explicit empty selection so a
     // deliberate clear round-trips. Returns {} if the editor has no .pr-crm blocks.
-    function pfCollectCrm(editor){
+    // sectionKey (optional, Brad 2026-08-20): the top-level override section this editor
+    // saves under (e.g. 'siteReadiness', 'design_professionals'). Passed so we can PRESERVE
+    // each firm's existing company ADDRESS across this whole-object __crm replace — the
+    // editor's company dropdown does not surface the address, so without this the address
+    // would be wiped whenever the picker is re-saved. Absent => address defaults to ''.
+    function pfCollectCrm(editor, sectionKey){
       var out = {};
       if (!editor) return out;
+      var prior = (sectionKey && typeof pfCrmMap === 'function') ? (pfCrmMap(sectionKey) || {}) : {};
       editor.querySelectorAll('.pr-crm').forEach(function(block){
         var sectionName = block.getAttribute('data-crm-section') || '';
         if (!sectionName) return;
@@ -20908,7 +20921,10 @@ try {
         });
         // Store a firm entry only when the user touched it (chose a company). This
         // avoids writing empty entries for firms the user never opened.
-        if (company || ids.length) out[sectionName] = { company: company, contactIds: ids };
+        if (company || ids.length) {
+          var pEn = prior[sectionName] || {};
+          out[sectionName] = { company: company, address: (typeof pEn.address === 'string' ? pEn.address : ''), contactIds: ids };
+        }
       });
       return out;
     }
@@ -21037,6 +21053,10 @@ try {
       // group shows BOTH its directory contacts (with real Edit/✕) and its remaining
       // legacy contacts (with migrate-on-Edit) — no contact ever disappears.
       var company = '';
+      // Brad 2026-08-20: company ADDRESS lives on the __crm entry (e.address), shown on one
+      // line to the right of the company name. It is a project-level pointer field (like
+      // e.company), not a directory field, so it resolves straight from the __crm entry.
+      var address = (e && typeof e.address === 'string') ? e.address : '';
       var rows = [];
       var seed = pfCrmDecodeLegacySeed(host);
       var seenKeys = {}; // dedupe keys already present via __crm
@@ -21172,6 +21192,24 @@ try {
           + 'title="Edit the company name (updates the shared directory everywhere it is used)">'
           + esc2(company || '') + '</div>'
         : '<div class="pr-pc-company-name">' + esc2(company || '') + '</div>';
+      // Company ADDRESS (Brad 2026-08-20): one line to the RIGHT of the company name, NOT
+      // bold (regular weight, muted). Only meaningful once a company exists on the group.
+      // Office users get an inline-editable cell (contenteditable, saves via
+      // pfPcInlineAddressSave -> full __crm map resend, same vetted path as the name).
+      // Read-only users see a static muted span. When there is no company at all we render
+      // nothing (an address with no company is meaningless). A placeholder prompts office
+      // users to add one so an empty-but-editable address is still discoverable.
+      var addrHtml = '';
+      if (company) {
+        addrHtml = _rowEditable
+          ? '<div class="pr-pc-company-addr pr-pc-inline pr-pc-address-edit" contenteditable="true" '
+            + 'data-pf-address="1" data-crm-cards="' + esc2(_prefix) + '" '
+            + 'data-crm-cards-key="' + esc2(_skey) + '" '
+            + 'data-pf-prev="' + esc2(address || '') + '" spellcheck="false" '
+            + 'title="Edit the company address (shown on this project only)">'
+            + esc2(address || '') + '</div>'
+          : (address ? '<div class="pr-pc-company-addr">' + esc2(address) + '</div>' : '');
+      }
       // "+ Add contact" — Brad 2026-08-14: MOVED to the right of the company name (in
       // the company header row, above the per-contact [✎ Edit] + red [✕]), applied to
       // EVERY group uniformly. The button still carries the same data-* + onclick; only
@@ -21201,7 +21239,7 @@ try {
       // Company header row: company name on the LEFT, "+ Add contact" on the RIGHT
       // (margin-left:auto). This row sits ABOVE the .pr-crow table whose rows each carry
       // their own [✎ Edit] + red [✕] — so Add is visually just above Edit/✕, per Brad.
-      var companyHeadRow = '<div class="pr-pc-company-head">' + companyHtml + addCoBtn + addBtn + '</div>';
+      var companyHeadRow = '<div class="pr-pc-company-head">' + companyHtml + addrHtml + addCoBtn + addBtn + '</div>';
       // When the uniform card renders (rows OR office affordances), HIDE the sibling
       // legacy static horizContactBlock table so contacts do not appear twice. The
       // hidden .pr-field editor grid (.pr-pc-cofields / .pr-ccards) is already display:none
@@ -21413,9 +21451,10 @@ try {
         Object.keys(curMap).forEach(function(k){
           var en = curMap[k] || {};
           out[k] = { company: (k === prefix ? nowVal : (en.company || '')),
+                     address: (typeof en.address === 'string' ? en.address : ''),
                      contactIds: Array.isArray(en.contactIds) ? en.contactIds.slice() : [] };
         });
-        if (!Object.prototype.hasOwnProperty.call(out, prefix)) out[prefix] = { company: nowVal, contactIds: ids };
+        if (!Object.prototype.hasOwnProperty.call(out, prefix)) out[prefix] = { company: nowVal, address: '', contactIds: ids };
         var body = {}; body[PF_CRM_KEY] = out;
         return fetch('/api/project-override', {
           method: 'POST', credentials: 'same-origin',
@@ -21444,6 +21483,65 @@ try {
       });
     }
 
+    // Inline-edit the company ADDRESS (Brad 2026-08-20). Unlike the company NAME, the
+    // address is a PROJECT-LEVEL pointer field on __crm[group].address (not a shared
+    // directory field), so there are NO directory records to rename — we simply resend the
+    // section's FULL __crm map with THIS group's address updated (preserving every sibling
+    // group's company/address/contactIds + all other reserved section keys). Same vetted
+    // /api/project-override write path as pfPcInlineCompanySave. Office-gated (canEdit) on
+    // the client; the server also 403s the write for non-crm roles. FAIL CLOSED: on any
+    // non-{ok,saved} response the cell reverts to its prior value + an inline error.
+    function pfPcInlineAddressSave(cell){
+      if (!cell) return;
+      if (typeof canEdit === 'function' && !canEdit()) return; // office-only (defense in depth)
+      var prefix = cell.getAttribute('data-crm-cards') || '';
+      var skey = cell.getAttribute('data-crm-cards-key') || 'design_professionals';
+      var prev = cell.getAttribute('data-pf-prev') || '';
+      var nowVal = (cell.textContent == null ? '' : cell.textContent).trim();
+      var host = cell.closest ? cell.closest('.pr-crm-cards') : null;
+      if (!prefix) { cell.textContent = prev; return; }
+      if (nowVal === prev) return;           // no change
+      var num = _curNum || '';
+      if (!num) { cell.textContent = prev; pfPcSay(host, 'Could not resolve the project; refresh and retry.', true); return; }
+      // Rebuild the section's FULL __crm map, editing only this group's address.
+      var curMap = pfCrmMap(skey) || {};
+      var out = {};
+      Object.keys(curMap).forEach(function(k){
+        var en = curMap[k] || {};
+        out[k] = { company: en.company || '',
+                   address: (k === prefix ? nowVal : (typeof en.address === 'string' ? en.address : '')),
+                   contactIds: Array.isArray(en.contactIds) ? en.contactIds.slice() : [] };
+      });
+      // If this group has no entry yet (edge: address edited before any contact — shouldn't
+      // happen since the cell only renders when a company exists, but stay safe) seed one.
+      if (!Object.prototype.hasOwnProperty.call(out, prefix)) out[prefix] = { company: '', address: nowVal, contactIds: [] };
+      var body = {}; body[PF_CRM_KEY] = out;
+      pfPcSay(host, 'Saving…', false);
+      fetch('/api/project-override', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ num: num, section: skey, fields: body })
+      }).then(function(res){ return res.json().then(function(b){ return { ok: res.ok, status: res.status, body: b }; })
+          .catch(function(){ return { ok: res.ok, status: res.status, body: null }; }); })
+        .then(function(r){
+          if (!r.ok || !r.body || r.body.ok !== true || r.body.saved !== true) {
+            cell.textContent = prev;
+            pfPcSay(host, (r.body && r.body.message) ? r.body.message
+              : (r.status === 403 ? 'You do not have permission to edit this project.'
+                 : 'Address save failed (' + r.status + '). Reverted — please retry.'), true);
+            return;
+          }
+          window.PF_PROJECT_OVERRIDES[num] = { sections: (r.body.sections) || {}, _meta: (r.body._meta) || null };
+          try { if (String(num) === String(_curNum) && r.body.sections) _curOverrides = r.body.sections; } catch(e){}
+          cell.setAttribute('data-pf-prev', nowVal);
+          pfPcSay(host, 'Saved', false);
+          if (window.pfCrmRenderCards) window.pfCrmRenderCards(document);
+        }).catch(function(){
+          cell.textContent = prev;
+          pfPcSay(host, 'Address save failed: could not reach the server. Not saved — reverted.', true);
+        });
+    }
+
     // Delegated save-on-change wiring for the inline Project Contacts cells. Bound ONCE
     // (guarded). Saves on blur (focusout) and on Enter (which also blurs). Enter never
     // inserts a newline in these single-line cells. Only fires for cells inside a Project
@@ -21460,6 +21558,7 @@ try {
         if (!el || !el.classList || !el.classList.contains('pr-pc-inline')) return;
         if (!el.closest || !el.closest('.pr-crm-cards')) return;
         if (el.getAttribute('data-pf-company') === '1') pfPcInlineCompanySave(el);
+        else if (el.getAttribute('data-pf-address') === '1') pfPcInlineAddressSave(el);
         else pfPcInlineFieldSave(el);
       }, true);
       document.addEventListener('keydown', function(ev){
@@ -21485,6 +21584,9 @@ try {
       var prefix = btn.getAttribute('data-crm-cards') || '';
       var skey = btn.getAttribute('data-crm-cards-key') || 'design_professionals';
       var company = btn.getAttribute('data-crm-company') || '';
+      // Brad 2026-08-20: carry the "+ Add company" seeded address (if any) onto the form so
+      // pfPcAddContactSave can persist it into __crm[group].address on the first contact.
+      var companyAddress = btn.getAttribute('data-crm-company-address') || '';
       var trade = (typeof pfPcGroupTradeSafe === 'function') ? pfPcGroupTradeSafe(skey, prefix) : '';
       var host = btn.closest ? btn.closest('.pr-crm-cards') : null;
       var wrap = btn.closest ? btn.closest('.pr-pc-company') : null;
@@ -21502,6 +21604,7 @@ try {
       form.setAttribute('data-crm-cards', prefix);
       form.setAttribute('data-crm-cards-key', skey);
       form.setAttribute('data-crm-company', company);
+      form.setAttribute('data-crm-company-address', companyAddress);
       form.setAttribute('data-crm-trade', trade || '');
       form.innerHTML = ''
         + '<div class="pr-crm-addform-note">New contact for <strong>' + esc2(company || 'this group')
@@ -21547,6 +21650,12 @@ try {
       if (typeof canEdit === 'function' && !canEdit()) return; // office-only (defense in depth)
       var name = (window.prompt('New company name for this group:') || '').trim();
       if (!name) return;
+      // Brad 2026-08-20: also capture the company ADDRESS on add (second prompt — keeps the
+      // simple prompt-based add-company UX). Optional: a blank address is fine (the field
+      // just renders empty and stays inline-editable). It is seeded onto the add-contact
+      // form (data-crm-company-address) and persisted into __crm[group].address when the
+      // first contact's Save resends the full map.
+      var address = (window.prompt('Company address (optional — one line, e.g. 123 Main St, City, ST):', '') || '').trim();
       var prefix = btn.getAttribute('data-crm-cards') || '';
       var skey = btn.getAttribute('data-crm-cards-key') || 'design_professionals';
       var wrap = btn.closest ? btn.closest('.pr-pc-company') : null;
@@ -21557,6 +21666,7 @@ try {
       var addBtn = wrap.querySelector('.pr-pc-addbtn:not(.pr-pc-addco-head)');
       if (addBtn) {
         addBtn.setAttribute('data-crm-company', name);
+        addBtn.setAttribute('data-crm-company-address', address);
       } else {
         addBtn = document.createElement('button');
         addBtn.type = 'button';
@@ -21564,6 +21674,7 @@ try {
         addBtn.setAttribute('data-crm-cards', prefix);
         addBtn.setAttribute('data-crm-cards-key', skey);
         addBtn.setAttribute('data-crm-company', name);
+        addBtn.setAttribute('data-crm-company-address', address);
         addBtn.setAttribute('onclick', 'window.pfPcAddContact(this)');
         var head = btn.parentNode; if (head) head.appendChild(addBtn);
       }
@@ -21612,14 +21723,19 @@ try {
           pfPcAdoptDirRow(r.body.contact);
           var newId = String(r.body.contact.contactId || '').toUpperCase();
           // STEP 2: assign the new id to this project's __crm[group] (full-map resend).
+          // Preserve every group's address (en.address) across the rebuild; seed THIS
+          // group's address from the add-contact form's data-crm-company-address (set by
+          // "+ Add company" — Brad 2026-08-20) when the group has no address yet.
           var curMap = pfCrmMap(skey) || {};
           var out = {};
           Object.keys(curMap).forEach(function(k){
             var en = curMap[k] || {};
-            out[k] = { company: en.company || '', contactIds: Array.isArray(en.contactIds) ? en.contactIds.slice() : [] };
+            out[k] = { company: en.company || '', address: (typeof en.address === 'string' ? en.address : ''), contactIds: Array.isArray(en.contactIds) ? en.contactIds.slice() : [] };
           });
-          var mine = out[prefix] || { company: company || '', contactIds: [] };
+          var _seedAddr = form.getAttribute('data-crm-company-address') || '';
+          var mine = out[prefix] || { company: company || '', address: _seedAddr, contactIds: [] };
           if (!mine.company && company) mine.company = company;
+          if ((typeof mine.address !== 'string' || !mine.address) && _seedAddr) mine.address = _seedAddr;
           if (mine.contactIds.indexOf(newId) === -1) mine.contactIds.push(newId);
           out[prefix] = mine;
           var body = {}; body[PF_CRM_KEY] = out;
@@ -21718,14 +21834,15 @@ try {
           pfPcAdoptDirRow(r.body.contact);
           var newId = String(r.body.contact.contactId || '').toUpperCase();
           // STEP 2: assign the new id to this group's __crm (full-map resend: preserve
-          // every sibling group's selection; the backend whole-object-replaces __crm).
+          // every sibling group's selection AND its address; the backend
+          // whole-object-replaces __crm).
           var curMap = pfCrmMap(skey) || {};
           var out = {};
           Object.keys(curMap).forEach(function(k){
             var en = curMap[k] || {};
-            out[k] = { company: en.company || '', contactIds: Array.isArray(en.contactIds) ? en.contactIds.slice() : [] };
+            out[k] = { company: en.company || '', address: (typeof en.address === 'string' ? en.address : ''), contactIds: Array.isArray(en.contactIds) ? en.contactIds.slice() : [] };
           });
-          var mine = out[prefix] || { company: company || '', contactIds: [] };
+          var mine = out[prefix] || { company: company || '', address: '', contactIds: [] };
           if (!mine.company && company) mine.company = company;
           if (mine.contactIds.indexOf(newId) === -1) mine.contactIds.push(newId);
           out[prefix] = mine;
@@ -22039,7 +22156,7 @@ try {
               var en = curM[k] || {};
               var ids = Array.isArray(en.contactIds) ? en.contactIds.slice() : [];
               if (k === prefix) ids = ids.filter(function(id){ return String(id||'').toUpperCase() !== String(newId).toUpperCase(); });
-              outM[k] = { company: en.company || '', contactIds: ids };
+              outM[k] = { company: en.company || '', address: (typeof en.address === 'string' ? en.address : ''), contactIds: ids };
             });
             fetch('/api/project-override', {
               method: 'POST', credentials: 'same-origin',
@@ -22102,7 +22219,7 @@ try {
         if (k === prefix) {
           ids = ids.filter(function(id){ return String(id || '').toUpperCase() !== cid; });
         }
-        out[k] = { company: entry.company || '', contactIds: ids };
+        out[k] = { company: entry.company || '', address: (typeof entry.address === 'string' ? entry.address : ''), contactIds: ids };
       });
       if (errEl) errEl.style.display = 'none';
       busy(true);
@@ -22492,7 +22609,7 @@ try {
       // material editors that now render CRM blocks.) pfCollectCrm harvests whatever
       // .pr-crm blocks this editor rendered.
       if (editor.querySelector('.pr-crm')) {
-        var crm = pfCollectCrm(editor);
+        var crm = pfCollectCrm(editor, section);
         // Send even an empty {} so a full clear round-trips; backend cleanCrm accepts it.
         fields[PF_CRM_KEY] = crm;
       }
