@@ -13652,7 +13652,13 @@ try {
     // under their OLD label so existing data still renders. new label -> old label.
     var PF_OVERRIDE_LABEL_ALIASES = {
       // "Taxes/Sales Tax Notes" -> "Sales Tax Notes" (Brad 2026-08-07, display rename).
-      'Sales Tax Notes': 'Taxes/Sales Tax Notes'
+      'Sales Tax Notes': 'Taxes/Sales Tax Notes',
+      // General Info SOW field DISPLAY-renamed (Brad 2026-08-20): "Project Scope of Work
+      // (SOW)" -> "Project Scope of Work Notes". Alias new->old so any override already
+      // stored under the OLD label (e.g. a Manual override scope value) still resolves and
+      // the field populates exactly as before. Value binding untouched. (This is a
+      // DIFFERENT field from the separate "SOW Notes" field, which is unchanged.)
+      'Project Scope of Work Notes': 'Project Scope of Work (SOW)'
     };
     function ovLookup(sectionKey, label){
       var sec = _curOverrides && _curOverrides[sectionKey];
@@ -16948,7 +16954,13 @@ try {
             })(), 'Auto (start + duration)')
         ], [
           // DROPDOWN (SOW). Value seeds from the confirmed subcontract scope where present.
-          field('Project Scope of Work (SOW)', SF.confirmed_scope, SF.confirmed_scope ? SS : ''),
+          // Label DISPLAY-renamed "Project Scope of Work (SOW)" -> "Project Scope of Work
+          // Notes" (Brad 2026-08-20). The label is the override/dropdown KEY, so the rename
+          // is paired with a PF_OVERRIDE_LABEL_ALIASES entry (new->old, so the existing
+          // stored override value still resolves + populates unchanged) and a re-keyed
+          // PF_FIELD_DROPDOWNS entry (so it still renders as the SOW dropdown in the editor).
+          // Value binding (SF.confirmed_scope + the override plumbing) is UNCHANGED.
+          field('Project Scope of Work Notes', SF.confirmed_scope, SF.confirmed_scope ? SS : ''),
           field('SOW Notes', ''),
           field('Total Pier Qty (Prelim)', bid.total_columns, 'Bid Log'),
           field('Total LF (Prelim)', bid.total_lf, 'Bid Log'),
@@ -19877,7 +19889,11 @@ try {
     // value is saved as a plain string through the same override plumbing, so the
     // read/display path is unchanged.
     var PF_FIELD_DROPDOWNS = {
-      'Project Scope of Work (SOW)': [
+      // Re-keyed to the new display label "Project Scope of Work Notes" (Brad 2026-08-20
+      // rename of "Project Scope of Work (SOW)"). The dropdown map is keyed BY LABEL, so
+      // it must track the rename for the field to keep rendering as the SOW dropdown in
+      // the section editor. Option list is unchanged.
+      'Project Scope of Work Notes': [
         'Aggregate Piers, Top Feed',
         'Aggregate Piers, Bottom Feed',
         'Helical Pilings',
