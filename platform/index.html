@@ -3275,12 +3275,16 @@ tr.pf-dragging { opacity: 0.45; }
    typical address without hogging. One line per contact preserved: cells have
    min-width:0 (they shrink rather than wrap the row); headers share these classes so
    they stay aligned over their data columns. */
-.pr-crow-name  { flex: 0 0 130px; font-weight: 600; color: var(--text-0); text-align: left; }
-.pr-crow-title { flex: 0 0 120px; color: var(--text-1, #444); text-align: left; }
+/* Column widths (Brad 2026-08-20): widen Name/Title/Email for longer values; KEEP    */
+/* Office/Cell phone fixed (phone char count is constant); Notes stays the sole grower */
+/* so it shrinks to absorb the enlarged left cluster — more room for names/titles/     */
+/* emails, phones unchanged, Notes smaller. One line per contact preserved.            */
+.pr-crow-name  { flex: 0 0 175px; font-weight: 600; color: var(--text-0); text-align: left; }
+.pr-crow-title { flex: 0 0 150px; color: var(--text-1, #444); text-align: left; }
 .pr-crow-off   { flex: 0 0 120px; text-align: left; white-space: nowrap; }
 .pr-crow-cell  { flex: 0 0 120px; text-align: left; white-space: nowrap; }
-.pr-crow-email { flex: 0 0 220px; text-align: left; }
-.pr-crow-notes { flex: 1 1 200px; color: var(--text-1, #444); white-space: normal; text-align: left; }
+.pr-crow-email { flex: 0 0 260px; text-align: left; }
+.pr-crow-notes { flex: 1 1 150px; color: var(--text-1, #444); white-space: normal; text-align: left; }
 /* Header cells inherit the SAME per-column text-align above; only weight/color differ. */
 .pr-crow-head .pr-crow-name,
 .pr-crow-head .pr-crow-title,
@@ -15777,7 +15781,10 @@ try {
         ? '<div class="pr-crow-table">' + crowHead() + live.map(crowRow).join('') + '</div>'
         : '';
       return '<div class="pr-pc-horiz-block">'
-        + (opts.roleTag ? '<div class="pr-role-tag">' + E(opts.roleTag) + '</div>' : '')
+        // Brad 2026-08-20: redundant gray-bg/blue-text category pill (.pr-role-tag)
+        // removed — the standard underlined .pr-subhead category header above each
+        // group is the single source of the category name now. (Legacy path; kept in
+        // sync with pfCrmRenderCards so no group can ever render the duplicate chip.)
         + '<div class="pr-pc-company">'
         +   (opts.company ? '<div class="pr-pc-company-name">' + E(opts.company) + '</div>' : '')
         +   metaLine
@@ -21191,9 +21198,14 @@ try {
         }
       } catch(e){}
 
+      // Brad 2026-08-20: the gray-background/blue-text category PILL (.pr-role-tag)
+      // duplicated the standard underlined category subhead (.pr-subhead, e.g.
+      // "Staking & Layout") that already sits above each group. Removed here so every
+      // group shows the category name ONCE (the standard header), consistently across
+      // all 13 Project Contacts groups. roleTag is still read (used elsewhere) but no
+      // longer emits the redundant chip above the company name.
       host.innerHTML =
-          (roleTag ? '<div class="pr-role-tag">' + esc2(roleTag) + '</div>' : '')
-        + '<div class="pr-pc-company">'
+          '<div class="pr-pc-company">'
         +   companyHeadRow
         +   '<div class="pr-crow-table">' + headRow + rowHtml.join('') + '</div>'
         + '</div>';
