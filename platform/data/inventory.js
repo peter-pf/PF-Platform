@@ -78,8 +78,9 @@ window.PF_INVENTORY = {
     { id: 'drill-1', category: 'Drilling', description: 'Drive Head Adapter Plate', manufacturer: 'Custom Fabrication', mfrPart: '', reqTrailer: 1, reqHome: 1, altSources: 'Local Machine Shop', actualOnHand: null, notes: '' },
     { id: 'drill-2', category: 'Drilling', description: '18" Auger', manufacturer: 'ProDig', mfrPart: '', reqTrailer: 1, reqHome: 1, altSources: 'Jeffrey Machine', actualOnHand: null, notes: '' },
     { id: 'drill-3', category: 'Drilling', description: '24" Auger', manufacturer: 'ProDig', mfrPart: '', reqTrailer: 1, reqHome: 1, altSources: 'Jeffrey Machine', actualOnHand: null, notes: '' },
-    { id: 'drill-4', category: 'Drilling', description: 'Auger Teeth (Box of 25)', manufacturer: 'ProDig / Jeffrey Machine', mfrPart: '', reqTrailer: 8, reqHome: 10, altSources: 'TBD', actualOnHand: null, notes: 'Quantities are in BOXES (25/box).' },
-    { id: 'drill-5', category: 'Drilling', description: 'Pilot Bit', manufacturer: 'ProDig', mfrPart: '', reqTrailer: 2, reqHome: 3, altSources: 'Jeffrey Machine', actualOnHand: null, notes: '' },
+    { id: 'drill-4', category: 'Drilling', description: 'Auger Teeth (Box of 25)', manufacturer: 'ProDig / Jeffrey Machine', mfrPart: '', reqTrailer: 10, reqHome: 20, altSources: 'TBD', actualOnHand: null, notes: 'Quantities are in BOXES (25/box).' },
+    { id: 'drill-5', category: 'Drilling', description: 'Pilot Bit', manufacturer: 'ProDig', mfrPart: '', reqTrailer: 4, reqHome: 10, altSources: 'Jeffrey Machine', actualOnHand: null, notes: 'Auger tips are stocked here (Derek 2026-08-20).' },
+    { id: 'drill-6', category: 'Drilling', description: 'Weldable Wear Plate (Box of 25)', manufacturer: '', mfrPart: '', reqTrailer: 2, reqHome: 10, altSources: '', actualOnHand: null, notes: '' },
 
     // ---- Mast Components ----
     { id: 'mast-1', category: 'Mast Components', description: 'Sheave', manufacturer: 'ProDig', mfrPart: '', reqTrailer: 1, reqHome: 1, altSources: '', actualOnHand: null, notes: '' },
@@ -94,6 +95,7 @@ window.PF_INVENTORY = {
 
     // ---- Side Dump Bucket ----
     { id: 'sidedump-1', category: 'Side Dump Bucket', description: 'Side Dump Bucket', manufacturer: 'Max Attachments', mfrPart: '', reqTrailer: 1, reqHome: 1, altSources: 'Malecio Attachments', actualOnHand: null, notes: '' },
+    { id: 'sidedump-2', category: 'Side Dump Bucket', description: 'Side Dump Bucket Spare Hoses', manufacturer: '', mfrPart: '', reqTrailer: 4, reqHome: null, altSources: '', actualOnHand: null, notes: '' },
 
     // ---- Testing Equipment ----
     { id: 'test-1', category: 'Testing Equipment', description: 'Drive Head', manufacturer: 'ProDig (model X12K)', mfrPart: 'X12K', reqTrailer: 1, reqHome: 0, altSources: '', actualOnHand: null, notes: '' },
