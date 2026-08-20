@@ -2316,24 +2316,41 @@ tr.pf-dragging { opacity: 0.45; }
    the data binding, pfFmtDate/pfFmtPhone/pfFmtQty formatting, the .blank amber
    empty-state, the override/edit path, the live-edit control, and the section-
    editor DOM scan are ALL untouched. Scoped strictly to the General card body so
-   no other section changes. Two-column grid => the values line up in a clean
-   column within each group (cleaner than ragged inline text) and it saves
-   vertical space (density preference). Also covers the fieldLinked() rows and the
-   Site-Readiness-style live-edit rows, since both emit the identical .pr-field
-   structure. */
+   no other section changes. Grid => bold label left + value right, and every field
+   is forced onto EXACTLY ONE line (label nowrap; value nowrap + ellipsis on
+   overflow) per Brad's definitive requirement. Also covers the fieldLinked() rows
+   and the Site-Readiness-style live-edit rows, since both emit the identical
+   .pr-field structure. */
 .pr-card[data-pr-section="general"] > .pr-card-body > .pr-2col .pr-field,
 .pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields .pr-field {
   display: grid;
-  grid-template-columns: minmax(120px, 40%) 1fr;
+  /* Brad 2026-08-19 (definitive): EVERY General Info field must fit on EXACTLY ONE
+     row — title + data on a single line, NO wrapping, for all fields. Label column
+     sizes to the (nowrap) label's content; the value column is minmax(0, 1fr) — the
+     `0` minimum is REQUIRED so the value cell can shrink below its content width and
+     let text-overflow:ellipsis actually trigger inside the grid cell (an `auto`/1fr
+     min would refuse to shrink and force a wider row / overflow). */
+  grid-template-columns: max-content minmax(0, 1fr);
   align-items: baseline;
-  column-gap: 12px;
+  column-gap: 10px;
   row-gap: 0;
 }
-/* Label sits in the left grid cell; keep it from wrapping raggedly but allow it
-   to wrap on very long labels rather than overflow. */
+/* Label: one line, never wraps (nowrap) so the title always stays on a single row. */
 .pr-card[data-pr-section="general"] > .pr-card-body > .pr-2col .pr-field > .pr-field-label,
 .pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields .pr-field > .pr-field-label {
   align-self: baseline;
+  white-space: nowrap;
+}
+/* Value: one line, never wraps; if too long to fit it TRUNCATES with an ellipsis "…"
+   rather than wrapping to a second line. min-width:0 lets the grid cell shrink so the
+   ellipsis triggers. Trade-off (Brad 2026-08-19): long values — Project Scope of Work,
+   SOW Notes, Project Address — now truncate with "…" on one line instead of wrapping. */
+.pr-card[data-pr-section="general"] > .pr-card-body > .pr-2col .pr-field > .pr-field-value,
+.pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields .pr-field > .pr-field-value {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 /* The source hint (e.g. "Bid Log", "Auto (start + duration)") sits UNDER the value
    in the right grid cell, so it never pushes the value off the label's line.
