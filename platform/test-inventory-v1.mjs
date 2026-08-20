@@ -285,15 +285,35 @@ r = await inv.onRequestPost(ctx({ role: null, kv: kv2,
   body: JSON.stringify({ action: 'setFields', item: 'drill-2', fields: { description: 'anon' } }) }));
 ok('no-session setFields BLOCKED -> 403 (fail closed)', r.status === 403);
 
-// 6g) clearing all overridden fields removes the item key entirely.
+// 6g) BLANKING TEXT fields to '' PERSISTS them as empty (deliberate clear-to-blank);
+//     the item is NOT dropped because '' is a real stored value now (empty-string
+//     persistence fix 2026-08-20). NUM fields ('') still CLEAR. So sending all-''
+//     leaves the 4 TEXT fields stored as '' and drops only reqHome.
 r = await inv.onRequestPost(ctx({ role: 'admin', kv: kv2,
   body: JSON.stringify({ action: 'setFields', item: 'drill-2',
     fields: { description: '', manufacturer: '', mfrPart: '', notes: '', reqHome: '' } }) }));
 j = await r.json();
-ok('clearing every field succeeds', r.status === 200 && j.ok);
+ok('blanking TEXT fields succeeds and persists "" (not cleared)',
+  r.status === 200 && j.ok && j.cleared === false
+  && j.fields.description === '' && j.fields.notes === '' && !('reqHome' in j.fields));
 r = await inv.onRequestGet(ctx({ role: 'admin', kv: kv2, method: 'GET' }));
 j = await r.json();
-ok('item with no remaining overrides removed from fields map', !j.fields['drill-2']);
+ok('blanked TEXT fields persist as "" across reload (item kept)',
+  j.fields['drill-2'] && j.fields['drill-2'].notes === '' && j.fields['drill-2'].description === ''
+  && !('reqHome' in j.fields['drill-2']));
+
+// 6g-2) An item whose overrides are ONLY numeric-cleared (no text) IS dropped when
+//       nothing remains — the drop-empty-item path still works for genuine clears.
+r = await inv.onRequestPost(ctx({ role: 'admin', kv: kv2,
+  body: JSON.stringify({ action: 'setFields', item: 'drill-9', fields: { reqHome: 7 } }) }));
+await r.json();
+r = await inv.onRequestPost(ctx({ role: 'admin', kv: kv2,
+  body: JSON.stringify({ action: 'setFields', item: 'drill-9', fields: { reqHome: null } }) }));
+j = await r.json();
+ok('clearing the only (numeric) override drops the item', j.cleared === true);
+r = await inv.onRequestGet(ctx({ role: 'admin', kv: kv2, method: 'GET' }));
+j = await r.json();
+ok('numeric-only-cleared item removed from fields map', !j.fields['drill-9']);
 
 // 6h) qty + fields coexist in the SAME store (qty overlay not broken by fields).
 r = await inv.onRequestPost(ctx({ role: 'admin', kv: kv2,

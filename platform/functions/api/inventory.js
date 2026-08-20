@@ -242,7 +242,11 @@ async function handleSetFields(env, session, parsed) {
     if (!Object.prototype.hasOwnProperty.call(inFields, f)) continue;
     sawAny = true;
     const raw = inFields[f];
-    if (raw === null || raw === '' || typeof raw === 'undefined') { clears.push(f); continue; }
+    // null/undefined = CLEAR (delete override -> fall back to seed value).
+    // '' = a TEXT field DELIBERATELY BLANKED: store the empty string (key present)
+    //      so it persists as blank and does NOT revert to the seed on re-render/reload.
+    //      '' is a valid bounded value; s('') === '' after strip/cap, still sanitized.
+    if (raw === null || typeof raw === 'undefined') { clears.push(f); continue; }
     setVals[f] = s(raw, MAX_FIELD_LEN);
   }
   for (const f of NUM_FIELDS) {

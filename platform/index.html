@@ -36001,8 +36001,12 @@ try {
         if (!itemId || !field) return;
         var isNum = inp.classList.contains('inv-fin-num');
         var raw = inp.value.trim();
+        // val === null  => CLEAR the override (delete key -> fall back to seed).
+        // val === ''     => a TEXT field deliberately blanked; persist the EMPTY string
+        //                   (key present = "") so it does NOT revert to the seed value.
+        // For NUM fields, empty means unset/clear (null), not a stored "".
         var val;
-        if (raw === '') { val = null; }
+        if (raw === '') { val = isNum ? null : ''; }
         else if (isNum) {
           var n = Number(raw);
           if (!Number.isFinite(n) || n < 0 || Math.floor(n) !== n) {
@@ -36012,6 +36016,8 @@ try {
           val = n;
         } else { val = raw; }
 
+        // POST body: null (NUM clear) -> send '' so the API clears; '' or a value for
+        // TEXT -> send it verbatim so a deliberately-blanked field persists as empty.
         var payloadFields = {}; payloadFields[field] = (val === null ? '' : val);
 
         // OPTIMISTIC-FIRST merge (fixes the "Done editing reverts edits" race): apply
@@ -36026,6 +36032,9 @@ try {
         var prevVal = hadField ? prevRec[field] : undefined;
         (function applyLocal() {
           var rec = fieldOverrides[itemId] ? Object.assign({}, fieldOverrides[itemId]) : {};
+          // null = CLEAR (delete key -> seed fallback). '' or a value = STORE by key
+          // presence, so a deliberately-blanked TEXT field persists as empty and
+          // mergedItem() (key-presence merge) shows blank instead of reverting to seed.
           if (val === null) { delete rec[field]; }
           else { rec[field] = val; }
           if (Object.keys(rec).length) { fieldOverrides[itemId] = rec; }
