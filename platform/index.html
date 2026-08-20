@@ -2316,24 +2316,32 @@ tr.pf-dragging { opacity: 0.45; }
    the data binding, pfFmtDate/pfFmtPhone/pfFmtQty formatting, the .blank amber
    empty-state, the override/edit path, the live-edit control, and the section-
    editor DOM scan are ALL untouched. Scoped strictly to the General card body so
-   no other section changes. Two-column grid => the values line up in a clean
-   column within each group (cleaner than ragged inline text) and it saves
-   vertical space (density preference). Also covers the fieldLinked() rows and the
-   Site-Readiness-style live-edit rows, since both emit the identical .pr-field
-   structure. */
+   no other section changes. Grid => bold label left, value hugging it on the same
+   line, and it saves vertical space (density preference). Also covers the
+   fieldLinked() rows and the Site-Readiness-style live-edit rows, since both emit
+   the identical .pr-field structure. */
 .pr-card[data-pr-section="general"] > .pr-card-body > .pr-2col .pr-field,
 .pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields .pr-field {
   display: grid;
-  grid-template-columns: minmax(120px, 40%) 1fr;
+  /* Brad 2026-08-19 (follow-up): pull the DATA closer to the TITLE. Size the label
+     column to its own CONTENT (max-content) with a small gap, so the value hugs each
+     label immediately instead of waiting for a fixed 40% column that left a big gap
+     after short labels. Trade-off: values are now ragged (each starts right after its
+     own label) rather than aligned in one vertical column — intentional, since Brad
+     asked for "closer" and it matches the density preference. minmax(0,…) lets the
+     column shrink; the label's own max-width (below) caps it so a long label can't
+     starve the value cell. */
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
   align-items: baseline;
-  column-gap: 12px;
+  column-gap: 8px;
   row-gap: 0;
 }
-/* Label sits in the left grid cell; keep it from wrapping raggedly but allow it
-   to wrap on very long labels rather than overflow. */
+/* Label sits in the left grid cell, sized to its content. Cap its width so an
+   unusually long label wraps instead of eating the whole row / starving the value. */
 .pr-card[data-pr-section="general"] > .pr-card-body > .pr-2col .pr-field > .pr-field-label,
 .pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields .pr-field > .pr-field-label {
   align-self: baseline;
+  max-width: 60%;
 }
 /* The source hint (e.g. "Bid Log", "Auto (start + duration)") sits UNDER the value
    in the right grid cell, so it never pushes the value off the label's line.
