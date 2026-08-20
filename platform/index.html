@@ -3262,19 +3262,20 @@ tr.pf-dragging { opacity: 0.45; }
    (flex-grow 1) so leftover row width is shared evenly instead of pooling in an
    oversized Notes column (Brad 2026-08-20). Phones keep a 130px basis + nowrap so
    "(605) 965-2211" never breaks, and their headers left-align over the numbers. */
-/* Rebalanced 2026-08-20 (Brad): distribute columns EVENLY across the full row.
-   Title moved tighter to Name (shorter basis + it grows) so it reads as part of the
-   contact; the two phone cols now GROW (flex 1) instead of sitting fixed so they no
-   longer bunch in the middle with dead space to their right; Notes dropped from
-   flex-grow 2 -> 1 so it stops hogging ~40% of the row. All growing columns now share
-   slack at flex-grow 1 = proportionate, even spread. One line per contact preserved
-   (no wrap; nowrap on phones so "(605) 965-2211" never breaks). */
-.pr-crow-name  { flex: 1 1 150px; font-weight: 600; color: var(--text-0); text-align: left; }
-.pr-crow-title { flex: 1 1 130px; color: var(--text-1, #444); text-align: left; }
-.pr-crow-off   { flex: 1 1 130px; text-align: left; white-space: nowrap; }
-.pr-crow-cell  { flex: 1 1 130px; text-align: left; white-space: nowrap; }
-.pr-crow-email { flex: 1 1 190px; text-align: left; }
-.pr-crow-notes { flex: 1 1 150px; color: var(--text-1, #444); white-space: normal; text-align: left; }
+/* Notes-dominant layout 2026-08-20 (Brad): cluster Name/Title/phones/email TIGHT on
+   the left at content-sized fixed widths (flex-grow:0, so they never expand to eat
+   slack), and give Notes the ONLY flex-grow:1 so it absorbs ALL remaining row width =
+   the big right-hand column (Notes is generally the longest field). Phones keep a
+   fixed basis + nowrap so "(605) 965-2211" fits on one line; email basis fits a
+   typical address without hogging. One line per contact preserved: cells have
+   min-width:0 (they shrink rather than wrap the row); headers share these classes so
+   they stay aligned over their data columns. */
+.pr-crow-name  { flex: 0 0 130px; font-weight: 600; color: var(--text-0); text-align: left; }
+.pr-crow-title { flex: 0 0 120px; color: var(--text-1, #444); text-align: left; }
+.pr-crow-off   { flex: 0 0 120px; text-align: left; white-space: nowrap; }
+.pr-crow-cell  { flex: 0 0 120px; text-align: left; white-space: nowrap; }
+.pr-crow-email { flex: 0 0 220px; text-align: left; }
+.pr-crow-notes { flex: 1 1 200px; color: var(--text-1, #444); white-space: normal; text-align: left; }
 /* Header cells inherit the SAME per-column text-align above; only weight/color differ. */
 .pr-crow-head .pr-crow-name,
 .pr-crow-head .pr-crow-title,
