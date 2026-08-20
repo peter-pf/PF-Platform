@@ -35687,6 +35687,7 @@ try {
   var canEdit = false;          // office (admin/partner/business_dev)?
   var editMode = false;         // CHANGE B: full-row edit toggle (office-only). OFF by default.
   var collapsed = {};           // CHANGE C: { "<locationId>": true } => that location collapsed.
+  var pendingSaves = 0;         // count of in-flight field saves; "Done editing" waits on these.
 
   function api(path, opts) {
     return fetch(path, Object.assign({ credentials: 'same-origin',
@@ -35901,23 +35902,36 @@ try {
           msg('Quantity must be 0 or greater.', false);
           return;
         }
+        // OPTIMISTIC-FIRST merge (same race fix as the field edits): update the local
+        // overrides map SYNCHRONOUSLY so a re-render (e.g. entering/leaving edit mode)
+        // reflects the new qty immediately instead of reverting to the stale value.
+        var hadKey = Object.prototype.hasOwnProperty.call(overrides, k);
+        var prevQty = hadKey ? overrides[k] : undefined;
+        if (qty == null) { delete overrides[k]; } else { overrides[k] = qty; }
+        recalcRow(inp);
+
+        pendingSaves++;
         inp.disabled = true;
         api('/api/inventory', { method: 'POST',
           body: JSON.stringify({ action: 'set', key: k, qty: qty }) })
           .then(function (res) {
+            pendingSaves--;
             inp.disabled = false;
             if (!res.ok || !(res.body && res.body.ok)) {
+              // REVERT the optimistic qty on server rejection.
+              if (hadKey) { overrides[k] = prevQty; } else { delete overrides[k]; }
+              recalcRow(inp);
               msg((res.body && res.body.message) || 'Save failed. Not saved.', false);
               return;
             }
-            // Update local override map + low-stock highlight without a full re-render.
-            if (qty == null) { delete overrides[k]; } else { overrides[k] = qty; }
-            recalcRow(inp);
             msg('Saved.', true);
             setTimeout(function () { msg(''); }, 1500);
           })
           .catch(function () {
+            pendingSaves--;
             inp.disabled = false;
+            if (hadKey) { overrides[k] = prevQty; } else { delete overrides[k]; }
+            recalcRow(inp);
             msg('Save failed (network). Not saved.', false); // FAIL CLOSED: honest error
           });
       });
@@ -35952,8 +35966,26 @@ try {
     var btn = host.querySelector('#invEditBtn');
     if (!btn) return;
     btn.addEventListener('click', function () {
+      // Clicking the button blurs the focused input, firing its change handler and
+      // starting an async save. The optimistic-first merge already updates the local
+      // fieldOverrides synchronously, so an immediate re-render keeps the edited value.
+      // If a save is still in flight, defer the re-render one tick so pendingSaves and
+      // any low-stock recalc settle first (belt-and-suspenders against the revert race).
       editMode = !editMode;
-      render(); // preserves collapsed[] + overrides + fieldOverrides
+      if (pendingSaves > 0) {
+        btn.disabled = true;
+        var waited = 0;
+        (function waitThenRender() {
+          if (pendingSaves > 0 && waited < 8000) {
+            waited += 60;
+            setTimeout(waitThenRender, 60);
+            return;
+          }
+          render(); // preserves collapsed[] + overrides + fieldOverrides
+        })();
+      } else {
+        render(); // preserves collapsed[] + overrides + fieldOverrides
+      }
     });
   }
 
@@ -35981,32 +36013,76 @@ try {
         } else { val = raw; }
 
         var payloadFields = {}; payloadFields[field] = (val === null ? '' : val);
+
+        // OPTIMISTIC-FIRST merge (fixes the "Done editing reverts edits" race): apply
+        // the edit to the local fieldOverrides map SYNCHRONOUSLY, before the async POST
+        // resolves. "Done editing" re-renders synchronously on click (which also blurs
+        // this input and fires this change handler); if the local map were only updated
+        // in the POST .then(), the re-render would run first and read the STALE seed
+        // value, reverting the edit on screen. Merging here means the re-render already
+        // reflects the correction. We remember the prior value to revert on save failure.
+        var prevRec = fieldOverrides[itemId];
+        var hadField = prevRec && Object.prototype.hasOwnProperty.call(prevRec, field);
+        var prevVal = hadField ? prevRec[field] : undefined;
+        (function applyLocal() {
+          var rec = fieldOverrides[itemId] ? Object.assign({}, fieldOverrides[itemId]) : {};
+          if (val === null) { delete rec[field]; }
+          else { rec[field] = val; }
+          if (Object.keys(rec).length) { fieldOverrides[itemId] = rec; }
+          else { delete fieldOverrides[itemId]; }
+        })();
+        // If a Req field changed, the low-stock highlight may change too.
+        if (field === 'reqTrailer' || field === 'reqHome') recalcRowByItem(host, itemId);
+
+        // Track this in-flight save so "Done editing" can wait for it before re-render.
+        pendingSaves++;
         inp.disabled = true;
         api('/api/inventory', { method: 'POST',
           body: JSON.stringify({ action: 'setFields', item: itemId, fields: payloadFields }) })
           .then(function (res) {
+            pendingSaves--;
             inp.disabled = false;
             if (!res.ok || !(res.body && res.body.ok)) {
+              // REVERT the optimistic local merge on server rejection (fail-closed).
+              revertLocalField(itemId, field, hadField, prevVal, host);
               msg((res.body && res.body.message) || 'Save failed. Not saved.', false);
               return;
             }
-            // Update the local per-item override map to match the server result.
-            var rec = fieldOverrides[itemId] || {};
-            if (val === null) { delete rec[field]; }
-            else { rec[field] = val; }
-            if (Object.keys(rec).length) { fieldOverrides[itemId] = rec; }
-            else { delete fieldOverrides[itemId]; }
-            // If a Req field changed, the low-stock highlight may change too.
-            if (field === 'reqTrailer' || field === 'reqHome') recalcRowByItem(host, itemId);
             msg('Saved.', true);
             setTimeout(function () { msg(''); }, 1500);
           })
           .catch(function () {
+            pendingSaves--;
             inp.disabled = false;
-            msg('Save failed (network). Not saved.', false); // FAIL CLOSED
+            revertLocalField(itemId, field, hadField, prevVal, host); // FAIL CLOSED
+            msg('Save failed (network). Not saved.', false);
           });
       });
     });
+  }
+
+  // Revert an optimistic field merge back to its prior local value after a failed save
+  // (fail-closed: the on-screen value must reflect what actually persisted). Also fixes
+  // the visible input if the row is still rendered, and re-checks low-stock for Req.
+  function revertLocalField(itemId, field, hadField, prevVal, host) {
+    var rec = fieldOverrides[itemId] ? Object.assign({}, fieldOverrides[itemId]) : {};
+    if (hadField) { rec[field] = prevVal; } else { delete rec[field]; }
+    if (Object.keys(rec).length) { fieldOverrides[itemId] = rec; }
+    else { delete fieldOverrides[itemId]; }
+    // Repair the still-mounted input (if edit mode wasn't torn down) to the merged value.
+    if (host) {
+      var sel = 'input.inv-fin[data-item="' + (window.CSS && CSS.escape ? CSS.escape(itemId) : itemId) + '"]';
+      var inputs = host.querySelectorAll(sel);
+      inputs.forEach(function (el) {
+        if (el.getAttribute('data-field') !== field) return;
+        var base = (window.PF_INVENTORY && (window.PF_INVENTORY.items || []).filter(
+          function (i) { return i.id === itemId; })[0]) || {};
+        var merged = mergedItem(base);
+        var mv = merged[field];
+        el.value = (mv == null ? '' : mv);
+      });
+    }
+    if (field === 'reqTrailer' || field === 'reqHome') recalcRowByItem(host, itemId);
   }
 
   // Recalc low-stock for every rendered row of a given item (both locations).
