@@ -2308,6 +2308,54 @@ tr.pf-dragging { opacity: 0.45; }
   font-weight: 700;
 }
 
+/* INLINE label:value layout for General Info (Brad 2026-08-19). Brad asked for
+   each field's DATA to render to the RIGHT of the (still-bold) field title on the
+   SAME line, instead of stacked label-above-value. PRESENTATION-ONLY: this only
+   flips the .pr-field flex-column into a label|value grid — the markup, the
+   .pr-field[data-pr-label] wrapper, the .pr-field-label / .pr-field-value spans,
+   the data binding, pfFmtDate/pfFmtPhone/pfFmtQty formatting, the .blank amber
+   empty-state, the override/edit path, the live-edit control, and the section-
+   editor DOM scan are ALL untouched. Scoped strictly to the General card body so
+   no other section changes. Two-column grid => the values line up in a clean
+   column within each group (cleaner than ragged inline text) and it saves
+   vertical space (density preference). Also covers the fieldLinked() rows and the
+   Site-Readiness-style live-edit rows, since both emit the identical .pr-field
+   structure. */
+.pr-card[data-pr-section="general"] > .pr-card-body > .pr-2col .pr-field,
+.pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields .pr-field {
+  display: grid;
+  grid-template-columns: minmax(120px, 40%) 1fr;
+  align-items: baseline;
+  column-gap: 12px;
+  row-gap: 0;
+}
+/* Label sits in the left grid cell; keep it from wrapping raggedly but allow it
+   to wrap on very long labels rather than overflow. */
+.pr-card[data-pr-section="general"] > .pr-card-body > .pr-2col .pr-field > .pr-field-label,
+.pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields .pr-field > .pr-field-label {
+  align-self: baseline;
+}
+/* The source hint (e.g. "Bid Log", "Auto (start + duration)") sits UNDER the value
+   in the right grid cell, so it never pushes the value off the label's line.
+   grid-column places it in the value column, row 2. */
+.pr-card[data-pr-section="general"] > .pr-card-body > .pr-2col .pr-field > .pr-field-src,
+.pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields .pr-field > .pr-field-src {
+  grid-column: 2;
+  margin-top: 1px;
+}
+/* Narrow screens: fall back to stacked label-above-value so long values are not
+   crushed into a tiny column on a phone (field crew / mobile). */
+@media (max-width: 560px) {
+  .pr-card[data-pr-section="general"] > .pr-card-body > .pr-2col .pr-field,
+  .pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields .pr-field {
+    grid-template-columns: 1fr;
+  }
+  .pr-card[data-pr-section="general"] > .pr-card-body > .pr-2col .pr-field > .pr-field-src,
+  .pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields .pr-field > .pr-field-src {
+    grid-column: 1;
+  }
+}
+
 /* Nested PF Team card living inside the General Info body: slightly inset + a    */
 /* lighter surface so it reads as a sub-section, not a peer of the top cards.     */
 .pr-nested-card-wrap { margin-top: 6px; }
