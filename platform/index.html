@@ -3225,6 +3225,28 @@ tr.pf-dragging { opacity: 0.45; }
   letter-spacing: 0.04em; color: var(--accent-dark);
 }
 .pr-pc-section .pr-nested-card-wrap > .pr-card > .pr-card-body { padding-left: 0; padding-right: 0; }
+/* (1b) SUPPRESS the redundant PARENT header (Brad 2026-08-20). Four groups wrap  */
+/* their contact block(s) in a grouping card('', '<Parent Name>', ...) that emits */
+/* its own title AND each inner pcContactBlock() emits a subhead() sub-group      */
+/* header -> the category name rendered TWICE (SAFETY CONSULTANT / STAKING &       */
+/* LAYOUT / EQUIPMENT TRANSPORT & RENTAL / MATERIAL & FUEL VENDORS). Owner / GC /  */
+/* Design Professionals / PF Project Team have NO extra parent wrapper title, so   */
+/* they show ONE header. The `pr-pc-nohead` marker (added to the wrapper for those */
+/* four groups only) HIDES the parent card head (title + num + chevron) so ONLY    */
+/* the inner subhead sub-group header(s) + companies show — matching the           */
+/* single-header pattern of the good groups. The .pr-card + data-pr-section stays  */
+/* intact (editor/save/CRM binding untouched); the Edit button is kept + right-    */
+/* aligned inline. Single-subgroup groups (Safety, Staking) => one header; multi-  */
+/* subgroup groups (Equipment Transport + Rental / Material Vendor(s) + Fuel        */
+/* Delivery) => their two distinct sub-group headers, no parent line.              */
+.pr-pc-section .pr-nested-card-wrap.pr-pc-nohead > .pr-card > .pr-card-head {
+  padding: 0; border-bottom: none; cursor: default; min-height: 0;
+}
+.pr-pc-section .pr-nested-card-wrap.pr-pc-nohead > .pr-card > .pr-card-head:hover { background: transparent; }
+.pr-pc-section .pr-nested-card-wrap.pr-pc-nohead > .pr-card > .pr-card-head > .pr-card-num,
+.pr-pc-section .pr-nested-card-wrap.pr-pc-nohead > .pr-card > .pr-card-head > .pr-card-title,
+.pr-pc-section .pr-nested-card-wrap.pr-pc-nohead > .pr-card > .pr-card-head > .pr-chev { display: none; }
+.pr-pc-section .pr-nested-card-wrap.pr-pc-nohead > .pr-card > .pr-card-head > .pr-edit-btn { margin-left: auto; }
 /* Small ROLE TAG chip shown above each company block. Compact + subtle — Brad   */
 /* will review and may revise the styling.                                       */
 .pr-role-tag {
@@ -18819,14 +18841,18 @@ try {
         // block per Brad's Project Contacts order.)
         var _prevS = _curSection; _curSection = 'safety';
         pcHost.insertAdjacentHTML('beforeend',
-          '<div class="pr-nested-card-wrap">'
+          // pr-pc-nohead: single-subgroup group — hide the redundant parent header
+          // (parent name == the inner subhead "Safety Consultant"), leaving ONE header.
+          '<div class="pr-nested-card-wrap pr-pc-nohead">'
           + card('', 'Safety Consultant', null, pcContactBlock('Safety Consultant', 'safety'), true, 'safety')
           + '</div>');
         _curSection = _prevS;
         // (9) Staking & Layout — siteReadiness key.
         var _prevSr = _curSection; _curSection = 'siteReadiness';
         pcHost.insertAdjacentHTML('beforeend',
-          '<div class="pr-nested-card-wrap">'
+          // pr-pc-nohead: single-subgroup group — hide the redundant parent header
+          // (parent name == the inner subhead "Staking & Layout"), leaving ONE header.
+          '<div class="pr-nested-card-wrap pr-pc-nohead">'
           + card('', 'Staking & Layout', null, pcContactBlock('Staking & Layout', 'siteReadiness'), true, 'siteReadiness')
           + '</div>');
         _curSection = _prevSr;
@@ -18834,7 +18860,10 @@ try {
         // two subhead groups; contiguous in the order).
         var _prevEqc = _curSection; _curSection = 'equipment';
         pcHost.insertAdjacentHTML('beforeend',
-          '<div class="pr-nested-card-wrap">'
+          // pr-pc-nohead: multi-subgroup group — hide the redundant parent header
+          // ("Equipment Transport & Rental"), leaving the TWO distinct sub-group
+          // headers (Equipment Transport, Rental Equipment) from the inner subheads.
+          '<div class="pr-nested-card-wrap pr-pc-nohead">'
           + card('', 'Equipment Transport & Rental', null,
               pcContactBlock('Equipment Transport', 'equipment')
               + pcContactBlock('Rental Equipment', 'equipment'),
@@ -18845,7 +18874,10 @@ try {
         // subhead groups; contiguous in the order).
         var _prevMatc = _curSection; _curSection = 'material';
         pcHost.insertAdjacentHTML('beforeend',
-          '<div class="pr-nested-card-wrap">'
+          // pr-pc-nohead: multi-subgroup group — hide the redundant parent header
+          // ("Material & Fuel Vendors"), leaving the TWO distinct sub-group headers
+          // (Material Vendor(s), Fuel Delivery) from the inner subheads.
+          '<div class="pr-nested-card-wrap pr-pc-nohead">'
           + card('', 'Material & Fuel Vendors', null,
               pcContactBlock('Material Vendor(s)', 'material')
               + pcContactBlock('Fuel Delivery', 'material'),
