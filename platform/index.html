@@ -2321,16 +2321,32 @@ tr.pf-dragging { opacity: 0.45; }
    overflow) per Brad's definitive requirement. Also covers the fieldLinked() rows
    and the Site-Readiness-style live-edit rows, since both emit the identical
    .pr-field structure. */
+/* GROUP-LEVEL grid (Brad 2026-08-20): make each .pr-fields GROUP a 2-column grid so
+   the LABEL column auto-sizes to that group's WIDEST label and every value in the
+   group starts on the SAME vertical line (aligned value column) — instead of each
+   field starting its value right after its own label (ragged). `max-content` = the
+   group's longest label incl. the pencil edit icon; `minmax(0,1fr)` value column with
+   the `0` min lets long values ellipsis-truncate (below). Each .pr-field then adopts
+   these SAME tracks via `subgrid` so its own label+value land in the group columns.
+   Applies to both twoCol groups (.pr-2col-col) and any flat .pr-fields in the card. */
+.pr-card[data-pr-section="general"] > .pr-card-body > .pr-2col > .pr-2col-col.pr-fields,
+.pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 10px;
+}
 .pr-card[data-pr-section="general"] > .pr-card-body > .pr-2col .pr-field,
 .pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields .pr-field {
   display: grid;
-  /* Brad 2026-08-19 (definitive): EVERY General Info field must fit on EXACTLY ONE
-     row — title + data on a single line, NO wrapping, for all fields. Label column
-     sizes to the (nowrap) label's content; the value column is minmax(0, 1fr) — the
-     `0` minimum is REQUIRED so the value cell can shrink below its content width and
-     let text-overflow:ellipsis actually trigger inside the grid cell (an `auto`/1fr
-     min would refuse to shrink and force a wider row / overflow). */
+  /* Brad 2026-08-19 (definitive): EVERY General Info field on EXACTLY ONE row — title
+     + data on a single line, NO wrapping. Brad 2026-08-20: adopt the GROUP's two
+     tracks via `subgrid` so all labels share one auto-sized column and all values
+     ALIGN on the same vertical line across the group. FALLBACK (browsers w/o subgrid):
+     `max-content minmax(0,1fr)` keeps each field one-line + ellipsis (values ragged,
+     but never broken/wrapped) — graceful degradation on the desktop office view. */
   grid-template-columns: max-content minmax(0, 1fr);
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
   align-items: baseline;
   column-gap: 10px;
   row-gap: 0;
@@ -2361,11 +2377,18 @@ tr.pf-dragging { opacity: 0.45; }
   margin-top: 1px;
 }
 /* Narrow screens: fall back to stacked label-above-value so long values are not
-   crushed into a tiny column on a phone (field crew / mobile). */
+   crushed into a tiny column on a phone (field crew / mobile). Collapse the GROUP
+   grid to one column and drop each field OUT of subgrid back to its own 1-col
+   (stacked) grid; the value/label lose nowrap so mobile can wrap freely. */
 @media (max-width: 560px) {
+  .pr-card[data-pr-section="general"] > .pr-card-body > .pr-2col > .pr-2col-col.pr-fields,
+  .pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields {
+    grid-template-columns: 1fr;
+  }
   .pr-card[data-pr-section="general"] > .pr-card-body > .pr-2col .pr-field,
   .pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields .pr-field {
     grid-template-columns: 1fr;
+    grid-column: auto;
   }
   .pr-card[data-pr-section="general"] > .pr-card-body > .pr-2col .pr-field > .pr-field-src,
   .pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields .pr-field > .pr-field-src {
