@@ -19085,10 +19085,20 @@ try {
       // count as "already shown" for this key. Needed because the `general` key is now
       // split across TWO cards (General Info + the relocated Owner & GC card): a general
       // override shown in either card must NOT be re-dumped as an "extra" in the other.
-      var _surfaceExtras = function(cardBody, sectionKey, headLabel, groupToken, extraShownCards){
+      // keyFilter (optional): predicate(label) -> keep. When the section key doubles as
+      // another section's own override bucket (the `general` key backs BOTH the General
+      // Info flat fields AND the Owner/GC contact extras), a filter restricts which
+      // label-keyed overrides may surface here so foreign field-labels (e.g. the General
+      // Info "Project Scope of Work (SOW)" override) can never echo into a Contacts card.
+      // Reserved structured keys (any '__'-prefixed key incl. PF_CRM_KEY) are always skipped.
+      var _surfaceExtras = function(cardBody, sectionKey, headLabel, groupToken, extraShownCards, keyFilter){
         if (!cardBody) return;
         var ov = (_curOverrides && _curOverrides[sectionKey]) || {};
-        var labels = Object.keys(ov).filter(function(k){ return k !== PF_CRM_KEY; });
+        var labels = Object.keys(ov).filter(function(k){
+          if (k === PF_CRM_KEY || String(k).indexOf('__') === 0) return false; // reserved
+          if (keyFilter && !keyFilter(k)) return false; // section-scoped allow-list
+          return true;
+        });
         if (!labels.length) return;
         var ownCard = cardBody.closest('.pr-card');
         var shown = {};
@@ -19126,12 +19136,26 @@ try {
       var ownerBodyEl = _pcNested('Owner');
       var gcBodyEl = _pcNested('General Contractor');
 
-      // General "extras": added Owner Contacts + any manual general fields that don't
-      // map to a rendered row. Surface them in the OWNER card (where the Owner Contact
-      // add-token lives), deduping against BOTH the General Info card AND the GC card so
-      // a field already shown in either is never re-dumped as an Owner extra.
+      // General "extras": ONLY added Owner/GC Contacts (label-keyed overrides matching the
+      // "Owner Contact N - ..." / "GC Contact N - ..." naming) that don't map to a rendered
+      // row. Surface them in the OWNER card (where the Owner Contact add-token lives),
+      // deduping against BOTH the General Info card AND the GC card so a contact already
+      // shown in either is never re-dumped as an Owner extra.
+      // CONTACTS EXCLUSION (Brad 2026-08-20 regression fix, Owner/GC split 0e06ad5): the
+      // `general` override key ALSO backs the General Info flat fields (Project Name, SOW,
+      // etc.). Those field-labels are NOT contacts and must NEVER echo into this Contacts
+      // subsection. The keyFilter below restricts surfaced labels to genuine contact keys
+      // only — so e.g. the General Info "Project Scope of Work (SOW)" manual override stays
+      // in General Info and is no longer dumped as an Owner "Additional Contacts / Fields"
+      // row. Display-only: the underlying override data is untouched and still renders in
+      // General Info via its own field()/ovLookup round-trip. Pre-split, the combined
+      // "Owner & General Contractor" card had this same latent leak; the split's retarget
+      // to the Owner body simply surfaced it — this filter closes it for good. If nothing
+      // genuine remains, _surfaceExtras returns early and the empty header does not render.
       _surfaceExtras(ownerBodyEl || genCard, 'general', 'Additional Contacts / Fields',
-        'Owner Contact', [genCard, gcBodyEl]);
+        'Owner Contact', [genCard, gcBodyEl], function(lbl){
+          return /^(Owner|GC) Contact\b/.test(String(lbl));
+        });
 
       // Design Professionals nested card ("design_professionals" key — added firm
       // contacts / manual fields). Now inside Project Contacts; its querySelector still
