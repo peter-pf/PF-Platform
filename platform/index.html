@@ -3242,6 +3242,11 @@ tr.pf-dragging { opacity: 0.45; }
 .pr-pc-company-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .pr-pc-company-head .pr-pc-company-name { margin: 0; }
 .pr-pc-company-head .pr-pc-addbtn-head { margin: 0 0 0 auto; }
+/* "+ Add company" (Brad 2026-08-20): read-view entry for an EMPTY sub-group. When it   */
+/* renders alongside "+ Add contact" both sit together on the right (the FIRST header    */
+/* button takes the auto-margin; siblings keep the flex gap). Same look as "+ Add        */
+/* contact" — it already carries .pr-add-contact-btn.                                    */
+.pr-pc-company-head .pr-pc-addbtn-head ~ .pr-pc-addbtn-head { margin: 0; }
 /* (2) Horizontal contact rows. A lightweight table-like flex layout: header row */
 /* + one row per contact. Compact so more fits on screen; Notes wraps.           */
 .pr-crow-table { width: 100%; margin: 2px 0 0; }
@@ -21053,9 +21058,13 @@ try {
           });
         });
       }
-      // Neither a __crm selection nor any legacy seed -> nothing to render here (unless an
-      // office user wants to Add). Read-only + no company + no rows => clean empty.
-      if (!hasCrmSel && !seed) { host.innerHTML = ''; return; }
+      // Neither a __crm selection nor any legacy seed -> nothing to render here for a
+      // READ-ONLY user (clean empty, no wall of blanks). But an OFFICE user (canEdit)
+      // must still get the company header + "+ Add company" / "+ Add contact" affordance
+      // so an EMPTY sub-group (e.g. "Fuel Delivery") is reachable from the read view —
+      // otherwise the group would show nothing at all and there'd be no way to populate
+      // it (Brad 2026-08-20). Fall through when editable; only bail when read-only.
+      if (!hasCrmSel && !seed && !_rowEditable) { host.innerHTML = ''; return; }
 
       // Build each .pr-crow row (STATIC display cells + right-side [✎ Edit] + red [✕]).
       // A legacy row carries data-crm-legacy="1" + its seed values so Edit can migrate it
@@ -21151,10 +21160,25 @@ try {
           + 'data-crm-company="' + esc2(company || '') + '" '
           + 'onclick="window.pfPcAddContact(this)">+ Add contact</button>'
         : '';
+      // "+ Add company" — Brad 2026-08-20: read-view entry point for an EMPTY sub-group
+      // (no company resolved yet, e.g. "Fuel Delivery"). When a company already exists,
+      // "+ Add contact" is the right control, so this button only shows while company is
+      // blank. Office-gated by _rowEditable (same canEdit() admin/partner/business_dev
+      // gate as "+ Add contact"; field_ops / read-only never see it, and the server also
+      // 403s the underlying writes). It reuses the VETTED read-view add path: prompt for a
+      // name (as pfCrmAddCompany does), then open the existing pfPcAddContact form seeded
+      // with that company (which POSTs /api/contacts add + assigns to this group's __crm —
+      // e.g. material.__crm — on Save). A company becomes real once it has >=1 contact
+      // (OPTION 1: no company table), so add-company => open add-contact-for-that-company.
+      var addCoBtn = (_rowEditable && !company)
+        ? '<button type="button" class="pr-add-contact-btn pr-pc-addbtn pr-pc-addbtn-head pr-pc-addco-head" '
+          + 'data-crm-cards="' + esc2(_prefix) + '" data-crm-cards-key="' + esc2(_skey) + '" '
+          + 'onclick="window.pfPcAddCompany(this)">+ Add company</button>'
+        : '';
       // Company header row: company name on the LEFT, "+ Add contact" on the RIGHT
       // (margin-left:auto). This row sits ABOVE the .pr-crow table whose rows each carry
       // their own [✎ Edit] + red [✕] — so Add is visually just above Edit/✕, per Brad.
-      var companyHeadRow = '<div class="pr-pc-company-head">' + companyHtml + addBtn + '</div>';
+      var companyHeadRow = '<div class="pr-pc-company-head">' + companyHtml + addCoBtn + addBtn + '</div>';
       // When the uniform card renders (rows OR office affordances), HIDE the sibling
       // legacy static horizContactBlock table so contacts do not appear twice. The
       // hidden .pr-field editor grid (.pr-pc-cofields / .pr-ccards) is already display:none
@@ -21479,6 +21503,44 @@ try {
       if (!form) return;
       if (form._addBtn) form._addBtn.style.display = '';
       form.remove();
+    };
+    // "+ Add company" for a Project Contacts sub-group from the READ VIEW (Brad 2026-08-20).
+    // Fills the gap where an EMPTY sub-group (e.g. "Fuel Delivery" under material) showed no
+    // affordance at all. Mirrors the section-editor's pfCrmAddCompany UX (prompt for a name)
+    // but persists through the VETTED read-view add path: it seeds the company onto the
+    // existing "+ Add contact" button and opens pfPcAddContact — so the first contact's Save
+    // mints the directory row (POST /api/contacts action:'add') AND assigns it to THIS
+    // project's __crm[group] under the sub-group's key (e.g. material) via
+    // /api/project-override. A company becomes real once it has >=1 contact (OPTION 1 — no
+    // company table), exactly as pfCrmAddCompany documents. RBAC: office-only, same canEdit()
+    // gate as "+ Add contact"; the server also 403s the underlying writes for non-crm roles.
+    window.pfPcAddCompany = function(btn){
+      if (!btn) return;
+      if (typeof canEdit === 'function' && !canEdit()) return; // office-only (defense in depth)
+      var name = (window.prompt('New company name for this group:') || '').trim();
+      if (!name) return;
+      var prefix = btn.getAttribute('data-crm-cards') || '';
+      var skey = btn.getAttribute('data-crm-cards-key') || 'design_professionals';
+      var wrap = btn.closest ? btn.closest('.pr-pc-company') : null;
+      if (!prefix || !wrap) return;
+      // Reuse the existing read-view add-contact form, seeded with the new company. Prefer
+      // the group's own "+ Add contact" button (carries the correct data-* + wiring); if it
+      // is absent (empty group may render only this button), synthesize an equivalent one.
+      var addBtn = wrap.querySelector('.pr-pc-addbtn:not(.pr-pc-addco-head)');
+      if (addBtn) {
+        addBtn.setAttribute('data-crm-company', name);
+      } else {
+        addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'pr-add-contact-btn pr-pc-addbtn pr-pc-addbtn-head';
+        addBtn.setAttribute('data-crm-cards', prefix);
+        addBtn.setAttribute('data-crm-cards-key', skey);
+        addBtn.setAttribute('data-crm-company', name);
+        addBtn.setAttribute('onclick', 'window.pfPcAddContact(this)');
+        var head = btn.parentNode; if (head) head.appendChild(addBtn);
+      }
+      btn.style.display = 'none'; // hide "+ Add company" while the add-contact form is open
+      window.pfPcAddContact(addBtn);
     };
     window.pfPcAddContactSave = function(btn){
       var form = btn.closest ? btn.closest('.pr-crm-addform') : null;
