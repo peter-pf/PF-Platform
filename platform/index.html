@@ -35684,6 +35684,13 @@ try {
   //   notes, reqTrailer, reqHome } } per-ITEM corrections (CHANGE B). Merged over the
   // seed item BEFORE render so a corrected value shows everywhere the item appears.
   var fieldOverrides = {};
+  // imageMap (CHANGE D): { "<itemId>": ["partPhoto","locationPhoto"] } — which detail
+  //   image slots have a stored photo. Bytes are fetched on demand via
+  //   /api/inventory?img=<itemId>&slot=<slot> (never bulk-loaded).
+  var imageMap = {};
+  // expanded (CHANGE D): { "<itemId>": true } => that row's detail pane is open.
+  //   Rows expand independently; state survives a re-render.
+  var expanded = {};
   var canEdit = false;          // office (admin/partner/business_dev)?
   var editMode = false;         // CHANGE B: full-row edit toggle (office-only). OFF by default.
   var collapsed = {};           // CHANGE C: { "<locationId>": true } => that location collapsed.
@@ -35697,9 +35704,13 @@ try {
 
   function invKey(locId, itemId) { return locId + '::' + itemId; }
 
-  // Editable per-item text/number fields for CHANGE B (must match the server allowlist).
-  var TEXT_FIELDS = ['description', 'manufacturer', 'mfrPart', 'altSources', 'notes'];
+  // Editable per-item text/number fields for CHANGE B + CHANGE D (must match the
+  // server allowlist in functions/api/inventory.js). purchaseLink/orderContact are
+  // surfaced only in the CHANGE D detail pane (not the main table row).
+  var TEXT_FIELDS = ['description', 'manufacturer', 'mfrPart', 'altSources', 'notes',
+                     'purchaseLink', 'orderContact'];
   var NUM_FIELDS  = ['reqTrailer', 'reqHome'];
+  var IMG_SLOTS   = ['partPhoto', 'locationPhoto']; // CHANGE D detail image slots.
 
   // Return an item MERGED with its per-item field override (CHANGE B). The seed item
   // is never mutated; a shallow copy carries the office's corrections.
@@ -35819,10 +35830,17 @@ try {
             var qv = liveQty(loc.id, it.id);
             // Which per-location required field this location edits (CHANGE B).
             var reqField = (loc.type === 'farm') ? 'reqHome' : 'reqTrailer';
-            h += '<tr' + (low ? ' class="inv-low"' : '') + ' data-item="' + E(it.id) + '">';
+            var isOpenRow = !!expanded[it.id]; // CHANGE D
+            // CHANGE D: a caret toggle in the Product cell expands the detail pane.
+            var caret = '<button type="button" class="inv-caret'
+              + (isOpenRow ? ' inv-caret-open' : '') + '" data-detail-toggle="' + E(it.id) + '" '
+              + 'data-loc="' + E(loc.id) + '" aria-expanded="' + (isOpenRow ? 'true' : 'false') + '" '
+              + 'aria-label="Toggle item details">&#9656;</button>';
+            h += '<tr' + (low ? ' class="inv-low' : ' class="') + (isOpenRow ? ' inv-row-open' : '')
+               + '" data-item="' + E(it.id) + '" data-loc="' + E(loc.id) + '">';
             if (editMode) {
               // CHANGE B: full-row edit. Text fields = text inputs; Req = number input.
-              h += '<td class="inv-desc">'
+              h += '<td class="inv-desc">' + caret
                  + fieldInput('description', it, 'inv-fin')
                  + (low ? ' <span class="inv-lowtag">LOW</span>' : '') + '</td>';
               h += '<td>' + fieldInput('manufacturer', it, 'inv-fin') + '</td>';
@@ -35839,7 +35857,7 @@ try {
               h += '<td>' + fieldInput('altSources', it, 'inv-fin') + '</td>';
               h += '<td class="inv-notes">' + fieldInput('notes', it, 'inv-fin') + '</td>';
             } else {
-              h += '<td class="inv-desc">' + E(it.description)
+              h += '<td class="inv-desc">' + caret + E(it.description)
                  + (low ? ' <span class="inv-lowtag">LOW</span>' : '') + '</td>';
               h += '<td>' + E(it.manufacturer || '—') + '</td>';
               h += '<td>' + E(it.mfrPart || '—') + '</td>';
@@ -35857,6 +35875,12 @@ try {
               h += '<td class="inv-notes">' + E(it.notes || '') + '</td>';
             }
             h += '</tr>';
+            // CHANGE D: the expandable DETAIL PANE row (full-width). Rendered only
+            // when this row is expanded so the table stays light when collapsed.
+            if (isOpenRow) {
+              h += '<tr class="inv-detail-row" data-detail-item="' + E(it.id) + '">'
+                 + '<td colspan="7" class="inv-detail-cell">' + detailPaneHTML(it) + '</td></tr>';
+            }
           });
           h += '</tbody></table>';
         }
@@ -35869,6 +35893,8 @@ try {
 
     host.innerHTML = h;
     wireLocToggles(host);           // CHANGE C: always (view-only can collapse too).
+    wireDetailToggles(host);        // CHANGE D: row caret -> expand detail pane (all roles).
+    wireDetailPanes(host);          // CHANGE D: detail-pane field + image editing (office-only inside).
     if (canEdit) {
       wireEditToggle(host);         // CHANGE B: the Edit-rows button.
       wireEdits(host);              // Actual Qty save-on-change.
@@ -35884,6 +35910,118 @@ try {
       + 'value="' + E(v == null ? '' : v) + '" '
       + 'data-item="' + E(item.id) + '" data-field="' + E(field) + '" '
       + 'aria-label="' + E(field) + '">';
+  }
+
+  // CHANGE D: is a string an http(s) URL we can safely render as a clickable link?
+  function isHttpUrl(v) {
+    return typeof v === 'string' && /^https?:\/\/[^\s]+$/i.test(v.trim());
+  }
+
+  // CHANGE D: build the src for a stored image slot, cache-busted by updatedAt so a
+  // freshly-uploaded photo isn't served stale from the 5-min cache.
+  function imgSrc(itemId, slot) {
+    var bust = (imageMap[itemId] && imageMap[itemId].bust) ? ('&v=' + encodeURIComponent(imageMap[itemId].bust)) : '';
+    return '/api/inventory?img=' + encodeURIComponent(itemId) + '&slot=' + encodeURIComponent(slot) + bust;
+  }
+  // Does this item currently have a stored image in the given slot?
+  function hasImage(itemId, slot) {
+    var rec = imageMap[itemId];
+    if (!rec) return false;
+    var slots = Array.isArray(rec) ? rec : rec.slots;
+    return !!(slots && slots.indexOf(slot) >= 0);
+  }
+
+  // CHANGE D: render ONE image slot (part or storage location) inside the detail pane.
+  // Shows the stored photo (or an empty "no photo" affordance) plus office upload /
+  // replace / remove controls. field_ops sees the photo but no controls (view only).
+  function imageSlotHTML(item, slot, label) {
+    var has = hasImage(item.id, slot);
+    var h = '<div class="inv-img-slot" data-img-slot="' + E(slot) + '" data-item="' + E(item.id) + '">';
+    h += '<div class="inv-img-label">' + E(label) + '</div>';
+    h += '<div class="inv-img-frame">';
+    if (has) {
+      h += '<img class="inv-img" src="' + E(imgSrc(item.id, slot)) + '" alt="' + E(label) + '" '
+         + 'loading="lazy">';
+    } else {
+      h += '<div class="inv-img-empty">No photo yet</div>';
+    }
+    h += '</div>';
+    if (canEdit) {
+      h += '<div class="inv-img-ctrls">';
+      h += '<label class="inv-img-btn"><input type="file" accept="image/*" class="inv-img-file" '
+         + 'data-item="' + E(item.id) + '" data-slot="' + E(slot) + '" style="display:none">'
+         + (has ? 'Replace' : 'Upload') + '</label>';
+      if (has) {
+        h += '<button type="button" class="inv-img-btn inv-img-rm" data-item="' + E(item.id) + '" '
+           + 'data-slot="' + E(slot) + '">Remove</button>';
+      }
+      h += '</div>';
+    }
+    h += '</div>';
+    return h;
+  }
+
+  // CHANGE D: build the full detail pane for an item. Two image slots + a grid of
+  // editable metadata fields (manufacturer, part#, purchase link, order contact,
+  // notes). Office edits inline (save-on-change, setFields); everyone else views.
+  function detailPaneHTML(it) {
+    var ov = mergedItem(it); // seed <- override, so the pane shows corrected values.
+    var h = '<div class="inv-detail">';
+
+    // --- images row ---
+    h += '<div class="inv-img-row">';
+    h += imageSlotHTML(it, 'partPhoto', 'Part Photo');
+    h += imageSlotHTML(it, 'locationPhoto', 'Storage Location');
+    h += '</div>';
+
+    // --- metadata fields ---
+    h += '<div class="inv-detail-fields">';
+    h += detailField('Manufacturer', 'manufacturer', ov, 'text');
+    h += detailField('Part Number', 'mfrPart', ov, 'text');
+    h += detailField('Link to Purchase', 'purchaseLink', ov, 'url');
+    h += detailField('Company to Call to Order', 'orderContact', ov, 'text');
+    h += detailField('Alt Sources', 'altSources', ov, 'text');
+    h += detailField('Notes', 'notes', ov, 'textarea');
+    h += '</div>';
+
+    h += '<div class="inv-detail-msg" data-detail-msg="' + E(it.id) + '"></div>';
+    h += '</div>';
+    return h;
+  }
+
+  // CHANGE D: one labelled detail field. Office => editable input/textarea
+  // (save-on-change via the detail-pane wiring). Non-office => read-only value
+  // (purchaseLink rendered as a clickable link when it's an http(s) URL).
+  function detailField(label, field, item, kind) {
+    var v = item[field];
+    var display = (v == null ? '' : String(v));
+    var h = '<div class="inv-df' + (kind === 'textarea' ? ' inv-df-wide' : '') + '">';
+    h += '<div class="inv-df-label">' + E(label) + '</div>';
+    if (canEdit) {
+      if (kind === 'textarea') {
+        h += '<textarea class="inv-df-in inv-detail-fin" rows="2" '
+           + 'data-item="' + E(item.id) + '" data-field="' + E(field) + '" '
+           + 'aria-label="' + E(label) + '">' + E(display) + '</textarea>';
+      } else {
+        h += '<input class="inv-df-in inv-detail-fin" type="' + (kind === 'url' ? 'url' : 'text') + '" '
+           + 'value="' + E(display) + '" '
+           + (kind === 'url' ? 'placeholder="https://..." ' : '')
+           + 'data-item="' + E(item.id) + '" data-field="' + E(field) + '" '
+           + 'aria-label="' + E(label) + '">';
+      }
+      // For a purchase link, also show a "go" affordance beneath when it's a URL.
+      if (kind === 'url' && isHttpUrl(display)) {
+        h += '<a class="inv-df-link" href="' + E(display) + '" target="_blank" rel="noopener noreferrer">Open link &#8599;</a>';
+      }
+    } else {
+      if (kind === 'url' && isHttpUrl(display)) {
+        h += '<a class="inv-df-val inv-df-link" href="' + E(display) + '" target="_blank" rel="noopener noreferrer">' + E(display) + '</a>';
+      } else {
+        h += '<div class="inv-df-val">' + (display ? E(display) : '<span class="inv-df-empty">—</span>') + '</div>';
+      }
+    }
+    h += '</div>';
+    return h;
   }
 
   // Save-on-change (fail-closed): on blur/change of an Actual Qty input, POST the
@@ -36070,6 +36208,194 @@ try {
     });
   }
 
+  // ==== CHANGE D: expandable item DETAIL PANE ================================
+
+  // Small message helper scoped to a single detail pane (falls back to the global
+  // inv message bar if the pane isn't mounted).
+  function detailMsg(host, itemId, text, ok) {
+    var el = host.querySelector('[data-detail-msg="' + cssEsc(itemId) + '"]');
+    if (el) { el.textContent = text || ''; el.className = 'inv-detail-msg ' + (ok ? 'inv-ok' : (text ? 'inv-err' : '')); }
+    else { msg(text, ok); }
+  }
+  function cssEsc(v) { return (window.CSS && CSS.escape) ? CSS.escape(v) : v; }
+
+  // Toggle a row's detail pane. Works for EVERY role (view). State lives in
+  // `expanded` so it survives a re-render (e.g. toggling Edit rows). We re-render
+  // the whole module so the pane row is inserted/removed in the correct table.
+  function wireDetailToggles(host) {
+    var btns = host.querySelectorAll('.inv-caret[data-detail-toggle]');
+    btns.forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var itemId = btn.getAttribute('data-detail-toggle');
+        if (!itemId) return;
+        if (expanded[itemId]) { delete expanded[itemId]; } else { expanded[itemId] = true; }
+        render(); // preserves collapsed[] + overrides + fieldOverrides + expanded + imageMap
+      });
+    });
+  }
+
+  // Wire the detail pane's editable metadata fields + image upload/remove controls.
+  // ALL writes are office-only; the server ALSO gates POST to 'financials'. field_ops
+  // sees the pane read-only (no inputs / no controls rendered), so there is nothing to
+  // wire for them.
+  function wireDetailPanes(host) {
+    if (!canEdit) return;
+
+    // -- editable text/url/notes fields (reuse the setFields path) --
+    var fins = host.querySelectorAll('.inv-detail-fin');
+    fins.forEach(function (inp) {
+      inp.addEventListener('change', function () {
+        var itemId = inp.getAttribute('data-item');
+        var field = inp.getAttribute('data-field');
+        if (!itemId || !field) return;
+        var raw = String(inp.value == null ? '' : inp.value).trim();
+        // TEXT/URL: '' = deliberately blank -> persist "" (mirrors CHANGE B semantics).
+        var val = raw; // always a string here (no NUM fields in the detail pane)
+
+        // Optimistic-first local merge so a re-render keeps the value.
+        var prevRec = fieldOverrides[itemId];
+        var hadField = prevRec && Object.prototype.hasOwnProperty.call(prevRec, field);
+        var prevVal = hadField ? prevRec[field] : undefined;
+        (function applyLocal() {
+          var rec = fieldOverrides[itemId] ? Object.assign({}, fieldOverrides[itemId]) : {};
+          rec[field] = val; // store by key presence (incl. "")
+          fieldOverrides[itemId] = rec;
+        })();
+
+        pendingSaves++;
+        inp.disabled = true;
+        var payloadFields = {}; payloadFields[field] = val;
+        api('/api/inventory', { method: 'POST',
+          body: JSON.stringify({ action: 'setFields', item: itemId, fields: payloadFields }) })
+          .then(function (res) {
+            pendingSaves--;
+            inp.disabled = false;
+            if (!res.ok || !(res.body && res.body.ok)) {
+              revertLocalField(itemId, field, hadField, prevVal, host);
+              detailMsg(host, itemId, (res.body && res.body.message) || 'Save failed. Not saved.', false);
+              return;
+            }
+            detailMsg(host, itemId, 'Saved.', true);
+            setTimeout(function () { detailMsg(host, itemId, ''); }, 1500);
+          })
+          .catch(function () {
+            pendingSaves--;
+            inp.disabled = false;
+            revertLocalField(itemId, field, hadField, prevVal, host);
+            detailMsg(host, itemId, 'Save failed (network). Not saved.', false);
+          });
+      });
+    });
+
+    // -- image UPLOAD / REPLACE (file input -> downscale -> setImage) --
+    var files = host.querySelectorAll('.inv-img-file');
+    files.forEach(function (fi) {
+      fi.addEventListener('change', function () {
+        var itemId = fi.getAttribute('data-item');
+        var slot = fi.getAttribute('data-slot');
+        var file = fi.files && fi.files[0];
+        if (!itemId || !slot || !file) return;
+        if (!/^image\//.test(file.type)) {
+          detailMsg(host, itemId, 'Please choose an image file.', false);
+          fi.value = ''; return;
+        }
+        detailMsg(host, itemId, 'Processing image…', true);
+        downscaleImage(file, 1280, 0.82).then(function (dataUrl) {
+          if (!dataUrl) { detailMsg(host, itemId, 'Could not read that image.', false); return; }
+          // Guard the length client-side too (server also caps -> 413).
+          if (dataUrl.length > 1150000) {
+            detailMsg(host, itemId, 'Image is too large even after resizing. Try a smaller photo.', false);
+            return;
+          }
+          return api('/api/inventory', { method: 'POST',
+            body: JSON.stringify({ action: 'setImage', item: itemId, slot: slot, dataUrl: dataUrl }) })
+            .then(function (res) {
+              if (!res.ok || !(res.body && res.body.ok)) {
+                detailMsg(host, itemId, (res.body && res.body.message) || 'Upload failed. Not saved.', false);
+                return;
+              }
+              markImage(itemId, slot, true, res.body && res.body.updatedAt);
+              detailMsg(host, itemId, 'Photo saved.', true);
+              render();
+            });
+        }).catch(function () {
+          detailMsg(host, itemId, 'Upload failed. Not saved.', false);
+        });
+      });
+    });
+
+    // -- image REMOVE (setImage with dataUrl:null) --
+    var rms = host.querySelectorAll('.inv-img-rm');
+    rms.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var itemId = btn.getAttribute('data-item');
+        var slot = btn.getAttribute('data-slot');
+        if (!itemId || !slot) return;
+        btn.disabled = true;
+        api('/api/inventory', { method: 'POST',
+          body: JSON.stringify({ action: 'setImage', item: itemId, slot: slot, dataUrl: null }) })
+          .then(function (res) {
+            btn.disabled = false;
+            if (!res.ok || !(res.body && res.body.ok)) {
+              detailMsg(host, itemId, (res.body && res.body.message) || 'Remove failed.', false);
+              return;
+            }
+            markImage(itemId, slot, false, res.body && res.body.updatedAt);
+            detailMsg(host, itemId, 'Photo removed.', true);
+            render();
+          })
+          .catch(function () {
+            btn.disabled = false;
+            detailMsg(host, itemId, 'Remove failed (network).', false);
+          });
+      });
+    });
+  }
+
+  // Update the local imageMap presence + cache-bust stamp after an image write, so
+  // the immediate re-render shows/hides the photo and busts the <img> cache.
+  function markImage(itemId, slot, present, bust) {
+    var rec = imageMap[itemId];
+    var slots = (rec && Array.isArray(rec.slots)) ? rec.slots.slice() : (Array.isArray(rec) ? rec.slice() : []);
+    var i = slots.indexOf(slot);
+    if (present && i < 0) slots.push(slot);
+    if (!present && i >= 0) slots.splice(i, 1);
+    if (slots.length) { imageMap[itemId] = { slots: slots, bust: bust || String(Date.now()) }; }
+    else { delete imageMap[itemId]; }
+  }
+
+  // Downscale + re-encode an image File to a JPEG data-URL (max longest edge = maxPx).
+  // Returns a Promise<dataUrl|null>. Keeps uploads small so they fit the KV blob cap.
+  function downscaleImage(file, maxPx, quality) {
+    return new Promise(function (resolve) {
+      try {
+        var url = URL.createObjectURL(file);
+        var img = new Image();
+        img.onload = function () {
+          try {
+            var w = img.naturalWidth || img.width, ht = img.naturalHeight || img.height;
+            if (!w || !ht) { URL.revokeObjectURL(url); resolve(null); return; }
+            var scale = Math.min(1, maxPx / Math.max(w, ht));
+            var cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(ht * scale));
+            var canvas = document.createElement('canvas');
+            canvas.width = cw; canvas.height = ch;
+            var ctx = canvas.getContext('2d');
+            // white matte so a transparent PNG doesn't turn black in JPEG.
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, cw, ch);
+            ctx.drawImage(img, 0, 0, cw, ch);
+            var out = canvas.toDataURL('image/jpeg', quality || 0.82);
+            URL.revokeObjectURL(url);
+            resolve(out && out.indexOf('data:image/') === 0 ? out : null);
+          } catch (e) { try { URL.revokeObjectURL(url); } catch (e2) {} resolve(null); }
+        };
+        img.onerror = function () { try { URL.revokeObjectURL(url); } catch (e) {} resolve(null); };
+        img.src = url;
+      } catch (e) { resolve(null); }
+    });
+  }
+
   // Revert an optimistic field merge back to its prior local value after a failed save
   // (fail-closed: the on-screen value must reflect what actually persisted). Also fixes
   // the visible input if the row is still rendered, and re-checks low-stock for Req.
@@ -36130,6 +36456,7 @@ try {
     api('/api/inventory').then(function (res) {
       overrides = {};
       fieldOverrides = {};
+      imageMap = {};
       if (res.ok && res.body && res.body.qty && typeof res.body.qty === 'object') {
         Object.keys(res.body.qty).forEach(function (k) {
           var rec = res.body.qty[k];
@@ -36148,10 +36475,22 @@ try {
           if (Object.keys(clean).length) fieldOverrides[itemId] = clean;
         });
       }
+      // CHANGE D: image presence map { "<itemId>": ["partPhoto",...] }. Stored locally
+      // as { slots:[...], bust:<meta.updated> } so <img> cache-busts on reload.
+      if (res.ok && res.body && res.body.images && typeof res.body.images === 'object') {
+        var bust = (res.body.meta && res.body.meta.updated) ? String(res.body.meta.updated) : String(Date.now());
+        Object.keys(res.body.images).forEach(function (itemId) {
+          var slots = res.body.images[itemId];
+          if (Array.isArray(slots) && slots.length) {
+            imageMap[itemId] = { slots: slots.filter(function (s) { return IMG_SLOTS.indexOf(s) >= 0; }), bust: bust };
+          }
+        });
+      }
       render();
     }).catch(function () {
       overrides = {};
       fieldOverrides = {};
+      imageMap = {};
       render();
     });
   }
@@ -36243,6 +36582,51 @@ try {
   background: rgba(210,153,34,.18); border-radius: 8px; padding: 0 6px; margin-left: 6px; vertical-align: middle; }
 #mod-inventory .inv-empty { border: 1px dashed var(--border,#C8D5DC); border-radius: 8px; padding: 22px 16px;
   text-align: center; color: var(--text-2,#5A6370); font-size: 13px; }
+
+/* CHANGE D: expandable item detail pane (dense per Brad's minimize-scroll rule). */
+#mod-inventory .inv-caret { border: 0; background: transparent; cursor: pointer; padding: 0 4px 0 0;
+  font-size: 10px; line-height: 1; color: var(--accent,#006DB0); vertical-align: middle;
+  transition: transform .12s ease; display: inline-block; }
+#mod-inventory .inv-caret:hover { color: var(--accent-dark,#005A91); }
+#mod-inventory .inv-caret.inv-caret-open { transform: rotate(90deg); }
+#mod-inventory tr.inv-row-open > td { background: var(--accent-light,#E0F0FF); }
+#mod-inventory tr.inv-detail-row > td { padding: 0; background: #F7FAFD;
+  border-bottom: 2px solid var(--accent,#006DB0); }
+#mod-inventory .inv-detail { padding: 10px 12px 12px; }
+#mod-inventory .inv-img-row { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 10px; }
+#mod-inventory .inv-img-slot { flex: 0 0 auto; width: 190px; }
+#mod-inventory .inv-img-label { font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--text-2,#5A6370); margin-bottom: 4px; }
+#mod-inventory .inv-img-frame { width: 190px; height: 130px; border: 1px solid var(--border,#C8D5DC);
+  border-radius: 6px; background: #fff; overflow: hidden; display: flex; align-items: center;
+  justify-content: center; }
+#mod-inventory .inv-img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+#mod-inventory .inv-img-empty { font-size: 11px; color: var(--text-2,#5A6370); font-style: italic; }
+#mod-inventory .inv-img-ctrls { display: flex; gap: 6px; margin-top: 5px; }
+#mod-inventory .inv-img-btn { font-size: 11px; font-weight: 600; cursor: pointer; padding: 3px 9px;
+  border: 1px solid var(--border,#C8D5DC); border-radius: 5px; background: #fff; color: var(--text-0,#000); }
+#mod-inventory .inv-img-btn:hover { background: var(--accent-light,#E0F0FF); }
+#mod-inventory .inv-img-rm { color: #cf222e; border-color: #f0c0c0; }
+#mod-inventory .inv-img-rm:hover { background: #fdeaea; }
+#mod-inventory .inv-detail-fields { display: grid; grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 8px 16px; }
+#mod-inventory .inv-df.inv-df-wide { grid-column: 1 / -1; }
+#mod-inventory .inv-df-label { font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--text-2,#5A6370); margin-bottom: 2px; }
+#mod-inventory .inv-df-in { width: 100%; box-sizing: border-box; font-size: 12.5px; color: var(--text-0,#000);
+  border: 1px solid var(--border,#C8D5DC); border-radius: 5px; padding: 4px 7px; background: #fff; }
+#mod-inventory textarea.inv-df-in { resize: vertical; min-height: 34px; font-family: inherit; }
+#mod-inventory .inv-df-in:disabled { opacity: .5; }
+#mod-inventory .inv-df-val { font-size: 12.5px; color: var(--text-0,#000); word-break: break-word;
+  padding: 2px 0; min-height: 18px; }
+#mod-inventory .inv-df-empty { color: var(--text-2,#5A6370); }
+#mod-inventory .inv-df-link { font-size: 12px; color: var(--accent,#006DB0); text-decoration: none;
+  word-break: break-all; }
+#mod-inventory .inv-df-link:hover { text-decoration: underline; }
+#mod-inventory a.inv-df-link { display: inline-block; margin-top: 2px; }
+#mod-inventory .inv-detail-msg { font-size: 11px; margin-top: 6px; min-height: 13px; }
+#mod-inventory .inv-detail-msg.inv-ok { color: #1a7f37; }
+#mod-inventory .inv-detail-msg.inv-err { color: #cf222e; }
 </style>
 
 <script>

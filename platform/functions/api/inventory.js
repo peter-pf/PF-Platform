@@ -60,10 +60,39 @@ const MAX_KEY = 200;                // composite key length cap
 const MAX_QTY_VALUE = 1e9;          // sane upper bound on a quantity
 const MAX_FIELD_LEN = 2000;         // per text-field value length cap
 
-// Editable per-item text fields (CHANGE B). "reqTrailer"/"reqHome" are numeric and
-// handled separately below. Anything NOT in these allowlists is rejected.
-const TEXT_FIELDS = ['description', 'manufacturer', 'mfrPart', 'altSources', 'notes'];
+// Editable per-item text fields (CHANGE B + CHANGE D). "reqTrailer"/"reqHome" are
+// numeric and handled separately below. Anything NOT in these allowlists is rejected.
+//   CHANGE D (2026-08-22, Derek's expandable item detail pane):
+//     purchaseLink -- URL to buy the part (rendered as a clickable link when set).
+//     orderContact -- company/phone/name to call to place an order (free text).
+//   These join the existing per-item overrides so the detail pane's new fields
+//   persist through the SAME setFields path (no new write mechanism). URL/text are
+//   still length-capped + angle-stripped server-side; the UI escapes on render and
+//   only treats an http(s) value as a navigable link.
+const TEXT_FIELDS = ['description', 'manufacturer', 'mfrPart', 'altSources', 'notes',
+                     'purchaseLink', 'orderContact'];
 const NUM_FIELDS  = ['reqTrailer', 'reqHome'];
+
+// CHANGE D -- item DETAIL IMAGES (part photo + storage-location photo).
+// Two image slots per item, stored SEPARATELY from the field-override map so the
+// (small) 32KB field body cap is never bloated by image bytes. Each slot lives in
+// its OWN KV entry keyed `inventory_img_v1:<itemId>:<slot>` in the SAME PF_SCHEDULE
+// binding. We store a data-URL string (small, client-downscaled JPEG/PNG/WebP) so a
+// single GET can hand it straight to an <img src>. KV value ceiling is 25MB; we cap
+// FAR below that (~900KB post-base64) so the store stays cheap + fast, and require
+// the client to downscale before upload. This is the reuse-existing-KV path -- the
+// two SharePoint upload endpoints (field-upload/project-photos) are PROJECT-scoped
+// (resolve a project folder by number); inventory items are NOT project-scoped, so
+// a per-item KV blob is the correct, existing-infrastructure home for these.
+const IMG_SLOTS = ['partPhoto', 'locationPhoto'];
+const IMG_KEY = (itemId, slot) => `inventory_img_v1:${itemId}:${slot}`;
+// Max stored data-URL length. base64 ~= 4/3 of raw bytes; ~1.2MB string ~= 900KB
+// image. Client downscales to <= ~1280px so a photo lands well under this.
+const MAX_IMG_DATAURL_LEN = 1200000;
+// Accept only image data-URLs the browser can render inline (no SVG => no script).
+const IMG_DATAURL_RE = /^data:image\/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/;
+// Larger body cap for the image action ONLY (the field/qty actions keep 32KB).
+const MAX_IMG_BODY_BYTES = 1400000;
 
 const JSON_HEADERS = {
   'Content-Type': 'application/json',
@@ -116,19 +145,100 @@ function who(session) {
   return (session && (session.name || session.uid)) ? s(session.name || session.uid) : 'unknown';
 }
 
-// ---- GET: read the whole override map (loaded alongside the seed feed) -------
-// READ is everyone-viewable ('general'). Returns both qty + fields overrides.
+// CHANGE D helpers -- a validated itemId (used as a KV key segment) and slot name.
+function cleanItemId(v) {
+  const id = s(v, MAX_KEY);
+  if (!id || isBadKey(id)) return '';
+  // itemId keys a KV entry name; keep it to a safe, bounded charset (the seed ids
+  // are slug+index like 'drill-6', 'mast-1'). Reject anything with ':' (our KV key
+  // delimiter) or whitespace so a client can never collide/inject a foreign key.
+  if (!/^[A-Za-z0-9._-]{1,120}$/.test(id)) return '';
+  return id;
+}
+function cleanSlot(v) {
+  const slot = String(v == null ? '' : v);
+  return IMG_SLOTS.indexOf(slot) >= 0 ? slot : '';
+}
+
+// The set of image slots present for a given itemId (fast metadata list, no bytes).
+// One KV list() call scoped to this item's image prefix. Returns e.g. ['partPhoto'].
+async function imageSlotsForItem(env, itemId) {
+  const out = [];
+  try {
+    const listed = await env.PF_SCHEDULE.list({ prefix: `inventory_img_v1:${itemId}:` });
+    (listed && Array.isArray(listed.keys) ? listed.keys : []).forEach((k) => {
+      const slot = k && k.name ? k.name.split(':').pop() : '';
+      if (IMG_SLOTS.indexOf(slot) >= 0) out.push(slot);
+    });
+  } catch { /* fail closed: report no images rather than error the whole GET */ }
+  return out;
+}
+
+// ---- GET: two modes -----------------------------------------------------------
+//  (a) default: read the whole override map (loaded alongside the seed feed) PLUS
+//      an `images` presence map { "<itemId>": ["partPhoto",...] } so the client
+//      knows which detail-pane slots have a stored photo (without shipping bytes).
+//  (b) ?img=<itemId>&slot=<partPhoto|locationPhoto>: STREAM that one image's stored
+//      data-URL back as raw image bytes (Content-Type from the data-URL). 404 if
+//      absent. This is what the detail pane's <img src> points at.
+// READ is everyone-viewable ('general') in BOTH modes -- images carry no financials.
 export async function onRequestGet(context) {
-  const { env } = context;
+  const { env, request } = context;
   const denied = requireArea(context.data && context.data.session, 'general');
   if (denied) return denied;
   try {
     if (!env.PF_SCHEDULE) {
-      return json({ ok: true, qty: {}, fields: {}, meta: { updated: null }, fallback: true,
+      return json({ ok: true, qty: {}, fields: {}, images: {}, meta: { updated: null }, fallback: true,
         note: 'KV binding PF_SCHEDULE not available; no inventory overrides stored yet.' });
     }
+
+    // Parse the query for the image-serving mode. Guard a missing/invalid url
+    // (defensive: the real CF request always has one) so we fall back to the map.
+    let imgItem = null, slotParam = null;
+    try {
+      const url = new URL(request.url);
+      imgItem = url.searchParams.get('img');
+      slotParam = url.searchParams.get('slot');
+    } catch { imgItem = null; }
+    if (imgItem != null) {
+      // ---- mode (b): serve one stored image as raw bytes ----
+      const itemId = cleanItemId(imgItem);
+      const slot = cleanSlot(slotParam);
+      if (!itemId || !slot) return json({ status: 'error', message: 'Bad image request.' }, 400);
+      const dataUrl = await env.PF_SCHEDULE.get(IMG_KEY(itemId, slot));
+      if (!dataUrl || !IMG_DATAURL_RE.test(dataUrl)) {
+        return json({ status: 'error', message: 'Image not found.' }, 404);
+      }
+      const comma = dataUrl.indexOf(',');
+      const mime = dataUrl.slice(5, dataUrl.indexOf(';')); // e.g. image/png
+      const b64 = dataUrl.slice(comma + 1);
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return new Response(bytes, { status: 200, headers: {
+        'Content-Type': mime,
+        // private + short cache: it's session-gated media; the client also
+        // cache-busts with ?v=<updatedAt> when a new image is uploaded.
+        'Cache-Control': 'private, max-age=300',
+      } });
+    }
+
+    // ---- mode (a): the override map + an images presence map ----
     const store = await loadStore(env);
-    return json({ ok: true, qty: store.qty, fields: store.fields, meta: store.meta });
+    // Only items that actually carry an image key appear in the presence map.
+    const images = {};
+    try {
+      const listed = await env.PF_SCHEDULE.list({ prefix: 'inventory_img_v1:' });
+      (listed && Array.isArray(listed.keys) ? listed.keys : []).forEach((k) => {
+        const parts = k && k.name ? k.name.split(':') : [];
+        // key shape: inventory_img_v1:<itemId>:<slot>
+        if (parts.length !== 3) return;
+        const itemId = parts[1], slot = parts[2];
+        if (!itemId || IMG_SLOTS.indexOf(slot) < 0) return;
+        (images[itemId] = images[itemId] || []).push(slot);
+      });
+    } catch { /* fail closed: no images reported rather than 500 the whole GET */ }
+    return json({ ok: true, qty: store.qty, fields: store.fields, images, meta: store.meta });
   } catch (err) {
     console.error('api/inventory GET error:', err);
     return json({ status: 'error', message: 'An internal error occurred.' }, 500);
@@ -142,7 +252,12 @@ export async function onRequestGet(context) {
 //                     Body: { action:'setFields', item:'<itemId>', fields:{...} }
 //                     Each field value: string (text) / number (reqTrailer/reqHome)
 //                     to SET, or null/'' to CLEAR that one field.
-// field_ops -> 403 for BOTH actions. Fails CLOSED on missing session.
+//  action:'setImage'  -> set/clear ONE detail-pane image slot (CHANGE D, KV blob).
+//                     Body: { action:'setImage', item:'<itemId>',
+//                             slot:'partPhoto'|'locationPhoto', dataUrl:'<data:image/...>'|null }
+//                     dataUrl null/'' CLEARS (deletes) the slot. This action has its
+//                     own LARGER body cap (image bytes); set/setFields keep 32KB.
+// field_ops -> 403 for ALL actions. Fails CLOSED on missing session.
 export async function onRequestPost(context) {
   const { request, env } = context;
   const session = context.data && context.data.session;
@@ -150,16 +265,23 @@ export async function onRequestPost(context) {
   const denied = requireArea(session, 'financials');
   if (denied) return denied;
   try {
+    // Body-size gate is action-aware: the image action carries a downscaled photo
+    // (~<=900KB) so it uses MAX_IMG_BODY_BYTES; every other action keeps the tight
+    // 32KB cap. We peek Content-Length first (cheap reject of an absurd payload)
+    // using the larger ceiling, then re-check the actual text length per-action.
     const len = Number(request.headers.get('Content-Length') || '0');
-    if (len > MAX_BODY_BYTES) return json({ status: 'error', message: 'Payload too large.' }, 413);
+    if (len > MAX_IMG_BODY_BYTES) return json({ status: 'error', message: 'Payload too large.' }, 413);
     const text = await request.text();
-    if (text.length > MAX_BODY_BYTES) return json({ status: 'error', message: 'Payload too large.' }, 413);
 
     let parsed;
     try { parsed = JSON.parse(text); }
     catch { return json({ status: 'error', message: 'Invalid JSON.' }, 400); }
 
     const action = String((parsed && parsed.action) || '');
+
+    // Per-action body cap (defense in depth against a mislabeled huge non-image body).
+    const cap = (action === 'setImage') ? MAX_IMG_BODY_BYTES : MAX_BODY_BYTES;
+    if (text.length > cap) return json({ status: 'error', message: 'Payload too large.' }, 413);
 
     if (!env.PF_SCHEDULE) {
       return json({ status: 'error',
@@ -172,11 +294,51 @@ export async function onRequestPost(context) {
     if (action === 'setFields') {
       return await handleSetFields(env, session, parsed);
     }
-    return json({ status: 'error', message: "action must be 'set' or 'setFields'." }, 400);
+    if (action === 'setImage') {
+      return await handleSetImage(env, session, parsed);
+    }
+    return json({ status: 'error', message: "action must be 'set', 'setFields', or 'setImage'." }, 400);
   } catch (err) {
     console.error('api/inventory POST error:', err);
     return json({ status: 'error', message: 'An internal error occurred.' }, 500);
   }
+}
+
+// ---- action:'setImage' -- set/clear ONE detail-pane image slot (CHANGE D) -----
+// Stores the (client-downscaled) image as a data-URL in its OWN KV entry keyed
+// `inventory_img_v1:<itemId>:<slot>`. dataUrl null/'' DELETES the slot. Office-only
+// (the POST gate above already enforced 'financials'). Validates: known slot, safe
+// itemId, an image/* base64 data-URL under the length cap. Returns the cache-bust
+// stamp so the client can point <img src> at ?img=...&v=<updatedAt>.
+async function handleSetImage(env, session, parsed) {
+  const itemId = cleanItemId(parsed && parsed.item);
+  if (!itemId) return json({ status: 'error', message: 'A valid item is required.' }, 400);
+  const slot = cleanSlot(parsed && parsed.slot);
+  if (!slot) return json({ status: 'error', message: 'slot must be partPhoto or locationPhoto.' }, 400);
+
+  const raw = parsed && parsed.dataUrl;
+  const kvKey = IMG_KEY(itemId, slot);
+
+  // CLEAR: null / '' / undefined -> delete the stored image.
+  if (raw === null || raw === '' || typeof raw === 'undefined') {
+    await env.PF_SCHEDULE.delete(kvKey);
+    return json({ ok: true, saved: true, item: itemId, slot, cleared: true,
+      updatedAt: new Date().toISOString() });
+  }
+
+  const dataUrl = String(raw);
+  if (dataUrl.length > MAX_IMG_DATAURL_LEN) {
+    return json({ status: 'error', message: 'Image too large. Please use a smaller photo.' }, 413);
+  }
+  if (!IMG_DATAURL_RE.test(dataUrl)) {
+    return json({ status: 'error', message: 'Only PNG/JPEG/WebP/GIF images are accepted.' }, 400);
+  }
+
+  const stamp = new Date().toISOString();
+  // Store the data-URL plus a tiny sidecar of provenance is NOT needed here (the
+  // bytes ARE the value); updatedAt is returned for cache-busting the <img src>.
+  await env.PF_SCHEDULE.put(kvKey, dataUrl);
+  return json({ ok: true, saved: true, item: itemId, slot, cleared: false, updatedAt: stamp });
 }
 
 // ---- action:'set' -- Actual Qty on Hand (unchanged behavior) -----------------

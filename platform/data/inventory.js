@@ -7,12 +7,24 @@
 // ZERO dollars / pricing / financial data (part numbers + quantities + supplier
 // NAMES only), so it is safe for the whole company to view.
 //
-// SCHEMA (per SPEC — 9 fields per item):
+// SCHEMA (per SPEC — 9 seed fields per item):
 //   category, description, manufacturer, mfrPart, reqTrailer, reqHome,
 //   altSources, actualOnHand, notes
 // "actualOnHand" here is the BASELINE seed value. The LIVE value shown in the
 // portal is this baseline MERGED with the per-item KV override written through
 // /api/inventory (the only editable field in v1). See index.html mod-inventory.
+//
+// CHANGE D (2026-08-22) — EXPANDABLE ITEM DETAIL PANE (Derek): each row is clickable
+// and expands a detail pane carrying extra, all-editable, KV-OVERRIDE-driven fields.
+// These are NOT stored on the seed rows (they default empty); they persist as
+// per-item overrides via /api/inventory (setFields / setImage) exactly like the
+// editable seed fields above, so existing rows render unchanged with the pane empty:
+//   purchaseLink  (text)  — URL to buy the part (clickable link when set)
+//   orderContact  (text)  — company/phone/name to call to place an order
+//   partPhoto     (image) — photo of the part            (KV blob, setImage)
+//   locationPhoto (image) — photo of the storage location (KV blob, setImage)
+// Extending: add a text field to TEXT_FIELDS in functions/api/inventory.js AND the
+// index.html mod-inventory TEXT_FIELDS + detail-pane render. Images use setImage.
 //
 // LOCATIONS (per SPEC): "Farm" (= Home / main stockyard, Derek renamed Home->Farm)
 // plus field equipment trailers. Locations are DATA-DRIVEN below so adding a
