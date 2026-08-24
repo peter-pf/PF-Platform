@@ -36223,15 +36223,39 @@ try {
   // `expanded` so it survives a re-render (e.g. toggling Edit rows). We re-render
   // the whole module so the pane row is inserted/removed in the correct table.
   function wireDetailToggles(host) {
+    // CHANGE D2 (Derek): the WHOLE item row is a click target to expand/collapse the
+    // detail pane — not just the caret. The caret stays visible as an affordance and
+    // keeps its own handler below. A shared toggle() flips the expanded[] state.
+    function toggleItem(itemId) {
+      if (!itemId) return;
+      if (expanded[itemId]) { delete expanded[itemId]; } else { expanded[itemId] = true; }
+      render(); // preserves collapsed[] + overrides + fieldOverrides + expanded + imageMap
+    }
+
+    // Row-level click: any main item row (<tr data-item>, NOT the detail-pane row which
+    // uses data-detail-item) toggles its own pane. GUARD: clicks that originate from an
+    // interactive control (inline-edit inputs, the qty input, the caret button, image
+    // upload label/file/remove, purchase links, etc.) must NOT toggle — they do their own
+    // job. Only clicks on the row's non-interactive area toggle. This keeps editing intact.
+    var rows = host.querySelectorAll('tr[data-item]');
+    rows.forEach(function (row) {
+      row.addEventListener('click', function (e) {
+        // Ignore clicks that land on / inside an interactive element.
+        if (e.target.closest('input,textarea,select,button,a,label,[contenteditable],.inv-img-file,.inv-img-slot,.inv-detail-row')) {
+          return;
+        }
+        toggleItem(row.getAttribute('data-item'));
+      });
+    });
+
+    // Caret keeps its own dedicated handler (stopPropagation so the row handler above
+    // doesn't also fire). Preserves the existing affordance + keyboard/button semantics.
     var btns = host.querySelectorAll('.inv-caret[data-detail-toggle]');
     btns.forEach(function (btn) {
       btn.addEventListener('click', function (e) {
         e.preventDefault();
         e.stopPropagation();
-        var itemId = btn.getAttribute('data-detail-toggle');
-        if (!itemId) return;
-        if (expanded[itemId]) { delete expanded[itemId]; } else { expanded[itemId] = true; }
-        render(); // preserves collapsed[] + overrides + fieldOverrides + expanded + imageMap
+        toggleItem(btn.getAttribute('data-detail-toggle'));
       });
     });
   }
@@ -36590,6 +36614,11 @@ try {
 #mod-inventory .inv-caret:hover { color: var(--accent-dark,#005A91); }
 #mod-inventory .inv-caret.inv-caret-open { transform: rotate(90deg); }
 #mod-inventory tr.inv-row-open > td { background: var(--accent-light,#E0F0FF); }
+/* CHANGE D2 (Derek): whole item row is clickable to expand — signal it. Interactive
+   controls inside keep their own cursor; the row-blank area shows a pointer. */
+#mod-inventory .inv-tbl tbody tr[data-item] { cursor: pointer; }
+#mod-inventory .inv-tbl tbody tr[data-item]:hover > td { background: var(--bg-2,#F3F5F8); }
+#mod-inventory .inv-tbl tbody tr.inv-row-open:hover > td { background: var(--accent-light,#E0F0FF); }
 #mod-inventory tr.inv-detail-row > td { padding: 0; background: #F7FAFD;
   border-bottom: 2px solid var(--accent,#006DB0); }
 #mod-inventory .inv-detail { padding: 10px 12px 12px; }
