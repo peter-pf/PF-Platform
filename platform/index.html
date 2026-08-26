@@ -18415,8 +18415,17 @@ try {
 
           // ===== Subsection 2: Send Final As-Builts to Garbin =====
           subgroup('2. Send Final As-Builts to Garbin'),
-          subgroupNote('FUTURE: Jonathan is responsible for sending final as-builts to Garbin. His exact prep process is being documented (emailed 8/7). 5-business-day SOP: expected GGG return auto-set 5 business days after logs + load test submitted; if exceeded, auto daily reminder to the Garbin primary contact until received.'),
+          // SOP (Jonathan 2026-08-08): the Garbin closeout package = 3 tracked PDFs —
+          // (1) GI-300 QAQC as-built page (actual install depths typed over designed),
+          // (2) Column Logs (rig GUHMA combined PDF), (3) Modulus Load Test. Routing +
+          // the 5-business-day return loop are baked in below. Depths meeting/exceeding
+          // design = blue, shorts = red (handled on the QAQC page itself).
+          subgroupNote('Send the 3-PDF Garbin closeout package: (1) GI-300 QAQC As-Built page, (2) Column Logs (rig PDF), (3) Modulus Load Test. Routing baked in below (Jake Campbell + projects@garbingeostructural.com). 5-business-day SOP: expected GGG return auto-computes 5 business days after all files are sent; the portal flags it OVERDUE below once that date passes and Garbin has not returned.'),
           field('Responsible', 'Jonathan'),
+          // (a) NEW tracked doc #1 of the 3-PDF package: the GI-300 QAQC as-built page.
+          field('GI-300 QAQC As-Built Page Sent to Garbin?', ''),
+          field('Date QAQC As-Built Sent', ''),
+          fieldLinked('GI-300 QAQC As-Built Link', '', '', 'website'),
           field('Column Logs (Rig PDF) Sent to Garbin?', ''),
           field('Date Column Logs Sent', ''),
           fieldLinked('Column Logs Link', '', '', 'website'),
@@ -18430,14 +18439,62 @@ try {
           // the effective (override-wins) "Date All Files Sent to GGG"; if it is a
           // valid date, show a computed hint. The manual "Expected GGG Return Date"
           // field above stays editable and wins for display (this is only a hint).
+          // (d) AUTO-REMINDER: once the expected-return date has PASSED and Garbin has
+          // NOT returned the set (Subsection 3 "Date Final As-Builts Received from
+          // Garbin" still blank), the hint escalates to a RED overdue flag showing how
+          // many calendar days overdue. Fully client-side (no backend send yet — a true
+          // automated daily email reminder to Garbin is a Worker/Graph follow-up).
           (function(){
+            // Effective expected-return date = manual "Expected GGG Return Date" if the
+            // user entered one, else the computed (files-sent + 5 business days).
+            var _manualExp = pfParseDate(effVal('closeout', 'Expected GGG Return Date', ''));
             var _sent = pfParseDate(effVal('closeout', 'Date All Files Sent to GGG', ''));
-            if (!_sent) return '';
-            var _exp = pfAddBusinessDays(_sent, 5);
+            var _computedExp = _sent ? pfAddBusinessDays(_sent, 5) : null;
+            var _exp = _manualExp || _computedExp;
             if (!_exp) return '';
+            // Has Garbin returned the set yet? (Subsection 3 receipt date present.)
+            var _rcvd = pfParseDate(effVal('closeout', 'Date Final As-Builts Received from Garbin', ''));
+            // Today at local midnight for a clean calendar-day comparison.
+            var _now = new Date(); _now = new Date(_now.getFullYear(), _now.getMonth(), _now.getDate());
+            var _basis = _manualExp ? 'manual expected-return date' : '5 business days after files sent';
+            if (!_rcvd && _now.getTime() > _exp.getTime()) {
+              // OVERDUE: red flag with the number of calendar days past due.
+              var _daysOver = Math.round((_now.getTime() - _exp.getTime()) / 86400000);
+              return computedHint('OVERDUE: Garbin return expected '
+                + '<span class="pr-computed-val">' + E(pfFmtDateObj(_exp)) + '</span>'
+                + ' (' + _daysOver + ' day' + (_daysOver === 1 ? '' : 's') + ' ago, ' + E(_basis)
+                + ') and the stamped set has not been received. Follow up with Jake Campbell at Garbin.', true);
+            }
+            // Not overdue (or already received): informational computed hint.
             return computedHint('Computed expected GGG return: '
               + '<span class="pr-computed-val">' + E(pfFmtDateObj(_exp)) + '</span>'
-              + ' (5 business days after files sent). Manual entry above overrides this.', false);
+              + ' (5 business days after files sent). Manual entry above overrides this.'
+              + (_rcvd ? ' Stamped set received — loop closed.' : ''), false);
+          })(),
+          // (b) GARBIN ROUTING baked into the send step. Recipient shown explicitly so
+          // the routing is unambiguous, plus a one-click mailto that pre-fills the To
+          // (Jake Campbell), CC (projects@garbingeostructural.com), and a project-scoped
+          // subject. This is a mailto draft (opens the user's mail client) — a true
+          // server-side Outlook/Graph draft with the 3 PDFs auto-attached is a
+          // follow-up backend pass (noted below).
+          field('Garbin Recipient', 'Jake Campbell <jake@garbingeostructural.com>'),
+          field('Garbin CC', 'projects@garbingeostructural.com'),
+          (function(){
+            var _pname = String(D.project_name || '');
+            var _pnum = String(_curNum || D.project_number || '');
+            var _subj = 'Final As-Builts / Closeout Package'
+              + (_pnum ? ' - ' + _pnum : '')
+              + (_pname ? ' ' + _pname : '');
+            var _body = 'Jake,%0D%0A%0D%0AAttached is the closeout package for '
+              + encodeURIComponent((_pnum ? _pnum + ' ' : '') + _pname).replace(/%20/g, ' ')
+              + ':%0D%0A  1) GI-300 QAQC As-Built page%0D%0A  2) Column Logs (rig PDF)%0D%0A  3) Modulus Load Test%0D%0A%0D%0APlease stamp and return at your convenience.%0D%0A%0D%0AThank you,%0D%0APier Foundations';
+            var _href = 'mailto:jake@garbingeostructural.com'
+              + '?cc=projects@garbingeostructural.com'
+              + '&subject=' + encodeURIComponent(_subj)
+              + '&body=' + _body;
+            return '<div class="pr-computed-hint"><a class="fin-inv-btn fin-inv-btn-live pr-closeout-mailto" href="'
+              + E(_href) + '">Draft Garbin email (Jake + CC projects@)</a>'
+              + ' <span style="font-style:normal">Opens a pre-addressed draft; attach the 3 PDFs before sending. (Auto-attach = backend follow-up.)</span></div>';
           })(),
 
           // ===== Subsection 3: GGG Returns Final As-Builts =====
@@ -18448,20 +18505,85 @@ try {
           fieldLinked('Closeout Folder Link', '', '', 'website'),
           subgroupNote('Save to …\\001 - Completed Projects\\[year]\\[project]\\03 - Engineering & Design\\Closeout. FUTURE: Peter auto-saves on receipt.'),
           // Review checklist — each Yes/No paired with a Date + who where the spec asks.
+          // (e) AUTO-COMPARE HOOK: the "Peter analyzed vs sent" step. The tracked action
+          // (Yes/No + date) stays; a NEW link field holds the QAQC comparison RESULT
+          // (the marked-up compare set / discrepancy list Peter produces). The link is
+          // the durable attach point today; a FULLY automated stamped-vs-sent compare
+          // that populates this on its own is a backend/Worker pass (noted below).
           field('Peter Analyzed As-Builts vs Sent Files?', ''),
           field('Date Analyzed', ''),
+          fieldLinked('QAQC Comparison Result Link', '', '', 'website'),
           field('All Notes / Comments / Depths Picked Up?', ''),
           field('Discrepancy - Sent Back to Garbin (Jake)?', ''),
           field('Date Sent Back', ''),
           field('Jonathan Reviewed & Confirmed Match?', ''),
           field('Date Confirmed', ''),
           field('Confirmed to PM (Brad)?', ''),
-          subgroupNote('FUTURE: Peter auto-compares the GGG stamped set against the files sent to confirm all notes/depths carried; if not, back to Garbin (Jake) to revise/resubmit, repeat until confirmed.'),
+          subgroupNote('Peter compares the GGG stamped set against the files sent to confirm all notes/depths carried; attach the comparison result above. If a discrepancy, back to Garbin (Jake) to revise/resubmit, repeat until confirmed. FUTURE (backend): auto-run the stamped-vs-sent compare and auto-populate the result link.'),
           field('Ready to Send to GC?', ''),
           field('Date Sent to GC', ''),
           field('Sent By', ''),
-          subgroupNote('FUTURE: “Send to GC” button auto-creates an Outlook email with the approved shop drawings attached + verbiage + recipient auto-populated; PM sends, BCCs Peter; Peter documents the send + saves a copy to the project folder.'),
           fieldLinked('Final GGG As-Built Set Link', '', '', 'website'),
+          // (f) ONE-CLICK SEND-TO-GC DRAFT. A mailto pre-filled with the GC recipient
+          // (read from Project Contacts > General Contractor override, general.'GC'),
+          // a project-scoped subject, and the final GGG as-built set LINK in the body
+          // (so the recipient gets the set link; a true attach-the-file draft is a
+          // Graph follow-up). Gated read-only for crew: only office roles (canEdit)
+          // see the actionable draft button; crew see a static "ready to send" note.
+          (function(){
+            var _pname = String(D.project_name || '');
+            var _pnum = String(_curNum || D.project_number || '');
+            // GC name from Project Contacts (general override 'GC'); no email is stored
+            // structured, so the To is left blank for the user to pick — subject + body
+            // are pre-filled. If a GC email override ever exists it is used.
+            var _gcNameOv = ovLookup('general', 'GC');
+            var _gcName = _gcNameOv.has ? String(_gcNameOv.value || '') : '';
+            var _setLinkRaw = String(effVal('closeout', 'Final GGG As-Built Set Link', '') || '').trim();
+            var _subj = 'Final Stamped As-Builts'
+              + (_pnum ? ' - ' + _pnum : '')
+              + (_pname ? ' ' + _pname : '');
+            var _bodyPlain = (_gcName ? 'Attn: ' + _gcName + '\r\n\r\n' : '')
+              + 'Attached are the final stamped as-builts for '
+              + ((_pnum ? _pnum + ' ' : '') + _pname).trim() + '.\r\n\r\n'
+              + (_setLinkRaw ? 'Final GGG as-built set: ' + _setLinkRaw + '\r\n\r\n' : '')
+              + 'Please let us know if you need anything further.\r\n\r\nThank you,\r\nPier Foundations';
+            var _href = 'mailto:'
+              + '?subject=' + encodeURIComponent(_subj)
+              + '&body=' + encodeURIComponent(_bodyPlain);
+            if (canEdit()) {
+              return '<div class="pr-computed-hint"><a class="fin-inv-btn fin-inv-btn-live pr-closeout-mailto" href="'
+                + E(_href) + '">Draft "Send to GC" email</a>'
+                + ' <span style="font-style:normal">Pre-fills subject'
+                + (_setLinkRaw ? ' + the final GGG set link' : '')
+                + '; pick the GC recipient, BCC Peter, and send. (Outlook draft + auto-attach = backend follow-up.)</span></div>';
+            }
+            return computedHint('When ready, an office user drafts the "Send to GC" email here (final stamped as-builts + set link).', false);
+          })(),
+          // (c) RETAINAGE-ON-CLOSEOUT LINK. Ties closeout completion to the final
+          // invoice / retainage release: once the stamped set has gone to the GC, the
+          // final invoice INCLUDING RETAINAGE goes out (Jonathan SOP 2026-08-08). This
+          // surfaces the readiness + a jump to the Financials > Project Invoicing step.
+          field('Final Invoice (incl. Retainage) Sent?', ''),
+          field('Date Final Invoice Sent', ''),
+          (function(){
+            // Retainage release becomes actionable once the stamped set is out to the GC.
+            var _readyGC = String(effVal('closeout', 'Ready to Send to GC?', '') || '').trim().toLowerCase();
+            var _sentGC = pfParseDate(effVal('closeout', 'Date Sent to GC', ''));
+            var _invSent = String(effVal('closeout', 'Final Invoice (incl. Retainage) Sent?', '') || '').trim().toLowerCase();
+            var _closeoutDone = (_readyGC === 'yes' || !!_sentGC);
+            // Jump link to the Financials card's Project Invoicing block (same page).
+            var _jump = '<a href="#" class="pr-closeout-fin-jump" onclick="event.preventDefault();'
+              + 'var c=document.querySelector(\'.pr-card[data-pr-section=&quot;financials&quot;]\')'
+              + '||Array.prototype.filter.call(document.querySelectorAll(\'.pr-card-title\'),function(t){return t.textContent===\'Financials\';})[0];'
+              + 'if(c){var card=c.closest?c.closest(\'.pr-card\'):c;(card||c).scrollIntoView({behavior:&quot;smooth&quot;,block:&quot;start&quot;});}">'
+              + 'go to Financials &gt; Project Invoicing</a>';
+            if (_closeoutDone && _invSent !== 'yes') {
+              return computedHint('Closeout is out to the GC — the final invoice INCLUDING RETAINAGE can now go out. '
+                + _jump + '.', true);
+            }
+            return computedHint('Retainage releases with the final invoice once the stamped set is sent to the GC. '
+              + _jump + '.', false);
+          })(),
 
           // ===== Subsection 4: Certified Payroll Reports =====
           subgroup('4. Certified Payroll Reports'),
@@ -20045,7 +20167,9 @@ try {
       // ===== Project Closeout 5-subsection build (Brad 2026-08-07, batch-14) =====
       // Subsection 1: Field Closeout Procedure
       'Field Closeout Complete?': ['Yes', 'No'],
-      // Subsection 2: Send Final As-Builts to Garbin
+      // Subsection 2: Send Final As-Builts to Garbin (3-PDF package: GI-300 QAQC +
+      // Column Logs + Modulus Load Test).
+      'GI-300 QAQC As-Built Page Sent to Garbin?': ['Yes', 'No'],
       'Column Logs (Rig PDF) Sent to Garbin?': ['Yes', 'No'],
       'Modulus Load Test Sent to Garbin?': ['Yes', 'No'],
       // Subsection 3: GGG Returns Final As-Builts (review workflow — Yes/No gates)
@@ -20056,6 +20180,8 @@ try {
       'Jonathan Reviewed & Confirmed Match?': ['Yes', 'No'],
       'Confirmed to PM (Brad)?': ['Yes', 'No'],
       'Ready to Send to GC?': ['Yes', 'No'],
+      // Retainage-on-closeout: final invoice (incl. retainage release) sent to GC.
+      'Final Invoice (incl. Retainage) Sent?': ['Yes', 'No'],
       // Subsection 4: Certified Payroll Reports — Yes / No / N/A (auto-defaults to N/A
       // when the Contract Recap "Certified Payroll Required?" cross-read = not required).
       'Certified Payroll Submitted & Confirmed?': ['Yes', 'No', 'N/A'],
@@ -20123,6 +20249,7 @@ try {
       // Subsection 1: Field Closeout Procedure
       'Date Completed': true,
       // Subsection 2: Send Final As-Builts to Garbin
+      'Date QAQC As-Built Sent': true,
       'Date Column Logs Sent': true,
       'Date Load Test Sent': true,
       'Date All Files Sent to GGG': true,
@@ -20133,6 +20260,8 @@ try {
       'Date Sent Back': true,
       'Date Confirmed': true,
       'Date Sent to GC': true,
+      // Retainage-on-closeout: date the final invoice (incl. retainage) was sent.
+      'Date Final Invoice Sent': true,
       // Subsection 4: Certified Payroll Reports (disambiguated label to avoid the
       // Subsection-3 "Date Confirmed" key collision within the same closeout section).
       'Date Confirmed - Certified Payroll': true,
