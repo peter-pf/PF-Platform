@@ -35793,7 +35793,7 @@ try {
        + (canEdit
             ? (editMode
                  ? ' &middot; <b>Edit mode ON</b> — correct any field; changes save on blur'
-                 : ' &middot; edit <b>Actual Qty</b>, or click <b>Edit rows</b> to correct all fields')
+                 : ' &middot; click <b>Edit rows</b> to edit fields')
             : ' &middot; view only') + '</div>';
     h += '<div id="invMsg" class="inv-msg"></div>';
     h += '</div>';
@@ -35862,15 +35862,10 @@ try {
               h += '<td>' + E(it.manufacturer || '—') + '</td>';
               h += '<td>' + E(it.mfrPart || '—') + '</td>';
               h += '<td class="num">' + E(fmtReq(req)) + '</td>';
-              // Actual Qty: office = editable input; field_ops = read-only text.
-              if (canEdit) {
-                h += '<td class="num"><input class="inv-qty" type="number" min="0" step="1" '
-                   + 'value="' + E(qv) + '" '
-                   + 'data-loc="' + E(loc.id) + '" data-item="' + E(it.id) + '" '
-                   + 'aria-label="Actual quantity on hand"></td>';
-              } else {
-                h += '<td class="num inv-qty-ro">' + (qv === '' ? '—' : E(qv)) + '</td>';
-              }
+              // Actual Qty read-only text here (view / office not-in-edit). Editable only
+              // in edit mode (rendered in the editMode branch above). GATE (Derek 8/26):
+              // no field is typeable until "Edit rows" is clicked.
+              h += '<td class="num inv-qty-ro">' + (qv === '' ? '—' : E(qv)) + '</td>';
               h += '<td>' + E(it.altSources || '—') + '</td>';
               h += '<td class="inv-notes">' + E(it.notes || '') + '</td>';
             }
@@ -35946,7 +35941,8 @@ try {
       h += '<div class="inv-img-empty">No photo yet</div>';
     }
     h += '</div>';
-    if (canEdit) {
+    // GATE (Derek 8/26): photo upload/replace/remove only in edit mode; view-only otherwise.
+    if (canEdit && editMode) {
       h += '<div class="inv-img-ctrls">';
       h += '<label class="inv-img-btn"><input type="file" accept="image/*" class="inv-img-file" '
          + 'data-item="' + E(item.id) + '" data-slot="' + E(slot) + '" style="display:none">'
@@ -35997,7 +35993,9 @@ try {
     var display = (v == null ? '' : String(v));
     var h = '<div class="inv-df' + (kind === 'textarea' ? ' inv-df-wide' : '') + '">';
     h += '<div class="inv-df-label">' + E(label) + '</div>';
-    if (canEdit) {
+    // GATE (Derek 8/26): detail-pane fields are typeable ONLY in edit mode. Office sees
+    // read-only values until "Edit rows" is clicked; "Done editing" re-renders => re-locks.
+    if (canEdit && editMode) {
       if (kind === 'textarea') {
         h += '<textarea class="inv-df-in inv-detail-fin" rows="2" '
            + 'data-item="' + E(item.id) + '" data-field="' + E(field) + '" '
