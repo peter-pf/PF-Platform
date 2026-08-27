@@ -23,6 +23,14 @@
 //   orderContact  (text)  — company/phone/name to call to place an order
 //   partPhoto     (image) — photo of the part            (KV blob, setImage)
 //   locationPhoto (image) — photo of the storage location (KV blob, setImage)
+//
+// CHANGE E (2026-08-27) — ORDER-CONTACT PERSON (Derek): three more all-editable,
+// KV-override-driven text fields shown directly UNDER "Company to Call to Order"
+// so a reorder shows who to reach at that item's supplier. They default empty for
+// every existing row (no seed edits) and persist via /api/inventory setFields:
+//   orderContactName  (text)  — supplier contact person's name
+//   orderContactEmail (text)  — rendered as a mailto link in the pane when populated
+//   orderContactPhone (text)  — rendered as a tel link in the pane when populated
 // Extending: add a text field to TEXT_FIELDS in functions/api/inventory.js AND the
 // index.html mod-inventory TEXT_FIELDS + detail-pane render. Images use setImage.
 //

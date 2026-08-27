@@ -69,8 +69,16 @@ const MAX_FIELD_LEN = 2000;         // per text-field value length cap
 //   persist through the SAME setFields path (no new write mechanism). URL/text are
 //   still length-capped + angle-stripped server-side; the UI escapes on render and
 //   only treats an http(s) value as a navigable link.
+//   CHANGE E (2026-08-27, Derek): order-contact PERSON for each item's supplier,
+//     shown directly under "Company to Call to Order" in the detail pane:
+//       orderContactName  -- who to ask for
+//       orderContactEmail -- rendered as a mailto link in the UI when populated
+//       orderContactPhone -- rendered as a tel link in the UI when populated
+//     Plain text server-side (same s() cap/angle-strip/RBAC as every other field);
+//     the mailto/tel treatment is purely a client-render affordance.
 const TEXT_FIELDS = ['description', 'manufacturer', 'mfrPart', 'altSources', 'notes',
-                     'purchaseLink', 'orderContact'];
+                     'purchaseLink', 'orderContact',
+                     'orderContactName', 'orderContactEmail', 'orderContactPhone'];
 const NUM_FIELDS  = ['reqTrailer', 'reqHome'];
 
 // CHANGE D -- item DETAIL IMAGES (part photo + storage-location photo).

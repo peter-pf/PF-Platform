@@ -35837,7 +35837,9 @@ try {
   // server allowlist in functions/api/inventory.js). purchaseLink/orderContact are
   // surfaced only in the CHANGE D detail pane (not the main table row).
   var TEXT_FIELDS = ['description', 'manufacturer', 'mfrPart', 'altSources', 'notes',
-                     'purchaseLink', 'orderContact'];
+                     'purchaseLink', 'orderContact',
+                     // CHANGE E (Derek 8/27): per-item order-contact person fields.
+                     'orderContactName', 'orderContactEmail', 'orderContactPhone'];
   var NUM_FIELDS  = ['reqTrailer', 'reqHome'];
   var IMG_SLOTS   = ['partPhoto', 'locationPhoto']; // CHANGE D detail image slots.
 
@@ -36040,6 +36042,15 @@ try {
   function isHttpUrl(v) {
     return typeof v === 'string' && /^https?:\/\/[^\s]+$/i.test(v.trim());
   }
+  // CHANGE E (Derek 8/27): order-contact email/phone in the detail pane. An email
+  // renders as a mailto: link, a phone as a tel: link, when populated + view mode.
+  function isEmail(v) {
+    return typeof v === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+  }
+  function telHref(v) {
+    // tel: URIs allow digits, +, and a few separators; strip everything else.
+    return 'tel:' + String(v).replace(/[^0-9+]/g, '');
+  }
 
   // CHANGE D: build the src for a stored image slot, cache-busted by updatedAt so a
   // freshly-uploaded photo isn't served stale from the 5-min cache.
@@ -36105,6 +36116,11 @@ try {
     h += detailField('Part Number', 'mfrPart', ov, 'text');
     h += detailField('Link to Purchase', 'purchaseLink', ov, 'url');
     h += detailField('Company to Call to Order', 'orderContact', ov, 'text');
+    // CHANGE E (Derek 8/27): order-contact person for THIS item's supplier, directly
+    // under "Company to Call to Order". Email -> mailto link, phone -> tel link when set.
+    h += detailField('Contact Name', 'orderContactName', ov, 'text');
+    h += detailField('Contact Email', 'orderContactEmail', ov, 'email');
+    h += detailField('Contact Phone', 'orderContactPhone', ov, 'tel');
     h += detailField('Alt Sources', 'altSources', ov, 'text');
     h += detailField('Notes', 'notes', ov, 'textarea');
     h += '</div>';
@@ -36130,9 +36146,13 @@ try {
            + 'data-item="' + E(item.id) + '" data-field="' + E(field) + '" '
            + 'aria-label="' + E(label) + '">' + E(display) + '</textarea>';
       } else {
-        h += '<input class="inv-df-in inv-detail-fin" type="' + (kind === 'url' ? 'url' : 'text') + '" '
+        // Input type maps kind -> native input (url/email/tel get the right keyboard +
+        // light native validation); everything else is plain text. Editable inputs only.
+        var itype = (kind === 'url') ? 'url' : (kind === 'email') ? 'email' : (kind === 'tel') ? 'tel' : 'text';
+        var ph = (kind === 'url') ? 'https://...' : (kind === 'email') ? 'name@company.com' : (kind === 'tel') ? '(260) 555-0100' : '';
+        h += '<input class="inv-df-in inv-detail-fin" type="' + itype + '" '
            + 'value="' + E(display) + '" '
-           + (kind === 'url' ? 'placeholder="https://..." ' : '')
+           + (ph ? ('placeholder="' + E(ph) + '" ') : '')
            + 'data-item="' + E(item.id) + '" data-field="' + E(field) + '" '
            + 'aria-label="' + E(label) + '">';
       }
@@ -36143,6 +36163,12 @@ try {
     } else {
       if (kind === 'url' && isHttpUrl(display)) {
         h += '<a class="inv-df-val inv-df-link" href="' + E(display) + '" target="_blank" rel="noopener noreferrer">' + E(display) + '</a>';
+      } else if (kind === 'email' && isEmail(display)) {
+        // mailto link so a click opens the mail client pre-addressed to the supplier contact.
+        h += '<a class="inv-df-val inv-df-link" href="mailto:' + E(display.trim()) + '">' + E(display) + '</a>';
+      } else if (kind === 'tel' && display) {
+        // tel link so a tap on a phone dials (or texts) the supplier contact.
+        h += '<a class="inv-df-val inv-df-link" href="' + E(telHref(display)) + '">' + E(display) + '</a>';
       } else {
         h += '<div class="inv-df-val">' + (display ? E(display) : '<span class="inv-df-empty">—</span>') + '</div>';
       }
