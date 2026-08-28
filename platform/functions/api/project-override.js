@@ -99,6 +99,7 @@ const CRM_MAX_IDS = 40;              // contacts per firm on one project (genero
 const CRM_MAX_COMPANY = 200;         // a company name length cap
 const CRM_MAX_SUBKEY = 60;           // a firm-section label length cap
 const CRM_ID_RE = /^C\d+$/;          // contact id shape (C#### minted by /api/contacts)
+const CRM_MAX_COMPANIES = 25;        // MULTI-COMPANY (Brad 2026-08-28): companies per subsection cap
 
 // ---- __submittal_prereqs reserved structured key (Brad 2026-08-12) -----------
 // The Engineering & Design > PF Design Submittal subsection gains a "GC prerequisites"
@@ -613,6 +614,28 @@ function cleanChangeOrders(input) {
   return out;
 }
 
+// Validate + normalize ONE company object {company,address,contactIds} into a clean,
+// bounded shape. Returns the cleaned object, or null if present-but-malformed (a bad id
+// or an over-cap id list => reject the whole save closed). Shared by the legacy top-level
+// entry AND each element of a multi-company `companies[]` array.
+function cleanCrmCompany(entry) {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
+  const company = s(entry.company, CRM_MAX_COMPANY);
+  const address = s(entry.address, CRM_MAX_COMPANY);
+  const idsIn = Array.isArray(entry.contactIds) ? entry.contactIds : [];
+  if (idsIn.length > CRM_MAX_IDS) return null;
+  const seen = {};
+  const contactIds = [];
+  for (const rawId of idsIn) {
+    const id = String(rawId == null ? '' : rawId).trim().toUpperCase();
+    if (!CRM_ID_RE.test(id)) return null;        // any bad id => reject the whole save
+    if (seen[id]) continue;                      // de-dupe ids
+    seen[id] = 1;
+    contactIds.push(id);
+  }
+  return { company, address, contactIds };
+}
+
 // Validate + normalize an incoming __crm object into a clean, bounded structure.
 // Returns a SAFE object (possibly {}), or null if the input is present but so
 // malformed it must be rejected (caller fails the whole save closed). Rules:
@@ -622,6 +645,13 @@ function cleanChangeOrders(input) {
 //     DROPPED (defensive) rather than accepted verbatim.
 //   - bounded on firm count + ids-per-firm; anything over the cap => reject (null)
 //     so we never silently truncate a user's selection.
+//   - MULTI-COMPANY (Brad 2026-08-28): an entry MAY carry a `companies` ARRAY of
+//     {company,address,contactIds}. Each element is validated with the same rules
+//     (bad element => reject). The legacy top-level {company,address,contactIds} is
+//     ALWAYS emitted, MIRRORED from companies[0] (belt-and-suspenders: an un-updated
+//     reader / rollback still sees company #1). When `companies` is absent we synth a
+//     1-element array from the legacy top-level so every stored entry has the new shape.
+//     Bounded on companies-per-subsection.
 function cleanCrm(input) {
   if (input == null) return {};                 // absent => empty (nothing to store)
   if (typeof input !== 'object' || Array.isArray(input)) return null; // present but not an object => reject
@@ -633,28 +663,31 @@ function cleanCrm(input) {
     if (!key) continue;
     const entry = input[rawKey];
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
-    const company = s(entry.company, CRM_MAX_COMPANY);
-    // Brad 2026-08-20: OPTIONAL company `address` — one line shown to the right of the
-    // company name in the Project Contacts group header. Same defensive posture as
-    // `company`: a bounded string (reuse CRM_MAX_COMPANY as the cap), coerced + trimmed
-    // by s(). Absent/blank => '' (stored explicitly so a cleared address round-trips).
-    // WITHOUT this line cleanCrm silently dropped `address` (it rebuilt {company,contactIds}
-    // only), so the address would never persist. This is the minimal validator change.
-    const address = s(entry.address, CRM_MAX_COMPANY);
-    const idsIn = Array.isArray(entry.contactIds) ? entry.contactIds : [];
-    if (idsIn.length > CRM_MAX_IDS) return null;
-    const seen = {};
-    const contactIds = [];
-    for (const rawId of idsIn) {
-      const id = String(rawId == null ? '' : rawId).trim().toUpperCase();
-      if (!CRM_ID_RE.test(id)) return null;      // any bad id => reject the whole save
-      if (seen[id]) continue;                    // de-dupe ids
-      seen[id] = 1;
-      contactIds.push(id);
+
+    // Build the normalized companies[] list.
+    let companies;
+    if (Array.isArray(entry.companies)) {
+      if (entry.companies.length > CRM_MAX_COMPANIES) return null;
+      companies = [];
+      for (const raw of entry.companies) {
+        const c = cleanCrmCompany(raw);
+        if (c == null) return null;              // any bad company element => reject the save
+        companies.push(c);
+      }
+    } else {
+      // Legacy single -> a 1-element list synthesized from the top-level fields. A truly
+      // empty legacy entry (cleared selection) yields a single explicit empty element so
+      // it round-trips exactly as before.
+      const c = cleanCrmCompany(entry);
+      if (c == null) return null;
+      companies = [c];
     }
-    // An entry with neither a company nor any ids is a cleared selection; keep it
-    // as an explicit empty (so re-render shows the firm block with nothing picked).
-    out[key] = { company, address, contactIds };
+
+    // Mirror companies[0] to the legacy top-level. An entry with zero companies (empty
+    // companies:[]) collapses to an explicit empty (cleared selection) — same posture as
+    // the pre-existing "neither a company nor any ids" case.
+    const head = companies.length ? companies[0] : { company: '', address: '', contactIds: [] };
+    out[key] = { company: head.company, address: head.address, contactIds: head.contactIds, companies };
   }
   return out;
 }

@@ -3279,6 +3279,24 @@ tr.pf-dragging { opacity: 0.45; }
 /* button takes the auto-margin; siblings keep the flex gap). Same look as "+ Add        */
 /* contact" — it already carries .pr-add-contact-btn.                                    */
 .pr-pc-company-head .pr-pc-addbtn-head ~ .pr-pc-addbtn-head { margin: 0; }
+/* MULTI-COMPANY (Brad 2026-08-28): several company cards can stack inside ONE subsection */
+/* (Equipment Transport, Material Vendors, etc.). Keep it compact/dense (Brad's density   */
+/* directive): a hairline rule + small gap separates stacked cards; the sole-company case */
+/* is visually unchanged (no rule above the first card).                                  */
+.pr-pc-company + .pr-pc-company { border-top: 1px dashed var(--border, #e5e7eb); padding-top: 8px; }
+/* "Remove company" sits at the far right of the header (after "+ Add contact"). Small,    */
+/* muted-danger link-button so it never competes with the primary Add affordance.          */
+.pr-pc-rmco-head { margin-left: auto; background: none; border: 0; padding: 0 2px; cursor: pointer;
+  font-size: 0.72rem; color: var(--danger, #b91c1c); opacity: 0.75; white-space: nowrap; }
+.pr-pc-rmco-head:hover { opacity: 1; text-decoration: underline; }
+/* When BOTH "+ Add contact" and "Remove company" render, the FIRST header button takes    */
+/* the auto-margin (pushes the group right); rmco keeps its own auto-margin only when it is */
+/* the last child, so leave the add button's auto-margin and null rmco's if a sibling add   */
+/* precedes it (both then sit together on the right).                                       */
+.pr-pc-company-head .pr-pc-addbtn-head ~ .pr-pc-rmco-head { margin-left: 8px; }
+/* "+ Add company" foot control: below the last company card, appends a NEW company.        */
+.pr-pc-addco-foot-wrap { margin: 6px 0 2px; }
+.pr-pc-addco-foot { font-size: 0.78rem; }
 /* (2) Horizontal contact rows. A lightweight table-like flex layout: header row */
 /* + one row per contact. Compact so more fits on screen; Notes wraps.           */
 .pr-crow-table { width: 100%; margin: 2px 0 0; }
@@ -13648,6 +13666,77 @@ try {
       return (crm && typeof crm === 'object' && !Array.isArray(crm)) ? crm : {};
     }
 
+    // ---- MULTI-COMPANY per subsection (Brad 2026-08-28) --------------------------
+    // Most Project Contacts subsections have ONE company, but some (Equipment Transport,
+    // Material Vendor(s), etc.) can have several. Schema OPTION A (additive, back-compat):
+    // each __crm[sectionLabel] entry MAY carry a `companies:[{company,address,contactIds}]`
+    // array. The LEGACY top-level {company,address,contactIds} is KEPT (mirrored from
+    // companies[0]) so any un-updated reader / rollback still sees company #1. When
+    // `companies` is absent (every project written before this change), we SYNTHESIZE a
+    // 1-element list from the legacy top-level on READ — so old data renders unchanged as a
+    // single company card. No migration, no data loss.
+    //
+    // pfCrmNormEntry(entry) -> ALWAYS an array of {company,address,contactIds} (>=0 elems).
+    //   - entry.companies present + array  -> use it (each element normalized/bounded).
+    //   - else synth from legacy top-level -> [ {company,address,contactIds} ] IF it has any
+    //     content (a company OR ids); a truly empty legacy entry yields [] (nothing to show).
+    function pfCrmNormOneCompany(c){
+      c = (c && typeof c === 'object' && !Array.isArray(c)) ? c : {};
+      return {
+        company: (typeof c.company === 'string') ? c.company : '',
+        address: (typeof c.address === 'string') ? c.address : '',
+        contactIds: Array.isArray(c.contactIds)
+          ? c.contactIds.map(function(id){ return String(id == null ? '' : id).trim().toUpperCase(); })
+                        .filter(function(id){ return /^C\d+$/.test(id); })
+          : []
+      };
+    }
+    function pfCrmNormEntry(entry){
+      entry = (entry && typeof entry === 'object' && !Array.isArray(entry)) ? entry : {};
+      if (Array.isArray(entry.companies)) {
+        return entry.companies.map(pfCrmNormOneCompany);
+      }
+      // Legacy single -> synth a 1-element list when it has content.
+      var one = pfCrmNormOneCompany(entry);
+      return (one.company || one.contactIds.length) ? [one] : [];
+    }
+    // pfCrmPackEntry(companies[]) -> the STORED entry object. Writes the `companies` array
+    // AND mirrors companies[0] to the legacy top-level fields (belt-and-suspenders). An
+    // empty list stores an explicit empty entry (company '', ids []) so a cleared section
+    // round-trips (same posture as the pre-existing cleared-selection handling).
+    function pfCrmPackEntry(companies){
+      var list = (Array.isArray(companies) ? companies : []).map(pfCrmNormOneCompany);
+      var head = list.length ? list[0] : { company: '', address: '', contactIds: [] };
+      return {
+        company: head.company || '',
+        address: (typeof head.address === 'string' ? head.address : ''),
+        contactIds: head.contactIds.slice(),
+        companies: list
+      };
+    }
+    // Read the normalized companies[] for one section prefix (label) under a section key.
+    function pfCrmCompanies(sectionKey, prefix){
+      var m = pfCrmMap(sectionKey) || {};
+      return pfCrmNormEntry(m[prefix]);
+    }
+    // Rebuild the FULL __crm map for a section key, preserving EVERY sibling prefix exactly
+    // (round-tripped through norm+pack so old single entries gain a companies[] mirror
+    // without changing their content), applying `mutate(companiesArr)` ONLY to `prefix`.
+    // `mutate` receives the normalized companies[] for `prefix` and returns the new
+    // companies[] to store there. Returns the { <prefix>: entry, ... } object to POST.
+    function pfCrmRebuildMap(sectionKey, prefix, mutate){
+      var cur = pfCrmMap(sectionKey) || {};
+      var out = {};
+      var sawPrefix = false;
+      Object.keys(cur).forEach(function(k){
+        var companies = pfCrmNormEntry(cur[k]);
+        if (k === prefix) { companies = mutate(companies.slice()) || []; sawPrefix = true; }
+        out[k] = pfCrmPackEntry(companies);
+      });
+      if (!sawPrefix) { out[prefix] = pfCrmPackEntry(mutate([]) || []); }
+      return out;
+    }
+
     // ---- PER-PROJECT BUDGET state (Financials Phase 1) --------------------
     // window.PF_PROJECT_BUDGETS = { num: { rows:{ cost_code:{budget} }, _meta, loaded, error } }
     // Loaded synchronously per project in openProjectRecord()/renderPoet() (like
@@ -21129,9 +21218,16 @@ try {
         });
         // Store a firm entry only when the user touched it (chose a company). This
         // avoids writing empty entries for firms the user never opened.
+        // MULTI-COMPANY (Brad 2026-08-28): this selector editor edits company #0 (the
+        // legacy single-company slot). Any ADDITIONAL companies[] beyond index 0 (added
+        // via the read-view "+ Add company") are PRESERVED — we normalize the prior entry
+        // and replace only element[0], then pack back into {company,address,contactIds,
+        // companies}. Sibling firms are untouched (only edited blocks are written).
         if (company || ids.length) {
-          var pEn = prior[sectionName] || {};
-          out[sectionName] = { company: company, address: (typeof pEn.address === 'string' ? pEn.address : ''), contactIds: ids };
+          var priorCos = pfCrmNormEntry(prior[sectionName]);
+          var head = priorCos.length ? priorCos[0] : { company: '', address: '', contactIds: [] };
+          priorCos[0] = { company: company, address: (typeof head.address === 'string' ? head.address : ''), contactIds: ids };
+          out[sectionName] = pfCrmPackEntry(priorCos);
         }
       });
       return out;
@@ -21250,33 +21346,52 @@ try {
       var roleTag = host.getAttribute('data-role-tag') || '';
       var _rowEditable = (typeof canEdit === 'function') ? canEdit() : false;
       var _prefix = pfx;
-      var hasCrmSel = !!(e && Array.isArray(e.contactIds) && e.contactIds.length);
+      // MULTI-COMPANY (Brad 2026-08-28): normalize the __crm entry to a companies[] list.
+      // Legacy single -> a synthesized 1-element list; a companies[] entry -> used as-is.
+      // Each element renders its OWN company card (name/address/contacts/+Add contact/
+      // Remove company), and a section-foot "+ Add company" appends a new one. This keeps
+      // the single-company case visually identical while allowing many (Equipment Transport,
+      // Material Vendors, etc.). See pfCrmNormEntry / pfCrmPackEntry / pfCrmRebuildMap.
+      var companies = pfCrmNormEntry(e); // [] when the entry is empty/absent
+      var hasCrmSel = companies.some(function(c){ return c.contactIds && c.contactIds.length; });
 
-      // Resolve the group's contacts + company for THIS render. A real __crm selection
-      // WINS (rendered as directory rows). But we MUST also keep showing any legacy seed
-      // contacts NOT yet migrated — otherwise migrating one contact would hide the others.
-      // So: render __crm rows first, then APPEND legacy seed rows whose person is not
-      // already represented in __crm (deduped by email, else by name). company: __crm
-      // company if set, else the seed company. This merge means a partially-migrated
-      // group shows BOTH its directory contacts (with real Edit/✕) and its remaining
-      // legacy contacts (with migrate-on-Edit) — no contact ever disappears.
-      var company = '';
-      // Brad 2026-08-20: company ADDRESS lives on the __crm entry (e.address), shown on one
-      // line to the right of the company name. It is a project-level pointer field (like
-      // e.company), not a directory field, so it resolves straight from the __crm entry.
-      var address = (e && typeof e.address === 'string') ? e.address : '';
-      var rows = [];
       var seed = pfCrmDecodeLegacySeed(host);
-      var seenKeys = {}; // dedupe keys already present via __crm
       var keyOf = function(email, name){
         var em = String(email || '').trim().toLowerCase();
         if (em) return 'e:' + em;
         var nm = String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
         return nm ? 'n:' + nm : '';
       };
-      if (hasCrmSel) {
-        company = e.company || (seed ? seed.company : '') || '';
-        rows = e.contactIds.map(function(id){
+
+      // Neither a __crm selection nor any legacy seed -> nothing to render here for a
+      // READ-ONLY user (clean empty, no wall of blanks). But an OFFICE user (canEdit) must
+      // still get the company header + "+ Add company" / "+ Add contact" affordance so an
+      // EMPTY sub-group (e.g. "Fuel Delivery") is reachable from the read view (Brad
+      // 2026-08-20). Fall through when editable; only bail when read-only.
+      if (!companies.length && !seed && !_rowEditable) { host.innerHTML = ''; return; }
+
+      var headRow = '<div class="pr-crow pr-crow-head">'
+        + '<span class="pr-crow-name">Name</span>'
+        + '<span class="pr-crow-title">Title</span>'
+        + '<span class="pr-crow-off">Office Phone</span>'
+        + '<span class="pr-crow-cell">Cell Phone</span>'
+        + '<span class="pr-crow-email">Email</span>'
+        + '<span class="pr-crow-notes">Notes</span>'
+        + (_rowEditable ? '<span class="pr-crow-act"></span>' : '')
+        + '</div>';
+
+      // Build ONE .pr-pc-company card for a single company at index coIdx. contactIds are
+      // resolved against the directory (byId); rows carry data-co-idx so add/edit/remove
+      // target the right company within the section. mergeSeed=true (only for coIdx 0)
+      // appends any legacy seed contacts not already represented (back-compat: the legacy
+      // model had one implicit company == index 0).
+      var multiCompany = companies.length > 1; // remove-company shown only when >1 (never orphan the sole card)
+      var buildCompanyCard = function(comp, coIdx, mergeSeed){
+        var company = comp.company || '';
+        var address = comp.address || '';
+        var ids = comp.contactIds || [];
+        var seenKeys = {};
+        var rows = ids.map(function(id){
           var c = byId[String(id).toUpperCase()];
           if (!c) return null; // stale/removed id: skip, never crash
           var nm = (c.name || ((c.firstName||'') + ' ' + (c.lastName||''))).trim();
@@ -21289,170 +21404,152 @@ try {
             email: c.email || '', notes: c.notes || ''
           };
         }).filter(Boolean);
-      } else {
-        company = seed ? (seed.company || '') : '';
-      }
-      // Append un-migrated legacy seed rows (skipping any already shown via __crm).
-      if (seed && seed.contacts.length) {
-        seed.contacts.forEach(function(c, i){
-          var nm = (c.name || '').trim();
-          var k = keyOf(c.email, nm);
-          if (k && seenKeys[k]) return; // already a directory row for this person
-          if (k) seenKeys[k] = 1;
-          rows.push({
-            legacy: true, cid: '', legacyIdx: i,
-            name: nm, title: (c.title || '').trim(),
-            office: c.office || '', cell: c.cell || '',
-            email: c.email || '', notes: c.notes || '',
-            labels: (c.labels && typeof c.labels === 'object') ? c.labels : null,
-            labelSection: c.labelSection || ''
+        // For company #0 with a legacy seed, adopt the seed company name when none is set,
+        // and append un-migrated seed rows (dedup by email/name) so migrating one contact
+        // never hides the others.
+        if (mergeSeed && seed) {
+          if (!company) company = seed.company || '';
+          (seed.contacts || []).forEach(function(c, i){
+            var nm = (c.name || '').trim();
+            var k = keyOf(c.email, nm);
+            if (k && seenKeys[k]) return;
+            if (k) seenKeys[k] = 1;
+            rows.push({
+              legacy: true, cid: '', legacyIdx: i,
+              name: nm, title: (c.title || '').trim(),
+              office: c.office || '', cell: c.cell || '',
+              email: c.email || '', notes: c.notes || '',
+              labels: (c.labels && typeof c.labels === 'object') ? c.labels : null,
+              labelSection: c.labelSection || ''
+            });
           });
-        });
-      }
-      // Neither a __crm selection nor any legacy seed -> nothing to render here for a
-      // READ-ONLY user (clean empty, no wall of blanks). But an OFFICE user (canEdit)
-      // must still get the company header + "+ Add company" / "+ Add contact" affordance
-      // so an EMPTY sub-group (e.g. "Fuel Delivery") is reachable from the read view —
-      // otherwise the group would show nothing at all and there'd be no way to populate
-      // it (Brad 2026-08-20). Fall through when editable; only bail when read-only.
-      if (!hasCrmSel && !seed && !_rowEditable) { host.innerHTML = ''; return; }
+        }
 
-      // Build each .pr-crow row (STATIC display cells + right-side [✎ Edit] + red [✕]).
-      // A legacy row carries data-crm-legacy="1" + its seed values so Edit can migrate it
-      // and ✕ can blank the right labels. A directory row carries data-crm-cid.
-      var rowHtml = rows.map(function(r){
-        var off = r.office ? '<a href="tel:' + esc2(r.office) + '">' + esc2(pfFmtPhone(r.office)) + '</a>' : '';
-        var cell = r.cell ? '<a href="tel:' + esc2(r.cell) + '">' + esc2(pfFmtPhone(r.cell)) + '</a>' : '';
-        var email = r.email ? '<a href="mailto:' + esc2(r.email) + '">' + esc2(r.email) + '</a>' : '';
-        var actHtml = '';
-        if (_rowEditable) {
-          if (r.legacy) {
-            // Legacy (not-yet-in-directory) row: Edit lazily migrates+opens editor; ✕ blanks
-            // its seed labels. Both carry the seed values as data attrs so the handlers can
-            // act without a directory record.
-            actHtml = '<span class="pr-crow-act">'
-              + '<button type="button" class="pr-crow-editbtn" '
-              +   'title="Edit this contact (adds it to the shared PF directory, then edits it there)" '
-              +   'onclick="window.pfCrmEditContactRow(this)">&#9998; Edit</button>'
-              + '<button type="button" class="pr-crow-rmbtn" '
-              +   'title="Remove this contact from THIS project" '
-              +   'onclick="window.pfCrmRemoveContactRow(this)">&#10005;</button>'
-              + '</span>';
-          } else {
-            actHtml = r.cid
-              ? '<span class="pr-crow-act">'
+        var rowHtml = rows.map(function(r){
+          var off = r.office ? '<a href="tel:' + esc2(r.office) + '">' + esc2(pfFmtPhone(r.office)) + '</a>' : '';
+          var cell = r.cell ? '<a href="tel:' + esc2(r.cell) + '">' + esc2(pfFmtPhone(r.cell)) + '</a>' : '';
+          var email = r.email ? '<a href="mailto:' + esc2(r.email) + '">' + esc2(r.email) + '</a>' : '';
+          var actHtml = '';
+          if (_rowEditable) {
+            if (r.legacy) {
+              actHtml = '<span class="pr-crow-act">'
                 + '<button type="button" class="pr-crow-editbtn" '
-                +   'data-crm-cid="' + esc2(r.cid) + '" title="Edit this contact (updates the shared directory)" '
+                +   'title="Edit this contact (adds it to the shared PF directory, then edits it there)" '
                 +   'onclick="window.pfCrmEditContactRow(this)">&#9998; Edit</button>'
                 + '<button type="button" class="pr-crow-rmbtn" '
-                +   'data-crm-cid="' + esc2(r.cid) + '" title="Remove this contact from THIS project (keeps them in the directory)" '
+                +   'title="Remove this contact from THIS project" '
                 +   'onclick="window.pfCrmRemoveContactRow(this)">&#10005;</button>'
-                + '</span>'
-              : '<span class="pr-crow-act"></span>';
+                + '</span>';
+            } else {
+              actHtml = r.cid
+                ? '<span class="pr-crow-act">'
+                  + '<button type="button" class="pr-crow-editbtn" '
+                  +   'data-crm-cid="' + esc2(r.cid) + '" title="Edit this contact (updates the shared directory)" '
+                  +   'onclick="window.pfCrmEditContactRow(this)">&#9998; Edit</button>'
+                  + '<button type="button" class="pr-crow-rmbtn" '
+                  +   'data-crm-cid="' + esc2(r.cid) + '" title="Remove this contact from THIS project (keeps them in the directory)" '
+                  +   'onclick="window.pfCrmRemoveContactRow(this)">&#10005;</button>'
+                  + '</span>'
+                : '<span class="pr-crow-act"></span>';
+            }
           }
+          var rowAttrs = ' data-crm-cid="' + esc2(r.cid || '') + '"';
+          if (r.legacy) {
+            rowAttrs += ' data-crm-legacy="1"'
+              + ' data-legacy-idx="' + esc2(String(r.legacyIdx)) + '"'
+              + ' data-legacy-name="' + esc2(r.name) + '"'
+              + ' data-legacy-title="' + esc2(r.title) + '"'
+              + ' data-legacy-office="' + esc2(r.office) + '"'
+              + ' data-legacy-cell="' + esc2(r.cell) + '"'
+              + ' data-legacy-email="' + esc2(r.email) + '"'
+              + ' data-legacy-notes="' + esc2(r.notes) + '"';
+            if (r.labels) rowAttrs += ' data-legacy-labels="' + esc2(JSON.stringify(r.labels)) + '"';
+            if (r.labelSection) rowAttrs += ' data-legacy-section="' + esc2(r.labelSection) + '"';
+          }
+          return '<div class="pr-crow"' + rowAttrs + '>'
+            + '<span class="pr-crow-name">'  + esc2(r.name || (r.cid || '')) + '</span>'
+            + '<span class="pr-crow-title">' + esc2(r.title || '') + '</span>'
+            + '<span class="pr-crow-off">'   + off + '</span>'
+            + '<span class="pr-crow-cell">'  + cell + '</span>'
+            + '<span class="pr-crow-email">' + email + '</span>'
+            + '<span class="pr-crow-notes">' + esc2(r.notes || '') + '</span>'
+            + actHtml
+            + '</div>';
+        });
+
+        var coIdxAttr = ' data-co-idx="' + esc2(String(coIdx)) + '"';
+        // Company name: inline-editable for office (carries co-idx so the save targets the
+        // right company). Static for read-only.
+        var companyHtml = _rowEditable
+          ? '<div class="pr-pc-company-name pr-pc-inline pr-pc-company-edit" contenteditable="true" '
+            + 'data-pf-company="1" data-crm-cards="' + esc2(_prefix) + '" '
+            + 'data-crm-cards-key="' + esc2(_skey) + '"' + coIdxAttr + ' '
+            + 'data-pf-prev="' + esc2(company || '') + '" spellcheck="false" '
+            + 'title="Edit the company name (updates the shared directory everywhere it is used)">'
+            + esc2(company || '') + '</div>'
+          : '<div class="pr-pc-company-name">' + esc2(company || '') + '</div>';
+        // Company ADDRESS (Brad 2026-08-20): one line to the right, muted. Only when a
+        // company exists. Office = inline-editable (carries co-idx); read-only = static span.
+        var addrHtml = '';
+        if (company) {
+          addrHtml = _rowEditable
+            ? '<div class="pr-pc-company-addr pr-pc-inline pr-pc-address-edit" contenteditable="true" '
+              + 'data-pf-address="1" data-crm-cards="' + esc2(_prefix) + '" '
+              + 'data-crm-cards-key="' + esc2(_skey) + '"' + coIdxAttr + ' '
+              + 'data-pf-prev="' + esc2(address || '') + '" spellcheck="false" '
+              + 'title="Edit the company address (shown on this project only)">'
+              + esc2(address || '') + '</div>'
+            : (address ? '<div class="pr-pc-company-addr">' + esc2(address) + '</div>' : '');
         }
-        var rowAttrs = ' data-crm-cid="' + esc2(r.cid || '') + '"';
-        if (r.legacy) {
-          rowAttrs += ' data-crm-legacy="1"'
-            + ' data-legacy-idx="' + esc2(String(r.legacyIdx)) + '"'
-            + ' data-legacy-name="' + esc2(r.name) + '"'
-            + ' data-legacy-title="' + esc2(r.title) + '"'
-            + ' data-legacy-office="' + esc2(r.office) + '"'
-            + ' data-legacy-cell="' + esc2(r.cell) + '"'
-            + ' data-legacy-email="' + esc2(r.email) + '"'
-            + ' data-legacy-notes="' + esc2(r.notes) + '"';
-          if (r.labels) rowAttrs += ' data-legacy-labels="' + esc2(JSON.stringify(r.labels)) + '"';
-          if (r.labelSection) rowAttrs += ' data-legacy-section="' + esc2(r.labelSection) + '"';
-        }
-        return '<div class="pr-crow"' + rowAttrs + '>'
-          + '<span class="pr-crow-name">'  + esc2(r.name || (r.cid || '')) + '</span>'
-          + '<span class="pr-crow-title">' + esc2(r.title || '') + '</span>'
-          + '<span class="pr-crow-off">'   + off + '</span>'
-          + '<span class="pr-crow-cell">'  + cell + '</span>'
-          + '<span class="pr-crow-email">' + email + '</span>'
-          + '<span class="pr-crow-notes">' + esc2(r.notes || '') + '</span>'
-          + actHtml
+        // "+ Add contact" for THIS company (carries co-idx).
+        var addBtn = _rowEditable
+          ? '<button type="button" class="pr-add-contact-btn pr-pc-addbtn pr-pc-addbtn-head" '
+            + 'data-crm-cards="' + esc2(_prefix) + '" data-crm-cards-key="' + esc2(_skey) + '"' + coIdxAttr + ' '
+            + 'data-crm-company="' + esc2(company || '') + '" '
+            + 'onclick="window.pfPcAddContact(this)">+ Add contact</button>'
+          : '';
+        // Remove-company (office-only): drops THIS company from the section's companies[].
+        // Only shown when there is more than one company on the section, so the sole card is
+        // never orphaned (an empty section keeps its "+ Add company" foot control instead).
+        var rmCoBtn = (_rowEditable && multiCompany)
+          ? '<button type="button" class="pr-pc-rmco-head" '
+            + 'data-crm-cards="' + esc2(_prefix) + '" data-crm-cards-key="' + esc2(_skey) + '"' + coIdxAttr + ' '
+            + 'title="Remove this company from this subsection (this project only)" '
+            + 'onclick="window.pfPcRemoveCompany(this)">&#10005; Remove company</button>'
+          : '';
+        var companyHeadRow = '<div class="pr-pc-company-head">' + companyHtml + addrHtml + addBtn + rmCoBtn + '</div>';
+        return '<div class="pr-pc-company"' + coIdxAttr + '>'
+          + companyHeadRow
+          + '<div class="pr-crow-table">' + headRow + rowHtml.join('') + '</div>'
           + '</div>';
-      });
+      };
 
-      // Nothing to show AND read-only -> render clean empty (no wall of blanks). Office
-      // users still get the company + "+ Add contact" affordance even with zero rows.
-      if (!rowHtml.length && !_rowEditable && !company) { host.innerHTML = ''; return; }
-
-      var headRow = '<div class="pr-crow pr-crow-head">'
-        + '<span class="pr-crow-name">Name</span>'
-        + '<span class="pr-crow-title">Title</span>'
-        + '<span class="pr-crow-off">Office Phone</span>'
-        + '<span class="pr-crow-cell">Cell Phone</span>'
-        + '<span class="pr-crow-email">Email</span>'
-        + '<span class="pr-crow-notes">Notes</span>'
-        + (_rowEditable ? '<span class="pr-crow-act"></span>' : '')
-        + '</div>';
-      // Company name: inline-editable for office. For a legacy group (no __crm yet) the
-      // company edit still routes through pfPcInlineCompanySave, which no-ops safely when
-      // there are no directory contacts to rename (nothing to write) but keeps the shown
-      // value; once contacts are migrated it renames them for real. Static for read-only.
-      var companyHtml = _rowEditable
-        ? '<div class="pr-pc-company-name pr-pc-inline pr-pc-company-edit" contenteditable="true" '
-          + 'data-pf-company="1" data-crm-cards="' + esc2(_prefix) + '" '
-          + 'data-crm-cards-key="' + esc2(_skey) + '" '
-          + 'data-pf-prev="' + esc2(company || '') + '" spellcheck="false" '
-          + 'title="Edit the company name (updates the shared directory everywhere it is used)">'
-          + esc2(company || '') + '</div>'
-        : '<div class="pr-pc-company-name">' + esc2(company || '') + '</div>';
-      // Company ADDRESS (Brad 2026-08-20): one line to the RIGHT of the company name, NOT
-      // bold (regular weight, muted). Only meaningful once a company exists on the group.
-      // Office users get an inline-editable cell (contenteditable, saves via
-      // pfPcInlineAddressSave -> full __crm map resend, same vetted path as the name).
-      // Read-only users see a static muted span. When there is no company at all we render
-      // nothing (an address with no company is meaningless). A placeholder prompts office
-      // users to add one so an empty-but-editable address is still discoverable.
-      var addrHtml = '';
-      if (company) {
-        addrHtml = _rowEditable
-          ? '<div class="pr-pc-company-addr pr-pc-inline pr-pc-address-edit" contenteditable="true" '
-            + 'data-pf-address="1" data-crm-cards="' + esc2(_prefix) + '" '
-            + 'data-crm-cards-key="' + esc2(_skey) + '" '
-            + 'data-pf-prev="' + esc2(address || '') + '" spellcheck="false" '
-            + 'title="Edit the company address (shown on this project only)">'
-            + esc2(address || '') + '</div>'
-          : (address ? '<div class="pr-pc-company-addr">' + esc2(address) + '</div>' : '');
+      // Render every company card. For an EMPTY editable section (no companies at all), we
+      // still show one placeholder card so the seed (if any) is displayable and the header
+      // is present; office users additionally get the "+ Add company" foot control below.
+      var cards = [];
+      if (companies.length) {
+        companies.forEach(function(comp, i){ cards.push(buildCompanyCard(comp, i, i === 0)); });
+      } else if (seed || _rowEditable) {
+        // No __crm companies yet: render a single implicit company #0 (seed contacts, or an
+        // empty office-affordance card). This is the legacy single-company empty/seed path.
+        cards.push(buildCompanyCard({ company: '', address: '', contactIds: [] }, 0, true));
       }
-      // "+ Add contact" — Brad 2026-08-14: MOVED to the right of the company name (in
-      // the company header row, above the per-contact [✎ Edit] + red [✕]), applied to
-      // EVERY group uniformly. The button still carries the same data-* + onclick; only
-      // its DOM position changed. pfPcAddContact appends its form to the .pr-pc-company
-      // wrap (below the table) so the header stays a single clean line.
-      var addBtn = _rowEditable
-        ? '<button type="button" class="pr-add-contact-btn pr-pc-addbtn pr-pc-addbtn-head" '
+
+      // "+ Add company" foot control (office-only): appends a NEW company card to this
+      // subsection. Always available for office (single is common, multi is opt-in per
+      // Brad). field_ops / read-only never see it; the server also 403s the underlying
+      // write. Reuses the vetted add path (prompt name/address -> add-contact form seeded
+      // with that company, assigned to a NEW companies[] element on first Save).
+      var addCoFoot = _rowEditable
+        ? '<div class="pr-pc-addco-foot-wrap"><button type="button" '
+          + 'class="pr-add-contact-btn pr-pc-addbtn pr-pc-addco-foot" '
           + 'data-crm-cards="' + esc2(_prefix) + '" data-crm-cards-key="' + esc2(_skey) + '" '
-          + 'data-crm-company="' + esc2(company || '') + '" '
-          + 'onclick="window.pfPcAddContact(this)">+ Add contact</button>'
+          + 'onclick="window.pfPcAddCompany(this)">+ Add company</button></div>'
         : '';
-      // "+ Add company" — Brad 2026-08-20: read-view entry point for an EMPTY sub-group
-      // (no company resolved yet, e.g. "Fuel Delivery"). When a company already exists,
-      // "+ Add contact" is the right control, so this button only shows while company is
-      // blank. Office-gated by _rowEditable (same canEdit() admin/partner/business_dev
-      // gate as "+ Add contact"; field_ops / read-only never see it, and the server also
-      // 403s the underlying writes). It reuses the VETTED read-view add path: prompt for a
-      // name (as pfCrmAddCompany does), then open the existing pfPcAddContact form seeded
-      // with that company (which POSTs /api/contacts add + assigns to this group's __crm —
-      // e.g. material.__crm — on Save). A company becomes real once it has >=1 contact
-      // (OPTION 1: no company table), so add-company => open add-contact-for-that-company.
-      var addCoBtn = (_rowEditable && !company)
-        ? '<button type="button" class="pr-add-contact-btn pr-pc-addbtn pr-pc-addbtn-head pr-pc-addco-head" '
-          + 'data-crm-cards="' + esc2(_prefix) + '" data-crm-cards-key="' + esc2(_skey) + '" '
-          + 'onclick="window.pfPcAddCompany(this)">+ Add company</button>'
-        : '';
-      // Company header row: company name on the LEFT, "+ Add contact" on the RIGHT
-      // (margin-left:auto). This row sits ABOVE the .pr-crow table whose rows each carry
-      // their own [✎ Edit] + red [✕] — so Add is visually just above Edit/✕, per Brad.
-      var companyHeadRow = '<div class="pr-pc-company-head">' + companyHtml + addrHtml + addCoBtn + addBtn + '</div>';
-      // When the uniform card renders (rows OR office affordances), HIDE the sibling
-      // legacy static horizContactBlock table so contacts do not appear twice. The
-      // hidden .pr-field editor grid (.pr-pc-cofields / .pr-ccards) is already display:none
-      // via CSS and is left intact (editor + fallback). We only hide the visible
-      // .pr-pc-horiz-block that lives just BEFORE this host inside the same group.
+
+      // Hide the sibling legacy static horizContactBlock table so contacts do not appear
+      // twice (same as before — only when the uniform card renders something).
       try {
         var prev = host.previousElementSibling;
         if (prev && prev.classList && prev.classList.contains('pr-pc-horiz-block')) {
@@ -21460,17 +21557,7 @@ try {
         }
       } catch(e){}
 
-      // Brad 2026-08-20: the gray-background/blue-text category PILL (.pr-role-tag)
-      // duplicated the standard underlined category subhead (.pr-subhead, e.g.
-      // "Staking & Layout") that already sits above each group. Removed here so every
-      // group shows the category name ONCE (the standard header), consistently across
-      // all 13 Project Contacts groups. roleTag is still read (used elsewhere) but no
-      // longer emits the redundant chip above the company name.
-      host.innerHTML =
-          '<div class="pr-pc-company">'
-        +   companyHeadRow
-        +   '<div class="pr-crow-table">' + headRow + rowHtml.join('') + '</div>'
-        + '</div>';
+      host.innerHTML = cards.join('') + addCoFoot;
     }
     window.pfCrmRenderCards = pfCrmRenderCards;
 
@@ -21614,6 +21701,7 @@ try {
       if (typeof canEdit === 'function' && !canEdit()) return;
       var prefix = cell.getAttribute('data-crm-cards') || '';
       var skey = cell.getAttribute('data-crm-cards-key') || 'design_professionals';
+      var coIdx = parseInt(cell.getAttribute('data-co-idx') || '0', 10); if (isNaN(coIdx) || coIdx < 0) coIdx = 0;
       var prev = cell.getAttribute('data-pf-prev') || '';
       var nowVal = (cell.textContent == null ? '' : cell.textContent).trim();
       var host = cell.closest ? cell.closest('.pr-crm-cards') : null;
@@ -21621,7 +21709,9 @@ try {
       if (nowVal === prev) return;
       if (!nowVal) { cell.textContent = prev; pfPcSay(host, 'Company name cannot be blank.', true); return; }
       var num = _curNum || '';
-      var entry = (pfCrmMap(skey)[prefix]) || {};
+      // MULTI-COMPANY: this rename targets company at index coIdx within the section.
+      var _cos = pfCrmCompanies(skey, prefix);
+      var entry = _cos[coIdx] || {};
       var ids = Array.isArray(entry.contactIds) ? entry.contactIds.slice() : [];
       // Directory contacts in this group to rename (those matching the old company).
       var toRename = [];
@@ -21652,17 +21742,17 @@ try {
           return;
         }
         results.forEach(function(r){ pfPcAdoptDirRow(r.body && r.body.contact); });
-        // Repoint the project's __crm[group].company to the new name. Resend the section's
-        // FULL __crm map (preserves sibling groups + all other reserved section keys).
-        var curMap = pfCrmMap(skey) || {};
-        var out = {};
-        Object.keys(curMap).forEach(function(k){
-          var en = curMap[k] || {};
-          out[k] = { company: (k === prefix ? nowVal : (en.company || '')),
-                     address: (typeof en.address === 'string' ? en.address : ''),
-                     contactIds: Array.isArray(en.contactIds) ? en.contactIds.slice() : [] };
+        // Repoint this project's __crm[group] company #coIdx to the new name. Rebuild the
+        // section's FULL __crm map (preserves every sibling group + all their companies[] +
+        // all other reserved section keys); mutate only company[coIdx].company here.
+        var out = pfCrmRebuildMap(skey, prefix, function(cos){
+          if (!cos.length) cos = [{ company: '', address: '', contactIds: ids }];
+          var idx = (coIdx < cos.length) ? coIdx : 0;
+          cos[idx] = { company: nowVal,
+                       address: (typeof cos[idx].address === 'string' ? cos[idx].address : ''),
+                       contactIds: Array.isArray(cos[idx].contactIds) ? cos[idx].contactIds.slice() : ids };
+          return cos;
         });
-        if (!Object.prototype.hasOwnProperty.call(out, prefix)) out[prefix] = { company: nowVal, address: '', contactIds: ids };
         var body = {}; body[PF_CRM_KEY] = out;
         return fetch('/api/project-override', {
           method: 'POST', credentials: 'same-origin',
@@ -21704,6 +21794,7 @@ try {
       if (typeof canEdit === 'function' && !canEdit()) return; // office-only (defense in depth)
       var prefix = cell.getAttribute('data-crm-cards') || '';
       var skey = cell.getAttribute('data-crm-cards-key') || 'design_professionals';
+      var coIdx = parseInt(cell.getAttribute('data-co-idx') || '0', 10); if (isNaN(coIdx) || coIdx < 0) coIdx = 0;
       var prev = cell.getAttribute('data-pf-prev') || '';
       var nowVal = (cell.textContent == null ? '' : cell.textContent).trim();
       var host = cell.closest ? cell.closest('.pr-crm-cards') : null;
@@ -21711,18 +21802,15 @@ try {
       if (nowVal === prev) return;           // no change
       var num = _curNum || '';
       if (!num) { cell.textContent = prev; pfPcSay(host, 'Could not resolve the project; refresh and retry.', true); return; }
-      // Rebuild the section's FULL __crm map, editing only this group's address.
-      var curMap = pfCrmMap(skey) || {};
-      var out = {};
-      Object.keys(curMap).forEach(function(k){
-        var en = curMap[k] || {};
-        out[k] = { company: en.company || '',
-                   address: (k === prefix ? nowVal : (typeof en.address === 'string' ? en.address : '')),
-                   contactIds: Array.isArray(en.contactIds) ? en.contactIds.slice() : [] };
+      // MULTI-COMPANY: rebuild the section's FULL __crm map, editing only company[coIdx]'s
+      // address within THIS group (every sibling group + their companies[] preserved).
+      var out = pfCrmRebuildMap(skey, prefix, function(cos){
+        if (!cos.length) cos = [{ company: '', address: '', contactIds: [] }];
+        var idx = (coIdx < cos.length) ? coIdx : 0;
+        cos[idx] = { company: cos[idx].company || '', address: nowVal,
+                     contactIds: Array.isArray(cos[idx].contactIds) ? cos[idx].contactIds.slice() : [] };
+        return cos;
       });
-      // If this group has no entry yet (edge: address edited before any contact — shouldn't
-      // happen since the cell only renders when a company exists, but stay safe) seed one.
-      if (!Object.prototype.hasOwnProperty.call(out, prefix)) out[prefix] = { company: '', address: nowVal, contactIds: [] };
       var body = {}; body[PF_CRM_KEY] = out;
       pfPcSay(host, 'Saving…', false);
       fetch('/api/project-override', {
@@ -21792,12 +21880,20 @@ try {
       var prefix = btn.getAttribute('data-crm-cards') || '';
       var skey = btn.getAttribute('data-crm-cards-key') || 'design_professionals';
       var company = btn.getAttribute('data-crm-company') || '';
+      // MULTI-COMPANY (Brad 2026-08-28): which company within the section this contact is
+      // for. "+ Add contact" on a company card carries that card's index; "+ Add company"
+      // (pfPcAddCompany) sets -1 to signal "append a NEW company element".
+      var coIdx = btn.getAttribute('data-co-idx');
+      coIdx = (coIdx == null || coIdx === '') ? '0' : coIdx;
       // Brad 2026-08-20: carry the "+ Add company" seeded address (if any) onto the form so
       // pfPcAddContactSave can persist it into __crm[group].address on the first contact.
       var companyAddress = btn.getAttribute('data-crm-company-address') || '';
       var trade = (typeof pfPcGroupTradeSafe === 'function') ? pfPcGroupTradeSafe(skey, prefix) : '';
       var host = btn.closest ? btn.closest('.pr-crm-cards') : null;
       var wrap = btn.closest ? btn.closest('.pr-pc-company') : null;
+      // "+ Add company" foot button lives OUTSIDE any .pr-pc-company card; anchor its form
+      // to the whole host so it opens below the last card.
+      if (!wrap && host) wrap = host;
       if (!prefix || !wrap) return;
       if (wrap.querySelector('.pr-crm-addform')) { var o = wrap.querySelector('.pr-crm-addform input'); if (o) o.focus(); return; }
       function fld(key, label, wide){
@@ -21813,6 +21909,7 @@ try {
       form.setAttribute('data-crm-cards-key', skey);
       form.setAttribute('data-crm-company', company);
       form.setAttribute('data-crm-company-address', companyAddress);
+      form.setAttribute('data-co-idx', String(coIdx));
       form.setAttribute('data-crm-trade', trade || '');
       form.innerHTML = ''
         + '<div class="pr-crm-addform-note">New contact for <strong>' + esc2(company || 'this group')
@@ -21843,51 +21940,87 @@ try {
       if (form._addBtn) form._addBtn.style.display = '';
       form.remove();
     };
-    // "+ Add company" for a Project Contacts sub-group from the READ VIEW (Brad 2026-08-20).
-    // Fills the gap where an EMPTY sub-group (e.g. "Fuel Delivery" under material) showed no
-    // affordance at all. Mirrors the section-editor's pfCrmAddCompany UX (prompt for a name)
-    // but persists through the VETTED read-view add path: it seeds the company onto the
-    // existing "+ Add contact" button and opens pfPcAddContact — so the first contact's Save
-    // mints the directory row (POST /api/contacts action:'add') AND assigns it to THIS
-    // project's __crm[group] under the sub-group's key (e.g. material) via
-    // /api/project-override. A company becomes real once it has >=1 contact (OPTION 1 — no
-    // company table), exactly as pfCrmAddCompany documents. RBAC: office-only, same canEdit()
-    // gate as "+ Add contact"; the server also 403s the underlying writes for non-crm roles.
+    // "+ Add company" for a Project Contacts sub-group from the READ VIEW.
+    // MULTI-COMPANY (Brad 2026-08-28): this now lives at the SECTION FOOT (below the last
+    // company card) and ALWAYS appends a NEW company to the sub-group's companies[] — so a
+    // sub-group can hold several (Equipment Transport, Material Vendors, etc.) while single
+    // remains the common case. It prompts for name + address, then opens the vetted
+    // pfPcAddContact form with data-co-idx="-1" (append). The first contact's Save mints the
+    // directory row (POST /api/contacts action:'add') AND assigns it to a NEW companies[]
+    // element under this sub-group's key via /api/project-override (pfCrmRebuildMap, which
+    // preserves every existing company + sibling group). A company becomes real once it has
+    // >=1 contact (OPTION 1 — no company table). RBAC: office-only (canEdit); the server
+    // also 403s the underlying writes for non-crm roles.
     window.pfPcAddCompany = function(btn){
       if (!btn) return;
       if (typeof canEdit === 'function' && !canEdit()) return; // office-only (defense in depth)
-      var name = (window.prompt('New company name for this group:') || '').trim();
+      var name = (window.prompt('New company name for this subsection:') || '').trim();
       if (!name) return;
-      // Brad 2026-08-20: also capture the company ADDRESS on add (second prompt — keeps the
-      // simple prompt-based add-company UX). Optional: a blank address is fine (the field
-      // just renders empty and stays inline-editable). It is seeded onto the add-contact
-      // form (data-crm-company-address) and persisted into __crm[group].address when the
-      // first contact's Save resends the full map.
       var address = (window.prompt('Company address (optional — one line, e.g. 123 Main St, City, ST):', '') || '').trim();
       var prefix = btn.getAttribute('data-crm-cards') || '';
       var skey = btn.getAttribute('data-crm-cards-key') || 'design_professionals';
-      var wrap = btn.closest ? btn.closest('.pr-pc-company') : null;
-      if (!prefix || !wrap) return;
-      // Reuse the existing read-view add-contact form, seeded with the new company. Prefer
-      // the group's own "+ Add contact" button (carries the correct data-* + wiring); if it
-      // is absent (empty group may render only this button), synthesize an equivalent one.
-      var addBtn = wrap.querySelector('.pr-pc-addbtn:not(.pr-pc-addco-head)');
-      if (addBtn) {
-        addBtn.setAttribute('data-crm-company', name);
-        addBtn.setAttribute('data-crm-company-address', address);
-      } else {
-        addBtn = document.createElement('button');
-        addBtn.type = 'button';
-        addBtn.className = 'pr-add-contact-btn pr-pc-addbtn pr-pc-addbtn-head';
-        addBtn.setAttribute('data-crm-cards', prefix);
-        addBtn.setAttribute('data-crm-cards-key', skey);
-        addBtn.setAttribute('data-crm-company', name);
-        addBtn.setAttribute('data-crm-company-address', address);
-        addBtn.setAttribute('onclick', 'window.pfPcAddContact(this)');
-        var head = btn.parentNode; if (head) head.appendChild(addBtn);
-      }
+      var host = btn.closest ? btn.closest('.pr-crm-cards') : null;
+      if (!prefix || !host) return;
+      if (host.querySelector('.pr-crm-addform')) { var o = host.querySelector('.pr-crm-addform input'); if (o) o.focus(); return; }
+      // Synthesize an add-contact button that APPENDS a new company (data-co-idx="-1"),
+      // seeded with the new name/address, anchored to the host so the form opens at the foot.
+      var addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = 'pr-add-contact-btn pr-pc-addbtn pr-pc-addbtn-head';
+      addBtn.setAttribute('data-crm-cards', prefix);
+      addBtn.setAttribute('data-crm-cards-key', skey);
+      addBtn.setAttribute('data-crm-company', name);
+      addBtn.setAttribute('data-crm-company-address', address);
+      addBtn.setAttribute('data-co-idx', '-1');
+      addBtn.setAttribute('onclick', 'window.pfPcAddContact(this)');
+      host.appendChild(addBtn);
+      addBtn.style.display = 'none';
       btn.style.display = 'none'; // hide "+ Add company" while the add-contact form is open
       window.pfPcAddContact(addBtn);
+    };
+    // Remove a whole COMPANY from a sub-group's companies[] (Brad 2026-08-28). Office-only
+    // deliberate action (canEdit; server also 403s). Confirms, then rebuilds the section's
+    // FULL __crm map dropping company[coIdx] from THIS prefix (siblings + other companies
+    // preserved via pfCrmRebuildMap). The directory records are NEVER touched — this only
+    // unassigns the company + its contacts from THIS project's sub-group. FAIL CLOSED.
+    window.pfPcRemoveCompany = function(btn){
+      if (!btn) return;
+      if (typeof canEdit === 'function' && !canEdit()) return; // office-only (defense in depth)
+      var prefix = btn.getAttribute('data-crm-cards') || '';
+      var skey = btn.getAttribute('data-crm-cards-key') || 'design_professionals';
+      var coIdx = parseInt(btn.getAttribute('data-co-idx') || '', 10);
+      var host = btn.closest ? btn.closest('.pr-crm-cards') : null;
+      var num = _curNum || '';
+      if (!prefix || isNaN(coIdx) || coIdx < 0) { window.alert('Could not resolve which company to remove. Refresh and retry.'); return; }
+      if (!num) { pfPcSay(host, 'Could not resolve the project; refresh and retry.', true); return; }
+      var cos = pfCrmCompanies(skey, prefix);
+      var who = (cos[coIdx] && cos[coIdx].company) ? cos[coIdx].company : 'this company';
+      if (!window.confirm('Remove ' + who + ' from this subsection? (This project only — the directory is not changed.)')) return;
+      var out = pfCrmRebuildMap(skey, prefix, function(list){
+        if (coIdx < list.length) list.splice(coIdx, 1);
+        return list;
+      });
+      var body = {}; body[PF_CRM_KEY] = out;
+      pfPcSay(host, 'Removing…', false);
+      fetch('/api/project-override', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ num: num, section: skey, fields: body })
+      }).then(function(res){ return res.json().then(function(b){ return { ok: res.ok, status: res.status, body: b }; })
+          .catch(function(){ return { ok: res.ok, status: res.status, body: null }; }); })
+        .then(function(r){
+          if (!r.ok || !r.body || r.body.ok !== true || r.body.saved !== true) {
+            pfPcSay(host, (r.body && r.body.message) ? r.body.message
+              : (r.status === 403 ? 'You do not have permission to edit this project.'
+                 : 'Remove failed (' + r.status + '). Nothing was changed — please retry.'), true);
+            return;
+          }
+          window.PF_PROJECT_OVERRIDES[num] = { sections: (r.body.sections) || {}, _meta: (r.body._meta) || null };
+          try { if (String(num) === String(_curNum) && r.body.sections) _curOverrides = r.body.sections; } catch(e){}
+          if (window.pfCrmRenderCards) window.pfCrmRenderCards(document);
+        }).catch(function(){
+          pfPcSay(host, 'Remove failed: could not reach the server. Nothing was changed — please retry.', true);
+        });
     };
     window.pfPcAddContactSave = function(btn){
       var form = btn.closest ? btn.closest('.pr-crm-addform') : null;
@@ -21895,6 +22028,7 @@ try {
       var prefix = form.getAttribute('data-crm-cards') || '';
       var skey = form.getAttribute('data-crm-cards-key') || 'design_professionals';
       var company = form.getAttribute('data-crm-company') || '';
+      var coIdx = parseInt(form.getAttribute('data-co-idx') || '0', 10); if (isNaN(coIdx)) coIdx = 0;
       var trade = form.getAttribute('data-crm-trade') || '';
       var errEl = form.querySelector('.pr-crm-addform-err');
       function showErr(m){ if (errEl){ errEl.textContent = m; errEl.style.display = 'block'; } }
@@ -21930,22 +22064,27 @@ try {
           }
           pfPcAdoptDirRow(r.body.contact);
           var newId = String(r.body.contact.contactId || '').toUpperCase();
-          // STEP 2: assign the new id to this project's __crm[group] (full-map resend).
-          // Preserve every group's address (en.address) across the rebuild; seed THIS
-          // group's address from the add-contact form's data-crm-company-address (set by
-          // "+ Add company" — Brad 2026-08-20) when the group has no address yet.
-          var curMap = pfCrmMap(skey) || {};
-          var out = {};
-          Object.keys(curMap).forEach(function(k){
-            var en = curMap[k] || {};
-            out[k] = { company: en.company || '', address: (typeof en.address === 'string' ? en.address : ''), contactIds: Array.isArray(en.contactIds) ? en.contactIds.slice() : [] };
-          });
+          // STEP 2: assign the new id to this project's __crm[group] (full-map rebuild,
+          // preserving every sibling group + all their companies[]). MULTI-COMPANY: the
+          // contact goes to company at index coIdx, or a NEW appended company when coIdx<0
+          // ("+ Add company"). Seed THIS company's name/address from the form when empty.
           var _seedAddr = form.getAttribute('data-crm-company-address') || '';
-          var mine = out[prefix] || { company: company || '', address: _seedAddr, contactIds: [] };
-          if (!mine.company && company) mine.company = company;
-          if ((typeof mine.address !== 'string' || !mine.address) && _seedAddr) mine.address = _seedAddr;
-          if (mine.contactIds.indexOf(newId) === -1) mine.contactIds.push(newId);
-          out[prefix] = mine;
+          var out = pfCrmRebuildMap(skey, prefix, function(cos){
+            var mine;
+            if (coIdx < 0 || coIdx >= cos.length) {
+              // Append a new company element (or fall back to a fresh one if index is stale).
+              mine = { company: company || '', address: _seedAddr || '', contactIds: [] };
+              cos.push(mine);
+            } else {
+              mine = cos[coIdx] || { company: company || '', address: _seedAddr || '', contactIds: [] };
+              cos[coIdx] = mine;
+            }
+            if (!mine.company && company) mine.company = company;
+            if ((typeof mine.address !== 'string' || !mine.address) && _seedAddr) mine.address = _seedAddr;
+            if (!Array.isArray(mine.contactIds)) mine.contactIds = [];
+            if (mine.contactIds.indexOf(newId) === -1) mine.contactIds.push(newId);
+            return cos;
+          });
           var body = {}; body[PF_CRM_KEY] = out;
           return fetch('/api/project-override', {
             method: 'POST', credentials: 'same-origin',
@@ -22270,6 +22409,9 @@ try {
       var host = row.closest ? row.closest('.pr-crm-cards') : null;
       var prefix = host ? (host.getAttribute('data-crm-cards') || '') : '';
       var sectionKey = host ? (host.getAttribute('data-crm-cards-key') || 'design_professionals') : 'design_professionals';
+      // MULTI-COMPANY: which company card this row lives in (drop the id from THAT company).
+      var coCard = row.closest ? row.closest('.pr-pc-company') : null;
+      var coIdx = coCard ? (coCard.getAttribute('data-co-idx') || '0') : '0';
       if (!prefix) { window.alert('Could not resolve which group this contact belongs to. Please refresh and retry.'); return; }
       if (row.getAttribute('data-crm-removing') === '1') return;
       row.setAttribute('data-crm-removing', '1');
@@ -22288,6 +22430,7 @@ try {
       confirmBar.setAttribute('data-crm-cid', cid);
       confirmBar.setAttribute('data-crm-prefix', prefix);
       confirmBar.setAttribute('data-crm-key', sectionKey);
+      confirmBar.setAttribute('data-co-idx', String(coIdx));
       // Legacy (not-yet-in-directory) row: carry its blank-labels + label section so the
       // confirm handler removes it via a plain field-blanking override (NOT a __crm edit).
       if (isLegacy) {
@@ -22330,6 +22473,7 @@ try {
       var cid = String(bar.getAttribute('data-crm-cid') || '').toUpperCase();
       var prefix = bar.getAttribute('data-crm-prefix') || '';
       var sectionKey = bar.getAttribute('data-crm-key') || 'design_professionals';
+      var coIdx = parseInt(bar.getAttribute('data-co-idx') || '0', 10); if (isNaN(coIdx) || coIdx < 0) coIdx = 0;
       var num = _curNum || '';
       var errEl = bar.querySelector('.pr-crow-rmconfirm-err');
       function showErr(m){ if (errEl){ errEl.textContent = m; errEl.style.display = 'block'; } }
@@ -22357,14 +22501,12 @@ try {
           var ctM = pfCrmHostCompanyTrade(hostM, prefix, sectionKey);
           busy(true);
           pfCrmMigrateLegacyRow(origRow, hostM, prefix, sectionKey, ctM.company, ctM.trade, function(newId){
-            // Now remove the freshly-minted id from __crm (full-map resend).
-            var curM = pfCrmMap(sectionKey) || {};
-            var outM = {};
-            Object.keys(curM).forEach(function(k){
-              var en = curM[k] || {};
-              var ids = Array.isArray(en.contactIds) ? en.contactIds.slice() : [];
-              if (k === prefix) ids = ids.filter(function(id){ return String(id||'').toUpperCase() !== String(newId).toUpperCase(); });
-              outM[k] = { company: en.company || '', address: (typeof en.address === 'string' ? en.address : ''), contactIds: ids };
+            // Now remove the freshly-minted id from company[coIdx] (full-map rebuild).
+            var _cid = String(newId||'').toUpperCase();
+            var outM = pfCrmRebuildMap(sectionKey, prefix, function(cos){
+              var idx = (coIdx < cos.length) ? coIdx : 0;
+              if (cos[idx]) cos[idx].contactIds = (cos[idx].contactIds || []).filter(function(id){ return String(id||'').toUpperCase() !== _cid; });
+              return cos;
             });
             fetch('/api/project-override', {
               method: 'POST', credentials: 'same-origin',
@@ -22417,17 +22559,13 @@ try {
       }
 
       if (!num || !cid || !prefix) { showErr('Could not resolve the project or contact; refresh and retry.'); return; }
-      // Build the COMPLETE current __crm map for the section (whole-object replace on
-      // the backend — we must resend every prefix, editing only the target one).
-      var cur = pfCrmMap(sectionKey) || {};
-      var out = {};
-      Object.keys(cur).forEach(function(k){
-        var entry = cur[k] || {};
-        var ids = Array.isArray(entry.contactIds) ? entry.contactIds.slice() : [];
-        if (k === prefix) {
-          ids = ids.filter(function(id){ return String(id || '').toUpperCase() !== cid; });
-        }
-        out[k] = { company: entry.company || '', address: (typeof entry.address === 'string' ? entry.address : ''), contactIds: ids };
+      // Rebuild the COMPLETE __crm map for the section (whole-object replace on the backend),
+      // dropping this cid from ONLY company[coIdx] of the target prefix. Every sibling group
+      // + every other company on this prefix is preserved (pfCrmRebuildMap).
+      var out = pfCrmRebuildMap(sectionKey, prefix, function(cos){
+        var idx = (coIdx < cos.length) ? coIdx : 0;
+        if (cos[idx]) cos[idx].contactIds = (cos[idx].contactIds || []).filter(function(id){ return String(id || '').toUpperCase() !== cid; });
+        return cos;
       });
       if (errEl) errEl.style.display = 'none';
       busy(true);

@@ -153,6 +153,12 @@ function build(opts) {
   g.window.renderProjectRecord = g.renderProjectRecord;
 
   const src = [
+    // MULTI-COMPANY helpers (Brad 2026-08-28): pfCrmRenderOneHost + save paths call these.
+    extractFn(html, 'pfCrmNormOneCompany'),
+    extractFn(html, 'pfCrmNormEntry'),
+    extractFn(html, 'pfCrmPackEntry'),
+    extractFn(html, 'pfCrmCompanies'),
+    extractFn(html, 'pfCrmRebuildMap'),
     extractFn(html, 'pfCrmDecodeLegacySeed'),
     extractFn(html, 'pfCrmRenderOneHost'),
     extractFn(html, 'pfCrmRenderCards'),
@@ -418,10 +424,18 @@ function pfTeamSeed(role) { return { name:'Jonathan Reinking', title:role, offic
     const tableIdx = kids.indexOf(wrap.querySelector('.pr-crow-table'));
     ok('(B/' + grp.tag + ') header row (with Add) is ABOVE the contact table (with Edit/✕)',
        headIdx > -1 && tableIdx > -1 && headIdx < tableIdx);
-    // The Add button must NOT be below the list any more (no addbtn outside the header).
-    const addBtns = host.querySelectorAll('.pr-pc-addbtn');
-    ok('(B/' + grp.tag + ') the ONLY Add button is the header one (none left below the list)',
-       addBtns.length === 1 && head.contains(addBtns[0]));
+    // MULTI-COMPANY (Brad 2026-08-28): the header carries exactly ONE "+ Add contact"; a
+    // separate "+ Add company" foot control (also .pr-pc-addbtn, class .pr-pc-addco-foot)
+    // now sits BELOW the last card to append another company. So: exactly one header Add
+    // (the "+ Add contact"), and it must be the header one (none stray below the list).
+    const headAddBtns = head.querySelectorAll('.pr-pc-addbtn:not(.pr-pc-addco-foot)');
+    ok('(B/' + grp.tag + ') exactly one "+ Add contact" in the header',
+       headAddBtns.length === 1 && head.contains(headAddBtns[0]));
+    // The "+ Add company" foot control is present (office) and is OUTSIDE the company card.
+    const addCoFoot = host.querySelector('.pr-pc-addco-foot');
+    ok('(B/' + grp.tag + ') "+ Add company" foot control present (multi-company)', !!addCoFoot);
+    ok('(B/' + grp.tag + ') "+ Add company" foot is OUTSIDE the company card',
+       !!addCoFoot && !wrap.contains(addCoFoot));
     // Edit + ✕ still present per contact on this group.
     ok('(B/' + grp.tag + ') per-contact [✎ Edit] + red [✕] still present', !!host.querySelector('.pr-crow-editbtn') && !!host.querySelector('.pr-crow-rmbtn'));
   }

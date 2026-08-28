@@ -170,6 +170,14 @@ function build(opts) {
   // ---- load the REAL functions ----
   const src = [
     'var _pfPcInlineBound = false;',   // module-scoped guard referenced by pfPcMountInline
+    // MULTI-COMPANY helpers (Brad 2026-08-28): pfCrmRenderOneHost + the save paths now call
+    // these normalize/pack/rebuild helpers. Extract them so the sandbox render doesn't throw
+    // (the harness provides pfCrmMap as a stub above; these build ON it).
+    extractFn(html, 'pfCrmNormOneCompany'),
+    extractFn(html, 'pfCrmNormEntry'),
+    extractFn(html, 'pfCrmPackEntry'),
+    extractFn(html, 'pfCrmCompanies'),
+    extractFn(html, 'pfCrmRebuildMap'),
     extractFn(html, 'pfCrmDecodeLegacySeed'),
     extractFn(html, 'pfCrmRenderOneHost'),
     extractFn(html, 'pfCrmRenderCards'),
