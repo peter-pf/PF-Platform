@@ -24167,6 +24167,45 @@ try {
       m.style.display = text ? 'block' : 'none';
       m.style.color = isErr ? '#b91c1c' : '#166534';
     }
+    // Patch the County/Township read cells IN PLACE after a successful geocode+save,
+    // without re-rendering (and thus without collapsing/closing) the record view. Only
+    // touches the general card's .pr-field value cells for the given labels; clears the
+    // .blank amber highlight on a now-filled value and stamps the "manually edited"
+    // pencil the same way field() would on a re-render. Returns true if it found + wrote
+    // at least the County cell (the always-present one). Fail-safe: any missing node ->
+    // returns false so the caller falls back to an honest "reload" note (never closes).
+    function pfPatchGeneralFieldsInPlace(fields, wrap){
+      var card = document.querySelector('.pr-card[data-pr-section="general"]');
+      if (!card) return false;
+      var wroteCounty = false;
+      Object.keys(fields).forEach(function(label){
+        var val = String(fields[label] == null ? '' : fields[label]);
+        var row = card.querySelector('.pr-field[data-pr-label="' + (window.CSS && CSS.escape ? CSS.escape(label) : label) + '"]');
+        if (!row) return;
+        var valEl = row.querySelector('.pr-field-value');
+        if (!valEl) return;
+        var filled = val.trim() !== '';
+        // Read-cell text: filled value or the "-" em-dash fallback field() uses.
+        valEl.textContent = filled ? val : '-';
+        // .blank amber highlight tracks emptiness, exactly like field()/pfLiveFieldChange.
+        if (filled) valEl.classList.remove('empty', 'blank');
+        else { valEl.classList.add('empty'); valEl.classList.add('blank'); }
+        // Stamp the "manually edited" pencil next to the label (idempotent) — this is now
+        // a Manual override, so mark it the way a full re-render would.
+        try {
+          var labelEl = row.querySelector('.pr-field-label');
+          if (labelEl && filled && !labelEl.querySelector('.pr-field-edited')) {
+            var mk = document.createElement('span');
+            mk.className = 'pr-field-edited'; mk.title = 'Manually edited';
+            mk.innerHTML = '&#9998;';
+            labelEl.appendChild(mk);
+          }
+        } catch (e) {}
+        if (label === 'County' && filled) wroteCounty = true;
+      });
+      return wroteCounty;
+    }
+
     window.pfLookupCountyTownship = function(btn){
       if (!canEdit()) return;                          // defense-in-depth (server also 403s)
       var wrap = pfCtlkWrap(btn);
@@ -24226,12 +24265,30 @@ try {
           var okMsg = 'County' + (fields['Township'] ? ' & Township' : '') + ' filled from the US Census Geocoder.'
             + (note ? ' ' + note : '');
           pfCtlkMsg(wrap, okMsg, false);
-          // Re-render the whole record from server truth (fields now populated). If the
-          // re-render helper is unavailable, the inline note tells the user to reload.
+          // Update the County/Township fields IN PLACE and KEEP the General Info view
+          // open (Brad 2026-08-27 bug: this used to call openProjectRecord(num), a FULL
+          // record re-render that collapsed the open card, jumped scroll to top, and
+          // wiped any unsaved edits in other sections — it read as "the page closed").
+          // Instead we patch just the two .pr-field value cells in the general card,
+          // mirroring the no-re-render pattern of pfLiveFieldChange. Server truth was
+          // already adopted into _curOverrides / PF_PROJECT_OVERRIDES above, so any
+          // LATER re-render stays correct; nothing here dismisses or reloads the view.
+          var patched = false;
           try {
-            if (typeof openProjectRecord === 'function' && String(num) === String(_curNum)) openProjectRecord(num);
-            else pfCtlkMsg(wrap, okMsg + ' Reload to see the values.', false);
-          } catch (e) {
+            if (String(num) === String(_curNum)) {
+              patched = pfPatchGeneralFieldsInPlace(fields, wrap);
+            }
+          } catch (e) { patched = false; }
+          // The look-up affordance hides once BOTH fields are filled — remove the
+          // button so the (now-satisfied) control disappears in place, keeping only the
+          // success note. If we could not patch the DOM (unexpected structure), fall
+          // back to an honest "reload to see the values" note (NEVER re-render/close).
+          if (patched) {
+            try {
+              var _b = wrap.querySelector('.pf-cpull-btn');
+              if (_b && _b.parentNode) _b.parentNode.removeChild(_b);
+            } catch (e2) {}
+          } else {
             pfCtlkMsg(wrap, okMsg + ' Reload to see the values.', false);
           }
         }).catch(function(){
