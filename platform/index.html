@@ -4060,6 +4060,132 @@ window.PF_DATE_LABEL_RE = /(^|[^a-z])dates?([^a-z]|$)|completion\b|\bstart\b|(pr
 window.pfIsDateLabel = function(label){ return window.PF_DATE_LABEL_RE.test(String(label || '')); };
 
 // ============================================================
+// SYNC NOW BUTTON (office-only, top-right topbar)
+// Triggers /api/sync-request (POST) -> writes the sync_request_v1 KV flag ->
+// the container's platform_sync_daemon polls that flag, runs the SharePoint pull
+// + feed rebuild + wrangler deploy, and writes sync_status_v1 back to KV. This
+// block polls GET /api/sync-request for the honest state and reflects it on the
+// button (Syncing / Synced (ts) / Sync failed). NEVER fakes a success. Client
+// gate is cosmetic (field_ops UI stays clean); the endpoint enforces office-only
+// server-side (requireArea 'financials' + areaForPath). See functions/api/
+// sync-request.js and tools/platform_sync_daemon.sh.
+// ============================================================
+(function () {
+  // Office roles that may trigger a sync (MATCHES the server 'financials' area:
+  // admin/partner/business_dev; field_ops is blocked both here and server-side).
+  var OFFICE_ROLES = { admin: 1, partner: 1, business_dev: 1 };
+  var pollTimer = null;
+
+  function role() { return (window.PF_ME && window.PF_ME.role) || 'field_ops'; }
+  function isOffice() { return !!OFFICE_ROLES[role()]; }
+
+  // Format an ISO timestamp as "MM/DD/YYYY h:mm AM/PM" (date via pfFmtDate per the
+  // standing MM/DD/YYYY rule; time appended, local). Returns '' on anything odd.
+  function fmtStamp(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    var datePart = window.pfFmtDate(d); // MM/DD/YYYY
+    var h = d.getHours(), m = d.getMinutes();
+    var ap = h >= 12 ? 'PM' : 'AM';
+    h = h % 12; if (h === 0) h = 12;
+    var mm = (m < 10 ? '0' : '') + m;
+    return datePart + ' ' + h + ':' + mm + ' ' + ap;
+  }
+
+  function setBtn(text, disabled) {
+    var b = document.getElementById('syncNowBtn');
+    if (!b) return;
+    b.textContent = text;
+    b.disabled = !!disabled;
+    b.style.opacity = disabled ? '0.65' : '1';
+    b.style.cursor = disabled ? 'default' : 'pointer';
+  }
+  function setLast(text) {
+    var l = document.getElementById('syncLastLabel');
+    if (l) l.textContent = text ? ('Last sync: ' + text) : '';
+  }
+
+  // Render the button + label from a status object {state,startedAt,finishedAt,
+  // lastSync,by,error} (may be null). Honest states only.
+  function render(status) {
+    if (!status || !status.state) { setBtn('Sync Now', false); return; }
+    if (status.state === 'running') {
+      setBtn('Syncing…', true);
+      ensurePolling();
+    } else if (status.state === 'done') {
+      setBtn('Synced ✓', false);
+      setLast(fmtStamp(status.lastSync || status.finishedAt));
+      // After a short beat, relax the label back to plain "Sync Now" so it is
+      // ready for the next trigger (the Last sync timestamp stays).
+      setTimeout(function(){ setBtn('Sync Now', false); }, 4000);
+      stopPolling();
+    } else if (status.state === 'failed') {
+      setBtn('Sync failed', false);
+      var b = document.getElementById('syncNowBtn');
+      if (b && status.error) b.title = 'Sync failed: ' + status.error;
+      stopPolling();
+    } else {
+      setBtn('Sync Now', false);
+      stopPolling();
+    }
+  }
+
+  function fetchStatus(cb) {
+    fetch('/api/sync-request', { method: 'GET', credentials: 'same-origin',
+      headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { if (cb) cb(j && j.status ? j.status : null); })
+      .catch(function () { if (cb) cb(null); });
+  }
+
+  function ensurePolling() {
+    if (pollTimer) return;
+    pollTimer = setInterval(function () { fetchStatus(render); }, 5000);
+  }
+  function stopPolling() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  }
+
+  // Global click handler for the button.
+  window.pfSyncNow = function () {
+    if (!isOffice()) return; // server also blocks; belt-and-suspenders
+    setBtn('Requesting…', true);
+    fetch('/api/sync-request', { method: 'POST', credentials: 'same-origin',
+      headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
+      .then(function (res) {
+        if (!res.ok) {
+          // Honest failure: server rejected (e.g. 403 non-office, 503 no KV).
+          setBtn('Sync failed', false);
+          var b = document.getElementById('syncNowBtn');
+          if (b) b.title = (res.j && res.j.message) || 'Sync request rejected.';
+          return;
+        }
+        setBtn('Syncing…', true);
+        ensurePolling();
+      })
+      .catch(function () { setBtn('Sync failed', false); });
+  };
+
+  // Reveal + initialize the button for office roles once the DOM is ready.
+  function init() {
+    if (!isOffice()) return; // stays display:none for field_ops
+    var wrap = document.getElementById('syncNowWrap');
+    if (wrap) wrap.style.display = 'flex';
+    fetchStatus(function (status) {
+      render(status);
+      if (status && status.state === 'done') setLast(fmtStamp(status.lastSync || status.finishedAt));
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+
+// ============================================================
 // AUTO PROGRESS HELPER (window.progress) - single source of truth
 // for project %-complete. Reads window.PF_PROGRESS (generated by
 // sync/build-progress.py from GUHMA column logs). LF % is the headline
@@ -4631,6 +4757,19 @@ document.addEventListener('click', function(e) {
     <span class="topbar-title" id="pageTitle">Dashboard</span>
   </div>
   <div class="topbar-right">
+    <!-- SYNC NOW (office only; hidden for field_ops + shown only after role check).
+         Triggers /api/sync-request -> KV flag -> local sync daemon runs the
+         SharePoint pull + rebuild + redeploy, and writes sync_status_v1 which this
+         button polls for honest state (Syncing / Synced (ts) / Sync failed). -->
+    <div id="syncNowWrap" style="display:none;align-items:center;gap:6px;">
+      <span id="syncLastLabel" title="Last successful sync"
+            style="font-size:11px;color:var(--text-3);white-space:nowrap;"></span>
+      <button id="syncNowBtn" type="button" onclick="pfSyncNow()"
+              title="Pull the latest data from SharePoint and republish the portal"
+              style="font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--border,#d0d5dd);background:var(--accent,#0a6cff);color:#fff;cursor:pointer;white-space:nowrap;line-height:1.2;">
+        Sync Now
+      </button>
+    </div>
     <span class="topbar-status" id="dataStatus">Local Data</span>
     <div class="topbar-user">
       <div class="topbar-avatar" id="currentUserAvatar">&#8230;</div>

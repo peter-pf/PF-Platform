@@ -547,6 +547,14 @@ export function areaForPath(pathname) {
     if (pathname.startsWith('/api/equipment-log')) return 'financials';
     // Bid-resolution fork + Dead Set (item A): preconstruction action.
     // admin + partner + business_dev allowed; field_ops BLOCKED by direct URL.
+    // "Sync Now" trigger (whole-platform live-data refresh + redeploy). OFFICE
+    // action -> financials area (admin + partner + business_dev; field_ops BLOCKED
+    // by direct URL too). Same office tier as the sibling refresh-actuals button.
+    // POST sets the sync_request_v1 KV flag; GET reports request+status. The
+    // handler ALSO calls requireArea(session,'financials') on GET + POST. Without
+    // this line it would fall through to default-deny (admin-only) and partners /
+    // BD could not trigger a sync.
+    if (pathname.startsWith('/api/sync-request')) return 'financials';
     if (pathname.startsWith('/api/pipeline-state')) return 'preconstruction';
     // Per-bid precon activity log (notes/changes/comms/file refs). BD domain:
     // admin + partner + business_dev; field_ops BLOCKED by direct URL too. The
