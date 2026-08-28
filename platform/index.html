@@ -17880,9 +17880,7 @@ try {
       var sub1Inner =
           '<div class="pr-subgroup-actions"><a class="pr-action-link" href="' + E(_fedexPrint) + '" target="_blank" rel="noopener noreferrer">&#128424; Sent to Print (FedEx Office)</a></div>'
         + subgroupNote('Print spec: B&W, 24x36 Standard White, 1-sided, 3 copies, horizontal orientation, bind on left. Login credentials are stored securely (not shown here).')
-        + fields([
-            fieldLinked('Shop Drawings Print Order Link', '', '', 'website')
-          ])
+        // "Shop Drawings Print Order Link" field + its paste-URL box REMOVED (Brad 2026-08-27).
         + subgroupNote('Date Ready for Pickup = anticipated date; email pickup person with order details.')
         + fields([
             field('Date Ready for Pickup', '')
@@ -18491,19 +18489,32 @@ try {
         ? 'Auto-read: Contract Recap = not required'
         : 'Contract Recap: certified payroll required — confirm submission';
 
-      html += card(8, 'Project Closeout', null,
-        fields([
+      // COLLAPSIBLE SUBSECTIONS (Brad 2026-08-27): the 5 Closeout subsections are now
+      // INDEPENDENTLY collapsible groups, reusing the SAME collapsibleSubgroup() helper
+      // + .pr-cgroup collapse idiom that Engineering & Design (Prelim Design / PF
+      // Submittal Design / As Built Drawings) and Site Readiness use. The old static,
+      // NUMBERED subgroup('1. ...') dividers are removed; each subsection's rows are now
+      // built into an *Inner string (a single fields([...]) preserving every existing
+      // field(), fieldLinked(), subgroupNote(), computed-hint IIFE, mailto draft,
+      // retainage jump, and the certified-payroll cross-read EXACTLY), then wrapped with
+      // collapsibleSubgroup(de-numbered title, inner) — DEFAULT COLLAPSED (matching E&D +
+      // the density directive). The collapsible bodies are plain wrapper divs INSIDE the
+      // ONE data-pr-section="closeout" card, so every .pr-field[data-pr-label] stays a
+      // descendant of the closeout section (save-scan + _surfaceExtras('closeout')
+      // unaffected). Left-alignment is inherited from .pr-cgroup-head/.pr-subgroup, same
+      // as every other collapsible in the record.
 
-          // ===== Subsection 1: Field Closeout Procedure =====
-          subgroup('1. Field Closeout Procedure'),
+      // ---- Subsection 1: Field Closeout Procedure ----
+      var closeoutSub1Inner = fields([
           subgroupNote('Standardized closeout & demob checklist the field runs before leaving, so every job gets the same consistent experience.'),
           fieldLinked('Field Closeout & Demob Checklist Link', '', '', 'website'),
           field('Field Closeout Complete?', ''),
           field('Date Completed', ''),
-          field('Completed By', ''),
+          field('Completed By', '')
+      ]);
 
-          // ===== Subsection 2: Send Final As-Builts to Garbin =====
-          subgroup('2. Send Final As-Builts to Garbin'),
+      // ---- Subsection 2: Send Final As-Builts to Garbin ----
+      var closeoutSub2Inner = fields([
           // SOP (Jonathan 2026-08-08): the Garbin closeout package = 3 tracked PDFs —
           // (1) GI-300 QAQC as-built page (actual install depths typed over designed),
           // (2) Column Logs (rig GUHMA combined PDF), (3) Modulus Load Test. Routing +
@@ -18584,10 +18595,11 @@ try {
             return '<div class="pr-computed-hint"><a class="fin-inv-btn fin-inv-btn-live pr-closeout-mailto" href="'
               + E(_href) + '">Draft Garbin email (Jake + CC projects@)</a>'
               + ' <span style="font-style:normal">Opens a pre-addressed draft; attach the 3 PDFs before sending. (Auto-attach = backend follow-up.)</span></div>';
-          })(),
+          })()
+      ]);
 
-          // ===== Subsection 3: GGG Returns Final As-Builts =====
-          subgroup('3. GGG Returns Final As-Builts'),
+      // ---- Subsection 3: GGG Returns Final As-Builts ----
+      var closeoutSub3Inner = fields([
           field('Date Final As-Builts Received from Garbin', ''),
           field('Received By', ''),
           field('As-Builts Saved to Closeout Folder?', ''),
@@ -18672,10 +18684,11 @@ try {
             }
             return computedHint('Retainage releases with the final invoice once the stamped set is sent to the GC. '
               + _jump + '.', false);
-          })(),
+          })()
+      ]);
 
-          // ===== Subsection 4: Certified Payroll Reports =====
-          subgroup('4. Certified Payroll Reports'),
+      // ---- Subsection 4: Certified Payroll Reports ----
+      var closeoutSub4Inner = fields([
           // Dynamic note reflecting the Contract Recap cross-read so the requirement
           // state is visible even when the item field is still empty (field() only
           // shows a source tag when the value is non-blank). This is DISPLAY-ONLY.
@@ -18687,16 +18700,27 @@ try {
           // payroll; a manual override on this field still wins.
           field('Certified Payroll Submitted & Confirmed?', _certDefault, _certSrc),
           field('Date Confirmed - Certified Payroll', ''),
-          field('Certified Payroll - Responsible', 'Accounting'),
+          field('Certified Payroll - Responsible', 'Accounting')
+      ]);
 
-          // ===== Subsection 5: Thank-You Email to GC =====
-          subgroup('5. Thank-You Email to GC'),
+      // ---- Subsection 5: Thank-You Email to GC ----
+      var closeoutSub5Inner = fields([
           subgroupNote('Send after all closeout items done; include a brief survey of how the PF team did; portal tracks date + sender + files the email. FUTURE: auto-file the sent email to the project folder.'),
           field('Thank-You Email Sent?', ''),
           field('Date Thank-You Sent', ''),
           field('Thank-You Sent By', ''),
           field('Performance Survey Notes', '')
-        ]), false, 'closeout');
+      ]);
+
+      // De-numbered, left-aligned, collapsible (default collapsed) — matches E&D.
+      var closeoutBody =
+          collapsibleSubgroup('Field Closeout Procedure', closeoutSub1Inner)
+        + collapsibleSubgroup('Send Final As-Builts to Garbin', closeoutSub2Inner)
+        + collapsibleSubgroup('GGG Returns Final As-Builts', closeoutSub3Inner)
+        + collapsibleSubgroup('Certified Payroll Reports', closeoutSub4Inner)
+        + collapsibleSubgroup('Thank-You Email to GC', closeoutSub5Inner);
+
+      html += card(8, 'Project Closeout', null, closeoutBody, false, 'closeout');
       // (office renumber 2026-08-07 batch-13: standalone Project Safety REMOVED and
       // absorbed into Site Readiness > Subsection 4 (Safety). Top-level list is now
       // gap-free 1-7:
