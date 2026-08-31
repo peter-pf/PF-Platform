@@ -36197,7 +36197,11 @@ try {
   var TEXT_FIELDS = ['description', 'manufacturer', 'mfrPart', 'altSources', 'notes',
                      'purchaseLink', 'orderContact',
                      // CHANGE E (Derek 8/27): per-item order-contact person fields.
-                     'orderContactName', 'orderContactEmail', 'orderContactPhone'];
+                     'orderContactName', 'orderContactEmail', 'orderContactPhone',
+                     // CHANGE G (Derek 8/31): office-added blank rows. `category` slots a
+                     // KV-only new row into the right table; `newItem` marks it as
+                     // portal-created (no seed row). Both persist via the same setFields path.
+                     'category', 'newItem'];
   var NUM_FIELDS  = ['reqTrailer', 'reqHome'];
   var IMG_SLOTS   = ['partPhoto', 'locationPhoto']; // CHANGE D detail image slots.
 
@@ -36212,6 +36216,40 @@ try {
       if (Object.prototype.hasOwnProperty.call(ov, f)) out[f] = ov[f];
     });
     return out;
+  }
+
+  // CHANGE G: the effective item list rendered by the module = the immutable seed
+  // items PLUS office-added "new" rows that live ONLY as KV field overrides. A new
+  // row is identified by its override carrying the `newItem` marker AND an id that is
+  // NOT already a seed item. We reconstruct a minimal seed-shaped item ({id, category,
+  // description...}) so the normal render/merge path treats it exactly like a seed row
+  // (mergedItem() overlays its own override on top -> the row's edited values show).
+  // We do NOT mutate window.PF_INVENTORY; this list is rebuilt every render from the
+  // current overrides, so an added row appears immediately and a fully-cleared one
+  // (all fields deleted -> override key gone) disappears.
+  function effectiveItems() {
+    var data = window.PF_INVENTORY || {};
+    var seed = Array.isArray(data.items) ? data.items : [];
+    var seedIds = {};
+    seed.forEach(function (it) { if (it && it.id) seedIds[it.id] = true; });
+    var extra = [];
+    Object.keys(fieldOverrides).forEach(function (itemId) {
+      if (seedIds[itemId]) return;                 // seed row: already in the list
+      var ov = fieldOverrides[itemId];
+      if (!ov || !ov.newItem) return;              // only reconstruct portal-added rows
+      // Minimal seed-shaped stub. Real values come via mergedItem(ov) at render time,
+      // so we only need the id + a category (which table) + null baselines here.
+      extra.push({
+        id: itemId,
+        category: (ov.category != null ? String(ov.category) : ''),
+        description: '', manufacturer: '', mfrPart: '',
+        reqTrailer: null, reqHome: null, altSources: '', actualOnHand: null, notes: '',
+        _isNew: true
+      });
+    });
+    // Seed rows first (stable original order), office-added rows appended. Grouping by
+    // category in render() keeps each added row inside its declared table.
+    return seed.concat(extra);
   }
 
   // Live actual qty for (location,item): the KV override if set, else '' (blank).
@@ -36264,7 +36302,8 @@ try {
 
     var locations = data.locations.slice().sort(function (a, b) { return (a.order || 0) - (b.order || 0); });
     var categories = Array.isArray(data.categories) ? data.categories : [];
-    var items = data.items;
+    // CHANGE G: the render item list = seed items + office-added KV-only rows (newItem).
+    var items = effectiveItems();
 
     var h = '';
     h += '<div class="inv-head">';
@@ -36287,7 +36326,8 @@ try {
     h += '<div id="invMsg" class="inv-msg"></div>';
     h += '</div>';
 
-    locations.forEach(function (loc) {
+    locations.forEach(function (loc, locIdx) {
+      var isFirstLoc = (locIdx === 0); // CHANGE G: "+ Add Material" renders once (first loc).
       var isOpen = !collapsed[loc.id]; // CHANGE C: default expanded unless collapsed.
       // Count items shown for this location (all seed items appear in every location).
       var locCount = items.length;
@@ -36310,7 +36350,7 @@ try {
         if (!catItems.length) {
           h += '<div class="inv-cat-empty">No items yet. (Placeholder category — list pending.)</div>';
         } else {
-          h += '<table class="inv-tbl"><thead><tr>'
+          h += '<table class="inv-tbl" data-cat-tbl="' + E(cat) + '" data-loc="' + E(loc.id) + '"><thead><tr>'
              + '<th>Product</th><th>Mfr</th><th>Part #</th><th class="num">Req</th>'
              + '<th class="num">Actual</th><th>Alt Sources</th><th>Notes</th></tr></thead><tbody>';
           catItems.forEach(function (it) {
@@ -36368,6 +36408,20 @@ try {
           });
           h += '</tbody></table>';
         }
+        // CHANGE G (Derek 8/31): in EDIT MODE only (office), a per-table button to
+        // append a NEW BLANK material row to THIS category's table. Gated on
+        // canEdit && editMode = a DELIBERATE action behind the same Edit-rows toggle
+        // Derek explicitly asked for. The button carries which category (table) the
+        // new row belongs to; the server ALSO 403s a non-office POST (defense in depth).
+        // Shown once per category table (Farm + each trailer render the same tables,
+        // so the button appears under each — an add creates the item once; it then
+        // shows in every location like any seed item). To avoid duplicate add buttons
+        // across locations, only the FIRST location renders it.
+        if (canEdit && editMode && isFirstLoc) {
+          h += '<div class="inv-addrow-wrap">'
+             + '<button type="button" class="inv-addrow-btn" data-add-cat="' + E(cat) + '">'
+             + '+ Add Material</button></div>';
+        }
         h += '</div>'; // .inv-cat
       });
       h += '</div>'; // .inv-loc-body
@@ -36383,7 +36437,72 @@ try {
       wireEditToggle(host);         // CHANGE B: the Edit-rows button.
       wireEdits(host);              // Actual Qty save-on-change.
       if (editMode) wireFieldEdits(host); // CHANGE B: field save-on-change.
+      if (editMode) wireAddRows(host);    // CHANGE G: per-table "+ Add Material".
     }
+  }
+
+  // CHANGE G: a unique, server-safe itemId for a portal-added row. The server's
+  // cleanItemId() (used for images) requires /^[A-Za-z0-9._-]{1,120}$/ and rejects ':'
+  // + whitespace, so we mint an id in that charset. 'new-' prefix keeps office-added
+  // rows visually distinct in the KV store from seed slugs (drill-1, mast-1, ...).
+  function newItemId() {
+    var rnd = Math.random().toString(36).slice(2, 8);
+    return 'new-' + Date.now().toString(36) + '-' + rnd;
+  }
+
+  // CHANGE G: wire each "+ Add Material" button (office + edit mode only). Clicking it
+  // creates a NEW BLANK item in the clicked category via the EXISTING setFields path
+  // (action:'setFields'), marking it newItem:'1' + category:<cat> so the load()
+  // reconstruction (effectiveItems) slots it into the right table on every render.
+  // Optimistic-first: we merge the new item locally + re-render immediately so the
+  // blank editable row (same structure as seed rows, incl. the detail-pane photo slots)
+  // appears at once; on server rejection we revert (fail-closed) and surface an error.
+  function wireAddRows(host) {
+    var btns = host.querySelectorAll('.inv-addrow-btn[data-add-cat]');
+    btns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (!canEdit) return;                 // defense in depth (server also 403s)
+        var cat = btn.getAttribute('data-add-cat');
+        if (!cat) return;
+        var itemId = newItemId();
+        // The minimal record that makes a KV-only row exist + render: a category (which
+        // table), the newItem marker, and an empty description (so the row is present
+        // with a blank first field ready to type). Everything else defaults empty/TBD,
+        // exactly like a seed row with no overrides.
+        var rec = { newItem: '1', category: String(cat), description: '' };
+
+        // Optimistic-first: register locally so the immediate re-render shows the row.
+        fieldOverrides[itemId] = Object.assign({}, rec);
+        expanded[itemId] = false;             // start collapsed like any other row
+        btn.disabled = true;
+        pendingSaves++;
+        api('/api/inventory', { method: 'POST',
+          body: JSON.stringify({ action: 'setFields', item: itemId, fields: rec }) })
+          .then(function (res) {
+            pendingSaves--;
+            btn.disabled = false;
+            if (!res.ok || !(res.body && res.body.ok)) {
+              // REVERT the optimistic new row on server rejection (fail-closed).
+              delete fieldOverrides[itemId];
+              delete expanded[itemId];
+              render();
+              msg((res.body && res.body.message) || 'Could not add a row. Not saved.', false);
+              return;
+            }
+            msg('Blank row added. Fill in the fields — each saves as you go.', true);
+            setTimeout(function () { msg(''); }, 2500);
+            render(); // re-render with the persisted new row (still in edit mode)
+          })
+          .catch(function () {
+            pendingSaves--;
+            btn.disabled = false;
+            delete fieldOverrides[itemId];
+            delete expanded[itemId];
+            render();
+            msg('Could not add a row (network). Not saved.', false); // FAIL CLOSED
+          });
+      });
+    });
   }
 
   // CHANGE B helper: a text input for an editable per-item field, value from the
@@ -37155,6 +37274,14 @@ try {
   background: rgba(210,153,34,.18); border-radius: 8px; padding: 0 6px; margin-left: 6px; vertical-align: middle; }
 #mod-inventory .inv-empty { border: 1px dashed var(--border,#C8D5DC); border-radius: 8px; padding: 22px 16px;
   text-align: center; color: var(--text-2,#5A6370); font-size: 13px; }
+/* CHANGE G (Derek 8/31): per-table "+ Add Material" button (edit mode only). Dense,
+   left-aligned under its table; matches the accent-outline style of the Edit-rows btn. */
+#mod-inventory .inv-addrow-wrap { margin: 3px 0 2px; }
+#mod-inventory .inv-addrow-btn { font-size: 11px; font-weight: 600; cursor: pointer;
+  padding: 3px 10px; border-radius: 5px; border: 1px dashed var(--accent,#006DB0);
+  color: var(--accent,#006DB0); background: #fff; transition: all .12s ease; }
+#mod-inventory .inv-addrow-btn:hover { background: var(--accent-light,#E0F0FF); border-style: solid; }
+#mod-inventory .inv-addrow-btn:disabled { opacity: .5; cursor: default; }
 
 /* CHANGE D: expandable item detail pane (dense per Brad's minimize-scroll rule). */
 #mod-inventory .inv-caret { border: 0; background: transparent; cursor: pointer; padding: 0 4px 0 0;

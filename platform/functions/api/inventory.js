@@ -76,9 +76,22 @@ const MAX_FIELD_LEN = 2000;         // per text-field value length cap
 //       orderContactPhone -- rendered as a tel link in the UI when populated
 //     Plain text server-side (same s() cap/angle-strip/RBAC as every other field);
 //     the mailto/tel treatment is purely a client-render affordance.
+//   CHANGE G (2026-08-31, Derek): OFFICE-ADDED BLANK ROWS. Derek can click "Edit
+//     rows" and use a per-table "+ Add Material" button to append a NEW blank item
+//     that is NOT in the seed (data/inventory.js). Such a row exists ONLY as a KV
+//     field override, so two extra allowlisted text fields make it self-describing:
+//       category  -- which table (seed category) the new row belongs to. REQUIRED for
+//                    a KV-only row so the GET-load can slot it into the right table.
+//       newItem   -- a marker ('1') set when the row was created in the portal (no seed
+//                    counterpart). Lets the client reconstruct KV-only items on load and
+//                    lets a future fold-back tool find the office-added rows.
+//     These persist through the SAME setFields path (no new write mechanism). Clearing
+//     every field of a new-item row deletes its key entirely (row removed) -- same
+//     existing "empty override => drop key" behavior as any other item.
 const TEXT_FIELDS = ['description', 'manufacturer', 'mfrPart', 'altSources', 'notes',
                      'purchaseLink', 'orderContact',
-                     'orderContactName', 'orderContactEmail', 'orderContactPhone'];
+                     'orderContactName', 'orderContactEmail', 'orderContactPhone',
+                     'category', 'newItem'];
 const NUM_FIELDS  = ['reqTrailer', 'reqHome'];
 
 // CHANGE D -- item DETAIL IMAGES (part photo + storage-location photo).
