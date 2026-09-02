@@ -31901,28 +31901,73 @@ try {
      per Brad's density preference. ALL strings via window.esc.
      ============================================================ -->
 <style>
-  #mod-cost-codes .cc-toolbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:8px 0 12px; }
-  #mod-cost-codes .cc-search { padding:6px 10px; border:1px solid var(--border,#2a2f3a); border-radius:6px;
-    background:var(--card,#161a22); color:var(--text,#e6e9ef); min-width:240px; font-size:13px; }
-  #mod-cost-codes .cc-count { font-size:12px; color:var(--text-3,#8a93a6); }
-  #mod-cost-codes .cc-btn { font-size:12px; padding:5px 10px; border:1px solid var(--border,#2a2f3a); border-radius:6px;
-    background:var(--card,#161a22); color:var(--text-2,#aeb6c6); cursor:pointer; }
-  #mod-cost-codes .cc-band { border:1px solid var(--border,#2a2f3a); border-radius:8px; margin-bottom:10px; overflow:hidden; }
-  #mod-cost-codes .cc-band > summary { list-style:none; cursor:pointer; padding:9px 12px; font-weight:600; font-size:13px;
-    background:var(--card-2,#1b202a); color:var(--text,#e6e9ef); display:flex; justify-content:space-between; align-items:center; }
+  /* ---------------------------------------------------------------
+     PF Cost Codes - LIGHT / FORMAL EXCEL-STYLE theme (Brad 09/02).
+     ALL rules scoped under #mod-cost-codes so the shared dark portal
+     theme (and the shared .pf-index-* header classes) are overridden
+     ONLY on this page. White cells, thin gray gridlines, shaded
+     section-header bands, indented sub-codes, subtle zebra striping.
+     Presentation only - data/render/RBAC unchanged.
+     --------------------------------------------------------------- */
+  #mod-cost-codes {
+    --cc-ink:#1f2430; --cc-ink-2:#3a4150; --cc-ink-3:#6b7280;
+    --cc-line:#d0d5dd; --cc-line-soft:#e6e9ee;
+    --cc-band:#eef1f5; --cc-band-line:#c3cad4;
+    --cc-parent:#f6f8fa; --cc-zebra:#fafbfc; --cc-head:#f0f2f5;
+    --cc-accent:#b23434;
+    background:#ffffff; color:var(--cc-ink);
+    border:1px solid var(--cc-line); border-radius:8px;
+    padding:16px 18px; margin:2px 0;
+  }
+  /* Override shared dark-theme header classes locally (light + formal). */
+  #mod-cost-codes .pf-index-head { margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid var(--cc-line); }
+  #mod-cost-codes .pf-index-head h2 { color:var(--cc-ink); }
+  #mod-cost-codes .pf-index-sub { color:var(--cc-ink-2); }
+  #mod-cost-codes .pf-index-sub strong { color:var(--cc-ink); }
+  #mod-cost-codes .pf-index-meta { color:var(--cc-ink-3); }
+  #mod-cost-codes .pf-index-meta a { color:var(--cc-accent); }
+
+  #mod-cost-codes .cc-toolbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:8px 0 14px; }
+  #mod-cost-codes .cc-search { padding:6px 10px; border:1px solid var(--cc-line); border-radius:6px;
+    background:#ffffff; color:var(--cc-ink); min-width:260px; font-size:13px; }
+  #mod-cost-codes .cc-search::placeholder { color:#9aa1ad; }
+  #mod-cost-codes .cc-count { font-size:12px; color:var(--cc-ink-3); }
+  #mod-cost-codes .cc-btn { font-size:12px; padding:5px 11px; border:1px solid var(--cc-line); border-radius:6px;
+    background:#f7f8fa; color:var(--cc-ink-2); cursor:pointer; }
+  #mod-cost-codes .cc-btn:hover { background:#eef1f5; border-color:var(--cc-band-line); }
+
+  /* Account-type section = an Excel "sheet block": bordered, shaded header band. */
+  #mod-cost-codes .cc-band { border:1px solid var(--cc-band-line); border-radius:6px; margin-bottom:14px; overflow:hidden; background:#ffffff; }
+  #mod-cost-codes .cc-band > summary { list-style:none; cursor:pointer; padding:9px 12px; font-weight:700; font-size:13px;
+    background:var(--cc-band); color:var(--cc-ink); border-bottom:1px solid var(--cc-band-line);
+    display:flex; justify-content:space-between; align-items:center; letter-spacing:.01em; }
+  #mod-cost-codes .cc-band:not([open]) > summary { border-bottom:none; }
   #mod-cost-codes .cc-band > summary::-webkit-details-marker { display:none; }
-  #mod-cost-codes .cc-band > summary .cc-tag { font-size:11px; font-weight:500; color:var(--text-3,#8a93a6); }
-  #mod-cost-codes table.cc-table { width:100%; border-collapse:collapse; font-size:13px; }
-  #mod-cost-codes table.cc-table th { text-align:left; font-size:11px; letter-spacing:.03em; text-transform:uppercase;
-    color:var(--text-3,#8a93a6); padding:6px 10px; border-bottom:1px solid var(--border,#2a2f3a); }
-  #mod-cost-codes table.cc-table td { padding:4px 10px; border-bottom:1px solid var(--border-subtle,#20242e); vertical-align:top; }
-  #mod-cost-codes tr.cc-parent td { font-weight:600; background:var(--card,#12161d); }
-  #mod-cost-codes tr.cc-parent td.cc-code { color:var(--accent,#d64545); }
-  #mod-cost-codes td.cc-code { font-variant-numeric:tabular-nums; white-space:nowrap; width:1%; padding-right:18px; }
-  #mod-cost-codes tr.cc-child td.cc-desc { padding-left:26px; color:var(--text-2,#c7cddb); }
-  #mod-cost-codes tr.cc-child td.cc-code { color:var(--text-2,#aeb6c6); }
-  #mod-cost-codes tr.cc-child3 td.cc-desc { padding-left:44px; color:var(--text-3,#98a1b3); }
-  #mod-cost-codes .cc-empty { padding:24px; text-align:center; color:var(--text-3,#8a93a6); font-size:13px; }
+  #mod-cost-codes .cc-band > summary .cc-tag { font-size:11px; font-weight:600; color:var(--cc-ink-3); }
+
+  /* Spreadsheet grid: white cells, thin gray gridlines on every side. */
+  #mod-cost-codes table.cc-table { width:100%; border-collapse:collapse; font-size:13px; background:#ffffff; }
+  #mod-cost-codes table.cc-table th { text-align:left; font-size:11px; letter-spacing:.04em; text-transform:uppercase;
+    color:var(--cc-ink-3); font-weight:700; padding:7px 12px; background:var(--cc-head);
+    border-bottom:2px solid var(--cc-band-line); border-right:1px solid var(--cc-line); }
+  #mod-cost-codes table.cc-table th:last-child { border-right:none; }
+  #mod-cost-codes table.cc-table td { padding:5px 12px; border-bottom:1px solid var(--cc-line-soft);
+    border-right:1px solid var(--cc-line-soft); vertical-align:top; color:var(--cc-ink); }
+  #mod-cost-codes table.cc-table td:last-child { border-right:none; }
+  /* Subtle zebra striping (spreadsheet-like) on alternating child rows. */
+  #mod-cost-codes tr.cc-child:nth-of-type(even) td { background:var(--cc-zebra); }
+  /* Level-1 parent = a bold, shaded group header row within the block. */
+  #mod-cost-codes tr.cc-parent td { font-weight:700; background:var(--cc-parent) !important; border-top:1px solid var(--cc-line);
+    border-bottom:1px solid var(--cc-line); color:var(--cc-ink); }
+  #mod-cost-codes tr.cc-parent td.cc-code { color:var(--cc-accent); }
+  #mod-cost-codes td.cc-code { font-variant-numeric:tabular-nums; white-space:nowrap; width:1%; padding-right:20px; color:var(--cc-ink-2); }
+  /* Hierarchy indent preserved: L2 indented, L3 indented further. */
+  #mod-cost-codes tr.cc-child td.cc-desc { padding-left:28px; color:var(--cc-ink); }
+  #mod-cost-codes tr.cc-child td.cc-code { color:var(--cc-ink-2); }
+  #mod-cost-codes tr.cc-child3 td.cc-desc { padding-left:48px; color:var(--cc-ink-2); }
+  #mod-cost-codes tr.cc-child3 td.cc-code { color:var(--cc-ink-3); }
+  #mod-cost-codes .cc-tag { color:var(--cc-ink-3); }
+  #mod-cost-codes .cc-empty { padding:24px; text-align:center; color:var(--cc-ink-3); font-size:13px; background:#ffffff; }
 </style>
 <script>
 (function(){
