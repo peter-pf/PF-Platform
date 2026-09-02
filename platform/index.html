@@ -3747,6 +3747,7 @@ tr.pf-dragging { opacity: 0.45; }
     '/data/feasibility-history.js',
     '/data/project-master.js',
     '/data/pf-coi.js',
+    '/data/cost-codes.js',       // PF Cost Codes reference (chart of accounts, office-only)
     '/data/pf-dashboard.js'      // company-wide monthly KPI dashboard (financials_global)
   ];
 
@@ -3819,6 +3820,7 @@ tr.pf-dragging { opacity: 0.45; }
                '/data/awarded-projects.js', '/data/project-history.js',
                '/data/precon-pipeline.js', '/data/feasibility-history.js',
                '/data/project-master.js', '/data/pf-coi.js',
+               '/data/cost-codes.js',
                '/data/pf-dashboard.js');
   } else {
     // field_ops: the project LIST comes from the field-safe derivative (no $),
@@ -4540,6 +4542,11 @@ window.progress = (function () {
         <div class="nav-sub-label" onclick="this.parentElement.classList.toggle('collapsed')">Insurance</div>
         <a class="nav-item" data-module="pf-coi" onclick="showModule('pf-coi')" style="color:#d64545">PF COI</a>
       </div>
+
+      <!-- 5c3) PF Cost Codes (read-only reference; extracted verbatim from the
+           "PF Cost Codes" tab of PF Project Master.xlsx - the cost-code source of
+           truth). Office-scoped (chart of accounts), NOT data-fo-safe. -->
+      <a class="nav-item" data-module="cost-codes" onclick="showModule('cost-codes')" style="color:#d64545"><span class="nav-icon">&#128209;</span> PF Cost Codes</a>
 
       <!-- TimeSheets (moved here from Field Operations). Hours-only, no financials.
            field-safe so the crew keeps access even though PM is otherwise hidden. -->
@@ -5303,6 +5310,13 @@ document.addEventListener('click', function(e) {
     <div id="pfCoiRoot" class="pf-index-root"></div>
   </div>
 
+  <!-- PF COST CODES - read-only reference. Populated client-side by the cost-codes -->
+  <!-- renderer from window.PF_COST_CODES (data/cost-codes.js), extracted verbatim   -->
+  <!-- from the "PF Cost Codes" tab of PF Project Master.xlsx. ALL strings via esc.  -->
+  <div class="module-view" id="mod-cost-codes">
+    <div id="pfCostCodesRoot" class="pf-index-root"></div>
+  </div>
+
   <!-- PROJECT RECORD DETAIL VIEW (Phase 2 v1, READ-ONLY) - POET 26-002 is the reference template. -->
   <!-- Populated client-side by initProjectRecord() from window.PF_PROJECT_POET (data/project-record-poet.js). -->
   <div class="module-view" id="mod-project-poet">
@@ -5908,6 +5922,7 @@ const moduleTitles = {
   'maintenance': 'Maintenance Tasks',
   'field-lists': 'Field Lists (Fleet & Crew)',
   'pf-coi': 'PF COI - Standard Coverages',
+  'cost-codes': 'PF Cost Codes',
   'project-poet': '26-002 POET Biosciences',
   'financials-wip': 'WIP & Cashflow',
   'pf-dashboard': 'PF Dashboard',
@@ -31873,6 +31888,153 @@ try {
     if (document.readyState !== 'loading') render();
   } catch(e) {
     console.error("PF COI view failed to load:", e);
+  }
+})();
+</script>
+
+<!-- ============================================================
+     PF COST CODES - renders window.PF_COST_CODES into
+     #pfCostCodesRoot. Read-only reference, extracted VERBATIM from the
+     "PF Cost Codes" tab of PF Project Master.xlsx (the cost-code source
+     of truth). Grouped by Account Type -> parent code -> sub-codes, in
+     the exact order the excel lays them out. Compact/dense + collapsible
+     per Brad's density preference. ALL strings via window.esc.
+     ============================================================ -->
+<style>
+  #mod-cost-codes .cc-toolbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:8px 0 12px; }
+  #mod-cost-codes .cc-search { padding:6px 10px; border:1px solid var(--border,#2a2f3a); border-radius:6px;
+    background:var(--card,#161a22); color:var(--text,#e6e9ef); min-width:240px; font-size:13px; }
+  #mod-cost-codes .cc-count { font-size:12px; color:var(--text-3,#8a93a6); }
+  #mod-cost-codes .cc-btn { font-size:12px; padding:5px 10px; border:1px solid var(--border,#2a2f3a); border-radius:6px;
+    background:var(--card,#161a22); color:var(--text-2,#aeb6c6); cursor:pointer; }
+  #mod-cost-codes .cc-band { border:1px solid var(--border,#2a2f3a); border-radius:8px; margin-bottom:10px; overflow:hidden; }
+  #mod-cost-codes .cc-band > summary { list-style:none; cursor:pointer; padding:9px 12px; font-weight:600; font-size:13px;
+    background:var(--card-2,#1b202a); color:var(--text,#e6e9ef); display:flex; justify-content:space-between; align-items:center; }
+  #mod-cost-codes .cc-band > summary::-webkit-details-marker { display:none; }
+  #mod-cost-codes .cc-band > summary .cc-tag { font-size:11px; font-weight:500; color:var(--text-3,#8a93a6); }
+  #mod-cost-codes table.cc-table { width:100%; border-collapse:collapse; font-size:13px; }
+  #mod-cost-codes table.cc-table th { text-align:left; font-size:11px; letter-spacing:.03em; text-transform:uppercase;
+    color:var(--text-3,#8a93a6); padding:6px 10px; border-bottom:1px solid var(--border,#2a2f3a); }
+  #mod-cost-codes table.cc-table td { padding:4px 10px; border-bottom:1px solid var(--border-subtle,#20242e); vertical-align:top; }
+  #mod-cost-codes tr.cc-parent td { font-weight:600; background:var(--card,#12161d); }
+  #mod-cost-codes tr.cc-parent td.cc-code { color:var(--accent,#d64545); }
+  #mod-cost-codes td.cc-code { font-variant-numeric:tabular-nums; white-space:nowrap; width:1%; padding-right:18px; }
+  #mod-cost-codes tr.cc-child td.cc-desc { padding-left:26px; color:var(--text-2,#c7cddb); }
+  #mod-cost-codes tr.cc-child td.cc-code { color:var(--text-2,#aeb6c6); }
+  #mod-cost-codes tr.cc-child3 td.cc-desc { padding-left:44px; color:var(--text-3,#98a1b3); }
+  #mod-cost-codes .cc-empty { padding:24px; text-align:center; color:var(--text-3,#8a93a6); font-size:13px; }
+</style>
+<script>
+(function(){
+  try {
+    var E = window.esc;
+    function render(){
+      var root = document.getElementById('pfCostCodesRoot');
+      if (!root) return;
+      var D = window.PF_COST_CODES;
+      if (!D || !D.groups) {
+        root.innerHTML = '<div class="pf-placeholder"><div class="pf-placeholder-icon">&#128209;</div>'
+          + '<h2>PF Cost Codes</h2><p>Cost-code data not loaded. Regenerate '
+          + '<code>data/cost-codes.js</code> from the PF Project Master workbook.</p></div>';
+        return;
+      }
+
+      // Group parents into Account-Type bands, preserving first-seen order (mirrors
+      // the excel top-to-bottom layout). Each parent carries its own children.
+      var bands = [];              // [{type, groups:[...]}]
+      var byType = {};
+      (D.groups || []).forEach(function(g){
+        var t = g.account_type || '(none)';
+        if (!byType[t]) { byType[t] = { type: t, groups: [] }; bands.push(byType[t]); }
+        byType[t].groups.push(g);
+      });
+
+      var head = '<div class="pf-index-head">'
+        + '<h2>PF Cost Codes</h2>'
+        + '<p class="pf-index-sub">Cost codes &amp; descriptions - the company chart of accounts. '
+        + 'Source of truth: <strong>' + E(D.source_file) + '</strong> &middot; tab <strong>' + E(D.source_tab) + '</strong>'
+        + (D.source_path ? ' &middot; ' + E(D.source_path) : '') + '.</p>'
+        + '<div class="pf-index-meta">'
+        + (D.source_last_modified ? 'Master updated ' + E(D.source_last_modified) + ' &middot; ' : '')
+        + 'Extracted ' + E(D.extracted) + ' &middot; '
+        + E(D.total_codes) + ' codes &middot; read-only (edit in the workbook)</div>'
+        + '</div>';
+
+      var toolbar = '<div class="cc-toolbar">'
+        + '<input type="text" class="cc-search" id="ccSearch" placeholder="Filter code or description...">'
+        + '<button type="button" class="cc-btn" id="ccExpand">Expand all</button>'
+        + '<button type="button" class="cc-btn" id="ccCollapse">Collapse all</button>'
+        + '<span class="cc-count" id="ccCount"></span>'
+        + '</div>';
+
+      var body = '';
+      bands.forEach(function(b, bi){
+        var rows = '';
+        var count = 0;
+        b.groups.forEach(function(g){
+          rows += '<tr class="cc-parent" data-code="' + E(g.code == null ? '' : g.code) + '" data-desc="' + E((g.name||'').toLowerCase()) + '">'
+            + '<td class="cc-code">' + E(g.code == null ? '' : g.code) + '</td>'
+            + '<td class="cc-desc">' + E(g.name) + (g.note ? ' <span class="cc-tag">' + E(g.note) + '</span>' : '') + '</td>'
+            + '</tr>';
+          count++;
+          (g.children || []).forEach(function(c){
+            rows += '<tr class="cc-child" data-code="' + E(c.code) + '" data-desc="' + E((c.description||'').toLowerCase()) + '">'
+              + '<td class="cc-code">' + E(c.code) + '</td>'
+              + '<td class="cc-desc">' + E(c.description) + (c.note ? ' <span class="cc-tag">' + E(c.note) + '</span>' : '') + '</td>'
+              + '</tr>';
+            count++;
+            // Level-3 sub-sub-codes (e.g. 5405 Equipment Transportation -> 5406-5409).
+            (c.children || []).forEach(function(gc){
+              rows += '<tr class="cc-child cc-child3" data-code="' + E(gc.code) + '" data-desc="' + E((gc.description||'').toLowerCase()) + '">'
+                + '<td class="cc-code">' + E(gc.code) + '</td>'
+                + '<td class="cc-desc">' + E(gc.description) + (gc.note ? ' <span class="cc-tag">' + E(gc.note) + '</span>' : '') + '</td>'
+                + '</tr>';
+              count++;
+            });
+          });
+        });
+        // 5xxx (Cost of Goods Sold) is the primary job cost-code band - open it by default.
+        var openAttr = (b.type === 'Cost of Goods Sold') ? ' open' : '';
+        body += '<details class="cc-band"' + openAttr + '>'
+          + '<summary><span>' + E(b.type) + '</span><span class="cc-tag">' + count + ' codes</span></summary>'
+          + '<table class="cc-table"><thead><tr><th>Code</th><th>Description</th></tr></thead>'
+          + '<tbody>' + rows + '</tbody></table>'
+          + '</details>';
+      });
+
+      root.innerHTML = head + toolbar + body + '<div class="cc-empty" id="ccEmpty" style="display:none">No cost codes match your filter.</div>';
+
+      // ---- Filter + expand/collapse wiring (client-side, non-destructive) ----
+      var search = document.getElementById('ccSearch');
+      var countEl = document.getElementById('ccCount');
+      var emptyEl = document.getElementById('ccEmpty');
+      var bandsEls = Array.prototype.slice.call(root.querySelectorAll('details.cc-band'));
+
+      function applyFilter(){
+        var q = (search.value || '').trim().toLowerCase();
+        var shown = 0;
+        bandsEls.forEach(function(band){
+          var anyVisible = false;
+          Array.prototype.slice.call(band.querySelectorAll('tbody tr')).forEach(function(tr){
+            var hay = (tr.getAttribute('data-code') || '') + ' ' + (tr.getAttribute('data-desc') || '');
+            var match = !q || hay.indexOf(q) !== -1;
+            tr.style.display = match ? '' : 'none';
+            if (match) { anyVisible = true; shown++; }
+          });
+          band.style.display = anyVisible ? '' : 'none';
+          if (q && anyVisible) band.open = true;   // auto-open bands with matches
+        });
+        countEl.textContent = q ? (shown + ' shown') : '';
+        emptyEl.style.display = (q && shown === 0) ? '' : 'none';
+      }
+      search.addEventListener('input', applyFilter);
+      document.getElementById('ccExpand').addEventListener('click', function(){ bandsEls.forEach(function(b){ b.open = true; }); });
+      document.getElementById('ccCollapse').addEventListener('click', function(){ bandsEls.forEach(function(b){ b.open = false; }); });
+    }
+    document.addEventListener('DOMContentLoaded', render);
+    if (document.readyState !== 'loading') render();
+  } catch(e) {
+    console.error("PF Cost Codes view failed to load:", e);
   }
 })();
 </script>
