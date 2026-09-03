@@ -31936,14 +31936,9 @@ try {
     background:#f7f8fa; color:var(--cc-ink-2); cursor:pointer; }
   #mod-cost-codes .cc-btn:hover { background:#eef1f5; border-color:var(--cc-band-line); }
 
-  /* Account-type section = an Excel "sheet block": bordered, shaded header band. */
-  #mod-cost-codes .cc-band { border:1px solid var(--cc-band-line); border-radius:6px; margin-bottom:14px; overflow:hidden; background:#ffffff; }
-  #mod-cost-codes .cc-band > summary { list-style:none; cursor:pointer; padding:9px 12px; font-weight:700; font-size:13px;
-    background:var(--cc-band); color:var(--cc-ink); border-bottom:1px solid var(--cc-band-line);
-    display:flex; justify-content:space-between; align-items:center; letter-spacing:.01em; }
-  #mod-cost-codes .cc-band:not([open]) > summary { border-bottom:none; }
-  #mod-cost-codes .cc-band > summary::-webkit-details-marker { display:none; }
-  #mod-cost-codes .cc-band > summary .cc-tag { font-size:11px; font-weight:600; color:var(--cc-ink-3); }
+  /* Single bordered spreadsheet block wrapping the full, always-open list
+     (Brad 09/03: no account-type sections, no collapse - open by default). */
+  #mod-cost-codes .cc-sheet { border:1px solid var(--cc-band-line); border-radius:6px; overflow:hidden; background:#ffffff; }
 
   /* Spreadsheet grid: white cells, thin gray gridlines on every side. */
   #mod-cost-codes table.cc-table { width:100%; border-collapse:collapse; font-size:13px; background:#ffffff; }
@@ -31967,6 +31962,21 @@ try {
   #mod-cost-codes tr.cc-child3 td.cc-desc { padding-left:48px; color:var(--cc-ink-2); }
   #mod-cost-codes tr.cc-child3 td.cc-code { color:var(--cc-ink-3); }
   #mod-cost-codes .cc-tag { color:var(--cc-ink-3); }
+  /* Per-line Account Type: compact right-aligned column, one label per code
+     (Brad 09/03: label each code's type inline instead of grouping by section). */
+  #mod-cost-codes table.cc-table th.cc-type-h { text-align:right; }
+  #mod-cost-codes td.cc-type { text-align:right; white-space:nowrap; width:1%; padding-left:24px; }
+  #mod-cost-codes span.cc-type-badge { display:inline-block; font-size:10.5px; font-weight:600; line-height:1.5;
+    letter-spacing:.01em; padding:1px 8px; border-radius:10px; background:#eef1f5; color:var(--cc-ink-2);
+    border:1px solid var(--cc-band-line); }
+  /* Color-code the main accounting families so the type reads at a glance. */
+  #mod-cost-codes span.cc-type-cogs   { background:#eaf3ec; color:#2f6b3d; border-color:#c6e0cd; }
+  #mod-cost-codes span.cc-type-expense { background:#f3eeea; color:#7a5326; border-color:#e2d3c4; }
+  #mod-cost-codes span.cc-type-income { background:#e9f0f7; color:#2b5580; border-color:#c8daea; }
+  #mod-cost-codes span.cc-type-equity { background:#f0ecf6; color:#5a4485; border-color:#d8cee9; }
+  #mod-cost-codes span.cc-type-asset  { background:#eef1f5; color:#3a4150; border-color:#c3cad4; }
+  #mod-cost-codes span.cc-type-liab   { background:#f6efe9; color:#7a4a2e; border-color:#e6d3c2; }
+  #mod-cost-codes span.cc-type-none   { background:#f5f5f5; color:#9aa1ad; border-color:#e0e0e0; font-style:italic; }
   #mod-cost-codes .cc-empty { padding:24px; text-align:center; color:var(--cc-ink-3); font-size:13px; background:#ffffff; }
 </style>
 <script>
@@ -31984,15 +31994,33 @@ try {
         return;
       }
 
-      // Group parents into Account-Type bands, preserving first-seen order (mirrors
-      // the excel top-to-bottom layout). Each parent carries its own children.
-      var bands = [];              // [{type, groups:[...]}]
-      var byType = {};
-      (D.groups || []).forEach(function(g){
-        var t = g.account_type || '(none)';
-        if (!byType[t]) { byType[t] = { type: t, groups: [] }; bands.push(byType[t]); }
-        byType[t].groups.push(g);
-      });
+      // Brad 09/03: NO account-type section grouping / no collapse. Render the
+      // FULL list open by default as ONE flat table, and label each individual
+      // code with its own Account Type (from the source data, col E) inline.
+      // The numeric parent rows (e.g. 5000 Job Expenses) and their sub-category
+      // children are preserved exactly - Brad likes those headers as-is.
+
+      // Map a raw account_type string to a compact badge class + short label.
+      function typeMeta(raw){
+        var t = (raw == null ? '' : String(raw)).trim();
+        if (!t) return { label: '', cls: 'cc-type-none' };
+        var lo = t.toLowerCase();
+        var cls = 'cc-type-badge ';
+        if (lo === 'cost of goods sold') cls += 'cc-type-cogs';
+        else if (lo === 'expense' || lo === 'other expense') cls += 'cc-type-expense';
+        else if (lo === 'income' || lo === 'other income') cls += 'cc-type-income';
+        else if (lo === 'equity') cls += 'cc-type-equity';
+        else if (lo.indexOf('liability') !== -1 || lo === 'accounts payable' || lo === 'credit card') cls += 'cc-type-liab';
+        else if (lo.indexOf('asset') !== -1 || lo === 'accounts receivable' || lo.indexOf('checking') !== -1 || lo.indexOf('savings') !== -1) cls += 'cc-type-asset';
+        else if (lo === 'heading') return { label: '', cls: 'cc-type-none' }; // structural heading row, not a real acct type
+        else cls += 'cc-type-asset';
+        return { label: t, cls: cls };
+      }
+      function typeCell(raw){
+        var m = typeMeta(raw);
+        if (!m.label) return '<td class="cc-type"></td>';
+        return '<td class="cc-type"><span class="' + m.cls + '">' + E(m.label) + '</span></td>';
+      }
 
       var head = '<div class="pf-index-head">'
         + '<h2>PF Cost Codes</h2>'
@@ -32006,75 +32034,65 @@ try {
         + '</div>';
 
       var toolbar = '<div class="cc-toolbar">'
-        + '<input type="text" class="cc-search" id="ccSearch" placeholder="Filter code or description...">'
-        + '<button type="button" class="cc-btn" id="ccExpand">Expand all</button>'
-        + '<button type="button" class="cc-btn" id="ccCollapse">Collapse all</button>'
+        + '<input type="text" class="cc-search" id="ccSearch" placeholder="Filter code, description or type...">'
         + '<span class="cc-count" id="ccCount"></span>'
         + '</div>';
 
-      var body = '';
-      bands.forEach(function(b, bi){
-        var rows = '';
-        var count = 0;
-        b.groups.forEach(function(g){
-          rows += '<tr class="cc-parent" data-code="' + E(g.code == null ? '' : g.code) + '" data-desc="' + E((g.name||'').toLowerCase()) + '">'
-            + '<td class="cc-code">' + E(g.code == null ? '' : g.code) + '</td>'
-            + '<td class="cc-desc">' + E(g.name) + (g.note ? ' <span class="cc-tag">' + E(g.note) + '</span>' : '') + '</td>'
+      // Build all rows into one flat tbody, preserving hierarchy indent + notes.
+      var rows = '';
+      (D.groups || []).forEach(function(g){
+        rows += '<tr class="cc-parent" data-code="' + E(g.code == null ? '' : g.code) + '" data-desc="' + E((g.name||'').toLowerCase()) + '" data-type="' + E((g.account_type||'').toLowerCase()) + '">'
+          + '<td class="cc-code">' + E(g.code == null ? '' : g.code) + '</td>'
+          + '<td class="cc-desc">' + E(g.name) + (g.note ? ' <span class="cc-tag">' + E(g.note) + '</span>' : '') + '</td>'
+          + typeCell(g.account_type)
+          + '</tr>';
+        (g.children || []).forEach(function(c){
+          rows += '<tr class="cc-child" data-code="' + E(c.code) + '" data-desc="' + E((c.description||'').toLowerCase()) + '" data-type="' + E((c.account_type||'').toLowerCase()) + '">'
+            + '<td class="cc-code">' + E(c.code) + '</td>'
+            + '<td class="cc-desc">' + E(c.description) + (c.note ? ' <span class="cc-tag">' + E(c.note) + '</span>' : '') + '</td>'
+            + typeCell(c.account_type)
             + '</tr>';
-          count++;
-          (g.children || []).forEach(function(c){
-            rows += '<tr class="cc-child" data-code="' + E(c.code) + '" data-desc="' + E((c.description||'').toLowerCase()) + '">'
-              + '<td class="cc-code">' + E(c.code) + '</td>'
-              + '<td class="cc-desc">' + E(c.description) + (c.note ? ' <span class="cc-tag">' + E(c.note) + '</span>' : '') + '</td>'
+          // Level-3 sub-sub-codes (e.g. 5405 Equipment Transportation -> 5406-5409).
+          (c.children || []).forEach(function(gc){
+            rows += '<tr class="cc-child cc-child3" data-code="' + E(gc.code) + '" data-desc="' + E((gc.description||'').toLowerCase()) + '" data-type="' + E((gc.account_type||'').toLowerCase()) + '">'
+              + '<td class="cc-code">' + E(gc.code) + '</td>'
+              + '<td class="cc-desc">' + E(gc.description) + (gc.note ? ' <span class="cc-tag">' + E(gc.note) + '</span>' : '') + '</td>'
+              + typeCell(gc.account_type)
               + '</tr>';
-            count++;
-            // Level-3 sub-sub-codes (e.g. 5405 Equipment Transportation -> 5406-5409).
-            (c.children || []).forEach(function(gc){
-              rows += '<tr class="cc-child cc-child3" data-code="' + E(gc.code) + '" data-desc="' + E((gc.description||'').toLowerCase()) + '">'
-                + '<td class="cc-code">' + E(gc.code) + '</td>'
-                + '<td class="cc-desc">' + E(gc.description) + (gc.note ? ' <span class="cc-tag">' + E(gc.note) + '</span>' : '') + '</td>'
-                + '</tr>';
-              count++;
-            });
           });
         });
-        // 5xxx (Cost of Goods Sold) is the primary job cost-code band - open it by default.
-        var openAttr = (b.type === 'Cost of Goods Sold') ? ' open' : '';
-        body += '<details class="cc-band"' + openAttr + '>'
-          + '<summary><span>' + E(b.type) + '</span><span class="cc-tag">' + count + ' codes</span></summary>'
-          + '<table class="cc-table"><thead><tr><th>Code</th><th>Description</th></tr></thead>'
-          + '<tbody>' + rows + '</tbody></table>'
-          + '</details>';
       });
+
+      var body = '<div class="cc-sheet">'
+        + '<table class="cc-table"><thead><tr>'
+        + '<th>Code</th><th>Description</th><th class="cc-type-h">Account Type</th>'
+        + '</tr></thead>'
+        + '<tbody>' + rows + '</tbody></table>'
+        + '</div>';
 
       root.innerHTML = head + toolbar + body + '<div class="cc-empty" id="ccEmpty" style="display:none">No cost codes match your filter.</div>';
 
-      // ---- Filter + expand/collapse wiring (client-side, non-destructive) ----
+      // ---- Filter wiring (client-side, non-destructive). No collapse: always open. ----
       var search = document.getElementById('ccSearch');
       var countEl = document.getElementById('ccCount');
       var emptyEl = document.getElementById('ccEmpty');
-      var bandsEls = Array.prototype.slice.call(root.querySelectorAll('details.cc-band'));
+      var rowEls = Array.prototype.slice.call(root.querySelectorAll('tbody tr'));
 
       function applyFilter(){
         var q = (search.value || '').trim().toLowerCase();
         var shown = 0;
-        bandsEls.forEach(function(band){
-          var anyVisible = false;
-          Array.prototype.slice.call(band.querySelectorAll('tbody tr')).forEach(function(tr){
-            var hay = (tr.getAttribute('data-code') || '') + ' ' + (tr.getAttribute('data-desc') || '');
-            var match = !q || hay.indexOf(q) !== -1;
-            tr.style.display = match ? '' : 'none';
-            if (match) { anyVisible = true; shown++; }
-          });
-          band.style.display = anyVisible ? '' : 'none';
-          if (q && anyVisible) band.open = true;   // auto-open bands with matches
+        rowEls.forEach(function(tr){
+          var hay = (tr.getAttribute('data-code') || '') + ' '
+            + (tr.getAttribute('data-desc') || '') + ' '
+            + (tr.getAttribute('data-type') || '');
+          var match = !q || hay.indexOf(q) !== -1;
+          tr.style.display = match ? '' : 'none';
+          if (match) shown++;
         });
         countEl.textContent = q ? (shown + ' shown') : '';
         emptyEl.style.display = (q && shown === 0) ? '' : 'none';
       }
       search.addEventListener('input', applyFilter);
-      document.getElementById('ccExpand').addEventListener('click', function(){ bandsEls.forEach(function(b){ b.open = true; }); });
-      document.getElementById('ccCollapse').addEventListener('click', function(){ bandsEls.forEach(function(b){ b.open = false; }); });
     }
     document.addEventListener('DOMContentLoaded', render);
     if (document.readyState !== 'loading') render();
