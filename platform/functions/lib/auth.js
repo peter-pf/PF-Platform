@@ -633,6 +633,12 @@ export function areaForPath(pathname) {
     // requireArea(session, 'financials') AND requires a CONFIRM step client-side
     // before it will send (the responsible party is often an EXTERNAL GC).
     if (pathname.startsWith('/api/submittal-reminder')) return 'financials';
+    // Staking & Layout "required info" email (Site Readiness > Staking & Layout doc
+    // checklist). Office action -> financials area (admin + partner + business_dev;
+    // field_ops BLOCKED by direct URL too). The handler ALSO calls requireArea(session,
+    // 'financials') AND requires a CONFIRM step client-side before it will send (the
+    // recipient is an EXTERNAL surveyor or GC).
+    if (pathname.startsWith('/api/email-surveyor-required')) return 'financials';
     // BD CRM write-back (companies/contacts overlay + interactions log). BD's
     // own tool: admin + partner + business_dev allowed; field_ops BLOCKED by
     // direct URL too. Each endpoint ALSO calls requireArea('business_dev').

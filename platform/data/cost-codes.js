@@ -312,34 +312,34 @@ window.PF_COST_CODES = {
       "code": 5000,
       "name": "Job Expenses",
       "account_type": "Cost of Goods Sold",
-      "note": "(Job specfic)",
+      "note": "(Job specific)",
       "children": [
         {
           "code": 5050,
           "description": "Professional Services",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         },
         {
           "code": 5051,
           "description": "Engineering & Design Services",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         },
         {
           "code": 5052,
           "description": "Material Testing",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         },
         {
           "code": 5053,
           "description": "Surveying & Staking",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         }
       ]
@@ -348,41 +348,41 @@ window.PF_COST_CODES = {
       "code": 5100,
       "name": "Jobsite Materials",
       "account_type": "Cost of Goods Sold",
-      "note": "(Job specfic)",
+      "note": "(Job specific)",
       "children": [
         {
           "code": 5110,
           "description": "Stone Materials",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         },
         {
           "code": 5120,
           "description": "Rigid Inclusion Materials",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         },
         {
           "code": 5130,
           "description": "Helical Piling Materials",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         },
         {
           "code": 5140,
           "description": "Equipment Consumables",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         },
         {
           "code": 5190,
           "description": "Ground Improvement Testing",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         }
       ]
@@ -391,34 +391,34 @@ window.PF_COST_CODES = {
       "code": 5200,
       "name": "Job Labor",
       "account_type": "Cost of Goods Sold",
-      "note": "(Job specfic)",
+      "note": "(Job specific)",
       "children": [
         {
           "code": 5210,
           "description": "Subcontractors Labor",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         },
         {
           "code": 5215,
           "description": "Willis Dirt Works Retainer",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         },
         {
           "code": 5220,
           "description": "Employee Job Labor",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         },
         {
           "code": 5230,
           "description": "Payroll Tax Expenses",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         }
       ]
@@ -427,48 +427,48 @@ window.PF_COST_CODES = {
       "code": 5300,
       "name": "Job Travel",
       "account_type": "Cost of Goods Sold",
-      "note": "(Job specfic)",
+      "note": "(Job specific)",
       "children": [
         {
           "code": 5310,
           "description": "Travel - Air",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         },
         {
           "code": 5320,
           "description": "Travel - Car Rental/Uber",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         },
         {
           "code": 5330,
           "description": "Travel - Mileage",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         },
         {
           "code": 5340,
           "description": "Travel - Hotel/Housing",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         },
         {
           "code": 5350,
           "description": "Travel - Parking",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         },
         {
           "code": 5360,
           "description": "Travel - Meals/Per Diem",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         }
       ]
@@ -477,37 +477,37 @@ window.PF_COST_CODES = {
       "code": 5400,
       "name": "Jobsite Equipment Expenses",
       "account_type": "Cost of Goods Sold",
-      "note": "(Job specfic)",
+      "note": "(Job specific)",
       "children": [
         {
           "code": 5405,
           "description": "Equipment Transportation",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": [
             {
               "code": 5406,
               "description": "AP Rig",
               "account_type": "Cost of Goods Sold",
-              "note": "(Job specfic)"
+              "note": "(Job specific)"
             },
             {
               "code": 5407,
               "description": "PF Predrill",
               "account_type": "Cost of Goods Sold",
-              "note": "(Job specfic)"
+              "note": "(Job specific)"
             },
             {
               "code": 5408,
               "description": "Gooseneck Parts Load",
               "account_type": "Cost of Goods Sold",
-              "note": "(Job specfic)"
+              "note": "(Job specific)"
             },
             {
               "code": 5409,
               "description": "Fall Off Load/Misc Mob",
               "account_type": "Cost of Goods Sold",
-              "note": "(Job specfic)"
+              "note": "(Job specific)"
             }
           ]
         },
@@ -515,21 +515,21 @@ window.PF_COST_CODES = {
           "code": 5410,
           "description": "Equipment Rental for Jobs",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         },
         {
           "code": 5420,
           "description": "Equipment Maintenance & Repairs",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         },
         {
           "code": 5430,
           "description": "Equipment Fuel",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         }
       ]
@@ -538,34 +538,34 @@ window.PF_COST_CODES = {
       "code": 5600,
       "name": "Small Tools & Equipment - Job Specific",
       "account_type": "Cost of Goods Sold",
-      "note": "(Job specfic)",
+      "note": "(Job specific)",
       "children": []
     },
     {
       "code": 5700,
       "name": "Permits & Fees",
       "account_type": "Cost of Goods Sold",
-      "note": "(Job specfic)",
+      "note": "(Job specific)",
       "children": [
         {
           "code": 5710,
           "description": "Printing / Drawing Expense",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         },
         {
           "code": 5720,
           "description": "Bonds",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         },
         {
           "code": 5730,
           "description": "Permits & Licenses",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         }
       ]
@@ -580,14 +580,14 @@ window.PF_COST_CODES = {
           "code": 5810,
           "description": "As Built Documents",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         },
         {
           "code": 5820,
           "description": "Warranty",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         }
       ]
@@ -596,20 +596,20 @@ window.PF_COST_CODES = {
       "code": 5900,
       "name": "Project Incentives",
       "account_type": "Cost of Goods Sold",
-      "note": "(Job specfic)",
+      "note": "(Job specific)",
       "children": [
         {
           "code": 5910,
           "description": "Commissions",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         },
         {
           "code": 5920,
           "description": "Project Bonuses",
           "account_type": "Cost of Goods Sold",
-          "note": "(Job specfic)",
+          "note": "(Job specific)",
           "children": []
         }
       ]
@@ -618,7 +618,7 @@ window.PF_COST_CODES = {
       "code": 5950,
       "name": "Other Job Related Costs / Contingency",
       "account_type": "Cost of Goods Sold",
-      "note": "(Job specfic)",
+      "note": "(Job specific)",
       "children": []
     },
     {
