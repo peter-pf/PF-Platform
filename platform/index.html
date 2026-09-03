@@ -4103,13 +4103,22 @@ window.pfIsDateLabel = function(label){ return window.PF_DATE_LABEL_RE.test(Stri
     b.style.opacity = disabled ? '0.65' : '1';
     b.style.cursor = disabled ? 'default' : 'pointer';
   }
-  function setLast(text) {
-    var l = document.getElementById('syncLastLabel');
-    if (l) l.textContent = text ? ('Last sync: ' + text) : '';
+  // Update the SINGLE surviving sync-time readout — the green #dataStatus badge
+  // at the right of the topbar — from the LIVE KV sync status (sync_status_v1).
+  // This is the accurate, most-recent sync time (the daemon writes it every run),
+  // NOT the build-time-baked LIVE_SYNC_META.last_sync that could go stale between
+  // rebuilds. Fails safe: leaves whatever renderDashboard() seeded if no timestamp.
+  function setGreenSynced(iso) {
+    var d = document.getElementById('dataStatus');
+    if (!d) return;
+    var ts = fmtStamp(iso);
+    if (!ts) return; // no live timestamp -> keep the embedded-meta fallback text
+    d.textContent = 'SharePoint Live | Synced: ' + ts;
+    d.style.color = '#22c55e';
   }
 
-  // Render the button + label from a status object {state,startedAt,finishedAt,
-  // lastSync,by,error} (may be null). Honest states only.
+  // Render the button + green status from a status object {state,startedAt,
+  // finishedAt,lastSync,by,error} (may be null). Honest states only.
   function render(status) {
     if (!status || !status.state) { setBtn('Sync Now', false); return; }
     if (status.state === 'running') {
@@ -4117,7 +4126,7 @@ window.pfIsDateLabel = function(label){ return window.PF_DATE_LABEL_RE.test(Stri
       ensurePolling();
     } else if (status.state === 'done') {
       setBtn('Synced ✓', false);
-      setLast(fmtStamp(status.lastSync || status.finishedAt));
+      setGreenSynced(status.lastSync || status.finishedAt);
       // After a short beat, relax the label back to plain "Sync Now" so it is
       // ready for the next trigger (the Last sync timestamp stays).
       setTimeout(function(){ setBtn('Sync Now', false); }, 4000);
@@ -4170,14 +4179,23 @@ window.pfIsDateLabel = function(label){ return window.PF_DATE_LABEL_RE.test(Stri
       .catch(function () { setBtn('Sync failed', false); });
   };
 
-  // Reveal + initialize the button for office roles once the DOM is ready.
+  // Reveal + initialize the button (office only) and refresh the green synced
+  // badge from the LIVE KV status. The badge refresh runs for ALL roles: the
+  // GET is read-only + the badge is visible to everyone, so every viewer sees
+  // the true most-recent sync time (overriding the build-time seed that
+  // renderDashboard() paints from LIVE_SYNC_META). The Sync Now BUTTON itself
+  // stays office-only (server also enforces).
   function init() {
-    if (!isOffice()) return; // stays display:none for field_ops
-    var wrap = document.getElementById('syncNowWrap');
-    if (wrap) wrap.style.display = 'flex';
+    var office = isOffice();
+    if (office) {
+      var wrap = document.getElementById('syncNowWrap');
+      if (wrap) wrap.style.display = 'flex';
+    }
     fetchStatus(function (status) {
-      render(status);
-      if (status && status.state === 'done') setLast(fmtStamp(status.lastSync || status.finishedAt));
+      if (office) render(status);
+      // Trust the live KV timestamp whenever we have one (any recent successful
+      // sync), not only on state==='done', so the badge is accurate on load.
+      if (status) setGreenSynced(status.lastSync || status.finishedAt);
     });
   }
   if (document.readyState === 'loading') {
@@ -4768,9 +4786,11 @@ document.addEventListener('click', function(e) {
          Triggers /api/sync-request -> KV flag -> local sync daemon runs the
          SharePoint pull + rebuild + redeploy, and writes sync_status_v1 which this
          button polls for honest state (Syncing / Synced (ts) / Sync failed). -->
+    <!-- Left "Last sync:" label REMOVED (redundant w/ the green SharePoint Live |
+         Synced status at right). The single surviving sync-time readout lives on
+         #dataStatus and is fed from the LIVE KV sync status (sync_status_v1) so it
+         is truthful + updates on every daemon run. -->
     <div id="syncNowWrap" style="display:none;align-items:center;gap:6px;">
-      <span id="syncLastLabel" title="Last successful sync"
-            style="font-size:11px;color:var(--text-3);white-space:nowrap;"></span>
       <button id="syncNowBtn" type="button" onclick="pfSyncNow()"
               title="Pull the latest data from SharePoint and republish the portal"
               style="font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--border,#d0d5dd);background:var(--accent,#0a6cff);color:#fff;cursor:pointer;white-space:nowrap;line-height:1.2;">
