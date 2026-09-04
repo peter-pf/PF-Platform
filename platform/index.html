@@ -21046,11 +21046,14 @@ try {
         ? subhead('Documents to send the surveyor')
         : subhead('Document to send the GC');
       var body = items.map(function(it){
+        // Brad 2026-09-04: "Approved AP Shop Dwgs (CAD)" drops its File Link box in BOTH
+        // scenarios (PF surveyor list + GC list); its Date Sent stays. Others keep both.
+        var noLink = (it.name === 'Approved AP Shop Dwgs (CAD)');
         return subgroup(it.name)
-          + fields([
-              field(pfStakingDateLabel(it.name), ''),
-              fieldLinked(pfStakingLinkLabel(it.name), '', '', 'website')
-            ]);
+          + fields(noLink
+              ? [ field(pfStakingDateLabel(it.name), '') ]
+              : [ field(pfStakingDateLabel(it.name), ''),
+                  fieldLinked(pfStakingLinkLabel(it.name), '', '', 'website') ]);
       }).join('');
       return head + body;
     }
