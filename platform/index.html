@@ -2344,6 +2344,53 @@ tr.pf-dragging { opacity: 0.45; }
 .pf-testing-table .pr-field { padding: 0; border-bottom: none; }
 .pf-testing-table .pr-field-label { display: none; }
 
+/* ---- Site Readiness NEW (Inventory-style) tables (Brad 2026-09-04) --------- */
+/* The "Site Readiness / Project Setup - New" SANDBOX card rebuilds Site         */
+/* Readiness subsections in the INVENTORY MODULE look: each subsection gets a    */
+/* dark-blue HEADER BAR (name + item count), an accent-blue COLUMN-HEADER row,   */
+/* and body rows with alternating (zebra) shading + borders. Modeled on the      */
+/* #mod-inventory .inv-loc-h (header band) + .inv-tbl (accent th + bordered td)  */
+/* CSS so it visually mirrors Inventory. Each value cell embeds the FULL         */
+/* field()/fieldLinked() output, so save-on-change / .blank / read-view wiring   */
+/* is untouched (label key + siteReadiness section resolved from the .pr-card    */
+/* ancestor); the embedded .pr-field-label is CSS-hidden (the left cell labels   */
+/* the row). Scoped to .pf-sr-table so it never leaks into the ORIGINAL card.    */
+.pf-sr-headbar {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px; font-weight: 600; color: #ffffff;
+  background: #1E2A38; border: 1px solid #1E2A38; border-radius: 8px;
+  padding: 8px 14px; margin: 4px 0 8px;
+}
+.pf-sr-headbar .pf-sr-headbar-label { flex: 1 1 auto; }
+.pf-sr-headbar .pf-sr-headbar-count {
+  font-size: 10px; font-weight: 500; color: rgba(255,255,255,0.6);
+}
+.pf-sr-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; table-layout: fixed; }
+/* Accent-blue column-header row (matches .inv-tbl th). */
+.pf-sr-table th {
+  text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .04em;
+  color: #fff; background: var(--accent, #006DB0); font-weight: 600;
+  padding: 5px 12px; border-bottom: 1px solid var(--border, #C8D5DC);
+}
+.pf-sr-table td {
+  padding: 6px 12px; border-bottom: 1px solid var(--border-light); vertical-align: middle;
+  overflow: hidden; text-overflow: ellipsis;
+}
+/* Zebra rows (Brad's Inventory-look ask): alternate body-row shading. */
+.pf-sr-table tbody tr:nth-child(even) td { background: var(--bg-2, #F3F5F8); }
+.pf-sr-table tr:last-child td { border-bottom: none; }
+.pf-sr-table td.pf-sr-name,
+.pf-sr-table th.pf-sr-name { width: 55%; }
+.pf-sr-table td.pf-sr-name {
+  font-size: 0.9rem; color: var(--text-1); word-break: break-word;
+}
+.pf-sr-table td.pf-sr-val,
+.pf-sr-table th.pf-sr-val { width: 45%; }
+/* Neutralize the embedded .pr-field so it seats flush in the cell (label hidden, */
+/* the field name already labels the row via the left cell). */
+.pf-sr-table .pr-field { padding: 0; border-bottom: none; background: transparent; }
+.pf-sr-table .pr-field-label { display: none; }
+
 /* ---- General Info rework (Brad 2026-08-06 / PDF-grouping 2026-08-07) ------ */
 /* FIXED 2-column grouping that matches Brad's spec PDFs: fields are grouped    */
 /* LEFT vs RIGHT (see twoCol() in the renderer) so fields that belong together  */
@@ -18347,6 +18394,79 @@ try {
         + collapsibleSubgroup('7. Rental Equipment', sub7Inner);
       html += card(5, 'Site Readiness / Project Setup', null,
         srBody + linkRow(L.site), false, 'siteReadiness');
+
+      // ===== Site Readiness / Project Setup - NEW (SANDBOX rebuild) ============
+      // (Brad 2026-09-04) A SEPARATE card where Site Readiness is rebuilt in the
+      // INVENTORY-module table look (dark-blue subsection header bar + accent
+      // column-header row + zebra rows), page-by-page, WITHOUT touching the
+      // working ORIGINAL card above. Brad refines columns live here; when a
+      // subsection is signed off it can replace the original.
+      //
+      // DATA APPROACH — REUSE the existing `siteReadiness` sectionKey (NOT an
+      // isolated key). This is SAFE and needs NO backend allowlist change because:
+      //  (1) SAVE: every field is a live save-on-change control (_srLiveEdit is
+      //      still true here — this card is rendered INSIDE the 18061->19578
+      //      _srLiveEdit window). pfLiveFieldChange resolves section from the
+      //      field's .pr-card[data-pr-section] ancestor (= siteReadiness) + label
+      //      from data-pr-field-label. So a field saves through the ALREADY-
+      //      allowlisted `siteReadiness` key with the identical label -> it shows
+      //      + persists the SAME real per-project data as the original card.
+      //  (2) NO card-level Save-scan to blank the section: because _srLiveEdit is
+      //      on, card() suppresses the Edit/Save button (editBtn=''), so there is
+      //      no full-section overwrite that could blank fields absent from this
+      //      subset. Each field round-trips independently.
+      //  (3) NO hook collision: the Safety/Equipment/Material nested-card injection
+      //      + the completion-count title lookups (L~19378 / L~19740) match the
+      //      EXACT title string 'Site Readiness / Project Setup' — this card's
+      //      title is 'Site Readiness / Project Setup - New' (different string) so
+      //      they never target it. The two capture-phase toggle listeners
+      //      (L~21276 staking, L~21310 testing) key on data-pr-field-label values
+      //      'Staking & Layout PF\'s responsibility?' / 'Modulus Load Test
+      //      Required?' — NEITHER field exists in the Shop Drawings subsection
+      //      built here, so neither listener can cross-fire from this card.
+      //
+      // _srNewRow(fieldHtml): one Inventory-style table row = [name cell | value
+      // cell]. The value cell holds an already-built field()/fieldLinked() string;
+      // the name is pulled from the field's own data-pr-label (already E()-escaped
+      // -> guaranteed identical to the save key, XSS-safe).
+      var _srNewRow = function(fieldHtml){
+        var m = /data-pr-label="([^"]*)"/.exec(fieldHtml);
+        var name = m ? m[1] : '';
+        return '<tr><td class="pf-sr-name">' + name + '</td>'
+             + '<td class="pf-sr-val">' + fieldHtml + '</td></tr>';
+      };
+      // _srNewSubTable(title, fieldHtmls): a subsection rendered as an Inventory-
+      // style table = dark-blue header bar (title + item count) + accent column-
+      // header row (Field | Value) + zebra body rows.
+      var _srNewSubTable = function(title, fieldHtmls){
+        return '<div class="pf-sr-headbar">'
+             +   '<span class="pf-sr-headbar-label">' + E(title) + '</span>'
+             +   '<span class="pf-sr-headbar-count">' + fieldHtmls.length
+             +     ' item' + (fieldHtmls.length === 1 ? '' : 's') + '</span>'
+             + '</div>'
+             + '<div class="table-wrap"><table class="pf-sr-table">'
+             +   '<thead><tr>'
+             +     '<th class="pf-sr-name">Field</th>'
+             +     '<th class="pf-sr-val">Value</th>'
+             +   '</tr></thead>'
+             +   '<tbody>' + fieldHtmls.map(_srNewRow).join('') + '</tbody>'
+             + '</table></div>';
+      };
+      // ---- Subsection 1: Shop Drawings (first subsection built into the NEW card)
+      // Same fields as the ORIGINAL Shop Drawings subsection (sub1Inner): the
+      // print action link + print-spec/pickup notes (kept as context) and the one
+      // editable field 'Date Ready for Pickup'. Rendered here as an Inventory-style
+      // table so the field saves through siteReadiness exactly as in the original.
+      var _srNewShopFields = [
+        field('Date Ready for Pickup', '')
+      ];
+      var srNewBody =
+          '<div class="pr-subgroup-actions"><a class="pr-action-link" href="' + E(_fedexPrint) + '" target="_blank" rel="noopener noreferrer">&#128424; Sent to Print (FedEx Office)</a></div>'
+        + subgroupNote('Print spec: B&W, 24x36 Standard White, 1-sided, 3 copies, horizontal orientation, bind on left. Login credentials are stored securely (not shown here).')
+        + subgroupNote('Date Ready for Pickup = anticipated date; email pickup person with order details.')
+        + _srNewSubTable('Shop Drawings', _srNewShopFields);
+      html += card(5, 'Site Readiness / Project Setup - New', null,
+        srNewBody, false, 'siteReadiness');
 
       // ----- 6. Project Photos (LIVE, READ-ONLY gallery) -----
       // A live thumbnail gallery of this project's SharePoint "02 - Project Photos"
