@@ -17695,15 +17695,8 @@ try {
           // header so it reads as a distinct group beneath "As Built Drawings".
           subgroupSub('Field As-Built Drawings')
         + subgroupNote('FUTURE (not yet built): each daily-report upload saves a dated file per day; Peter compares installed vs the Approved Shop Drawing and posts a daily summary (LF, columns, start/end from rig data).')
-        + fields([
-            fieldLinked('Field As-Built Drawings Link', '', '', 'website'),
-            field('Field As-Built Notes', '')
-          ])
-          // Sub-sub-group B: Stamped Final As-Built Drawings.
-        + subgroupSub('Stamped Final As-Built Drawings')
-        + fields([
-            fieldLinked('Stamped Final As-Built Link', '', '', 'website')
-          ])
+          // Placeholder fields (Field As-Built Drawings Link, Field As-Built Notes) and the
+          // Stamped Final As-Built Drawings sub-group removed (Brad 2026-09-04, not needed now).
         + linkRow((L.engineering || []).concat(L.general || []));
       // Assemble the 3 COLLAPSIBLE subsections (default collapsed / rolled up — Brad 2026-08-13).
       // Each rolls up/expands independently via the shared .pr-card collapse idiom
@@ -18285,44 +18278,14 @@ try {
       // save / add-more vendor contacts keep working with ZERO data migration and
       // zero API change. See the Site-Readiness nested-card injection block below.
 
-      // ----- QA / QC (Brad 2026-08-07, batch-12: MOVED INTO Engineering & Design) -----
-      // The standalone top-level QA/QC section (#6) is REMOVED. Its full content —
-      // including the LIVE-COMPUTED installed-quantity display (GUHMA installed columns
-      // / LF / redrill / last-log, sourced from `q` = the record's qaqc auto-progress
-      // object) — is relocated as a NESTED editable card INSIDE the Engineering & Design
-      // section body, under the "As Built Drawings" area (QA/QC = installed pier data).
-      // The nested card KEEPS its own data-pr-section="qaqc" override key (already in the
-      // API VALID_SECTIONS allowlist), so:
-      //   - pfEditSection/pfSaveSection resolve via btn.closest('.pr-card') = the nested
-      //     card => edits still save under the 'qaqc' key => ZERO data migration.
-      //   - _surfaceExtras('qaqc') still surfaces added/overridden qaqc fields.
-      //   - The engineering-section editor scan is scoped to its own card, so nesting
-      //     qaqc does NOT leak its rows into the 'engineering' key (and vice-versa).
-      // qaRows/qaMeta/qaNote are computed here (data unchanged) and the card is INJECTED
-      // post-render into the engineering card body below (same idiom as Equipment/
-      // Material into Site Readiness). PLACEMENT FLAGGED FOR BRAD.
-      var _prevQa = _curSection; _curSection = 'qaqc';
-      var qaRows;
-      if (q) {
-        qaRows = [
-          field('Installed Columns', q.installed_columns, 'Auto-progress (GUHMA)'),
-          field('Installed LF', q.installed_lf, 'Auto-progress (GUHMA)'),
-          field('Design Columns (baseline)', q.design_columns, 'Baseline pending'),
-          field('Design LF (baseline)', q.design_lf, 'Baseline pending'),
-          field('% Complete (Columns)', q.pct_columns, 'Withheld - baseline pending'),
-          field('% Complete (LF)', q.pct_lf, 'Withheld - baseline pending'),
-          field('Redrill Logs', q.redrill_logs, 'Auto-progress'),
-          field('Last Log Date', q.last_log_date, 'Auto-progress'),
-          field('Modulus Load Test', ''),
-          field('Handlogs vs GUHMA Data Checks', '')
-        ];
-      } else {
-        qaRows = [ field('Installed Columns', ''), field('Installed LF', ''), field('Modulus Load Test', ''), field('Handlogs vs GUHMA Data Checks', '') ];
-      }
-      var qaMeta = q ? (q.installed_columns + ' cols / ' + q.installed_lf + ' LF') : null;
-      var qaNote = '<div class="pr-empty-note">Baseline pending - approved Garbin design totals not yet confirmed, so % complete is withheld (installed quantities shown).</div>';
-      var qaBody = qaNote + fields(qaRows) + linkRow(L.qaqc);
-      _curSection = _prevQa;
+      // ----- QA / QC card REMOVED (Brad 2026-09-04, "not needed at this time") -----
+      // The E&D QA/QC summary card (Installed Columns/LF, Modulus Load Test, Handlogs vs
+      // GUHMA, the "Baseline pending" note, and the QA/QC docs linkRow) was deleted from
+      // this office/main project view. The former qaRows/qaMeta/qaNote assembly + the
+      // nested-card injection + the _surfaceExtras('qaqc') call below are all removed.
+      // NOTE: no KV data is touched — the 'qaqc' section key stays in the API/serialization
+      // allowlist so any existing saved qaqc overrides still round-trip (just not displayed).
+      // The separate GUHMA/Modulus MODULE routes + server gating are untouched.
 
       // ----- 7. Financials (renumbered from 6 after Project Photos inserted at 6) -----
       // Phase 1: a per-project BUDGET vs ACTUAL table seeded from the standard
@@ -19638,22 +19601,10 @@ try {
       // the whole record root so the Engineering & Design prereq wrap is covered.
       if (typeof pfPrqRefreshAfterContacts === 'function') pfPrqRefreshAfterContacts(root);
 
-      // --- QA/QC nested card injected into Engineering & Design (Brad 2026-08-07,
-      // batch-12) --- The former standalone QA/QC section now lives as a NESTED editable
-      // card inside the Engineering & Design card body, appended after the "As Built
-      // Drawings" subgroup. It keeps its own data-pr-section="qaqc" override key, its
-      // Edit button, the live-computed GUHMA installed-quantity display (qaBody, built
-      // above from `q`), and its Documents (L.qaqc). Injected BEFORE the engineering
-      // _surfaceExtras so that dedupe only sees engineering-card fields (the qaqc rows
-      // live in their OWN nested card, skipped by _surfaceExtras' closest('.pr-card')
-      // guard). PLACEMENT FLAGGED FOR BRAD.
-      var engCardBody = root.querySelector('.pr-card[data-pr-section="engineering"] .pr-card-body');
-      if (engCardBody) {
-        engCardBody.insertAdjacentHTML('beforeend',
-          '<div class="pr-nested-card-wrap">'
-          + card('', 'QA / QC', qaMeta, qaBody, true, 'qaqc')
-          + '</div>');
-      }
+      // --- QA/QC nested card REMOVED from Engineering & Design (Brad 2026-09-04,
+      // "not needed at this time") --- The former nested QA/QC card injection was
+      // deleted here (and its qaRows/qaMeta/qaNote/qaBody assembly above). No KV data
+      // touched; existing 'qaqc' overrides stay in storage, just no longer surfaced. ---
 
       // Standalone Engineering & Design section (card #3, the single editable
       // "engineering" key). Batch-8: the Design Professionals subsection in General Info
@@ -19669,11 +19620,10 @@ try {
       // overrides stay in KV, they just stop displaying/re-saving). The real engineering
       // field rows + their section editor save are UNAFFECTED (they render via engBody
       // above, not via this catch-all).
-      // QA/QC nested card ("qaqc" key — added/overridden QA fields). Nested inside
-      // Engineering & Design; its querySelector resolves to the single
-      // .pr-card[data-pr-section="qaqc"].
-      _surfaceExtras(root.querySelector('.pr-card[data-pr-section="qaqc"] .pr-card-body'),
-        'qaqc', 'Additional QA/QC Fields', null);
+      // QA/QC nested card REMOVED (Brad 2026-09-04) — its _surfaceExtras('qaqc') call
+      // was deleted along with the card, since the .pr-card[data-pr-section="qaqc"] it
+      // targeted no longer renders (the call would always resolve null and no-op).
+      // Existing 'qaqc' KV overrides are untouched, just no longer surfaced here.
       // PF Project Team nested card ("pfTeam" key). Brad 2026-08-11: the
       // "Additional Team Members / Fields" _surfaceExtras subsection was REMOVED
       // per his request (delete that subsection + all fields related to it). The
@@ -31564,27 +31514,11 @@ try {
             field('Fuel Delivery', '')
           ]) + linkRow(L.material));
 
-      // ----- 9. QA / QC (installed quantities + % complete - NO financials) -----
-      var qaRows, qaMeta = null;
-      if (q) {
-        qaRows = [
-          field('Installed Columns', q.installed_columns, 'Auto-progress (GUHMA)'),
-          field('Installed LF', q.installed_lf, 'Auto-progress (GUHMA)'),
-          field('Design Columns (baseline)', q.design_columns, 'Baseline pending'),
-          field('Design LF (baseline)', q.design_lf, 'Baseline pending'),
-          field('% Complete (Columns)', q.pct_columns, 'Withheld - baseline pending'),
-          field('% Complete (LF)', q.pct_lf, 'Withheld - baseline pending'),
-          field('Redrill Logs', q.redrill_logs, 'Auto-progress'),
-          field('Last Log Date', q.last_log_date, 'Auto-progress'),
-          field('Modulus Load Test', ''),
-          field('Handlogs vs GUHMA Data Checks', '')
-        ];
-        qaMeta = q.installed_columns + ' cols / ' + q.installed_lf + ' LF';
-      } else {
-        qaRows = [ field('Installed Columns', ''), field('Installed LF', ''), field('Modulus Load Test', ''), field('Handlogs vs GUHMA Data Checks', '') ];
-      }
-      var qaNote = '<div class="pr-empty-note">Baseline pending - approved Garbin design totals not yet confirmed, so % complete is withheld (installed quantities shown).</div>';
-      html += card(9, 'QA / QC', qaMeta, qaNote + fields(qaRows) + linkRow(L.qaqc));
+      // ----- 9. QA / QC card REMOVED (Brad 2026-09-04, "not needed at this time") -----
+      // The QA/QC card (Installed Columns/LF, Modulus Load Test, Handlogs vs GUHMA,
+      // "Baseline pending" note, QA/QC docs linkRow) was deleted from this field-ops
+      // project detail view too, so the box is gone entirely across user-facing views.
+      // `q` (D.qaqc) is left declared above as a harmless record accessor; no KV touched.
 
       // ----- 10. Project Closeout (NO financial closeout items) -----
       html += card(10, 'Project Closeout', null,

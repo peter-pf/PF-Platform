@@ -4,6 +4,11 @@
 // Read by the PF Design Submittal 'GC prerequisites' checklist link.
 window.PF_SHOP_DWG_INFO = {
   "projects": {
+    "25-026": {
+      "folder_url": "https://pierfoundations.sharepoint.com/sites/pf/Shared%20Documents/04%20-%20Project%20Management/02%20-%20Projects/25-026%20-%20The%20Granary%20-%20FlCo/03%20-%20Engineering%20%26%20Design/Shop%20Dwg%20Info",
+      "folder_name": "Shop Dwg Info",
+      "source_path": "25-026 - The Granary - FlCo/03 - Engineering & Design/Shop Dwg Info"
+    },
     "26-007": {
       "folder_url": "https://pierfoundations.sharepoint.com/sites/pf/Shared%20Documents/04%20-%20Project%20Management/02%20-%20Projects/26-007%20-%20Madison%20Lifestyle%20Garage%20-%20Wilhelm/03%20-%20Engineering%20%26%20Design/Shop%20Dwg%20info",
       "folder_name": "Shop Dwg info",
@@ -51,9 +56,9 @@ window.PF_SHOP_DWG_INFO = {
     }
   },
   "meta": {
-    "generated": "2026-09-04T19:27:01.624027Z",
+    "generated": "2026-09-04T19:36:58.444894Z",
     "source": "SharePoint 04 - Project Management/02 - Projects/<project>/03 - Engineering & Design/Shop Dwg Info (folder webUrl)",
     "note": "folder_url is the driveItem webUrl of the project's 'Shop Dwg Info' folder; projects without one get no entry (portal renders the link gracefully blank).",
-    "project_count": 9
+    "project_count": 10
   }
 };
