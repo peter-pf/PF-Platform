@@ -19791,9 +19791,10 @@ try {
       // which lives OUTSIDE pcHost. Each host's data-crm-cards-key selects its own
       // override map; no selection -> hosts stay empty (renders as before). Idempotent.
       pfCrmRenderCards(root || pcHost);
-      // CHANGE B: hydrate the inline Staking & Layout picker (company dropdown +
-      // contact checkboxes) when it rendered (office + toggle=Yes). Fail-soft.
-      if (typeof pfStakingHydrate === 'function') pfStakingHydrate(root);
+      // (Option A, Brad 2026-09-04) The inline Staking & Layout "select from directory"
+      // picker was removed — the uniform Project-Contacts card (rendered by
+      // pfCrmRenderCards above) is now the sole editor, so no staking-specific hydrate
+      // step is needed.
       // ALWAYS-LIVE Project Contacts INLINE CRUD (Brad 2026-08-13, REWORK): for office
       // users, mount inline-editable contact rows (no Edit button — save-on-change) and
       // an "+ Add contact" button per group on top of the resolved read cards that
@@ -21301,75 +21302,20 @@ try {
       var host = '<div class="pr-crm-cards" data-crm-cards="Staking & Layout" '
         + 'data-crm-cards-key="siteReadiness" data-role-tag="Staking & Layout"></div>';
       if (!_office) return host;
-      // Office: the cascading picker + an explicit save button for this ONE group.
-      return '<div class="pr-crm-wrap" data-pf-staking-picker>'
-        + '<div class="pr-edit-note">Select the staking &amp; layout company &amp; contacts from the master directory. '
-        + 'Use &ldquo;+ Add company / contact&rdquo; to grow the directory, then Save.</div>'
-        + pfCrmSelectorBlock('Staking & Layout', PF_STAKING_TRADE, 'siteReadiness')
-        + '<div class="pr-add-contact-bar">'
-        +   '<button type="button" class="pr-save-btn pf-staking-save" '
-        +     'onclick="window.pfStakingSaveSelection(this)">&#128190; Save staking company / contact</button>'
-        + '</div>'
-        + '<div class="pr-dir-msg pf-staking-msg" style="display:none;font-size:0.76rem;margin:2px 0;"></div>'
+      // Office: the SAME uniform Project-Contacts card as read-only, which already carries
+      // the office inline affordances (inline company name/address edit, per-row Edit / ✕,
+      // "+ Add contact" per company, "+ Add company" foot). Option A (Brad 2026-09-04):
+      // the old top "select from directory" picker + separate Save button were a redundant
+      // second editor on the SAME siteReadiness.__crm['Staking & Layout'] store, so they
+      // were dropped — the host card is now the ONE editor, identical to every other
+      // Project Contacts group. Adds/edits here save via pfPcAddContactSave/pfCrmRebuildMap
+      // and auto-sync into the Project Contacts "Staking & Layout" card (same key).
+      return '<div class="pr-crm-wrap">'
+        + '<div class="pr-edit-note">Add or edit the staking &amp; layout surveyor company &amp; contacts below. '
+        + 'Changes sync to Project Contacts automatically.</div>'
         + host
         + '</div>';
     }
-
-    // Hydrate the inline staking picker's company dropdown + contact checkboxes after
-    // render (mirrors pfCrmHydrate over the whole staking picker container).
-    function pfStakingHydrate(root){
-      if (!root || !root.querySelectorAll) return;
-      root.querySelectorAll('[data-pf-staking-picker]').forEach(function(p){ pfCrmHydrate(p); });
-    }
-
-    // Explicit save for the inline staking selector. Harvests the picked company +
-    // checked contactIds from THIS picker (pfCollectCrm) and POSTs the whole __crm map
-    // under siteReadiness (whole-object replace; the map only holds "Staking & Layout").
-    // FAIL CLOSED: any non-{ok:true,saved:true} shows an inline error + leaves the
-    // picker as-is (nothing fabricated). On success adopt server truth into
-    // PF_PROJECT_OVERRIDES + _curOverrides and re-render just the read host — NO
-    // renderProjectRecord (no page bounce; the picker stays open, scroll preserved).
-    window.pfStakingSaveSelection = function(btn){
-      if (typeof canEdit === 'function' && !canEdit()) return; // server also 403s
-      var wrap = btn && btn.closest ? btn.closest('[data-pf-staking-picker]') : null;
-      var msgEl = wrap ? wrap.querySelector('.pf-staking-msg') : null;
-      function say(t, isErr){
-        if (!msgEl) return;
-        msgEl.textContent = t || '';
-        msgEl.style.display = t ? 'block' : 'none';
-        msgEl.style.color = isErr ? '#b91c1c' : '#166534';
-      }
-      var num = _curNum || '';
-      if (!wrap || !num) { say('Could not save; please retry.', true); return; }
-      var crm = pfCollectCrm(wrap, 'siteReadiness'); // { 'Staking & Layout': { company, address, contactIds } } or {}
-      btn.disabled = true; say('Saving…', false);
-      fetch('/api/project-override', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ num: num, section: 'siteReadiness', fields: (function(){ var f = {}; f[PF_CRM_KEY] = crm; return f; })() })
-      }).then(function(res){
-        return res.json().then(function(b){ return { ok: res.ok, status: res.status, body: b }; })
-          .catch(function(){ return { ok: res.ok, status: res.status, body: null }; });
-      }).then(function(r){
-        btn.disabled = false;
-        if (!r.ok || !r.body || r.body.ok !== true || r.body.saved !== true) {
-          say((r.body && r.body.message) ? r.body.message
-              : (r.status === 403 ? 'You do not have permission to edit this project.'
-                                   : 'Save failed (' + r.status + '). Not saved — please retry.'), true);
-          return;
-        }
-        window.PF_PROJECT_OVERRIDES[num] = { sections: (r.body.sections) || {}, _meta: (r.body._meta) || null };
-        try {
-          if (String(num) === String(_curNum) && r.body.sections && typeof r.body.sections === 'object') _curOverrides = r.body.sections;
-        } catch (e) {}
-        // Re-render the resolved read cards for this group (both this inline host AND
-        // the Project Contacts "Staking & Layout" host share the same key/name).
-        if (window.pfCrmRenderCards) window.pfCrmRenderCards(document);
-        say('Saved', false);
-      }).catch(function(){
-        btn.disabled = false; say('Save failed: could not reach the server. Not saved — please retry.', true);
-      });
-    };
 
 
     // Live visibility toggle for the inline staking selector. Bound once (document-level
