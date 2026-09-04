@@ -2299,6 +2299,29 @@ tr.pf-dragging { opacity: 0.45; }
 .pr-live-msg-ok { color: #2e7d32; }
 .pr-live-msg-err { color: #c0392b; font-weight: 600; }
 
+/* ---- Staking "Documents to send the surveyor" table (Brad 2026-09-04) ------ */
+/* One row per doc: left cell = doc NAME, right cell = the SAME field()-emitted   */
+/* Date Sent control (input/date in live-edit, MM/DD/YYYY read view). The full    */
+/* .pr-field wrapper is embedded in the right cell so save-on-change / fail-closed */
+/* / blank-highlight / MM-DD-YYYY read view all keep working unchanged; we only    */
+/* HIDE the now-redundant .pr-field-label (the doc name already sits in the left   */
+/* cell) and strip the .pr-field's own border/padding so it seats cleanly in the   */
+/* cell. Data binding (label key + siteReadiness section via .pr-card ancestor) is */
+/* untouched — no new save path. */
+.pf-staking-doc-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.pf-staking-doc-table td {
+  padding: 6px 12px; border-bottom: 1px solid var(--border-light); vertical-align: middle;
+}
+.pf-staking-doc-table tr:last-child td { border-bottom: none; }
+.pf-staking-doc-table td.pf-staking-doc-name {
+  font-size: 0.9rem; color: var(--text-1); width: 55%; word-break: break-word;
+}
+.pf-staking-doc-table td.pf-staking-doc-date { width: 45%; }
+/* Neutralize the embedded .pr-field so it sits flush in the cell (label hidden,   */
+/* the doc name already labels the row via the left cell). */
+.pf-staking-doc-table .pr-field { padding: 0; border-bottom: none; }
+.pf-staking-doc-table .pr-field-label { display: none; }
+
 /* ---- General Info rework (Brad 2026-08-06 / PDF-grouping 2026-08-07) ------ */
 /* FIXED 2-column grouping that matches Brad's spec PDFs: fields are grouped    */
 /* LEFT vs RIGHT (see twoCol() in the renderer) so fields that belong together  */
@@ -18120,15 +18143,15 @@ try {
             // inside data-pf-staking-gc-list (shown only when the toggle = No). Both lists
             // are always rendered so the live listener can show/hide WITHOUT a re-render;
             // only ONE is visible at a time (mirrors the selector/gcnote wrappers).
+            // Brad 2026-09-04: the "Email surveyor/GC required info" button was removed from
+            // both scenarios (its helper fns + client fetch were removed too — see below).
             return _gcNote
               + '<div data-pf-staking-gc-list style="' + (_isNo ? '' : 'display:none;') + '">'
               +   pfStakingDocChecklist(false)
-              +   pfStakingEmailButton(false)
               + '</div>'
               + '<div data-pf-staking-selector style="' + (_isPf ? '' : 'display:none;') + '">'
               +   _sel
               +   pfStakingDocChecklist(true)
-              +   pfStakingEmailButton(true)
               + '</div>';
           })();
 
@@ -21035,8 +21058,9 @@ try {
     // Brad 2026-09-04: "Approved AP Shop Dwgs (CAD)" removed from the checklist — its
     // Date Sent now lives next to the responsibility dropdown (see sub3Inner) and its
     // File Link box was already removed in a prior change. It was the ONLY gc:true item,
-    // so the NO/GC checklist is now EMPTY (handled by pfStakingDocChecklist returning ''
-    // and pfStakingEmailButton suppressing the GC button when there are no GC items).
+    // so the NO/GC checklist is now EMPTY (handled by pfStakingDocChecklist returning '').
+    // Brad 2026-09-04: the surveyor doc list is now a TABLE (doc name | Date Sent); the
+    // per-item File Link fields were removed entirely, so pfStakingLinkLabel is gone.
     var PF_STAKING_DOC_ITEMS = [
       { name: 'Approved AP Shop Dwgs (PDF)',                gc: false },
       { name: 'Civil Drawings PDF',                         gc: false },
@@ -21045,79 +21069,48 @@ try {
       { name: 'Structural Foundations (PDF)',               gc: false }
     ];
     function pfStakingDateLabel(name){ return name + ' - Date Sent'; }
-    function pfStakingLinkLabel(name){ return name + ' - File Link'; }
 
-    // Render the conditional checklist. isPf=true -> all 6 items (surveyor); false -> the
-    // single GC item (index 0). Each item = subhead + [Date Sent | File Link]. When
-    // _srLiveEdit + office, field()/fieldLinked() emit save-on-change controls; otherwise a
-    // read view (date shown MM/DD/YYYY, link shown as a clickable anchor). No wiring needed.
+    // Render the conditional doc list. isPf=true -> a TABLE of the surveyor docs
+    // (Brad 2026-09-04): one ROW per doc = doc NAME (left) + a single Date Sent field
+    // (right). File Links were REMOVED entirely. isPf=false -> the GC list, which filters
+    // to gc:true items (currently zero) and returns '' via the empty guard.
+    //
+    // DATA BINDING (unchanged): the right cell embeds the FULL field() output for label
+    // "<doc> - Date Sent". That .pr-field wrapper keeps its .pr-field-value.pr-field-live
+    // span + the input's data-pr-field-label, so save-on-change (pfLiveFieldChange), the
+    // section key (resolved from the .pr-card[data-pr-section="siteReadiness"] ancestor —
+    // NOT from render-time _curSection, which here is already 'siteReadiness'), fail-closed
+    // revert, the .blank amber highlight, and the MM/DD/YYYY read view ALL keep working with
+    // ZERO new wiring. The allowlist entry ('<doc> - Date Sent': true) is unchanged. We only
+    // hide the redundant .pr-field-label via the .pf-staking-doc-table CSS scope (the doc
+    // name already labels the row in the left cell).
     function pfStakingDocChecklist(isPf){
       var items = isPf ? PF_STAKING_DOC_ITEMS : PF_STAKING_DOC_ITEMS.filter(function(it){ return it.gc; });
       // Brad 2026-09-04: with CAD (the only gc:true item) moved up next to the dropdown,
       // the NO/GC list has zero items — return '' so no orphan "Document to send the GC"
-      // header renders (pfStakingEmailButton likewise suppresses the dead GC button).
+      // header renders (the email button was removed entirely).
       if (!items.length) return '';
       var head = isPf
         ? subhead('Documents to send the surveyor')
         : subhead('Document to send the GC');
-      var body = items.map(function(it){
-        // Each remaining item keeps both Date Sent + File Link (all are gc:false docs).
-        return subgroup(it.name)
-          + fields([ field(pfStakingDateLabel(it.name), ''),
-                     fieldLinked(pfStakingLinkLabel(it.name), '', '', 'website') ]);
+      var rows = items.map(function(it){
+        // Left cell = doc name; right cell = the SAME Date Sent field() (same label key +
+        // siteReadiness section). No File Link. field() emits the office save-on-change
+        // control when _srLiveEdit + office, else the MM/DD/YYYY read span.
+        return '<tr>'
+          + '<td class="pf-staking-doc-name">' + E(it.name) + '</td>'
+          + '<td class="pf-staking-doc-date">' + field(pfStakingDateLabel(it.name), '') + '</td>'
+          + '</tr>';
       }).join('');
-      return head + body;
+      var table = '<div class="table-wrap"><table class="pf-staking-doc-table"><tbody>'
+        + rows + '</tbody></table></div>';
+      return head + table;
     }
 
-    // Resolve the surveyor recipient(s) from the current project's staking __crm selection.
-    // Reads siteReadiness.__crm['Staking & Layout'] (single- or multi-company), pulls the
-    // checked contactIds, and resolves each against the loaded PF_CONTACTS directory to
-    // {name,email,title}. Returns [] when nothing is selected or the directory has not
-    // loaded yet (the caller then shows a clear "pick a contact first" message — never a
-    // fabricated address). Used by the "email surveyor required info" button.
-    function pfStakingRecipients(){
-      var out = [];
-      try {
-        var e = pfCrmMap('siteReadiness')['Staking & Layout'];
-        var companies = pfCrmNormEntry(e); // [] when empty
-        var ids = [];
-        companies.forEach(function(c){ (c.contactIds || []).forEach(function(id){ if (id) ids.push(String(id).toUpperCase()); }); });
-        if (!ids.length) return out;
-        var byId = {};
-        (window.PF_CONTACTS || []).forEach(function(c){ if (c && c.contactId) byId[String(c.contactId).toUpperCase()] = c; });
-        ids.forEach(function(id){
-          var c = byId[id];
-          if (!c) return;
-          var nm = [c.firstName, c.lastName].filter(Boolean).join(' ').trim() || c.company || '';
-          var em = String(c.email || '').trim();
-          if (em) out.push({ name: nm, email: em, title: String(c.title || '').trim() });
-        });
-      } catch (err) { /* fail soft -> empty */ }
-      return out;
-    }
-
-    // The "email <surveyor|GC> required info" button (office-only). Composes + sends the
-    // required-items email (with each item's date sent + file link) via the portal backend
-    // (/api/email-surveyor-required). isPf=true -> to the selected surveyor contact(s);
-    // false -> to the GC. The SEND is a real Graph app-only sendMail server-side (modeled
-    // on /api/submittal-reminder); FAIL CLOSED — nothing is ever reported "sent" unless the
-    // server returns {ok:true,sent:true}. Non-office get nothing (server also 403s).
-    function pfStakingEmailButton(isPf){
-      var _office = (typeof canEdit === 'function') ? canEdit() : false;
-      if (!_office) return '';
-      // Brad 2026-09-04: don't render the GC email button when there are no gc:true docs
-      // to send (CAD moved up next to the dropdown) — nothing to email, so no dead button.
-      // Surveyor button is unaffected (still has its 5 gc:false items).
-      if (!isPf && !PF_STAKING_DOC_ITEMS.some(function(it){ return it.gc; })) return '';
-      var label = isPf ? '&#9993; Email surveyor required info' : '&#9993; Email GC required info';
-      var msgCls = isPf ? 'pf-staking-email-msg-pf' : 'pf-staking-email-msg-gc';
-      return '<div class="pr-add-contact-bar" style="margin-top:4px;">'
-        + '<button type="button" class="pr-save-btn pf-staking-email-btn" '
-        +   'data-staking-role="' + (isPf ? 'surveyor' : 'gc') + '" '
-        +   'onclick="window.pfStakingEmailRequired(this, ' + (isPf ? 'true' : 'false') + ')">' + label + '</button>'
-        + '<span class="pr-dir-msg ' + msgCls + '" style="display:none;font-size:0.76rem;margin-left:6px;"></span>'
-        + '</div>';
-    }
+    // (Brad 2026-09-04) The "Email surveyor/GC required info" button was removed from the UI,
+    // so its helpers pfStakingRecipients() + pfStakingEmailButton() and the send handler
+    // window.pfStakingEmailRequired() (further below) were deleted — nothing references them.
+    // The backend /api/email-surveyor-required is left untouched.
 
     function pfStakingSelectorBlock(){
       var _office = (typeof canEdit === 'function') ? canEdit() : false;
@@ -21196,109 +21189,6 @@ try {
       });
     };
 
-    // ---- "Email <surveyor|GC> required info" send (Brad 2026-09-03) -----------------
-    // Composes the required-items email (each item + its file link) and POSTs it to
-    // /api/email-surveyor-required, which sends AS peter@ via Graph app-only sendMail
-    // (modeled on /api/submittal-reminder). isPf=true -> to the selected SURVEYOR
-    // contact(s) resolved from the staking __crm selection; false -> to the GC contact
-    // resolved from the project's General Info GC __crm selection.
-    //
-    // FAIL CLOSED at every step: no recipient email selected -> inline error, no send.
-    // The server FAILS CLOSED too (503 if Graph unconfigured, 502 on send failure); the
-    // UI only shows "Sent" on a clean {ok:true,sent:true}. NOTHING is ever faked. Office-
-    // gated client-side (canEdit) AND server-side (requireArea('financials')). The button
-    // requires a CONFIRM step (shows WHO + WHICH items) before it will send — the surveyor/
-    // GC is an EXTERNAL party.
-    window.pfStakingEmailRequired = function(btn, isPf){
-      if (typeof canEdit === 'function' && !canEdit()) return; // server also 403s
-      var bar = btn && btn.closest ? btn.closest('.pr-add-contact-bar') : null;
-      var msgEl = bar ? bar.querySelector('.pr-dir-msg') : null;
-      function say(t, isErr){
-        if (!msgEl) return;
-        msgEl.textContent = t || '';
-        msgEl.style.display = t ? 'inline' : 'none';
-        msgEl.style.color = isErr ? '#b91c1c' : '#166534';
-      }
-      var num = _curNum || '';
-      if (!num) { say('Could not send; no project loaded.', true); return; }
-
-      // Resolve the recipient. Surveyor -> staking __crm contacts; GC -> General Info GC
-      // __crm contacts (resolved the same way via PF_CONTACTS).
-      var recips = [];
-      if (isPf) {
-        recips = pfStakingRecipients();
-      } else {
-        try {
-          var gce = pfCrmMap('general')['GC'];
-          var gcCompanies = pfCrmNormEntry(gce);
-          var gids = [];
-          gcCompanies.forEach(function(c){ (c.contactIds || []).forEach(function(id){ if (id) gids.push(String(id).toUpperCase()); }); });
-          var byId = {};
-          (window.PF_CONTACTS || []).forEach(function(c){ if (c && c.contactId) byId[String(c.contactId).toUpperCase()] = c; });
-          gids.forEach(function(id){
-            var c = byId[id];
-            if (!c) return;
-            var nm = [c.firstName, c.lastName].filter(Boolean).join(' ').trim() || c.company || '';
-            var em = String(c.email || '').trim();
-            if (em) recips.push({ name: nm, email: em, title: String(c.title || '').trim() });
-          });
-        } catch (err) { /* fail soft */ }
-      }
-      if (!recips.length) {
-        say(isPf
-          ? 'Select a surveyor contact (with an email) above first, then Save — then send.'
-          : 'No GC contact with an email is selected on this project (see General Info). Add one first.', true);
-        return;
-      }
-
-      // Build the item list with each item's Date Sent + File Link from the effective
-      // (override-wins) values. YES -> all 6; NO -> the single GC item.
-      var items = (isPf ? PF_STAKING_DOC_ITEMS : PF_STAKING_DOC_ITEMS.filter(function(it){ return it.gc; }))
-        .map(function(it){
-          return {
-            name: it.name,
-            dateSent: String(effVal('siteReadiness', pfStakingDateLabel(it.name), '') || '').trim(),
-            link:     String(effVal('siteReadiness', pfStakingLinkLabel(it.name), '') || '').trim()
-          };
-        });
-
-      var toList = recips.map(function(r){ return r.name ? (r.name + ' <' + r.email + '>') : r.email; }).join(', ');
-      var who = isPf ? 'the surveyor' : 'the GC';
-      if (!window.confirm('Send the required-info email to ' + who + ':\n\n' + toList
-          + '\n\nlisting ' + items.length + ' item(s) and their file links?')) {
-        return;
-      }
-
-      var projectName = '';
-      try { var _pr = resolveRecord(num); projectName = String((_pr && _pr.project_name) || '').trim(); } catch (e) {}
-
-      btn.disabled = true; say('Sending…', false);
-      fetch('/api/email-surveyor-required', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          num: num,
-          projectName: projectName,
-          recipientRole: isPf ? 'surveyor' : 'gc',
-          recipients: recips.map(function(r){ return { name: r.name, email: r.email }; }),
-          items: items
-        })
-      }).then(function(res){
-        return res.json().then(function(b){ return { ok: res.ok, status: res.status, body: b }; })
-          .catch(function(){ return { ok: res.ok, status: res.status, body: null }; });
-      }).then(function(r){
-        btn.disabled = false;
-        if (!r.ok || !r.body || r.body.ok !== true || r.body.sent !== true) {
-          say((r.body && r.body.message) ? r.body.message
-              : (r.status === 403 ? 'You do not have permission to send this email.'
-                                   : 'Send failed (' + r.status + '). Not sent — please retry.'), true);
-          return;
-        }
-        say('Sent to ' + (r.body.to || toList), false);
-      }).catch(function(){
-        btn.disabled = false; say('Send failed: could not reach the server. Not sent — please retry.', true);
-      });
-    };
 
     // Live visibility toggle for the inline staking selector. Bound once (document-level
     // 'change'): when the "Staking & Layout PF's responsibility?" live select changes,
