@@ -4755,9 +4755,6 @@ window.progress = (function () {
   <a class="mobile-tab" onclick="showModule('safety');setMobileActive(this)">
     <span class="mt-icon">&#9888;</span> Safety
   </a>
-  <a class="mobile-tab" onclick="showModule('guhma');setMobileActive(this)">
-    <span class="mt-icon">&#9881;</span> QA/QC
-  </a>
 </nav>
 
 <!-- QUICK ACTION BUTTON -->
@@ -4823,17 +4820,6 @@ document.addEventListener('click', function(e) {
     <!-- Headline KPI tiles -->
     <div class="grid grid-4" id="dashboardStats">
       <!-- Populated by renderDashboard() -->
-    </div>
-
-    <!-- Live crew-schedule summary (reads /api/schedule - one source of truth) -->
-    <div style="margin-top:20px" class="card">
-      <div class="card-header">
-        <span class="card-title" style="cursor:pointer" onclick="showModule('schedule')">PF Project Schedule &#8599;</span>
-        <span class="card-subtitle">Live from the scheduler &#8212; click to open</span>
-      </div>
-      <div id="dashScheduleWidget">
-        <div style="color:var(--text-3);padding:8px 0">Loading schedule&#8230;</div>
-      </div>
     </div>
 
     <!-- Upcoming bids (next 7 days) + Active projects -->
@@ -6482,8 +6468,8 @@ renderDashboard();
     });
   };
 
-  // Render the main-dashboard widget now (container is in mod-dashboard).
-  window.pfScheduleWidget('dashScheduleWidget');
+  // Main-dashboard schedule-summary card removed (UI-doorway cleanup); no
+  // container to render into. pfScheduleWidget remains defined + null-guarded.
 })();
 </script>
 
@@ -13390,12 +13376,6 @@ try {
 
   html += '</div>'; // end grid-2
 
-  // ===== LIVE CREW SCHEDULE (reads /api/schedule - one source of truth) =====
-  html += '<div class="stat-card" style="padding:1rem;margin-bottom:1rem">';
-  html += '<div style="' + STAT_LABEL + ';margin-bottom:0.75rem;cursor:pointer" onclick="showModule(\'schedule\')">PF Project Schedule &#8599;</div>';
-  html += '<div id="ceodashScheduleWidget"><div style="color:#888;font-size:0.8rem">Loading schedule&#8230;</div></div>';
-  html += '</div>';
-
   // ===== ALERTS =====
   var alerts = [];
 
@@ -13436,9 +13416,8 @@ try {
 
   root.innerHTML = html;
 
-  // Populate the live crew-schedule summary (read-only, /api/schedule). Safe:
-  // never throws, falls back to embedded seed / neutral note.
-  if (typeof window.pfScheduleWidget === 'function') window.pfScheduleWidget('ceodashScheduleWidget');
+  // CEO-dashboard schedule-summary stat-card removed (UI-doorway cleanup);
+  // no container to render into.
 
   // ---- HELPER: stat card ----
   function statCard(label, value) {
