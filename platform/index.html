@@ -2322,6 +2322,28 @@ tr.pf-dragging { opacity: 0.45; }
 .pf-staking-doc-table .pr-field { padding: 0; border-bottom: none; }
 .pf-staking-doc-table .pr-field-label { display: none; }
 
+/* ---- Testing subsection table (Brad 2026-09-04) ---------------------------- */
+/* Site Readiness > "3. Testing": the fields BELOW the "Modulus Load Test        */
+/* Required?" dropdown are laid out as a clean 2-column table (label | value)    */
+/* resembling the Inventory module look, instead of the stacked pr-fields view.  */
+/* Each row embeds the FULL field()/fieldLinked() output in the value cell, so    */
+/* the save-on-change / .blank / read-view wiring is untouched (label key +      */
+/* siteReadiness section resolved from the .pr-card ancestor). The field's own    */
+/* .pr-field-label is CSS-hidden because the left cell already labels the row.    */
+.pf-testing-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.pf-testing-table td {
+  padding: 6px 12px; border-bottom: 1px solid var(--border-light); vertical-align: middle;
+}
+.pf-testing-table tr:last-child td { border-bottom: none; }
+.pf-testing-table td.pf-testing-name {
+  font-size: 0.9rem; color: var(--text-1); width: 55%; word-break: break-word;
+}
+.pf-testing-table td.pf-testing-val { width: 45%; }
+/* Neutralize the embedded .pr-field so it seats flush in the cell (label hidden, */
+/* the field name already labels the row via the left cell). */
+.pf-testing-table .pr-field { padding: 0; border-bottom: none; }
+.pf-testing-table .pr-field-label { display: none; }
+
 /* ---- General Info rework (Brad 2026-08-06 / PDF-grouping 2026-08-07) ------ */
 /* FIXED 2-column grouping that matches Brad's spec PDFs: fields are grouped    */
 /* LEFT vs RIGHT (see twoCol() in the renderer) so fields that belong together  */
@@ -18072,25 +18094,65 @@ try {
           ]);
 
       // ---- Subsection 2: Testing ----
+      // Brad 2026-09-04, TWO changes:
+      //   (1) CONDITIONAL VISIBILITY — the "Modulus Load Test Required?" Yes/No dropdown is
+      //       ALWAYS visible; ALL other Testing fields live inside a data-testing-body
+      //       wrapper that is shown ONLY when the effective Modulus value = Yes (hidden on
+      //       No or blank). Initial display is set at render from the effective value; a
+      //       document CAPTURE-phase 'change' listener (~21233, mirroring the Staking &
+      //       Layout toggle handler) flips the wrapper live WITHOUT a re-render. Capture
+      //       phase is required because the dropdown's inline onchange calls
+      //       stopPropagation (which kills the bubble) — the same reason the staking toggle
+      //       uses capture. The dropdown's own save-on-change (pfLiveFieldChange, siteReadiness
+      //       key) is untouched.
+      //   (2) TABLE LAYOUT — the fields inside the wrapper render as a clean 2-column table
+      //       (.pf-testing-table: field name | value/input) resembling the Inventory module
+      //       look, replacing the stacked pr-fields view. Each row embeds the FULL
+      //       field()/fieldLinked() output in the value cell, so save-on-change / .blank /
+      //       read-view / MM-DD date + link rendering all keep working unchanged (section =
+      //       siteReadiness via the .pr-card ancestor, key = the IDENTICAL label string). The
+      //       embedded .pr-field-label is CSS-hidden; the left cell labels the row.
+      // pfTestingRow(cellHtml): one table row = [name cell | value cell]. The value cell
+      // holds an already-built field()/fieldLinked() string; the name is taken from the
+      // field's data-pr-label so the visible label string is guaranteed identical to the
+      // save key.
+      var _testRow = function(fieldHtml){
+        var m = /data-pr-label="([^"]*)"/.exec(fieldHtml);
+        var name = m ? m[1] : '';
+        return '<tr><td class="pf-testing-name">' + name + '</td>'
+             + '<td class="pf-testing-val">' + fieldHtml + '</td></tr>';
+      };
+      var _testFields = [
+        field('# of Load Tests', ''),
+        field('AP Design Diameter (ft)', ''),
+        field('Diameter of Place (ft)', ''),
+        field('AP Reaction Modulus - Design (pci)', ''),
+        field('AP Design Load (kips)', ''),
+        field('Load Test Jack Calibration Factor (psi/kip)', ''),
+        field('Load Test Size (kips)', ''),
+        field('Which Jack', ''),
+        field('Testing Equipment vs Rig', ''),
+        field('Test Document Status', ''),
+        fieldLinked('Test Document Link', '', '', 'website'),
+        fieldLinked('Mod Test Jack Calibration Report', '', '', 'website')
+      ];
+      // Effective Modulus value (override-wins). Yes -> body shown; No/blank -> hidden.
+      var _modReq = String(effVal('siteReadiness', 'Modulus Load Test Required?', '') || '').trim();
+      var _modYes = /^yes$/i.test(_modReq);
       var sub2Inner =
+          // Modulus dropdown ALWAYS visible (its own row, not inside the conditional body).
           fields([
-            field('Modulus Load Test Required?', ''),
-            field('# of Load Tests', ''),
-            field('AP Design Diameter (ft)', ''),
-            field('Diameter of Place (ft)', ''),
-            field('AP Reaction Modulus - Design (pci)', ''),
-            field('AP Design Load (kips)', ''),
-            field('Load Test Jack Calibration Factor (psi/kip)', ''),
-            field('Load Test Size (kips)', ''),
-            field('Which Jack', ''),
-            field('Testing Equipment vs Rig', ''),
-            field('Test Document Status', '')
+            field('Modulus Load Test Required?', '')
           ])
-        + fields([
-            fieldLinked('Test Document Link', '', '', 'website'),
-            fieldLinked('Mod Test Jack Calibration Report', '', '', 'website')
-          ])
-        + subgroupNote('Threshold ~85 kip determines testing equipment vs rig. FUTURE automation: Peter extracts test data from approved shop drawings + generates the test doc in SharePoint on Garbin approval. Annual jack recalibration reminder every Dec/Jan.');
+          // Conditional body: all other Testing fields as an Inventory-style table +
+          // the FUTURE note. Hidden unless the effective Modulus value = Yes; the
+          // capture-phase 'change' listener flips this display live.
+        + '<div data-testing-body style="' + (_modYes ? '' : 'display:none;') + '">'
+        +   '<div class="table-wrap"><table class="pf-testing-table"><tbody>'
+        +     _testFields.map(_testRow).join('')
+        +   '</tbody></table></div>'
+        +   subgroupNote('Threshold ~85 kip determines testing equipment vs rig. FUTURE automation: Peter extracts test data from approved shop drawings + generates the test doc in SharePoint on Garbin approval. Annual jack recalibration reminder every Dec/Jan.')
+        + '</div>';
 
       // ---- Subsection 3: Staking & Layout ----
       var sub3Inner =
@@ -21229,6 +21291,28 @@ try {
       // a sibling of the selector (Brad 2026-09-03). WITHOUT a re-render, symmetric.
       var gcList = card.querySelector('[data-pf-staking-gc-list]');
       if (gcList) gcList.style.display = isNo ? '' : 'none';
+    }, true);
+
+    // Site Readiness > "3. Testing" conditional-visibility toggle (Brad 2026-09-04).
+    // The "Modulus Load Test Required?" Yes/No dropdown controls whether the rest of the
+    // Testing fields (wrapped in data-testing-body) are shown. Mirrors the Staking & Layout
+    // toggle above EXACTLY: registered in the CAPTURE phase (3rd arg true) so it runs BEFORE
+    // the dropdown's inline onchange calls event.stopPropagation() (which would otherwise
+    // stop this listener from ever seeing the event). Reading el.value in capture is correct
+    // for a <select> — the value is already committed when 'change' dispatches. Flips the
+    // wrapper's inline display WITHOUT a re-render; the dropdown's own save-on-change
+    // (pfLiveFieldChange, siteReadiness key) still fires independently. Yes -> body shown;
+    // anything not-Yes (No or blank) -> body hidden.
+    document.addEventListener('change', function(ev){
+      var el = ev.target;
+      if (!el || !el.getAttribute) return;
+      if (el.getAttribute('data-pr-field-label') !== 'Modulus Load Test Required?') return;
+      var card = el.closest ? el.closest('.pr-card[data-pr-section="siteReadiness"]') : null;
+      if (!card) return;
+      var body = card.querySelector('[data-testing-body]');
+      if (!body) return;
+      var isYes = /^yes$/i.test(String(el.value || '').trim());
+      body.style.display = isYes ? '' : 'none';
     }, true);
 
     // Populate the company dropdown + (if a company is selected) its contact checkboxes
