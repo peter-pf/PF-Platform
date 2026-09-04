@@ -18452,7 +18452,27 @@ try {
              +   '<tbody>' + fieldHtmls.map(_srNewRow).join('') + '</tbody>'
              + '</table></div>';
       };
-      // ---- Subsection 1: Shop Drawings (first subsection built into the NEW card)
+      // _srNewSubTableKeyed(title, buildFieldsFn, sectionKey): same Inventory-style
+      // table as _srNewSubTable, but the field() calls inside buildFieldsFn are
+      // evaluated with _curSection temporarily set to `sectionKey`. Needed for the
+      // Safety / Equipment / Material subsections, whose fields save under their OWN
+      // override keys ('safety' / 'equipment' / 'material') — NOT siteReadiness —
+      // exactly as the ORIGINAL nested cards do. field()/fieldLinked() read the live
+      // _curSection at build time to look up the override value; the DOM save later
+      // resolves the key from the .pr-card[data-pr-section] ancestor. Because the
+      // NEW card is itself data-pr-section="siteReadiness", these non-siteReadiness
+      // fields would SAVE under siteReadiness if embedded raw. See the per-section
+      // wrapper note where these are rendered — Brad will decide the final data key
+      // for the sandbox (simplification flagged in the report).
+      var _srNewSubTableKeyed = function(title, buildFieldsFn, sectionKey){
+        var _prev = _curSection;
+        if (sectionKey) _curSection = sectionKey;
+        var flds = buildFieldsFn();
+        _curSection = _prev;
+        return _srNewSubTable(title, flds);
+      };
+
+      // ---- Subsection 1: Shop Drawings ----------------------------------------
       // Same fields as the ORIGINAL Shop Drawings subsection (sub1Inner): the
       // print action link + print-spec/pickup notes (kept as context) and the one
       // editable field 'Date Ready for Pickup'. Rendered here as an Inventory-style
@@ -18460,11 +18480,239 @@ try {
       var _srNewShopFields = [
         field('Date Ready for Pickup', '')
       ];
-      var srNewBody =
+      var _srN_shop =
           '<div class="pr-subgroup-actions"><a class="pr-action-link" href="' + E(_fedexPrint) + '" target="_blank" rel="noopener noreferrer">&#128424; Sent to Print (FedEx Office)</a></div>'
         + subgroupNote('Print spec: B&W, 24x36 Standard White, 1-sided, 3 copies, horizontal orientation, bind on left. Login credentials are stored securely (not shown here).')
         + subgroupNote('Date Ready for Pickup = anticipated date; email pickup person with order details.')
         + _srNewSubTable('Shop Drawings', _srNewShopFields);
+
+      // ---- Subsection 2: Staking & Layout -------------------------------------
+      // Mirrors the ORIGINAL sub3Inner: the "Staking & Layout PF's responsibility?"
+      // Yes/No toggle + the CAD "Date Sent" field (as a table), then the conditional
+      // wrappers (gcnote / gc-list / selector). The wrappers carry the SAME marker
+      // attributes (data-pf-staking-gcnote / data-pf-staking-gc-list /
+      // data-pf-staking-selector) as the original so the document CAPTURE-phase
+      // 'change' listener works UNCHANGED for this card too: that listener resolves
+      // its card via el.closest('.pr-card[data-pr-section="siteReadiness"]') — closest
+      // walks UP from the CHANGED toggle, so it lands on THIS card (the one the toggle
+      // lives in), then card.querySelector finds THIS card's own wrappers. Both the
+      // original and this sandbox toggle therefore flip only their OWN card's wrappers,
+      // independently. The Option-A clean contact card (pfStakingSelectorBlock, picker-
+      // free) + the "Documents to send the surveyor" table (pfStakingDocChecklist(true))
+      // are reused verbatim, so contacts sync to Project Contacts + the doc Date-Sent
+      // fields save exactly as in the original.
+      var _srN_staking = (function(){
+        var _stk = String(effVal('siteReadiness', 'Staking & Layout PF\'s responsibility?', '') || '').trim();
+        var _isPf = /^yes$/i.test(_stk);
+        var _isNo = /^no$/i.test(_stk);
+        var _gcNote = '<div data-pf-staking-gcnote style="' + (_isNo ? '' : 'display:none;') + '">'
+          + subgroupNote('Staking &amp; Layout is the GC’s responsibility.')
+          + '</div>';
+        return _srNewSubTable('Staking & Layout', [
+                 field('Staking & Layout PF\'s responsibility?', ''),
+                 field('Approved AP Shop Dwgs (CAD) - Date Sent', '')
+               ])
+          + _gcNote
+          + '<div data-pf-staking-gc-list style="' + (_isNo ? '' : 'display:none;') + '">'
+          +   pfStakingDocChecklist(false)
+          + '</div>'
+          + '<div data-pf-staking-selector style="' + (_isPf ? '' : 'display:none;') + '">'
+          +   pfStakingSelectorBlock()
+          +   pfStakingDocChecklist(true)
+          + '</div>';
+      })();
+
+      // ---- Subsection 3: Testing ----------------------------------------------
+      // Mirrors sub2Inner: the "Modulus Load Test Required?" toggle is ALWAYS visible
+      // (its own 1-row table); all other Testing fields live inside a data-testing-body
+      // wrapper (Inventory-style table) shown only when the effective Modulus value =
+      // Yes. The CAPTURE-phase Testing listener resolves its card the same way
+      // (el.closest('.pr-card[data-pr-section="siteReadiness"]') -> THIS card) and
+      // flips THIS card's own [data-testing-body], independently of the original.
+      var _srN_testing = (function(){
+        var _modReq = String(effVal('siteReadiness', 'Modulus Load Test Required?', '') || '').trim();
+        var _modYes = /^yes$/i.test(_modReq);
+        var _testFieldsNew = [
+          field('# of Load Tests', ''),
+          field('AP Design Diameter (ft)', ''),
+          field('Diameter of Place (ft)', ''),
+          field('AP Reaction Modulus - Design (pci)', ''),
+          field('AP Design Load (kips)', ''),
+          field('Load Test Jack Calibration Factor (psi/kip)', ''),
+          field('Load Test Size (kips)', ''),
+          field('Which Jack', ''),
+          field('Testing Equipment vs Rig', ''),
+          field('Test Document Status', ''),
+          fieldLinked('Test Document Link', '', '', 'website'),
+          fieldLinked('Mod Test Jack Calibration Report', '', '', 'website')
+        ];
+        return _srNewSubTable('Testing', [ field('Modulus Load Test Required?', '') ])
+          + '<div data-testing-body style="' + (_modYes ? '' : 'display:none;') + '">'
+          +   _srNewSubTable('Testing Detail', _testFieldsNew)
+          +   subgroupNote('Threshold ~85 kip determines testing equipment vs rig. FUTURE automation: Peter extracts test data from approved shop drawings + generates the test doc in SharePoint on Garbin approval. Annual jack recalibration reminder every Dec/Jan.')
+          + '</div>';
+      })();
+
+      // ---- Subsection 4: Safety -----------------------------------------------
+      // SIMPLIFICATION (flagged to Brad): the ORIGINAL Safety renders as a nested
+      // 'safety'-keyed editable card injected post-render via the data-sr-safety-anchor
+      // marker keyed to the EXACT original title — which never fires for this "...- New"
+      // card. Rather than replicate the nested-card injection, the Safety FIELDS are
+      // rendered inline here as Inventory-style tables, grouped by the original's
+      // subgroups (SSSP / MSDS / Docs / Hand Logs / Utility Locates). Their field()
+      // strings are built with _curSection='safety' so, once Brad wires the sandbox's
+      // final data key, the read values map to the safety override bucket like the
+      // original. NOTE: because this card's DOM section is siteReadiness, these fields
+      // would currently SAVE under siteReadiness (not safety) if edited — acceptable
+      // for a sandbox; Brad will tweak the key strategy on sign-off.
+      var _srN_safety =
+          subgroup('Site Specific Safety Plan (SSSP)')
+        + '<div class="pr-subgroup-actions"><a class="pr-action-link" href="' + E(_pipefySSSP) + '" target="_blank" rel="noopener noreferrer">&#128221; Create / Send SSSP (Pipefy)</a></div>'
+        + pfSspFolderRow()
+        + _srNewSubTableKeyed('SSSP', function(){ return [
+              field('Safety Consultant', ''),
+              field('Date SSSP Sent to GC', ''),
+              fieldLinked('SSSP Email/Copy Link', '', '', 'website')
+            ]; }, 'safety')
+        + _srNewSubTableKeyed('MSDS (Material Safety Data Sheets)', function(){ return [
+              field('Material Safety Data Sheets (MSDS)', ''),
+              field('MSDS Sent?', ''),
+              field('Date MSDS Sent', ''),
+              fieldLinked('MSDS Copy Link', '', '', 'website')
+            ]; }, 'safety')
+        + _srNewSubTableKeyed('Safety Docs & Checklists', function(){ return [
+              field('Toolbox Talks Prepared', ''),
+              field('Jobsite Safety Analysis (JSA)', ''),
+              field('Daily Equipment Checklist', ''),
+              field('Other Safety Items', ''),
+              fieldLinked('Toolbox Talks', '', '', 'website'),
+              fieldLinked('JSA (Jobsite Safety Analysis)', '', '', 'website'),
+              fieldLinked('Daily Equipment Checklist Link', '', '', 'website')
+            ]; }, 'safety')
+        + _srNewSubTableKeyed('Hand Log Sheets', function(){ return [
+              field('Hand Log Sheets', ''),
+              field('Hand Log Sheets - Date Uploaded', ''),
+              fieldLinked('Hand Log Sheets Link', '', '', 'website')
+            ]; }, 'safety')
+        + _srNewSubTableKeyed('Utility Locates', function(){ return [
+              field('Locate Ticket #', ''),
+              field('Locate Ticket # (Excavator ID)', ''),
+              field('Date Locate Called In', ''),
+              field('Date Locates Called In', ''),
+              field('Date Cleared to Start', ''),
+              field('Date Ticket Cleared to Start', ''),
+              field('Date Ticket Expires', ''),
+              fieldLinked('Locate Ticket PDF Link', '', '', 'website')
+            ]; }, 'safety');
+
+      // ---- Subsection 5: Mobilization Preparation -----------------------------
+      // Mirrors sub5Inner: proof-roll fields, elevation fields, checklist fields, and
+      // the "Field Ops Manager Jobsite Visit" sub-group, all as Inventory-style tables
+      // (siteReadiness key). The computed elevation-difference hint is omitted from the
+      // sandbox for now (display-only; the original keeps it) — flagged to Brad.
+      var _srN_mobprep =
+          subgroupNote('Proof roll: obtain from GC on geotech letterhead before mobilizing.')
+        + _srNewSubTable('Proof Roll', [
+              field('Building Pad Passed Proof Roll', ''),
+              field('Date Proof Roll Received', ''),
+              fieldLinked('Proof Roll Report Link', '', '', 'website')
+            ])
+        + subgroupNote('FUTURE automation: flag red + notify PM / Field Ops Mgr / Owners if the elevation difference exceeds 2 ft.')
+        + _srNewSubTable('Building Pad Elevation', [
+              field('Expected Building Pad Elevation', ''),
+              field('Actual Building Pad Elevation', ''),
+              field('Elevation Difference', '')
+            ])
+        + subgroupNote('Send site readiness checklist >= 3 weeks prior; PM confirms all items with GC/Super; 100% complete = clear to mobilize.')
+        + _srNewSubTable('Site Readiness Checklist', [
+              field('Site Readiness Checklist Sent?', ''),
+              field('Date Site Readiness Checklist Sent to GC', ''),
+              field('Checklist Items 100% Confirmed w/ GC?', ''),
+              fieldLinked('Site Readiness Checklist Link', '', '', 'website'),
+              field('Checklist Notes', '')
+            ])
+        + _srNewSubTable('Field Ops Manager Jobsite Visit', [
+              field('Field Ops Manager Visit - Scheduled Date', ''),
+              field('Field Ops Manager Visit - Actual Date Visited', ''),
+              field('Field Ops Manager Visit - Comments / Recap', '')
+            ]);
+
+      // ---- Subsection 6: Mobilization to Site ---------------------------------
+      // Mirrors sub6Inner (the siteReadiness-owned MOB/DEMOB/Materials/Fuel tables)
+      // PLUS the two nested cards (Equipment / Material) rendered INLINE here as
+      // Inventory-style tables instead of the original post-render nested-card
+      // injection (same SIMPLIFICATION note as Safety — the injection is title-keyed
+      // to the original card, so it won't fire for "...- New"). Equipment/Material
+      // fields are built with _curSection='equipment' / 'material' so their read
+      // values map to the right override bucket; final save key is Brad's call on
+      // sign-off (currently the sandbox DOM section is siteReadiness).
+      var _srN_mob =
+          _srNewSubTable('PF Equipment MOB', [
+              field('Equipment Needed - VSC Rig', ''),
+              field('Equipment Needed - Predrill Rig', ''),
+              field('Equipment Needed - Gooseneck w/ Connex', ''),
+              field('Equipment Needed - Testing Material Fall Off Load', '')
+            ])
+        + _srNewSubTable('PF Equipment DEMOB', [
+              field('Demob Equipment', ''),
+              field('Demob Date', ''),
+              field('Demob Transport Company', '')
+            ])
+        + subgroupNote('Helical -> piling form (TBD); Rigid Inclusions -> other items.')
+        + _srNewSubTable('Materials (Stone, if Aggregate Pier)', [
+              field('Stone Vendor & Contact', ''),
+              field('Stone Name/Nomenclature', ''),
+              field('Stone Qty (TN)', bid.total_stone_tn, 'Bid Log'),
+              field('Stone Approved by Engineer (GGG)?', ''),
+              field('Stone Delivery Start Date', ''),
+              field('Stone Qty Day 1 (TN)', '')
+            ])
+        + _srNewSubTable('Equipment Fuel', [
+              field('Fuel Vendor', ''),
+              field('Fuel Contact', ''),
+              field('Fuel Delivery Dates', '')
+            ])
+        // Equipment nested card -> inline table ('equipment' key)
+        + _srNewSubTableKeyed('Equipment - PF Equipment Mobilization to Site', function(){ return [
+              field('Predrill Rig (Sany)', ''),
+              field('Mast, Vibro Rig (Deere 350G)', ''),
+              field('PF Parts Load - Gooseneck Trailer', ''),
+              field('Fall Off Load', '')
+            ]; }, 'equipment')
+        // Material nested card -> inline table ('material' key)
+        + _srNewSubTableKeyed('Material - Material Detail', function(){ return [
+              field('Stone Material Approved by Eng', ''),
+              field('Stone Material Name/Nomenclature', ''),
+              field('Stone Material Qty (TN)', bid.total_stone_tn, 'Bid Log'),
+              field('Stone Delivery Setup/Ordered', ''),
+              field('Concrete Mix (Rigid Inclusions)', ''),
+              field('Helical Material Approved by Eng', ''),
+              field('Fuel Tank/Containment', ''),
+              field('Fuel Delivery', '')
+            ]; }, 'material');
+
+      // ---- Subsection 7: Rental Equipment -------------------------------------
+      // Mirrors sub7Inner (siteReadiness key), Inventory-style table.
+      var _srN_rental = _srNewSubTable('Rental Equipment', [
+              field('Rental Equipment', ''),
+              field('Rental Company', ''),
+              field('Rental Date Rented/Active', ''),
+              field('Rental Anticipated Days Needed', ''),
+              field('Rental Anticipated Return Date', ''),
+              field('Rental Actual Date Called Off Rent', '')
+            ]);
+
+      // Assemble the sandbox body: subsection order mirrors the ORIGINAL srBody
+      // (1 Shop Drawings, 2 Staking & Layout, 3 Testing, 4 Safety, 5 Mob Prep,
+      // 6 Mob to Site, 7 Rental Equipment).
+      var srNewBody =
+          _srN_shop
+        + _srN_staking
+        + _srN_testing
+        + _srN_safety
+        + _srN_mobprep
+        + _srN_mob
+        + _srN_rental;
       html += card(5, 'Site Readiness / Project Setup - New', null,
         srNewBody, false, 'siteReadiness');
 
