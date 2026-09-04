@@ -6082,6 +6082,29 @@ function pfSeedViewStack() {
 if (document.readyState !== 'loading') pfSeedViewStack();
 else document.addEventListener('DOMContentLoaded', pfSeedViewStack);
 
+// Default landing page: when the user arrives with NO explicit page (no routable
+// hash deep-link), land on 'pf-dashboard' (PF Dashboard). We route through
+// window.showModule (not just markup .active) because the PF Dashboard only paints
+// its KPI cards/table when showModule('pf-dashboard') fires draw() (see the module
+// wrapper below). A deep-link ALWAYS wins: if location.hash names a real, nav-linked
+// module, we no-op here and let applyHashRoute() handle it. Uses the SAME hash
+// validity test as applyHashRoute so the two agree on what "an explicit page" is.
+function pfDefaultLanding() {
+  try {
+    var id = (location.hash || '').replace(/^#/, '').trim();
+    // An explicit, routable deep-link is present -> let applyHashRoute win, no-op.
+    if (id && /^[a-z0-9-]+$/i.test(id)
+        && document.getElementById('mod-' + id)
+        && document.querySelector('[data-module="' + id + '"]')) {
+      return;
+    }
+    // No explicit page requested -> land on PF Dashboard.
+    if (typeof window.showModule === 'function') window.showModule('pf-dashboard');
+  } catch (e) { /* never break the page on landing */ }
+}
+if (document.readyState !== 'loading') pfDefaultLanding();
+else document.addEventListener('DOMContentLoaded', pfDefaultLanding);
+
 // ---- LIVE DASHBOARD (data from LIVE_BIDS / LIVE_PROJECTS injected by embed-data.py) ----
 
 function renderDashboard() {
