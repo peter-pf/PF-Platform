@@ -18081,8 +18081,15 @@ try {
         // live by a document CAPTURE-phase 'change' listener (~19574) WITHOUT a re-render
         // — the field's own onchange still saves via pfLiveFieldChange. Capture phase is
         // required because that inline onchange calls stopPropagation (kills bubble).
+          // Brad 2026-09-04: consolidate — put the "Approved AP Shop Dwgs (CAD) - Date
+          // Sent" field to the RIGHT of the responsibility dropdown (2-column pr-fields
+          // row) so it's always visible next to the toggle and saves scenario-agnostic.
+          // It uses the IDENTICAL siteReadiness label string it had in the checklist, so
+          // existing data + the siteReadiness allowlist entry keep working; CAD is removed
+          // from PF_STAKING_DOC_ITEMS below so it no longer renders in either checklist.
           fields([
-            field('Staking & Layout PF\'s responsibility?', '')
+            field('Staking & Layout PF\'s responsibility?', ''),
+            field('Approved AP Shop Dwgs (CAD) - Date Sent', '')
           ])
         + (function(){
             // Effective toggle value (override-wins). Blank/No -> hidden; Yes -> shown.
@@ -21025,8 +21032,12 @@ try {
     // confirm): file link = a pasted share-link (not an upload); date sent = editable (the
     // email button also auto-stamps blank dates to today on send). ORDER matters — index 0
     // is the GC item.
+    // Brad 2026-09-04: "Approved AP Shop Dwgs (CAD)" removed from the checklist — its
+    // Date Sent now lives next to the responsibility dropdown (see sub3Inner) and its
+    // File Link box was already removed in a prior change. It was the ONLY gc:true item,
+    // so the NO/GC checklist is now EMPTY (handled by pfStakingDocChecklist returning ''
+    // and pfStakingEmailButton suppressing the GC button when there are no GC items).
     var PF_STAKING_DOC_ITEMS = [
-      { name: 'Approved AP Shop Dwgs (CAD)',                gc: true  },
       { name: 'Approved AP Shop Dwgs (PDF)',                gc: false },
       { name: 'Civil Drawings PDF',                         gc: false },
       { name: 'Civil Drawings CAD',                         gc: false },
@@ -21042,18 +21053,18 @@ try {
     // read view (date shown MM/DD/YYYY, link shown as a clickable anchor). No wiring needed.
     function pfStakingDocChecklist(isPf){
       var items = isPf ? PF_STAKING_DOC_ITEMS : PF_STAKING_DOC_ITEMS.filter(function(it){ return it.gc; });
+      // Brad 2026-09-04: with CAD (the only gc:true item) moved up next to the dropdown,
+      // the NO/GC list has zero items — return '' so no orphan "Document to send the GC"
+      // header renders (pfStakingEmailButton likewise suppresses the dead GC button).
+      if (!items.length) return '';
       var head = isPf
         ? subhead('Documents to send the surveyor')
         : subhead('Document to send the GC');
       var body = items.map(function(it){
-        // Brad 2026-09-04: "Approved AP Shop Dwgs (CAD)" drops its File Link box in BOTH
-        // scenarios (PF surveyor list + GC list); its Date Sent stays. Others keep both.
-        var noLink = (it.name === 'Approved AP Shop Dwgs (CAD)');
+        // Each remaining item keeps both Date Sent + File Link (all are gc:false docs).
         return subgroup(it.name)
-          + fields(noLink
-              ? [ field(pfStakingDateLabel(it.name), '') ]
-              : [ field(pfStakingDateLabel(it.name), ''),
-                  fieldLinked(pfStakingLinkLabel(it.name), '', '', 'website') ]);
+          + fields([ field(pfStakingDateLabel(it.name), ''),
+                     fieldLinked(pfStakingLinkLabel(it.name), '', '', 'website') ]);
       }).join('');
       return head + body;
     }
@@ -21094,6 +21105,10 @@ try {
     function pfStakingEmailButton(isPf){
       var _office = (typeof canEdit === 'function') ? canEdit() : false;
       if (!_office) return '';
+      // Brad 2026-09-04: don't render the GC email button when there are no gc:true docs
+      // to send (CAD moved up next to the dropdown) — nothing to email, so no dead button.
+      // Surveyor button is unaffected (still has its 5 gc:false items).
+      if (!isPf && !PF_STAKING_DOC_ITEMS.some(function(it){ return it.gc; })) return '';
       var label = isPf ? '&#9993; Email surveyor required info' : '&#9993; Email GC required info';
       var msgCls = isPf ? 'pf-staking-email-msg-pf' : 'pf-staking-email-msg-gc';
       return '<div class="pr-add-contact-bar" style="margin-top:4px;">'
