@@ -14675,24 +14675,17 @@ try {
         var dr = (d.date_received == null ? '' : String(d.date_received)).trim();
         var isReceived = !!dr;
         if (isReceived) received++;
-        // Required For: two metadata booleans (Brad 2026-08-12). Not part of the count.
-        var rf = (d.required_for && typeof d.required_for === 'object') ? d.required_for : {};
-        var rfSub = (rf.submittal_design === true);
-        var rfStk = (rf.staking_layout === true);
         var statusCell = isReceived
           ? '<span class="pf-prq-badge pf-prq-recd">&#10003; Received</span>'
           : '<span class="pf-prq-badge pf-prq-out">Outstanding</span>';
         // ---- OFFICE: always-live in-cell controls (save-on-change) ------------------
         // ---- FIELD_OPS: read-only value cells (no inputs) ---------------------------
-        var rfSubCell, rfStkCell, partyCell, emailCell, dateCell;
+        // (Brad 2026-09-04) The two "Required For" (Submittal Design / Staking Layout)
+        // columns were REMOVED — these are gathered from the GC all at once and PF no
+        // longer needs to delineate which item is needed for which. Any legacy
+        // required_for data in the override is simply ignored (harmless; never rendered).
+        var partyCell, emailCell, dateCell;
         if (edit) {
-          // Required For checkboxes (data-prq-field marks which flag they patch).
-          rfSubCell = '<td class="pf-prq-rf"><input type="checkbox" class="pf-prq-live pf-prq-live-rf-sub"'
-            + (rfSub?' checked':'') + ' data-prq-field="rf_submittal_design" aria-label="Required for Submittal Design"'
-            + ' onchange="event.stopPropagation();window.pfPrqLiveSave(this)"></td>';
-          rfStkCell = '<td class="pf-prq-rf"><input type="checkbox" class="pf-prq-live pf-prq-live-rf-stk"'
-            + (rfStk?' checked':'') + ' data-prq-field="rf_staking_layout" aria-label="Required for Staking Layout"'
-            + ' onchange="event.stopPropagation();window.pfPrqLiveSave(this)"></td>';
           // Responsible Party typeahead (+ hidden contactId). A NAME change fires the
           // typeahead helper (fills email + cid) THEN saves; a manual edit still saves.
           partyCell = '<td class="pf-prq-party">'
@@ -14716,13 +14709,6 @@ try {
             + ' onchange="event.stopPropagation();window.pfPrqLiveSave(this)"></td>';
         } else {
           // Read-only value cells for field_ops.
-          var rfCell = function(on, lbl){
-            return '<td class="pf-prq-rf">'
-              + '<input type="checkbox" class="pf-prq-rf-box" disabled'+(on?' checked':'')
-              + ' aria-label="'+E(lbl)+(on?': required':': not required')+'" title="'+E(lbl)+(on?': required':': not required')+'"></td>';
-          };
-          rfSubCell = rfCell(rfSub, 'Submittal Design');
-          rfStkCell = rfCell(rfStk, 'Staking Layout');
           var party = '';
           if (name && email) party = E(name) + ' <span class="pf-prq-email">&lt;'+E(email)+'&gt;</span>';
           else if (name) party = E(name);
@@ -14749,8 +14735,6 @@ try {
         }
         return '<tr class="pf-prq-row'+(isReceived?' pf-prq-row-recd':' pf-prq-row-out')+'" data-prq-item="'+E(it.key)+'" data-prq-label="'+E(it.label)+'" data-prq-email="'+E(email)+'" data-prq-name="'+E(name)+'" data-prq-cid="'+E(cid)+'">'
           + '<td class="pf-prq-item">'+statusCell+' '+E(it.label)+'</td>'
-          + rfSubCell
-          + rfStkCell
           + partyCell
           + (edit ? emailCell : '')
           + dateCell
@@ -14770,31 +14754,29 @@ try {
       var remindAll = (edit && !allReceived)
         ? '<button type="button" class="pf-prq-remind-all" onclick="event.stopPropagation();window.pfPrereqRemindAll(this)">Remind all outstanding</button>'
         : '';
-      // Two-row header: a "Required For" header spans the two centered checkbox
-      // sub-columns (Submittal Design / Staking Layout). The other columns span both
-      // header rows via rowspan. Office adds an Email column (the party cell holds the
+      // Single-row header (Brad 2026-09-04): the "Required For" spanning header + its two
+      // sub-columns (Submittal Design / Staking Layout) were removed, so the header is a
+      // plain single row now. Office still adds an Email column (the party cell holds the
       // typeahead only) + a Reminder column, both rightmost of the data columns.
       var thead = '<thead>'
         + '<tr>'
-        +   '<th rowspan="2">Description</th>'
-        +   '<th colspan="2" class="pf-prq-rf-span">Required For</th>'
-        +   '<th rowspan="2">Responsible Party</th>'
-        +   (edit ? '<th rowspan="2">Email</th>' : '')
-        +   '<th rowspan="2">Date Received</th>'
-        +   (edit ? '<th rowspan="2">Reminder</th>' : '')
-        + '</tr>'
-        + '<tr>'
-        +   '<th class="pf-prq-rf-sub">Submittal Design</th>'
-        +   '<th class="pf-prq-rf-sub">Staking Layout</th>'
+        +   '<th>Description</th>'
+        +   '<th>Responsible Party</th>'
+        +   (edit ? '<th>Email</th>' : '')
+        +   '<th>Date Received</th>'
+        +   (edit ? '<th>Reminder</th>' : '')
         + '</tr>'
         + '</thead>';
       var editNote = edit
         ? '<div class="pf-prq-edit-note">Assign a responsible party (select or type a project contact — the email auto-fills), set a Date Received when each item arrives, and check "Required For". Every change saves automatically for the whole office.</div>'
         : '';
+      // NOTE (Brad 2026-09-04): the "Submittal Design Files" folder link was MOVED OUT of
+      // this checklist block down next to "Stamped Drawings" in submittalWorkflowBlock
+      // (see shopDwgInfoLinkRow's call there). It no longer renders here. `sdi` is now
+      // unused by this function but the param is kept for call-site stability.
       return '<div class="pf-prq-wrap" data-prq-num="'+E(_curNum)+'">'
         + subgroup('PF Info Needed for Submittal Design')
         + subgroupNote('Items PF needs from the GC before starting the full Submittal Design. Fill a Date Received to mark an item received; PF begins once all are received.')
-        + shopDwgInfoLinkRow(sdi)
         + editNote
         + statusLine
         + datalistHtml
@@ -14950,10 +14932,14 @@ try {
       // "field and folder" = one .pr-field row (label "Approved Shop Drawings" + the blue
       // folder button); href/binding/style unchanged, position only.
       var folderRow = pfDesignSubmittalFolderRow(dsf);
-      // Stamped Drawings folder link (submitted to GC). STAYS in the folder-links row above
-      // the Submittal Summary table (alongside where Submittal Design Files renders in the
-      // prereqs block). Same shared pf-design-submittal record.
+      // Stamped Drawings folder link (submitted to GC). Renders in the folder-links row above
+      // the Submittal Summary table. Same shared pf-design-submittal record.
       var stampedRow = pfStampedDrawingsFolderRow(dsf);
+      // Submittal Design Files folder link (Shop Dwg Info). MOVED HERE (Brad 2026-09-04) from
+      // the prereqs checklist so it sits directly next to Stamped Drawings. Reads the
+      // project's shop-dwg-info record (folder_url -> 03 - Engineering & Design/Shop Dwg Info),
+      // same blank-graceful idiom as the other folder links (never a broken href).
+      var submittalFilesRow = shopDwgInfoLinkRow(pfShopDwgInfo(_curNum));
       // Office actions: Start Rev N ONLY (the per-field Edit button is gone — dates are now
       // always-live inputs that save on change). Start Rev shows only when the ACTIVE cycle
       // is the LATEST and its status is Revise & Resubmit, so a revision only spawns off the
@@ -14972,7 +14958,7 @@ try {
       return '<div class="pf-swf-wrap" data-swf-num="'+E(_curNum)+'" data-swf-rev="'+E(String(active.rev))+'">'
         + navBar
         + '<div class="pf-swf-body">' + body + '</div>'
-        + fields([ stampedRow ])
+        + fields([ submittalFilesRow, stampedRow ])
         + sgeInline
         // Approved Shop Drawings folder link — moved to JUST BELOW the Submittal Summary
         // table (Brad 2026-08-12).
@@ -23559,6 +23545,10 @@ try {
       var emailEl = tr.querySelector('.pf-prq-live-email');
       var cidEl   = tr.querySelector('.pf-prq-live-cid');
       var dateEl  = tr.querySelector('.pf-prq-live-date');
+      // (Brad 2026-09-04) The two "Required For" checkboxes were removed from the table.
+      // These lookups now always return null; the null-safe reads below (&&) resolve them
+      // to false. Any pre-existing required_for data is preserved untouched by the
+      // read-merge-write loop (which still carries the key for OTHER rows), never rendered.
       var rfSubEl = tr.querySelector('.pf-prq-live-rf-sub');
       var rfStkEl = tr.querySelector('.pf-prq-live-rf-stk');
       var name  = nameEl  ? String(nameEl.value || '').trim()  : '';

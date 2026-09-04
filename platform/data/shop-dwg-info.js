@@ -4,11 +4,6 @@
 // Read by the PF Design Submittal 'GC prerequisites' checklist link.
 window.PF_SHOP_DWG_INFO = {
   "projects": {
-    "26-002": {
-      "folder_url": "https://pierfoundations.sharepoint.com/sites/pf/Shared%20Documents/04%20-%20Project%20Management/02%20-%20Projects/26-002%20-%20POET%20Projects%20-%20POET/03%20-%20Engineering%20%26%20Design/Shop%20Drawing%20Info",
-      "folder_name": "Shop Drawing Info",
-      "source_path": "26-002 - POET Projects - POET/03 - Engineering & Design/Shop Drawing Info"
-    },
     "26-007": {
       "folder_url": "https://pierfoundations.sharepoint.com/sites/pf/Shared%20Documents/04%20-%20Project%20Management/02%20-%20Projects/26-007%20-%20Madison%20Lifestyle%20Garage%20-%20Wilhelm/03%20-%20Engineering%20%26%20Design/Shop%20Dwg%20info",
       "folder_name": "Shop Dwg info",
@@ -18,11 +13,6 @@ window.PF_SHOP_DWG_INFO = {
       "folder_url": "https://pierfoundations.sharepoint.com/sites/pf/Shared%20Documents/04%20-%20Project%20Management/02%20-%20Projects/26-008%20-%20INAW%20Terre%20Haute%20-%20Reynolds/03%20-%20Engineering%20%26%20Design/Shop%20Dwg%20Info",
       "folder_name": "Shop Dwg Info",
       "source_path": "26-008 - INAW Terre Haute - Reynolds/03 - Engineering & Design/Shop Dwg Info"
-    },
-    "26-011": {
-      "folder_url": "https://pierfoundations.sharepoint.com/sites/pf/Shared%20Documents/04%20-%20Project%20Management/02%20-%20Projects/26-011%20-%20Indy%20Housing%20-%20Shiel%20Sexton/03%20-%20Engineering%20%26%20Design/Shop%20Dwg%20Info",
-      "folder_name": "Shop Dwg Info",
-      "source_path": "26-011 - Indy Housing - Shiel Sexton/03 - Engineering & Design/Shop Dwg Info"
     },
     "26-013": {
       "folder_url": "https://pierfoundations.sharepoint.com/sites/pf/Shared%20Documents/04%20-%20Project%20Management/02%20-%20Projects/26-013%20-%20Park%20%26%20Poplar%20-%20OldTown/03%20-%20Engineering%20%26%20Design/Shop%20Dwg%20Info",
@@ -48,10 +38,20 @@ window.PF_SHOP_DWG_INFO = {
       "folder_url": "https://pierfoundations.sharepoint.com/sites/pf/Shared%20Documents/04%20-%20Project%20Management/02%20-%20Projects/26-019%20-%20Vivera%20Northbrook%20-%20Marion%20Group/03%20-%20Engineering%20%26%20Design/Shop%20Dwg%20Info",
       "folder_name": "Shop Dwg Info",
       "source_path": "26-019 - Vivera Northbrook - Marion Group/03 - Engineering & Design/Shop Dwg Info"
+    },
+    "26-020": {
+      "folder_url": "https://pierfoundations.sharepoint.com/sites/pf/Shared%20Documents/04%20-%20Project%20Management/02%20-%20Projects/26-020%20-%20Evansville%20Library%20-%20Arc%20Const/03%20-%20Engineering%20%26%20Design/Shop%20Dwg%20Info",
+      "folder_name": "Shop Dwg Info",
+      "source_path": "26-020 - Evansville Library - Arc Const/03 - Engineering & Design/Shop Dwg Info"
+    },
+    "26-021": {
+      "folder_url": "https://pierfoundations.sharepoint.com/sites/pf/Shared%20Documents/04%20-%20Project%20Management/02%20-%20Projects/26-021%20-%20TPS%20Greenwood%20-%20Brackett/03%20-%20Engineering%20%26%20Design/Shop%20Dwg%20Info",
+      "folder_name": "Shop Dwg Info",
+      "source_path": "26-021 - TPS Greenwood - Brackett/03 - Engineering & Design/Shop Dwg Info"
     }
   },
   "meta": {
-    "generated": "2026-08-12T00:47:05.169035Z",
+    "generated": "2026-09-04T19:27:01.624027Z",
     "source": "SharePoint 04 - Project Management/02 - Projects/<project>/03 - Engineering & Design/Shop Dwg Info (folder webUrl)",
     "note": "folder_url is the driveItem webUrl of the project's 'Shop Dwg Info' folder; projects without one get no entry (portal renders the link gracefully blank).",
     "project_count": 9
