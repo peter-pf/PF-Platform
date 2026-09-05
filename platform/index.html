@@ -2322,6 +2322,25 @@ tr.pf-dragging { opacity: 0.45; }
 .pf-staking-doc-table .pr-field { padding: 0; border-bottom: none; }
 .pf-staking-doc-table .pr-field-label { display: none; }
 
+/* ---- Staking "GC's responsibility" note placement (Brad 2026-09-05) --------- */
+/* The GC-has-it note now sits to the RIGHT of the "Staking & Layout PF's         */
+/* responsibility?" dropdown, on the SAME row, and appears only when No is chosen  */
+/* (visibility still driven by the capture-phase 'change' listener toggling the    */
+/* [data-pf-staking-gcnote] wrapper's inline display).                             */
+/* ORIGINAL card: the note wrapper is the 2nd child of the dropdown's .pr-fields    */
+/* 2-col grid, so it auto-places in grid cell 2 (right of the dropdown). This       */
+/* .pf-staking-gcnote-cell rule just seats the note text vertically + trims the     */
+/* default .pr-subgroup-note left/bottom margins so it reads inline with the        */
+/* control. When the listener sets display:'' it reverts to this block default.     */
+.pf-staking-gcnote-cell { display: flex; align-items: center; }
+.pf-staking-gcnote-cell .pr-subgroup-note { margin: 0; }
+/* SANDBOX card: the dropdown + note share ONE .pf-sr-table value cell, laid out    */
+/* side by side by this flex row (control left, note right). align-items:center so   */
+/* the note baselines against the live <select>/read value; gap separates them.     */
+.pf-staking-resprow { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.pf-staking-resprow > .pr-field { flex: 0 1 auto; }
+.pf-staking-resprow .pf-staking-gcnote-cell { flex: 1 1 auto; }
+
 /* ---- Testing subsection table (Brad 2026-09-04) ---------------------------- */
 /* Site Readiness > "3. Testing": the fields BELOW the "Modulus Load Test        */
 /* Required?" dropdown are laid out as a clean 2-column table (label | value)    */
@@ -2384,14 +2403,18 @@ tr.pf-dragging { opacity: 0.45; }
   color: var(--text-1, #2B2F36); vertical-align: top;
   overflow: hidden; text-overflow: ellipsis;
 }
+/* Name column narrowed 55% -> 34% (Brad 2026-09-05): the fillable value fields sat  */
+/* far to the right under a wide "Value" column; shrinking the label column pulls the */
+/* value cell (and its input) LEFT, closer to the row label. Sandbox-only            */
+/* (.pf-sr-table is emitted only by the "...- New" card's _srNewSubTable).            */
 .pf-sr-table td.pf-sr-name,
-.pf-sr-table th.pf-sr-name { width: 55%; }
+.pf-sr-table th.pf-sr-name { width: 34%; }
 /* name cell matches .inv-desc (product cell): weight 500, darkest text. */
 .pf-sr-table td.pf-sr-name {
   font-size: 12.5px; font-weight: 500; color: var(--text-0, #000); word-break: break-word;
 }
 .pf-sr-table td.pf-sr-val,
-.pf-sr-table th.pf-sr-val { width: 45%; }
+.pf-sr-table th.pf-sr-val { width: 66%; }
 /* Neutralize the embedded .pr-field so it seats flush in the cell (label hidden, */
 /* the field name already labels the row via the left cell). */
 .pf-sr-table .pr-field { padding: 0; border-bottom: none; background: transparent; }
@@ -2416,6 +2439,11 @@ tr.pf-dragging { opacity: 0.45; }
 .pf-srnew-scope .pf-staking-doc-table td.pf-staking-doc-name {
   font-size: 12.5px; font-weight: 500; color: var(--text-0, #000);
 }
+/* Name column narrowed to 34% (Brad 2026-09-05, same intent as .pf-sr-table): pulls  */
+/* the Date Sent input LEFT toward its row label. Sandbox-only (.pf-srnew-scope), so   */
+/* the ORIGINAL card's doc table keeps its 55/45 split. */
+.pf-srnew-scope .pf-staking-doc-table td.pf-staking-doc-name { width: 34%; }
+.pf-srnew-scope .pf-staking-doc-table td.pf-staking-doc-date { width: 66%; }
 .pf-srnew-scope .pf-staking-doc-table .pr-field-value { font-size: 12.5px; color: var(--text-1, #2B2F36); }
 .pf-srnew-scope .pf-staking-doc-table .pr-live-input { font-size: 12.5px; }
 
@@ -18293,24 +18321,34 @@ try {
           // was REMOVED from beside the dropdown — CAD now lives ONLY inside the doc
           // checklist (surveyor list when Yes, GC list when No; see pfStakingDocChecklist +
           // PF_STAKING_DOC_ITEMS CAD gc:true). Same siteReadiness label, single source of
-          // truth. The top row is now just the responsibility dropdown.
-          fields([
-            field('Staking & Layout PF\'s responsibility?', '')
-          ])
+          // truth. The top row is now just the responsibility dropdown — PLUS, to its
+          // RIGHT (Brad 2026-09-05), the GC-has-it note, which appears only when No is
+          // selected. The dropdown field() + the gcNote wrapper are BOTH placed inside the
+          // same .pr-fields 2-col grid, so the note lands in grid cell 2 (immediately right
+          // of the dropdown in cell 1) on the SAME row. The note wrapper keeps its
+          // data-pf-staking-gcnote marker + inline display toggle, so the capture-phase
+          // 'change' listener (~21671) flips it on/off live WITHOUT a re-render exactly as
+          // before (it only sets .style.display; the grid placement is CSS-driven).
+          (function(){
+            // Effective toggle value (override-wins). Blank/No -> hidden; Yes -> shown.
+            var _stk0 = String(effVal('siteReadiness', 'Staking & Layout PF\'s responsibility?', '') || '').trim();
+            var _isNo0 = /^no$/i.test(_stk0);
+            // GC-has-it note lives in grid cell 2 (right of the dropdown). .pf-staking-gcnote-cell
+            // vertically centers the note against the dropdown control.
+            var _gcNoteRight = '<div data-pf-staking-gcnote class="pf-staking-gcnote-cell" style="'
+              + (_isNo0 ? '' : 'display:none;') + '">'
+              + subgroupNote('Staking & Layout is the GC’s responsibility.')
+              + '</div>';
+            return fields([
+                     field('Staking & Layout PF\'s responsibility?', ''),
+                     _gcNoteRight
+                   ]);
+          })()
         + (function(){
             // Effective toggle value (override-wins). Blank/No -> hidden; Yes -> shown.
             var _stk = String(effVal('siteReadiness', 'Staking & Layout PF\'s responsibility?', '') || '').trim();
             var _isPf = /^yes$/i.test(_stk);
             var _isNo = /^no$/i.test(_stk);
-            // GC-has-it note (only meaningful when explicitly No; blank = undecided).
-            // ALWAYS rendered inside a data-pf-staking-gcnote wrapper (hidden unless No)
-            // so the live 'change' listener can flip it on/off WITHOUT a re-render —
-            // symmetric with the selector wrapper (Brad 2026-08-13, staking-toggle-
-            // visibility-fix). Prior version emitted the note only when effVal===No, so
-            // live-switching to No never surfaced it until the next page load.
-            var _gcNote = '<div data-pf-staking-gcnote style="' + (_isNo ? '' : 'display:none;') + '">'
-              + subgroupNote('Staking &amp; Layout is the GC’s responsibility.')
-              + '</div>';
             // Conditional CRM selector wrapper. Office roles get the live picker + a
             // save button; non-office see only the resolved read cards (host). Hidden
             // via inline display when the toggle is not Yes; the document capture-phase
@@ -18328,7 +18366,10 @@ try {
             // only ONE is visible at a time (mirrors the selector/gcnote wrappers).
             // Brad 2026-09-04: the "Email surveyor/GC required info" button was removed from
             // both scenarios (its helper fns + client fetch were removed too — see below).
-            return _gcNote
+            // NOTE (Brad 2026-09-05): the GC note itself was MOVED up into the dropdown's
+            // .pr-fields grid (right of the dropdown, same row) — see the block above. Only
+            // the conditional gc-list + selector wrappers remain here.
+            return ''
               + '<div data-pf-staking-gc-list style="' + (_isNo ? '' : 'display:none;') + '">'
               +   pfStakingDocChecklist(false)
               + '</div>'
@@ -18573,13 +18614,23 @@ try {
         var _stk = String(effVal('siteReadiness', 'Staking & Layout PF\'s responsibility?', '') || '').trim();
         var _isPf = /^yes$/i.test(_stk);
         var _isNo = /^no$/i.test(_stk);
-        var _gcNote = '<div data-pf-staking-gcnote style="' + (_isNo ? '' : 'display:none;') + '">'
-          + subgroupNote('Staking &amp; Layout is the GC’s responsibility.')
+        // GC note (Brad 2026-09-05): now placed to the RIGHT of the dropdown control, on the
+        // SAME table row, shown only when No. We build a COMPOSITE value cell = [dropdown
+        // field() | gcNote] wrapped in a .pf-staking-resprow flex box, and pass it as the
+        // single row's value HTML. _srNewRow extracts the row NAME from the first
+        // data-pr-label it finds (the dropdown field's, emitted first), so the row label +
+        // save wiring are unchanged; the gcNote sits in the same value cell, right of the
+        // control. The note wrapper keeps its data-pf-staking-gcnote marker + inline display
+        // toggle so the capture-phase 'change' listener flips it live WITHOUT a re-render.
+        var _gcNote = '<div data-pf-staking-gcnote class="pf-staking-gcnote-cell" style="'
+          + (_isNo ? '' : 'display:none;') + '">'
+          + subgroupNote('Staking & Layout is the GC’s responsibility.')
           + '</div>';
-        return _srNewSubTable('Staking & Layout', [
-                 field('Staking & Layout PF\'s responsibility?', '')
-               ])
+        var _respCell = '<div class="pf-staking-resprow">'
+          + field('Staking & Layout PF\'s responsibility?', '')
           + _gcNote
+          + '</div>';
+        return _srNewSubTable('Staking & Layout', [ _respCell ])
           + '<div data-pf-staking-gc-list style="' + (_isNo ? '' : 'display:none;') + '">'
           +   pfStakingDocChecklist(false)
           + '</div>'
@@ -21643,9 +21694,11 @@ try {
       // were dropped — the host card is now the ONE editor, identical to every other
       // Project Contacts group. Adds/edits here save via pfPcAddContactSave/pfCrmRebuildMap
       // and auto-sync into the Project Contacts "Staking & Layout" card (same key).
+      // Brad 2026-09-05: the gray instructional note ("Add or edit the staking & layout
+      // surveyor company & contacts below. Changes sync to Project Contacts automatically.")
+      // was REMOVED per request — only the CRM picker (host) remains. Shared by the original
+      // (~18357) + sandbox (~18638) renders, so removal here covers both.
       return '<div class="pr-crm-wrap">'
-        + '<div class="pr-edit-note">Add or edit the staking &amp; layout surveyor company &amp; contacts below. '
-        + 'Changes sync to Project Contacts automatically.</div>'
         + host
         + '</div>';
     }
