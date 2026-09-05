@@ -18261,15 +18261,13 @@ try {
         // live by a document CAPTURE-phase 'change' listener (~19574) WITHOUT a re-render
         // — the field's own onchange still saves via pfLiveFieldChange. Capture phase is
         // required because that inline onchange calls stopPropagation (kills bubble).
-          // Brad 2026-09-04: consolidate — put the "Approved AP Shop Dwgs (CAD) - Date
-          // Sent" field to the RIGHT of the responsibility dropdown (2-column pr-fields
-          // row) so it's always visible next to the toggle and saves scenario-agnostic.
-          // It uses the IDENTICAL siteReadiness label string it had in the checklist, so
-          // existing data + the siteReadiness allowlist entry keep working; CAD is removed
-          // from PF_STAKING_DOC_ITEMS below so it no longer renders in either checklist.
+          // Brad 2026-09-05 (Option A): the "Approved AP Shop Dwgs (CAD) - Date Sent" field
+          // was REMOVED from beside the dropdown — CAD now lives ONLY inside the doc
+          // checklist (surveyor list when Yes, GC list when No; see pfStakingDocChecklist +
+          // PF_STAKING_DOC_ITEMS CAD gc:true). Same siteReadiness label, single source of
+          // truth. The top row is now just the responsibility dropdown.
           fields([
-            field('Staking & Layout PF\'s responsibility?', ''),
-            field('Approved AP Shop Dwgs (CAD) - Date Sent', '')
+            field('Staking & Layout PF\'s responsibility?', '')
           ])
         + (function(){
             // Effective toggle value (override-wins). Blank/No -> hidden; Yes -> shown.
@@ -18551,8 +18549,7 @@ try {
           + subgroupNote('Staking &amp; Layout is the GC’s responsibility.')
           + '</div>';
         return _srNewSubTable('Staking & Layout', [
-                 field('Staking & Layout PF\'s responsibility?', ''),
-                 field('Approved AP Shop Dwgs (CAD) - Date Sent', '')
+                 field('Staking & Layout PF\'s responsibility?', '')
                ])
           + _gcNote
           + '<div data-pf-staking-gc-list style="' + (_isNo ? '' : 'display:none;') + '">'
@@ -21534,14 +21531,22 @@ try {
     // confirm): file link = a pasted share-link (not an upload); date sent = editable (the
     // email button also auto-stamps blank dates to today on send). ORDER matters — index 0
     // is the GC item.
-    // Brad 2026-09-04: "Approved AP Shop Dwgs (CAD)" removed from the checklist — its
-    // Date Sent now lives next to the responsibility dropdown (see sub3Inner) and its
-    // File Link box was already removed in a prior change. It was the ONLY gc:true item,
-    // so the NO/GC checklist is now EMPTY (handled by pfStakingDocChecklist returning '').
+    // Brad 2026-09-05 (Option A): "Approved AP Shop Dwgs (CAD)" moved OUT of the row beside
+    // the responsibility dropdown and INTO this checklist as a PLAIN doc row (name + Date
+    // Sent only) directly BELOW the (PDF) row — NO File Link box. It is flagged gc:true so it
+    // appears in BOTH the surveyor list (Yes mode) AND the GC-only list (No mode); its
+    // 'Approved AP Shop Dwgs (CAD) - Date Sent' allowlist entry (~20979) is unchanged, so the
+    // single siteReadiness value is shared across both modes. The GC list is no longer empty.
     // Brad 2026-09-04: the surveyor doc list is now a TABLE (doc name | Date Sent); the
     // per-item File Link fields were removed entirely, so pfStakingLinkLabel is gone.
+    // Brad 2026-09-05 (Option A): CAD is the ONLY item shown in BOTH modes. The surveyor
+    // list (isPf=true) already renders EVERY item regardless of flag; the GC list
+    // (isPf=false) filters to gc:true. Marking CAD gc:true therefore puts it in BOTH:
+    // full surveyor list (position 2, right after PDF) AND the GC-only list (CAD alone).
+    // Single save label per item, so CAD shares one siteReadiness value across both modes.
     var PF_STAKING_DOC_ITEMS = [
       { name: 'Approved AP Shop Dwgs (PDF)',                gc: false },
+      { name: 'Approved AP Shop Dwgs (CAD)',                gc: true  },
       { name: 'Civil Drawings PDF',                         gc: false },
       { name: 'Civil Drawings CAD',                         gc: false },
       { name: 'PDF File for Original Survey (est control)', gc: false },
@@ -21565,13 +21570,13 @@ try {
     // name already labels the row in the left cell).
     function pfStakingDocChecklist(isPf){
       var items = isPf ? PF_STAKING_DOC_ITEMS : PF_STAKING_DOC_ITEMS.filter(function(it){ return it.gc; });
-      // Brad 2026-09-04: with CAD (the only gc:true item) moved up next to the dropdown,
-      // the NO/GC list has zero items — return '' so no orphan "Document to send the GC"
-      // header renders (the email button was removed entirely).
+      // Brad 2026-09-05: GC mode (isPf=false) now has one item — CAD (gc:true) — so it
+      // renders the "Documents to send to GC" header + the single CAD Date-Sent row.
+      // Empty guard retained defensively (if the flag ever changes back to zero gc items).
       if (!items.length) return '';
       var head = isPf
         ? subhead('Documents to send the surveyor')
-        : subhead('Document to send the GC');
+        : subhead('Documents to send to GC');
       var rows = items.map(function(it){
         // Left cell = doc name; right cell = the SAME Date Sent field() (same label key +
         // siteReadiness section). No File Link. field() emits the office save-on-change
