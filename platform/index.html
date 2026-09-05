@@ -2312,13 +2312,19 @@ tr.pf-dragging { opacity: 0.45; }
 .pf-staking-doc-table td {
   padding: 6px 12px; border-bottom: 1px solid var(--border-light); vertical-align: middle;
 }
-/* Column header row (Brad 2026-09-05): accent-blue uppercase labels matching the      */
-/* surrounding Site Readiness / Inventory table headers (.pf-sr-table th). Blank first  */
-/* cell (doc-name column is already labeled by the "Documents to send..." subhead).     */
+/* Column header row (Brad 2026-09-05, corrected): ONE line matching the .pr-subhead    */
+/* label EXACTLY (same color/font-size/weight/uppercase/letter-spacing). NO dark         */
+/* background band — transparent. Cell 1 now holds the "Documents to send the surveyor"/ */
+/* "...to GC" subhead text itself (moved out of the separate subhead() line), cells 2/3  */
+/* are "Date Sent"/"Document Folder" aligned above their columns. Values mirror the       */
+/* .pr-subhead rule (font-size .8rem, weight 700, color var(--accent-dark), uppercase,    */
+/* letter-spacing .04em, bottom border var(--border-light)) so it's visually identical.  */
 .pf-staking-doc-table th {
-  text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .04em;
-  color: var(--accent, #006DB0); font-weight: 700; padding: 4px 12px;
-  border-bottom: 1px solid var(--border, #C8D5DC); vertical-align: bottom;
+  background: transparent; text-align: left;
+  font-size: 0.8rem; font-weight: 700; color: var(--accent-dark);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  padding: 4px 12px; padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-light); vertical-align: bottom;
 }
 .pf-staking-doc-table tr:last-child td { border-bottom: none; }
 /* Column widths apply to BOTH th (header) and td (body) so the header aligns with the  */
@@ -21791,9 +21797,11 @@ try {
       // renders the "Documents to send to GC" header + the single CAD Date-Sent row.
       // Empty guard retained defensively (if the flag ever changes back to zero gc items).
       if (!items.length) return '';
-      var head = isPf
-        ? subhead('Documents to send the surveyor')
-        : subhead('Documents to send to GC');
+      // Brad 2026-09-05: the "Documents to send the surveyor"/"...to GC" label is now the
+      // FIRST header cell of the table (NOT a separate subhead() line above it) so it sits
+      // ON THE SAME LINE as the "Date Sent"/"Document Folder" column labels, all three
+      // rendering identically to .pr-subhead (see .pf-staking-doc-table th CSS). No dark band.
+      var headLabel = isPf ? 'Documents to send the surveyor' : 'Documents to send to GC';
       var rows = items.map(function(it){
         // Left cell = doc name; middle cell = the SAME Date Sent field() (same label key +
         // siteReadiness section). No File Link. field() emits the office save-on-change
@@ -21820,20 +21828,22 @@ try {
           + '<td class="pf-staking-doc-folder">' + folderCell + '</td>'
           + '</tr>';
       }).join('');
-      // Column header row (Brad 2026-09-05): blank over the doc-name column (the
-      // "Documents to send the surveyor"/"...to GC" subhead above already labels it),
-      // "Date Sent" over the middle field column, "Document Folder" over the folder link.
-      // Cells reuse the 3 column-width classes so the header aligns with the body cells
-      // (base 44/34/22, sandbox .pf-srnew-scope 30/48/22). Shared by all 4 contexts
-      // (surveyor list + GC list, original card + sandbox card).
+      // Column header row (Brad 2026-09-05): ONE line, all three <th> cells styled to render
+      // IDENTICALLY to .pr-subhead (blue accent, same font/size/weight/uppercase/spacing, NO
+      // dark background band). Cell 1 holds the mode-dependent subhead TEXT itself ("Documents
+      // to send the surveyor"/"...to GC") — moved here from the old separate subhead() line so
+      // the label is one line with the column labels, not a row above. "Date Sent" over the
+      // middle field column, "Document Folder" over the folder link. Cells reuse the 3
+      // column-width classes so labels sit above their columns (base 44/34/22, sandbox
+      // .pf-srnew-scope 30/48/22). Shared by all 4 contexts (surveyor + GC, original + sandbox).
       var thead = '<thead><tr>'
-        + '<th class="pf-staking-doc-name"></th>'
+        + '<th class="pf-staking-doc-name">' + E(headLabel) + '</th>'
         + '<th class="pf-staking-doc-date">Date Sent</th>'
         + '<th class="pf-staking-doc-folder">Document Folder</th>'
         + '</tr></thead>';
       var table = '<div class="table-wrap"><table class="pf-staking-doc-table">'
         + thead + '<tbody>' + rows + '</tbody></table></div>';
-      return head + table;
+      return table;
     }
 
     // (Brad 2026-09-04) The "Email surveyor/GC required info" button was removed from the UI,
