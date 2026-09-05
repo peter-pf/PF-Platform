@@ -15052,6 +15052,10 @@ try {
         + '<div class="pf-swf-body">' + body + '</div>'
         + fields([ submittalFilesRow, stampedRow ])
         + sgeInline
+        // Printing Drawings block — directly BELOW the Submittal Summary (Brad 2026-09-05).
+        // Send-to-Print button + print-spec note + Date Sent to Print / Date Ready for
+        // Pickup date fields (both save under the engineering key via the E&D card editor).
+        + pfPrintingDrawingsBlock()
         // Approved Shop Drawings folder link — moved to JUST BELOW the Submittal Summary
         // table (Brad 2026-08-12).
         + fields([ folderRow ])
@@ -15831,6 +15835,44 @@ try {
         + pendingNote
         + '<div class="pf-sge-body">' + listHtml + '</div>'
         + '<div class="pf-sge-msg" style="display:none"></div>'
+        + '</div>';
+    }
+    // ---- Printing Drawings block (Brad 2026-09-05) --------------------------------
+    // MOVED here from Site Readiness > Shop Drawings. Rendered INSIDE
+    // submittalWorkflowBlock directly BELOW the Submittal Summary element, styled to
+    // MATCH the Submittal Summary's look (same .pf-sge-wrap / .pf-sge-inline-head title
+    // + .pf-sge-body categories). Contents:
+    //   * a "Send to Print" action BUTTON (the FedEx Office link, styled .pr-action-link
+    //     — the same filled accent button used elsewhere in the portal) + the print-spec
+    //     note (static, no data key);
+    //   * TWO data-bound date fields via field(): "Date Sent to Print" (NEW) and
+    //     "Date Ready for Pickup" (MOVED from Site Readiness Shop Drawings). Because this
+    //     renders while _curSection === 'engineering' (the E&D card, sectionKey
+    //     'engineering'), BOTH date fields now READ from / SAVE under the `engineering`
+    //     override key via the E&D card's section editor (data-pr-section="engineering"
+    //     on the enclosing .pr-card). DATA-KEY CHANGE (flagged to Brad): "Date Ready for
+    //     Pickup" previously saved under 'siteReadiness'; any prior siteReadiness value
+    //     for that label will NOT display here and, going forward, it saves under
+    //     'engineering'. "Date Sent to Print" is new -> engineering only.
+    // The FedEx URL is defined locally here (the Site Readiness `_fedexPrint` var no
+    // longer exists / is out of scope). Both labels are date-shaped (pfIsDateLabel true)
+    // and 'Date Sent to Print' is added to PF_FIELD_DATE_LABELS so the E&D editor renders
+    // both as native date pickers with MM/DD/YYYY display.
+    function pfPrintingDrawingsBlock(){
+      var fedexPrintUrl = 'https://www.office.fedex.com/default/architecture-construction-engineering.html';
+      return '<div class="pf-sge-wrap" data-printing-num="'+E(_curNum)+'">'
+        + '<div class="pf-sge-inline-head"><span class="pf-sge-inline-title">Printing Drawings</span>'
+        +   '<span class="pf-sge-inline-actions">'
+        +     '<a class="pr-action-link" href="'+E(fedexPrintUrl)+'" target="_blank" rel="noopener noreferrer">&#128424; Send to Print (FedEx Office)</a>'
+        +   '</span>'
+        + '</div>'
+        + subgroupNote('Print spec: B&W, 24x36 Standard White, 1-sided, 3 copies, horizontal orientation, bind on left. Login credentials are stored securely (not shown here).')
+        + '<div class="pf-sge-body">'
+        +   fields([
+              field('Date Sent to Print', ''),
+              field('Date Ready for Pickup', '')
+            ])
+        + '</div>'
         + '</div>';
     }
     // #7 link row for the Approved Shop Dwgs SharePoint folder (read view). dsf =
@@ -17768,6 +17810,10 @@ try {
           // Completion Date / Date PF Submits to GC / Submittal Status) MIGRATES into
           // the Original (rev 0) cycle on first render, so no entered data is lost.
         + submittalWorkflowBlock(pfDesignSubmittalFolder(_curNum));
+          // PRINTING DRAWINGS (Brad 2026-09-05): rendered INSIDE submittalWorkflowBlock,
+          // directly BELOW the Submittal Summary table (see pfPrintingDrawingsBlock call
+          // there), NOT here — so it sits immediately under the Submittal Summary element
+          // as requested.
           // DELETED (Brad 2026-08-12): the "GGG Design Notes" block (the 4 individual Garbin
           // readout fields — LF / Total Columns / Column Diameter (in) / Bearing Capacity
           // (psf)) is removed per Brad. Those values now live as COLUMNS in the Submittal
@@ -18106,7 +18152,9 @@ try {
       // Turned ON here and OFF right after the nested-card injection block below; the field's
       // section key is resolved from its .pr-card[data-pr-section] at change time (multi-key).
       _srLiveEdit = true;
-      var _fedexPrint = 'https://www.office.fedex.com/default/architecture-construction-engineering.html';
+      // _fedexPrint REMOVED (Brad 2026-09-05): the FedEx "Sent to Print" link moved to
+      // Engineering & Design > PF Submittal Design > "Printing Drawings" (now defined
+      // locally there as _fedexPrintUrl). No remaining references in Site Readiness.
       var _pipefySSSP = 'https://app.pipefy.com/public/form/7j9G40Zp';
       // Site Readiness workflow ACTIVATION (Brad 2026-08-12): a banner at the top of this
       // section reading the 3 kickoff gates. Gate C (PDF-in-folder confirm) MOVED to E&D >
@@ -18131,14 +18179,14 @@ try {
       // data-sr-eqmat-anchor) so they collapse WITH their subsection.
 
       // ---- Subsection 1: Shop Drawings ----
+      // PRINTING content (FedEx "Sent to Print" action link + print-spec note) AND the
+      // 'Date Ready for Pickup' field + its pickup note MOVED OUT of Site Readiness
+      // (Brad 2026-09-05) into Engineering & Design > PF Submittal Design > "Printing
+      // Drawings" (below the Submittal Summary). This ORIGINAL card stays canonical, so
+      // the "1. Shop Drawings" subsection is kept but now holds only a pointer note (the
+      // pickup note only made sense next to the moved field, so it is removed here).
       var sub1Inner =
-          '<div class="pr-subgroup-actions"><a class="pr-action-link" href="' + E(_fedexPrint) + '" target="_blank" rel="noopener noreferrer">&#128424; Sent to Print (FedEx Office)</a></div>'
-        + subgroupNote('Print spec: B&W, 24x36 Standard White, 1-sided, 3 copies, horizontal orientation, bind on left. Login credentials are stored securely (not shown here).')
-        // "Shop Drawings Print Order Link" field + its paste-URL box REMOVED (Brad 2026-08-27).
-        + subgroupNote('Date Ready for Pickup = anticipated date; email pickup person with order details.')
-        + fields([
-            field('Date Ready for Pickup', '')
-          ]);
+          subgroupNote('Print order + pickup tracking (Send to Print, Date Sent to Print, Date Ready for Pickup) moved to Engineering & Design → PF Submittal Design → Printing Drawings.');
 
       // ---- Subsection 2: Testing ----
       // Brad 2026-09-04, TWO changes:
@@ -18472,21 +18520,15 @@ try {
         return _srNewSubTable(title, flds);
       };
 
-      // ---- Subsection 1: Shop Drawings ----------------------------------------
-      // Same fields as the ORIGINAL Shop Drawings subsection (sub1Inner): the
-      // print action link + print-spec/pickup notes (kept as context) and the one
-      // editable field 'Date Ready for Pickup'. Rendered here as an Inventory-style
-      // table so the field saves through siteReadiness exactly as in the original.
-      var _srNewShopFields = [
-        field('Date Ready for Pickup', '')
-      ];
-      var _srN_shop =
-          '<div class="pr-subgroup-actions"><a class="pr-action-link" href="' + E(_fedexPrint) + '" target="_blank" rel="noopener noreferrer">&#128424; Sent to Print (FedEx Office)</a></div>'
-        + subgroupNote('Print spec: B&W, 24x36 Standard White, 1-sided, 3 copies, horizontal orientation, bind on left. Login credentials are stored securely (not shown here).')
-        + subgroupNote('Date Ready for Pickup = anticipated date; email pickup person with order details.')
-        + _srNewSubTable('Shop Drawings', _srNewShopFields);
+      // ---- Shop Drawings subsection ELIMINATED (Brad 2026-09-05) ----------------
+      // The sandbox Shop Drawings subsection had only two things: the printing content
+      // (FedEx link + print-spec/pickup notes) and the 'Date Ready for Pickup' field.
+      // BOTH moved to Engineering & Design > PF Submittal Design > "Printing Drawings"
+      // (below the Submittal Summary), so this subsection has no remaining purpose and is
+      // removed entirely. The sandbox card now STARTS at Staking & Layout. (_srN_shop /
+      // _srNewShopFields deleted — no other references, grep-confirmed.)
 
-      // ---- Subsection 2: Staking & Layout -------------------------------------
+      // ---- Subsection 1 (now first): Staking & Layout -------------------------
       // Mirrors the ORIGINAL sub3Inner: the "Staking & Layout PF's responsibility?"
       // Yes/No toggle + the CAD "Date Sent" field (as a table), then the conditional
       // wrappers (gcnote / gc-list / selector). The wrappers carry the SAME marker
@@ -18703,11 +18745,11 @@ try {
             ]);
 
       // Assemble the sandbox body: subsection order mirrors the ORIGINAL srBody
-      // (1 Shop Drawings, 2 Staking & Layout, 3 Testing, 4 Safety, 5 Mob Prep,
-      // 6 Mob to Site, 7 Rental Equipment).
+      // Shop Drawings ELIMINATED (Brad 2026-09-05) — sandbox now STARTS at Staking &
+      // Layout: (1 Staking & Layout, 2 Testing, 3 Safety, 4 Mob Prep, 5 Mob to Site,
+      // 6 Rental Equipment).
       var srNewBody =
-          _srN_shop
-        + _srN_staking
+          _srN_staking
         + _srN_testing
         + _srN_safety
         + _srN_mobprep
@@ -20923,6 +20965,12 @@ try {
       'Date Submittal Prereqs Sent to GGG': true,
       'Actual Submittal Completion Date': true,
       'Date PF Submits to GC': true,
+      // Printing Drawings block (Brad 2026-09-05, E&D > PF Submittal Design, below the
+      // Submittal Summary). Both date fields get the native date picker + MM/DD/YYYY
+      // display; they save under the `engineering` key. ('Date Ready for Pickup' is
+      // already registered below under the Site Readiness section but the map is keyed by
+      // LABEL, section-agnostic, so it already picks up the calendar here too.)
+      'Date Sent to Print': true,
       // ===== Site Readiness / Project Setup 6-subsection build (Brad 2026-08-07, batch-13) =====
       // Subsection 1: Shop Drawings
       'Date Ready for Pickup': true,
