@@ -18691,12 +18691,17 @@ try {
       // fields would SAVE under siteReadiness if embedded raw. See the per-section
       // wrapper note where these are rendered — Brad will decide the final data key
       // for the sandbox (simplification flagged in the report).
-      var _srNewSubTableKeyed = function(title, buildFieldsFn, sectionKey){
+      // opts (optional, Brad 2026-09-05) is forwarded verbatim to _srNewSubTable so a
+      // keyed subsection can ALSO drop its dark headbar + Field/Value thead ({noHeadbar,
+      // noThead}) — needed for the Safety lead table now that it sits inside the blue
+      // _srNewCollapsible('Safety', ...) bar. Omitting opts preserves the prior
+      // dark-headbar rendering for every other keyed caller.
+      var _srNewSubTableKeyed = function(title, buildFieldsFn, sectionKey, opts){
         var _prev = _curSection;
         if (sectionKey) _curSection = sectionKey;
         var flds = buildFieldsFn();
         _curSection = _prev;
-        return _srNewSubTable(title, flds);
+        return _srNewSubTable(title, flds, opts);
       };
 
       // ---- Shop Drawings subsection ELIMINATED (Brad 2026-09-05) ----------------
@@ -18862,21 +18867,54 @@ try {
       // original. NOTE: because this card's DOM section is siteReadiness, these fields
       // would currently SAVE under siteReadiness (not safety) if edited — acceptable
       // for a sandbox; Brad will tweak the key strategy on sign-off.
-      var _srN_safety =
-          subgroup('Site Specific Safety Plan (SSSP)')
-        + '<div class="pr-subgroup-actions"><a class="pr-action-link" href="' + E(_pipefySSSP) + '" target="_blank" rel="noopener noreferrer">&#128221; Create / Send SSSP (Pipefy)</a></div>'
-        + pfSspFolderRow()
-        + _srNewSubTableKeyed('SSSP', function(){ return [
-              field('Safety Consultant', ''),
+      // Header restructure (Brad 2026-09-05): carry the SAME blue collapsible header
+      // treatment as Staking & Layout / Testing into Safety. The whole subsection is
+      // wrapped in _srNewCollapsible('Safety', ..., true) — ONE clean accent-blue title
+      // bar reading "Safety" (renamed from the old "SSSP" subgroup header) that is the
+      // collapse toggle; clicking it rolls up EVERYTHING inside. Default EXPANDED.
+      //
+      // The lead table (SSSP + flattened MSDS rows) is emitted headerless
+      // ({noHeadbar:true,noThead:true}) so there is NO dark band + NO redundant
+      // "Field | Value" thead under the blue bar — identical treatment to Testing's lead
+      // table. The remaining keyed subgroups (Safety Docs & Checklists / Hand Log Sheets /
+      // Utility Locates) keep their own dark headbars for now.
+      //
+      // Changes in this rebuild:
+      //  * "SSSP" subgroup header -> "Safety" (now the blue collapse bar label).
+      //  * "MSDS (Material Safety Data Sheets)" sub-table header DELETED — its 4 rows are
+      //    flattened directly into the lead Safety table (same idiom as removing the
+      //    "Testing Detail" sub-header).
+      //  * "Safety Consultant" row RENAMED -> "Site Specific Safety Plan". (Label rename =
+      //    new save key; the old 'Safety Consultant' safety-override value does NOT carry.)
+      //  * The "Create / Send SSSP (Pipefy)" button, formerly ABOVE the section as a
+      //    .pr-subgroup-actions block, is MOVED INTO the lead table, inline to the RIGHT of
+      //    the "Site Specific Safety Plan" row — built as a composite value cell (field +
+      //    button) in a .pf-staking-resprow flex box (reused, no new CSS), exactly like
+      //    Staking's _respCell. _srNewRow pulls the row NAME from the field's data-pr-label
+      //    (emitted first), so the field save wiring is unchanged; the link/onclick (a plain
+      //    href target=_blank to _pipefySSSP) is preserved byte-for-byte.
+      //  * "SSSP Email/Copy Link" row DELETED entirely.
+      // Every remaining Safety field is still built under _curSection='safety' so its
+      // override read + DOM save resolve to the safety bucket exactly as before; the
+      // _srNewCollapsible wrapper is a plain div, so fields inside still resolve their save
+      // path via the card's data-pr-section ancestor — no save binding changes.
+      var _srN_safetyInner =
+          pfSspFolderRow()
+        + _srNewSubTableKeyed('Safety', function(){ return [
+              // "Site Specific Safety Plan" row + the Create/Send SSSP button inline to its
+              // right (composite value cell). field() is emitted FIRST so _srNewRow reads
+              // its data-pr-label for the row name; the button sits in the same value cell.
+              '<div class="pf-staking-resprow">'
+                + field('Site Specific Safety Plan', '')
+                + '<a class="pr-action-link" href="' + E(_pipefySSSP) + '" target="_blank" rel="noopener noreferrer">&#128221; Create / Send SSSP (Pipefy)</a>'
+              + '</div>',
               field('Date SSSP Sent to GC', ''),
-              fieldLinked('SSSP Email/Copy Link', '', '', 'website')
-            ]; }, 'safety')
-        + _srNewSubTableKeyed('MSDS (Material Safety Data Sheets)', function(){ return [
+              // Flattened MSDS rows (MSDS sub-header deleted):
               field('Material Safety Data Sheets (MSDS)', ''),
               field('MSDS Sent?', ''),
               field('Date MSDS Sent', ''),
               fieldLinked('MSDS Copy Link', '', '', 'website')
-            ]; }, 'safety')
+            ]; }, 'safety', { noHeadbar: true, noThead: true })
         + _srNewSubTableKeyed('Safety Docs & Checklists', function(){ return [
               field('Toolbox Talks Prepared', ''),
               field('Jobsite Safety Analysis (JSA)', ''),
@@ -18901,6 +18939,7 @@ try {
               field('Date Ticket Expires', ''),
               fieldLinked('Locate Ticket PDF Link', '', '', 'website')
             ]; }, 'safety');
+      var _srN_safety = _srNewCollapsible('Safety', _srN_safetyInner, true);
 
       // ---- Subsection 5: Mobilization Preparation -----------------------------
       // Mirrors sub5Inner: proof-roll fields, elevation fields, checklist fields, and
@@ -18922,7 +18961,9 @@ try {
             ])
         + subgroupNote('Send site readiness checklist >= 3 weeks prior; PM confirms all items with GC/Super; 100% complete = clear to mobilize.')
         + _srNewSubTable('Site Readiness Checklist', [
-              field('Site Readiness Checklist Sent?', ''),
+              // "Site Readiness Checklist Sent?" row DELETED entirely (Brad 2026-09-05).
+              // Removing the field() removes the row; any saved siteReadiness override under
+              // that label is now ORPHANED (no longer read or shown) — harmless, not purged.
               field('Date Site Readiness Checklist Sent to GC', ''),
               field('Checklist Items 100% Confirmed w/ GC?', ''),
               fieldLinked('Site Readiness Checklist Link', '', '', 'website'),
