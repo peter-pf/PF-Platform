@@ -403,6 +403,95 @@ function cleanSubmittalPull(input) {
   };
 }
 
+// ---- __testing_pull reserved structured key (Brad 2026-09-05, Stage 2) --------
+// "Pull from Approved Drawings" for the Testing section writes the 5 AP Testing
+// criteria (AP Reaction Modulus / AP Design Diameter / Diameter of Plate / AP
+// Design Load / AP Max Test Load) as REGULAR editable string fields on the
+// `siteReadiness` section (handled by cleanFields, keyed by their EXACT portal
+// labels -- they are NOT a reserved key). THIS key records only the lightweight
+// PROVENANCE + state of that pull (source PDF, when it ran/was requested, the
+// extracted values snapshot, and any needs_review reasons) so the render can show
+// a "Testing values pulled from {pdf}" line and the button's poll can reflect
+// requested/pulled/needs_review. Stored as ONE reserved, OBJECT-valued key
+// `__testing_pull` INSIDE the `siteReadiness` section:
+//   sections.siteReadiness.__testing_pull = {
+//     source_pdf: { name, revision, date },              // strings (bounded)
+//     pulled_at, requested_at, requested_by,             // strings
+//     status ('requested'|'pulled'|'needs_review'|''),
+//     values: { <label>: <string>, ... },               // snapshot of what was written
+//     reasons: [ "..." ]                                 // needs_review reasons (capped)
+//   }
+// This mirrors __submittal_pull's design exactly, but scoped to `siteReadiness` (NOT
+// engineering) and to the Testing criteria (NOT pier counts). Two writers use it:
+// (1) the OFFICE "Pull" BUTTON path (api/request-drawing-extraction) writes a
+// lightweight { status:'requested', requested_at, requested_by }; the CF Worker NEVER
+// runs vision. (2) Peter's engine (drawing_extract_daemon) writes the FULL payload
+// { status:'pulled'|'needs_review', values|reasons, source_pdf, pulled_at } after the
+// read. It rides the SAME merge as every other reserved key: Object.assign(existing,
+// fields) preserves it when a normal siteReadiness field save omits it, so a manual
+// Testing-field edit never wipes the pull provenance and vice-versa. STRICTLY validated
+// (cleanTestingPull below); a malformed body fails the WHOLE save closed. Allowed ONLY
+// under the `siteReadiness` section (rejected 400 anywhere else).
+const TPULL_KEY = '__testing_pull';
+const TPULL_ALLOWED_SECTIONS = { siteReadiness: 1 };
+const TPULL_MAX_STR = 300;            // source_pdf name / status / date / who string cap
+const TPULL_MAX_VAL_LABEL = 200;      // a values-snapshot label cap
+const TPULL_MAX_VAL = 200;            // a values-snapshot value cap
+const TPULL_MAX_VALS = 20;            // values entries (5 today; headroom), bounds abuse
+const TPULL_MAX_REASONS = 40;         // needs_review reasons, bounds abuse
+const TPULL_MAX_REASON_LEN = 1000;    // one reason line cap
+const TPULL_STATUSES = { requested: 1, pulled: 1, needs_review: 1, '': 1 };
+
+// Validate + normalize an incoming __testing_pull object into a clean, bounded
+// structure. Returns a SAFE object, or null if present-but-malformed (caller fails the
+// whole save closed). Rules mirror cleanSubmittalPull's defensive posture:
+//   - top-level must be a plain object (not array).
+//   - status is constrained to its small enum (unknown => reject).
+//   - source_pdf is shape-normalized (strings only).
+//   - values is an OPTIONAL { label: string } map (label + value each capped; over the
+//     count cap => reject). NO math -- a verbatim snapshot of what the daemon wrote.
+//   - reasons must be an array of strings (capped in count + length); over the cap =>
+//     reject. Empty reason lines are dropped.
+function cleanTestingPull(input) {
+  if (input == null) return {};                        // absent => empty (caller preserves prior)
+  if (typeof input !== 'object' || Array.isArray(input)) return null; // present but not object => reject
+  const status = s(input.status, TPULL_MAX_STR);
+  if (!(status in TPULL_STATUSES)) return null;        // unknown status => reject
+  const spIn = (input.source_pdf && typeof input.source_pdf === 'object' && !Array.isArray(input.source_pdf))
+    ? input.source_pdf : {};
+  // values snapshot (optional): a plain { label: string } map, bounded.
+  let values = {};
+  if (input.values != null) {
+    if (typeof input.values !== 'object' || Array.isArray(input.values)) return null;
+    const vkeys = Object.keys(input.values);
+    if (vkeys.length > TPULL_MAX_VALS) return null;
+    for (const k of vkeys) {
+      const label = s(k, TPULL_MAX_VAL_LABEL);
+      if (!label) continue;
+      values[label] = s(input.values[k], TPULL_MAX_VAL);
+    }
+  }
+  let reasons = [];
+  if (input.reasons != null) {
+    if (!Array.isArray(input.reasons)) return null;    // present but not an array => reject
+    if (input.reasons.length > TPULL_MAX_REASONS) return null;
+    reasons = input.reasons.map((n) => s(n, TPULL_MAX_REASON_LEN)).filter((n) => n !== '');
+  }
+  return {
+    source_pdf: {
+      name:     s(spIn.name, TPULL_MAX_STR),
+      revision: s(spIn.revision, TPULL_MAX_STR),
+      date:     s(spIn.date, TPULL_MAX_STR),
+    },
+    pulled_at:    s(input.pulled_at, TPULL_MAX_STR),
+    requested_at: s(input.requested_at, TPULL_MAX_STR),
+    requested_by: s(input.requested_by, TPULL_MAX_STR),
+    status: status,
+    values: values,
+    reasons: reasons,
+  };
+}
+
 // ---- __subcontract_analysis reserved structured key (Brad 2026-08-13) ---------
 // The Subcontract Agreement card (Section 3, override key `contract`) gains a
 // "Subcontract Analysis" SUBSECTION: a business-level review of the executed/draft
@@ -761,7 +850,7 @@ function cleanFields(input) {
   if (!input || typeof input !== 'object') return out;
   const keys = Object.keys(input).slice(0, MAX_FIELDS_PER_SECTION);
   for (const k of keys) {
-    if (k === CRM_KEY || k === PREREQ_KEY || k === CYCLES_KEY || k === SITE_ELEV_KEY || k === PULL_KEY || k === SUBAN_KEY || k === CPULL_KEY || k === CO_KEY) continue; // reserved structured keys; handled separately, never string-flattened
+    if (k === CRM_KEY || k === PREREQ_KEY || k === CYCLES_KEY || k === SITE_ELEV_KEY || k === PULL_KEY || k === TPULL_KEY || k === SUBAN_KEY || k === CPULL_KEY || k === CO_KEY) continue; // reserved structured keys; handled separately, never string-flattened
     const label = s(k, MAX_LABEL);
     if (!label) continue;
     out[label] = s(input[k], MAX_VALUE);
@@ -921,6 +1010,26 @@ export async function onRequestPost(context) {
       }
     }
 
+    // Reserved __testing_pull structured key (Brad 2026-09-05, Stage 2): the "Pull from
+    // Approved Drawings" provenance/state for the Testing section on the `siteReadiness`
+    // section. Allowed ONLY under `siteReadiness`. Same posture as __submittal_pull:
+    // absent => untouched (preserve prior), present => strictly validated, malformed =>
+    // reject the WHOLE save closed. Two writers use it -- the office Pull BUTTON (a small
+    // request marker) and Peter's out-of-band engine (the full payload). Both send this
+    // key WITHOUT the flat siteReadiness fields, so cleanFields yields {} and only this key
+    // is replaced; a normal Testing-field save omits it so the stored pull is preserved.
+    const hasTpullInBody = Object.prototype.hasOwnProperty.call(rawFieldsObj, TPULL_KEY);
+    let tpullUpdate; // undefined => untouched
+    if (hasTpullInBody) {
+      if (!TPULL_ALLOWED_SECTIONS[section]) {
+        return json({ status: 'error', message: 'Testing pull is not valid on this section.' }, 400);
+      }
+      tpullUpdate = cleanTestingPull(rawFieldsObj[TPULL_KEY]);
+      if (tpullUpdate === null) {
+        return json({ status: 'error', message: 'Invalid testing pull metadata; nothing was saved.' }, 400);
+      }
+    }
+
     // Reserved __subcontract_analysis structured key (Brad 2026-08-13): the Subcontract
     // Analysis subsection on the Subcontract Agreement card (Section 3). Allowed ONLY under
     // `contract`. Same posture as the other reserved keys: absent => untouched (preserve
@@ -1009,6 +1118,10 @@ export async function onRequestPost(context) {
     // Carry forward any existing structured __submittal_pull (an OBJECT, like __crm).
     const prevPull = (existing[PULL_KEY] && typeof existing[PULL_KEY] === 'object' && !Array.isArray(existing[PULL_KEY]))
       ? existing[PULL_KEY] : undefined;
+    // Carry forward any existing structured __testing_pull (an OBJECT, like __submittal_pull).
+    // Lives on the `siteReadiness` section; preserved independently of any Testing string field.
+    const prevTpull = (existing[TPULL_KEY] && typeof existing[TPULL_KEY] === 'object' && !Array.isArray(existing[TPULL_KEY]))
+      ? existing[TPULL_KEY] : undefined;
     // Carry forward any existing structured __subcontract_analysis (an OBJECT, like __crm).
     const prevSuban = (existing[SUBAN_KEY] && typeof existing[SUBAN_KEY] === 'object' && !Array.isArray(existing[SUBAN_KEY]))
       ? existing[SUBAN_KEY] : undefined;
@@ -1046,6 +1159,13 @@ export async function onRequestPost(context) {
     if (pullUpdate !== undefined) merged[PULL_KEY] = pullUpdate;
     else if (prevPull !== undefined) merged[PULL_KEY] = prevPull;
     else delete merged[PULL_KEY]; // never leave a stray/non-object key behind
+    // Same whole-object replace/preserve for __testing_pull (the writer sends the COMPLETE
+    // provenance object each save); otherwise preserve the prior. Rides the `siteReadiness`
+    // section; writing it never touches the flat Testing string fields, and a Testing-field
+    // save never touches it (each keyed off its own hasTpullInBody flag).
+    if (tpullUpdate !== undefined) merged[TPULL_KEY] = tpullUpdate;
+    else if (prevTpull !== undefined) merged[TPULL_KEY] = prevTpull;
+    else delete merged[TPULL_KEY]; // never leave a stray/non-object key behind
     // Same whole-object replace/preserve for __subcontract_analysis (the writer sends the
     // COMPLETE analysis object each save); otherwise preserve the prior.
     if (subanUpdate !== undefined) merged[SUBAN_KEY] = subanUpdate;

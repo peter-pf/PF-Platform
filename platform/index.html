@@ -18845,9 +18845,46 @@ try {
             + '<span class="pf-gents-msg" data-pf-gents-msg style="display:none;"></span>'
             + '</div>'
           : '';
+        // "Pull from Approved Drawings" action (Brad 2026-09-05). OFFICE-ONLY (canEdit() +
+        // server 403). Triggers the auto-extraction worker (POST /api/request-drawing-
+        // extraction {num}), then POLLS (GET ...?num=) until state is done|needs_review|failed
+        // (or a ~90s timeout). On `done`, the 5 design values (AP Reaction Modulus - Design
+        // (pci) / AP Design Diameter (ft) / Diameter of Plate (ft) / AP Design Load (kips) /
+        // AP Max Test Load) have already been written server-side into the SAME siteReadiness
+        // override this subsection reads via effVal(); so we re-fetch the override
+        // (loadOverridesSync) and full-re-render the record — the Testing fields then show the
+        // pulled values. `needs_review`/`failed` show reasons/error inline (NO fabricated
+        // values — the backend wrote none). Deliberate click only; never auto-fires on render.
+        var _pullBtn = canEdit()
+          ? '<div class="pr-subgroup-actions" data-pf-pull-wrap>'
+            + '<button type="button" class="pr-action-link" data-pf-pull-btn '
+            +   'onclick="event.stopPropagation();window.pfPullFromDrawings(this)">'
+            +   '&#128194; Pull from Approved Drawings</button>'
+            + '<span class="pf-gents-msg" data-pf-pull-msg style="display:none;"></span>'
+            + '</div>'
+          : '';
+        // Persisted provenance note (Brad 2026-09-05): if a prior pull wrote
+        // siteReadiness.__testing_pull, surface a small "Pulled from {name} on {date}" line
+        // near the criteria so it survives reload. Read straight off the current override map
+        // (same pattern as contract.__subcontract_analysis).
+        var _pullProv = (function(){
+          try {
+            var srov = (_curOverrides && _curOverrides['siteReadiness']) || {};
+            var tp = srov.__testing_pull;
+            if (tp && tp.status === 'pulled') {
+              var src = (tp.source_pdf && tp.source_pdf.name) ? tp.source_pdf.name : 'approved drawings';
+              var when = (tp.source_pdf && tp.source_pdf.date) ? tp.source_pdf.date
+                       : (tp.pulled_at ? String(tp.pulled_at).slice(0, 10) : '');
+              return subgroupNote('✓ Pulled from ' + src + (when ? (' on ' + when) : '') + '.');
+            }
+          } catch (e) {}
+          return '';
+        })();
         var _testInner =
             _srNewSubTable('Testing', [ field('Modulus Load Test Required?', '') ], { noHeadbar: true, noThead: true })
           + '<div data-testing-body style="' + (_modYes ? '' : 'display:none;') + '">'
+          +   _pullBtn
+          +   _pullProv
           +   _srNewSubTable('Testing Detail', _testFieldsNew, { noHeadbar: true, noThead: true })
           +   _genTestSheetBtn
           +   subgroupNote('Threshold ~85 kip determines testing equipment vs rig. FUTURE automation: Peter extracts test data from approved shop drawings + generates the test doc in SharePoint on Garbin approval. Annual jack recalibration reminder every Dec/Jan.')
@@ -21524,6 +21561,144 @@ try {
       }).catch(function(){
         el.disabled = false; revert();
         msg('Save failed: could not reach the server. Not saved — please retry.', true);
+      });
+    };
+
+    // ---- "Pull from Approved Drawings" action (Brad 2026-09-05) --------------
+    // Office-only (canEdit + server 403). Deliberate click only. Kicks off the auto-extraction
+    // worker then polls to completion:
+    //   POST /api/request-drawing-extraction {num}                 -> queues the extraction
+    //   GET  /api/request-drawing-extraction?num=<n>               -> { request, status }
+    //        status.state ∈ requested | running | done | needs_review | failed
+    // Terminal handling (FAIL CLOSED — only `done` is treated as success):
+    //   done         : the 5 design values are already written server-side into the
+    //                  siteReadiness override (SAME store the Testing fields read via effVal);
+    //                  re-fetch the override (loadOverridesSync) + full re-render
+    //                  (renderProjectRecord) so the pulled values + provenance appear. The
+    //                  post-render provenance note ("Pulled from {name} on {date}") comes from
+    //                  siteReadiness.__testing_pull and persists across reloads.
+    //   needs_review : show status.reasons[] inline; NO values shown (backend wrote none).
+    //   failed       : show status.error inline.
+    //   timeout      : "Still processing — refresh in a moment." (worker may take minutes; a
+    //                  later manual refresh will show the values once written).
+    // Any 403 / network error -> inline error, button re-enabled, no crash.
+    window.pfPullFromDrawings = function(btn){
+      if (!canEdit()) return;                          // defense-in-depth (server also 403s)
+      var wrap = btn && btn.closest ? btn.closest('[data-pf-pull-wrap]') : null;
+      var msgEl = wrap ? wrap.querySelector('[data-pf-pull-msg]') : null;
+      var card = btn && btn.closest ? btn.closest('.pr-card[data-pr-section]') : null;
+      var root = (card && card.closest ? card.closest('.pr-root') : null)
+              || document.getElementById('prGenericRoot');
+      function say(text, isErr){
+        if (!msgEl) return;
+        msgEl.textContent = text || '';
+        msgEl.className = 'pf-gents-msg ' + (isErr ? 'pr-live-msg-err' : 'pr-live-msg-ok');
+        msgEl.style.display = text ? 'inline' : 'none';
+      }
+      var num = String(_curNum || '').trim();
+      if (!/^[0-9]{2}-[0-9]{2,4}$/.test(num)) {
+        say('This project has no valid project number (NN-NNN); cannot pull from drawings.', true);
+        return;
+      }
+      var _origLabel = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '&#8987; Pulling…';
+      say('⏳ Pulling from approved drawings…', false);
+
+      // Adopt server truth + full re-render so the pulled values appear in the Testing fields.
+      // Same adopt/re-render path openProjectRecord uses: loadOverridesSync repopulates
+      // window.PF_PROJECT_OVERRIDES[num] from /api/project-override, then renderProjectRecord
+      // re-runs renderInto which re-reads _curOverrides from that map — the 5 pulled values then
+      // resolve through effVal('siteReadiness', ...). (This also re-renders THIS button, so no
+      // manual re-enable is needed on the `done` branch.)
+      function adoptAndRerender(){
+        try { loadOverridesSync(num); } catch (e) {}
+        try {
+          if (window.renderProjectRecord) window.renderProjectRecord(num, root);
+        } catch (e) {}
+      }
+      function restore(){
+        btn.disabled = false;
+        btn.innerHTML = _origLabel;
+      }
+
+      var MAX_POLLS = 22;                 // ~22 * 4s ≈ 88s cap
+      var POLL_MS = 4000;
+      var polls = 0;
+
+      function poll(){
+        polls++;
+        fetch('/api/request-drawing-extraction?num=' + encodeURIComponent(num), {
+          method: 'GET', credentials: 'same-origin'
+        }).then(function(res){
+          return res.json().then(function(b){ return { ok: res.ok, status: res.status, body: b }; })
+            .catch(function(){ return { ok: res.ok, status: res.status, body: null }; });
+        }).then(function(r){
+          if (r.status === 403) { restore(); say('You do not have permission to pull from drawings.', true); return; }
+          if (!r.ok || !r.body) {
+            if (polls >= MAX_POLLS) { restore(); say('Still processing — refresh in a moment.', false); return; }
+            setTimeout(poll, POLL_MS); return;
+          }
+          var st = r.body.status || {};
+          var state = String(st.state || '').toLowerCase();
+          if (state === 'done') {
+            // Values already written server-side into the siteReadiness override. Adopt + full
+            // re-render surfaces them in the Testing fields; the re-render also rebuilds this
+            // button and draws the persistent provenance note from siteReadiness.__testing_pull.
+            adoptAndRerender();
+            // Read the (now-adopted) source name for the transient toast. The persistent note is
+            // drawn by the render itself, so the toast is best-effort only.
+            var provName = '';
+            try {
+              var tp = ((_curOverrides && _curOverrides.siteReadiness) || {}).__testing_pull || {};
+              provName = (tp.source_pdf && tp.source_pdf.name) || '';
+            } catch (e) {}
+            // If the re-render did not rebuild this button (e.g. it is no longer in the DOM),
+            // restore it so it is never left stuck-disabled.
+            try { if (document.body.contains(btn)) restore(); } catch (e) { restore(); }
+            say('✓ Pulled' + (provName ? (' from ' + provName) : ' from approved drawings') + '.', false);
+            return;
+          }
+          if (state === 'needs_review') {
+            restore();
+            var reasons = (st.reasons && st.reasons.length) ? st.reasons.join('; ') : 'manual review required';
+            say('Needs review: ' + reasons, true);
+            return;
+          }
+          if (state === 'failed') {
+            restore();
+            say('Extraction failed: ' + (st.error || 'unknown error') + '.', true);
+            return;
+          }
+          // requested | running (or unknown non-terminal) -> keep polling until the cap.
+          if (polls >= MAX_POLLS) { restore(); say('Still processing — refresh in a moment.', false); return; }
+          setTimeout(poll, POLL_MS);
+        }).catch(function(){
+          if (polls >= MAX_POLLS) { restore(); say('Could not reach the server. Please retry.', true); return; }
+          setTimeout(poll, POLL_MS);
+        });
+      }
+
+      // Kick off the extraction, then start polling. A queue failure surfaces inline.
+      fetch('/api/request-drawing-extraction', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ num: num })
+      }).then(function(res){
+        return res.json().then(function(b){ return { ok: res.ok, status: res.status, body: b }; })
+          .catch(function(){ return { ok: res.ok, status: res.status, body: null }; });
+      }).then(function(r){
+        if (r.status === 403) { restore(); say('You do not have permission to pull from drawings.', true); return; }
+        if (!r.ok) {
+          var m = (r.body && r.body.message) ? r.body.message
+            : 'Could not start the drawing extraction (' + r.status + '). Please retry.';
+          restore(); say(m, true); return;
+        }
+        // Queued (or already running) — begin polling for completion.
+        setTimeout(poll, POLL_MS);
+      }).catch(function(){
+        restore();
+        say('Could not reach the server to start the extraction. Please retry.', true);
       });
     };
 

@@ -555,6 +555,17 @@ export function areaForPath(pathname) {
     // this line it would fall through to default-deny (admin-only) and partners /
     // BD could not trigger a sync.
     if (pathname.startsWith('/api/sync-request')) return 'financials';
+    // "Pull from Approved Drawings" trigger (Testing section): the office button
+    // enqueues an out-of-band extraction of the AP Testing criteria (modulus,
+    // diameters, design/max test load) from the project's Approved Shop Dwgs PDF.
+    // OFFICE action -> financials area (admin + partner + business_dev; field_ops
+    // BLOCKED by direct URL too). POST enqueues a KV request + status; GET reports
+    // request+status for the button to poll. The handler ALSO calls
+    // requireArea(session,'financials') on GET + POST (defense-in-depth). Without
+    // this line it would fall through to default-deny (admin-only) and partners /
+    // BD could not trigger a pull. A CF Worker NEVER runs vision — Peter's engine
+    // (drawing_extract_daemon) does the extraction + write out-of-band.
+    if (pathname.startsWith('/api/request-drawing-extraction')) return 'financials';
     if (pathname.startsWith('/api/pipeline-state')) return 'preconstruction';
     // Per-bid precon activity log (notes/changes/comms/file refs). BD domain:
     // admin + partner + business_dev; field_ops BLOCKED by direct URL too. The
