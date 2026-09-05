@@ -16135,6 +16135,15 @@ try {
       var n = Number(m[0]);
       return isFinite(n) ? n : null;
     }
+    // "Which Jack" auto-pick from an "AP Max Test Load" kips value (Brad 2026-09-05):
+    // <=174 kip -> small jack (Enerpac); >=175 kip -> large jack (Durapac). Blank /
+    // non-numeric load -> '' (leave Which Jack untouched). Returns a value that is one
+    // of the PF_FIELD_DROPDOWNS['Which Jack'] options (so the <select> matches it).
+    function pfWhichJackAuto(loadVal){
+      var n = pfParseNum(loadVal);
+      if (n === null) return '';
+      return n <= 174 ? 'Small Jack (Enerpac)' : 'Large Jack (Durapac)';
+    }
     // Parse a stored date value into a LOCAL Date (midnight) or null. Accepts the
     // same shapes pfFmtDate recognizes (ISO, M/D/Y, M-D-Y, 2/4-digit year, epoch
     // ms). Anything else -> null (no compute, no error).
@@ -18334,7 +18343,11 @@ try {
         field('AP Design Load (kips)', ''),
         field('Load Test Jack Calibration Factor (psi/kip)', ''),
         field('AP Max Test Load', ''),
-        field('Which Jack', ''),
+        // "Which Jack" default AUTO-picked from AP Max Test Load (Brad 2026-09-05):
+        // pass the computed jack as field()'s default value. field() uses it ONLY when
+        // there is no non-empty saved override, so a manual override still wins; the
+        // capture-phase listener below keeps it live on change without a re-render.
+        field('Which Jack', pfWhichJackAuto(effVal('siteReadiness', 'AP Max Test Load', ''))),
         field('Testing Equipment vs Rig', ''),
         field('Test Document Status', ''),
         fieldLinked('Test Document Link', '', '', 'website'),
@@ -18758,7 +18771,11 @@ try {
           field('AP Design Load (kips)', ''),
           field('Load Test Jack Calibration Factor (psi/kip)', ''),
           field('AP Max Test Load', ''),
-          field('Which Jack', ''),
+          // "Which Jack" default AUTO-picked from AP Max Test Load (Brad 2026-09-05) —
+          // same as the original card above; see pfWhichJackAuto + the capture-phase
+          // listener. field()'s default applies only when no non-empty override exists,
+          // so a manual override is preserved.
+          field('Which Jack', pfWhichJackAuto(effVal('siteReadiness', 'AP Max Test Load', ''))),
           field('Testing Equipment vs Rig', ''),
           field('Test Document Status', ''),
           fieldLinked('Test Document Link', '', '', 'website'),
@@ -21096,7 +21113,11 @@ try {
       // PF_FIELD_DROPDOWNS field.)
       // Subsection 2: Testing
       'Modulus Load Test Required?': ['Yes', 'No'],
-      'Which Jack': ['Big (>175 kip)', 'Small (<175 kip)'],
+      // Auto-selected from "AP Max Test Load" (Brad 2026-09-05): <=174 kip -> small
+      // jack (Enerpac); >=175 kip -> large jack (Durapac). See the capture-phase
+      // change listener (pfWhichJackAuto) that drives + persists this default; the
+      // dropdown stays a real editable override.
+      'Which Jack': ['Small Jack (Enerpac)', 'Large Jack (Durapac)'],
       'Test Document Status': ['Not Started', 'In Progress', 'Complete'],
       // Subsection 3: Staking & Layout
       'CAD & PDF Sent to Surveyor (MLS)?': ['Yes', 'No'],
@@ -21937,6 +21958,33 @@ try {
       if (!body) return;
       var isYes = /^yes$/i.test(String(el.value || '').trim());
       body.style.display = isYes ? '' : 'none';
+    }, true);
+
+    // Site Readiness > Testing > "Which Jack" AUTO-SELECT from "AP Max Test Load"
+    // (Brad 2026-09-05). When the "AP Max Test Load" (kips) field changes, drive the
+    // "Which Jack" dropdown in the SAME card: <=174 kip -> Small Jack (Enerpac);
+    // >=175 kip -> Large Jack (Durapac); blank/non-numeric -> leave Which Jack as-is.
+    // CAPTURE phase (3rd arg true) — same reason as the Modulus listener above: it must
+    // run BEFORE the input's inline onchange calls event.stopPropagation(). Scoped via
+    // el.closest('.pr-card[data-pr-section="siteReadiness"]') then card.querySelector so
+    // only THIS card's Which Jack is touched (original vs sandbox stay independent).
+    // After setting the select's value we call window.pfLiveFieldChange(sel) so the
+    // auto-pick PERSISTS to the siteReadiness bucket under "Which Jack" (round-trips on
+    // next render), exactly as a manual dropdown change would. The dropdown remains a
+    // real editable override (user can pick the other jack afterward).
+    document.addEventListener('change', function(ev){
+      var el = ev.target;
+      if (!el || !el.getAttribute) return;
+      if (el.getAttribute('data-pr-field-label') !== 'AP Max Test Load') return;
+      var want = pfWhichJackAuto(el.value);
+      if (!want) return;                                  // blank/non-numeric -> no change
+      var card = el.closest ? el.closest('.pr-card[data-pr-section="siteReadiness"]') : null;
+      if (!card) return;
+      var sel = card.querySelector('select[data-pr-field-label="Which Jack"]');
+      if (!sel) return;
+      if (String(sel.value || '') === want) return;       // already correct -> no save churn
+      sel.value = want;
+      if (typeof window.pfLiveFieldChange === 'function') window.pfLiveFieldChange(sel);
     }, true);
 
     // Populate the company dropdown + (if a company is selected) its contact checkboxes
