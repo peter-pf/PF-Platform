@@ -2425,6 +2425,31 @@ tr.pf-dragging { opacity: 0.45; }
 .pf-sr-table .pr-field-value { font-size: 12.5px; color: var(--text-1, #2B2F36); }
 .pf-sr-table .pr-live-input { font-size: 12.5px; }
 
+/* ---- Staking-only collapsible title bar (Brad 2026-09-05) ---------------------- */
+/* Replaces the dark .pf-sr-headbar + "Field/Value" thead for the Staking subsection */
+/* ONLY with a single clean accent-blue full-width title bar that IS the roll-up      */
+/* toggle. Sandbox-scoped classes (.pf-sr-collapse*) — emitted solely by             */
+/* _srNewCollapsible, which is called ONLY for Staking, so no other subsection is     */
+/* touched. Bar styling mirrors the accent-blue .pf-sr-table th (same #006DB0 fill,   */
+/* white text) but rendered full-width and at the subsection-header scale.            */
+.pf-sr-collapse { margin: 0 0 8px; }
+.pf-sr-collapse-head {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  background: var(--accent, #006DB0); color: #fff;
+  border: 1px solid var(--accent, #006DB0); border-radius: 8px;
+  padding: 8px 14px; font-size: 14px; font-weight: 600;
+  user-select: none;
+}
+.pf-sr-collapse-head:hover { background: var(--accent-dark, #005A91); border-color: var(--accent-dark, #005A91); }
+.pf-sr-collapse-title { flex: 1 1 auto; }
+.pf-sr-collapse-chev {
+  font-size: 0.72rem; color: rgba(255,255,255,0.85);
+  transition: transform 0.15s ease;
+}
+.pf-sr-collapse.open .pf-sr-collapse-chev { transform: rotate(90deg); }
+.pf-sr-collapse-body { display: none; margin-top: 8px; }
+.pf-sr-collapse.open .pf-sr-collapse-body { display: block; }
+
 /* ---- Sandbox-scoped Inventory match for the Staking doc checklist -------------- */
 /* The Staking subsection's "Documents to send the surveyor/GC" table uses the      */
 /* SHARED .pf-staking-doc-table class (also rendered in the ORIGINAL card), so its   */
@@ -18550,22 +18575,61 @@ try {
         return '<tr><td class="pf-sr-name">' + name + '</td>'
              + '<td class="pf-sr-val">' + fieldHtml + '</td></tr>';
       };
-      // _srNewSubTable(title, fieldHtmls): a subsection rendered as an Inventory-
+      // _srNewSubTable(title, fieldHtmls, opts): a subsection rendered as an Inventory-
       // style table = dark-blue header bar (title + item count) + accent column-
       // header row (Field | Value) + zebra body rows.
-      var _srNewSubTable = function(title, fieldHtmls){
-        return '<div class="pf-sr-headbar">'
+      //
+      // opts (optional) — used ONLY by the Staking subsection (Brad 2026-09-05); every
+      // other subsection calls this with NO opts, so their appearance is UNCHANGED:
+      //   opts.noHeadbar   -> omit the dark-blue .pf-sr-headbar band entirely.
+      //   opts.noThead     -> omit the accent "Field | Value" column-header row (used
+      //                       when a separate blue title bar already names the section,
+      //                       so a second "Field/Value" label row would be redundant).
+      // Both default falsy -> the shared 5 subsections render byte-identically to before.
+      var _srNewSubTable = function(title, fieldHtmls, opts){
+        opts = opts || {};
+        var head = opts.noHeadbar ? ''
+             : '<div class="pf-sr-headbar">'
              +   '<span class="pf-sr-headbar-label">' + E(title) + '</span>'
              +   '<span class="pf-sr-headbar-count">' + fieldHtmls.length
              +     ' item' + (fieldHtmls.length === 1 ? '' : 's') + '</span>'
-             + '</div>'
-             + '<div class="table-wrap"><table class="pf-sr-table">'
-             +   '<thead><tr>'
+             + '</div>';
+        var thead = opts.noThead ? ''
+             : '<thead><tr>'
              +     '<th class="pf-sr-name">Field</th>'
              +     '<th class="pf-sr-val">Value</th>'
-             +   '</tr></thead>'
+             +   '</tr></thead>';
+        return head
+             + '<div class="table-wrap"><table class="pf-sr-table">'
+             +   thead
              +   '<tbody>' + fieldHtmls.map(_srNewRow).join('') + '</tbody>'
              + '</table></div>';
+      };
+
+      // _srNewCollapsible(headerLabel, innerHtml, open): a Staking-only wrapper (Brad
+      // 2026-09-05) that replaces the dark headbar + separate "Field/Value" header with
+      // ONE clean full-width accent-blue title bar reading `headerLabel`, which itself is
+      // the collapse toggle. Clicking it rolls the ENTIRE `innerHtml` (the table rows,
+      // the doc checklist AND the contact card) up/down. The bar carries a chevron that
+      // rotates when open. The toggle is a self-contained inline classList.toggle on the
+      // wrapper (same idiom as collapsibleSubgroup) — no persisted open-state.
+      //
+      // Scoped to the sandbox via the .pf-sr-collapse* classes (sandbox CSS only). The
+      // body is a plain wrapper div, so the Staking dropdown's data-pf-staking-* markers
+      // and the capture-phase 'change' listener are UNAFFECTED: that listener resolves
+      // its card via el.closest('.pr-card[data-pr-section="siteReadiness"]') (walks UP,
+      // past this wrapper, to the card) then card.querySelector finds the markers inside
+      // this body — collapse state does not remove them from the DOM. open===true starts
+      // expanded (Brad: expanded default is safest).
+      var _srNewCollapsible = function(headerLabel, innerHtml, open){
+        var isOpen = (open === true);
+        return '<div class="pf-sr-collapse' + (isOpen ? ' open' : '') + '">'
+             +   '<div class="pf-sr-collapse-head" onclick="this.parentElement.classList.toggle(\'open\')">'
+             +     '<span class="pf-sr-collapse-title">' + E(headerLabel) + '</span>'
+             +     '<span class="pf-sr-collapse-chev">&#9654;</span>'
+             +   '</div>'
+             +   '<div class="pf-sr-collapse-body">' + innerHtml + '</div>'
+             + '</div>';
       };
       // _srNewSubTableKeyed(title, buildFieldsFn, sectionKey): same Inventory-style
       // table as _srNewSubTable, but the field() calls inside buildFieldsFn are
@@ -18630,7 +18694,14 @@ try {
           + field('Staking & Layout PF\'s responsibility?', '')
           + _gcNote
           + '</div>';
-        return _srNewSubTable('Staking & Layout', [ _respCell ])
+        // Header restructure (Brad 2026-09-05): drop the dark .pf-sr-headbar ("Staking &
+        // Layout") AND the redundant "Field | Value" thead; instead ONE clean accent-blue
+        // title bar reads "Staking & Layout" and is the collapse toggle. The wrapped body
+        // is the WHOLE subsection (the responsibility table + both conditional blocks =
+        // GC doc list + selector/contact card + PF doc checklist), so clicking the bar
+        // rolls up everything contained below it. Default EXPANDED (open:true).
+        var _stkInner =
+            _srNewSubTable('Staking & Layout', [ _respCell ], { noHeadbar: true, noThead: true })
           + '<div data-pf-staking-gc-list style="' + (_isNo ? '' : 'display:none;') + '">'
           +   pfStakingDocChecklist(false)
           + '</div>'
@@ -18638,6 +18709,7 @@ try {
           +   pfStakingSelectorBlock()
           +   pfStakingDocChecklist(true)
           + '</div>';
+        return _srNewCollapsible('Staking & Layout', _stkInner, true);
       })();
 
       // ---- Subsection 3: Testing ----------------------------------------------
@@ -21059,6 +21131,9 @@ try {
       // Staking & Layout document-tracking checklist (Brad 2026-09-03). Each item's
       // "Date Sent" gets the native date picker + MM/DD/YYYY display. Labels MUST match
       // PF_STAKING_DOC_ITEMS[].dateLabel below exactly (both YES 6-item + NO 1-item lists).
+      // Renamed (Brad 2026-09-05): CAD item name -> "...(CAD) sent to GC", so its derived
+      // Date Sent save label changed. Old entry kept below (harmless if now unused).
+      'Approved AP Shop Dwgs (CAD) sent to GC - Date Sent': true,
       'Approved AP Shop Dwgs (CAD) - Date Sent': true,
       'Approved AP Shop Dwgs (PDF) - Date Sent': true,
       'Civil Drawings PDF - Date Sent': true,
@@ -21629,7 +21704,7 @@ try {
     // Single save label per item, so CAD shares one siteReadiness value across both modes.
     var PF_STAKING_DOC_ITEMS = [
       { name: 'Approved AP Shop Dwgs (PDF)',                gc: false },
-      { name: 'Approved AP Shop Dwgs (CAD)',                gc: true  },
+      { name: 'Approved AP Shop Dwgs (CAD) sent to GC',    gc: true  },
       { name: 'Civil Drawings PDF',                         gc: false },
       { name: 'Civil Drawings CAD',                         gc: false },
       { name: 'PDF File for Original Survey (est control)', gc: false },
