@@ -2355,34 +2355,40 @@ tr.pf-dragging { opacity: 0.45; }
 /* is untouched (label key + siteReadiness section resolved from the .pr-card    */
 /* ancestor); the embedded .pr-field-label is CSS-hidden (the left cell labels   */
 /* the row). Scoped to .pf-sr-table so it never leaks into the ORIGINAL card.    */
+/* Values COPIED EXACTLY from #mod-inventory (.inv-loc-h band + .inv-tbl th/td +   */
+/* .inv-desc name cell) so the sandbox card renders visually IDENTICAL to the     */
+/* Inventory tab (Brad 2026-09-05: match font/size/spacing/formatting to          */
+/* Inventory). Kept as sandbox-scoped .pf-sr-* classes (not shared with the       */
+/* ORIGINAL card or Inventory) so this restyle affects ONLY the "...- New" card.  */
 .pf-sr-headbar {
   display: flex; align-items: center; gap: 8px;
   font-size: 14px; font-weight: 600; color: #ffffff;
   background: #1E2A38; border: 1px solid #1E2A38; border-radius: 8px;
-  padding: 8px 14px; margin: 4px 0 8px;
+  padding: 8px 14px; margin: 0 0 8px;      /* matches .inv-loc-h */
 }
 .pf-sr-headbar .pf-sr-headbar-label { flex: 1 1 auto; }
-.pf-sr-headbar .pf-sr-headbar-count {
+.pf-sr-headbar .pf-sr-headbar-count {     /* matches .inv-loc-count */
   font-size: 10px; font-weight: 500; color: rgba(255,255,255,0.6);
 }
-.pf-sr-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; table-layout: fixed; }
-/* Accent-blue column-header row (matches .inv-tbl th). */
+/* matches .inv-tbl */
+.pf-sr-table { width: 100%; border-collapse: collapse; font-size: 12.5px; table-layout: fixed; }
+/* Accent-blue column-header row (matches .inv-tbl th exactly). */
 .pf-sr-table th {
   text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .04em;
   color: #fff; background: var(--accent, #006DB0); font-weight: 600;
-  padding: 5px 12px; border-bottom: 1px solid var(--border, #C8D5DC);
+  padding: 4px 8px; border-bottom: 1px solid var(--border, #C8D5DC);
 }
+/* matches .inv-tbl td exactly (no zebra striping — Inventory body rows are plain). */
 .pf-sr-table td {
-  padding: 6px 12px; border-bottom: 1px solid var(--border-light); vertical-align: middle;
+  padding: 5px 8px; border-bottom: 1px solid var(--border, #C8D5DC);
+  color: var(--text-1, #2B2F36); vertical-align: top;
   overflow: hidden; text-overflow: ellipsis;
 }
-/* Zebra rows (Brad's Inventory-look ask): alternate body-row shading. */
-.pf-sr-table tbody tr:nth-child(even) td { background: var(--bg-2, #F3F5F8); }
-.pf-sr-table tr:last-child td { border-bottom: none; }
 .pf-sr-table td.pf-sr-name,
 .pf-sr-table th.pf-sr-name { width: 55%; }
+/* name cell matches .inv-desc (product cell): weight 500, darkest text. */
 .pf-sr-table td.pf-sr-name {
-  font-size: 0.9rem; color: var(--text-1); word-break: break-word;
+  font-size: 12.5px; font-weight: 500; color: var(--text-0, #000); word-break: break-word;
 }
 .pf-sr-table td.pf-sr-val,
 .pf-sr-table th.pf-sr-val { width: 45%; }
@@ -2390,6 +2396,28 @@ tr.pf-dragging { opacity: 0.45; }
 /* the field name already labels the row via the left cell). */
 .pf-sr-table .pr-field { padding: 0; border-bottom: none; background: transparent; }
 .pf-sr-table .pr-field-label { display: none; }
+/* Value-cell text sized to Inventory (12.5px) so the sandbox value column matches */
+/* the Inventory .inv-df-val / .inv-df-in read+edit text instead of the portal's   */
+/* default 0.9rem. Scoped to .pf-sr-table -> sandbox-only. */
+.pf-sr-table .pr-field-value { font-size: 12.5px; color: var(--text-1, #2B2F36); }
+.pf-sr-table .pr-live-input { font-size: 12.5px; }
+
+/* ---- Sandbox-scoped Inventory match for the Staking doc checklist -------------- */
+/* The Staking subsection's "Documents to send the surveyor/GC" table uses the      */
+/* SHARED .pf-staking-doc-table class (also rendered in the ORIGINAL card), so its   */
+/* base rule above is left untouched. These overrides are scoped to .pf-srnew-scope  */
+/* (the sandbox card body wrapper) so ONLY the sandbox copy adopts the Inventory     */
+/* font/size/padding/border — the original doc table is visually unaffected. Values  */
+/* copied from #mod-inventory .inv-tbl (td/th) + .inv-desc. */
+.pf-srnew-scope .pf-staking-doc-table { font-size: 12.5px; }
+.pf-srnew-scope .pf-staking-doc-table td {
+  padding: 5px 8px; border-bottom: 1px solid var(--border, #C8D5DC); vertical-align: top;
+}
+.pf-srnew-scope .pf-staking-doc-table td.pf-staking-doc-name {
+  font-size: 12.5px; font-weight: 500; color: var(--text-0, #000);
+}
+.pf-srnew-scope .pf-staking-doc-table .pr-field-value { font-size: 12.5px; color: var(--text-1, #2B2F36); }
+.pf-srnew-scope .pf-staking-doc-table .pr-live-input { font-size: 12.5px; }
 
 /* ---- General Info rework (Brad 2026-08-06 / PDF-grouping 2026-08-07) ------ */
 /* FIXED 2-column grouping that matches Brad's spec PDFs: fields are grouped    */
@@ -18752,8 +18780,12 @@ try {
         + _srN_mobprep
         + _srN_mob
         + _srN_rental;
+      // Wrap the sandbox body in a scoping div (.pf-srnew-scope) so CSS overrides that
+      // must match Inventory can target the sandbox WITHOUT leaking into the ORIGINAL
+      // Site Readiness card (both cards share data-pr-section="siteReadiness", so the
+      // wrapper is the only sandbox-unique selector). Purely visual; no logic change.
       html += card(5, 'Site Readiness / Project Setup - New', null,
-        srNewBody, false, 'siteReadiness');
+        '<div class="pf-srnew-scope">' + srNewBody + '</div>', false, 'siteReadiness');
 
       // ----- 6. Project Photos (LIVE, READ-ONLY gallery) -----
       // A live thumbnail gallery of this project's SharePoint "02 - Project Photos"
