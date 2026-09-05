@@ -2312,12 +2312,26 @@ tr.pf-dragging { opacity: 0.45; }
 .pf-staking-doc-table td {
   padding: 6px 12px; border-bottom: 1px solid var(--border-light); vertical-align: middle;
 }
-.pf-staking-doc-table tr:last-child td { border-bottom: none; }
-.pf-staking-doc-table td.pf-staking-doc-name {
-  font-size: 0.9rem; color: var(--text-1); width: 44%; word-break: break-word;
+/* Column header row (Brad 2026-09-05): accent-blue uppercase labels matching the      */
+/* surrounding Site Readiness / Inventory table headers (.pf-sr-table th). Blank first  */
+/* cell (doc-name column is already labeled by the "Documents to send..." subhead).     */
+.pf-staking-doc-table th {
+  text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--accent, #006DB0); font-weight: 700; padding: 4px 12px;
+  border-bottom: 1px solid var(--border, #C8D5DC); vertical-align: bottom;
 }
+.pf-staking-doc-table tr:last-child td { border-bottom: none; }
+/* Column widths apply to BOTH th (header) and td (body) so the header aligns with the  */
+/* body cells (base 44/34/22; sandbox .pf-srnew-scope overrides to 30/48/22 below).     */
+.pf-staking-doc-table th.pf-staking-doc-name,
+.pf-staking-doc-table td.pf-staking-doc-name {
+  width: 44%; word-break: break-word;
+}
+.pf-staking-doc-table td.pf-staking-doc-name { font-size: 0.9rem; color: var(--text-1); }
+.pf-staking-doc-table th.pf-staking-doc-date,
 .pf-staking-doc-table td.pf-staking-doc-date { width: 34%; }
 /* Auto folder-link column (Brad 2026-09-05): display-only "Open folder" link cell. */
+.pf-staking-doc-table th.pf-staking-doc-folder,
 .pf-staking-doc-table td.pf-staking-doc-folder { width: 22%; white-space: nowrap; }
 /* Neutralize the embedded .pr-field so it sits flush in the cell (label hidden,   */
 /* the doc name already labels the row via the left cell). */
@@ -2469,8 +2483,13 @@ tr.pf-dragging { opacity: 0.45; }
 /* Name column narrowed to 34% (Brad 2026-09-05, same intent as .pf-sr-table): pulls  */
 /* the Date Sent input LEFT toward its row label. Sandbox-only (.pf-srnew-scope), so   */
 /* the ORIGINAL card's doc table keeps its 55/45 split. */
+/* Widths applied to BOTH th + td so the sandbox header row stays aligned with the      */
+/* sandbox body cells (30/48/22, overriding the base 44/34/22 for .pf-srnew-scope). */
+.pf-srnew-scope .pf-staking-doc-table th.pf-staking-doc-name,
 .pf-srnew-scope .pf-staking-doc-table td.pf-staking-doc-name { width: 30%; }
+.pf-srnew-scope .pf-staking-doc-table th.pf-staking-doc-date,
 .pf-srnew-scope .pf-staking-doc-table td.pf-staking-doc-date { width: 48%; }
+.pf-srnew-scope .pf-staking-doc-table th.pf-staking-doc-folder,
 .pf-srnew-scope .pf-staking-doc-table td.pf-staking-doc-folder { width: 22%; }
 .pf-srnew-scope .pf-staking-doc-table .pr-field-value { font-size: 12.5px; color: var(--text-1, #2B2F36); }
 .pf-srnew-scope .pf-staking-doc-table .pr-live-input { font-size: 12.5px; }
@@ -21162,9 +21181,10 @@ try {
       // Staking & Layout document-tracking checklist (Brad 2026-09-03). Each item's
       // "Date Sent" gets the native date picker + MM/DD/YYYY display. Labels MUST match
       // PF_STAKING_DOC_ITEMS[].dateLabel below exactly (both YES 6-item + NO 1-item lists).
-      // Renamed (Brad 2026-09-05): CAD item name -> "...(CAD) sent to GC", so its derived
-      // Date Sent save label changed. Old entry kept below (harmless if now unused).
-      'Approved AP Shop Dwgs (CAD) sent to GC - Date Sent': true,
+      // Brad 2026-09-05: CAD item name reverted to "Approved AP Shop Dwgs (CAD)" (the
+      // "sent to GC" suffix was dropped now that the date column is labeled "Date Sent"),
+      // so the derived Date Sent save label is back to the original below. The transient
+      // "...(CAD) sent to GC - Date Sent" allowlist entry is removed (now unused).
       'Approved AP Shop Dwgs (CAD) - Date Sent': true,
       'Approved AP Shop Dwgs (PDF) - Date Sent': true,
       'Civil Drawings PDF - Date Sent': true,
@@ -21740,7 +21760,7 @@ try {
     // window.PF_SHOP_DWG_INFO). Resolved per-row in pfStakingDocChecklist; blank-graceful.
     var PF_STAKING_DOC_ITEMS = [
       { name: 'Approved AP Shop Dwgs (PDF)',                gc: false, folderSrc: 'submittal' },
-      { name: 'Approved AP Shop Dwgs (CAD) sent to GC',    gc: true,  folderSrc: 'submittal' },
+      { name: 'Approved AP Shop Dwgs (CAD)',               gc: true,  folderSrc: 'submittal' },
       { name: 'Civil Drawings PDF',                         gc: false, folderSrc: 'shopdwg'   },
       { name: 'Civil Drawings CAD',                         gc: false, folderSrc: 'shopdwg'   },
       { name: 'PDF File for Original Survey (est control)', gc: false, folderSrc: 'shopdwg'   },
@@ -21797,8 +21817,19 @@ try {
           + '<td class="pf-staking-doc-folder">' + folderCell + '</td>'
           + '</tr>';
       }).join('');
-      var table = '<div class="table-wrap"><table class="pf-staking-doc-table"><tbody>'
-        + rows + '</tbody></table></div>';
+      // Column header row (Brad 2026-09-05): blank over the doc-name column (the
+      // "Documents to send the surveyor"/"...to GC" subhead above already labels it),
+      // "Date Sent" over the middle field column, "Document Folder" over the folder link.
+      // Cells reuse the 3 column-width classes so the header aligns with the body cells
+      // (base 44/34/22, sandbox .pf-srnew-scope 30/48/22). Shared by all 4 contexts
+      // (surveyor list + GC list, original card + sandbox card).
+      var thead = '<thead><tr>'
+        + '<th class="pf-staking-doc-name"></th>'
+        + '<th class="pf-staking-doc-date">Date Sent</th>'
+        + '<th class="pf-staking-doc-folder">Document Folder</th>'
+        + '</tr></thead>';
+      var table = '<div class="table-wrap"><table class="pf-staking-doc-table">'
+        + thead + '<tbody>' + rows + '</tbody></table></div>';
       return head + table;
     }
 
