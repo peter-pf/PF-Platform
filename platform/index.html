@@ -21416,7 +21416,10 @@ try {
         } catch (e) {}
         el.setAttribute('data-pr-live-prev', value);   // new baseline for the next revert
         syncBlank(value);                               // clear/apply yellow to match new value
-        msg('Saved', false);
+        // No positive "Saved" readout (Brad 2026-09-05 density directive): the save
+        // succeeded silently. Clear any stale error/message so nothing lingers or
+        // reserves inline space in the field row. Error paths still call msg(...,true).
+        msg('', false);
       }).catch(function(){
         el.disabled = false; revert();
         msg('Save failed: could not reach the server. Not saved — please retry.', true);
@@ -22645,7 +22648,9 @@ try {
         }
         pfPcAdoptDirRow(r.body.contact || null);
         cell.setAttribute('data-pf-prev', nowVal); // new committed baseline
-        pfPcSay(host, 'Saved', false);
+        // No "Saved" readout (Brad 2026-09-05 density directive) — clear the inline
+        // message row so nothing lingers. Error paths above still show honestly.
+        pfPcSay(host, '', false);
         // Refresh resolved read cards in place (shows the change everywhere). No bounce.
         if (window.pfCrmRenderCards) window.pfCrmRenderCards(document);
       }).catch(function(){
@@ -22736,7 +22741,8 @@ try {
             window.PF_PROJECT_OVERRIDES[num] = { sections: (r.body.sections) || {}, _meta: (r.body._meta) || null };
             try { if (String(num) === String(_curNum) && r.body.sections) _curOverrides = r.body.sections; } catch(e){}
             cell.setAttribute('data-pf-prev', nowVal);
-            pfPcSay(host, 'Saved', false);
+            // No "Saved" readout (Brad 2026-09-05 density directive); clear the row.
+            pfPcSay(host, '', false);
             if (window.pfCrmRenderCards) window.pfCrmRenderCards(document);
           });
       }).catch(function(){
@@ -22794,7 +22800,8 @@ try {
           window.PF_PROJECT_OVERRIDES[num] = { sections: (r.body.sections) || {}, _meta: (r.body._meta) || null };
           try { if (String(num) === String(_curNum) && r.body.sections) _curOverrides = r.body.sections; } catch(e){}
           cell.setAttribute('data-pf-prev', nowVal);
-          pfPcSay(host, 'Saved', false);
+          // No "Saved" readout (Brad 2026-09-05 density directive); clear the row.
+          pfPcSay(host, '', false);
           if (window.pfCrmRenderCards) window.pfCrmRenderCards(document);
         }).catch(function(){
           cell.textContent = prev;
@@ -24184,7 +24191,9 @@ try {
         // received class, and reminder buttons from the now-updated store — NO full record
         // re-render, so the E&D card stays open + scroll is preserved.
         pfPrqRefreshInPlace(wrap, num);
-        pfPrqMsg(wrap, 'Saved', false);
+        // No "Saved" readout (Brad 2026-09-05 density directive); clear the message
+        // row so nothing lingers or reserves space. Error paths still show honestly.
+        pfPrqMsg(wrap, '', false);
       }).catch(function(){
         el.disabled = false;
         revert();
@@ -26625,16 +26634,13 @@ try {
       block.setAttribute('data-fin-inv-saved', '1');
       // Make sure the SOV dropdown stays expanded.
       block.classList.add('open');
-      // Flash a brief saved confirmation inside the SOV body (non-destructive).
+      // No "Saved" flash readout (Brad 2026-09-05 density directive): the SOV save
+      // succeeds silently; the freshly re-rendered read-only table is the confirmation.
+      // (Defensive) clear any stale flash left over from an earlier build/render.
       var head = block.querySelector('.fin-inv-block-head');
       if (head) {
         var old = head.querySelector('.fin-inv-saved-flash');
         if (old) { old.parentNode.removeChild(old); }
-        var flash = document.createElement('span');
-        flash.className = 'fin-inv-saved-flash';
-        flash.textContent = 'Saved';
-        head.appendChild(flash);
-        setTimeout(function(){ if (flash && flash.parentNode) flash.parentNode.removeChild(flash); }, 2600);
       }
     }
 
