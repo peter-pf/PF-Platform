@@ -597,6 +597,14 @@ export function areaForPath(pathname) {
     // this line it would fall through to the default 'user_admin' (admin-only) and
     // a partner (e.g. Jonathan/Derek as partner) could not read the checklist state.
     if (pathname.startsWith('/api/coo-checklist')) return 'financials_global';
+    // "Generate Test Sheet" (Testing section): copies the AP Modulus Test template
+    // into the project's SharePoint 04 - Testing folder and populates the portal
+    // cells. OFFICE / PM setup action -> financials area (admin + partner +
+    // business_dev; field_ops BLOCKED by direct URL too). The handler ALSO calls
+    // requireArea(session, 'financials') on GET (dry-run) + POST. Without this line
+    // it would fall through to the default 'user_admin' (admin-only) and the office
+    // (partner/BD) could not trigger it.
+    if (pathname.startsWith('/api/generate-test-sheet')) return 'financials';
     if (pathname.startsWith('/api/project-override')) return 'financials';
     // Project lifecycle STATUS overrides for the office summary drag-and-drop
     // (Active -> Completed / Dead, and back). PROJECT-level financials area:

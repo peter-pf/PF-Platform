@@ -3029,6 +3029,12 @@ tr.pf-dragging { opacity: 0.45; }
   padding: 5px 12px; border-radius: 6px; line-height: 1.2;
 }
 .pr-action-link:hover { filter: brightness(1.08); }
+/* <button> variant of .pr-action-link (Generate Test Sheet): strip native button chrome so
+   it matches the anchor action-links, add pointer + disabled state. */
+button.pr-action-link { border: 0; cursor: pointer; font-family: inherit; }
+button.pr-action-link:disabled { opacity: 0.6; cursor: default; filter: none; }
+/* Inline status text next to the Generate Test Sheet button. */
+.pf-gents-msg { margin-left: 10px; font-size: 0.76rem; }
 /* Site Readiness workflow ACTIVATION banner (Brad 2026-08-12): a status banner at the top
    of the Site Readiness section. Green = all 3 kickoff gates pass (ACTIVE); amber = waiting,
    with a list of the pending gates. Display-only (NOT .pr-field). */
@@ -16135,10 +16141,11 @@ try {
       var n = Number(m[0]);
       return isFinite(n) ? n : null;
     }
-    // "Which Jack" auto-pick from an "AP Max Test Load" kips value (Brad 2026-09-05):
-    // <=174 kip -> small jack (Enerpac); >=175 kip -> large jack (Durapac). Blank /
-    // non-numeric load -> '' (leave Which Jack untouched). Returns a value that is one
-    // of the PF_FIELD_DROPDOWNS['Which Jack'] options (so the <select> matches it).
+    // "Jack to use for modulus test" auto-pick from an "AP Max Test Load" kips value (Brad
+    // 2026-09-05, renamed from "Which Jack"): <=174 kip -> small jack (Enerpac); >=175 kip ->
+    // large jack (Durapac). Blank / non-numeric load -> '' (leave the dropdown untouched).
+    // Returns a value that is one of the PF_FIELD_DROPDOWNS['Jack to use for modulus test']
+    // options (so the <select> matches it).
     function pfWhichJackAuto(loadVal){
       var n = pfParseNum(loadVal);
       if (n === null) return '';
@@ -18343,14 +18350,14 @@ try {
         field('AP Design Load (kips)', ''),
         field('Load Test Jack Calibration Factor (psi/kip)', ''),
         field('AP Max Test Load', ''),
-        // "Which Jack" default AUTO-picked from AP Max Test Load (Brad 2026-09-05):
-        // pass the computed jack as field()'s default value. field() uses it ONLY when
-        // there is no non-empty saved override, so a manual override still wins; the
-        // capture-phase listener below keeps it live on change without a re-render.
-        field('Which Jack', pfWhichJackAuto(effVal('siteReadiness', 'AP Max Test Load', ''))),
-        field('Testing Equipment vs Rig', ''),
-        field('Test Document Status', ''),
-        fieldLinked('Test Document Link', '', '', 'website'),
+        // "Jack to use for modulus test" (RENAMED from "Which Jack", Brad 2026-09-05).
+        // Default AUTO-picked from AP Max Test Load: pass the computed jack as field()'s
+        // default value. field() uses it ONLY when there is no non-empty saved override, so a
+        // manual override still wins; the capture-phase listener below keeps it live on change
+        // without a re-render. (Original card kept in sync with the sandbox rename.)
+        field('Jack to use for modulus test', pfWhichJackAuto(effVal('siteReadiness', 'AP Max Test Load', ''))),
+        // "Testing Equipment vs Rig", "Test Document Status", "Test Document Link" REMOVED
+        // (Brad 2026-09-05) — same deletion as the sandbox.
         fieldLinked('Mod Test Jack Calibration Report', '', '', 'website')
       ];
       // Effective Modulus value (override-wins). Yes -> body shown; No/blank -> hidden.
@@ -18768,17 +18775,25 @@ try {
           field('AP Design Diameter (ft)', ''),
           field('Diameter of Plate (ft)', ''),
           field('AP Reaction Modulus - Design (pci)', ''),
-          field('AP Design Load (kips)', ''),
+          // ORDER (Brad 2026-09-05): "Load Test Jack Calibration Factor" and "AP Design Load
+          // (kips)" SWAP slots (Calibration Factor moves up into AP Design Load's old slot),
+          // and "AP Max Test Load" sits DIRECTLY UNDER "AP Design Load (kips)".
           field('Load Test Jack Calibration Factor (psi/kip)', ''),
+          field('AP Design Load (kips)', ''),
           field('AP Max Test Load', ''),
-          // "Which Jack" default AUTO-picked from AP Max Test Load (Brad 2026-09-05) —
-          // same as the original card above; see pfWhichJackAuto + the capture-phase
-          // listener. field()'s default applies only when no non-empty override exists,
-          // so a manual override is preserved.
-          field('Which Jack', pfWhichJackAuto(effVal('siteReadiness', 'AP Max Test Load', ''))),
-          field('Testing Equipment vs Rig', ''),
-          field('Test Document Status', ''),
-          fieldLinked('Test Document Link', '', '', 'website'),
+          // "Jack to use for modulus test" (RENAMED from "Which Jack", Brad 2026-09-05).
+          // Default AUTO-picked from AP Max Test Load — same as the original card above; see
+          // pfWhichJackAuto + the capture-phase listener. field()'s default applies only when
+          // no non-empty override exists, so a manual override is preserved. The rename
+          // changes the save key; old "Which Jack" values do NOT carry, but the value is
+          // auto-derived from AP Max Test Load on render so the impact is negligible.
+          field('Jack to use for modulus test', pfWhichJackAuto(effVal('siteReadiness', 'AP Max Test Load', ''))),
+          // "Mod Test Jack Calibration Report" (Brad 2026-09-05): repurposed to hold a
+          // CLICKABLE LINK to the GENERATED AP Modulus Test Excel document. The "Generate
+          // Test Sheet" button below persists the returned webUrl under THIS field's
+          // siteReadiness key (via /api/project-override), so once generated this row shows a
+          // clickable link to open the Excel. (Consolidated — the earlier separate "Test
+          // Sheet Link" field was removed; this single row is the link surface.)
           fieldLinked('Mod Test Jack Calibration Report', '', '', 'website')
         ];
         // Header restructure (Brad 2026-09-05): carry the SAME blue collapsible header
@@ -18807,10 +18822,29 @@ try {
         // "Testing Detail" fields STAY inside the [data-testing-body] wrapper so the
         // Modulus capture-phase listener still toggles them (Yes -> shown / No -> hidden),
         // and every field()/fieldLinked() save binding is unchanged.
+        // "Generate Test Sheet" action (Brad 2026-09-05). OFFICE-ONLY (canEdit()) and only
+        // rendered inside the Modulus [data-testing-body] block, so it is present ONLY when
+        // "Modulus Load Test Required?" = Yes (the block itself is display:none otherwise, and
+        // the button is omitted from the DOM entirely for non-office roles). It DELIBERATELY
+        // does nothing on render — the endpoint (/api/generate-test-sheet) creates a REAL
+        // SharePoint .xlsx, so it fires ONLY on an explicit click (window.pfGenerateTestSheet).
+        // On success it links + persists the returned webUrl into the "Mod Test Jack
+        // Calibration Report" row above (clickable link to open the generated Excel) and writes
+        // the read-back calibration factor into "Load Test Jack Calibration Factor (psi/kip)".
+        // Server also enforces office-only (requireArea 'financials').
+        var _genTestSheetBtn = canEdit()
+          ? '<div class="pr-subgroup-actions" data-pf-gents-wrap>'
+            + '<button type="button" class="pr-action-link" data-pf-gents-btn '
+            +   'onclick="event.stopPropagation();window.pfGenerateTestSheet(this)">'
+            +   '&#128203; Generate Test Sheet</button>'
+            + '<span class="pf-gents-msg" data-pf-gents-msg style="display:none;"></span>'
+            + '</div>'
+          : '';
         var _testInner =
             _srNewSubTable('Testing', [ field('Modulus Load Test Required?', '') ], { noHeadbar: true, noThead: true })
           + '<div data-testing-body style="' + (_modYes ? '' : 'display:none;') + '">'
           +   _srNewSubTable('Testing Detail', _testFieldsNew, { noHeadbar: true, noThead: true })
+          +   _genTestSheetBtn
           +   subgroupNote('Threshold ~85 kip determines testing equipment vs rig. FUTURE automation: Peter extracts test data from approved shop drawings + generates the test doc in SharePoint on Garbin approval. Annual jack recalibration reminder every Dec/Jan.')
           + '</div>';
         return _srNewCollapsible('Testing', _testInner, true);
@@ -21117,8 +21151,7 @@ try {
       // jack (Enerpac); >=175 kip -> large jack (Durapac). See the capture-phase
       // change listener (pfWhichJackAuto) that drives + persists this default; the
       // dropdown stays a real editable override.
-      'Which Jack': ['Small Jack (Enerpac)', 'Large Jack (Durapac)'],
-      'Test Document Status': ['Not Started', 'In Progress', 'Complete'],
+      'Jack to use for modulus test': ['Small Jack (Enerpac)', 'Large Jack (Durapac)'],
       // Subsection 3: Staking & Layout
       'CAD & PDF Sent to Surveyor (MLS)?': ['Yes', 'No'],
       // CHANGE B (Brad 2026-08-13): is staking & layout PF's responsibility? NEW plain
@@ -21452,6 +21485,190 @@ try {
         msg('Save failed: could not reach the server. Not saved — please retry.', true);
       });
     };
+
+    // ---- "Generate Test Sheet" action (Brad 2026-09-05) ----------------------
+    // Office-only (canEdit + server requireArea 'financials'). Deliberately fires ONLY on an
+    // explicit click of the "Generate Test Sheet" button in the Testing subsection (never on
+    // render): the /api/generate-test-sheet endpoint COPIES a real AP Modulus Test template
+    // into the project's SharePoint "04 - Testing" folder and populates cells, so it must be a
+    // deliberate action. On success it:
+    //   (1) persists the returned webUrl into the siteReadiness "Mod Test Jack Calibration
+    //       Report" field (POST /api/project-override) so it survives reload and shows as a
+    //       clickable link (open the generated Excel) on the next render;
+    //   (2) writes the read-back calibrationFactor into the live "Load Test Jack Calibration
+    //       Factor (psi/kip)" control and persists it via that control's own save path
+    //       (pfLiveFieldChange -> siteReadiness override).
+    // alreadyExists:true -> shows the EXISTING link + a "not overwritten" note (no clobber).
+    // Any failure (403, network, Graph error) -> inline error, button re-enabled, no crash.
+    window.pfGenerateTestSheet = function(btn){
+      if (!canEdit()) return;                          // defense-in-depth (server also 403s)
+      var wrap = btn && btn.closest ? btn.closest('[data-pf-gents-wrap]') : null;
+      var msgEl = wrap ? wrap.querySelector('[data-pf-gents-msg]') : null;
+      var body = btn && btn.closest ? btn.closest('[data-testing-body]') : null;
+      var card = btn && btn.closest ? btn.closest('.pr-card[data-pr-section]') : null;
+      function say(text, isErr){
+        if (!msgEl) return;
+        msgEl.textContent = text || '';
+        msgEl.className = 'pf-gents-msg ' + (isErr ? 'pr-live-msg-err' : 'pr-live-msg-ok');
+        msgEl.style.display = text ? 'inline' : 'none';
+      }
+      var num = String(_curNum || '').trim();
+      if (!/^[0-9]{2}-[0-9]{2,4}$/.test(num)) {
+        say('This project has no valid project number (NN-NNN); cannot generate a test sheet.', true);
+        return;
+      }
+      // Job Name + Location from the SAME provenance the record header uses:
+      // project_name; address = bid_log.address || subcontract.project_address.
+      var rec = {}; try { rec = resolveRecord(num) || {}; } catch (e) { rec = {}; }
+      var _bid = (rec && rec.bid_log) || {};
+      var _sf  = (rec && rec.subcontract && rec.subcontract.fields) || {};
+      var jobName = String(rec.project_name || '').trim();
+      var jobLocation = String(_bid.address || _sf.project_address || '').trim();
+      // The four design values from the Testing fields (siteReadiness override map).
+      var designDiaFt = effVal('siteReadiness', 'AP Design Diameter (ft)', '');
+      var plateDiaFt  = effVal('siteReadiness', 'Diameter of Plate (ft)', '');
+      var reactionMod = effVal('siteReadiness', 'AP Reaction Modulus - Design (pci)', '');
+      var designLoad  = effVal('siteReadiness', 'AP Design Load (kips)', '');
+      // Jack: derive from the portal's own "Jack to use for modulus test" value (itself
+      // auto-picked from AP Max Test Load) so the generated sheet's jack matches what the
+      // portal shows. Fall back to letting the endpoint derive from designLoad if it is unset.
+      var whichJack = String(effVal('siteReadiness', 'Jack to use for modulus test', '') || '').trim();
+      var jack = /enerpac/i.test(whichJack) ? 'enerpac'
+               : /durapac/i.test(whichJack) ? 'durapac'
+               : '';
+      // Coerce a design value to a finite number or undefined (endpoint skips blanks).
+      function _n(v){
+        var p = (typeof pfParseNum === 'function') ? pfParseNum(v) : (v === '' || v == null ? null : Number(v));
+        return (p === null || p === undefined || !isFinite(p)) ? undefined : p;
+      }
+      var payload = {
+        projnum: num,
+        jobName: jobName,
+        jobLocation: jobLocation,
+        designDiaFt: _n(designDiaFt),
+        plateDiaFt: _n(plateDiaFt),
+        reactionMod: _n(reactionMod),
+        designLoad: _n(designLoad),
+      };
+      if (jack) payload.jack = jack; // else endpoint derives from designLoad
+
+      btn.disabled = true;
+      var _origLabel = btn.innerHTML;
+      btn.innerHTML = '&#8987; Generating…';
+      say('Creating the test sheet in SharePoint… this can take a few seconds.', false);
+
+      fetch('/api/generate-test-sheet', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(function(res){
+        return res.json().then(function(b){ return { ok: res.ok, status: res.status, body: b }; })
+          .catch(function(){ return { ok: res.ok, status: res.status, body: null }; });
+      }).then(function(r){
+        btn.disabled = false;
+        btn.innerHTML = _origLabel;
+        // FAIL CLOSED: only a clean {ok:true, webUrl} is success.
+        if (!r.ok || !r.body || r.body.ok !== true || !r.body.webUrl) {
+          var m = (r.body && r.body.message) ? r.body.message
+            : (r.status === 403 ? 'You do not have permission to generate a test sheet.'
+                                 : 'Could not generate the test sheet (' + r.status + '). Please retry.');
+          say(m, true);
+          return;
+        }
+        var webUrl = String(r.body.webUrl);
+        var already = (r.body.alreadyExists === true);
+        // (1) PERSIST + surface the link. Save the generated Excel webUrl into the
+        //     siteReadiness "Mod Test Jack Calibration Report" field so it survives reload and
+        //     renders as a clickable "open the Excel" link in that row; also update the
+        //     rendered link cell in-place (no re-render).
+        pfPersistTestSheetLink(num, webUrl, card, body);
+        // (2) PERSIST the calibration factor into the live control (if returned + numeric).
+        var calWrote = false;
+        var cal = r.body.calibrationFactor;
+        if (cal !== null && cal !== undefined && cal !== '' && isFinite(Number(cal))) {
+          calWrote = pfWriteCalibrationFactor(num, Number(cal), card);
+        }
+        var note = already ? 'Existing sheet (not overwritten). ' : 'Test sheet generated. ';
+        note += 'Link saved' + (calWrote ? ' + calibration factor written.' : '.');
+        say(note, false);
+      }).catch(function(){
+        btn.disabled = false;
+        btn.innerHTML = _origLabel;
+        say('Could not reach the server to generate the test sheet. Please retry.', true);
+      });
+    };
+
+    // Persist the generated test-sheet webUrl into the siteReadiness "Mod Test Jack
+    // Calibration Report" override (same POST /api/project-override path pfLiveFieldChange
+    // uses), then surface it in-place: if that field's live text-input is on screen, set +
+    // baseline it (fieldLinked renders a live text-input in edit mode; on the next render the
+    // saved URL shows as a clickable link). This makes the "Mod Test Jack Calibration Report"
+    // row the single link surface to open the generated Excel document.
+    var PF_TEST_SHEET_LINK_LABEL = 'Mod Test Jack Calibration Report';
+    function pfPersistTestSheetLink(num, webUrl, card, body){
+      // In-place surface FIRST (never blocks on the network): update the live input value.
+      try {
+        var scope = card || document;
+        var input = scope.querySelector('input.pr-live-input[data-pr-field-label="' + PF_TEST_SHEET_LINK_LABEL + '"]');
+        if (input) {
+          input.value = webUrl;
+          input.setAttribute('data-pr-live-prev', webUrl);
+          var cell = input.closest ? input.closest('.pr-field-value.pr-field-live') : null;
+          if (cell) cell.classList.remove('blank');
+        }
+      } catch (e) {}
+      // Persist to the server (fire-and-forget with an honest error into the button toast is
+      // handled by the caller's success/refresh; adopt server truth into the override map).
+      try {
+        var _f = {}; _f[PF_TEST_SHEET_LINK_LABEL] = webUrl;
+        fetch('/api/project-override', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ num: num, section: 'siteReadiness', fields: _f })
+        }).then(function(res){ return res.json().catch(function(){ return null; }); })
+          .then(function(b){
+            if (b && b.ok === true && b.saved === true) {
+              window.PF_PROJECT_OVERRIDES[num] = { sections: (b.sections) || {}, _meta: (b._meta) || null };
+              try { if (String(num) === String(_curNum) && b.sections) { _curOverrides = b.sections; } } catch (e) {}
+            }
+          }).catch(function(){});
+      } catch (e) {}
+    }
+
+    // Write the read-back calibration factor into the live "Load Test Jack Calibration Factor
+    // (psi/kip)" control and persist it by driving that control's OWN save path
+    // (pfLiveFieldChange -> siteReadiness override). Returns true if the control was found +
+    // its save triggered. If the live control is not on screen (e.g. Testing collapsed off
+    // DOM — it is not, collapse is CSS), fall back to a direct override POST.
+    function pfWriteCalibrationFactor(num, cal, card){
+      var label = 'Load Test Jack Calibration Factor (psi/kip)';
+      var val = String(cal);
+      try {
+        var scope = card || document;
+        var ctl = scope.querySelector('input.pr-live-input[data-pr-field-label="' + label.replace(/"/g, '\\"') + '"]')
+               || scope.querySelector('.pr-live-input[data-pr-field-label="' + label.replace(/"/g, '\\"') + '"]');
+        if (ctl) {
+          ctl.value = val;
+          if (typeof window.pfLiveFieldChange === 'function') { window.pfLiveFieldChange(ctl); }
+          return true;
+        }
+      } catch (e) {}
+      // Fallback: persist directly (control not rendered).
+      try {
+        fetch('/api/project-override', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ num: num, section: 'siteReadiness', fields: { 'Load Test Jack Calibration Factor (psi/kip)': val } })
+        }).then(function(res){ return res.json().catch(function(){ return null; }); })
+          .then(function(b){
+            if (b && b.ok === true && b.saved === true) {
+              window.PF_PROJECT_OVERRIDES[num] = { sections: (b.sections) || {}, _meta: (b._meta) || null };
+              try { if (String(num) === String(_curNum) && b.sections) { _curOverrides = b.sections; } } catch (e) {}
+            }
+          }).catch(function(){});
+        return true;
+      } catch (e) { return false; }
+    }
     // Tiny inline saved/error toast next to a live control (fades via the .pr-live-msg span
     // injected into the field row). Reuses the row's own message span, or appends one.
     function pfLiveMsg(el, text, isErr){
@@ -21960,18 +22177,18 @@ try {
       body.style.display = isYes ? '' : 'none';
     }, true);
 
-    // Site Readiness > Testing > "Which Jack" AUTO-SELECT from "AP Max Test Load"
-    // (Brad 2026-09-05). When the "AP Max Test Load" (kips) field changes, drive the
-    // "Which Jack" dropdown in the SAME card: <=174 kip -> Small Jack (Enerpac);
-    // >=175 kip -> Large Jack (Durapac); blank/non-numeric -> leave Which Jack as-is.
-    // CAPTURE phase (3rd arg true) — same reason as the Modulus listener above: it must
-    // run BEFORE the input's inline onchange calls event.stopPropagation(). Scoped via
-    // el.closest('.pr-card[data-pr-section="siteReadiness"]') then card.querySelector so
-    // only THIS card's Which Jack is touched (original vs sandbox stay independent).
-    // After setting the select's value we call window.pfLiveFieldChange(sel) so the
-    // auto-pick PERSISTS to the siteReadiness bucket under "Which Jack" (round-trips on
-    // next render), exactly as a manual dropdown change would. The dropdown remains a
-    // real editable override (user can pick the other jack afterward).
+    // Site Readiness > Testing > "Jack to use for modulus test" AUTO-SELECT from "AP Max Test
+    // Load" (Brad 2026-09-05; dropdown renamed from "Which Jack"). When the "AP Max Test Load"
+    // (kips) field changes, drive the "Jack to use for modulus test" dropdown in the SAME card:
+    // <=174 kip -> Small Jack (Enerpac); >=175 kip -> Large Jack (Durapac); blank/non-numeric
+    // -> leave it as-is. CAPTURE phase (3rd arg true) — same reason as the Modulus listener
+    // above: it must run BEFORE the input's inline onchange calls event.stopPropagation().
+    // Scoped via el.closest('.pr-card[data-pr-section="siteReadiness"]') then card.querySelector
+    // so only THIS card's dropdown is touched (original vs sandbox stay independent). After
+    // setting the select's value we call window.pfLiveFieldChange(sel) so the auto-pick
+    // PERSISTS to the siteReadiness bucket under "Jack to use for modulus test" (round-trips on
+    // next render), exactly as a manual dropdown change would. The dropdown remains a real
+    // editable override (user can pick the other jack afterward).
     document.addEventListener('change', function(ev){
       var el = ev.target;
       if (!el || !el.getAttribute) return;
@@ -21980,7 +22197,7 @@ try {
       if (!want) return;                                  // blank/non-numeric -> no change
       var card = el.closest ? el.closest('.pr-card[data-pr-section="siteReadiness"]') : null;
       if (!card) return;
-      var sel = card.querySelector('select[data-pr-field-label="Which Jack"]');
+      var sel = card.querySelector('select[data-pr-field-label="Jack to use for modulus test"]');
       if (!sel) return;
       if (String(sel.value || '') === want) return;       // already correct -> no save churn
       sel.value = want;
