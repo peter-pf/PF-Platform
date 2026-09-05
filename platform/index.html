@@ -18739,11 +18739,39 @@ try {
           fieldLinked('Test Document Link', '', '', 'website'),
           fieldLinked('Mod Test Jack Calibration Report', '', '', 'website')
         ];
-        return _srNewSubTable('Testing', [ field('Modulus Load Test Required?', '') ])
+        // Header restructure (Brad 2026-09-05): carry the SAME blue collapsible header
+        // treatment as Staking & Layout into Testing. Drop the dark .pf-sr-headbar
+        // ("Testing") band AND the redundant "Field | Value" thead on the always-visible
+        // Modulus control (noHeadbar/noThead, exactly like Staking's _respCell table);
+        // instead ONE clean accent-blue title bar reads "Testing" and is the collapse
+        // toggle. The wrapped body is the WHOLE subsection = the Modulus dropdown table
+        // + the conditional [data-testing-body] block (the flattened testing fields as
+        // plain headerless rows + note), so clicking the bar rolls up EVERYTHING in
+        // Testing. Default EXPANDED (open:true),
+        // matching Staking.
+        //
+        // The Modulus capture-phase 'change' listener is UNAFFECTED: it resolves its card
+        // via el.closest('.pr-card[data-pr-section="siteReadiness"]') (walks UP from the
+        // changed dropdown, past this .pf-sr-collapse-body wrapper, to THIS card) then
+        // card.querySelector('[data-testing-body]') finds the wrapper inside this body —
+        // collapse is CSS display:none, the wrapper stays in the DOM either way. So the
+        // Modulus show/hide works whether Testing is collapsed or expanded, and the
+        // dropdown still saves under siteReadiness (data-pr-field-label unchanged).
+        // Flatten one level (Brad 2026-09-05): delete the "Testing Detail" sub-header —
+        // its fields render DIRECTLY under the "Testing" collapsible bar as plain rows.
+        // The Modulus dropdown table + the (formerly "Testing Detail") fields are both
+        // emitted headerless (noHeadbar/noThead), so there is NO intermediate title
+        // anywhere; the only header is the blue "Testing" collapse bar. The formerly-
+        // "Testing Detail" fields STAY inside the [data-testing-body] wrapper so the
+        // Modulus capture-phase listener still toggles them (Yes -> shown / No -> hidden),
+        // and every field()/fieldLinked() save binding is unchanged.
+        var _testInner =
+            _srNewSubTable('Testing', [ field('Modulus Load Test Required?', '') ], { noHeadbar: true, noThead: true })
           + '<div data-testing-body style="' + (_modYes ? '' : 'display:none;') + '">'
-          +   _srNewSubTable('Testing Detail', _testFieldsNew)
+          +   _srNewSubTable('Testing Detail', _testFieldsNew, { noHeadbar: true, noThead: true })
           +   subgroupNote('Threshold ~85 kip determines testing equipment vs rig. FUTURE automation: Peter extracts test data from approved shop drawings + generates the test doc in SharePoint on Garbin approval. Annual jack recalibration reminder every Dec/Jan.')
           + '</div>';
+        return _srNewCollapsible('Testing', _testInner, true);
       })();
 
       // ---- Subsection 4: Safety -----------------------------------------------
