@@ -2314,9 +2314,11 @@ tr.pf-dragging { opacity: 0.45; }
 }
 .pf-staking-doc-table tr:last-child td { border-bottom: none; }
 .pf-staking-doc-table td.pf-staking-doc-name {
-  font-size: 0.9rem; color: var(--text-1); width: 55%; word-break: break-word;
+  font-size: 0.9rem; color: var(--text-1); width: 44%; word-break: break-word;
 }
-.pf-staking-doc-table td.pf-staking-doc-date { width: 45%; }
+.pf-staking-doc-table td.pf-staking-doc-date { width: 34%; }
+/* Auto folder-link column (Brad 2026-09-05): display-only "Open folder" link cell. */
+.pf-staking-doc-table td.pf-staking-doc-folder { width: 22%; white-space: nowrap; }
 /* Neutralize the embedded .pr-field so it sits flush in the cell (label hidden,   */
 /* the doc name already labels the row via the left cell). */
 .pf-staking-doc-table .pr-field { padding: 0; border-bottom: none; }
@@ -2467,8 +2469,9 @@ tr.pf-dragging { opacity: 0.45; }
 /* Name column narrowed to 34% (Brad 2026-09-05, same intent as .pf-sr-table): pulls  */
 /* the Date Sent input LEFT toward its row label. Sandbox-only (.pf-srnew-scope), so   */
 /* the ORIGINAL card's doc table keeps its 55/45 split. */
-.pf-srnew-scope .pf-staking-doc-table td.pf-staking-doc-name { width: 34%; }
-.pf-srnew-scope .pf-staking-doc-table td.pf-staking-doc-date { width: 66%; }
+.pf-srnew-scope .pf-staking-doc-table td.pf-staking-doc-name { width: 30%; }
+.pf-srnew-scope .pf-staking-doc-table td.pf-staking-doc-date { width: 48%; }
+.pf-srnew-scope .pf-staking-doc-table td.pf-staking-doc-folder { width: 22%; }
 .pf-srnew-scope .pf-staking-doc-table .pr-field-value { font-size: 12.5px; color: var(--text-1, #2B2F36); }
 .pf-srnew-scope .pf-staking-doc-table .pr-live-input { font-size: 12.5px; }
 
@@ -21702,13 +21705,18 @@ try {
     // (isPf=false) filters to gc:true. Marking CAD gc:true therefore puts it in BOTH:
     // full surveyor list (position 2, right after PDF) AND the GC-only list (CAD alone).
     // Single save label per item, so CAD shares one siteReadiness value across both modes.
+    // folderSrc (Brad 2026-09-05): each doc row auto-links to an ALREADY-SYNCED
+    // SharePoint folder — no new sync/data file. 'submittal' -> the "Approved Shop
+    // Dwgs" folder (pfDesignSubmittalFolder(num).folder_url, window.PF_DESIGN_SUBMITTAL);
+    // 'shopdwg' -> the "Shop Dwg Info" folder (pfShopDwgInfo(num).folder_url,
+    // window.PF_SHOP_DWG_INFO). Resolved per-row in pfStakingDocChecklist; blank-graceful.
     var PF_STAKING_DOC_ITEMS = [
-      { name: 'Approved AP Shop Dwgs (PDF)',                gc: false },
-      { name: 'Approved AP Shop Dwgs (CAD) sent to GC',    gc: true  },
-      { name: 'Civil Drawings PDF',                         gc: false },
-      { name: 'Civil Drawings CAD',                         gc: false },
-      { name: 'PDF File for Original Survey (est control)', gc: false },
-      { name: 'Structural Foundations (PDF)',               gc: false }
+      { name: 'Approved AP Shop Dwgs (PDF)',                gc: false, folderSrc: 'submittal' },
+      { name: 'Approved AP Shop Dwgs (CAD) sent to GC',    gc: true,  folderSrc: 'submittal' },
+      { name: 'Civil Drawings PDF',                         gc: false, folderSrc: 'shopdwg'   },
+      { name: 'Civil Drawings CAD',                         gc: false, folderSrc: 'shopdwg'   },
+      { name: 'PDF File for Original Survey (est control)', gc: false, folderSrc: 'shopdwg'   },
+      { name: 'Structural Foundations (PDF)',               gc: false, folderSrc: 'shopdwg'   }
     ];
     function pfStakingDateLabel(name){ return name + ' - Date Sent'; }
 
@@ -21736,12 +21744,29 @@ try {
         ? subhead('Documents to send the surveyor')
         : subhead('Documents to send to GC');
       var rows = items.map(function(it){
-        // Left cell = doc name; right cell = the SAME Date Sent field() (same label key +
+        // Left cell = doc name; middle cell = the SAME Date Sent field() (same label key +
         // siteReadiness section). No File Link. field() emits the office save-on-change
         // control when _srLiveEdit + office, else the MM/DD/YYYY read span.
+        // Third cell (Brad 2026-09-05) = DISPLAY-ONLY auto folder link resolved from the
+        // item's folderSrc against the ACTIVE project (_curNum) using the two already-synced
+        // folder sources. NO data-pr-field-label here -> the siteReadiness save-scan ignores
+        // it, so the Date-Sent save-on-change is untouched. Blank-graceful when the accessor
+        // returns null or the project has no synced folder_url (never a broken href).
+        var url = '';
+        if (it.folderSrc === 'submittal') {
+          var rs = pfDesignSubmittalFolder(_curNum);
+          url = (rs && rs.folder_url) ? String(rs.folder_url).trim() : '';
+        } else if (it.folderSrc === 'shopdwg') {
+          var rd = pfShopDwgInfo(_curNum);
+          url = (rd && rd.folder_url) ? String(rd.folder_url).trim() : '';
+        }
+        var folderCell = url
+          ? pfFolderLink(url, 'Open folder')
+          : '<span class="pf-field-value empty blank"></span>';
         return '<tr>'
           + '<td class="pf-staking-doc-name">' + E(it.name) + '</td>'
           + '<td class="pf-staking-doc-date">' + field(pfStakingDateLabel(it.name), '') + '</td>'
+          + '<td class="pf-staking-doc-folder">' + folderCell + '</td>'
           + '</tr>';
       }).join('');
       var table = '<div class="table-wrap"><table class="pf-staking-doc-table"><tbody>'
