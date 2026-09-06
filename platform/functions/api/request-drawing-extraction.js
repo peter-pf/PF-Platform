@@ -53,6 +53,18 @@ const STATUS_PREFIX = 'drawing_extract_status_v1:';
 const OVERRIDE_PREFIX = 'project_override_v1:';
 const REQUEST_TTL_SEC = 1800; // 30 min -- guards a request stranded if daemon is down
 
+// LIST-FREE DISCOVERY BEACON (mirrors field_query_poller's beacon+GET pattern).
+// The container-side daemon must NOT list-keys every poll (free-tier caps list at
+// 1,000/day; a 60s per-cycle list blew that cap). Instead, on every enqueue we ALSO
+// add <num> to a SINGLE well-known beacon key holding a JSON array of pending nums.
+// The daemon then does ONE GET of this beacon per poll (a read, not a list) and only
+// GETs the per-num request keys the beacon names. The daemon CLEARS each num from the
+// beacon after processing (fire-once). The beacon carries the SAME TTL as the request
+// key so a stranded beacon self-heals; the daemon also drops any num whose request key
+// is already gone (TTL-expired) so the beacon can never accumulate stale entries.
+const BEACON_KEY = 'drawing_extract_beacon_v1';
+const BEACON_TTL_SEC = REQUEST_TTL_SEC; // beacon lives at least as long as any request it names
+
 const JSON_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' };
 const MAX_BODY_BYTES = 4 * 1024; // POST body is tiny ({num}); reject anything larger
 
@@ -115,6 +127,29 @@ async function stampTestingPullRequested(env, num, who, nowIso) {
   } catch (err) {
     // best-effort provenance -- never fail the enqueue over it
     console.error('request-drawing-extraction: __testing_pull stamp failed (non-fatal):', err);
+  }
+}
+
+// Best-effort: ADD <num> to the pending-beacon array so the daemon discovers it with a
+// single GET (no list-keys). Read-modify-write of the SINGLE beacon key: parse the
+// current array, add num if absent, cap length defensively, write back with a TTL. If
+// the beacon read/write fails we STILL do not fail the enqueue -- the request key is the
+// source of truth; the beacon is only a discovery accelerator. (The daemon retains a
+// low-frequency safety path so a beacon miss cannot strand a request indefinitely.)
+async function addToBeacon(env, num) {
+  try {
+    const raw = await env.PF_SCHEDULE.get(BEACON_KEY);
+    let arr = safeParse(raw);
+    if (!Array.isArray(arr)) arr = [];
+    // Keep only well-formed nums; de-dupe; add this one.
+    const set = new Set(arr.filter((x) => typeof x === 'string' && /^[A-Za-z0-9-]{1,20}$/.test(x)));
+    set.add(num);
+    // Defensive cap so a bug can never grow the beacon unbounded.
+    const out = Array.from(set).slice(0, 200);
+    await env.PF_SCHEDULE.put(BEACON_KEY, JSON.stringify(out), { expirationTtl: BEACON_TTL_SEC });
+  } catch (err) {
+    // Non-fatal: enqueue already wrote the request key; the daemon's safety path covers this.
+    console.error('request-drawing-extraction: beacon add failed (non-fatal):', err);
   }
 }
 
@@ -187,6 +222,10 @@ export async function onRequestPost(context) {
     // (it is the last-known state the button reads until the next pull).
     await env.PF_SCHEDULE.put(reqKey(num), JSON.stringify(reqObj), { expirationTtl: REQUEST_TTL_SEC });
     await env.PF_SCHEDULE.put(statusKey(num), JSON.stringify(statusObj));
+
+    // Add to the pending beacon so the daemon discovers this with ONE GET (no list-keys).
+    // Best-effort: never fails the enqueue (request key is the source of truth).
+    await addToBeacon(env, num);
 
     // Best-effort provenance stamp (never fails the enqueue).
     await stampTestingPullRequested(env, num, who, nowIso);
