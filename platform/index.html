@@ -2474,6 +2474,33 @@ tr.pf-dragging { opacity: 0.45; }
 .pf-sr-collapse.open .pf-sr-collapse-chev { transform: rotate(90deg); }
 .pf-sr-collapse-body { display: none; margin-top: 8px; }
 .pf-sr-collapse.open .pf-sr-collapse-body { display: block; }
+/* Nested Safety subcategory bars (Brad 2026-09-07): a lighter, slightly indented collapse
+   bar so the 5 Safety subcategories read as CHILDREN of the blue "Safety" bar. Each carries a
+   far-left completion check + the shared "X/Y Fields Complete, XX%" readout. */
+.pf-safety-cat { margin-left: 16px; }
+.pf-safety-cat > .pf-sr-collapse-head {
+  background: var(--accent-light, #4a93c2); border-color: var(--accent-light, #4a93c2);
+  font-size: 13px; padding: 6px 12px;
+}
+.pf-safety-cat > .pf-sr-collapse-head:hover {
+  background: var(--accent, #006DB0); border-color: var(--accent, #006DB0);
+}
+/* Far-left completion check on a subcategory bar: an empty ring until every field is filled,
+   then a filled green check. Injected/toggled by pfRenderSandboxSubStatus. */
+.pf-safety-check {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; flex: 0 0 16px; border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,0.65); background: transparent;
+  color: #fff; font-size: 11px; font-weight: 800; line-height: 1;
+}
+.pf-safety-check.done { background: var(--green, #2e7d32); border-color: var(--green, #2e7d32); }
+/* "X/Y Fields Complete, XX%" readout on a sandbox collapse bar — white text to sit on the
+   accent-blue bar, right-anchored just left of the chevron (the flex-grow title pushes it
+   right; gap on the head handles spacing). No click handler -> click bubbles to the toggle. */
+.pf-sr-collapse-status {
+  font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.92); white-space: nowrap;
+}
+.pf-sr-collapse-status .pf-sr-collapse-pct { font-weight: 800; color: #fff; }
 
 /* ---- Sandbox-scoped Inventory match for the Staking doc checklist -------------- */
 /* The Staking subsection's "Documents to send the surveyor/GC" table uses the      */
@@ -14383,7 +14410,7 @@ try {
     // .pr-field[data-pr-label] + .pr-field-value structure so the section editor
     // (which reads valEl.textContent -> plain string) is unaffected. Manual
     // overrides still win + render as the same link kind.
-    function fieldLinked(label, val, src, kind){
+    function fieldLinked(label, val, src, kind, opts){
       var ov = ovLookup(_curSection, label);
       // Same fix as field() (Brad 2026-08-12): a stored EMPTY override must NOT suppress
       // a real fallback value — only a non-empty override wins. Fail-safe: a blank
@@ -14405,6 +14432,29 @@ try {
       else inner = E(raw);
       var srcHtml = (src && raw) ? '<span class="pr-field-src">'+E(src)+'</span>' : '';
       var editMark = edited ? '<span class="pr-field-edited" title="Manually edited">&#9998;</span>' : '';
+      // READ-ONLY LINK mode (Brad 2026-09-07): for a field whose value is a GENERATED/auto URL
+      // the user should NOT hand-edit (the "Mod Test Jack Calibration Report" = the generated
+      // Modulus Test Excel), render ONLY a clickable link with a FIXED label (opts.linkLabel,
+      // e.g. "Open Mod Test Report") — NO raw address, NO edit input — even in Site Readiness
+      // live-edit mode. Empty -> a muted placeholder (opts.emptyText). The value span carries
+      // data-pf-linkfield so pfPersistTestSheetLink can swap the anchor in place after Generate
+      // Test Sheet (no reload). The row keeps data-pr-label + the .blank rule so it still counts
+      // toward the section/subsection completion badges.
+      if (opts && opts.readonlyLink) {
+        var roUrl = String((ovHasValue ? ov.value : (val == null ? '' : val)) || '').trim();
+        var roLabel = opts.linkLabel || 'Open';
+        var roInner, roBlank;
+        if (roUrl) {
+          var roHref = /^[a-z][a-z0-9+.-]*:\/\//i.test(roUrl) ? roUrl : ('https://' + roUrl.replace(/^\/+/, ''));
+          roInner = '<a href="'+E(roHref)+'" target="_blank" rel="noopener noreferrer">'+E(roLabel)+'</a>';
+          roBlank = '';
+        } else {
+          roInner = E(opts.emptyText || '-');
+          roBlank = ' empty blank';
+        }
+        return '<div class="pr-field" data-pr-label="'+E(label)+'"><span class="pr-field-label">'+E(label)+editMark+'</span>'
+             + '<span class="pr-field-value pf-linkfield'+roBlank+'" data-pf-linkfield="'+E(label)+'" data-pf-linklabel="'+E(roLabel)+'">'+roInner+'</span></div>';
+      }
       // ALWAYS-LIVE mode (Site Readiness): office roles get a save-on-change TEXT input for
       // the link's URL (paste a URL -> saves on change; the read view shows it as a clickable
       // link on the next render). Seeds from the RAW (unformatted) override/synced value.
@@ -18378,7 +18428,7 @@ try {
         field('Jack to use for modulus test', pfWhichJackAuto(effVal('siteReadiness', 'AP Max Test Load', ''))),
         // "Testing Equipment vs Rig", "Test Document Status", "Test Document Link" REMOVED
         // (Brad 2026-09-05) — same deletion as the sandbox.
-        fieldLinked('Mod Test Jack Calibration Report', '', '', 'website')
+        fieldLinked('Mod Test Jack Calibration Report', '', '', 'website', { readonlyLink: true, linkLabel: 'Open Mod Test Report', emptyText: 'Not generated yet' })
       ];
       // Effective Modulus value (override-wins). Yes -> body shown; No/blank -> hidden.
       var _modReq = String(effVal('siteReadiness', 'Modulus Load Test Required?', '') || '').trim();
@@ -18724,6 +18774,33 @@ try {
         return _srNewSubTable(title, flds, opts);
       };
 
+      // _srNewSafetyCat(catName, buildFieldsFn): a nested Inventory-style collapsible for
+      // ONE Safety subcategory (Brad 2026-09-07). Same click-to-expand idiom as
+      // _srNewCollapsible (a .pf-sr-collapse bar that rolls its body up/down), but rendered
+      // as a lighter, indented CHILD bar (.pf-safety-cat) so the 5 subcategories read as
+      // children of the blue "Safety" bar. DEFAULT COLLAPSED (rolled up) — click the bar to
+      // expand, exactly like the Inventory tab rows. Fields build under the 'safety' override
+      // key (same _curSection swap as _srNewSubTableKeyed) and render as a headerless table
+      // ({noHeadbar,noThead}) since the bar itself names the category. The far-left
+      // completion CHECK and the "X/Y Fields Complete, XX%" readout are injected AFTER render
+      // by pfRenderSandboxSubStatus (single source of truth = the .pr-field-value.blank rule,
+      // identical to the top-level section badges) — so this markup carries only an EMPTY
+      // .pf-safety-check placeholder that turns green when all fields are filled.
+      var _srNewSafetyCat = function(catName, buildFieldsFn){
+        var _prev = _curSection; _curSection = 'safety';
+        var flds = buildFieldsFn();
+        _curSection = _prev;
+        var body = _srNewSubTable(catName, flds, { noHeadbar: true, noThead: true });
+        return '<div class="pf-sr-collapse pf-safety-cat">'
+             +   '<div class="pf-sr-collapse-head" onclick="this.parentElement.classList.toggle(\'open\')">'
+             +     '<span class="pf-safety-check" aria-hidden="true"></span>'
+             +     '<span class="pf-sr-collapse-title">' + E(catName) + '</span>'
+             +     '<span class="pf-sr-collapse-chev">&#9654;</span>'
+             +   '</div>'
+             +   '<div class="pf-sr-collapse-body">' + body + '</div>'
+             + '</div>';
+      };
+
       // ---- Shop Drawings subsection ELIMINATED (Brad 2026-09-05) ----------------
       // The sandbox Shop Drawings subsection had only two things: the printing content
       // (FedEx link + print-spec/pickup notes) and the 'Date Ready for Pickup' field.
@@ -18819,7 +18896,7 @@ try {
           // siteReadiness key (via /api/project-override), so once generated this row shows a
           // clickable link to open the Excel. (Consolidated — the earlier separate "Test
           // Sheet Link" field was removed; this single row is the link surface.)
-          fieldLinked('Mod Test Jack Calibration Report', '', '', 'website')
+          fieldLinked('Mod Test Jack Calibration Report', '', '', 'website', { readonlyLink: true, linkLabel: 'Open Mod Test Report', emptyText: 'Not generated yet' })
         ];
         // Header restructure (Brad 2026-09-05): carry the SAME blue collapsible header
         // treatment as Staking & Layout into Testing. Drop the dark .pf-sr-headbar
@@ -18955,9 +19032,20 @@ try {
       // override read + DOM save resolve to the safety bucket exactly as before; the
       // _srNewCollapsible wrapper is a plain div, so fields inside still resolve their save
       // path via the card's data-pr-section ancestor — no save binding changes.
+      // Safety rebuilt (Brad 2026-09-07) into 5 Inventory-style, individually collapsible
+      // SUBCATEGORIES nested under the blue "Safety" bar. Each rolls up/down on click and
+      // carries a far-left green completion check (turns green once every field inside it is
+      // filled). Changes vs the prior flat tables:
+      //  * "MSDS" -> "SDS" across the board (Brad: make it consistent SDS). NOTE: renaming a
+      //    field label changes its save key, so any old MSDS-key value does NOT carry — the
+      //    sandbox fields are effectively empty so impact is negligible.
+      //  * "Hand Log Sheets" (+ date + link), "Daily Equipment Checklist" (+ link), and the
+      //    catch-all "Other Safety Items" are DROPPED out of Safety per Brad.
+      //  * Utility Locates DE-DUPLICATED to one clean set (the legacy card had two near-
+      //    duplicate variants of each locate field); surviving labels keep their save keys.
       var _srN_safetyInner =
-          pfSspFolderRow()
-        + _srNewSubTableKeyed('Safety', function(){ return [
+          _srNewSafetyCat('Site Specific Safety Plan (SSSP)', function(){ return [
+              pfSspFolderRow(),
               // "Site Specific Safety Plan" row + the Create/Send SSSP button inline to its
               // right (composite value cell). field() is emitted FIRST so _srNewRow reads
               // its data-pr-label for the row name; the button sits in the same value cell.
@@ -18965,37 +19053,29 @@ try {
                 + field('Site Specific Safety Plan', '')
                 + '<a class="pr-action-link" href="' + E(_pipefySSSP) + '" target="_blank" rel="noopener noreferrer">&#128221; Create / Send SSSP (Pipefy)</a>'
               + '</div>',
-              field('Date SSSP Sent to GC', ''),
-              // Flattened MSDS rows (MSDS sub-header deleted):
-              field('Material Safety Data Sheets (MSDS)', ''),
-              field('MSDS Sent?', ''),
-              field('Date MSDS Sent', ''),
-              fieldLinked('MSDS Copy Link', '', '', 'website')
-            ]; }, 'safety', { noHeadbar: true, noThead: true })
-        + _srNewSubTableKeyed('Safety Docs & Checklists', function(){ return [
-              field('Toolbox Talks Prepared', ''),
+              field('Date SSSP Sent to GC', '')
+            ]; })
+        + _srNewSafetyCat('Material Safety Data Sheets (SDS)', function(){ return [
+              field('Safety Data Sheets (SDS)', ''),
+              field('SDS Sent?', ''),
+              field('Date SDS Sent', ''),
+              fieldLinked('SDS Copy Link', '', '', 'website')
+            ]; })
+        + _srNewSafetyCat('Jobsite Hazard Analysis (JHA\'s/JSA\'s)', function(){ return [
               field('Jobsite Safety Analysis (JSA)', ''),
-              field('Daily Equipment Checklist', ''),
-              field('Other Safety Items', ''),
-              fieldLinked('Toolbox Talks', '', '', 'website'),
-              fieldLinked('JSA (Jobsite Safety Analysis)', '', '', 'website'),
-              fieldLinked('Daily Equipment Checklist Link', '', '', 'website')
-            ]; }, 'safety')
-        + _srNewSubTableKeyed('Hand Log Sheets', function(){ return [
-              field('Hand Log Sheets', ''),
-              field('Hand Log Sheets - Date Uploaded', ''),
-              fieldLinked('Hand Log Sheets Link', '', '', 'website')
-            ]; }, 'safety')
-        + _srNewSubTableKeyed('Utility Locates', function(){ return [
-              field('Locate Ticket #', ''),
+              fieldLinked('JSA (Jobsite Safety Analysis)', '', '', 'website')
+            ]; })
+        + _srNewSafetyCat('Toolbox Talks', function(){ return [
+              field('Toolbox Talks Prepared', ''),
+              fieldLinked('Toolbox Talks', '', '', 'website')
+            ]; })
+        + _srNewSafetyCat('Public Utility Locates', function(){ return [
               field('Locate Ticket # (Excavator ID)', ''),
-              field('Date Locate Called In', ''),
               field('Date Locates Called In', ''),
-              field('Date Cleared to Start', ''),
               field('Date Ticket Cleared to Start', ''),
               field('Date Ticket Expires', ''),
               fieldLinked('Locate Ticket PDF Link', '', '', 'website')
-            ]; }, 'safety');
+            ]; });
       var _srN_safety = _srNewCollapsible('Safety', _srN_safetyInner, true);
 
       // ---- Subsection 5: Mobilization Preparation -----------------------------
@@ -20569,6 +20649,10 @@ try {
       // up. Each section counts ITS OWN direct fields; sections with no countable fields
       // omit the badge (no broken "0/0").
       try { pfRenderAllSectionStatusBars(root); } catch (e) {}
+      // Sandbox subsection progress + Safety green-checks (Brad 2026-09-07): the SAME
+      // "X/Y Fields Complete, XX%" readout on each sandbox collapse bar (Staking & Layout,
+      // Testing, Safety, and each Safety subcategory), computed from the identical blank rule.
+      try { pfRenderSandboxSubStatus(root); } catch (e) {}
 
       _curSection = ''; // done rendering this record
     }
@@ -20679,6 +20763,59 @@ try {
       var cards = root.querySelectorAll(':scope > .pr-card');
       for (var i = 0; i < cards.length; i++){
         try { pfRenderSectionStatusBar(cards[i]); } catch (e) {}
+      }
+    }
+
+    // pfRenderSandboxSubStatus(root): put the SAME "X/Y Fields Complete, XX%" readout that
+    // the top-level section headers carry (pfRenderSectionStatusBar) onto EVERY collapse bar
+    // inside the sandbox "Site Readiness / Project Setup - New" card — Staking & Layout,
+    // Testing, Safety, and each nested Safety subcategory — plus the far-left green completion
+    // check on the Safety subcategory bars (Brad 2026-09-07). ONE source of truth: count each
+    // .pr-field[data-pr-label] whose value span is NOT .blank (the exact rule behind the
+    // yellow blank-field highlight and the section badges), scoped per bar. A bar counts ALL
+    // .pr-field descendants of its own body, so a PARENT bar ("Safety") shows the AGGREGATE of
+    // its nested category bars while each category shows its own — nested progress. The readout
+    // span carries no click handler, so a click on it bubbles to the bar's collapse toggle
+    // (roll-up intact). Runs after every render/save (renderInto calls it last), so counts
+    // recompute on each edit cycle. Scoped to .pf-srnew-scope so only the sandbox is touched.
+    function pfRenderSandboxSubStatus(root){
+      if (!root) return;
+      var bars = root.querySelectorAll('.pf-srnew-scope .pf-sr-collapse');
+      for (var b = 0; b < bars.length; b++){
+        var bar = bars[b];
+        var head = bar.querySelector(':scope > .pf-sr-collapse-head');
+        var body = bar.querySelector(':scope > .pf-sr-collapse-body');
+        if (!head || !body) continue;
+        var fieldEls = body.querySelectorAll('.pr-field[data-pr-label]');
+        var total = 0, done = 0;
+        for (var i = 0; i < fieldEls.length; i++){
+          var val = fieldEls[i].querySelector('.pr-field-value');
+          if (!val) continue;
+          total++;
+          if (!val.classList.contains('blank')) done++;   // same blank rule as the section badges
+        }
+        // Idempotency: drop any prior readout so a re-run never stacks two.
+        var oldStat = head.querySelector(':scope > .pf-sr-collapse-status');
+        if (oldStat) oldStat.parentNode.removeChild(oldStat);
+        // Green completion check (Safety subcategory bars only carry the .pf-safety-check span).
+        var chk = head.querySelector(':scope > .pf-safety-check');
+        if (chk){
+          var complete = (total > 0 && done === total);
+          chk.classList.toggle('done', complete);
+          chk.innerHTML = complete ? '&#10003;' : '';
+          chk.setAttribute('title', complete ? 'All fields complete'
+            : (total ? (done + ' of ' + total + ' complete') : 'No fields'));
+        }
+        if (total === 0) continue;   // no readout for a bar with nothing countable
+        var pct = Math.round((done / total) * 100);
+        var status = document.createElement('span');
+        status.className = 'pf-sr-collapse-status';
+        status.setAttribute('role', 'status');
+        status.innerHTML = done + '/' + total + ' Fields Complete, '
+          + '<span class="pf-sr-collapse-pct">' + pct + '%</span>';
+        var chev = head.querySelector(':scope > .pf-sr-collapse-chev');
+        if (chev) head.insertBefore(status, chev);
+        else head.appendChild(status);
       }
     }
 
@@ -21851,6 +21988,20 @@ try {
           input.setAttribute('data-pr-live-prev', webUrl);
           var cell = input.closest ? input.closest('.pr-field-value.pr-field-live') : null;
           if (cell) cell.classList.remove('blank');
+        }
+        // Read-only link surface (Brad 2026-09-07): the row now renders as a static
+        // "Open Mod Test Report" link (no input). Swap the anchor in place so the link
+        // appears immediately after Generate, without a reload. DOM-built (no HTML string)
+        // so the webUrl needs no manual escaping.
+        var linkCell = scope.querySelector('.pf-linkfield[data-pf-linkfield="' + PF_TEST_SHEET_LINK_LABEL + '"]');
+        if (linkCell) {
+          var _a = document.createElement('a');
+          var _h = /^[a-z][a-z0-9+.-]*:\/\//i.test(webUrl) ? webUrl : ('https://' + String(webUrl).replace(/^\/+/, ''));
+          _a.href = _h; _a.target = '_blank'; _a.rel = 'noopener noreferrer';
+          _a.textContent = linkCell.getAttribute('data-pf-linklabel') || 'Open';
+          linkCell.innerHTML = '';
+          linkCell.appendChild(_a);
+          linkCell.classList.remove('empty', 'blank');
         }
       } catch (e) {}
       // Persist to the server (fire-and-forget with an honest error into the button toast is
