@@ -2283,6 +2283,9 @@ tr.pf-dragging { opacity: 0.45; }
 .pr-live-select { max-width: 260px; }
 .pr-live-textarea { max-width: 100%; width: 100%; resize: vertical; }
 .pr-live-msg { font-size: 0.72rem; margin-left: 8px; }
+/* "Open" link beside a live-edit URL input (Brad 2026-09-07): compact clickable link so a
+   saved SharePoint/file URL opens directly in office edit mode, without hiding the input. */
+.pr-field-openlink { display: inline-block; margin-top: 3px; font-size: 0.8rem; font-weight: 600; }
 /* Blank live-edit field (Brad 2026-08-13, TASK F): an EMPTY editable Site Readiness field
    carries .blank (same convention as the read view). The generic .pr-field-value.blank rule
    is tuned for a short text placeholder (inline-block, centered, min-width) which would
@@ -14410,11 +14413,28 @@ try {
         // Blank -> yellow highlight in LIVE-EDIT mode (Brad 2026-08-13, TASK F), same rule +
         // same .blank convention as field(). Cleared live by pfLiveFieldChange on save.
         var liveBlank = (rawUrl == null || String(rawUrl).trim() === '') ? ' blank' : '';
+        // Clickable OPEN link beside the edit input (Brad 2026-09-07): office/live-edit
+        // previously showed ONLY the raw address in a text box (the read view already
+        // links via linkWebsite/linkEmail/linkPhone). When a URL is already saved, render
+        // a compact "Open" link so it's directly clickable to open the file, WITHOUT
+        // losing the input (URL stays editable/replaceable). Appears on next render after
+        // a paste (pfLiveFieldChange saves the value; the link surfaces on reload).
+        var liveOpen = '';
+        var ru = (rawUrl == null ? '' : String(rawUrl).trim());
+        if (ru) {
+          if (kind === 'email') liveOpen = '<span class="pr-field-openlink">'+linkEmail(ru)+'</span>';
+          else if (kind === 'phone') liveOpen = '<span class="pr-field-openlink">'+linkPhone(ru)+'</span>';
+          else {
+            var ohref = /^[a-z][a-z0-9+.-]*:\/\//i.test(ru) ? ru : ('https://' + ru.replace(/^\/+/, ''));
+            liveOpen = '<a class="pr-field-openlink" href="'+E(ohref)+'" target="_blank" rel="noopener noreferrer">Open &#8599;</a>';
+          }
+        }
         return '<div class="pr-field" data-pr-label="'+E(label)+'"><span class="pr-field-label">'+E(label)+editMark+'</span>'
              + '<span class="pr-field-value pr-field-live'+liveBlank+'">'
              +   '<input type="text" class="pr-live-input" data-pr-field-label="'+E(label)+'" '
              +     'data-pr-live-prev="'+esc2(String(rawUrl||''))+'" placeholder="Paste a URL" '
              +     'value="'+esc2(String(rawUrl||''))+'" onchange="event.stopPropagation();window.pfLiveFieldChange(this)">'
+             +   liveOpen
              + '</span>' + (src ? '<span class="pr-field-src">'+E(src)+'</span>' : '') + '</div>';
       }
       return '<div class="pr-field" data-pr-label="'+E(label)+'"><span class="pr-field-label">'+E(label)+editMark+'</span>'
