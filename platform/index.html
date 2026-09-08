@@ -2541,6 +2541,15 @@ tr.pf-dragging { opacity: 0.45; }
    after the hover/open rules so the flag wins in every state. */
 .pf-srnew-scope .pf-safety-invrow.pf-safety-invrow-flag > td { background: #fdecea; }
 .pf-srnew-scope .pf-safety-invrow.pf-safety-invrow-flag .pf-safety-invtitle { color: #c0392b; font-weight: 700; }
+/* inlineFields cats (Brad 2026-09-08, Demobilization redline): the field controls sit ON the main
+   summary row (right of the row name) instead of inside an expand. The row is not clickable (no
+   expand), so drop the pointer cursor. .pf-safety-inline holds the controls inline; a small left
+   gap separates them from the name. .pf-vscrow-inline keeps the mini-label columns compact/aligned
+   on the single line. */
+.pf-srnew-scope .pf-safety-invrow-inline { cursor: default; }
+.pf-srnew-scope .pf-safety-invrow-inline .pf-safety-invname { white-space: normal; }
+.pf-srnew-scope .pf-safety-inline { display: inline-flex; align-items: flex-end; gap: 18px; margin-left: 18px; vertical-align: middle; }
+.pf-srnew-scope .pf-vscrow-inline { display: inline-flex; gap: 18px; margin: 0; }
 /* VSC Rig conditional composite row (Brad 2026-09-08): Yes/No + conditional "Which Rig" + "Mob
    Date" columns on one flex row; the extra columns hide when No. Each labeled column stacks its
    mini-label over its control. */
@@ -18973,6 +18982,30 @@ try {
           + '</div>'
         + '</div>';
       };
+      // _pfRentalCalledOffRow(n): one auto-populated "Equipment Rental Called Off" row (Brad
+      // 2026-09-08) in the Demobilization section, MIRRORING the Mob Prep Rental Equipment Qty
+      // cascade — shown iff n <= effVal('siteReadiness','Rental Equipment - Qty') (blank/0 -> none);
+      // else .pf-cond-hidden + display:none (its date excluded from the count). Same idiom as
+      // _pfRentalPieceRow / _pfDemobPieceRow. Row label = "Rental Equipment #n", with the piece's
+      // Type appended when set (read cross-row from 'Rental Equipment #n - Type', a nice-to-have that
+      // keeps the label tied to the actual rented machine). ONE date field per piece, unique save key
+      // 'Rental Equipment #n - Date Called Off Rent' (registered in PF_FIELD_DATE_LABELS). The Qty
+      // capture-phase listener toggles [data-rental-calledoff-piece] live across sections (same
+      // .pr-root as Mob Prep). data-pr-label sentinel names the _srNewRow row (NOT a .pr-field).
+      var _pfRentalCalledOffRow = function(n){
+        var _qtyRaw = String(effVal('siteReadiness', 'Rental Equipment - Qty', '') || '').trim();
+        var _qty = /^\d+$/.test(_qtyRaw) ? parseInt(_qtyRaw, 10) : 0;
+        var _show = (n <= _qty);
+        var _type = String(effVal('siteReadiness', 'Rental Equipment #' + n + ' - Type', '') || '').trim();
+        var _label = 'Rental Equipment #' + n + (_type ? ' — ' + _type : '');
+        return '<div data-pr-label="' + E(_label) + '">'
+          + '<div class="pf-vscrow pf-rental-calledoff' + (_show ? '' : ' pf-cond-hidden')
+              + '" data-rental-calledoff-piece="' + n + '"' + (_show ? '' : ' style="display:none"') + '>'
+          +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Date Called Off Rent</span>'
+          +     field('Rental Equipment #' + n + ' - Date Called Off Rent', '') + '</span>'
+          + '</div>'
+        + '</div>';
+      };
       var _srNewSafetyInvTable = function(cats){
         var rows = '';
         cats.forEach(function(c){
@@ -18985,7 +19018,17 @@ try {
           var _prev = _curSection; _curSection = 'siteReadiness';
           var flds = c.fieldsFn();
           _curSection = _prev;
-          var body = _srNewSubTable(c.name, flds, { noHeadbar: true, noThead: true });
+          // inlineFields (Brad 2026-09-08, Demobilization redline): render this cat's field controls
+          // ON the main summary row (right of the row name) instead of inside the expand-to-reveal
+          // detail. The detail row is left EMPTY and the row's click-to-expand is suppressed for a
+          // clean single-line look. pfRenderSandboxSubStatus scans BOTH the srow and its detail for
+          // .pr-field, so counting + completeWhen/bothCompleteWhen still work with the fields on the
+          // main row. The controls are wrapped so a click on them never toggles the (now inert) row.
+          var inline = c.inlineFields === true;
+          var inlineHtml = inline
+            ? '<span class="pf-safety-inline" onclick="event.stopPropagation()">' + flds.join('') + '</span>'
+            : '';
+          var body = inline ? '' : _srNewSubTable(c.name, flds, { noHeadbar: true, noThead: true });
           // Optional inline ACTION on the summary row itself (Brad 2026-09-08): e.g. the SSSP
           // "Open Safety Folder" link sits ON the collapsed row, next to the category name —
           // not hidden inside the expand. Wrapped so a click on it opens the folder WITHOUT
@@ -19020,11 +19063,18 @@ try {
               + ' data-cond-hide-row="' + E(c.cond.hideRow || '') + '"'
               + ' data-cond-gate="' + E(c.cond.gate || '') + '"'
             : '';
-          rows += '<tr class="pf-safety-invrow"' + completeAttr + emptyCompleteAttr + bothCompleteAttr + condAttr + ' onclick="window.pfSafetyRowToggle(this)">'
+          // Inline cats carry their fields on the main line, so there is nothing to expand: drop the
+          // click-toggle + the pointer cursor (pf-safety-invrow-inline) for a clean single row. The
+          // (empty) detail row is still emitted so pfRenderSandboxSubStatus's nextElementSibling
+          // detail lookup stays valid for EVERY row.
+          var rowClass = 'pf-safety-invrow' + (inline ? ' pf-safety-invrow-inline' : '');
+          var rowClick = inline ? '' : ' onclick="window.pfSafetyRowToggle(this)"';
+          rows += '<tr class="' + rowClass + '"' + completeAttr + emptyCompleteAttr + bothCompleteAttr + condAttr + rowClick + '>'
                 +   '<td class="pf-safety-invname">'
                 +     '<span class="pf-safety-check" aria-hidden="true"></span>'
                 +     '<span class="pf-safety-invtitle">' + E(c.name) + '</span>'
                 +     rowAction
+                +     inlineHtml
                 +   '</td>'
                 +   '<td class="pf-safety-invstatus"></td>'
                 + '</tr>'
@@ -19494,11 +19544,16 @@ try {
                 _pfRentalPieceRow(1),
                 _pfRentalPieceRow(2),
                 _pfRentalPieceRow(3),
-                _pfRentalPieceRow(4),
-                field('Rental Date Rented/Active', ''),
-                field('Rental Anticipated Days Needed', ''),
-                field('Rental Anticipated Return Date', ''),
-                field('Rental Actual Date Called Off Rent', '')
+                _pfRentalPieceRow(4)
+                // The 4 legacy rental date fields (Rental Date Rented/Active, Rental Anticipated
+                // Days Needed, Rental Anticipated Return Date, Rental Actual Date Called Off Rent)
+                // were DELETED from THIS sandbox cat per Brad 2026-09-08 — the Qty cascade (#1..#N
+                // piece rows) now carries the per-piece delivery/pickup dates, so these standalone
+                // fields are superseded. Their PF_FIELD_DATE_LABELS entries are INTENTIONALLY KEPT
+                // because the ORIGINAL "Site Readiness / Project Setup" card's "7. Rental Equipment"
+                // subsection (sub7Inner ~18749) STILL uses these same labels; the label map is
+                // section-agnostic (keyed by label), so removing it would regress the original
+                // card's date pickers. Deletion, no alias.
               ]; } },
             { name: 'Equipment Fuel', fieldsFn: function(){ return [
                 // Fuel Vendor dropdown (Brad 2026-09-08): Hart Fuel / Jackson Oil (registered in
@@ -19591,8 +19646,9 @@ try {
       //      auto-rows shown when the matching Mob piece = Yes, cross-section-read via
       //      effVal('siteReadiness', name) which still works — both under _curSection='siteReadiness';
       //      + the kept 'Demob Transport Company' dropdown).
-      //   2. Equipment Rental Called Off — a 'Equipment Rental Called Off - Date' date; completes
-      //      normally when the date is filled.
+      //   2. Equipment Rental Called Off — auto-populates one row per rented piece (mirrors Mob Prep
+      //      'Rental Equipment - Qty', pieces #1..#N), each with a 'Rental Equipment #n - Date Called
+      //      Off Rent' date; Qty=0/blank -> no rows -> 100% (emptyCompleteWhen).
       //   3. Fuel Delivery Called Off — a Yes/No + a date; completes ONLY when Yes AND date filled
       //      (bothCompleteWhen cat flag -> data-both-yes-field / data-both-date-field, consumed in
       //      pfRenderSandboxSubStatus; a capture-phase listener re-runs the status on either change).
@@ -19611,29 +19667,40 @@ try {
                 _pfDemobPieceRow('Testing Material Fall Off Load'),
                 field('Demob Transport Company', '')
               ]; } },
-            { name: 'Equipment Rental Called Off', completeWhen: 'Equipment Rental Called Off - Date',
+            // INLINE (Brad 2026-09-08 redline): the date control shows ON the main summary row (right
+            // of the "Equipment Rental Called Off" label), not inside an expand. inlineFields renders
+            // the fieldsFn into the srow's name cell; the detail is empty + the row is non-clickable.
+            // completeWhen still gates the green check on the date (pfRenderSandboxSubStatus now scans
+            // the srow too). NOTE: no dropdown (Brad: "instead of having it a drop down") — just the
+            // single date field.
+            // AUTO-POPULATE per rented piece (Brad 2026-09-08 redline, SUPERSEDES the earlier inline
+            // single date): one row per Rental Equipment piece (mirrors Mob Prep 'Rental Equipment -
+            // Qty'), each with its own "Date Called Off Rent". Rendered as normal detail rows (like
+            // PF Equipment Demob), NOT inline. Qty=0/blank -> no rows -> emptyCompleteWhen forces the
+            // cat 100% complete (nothing rented to call off). Hidden rows (n>Qty) are .pf-cond-hidden
+            // -> excluded from the count; visible rows complete when their date is filled. The Qty
+            // capture-phase listener toggles these live across sections.
+            { name: 'Equipment Rental Called Off',
+              emptyCompleteWhen: { field: 'Rental Equipment - Qty', val: '0' },
               fieldsFn: function(){ return [
-                // Completes when the date is filled (completeWhen -> data-complete-field gates the
-                // green check on this one date; the X/Y readout still reflects the honest count).
-                '<div data-pr-label="Equipment Rental Called Off">'
-                  + '<div class="pf-vscrow">'
-                  +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Date Called Off Rent</span>'
-                  +     field('Equipment Rental Called Off - Date', '') + '</span>'
-                  + '</div>'
-                + '</div>'
+                _pfRentalCalledOffRow(1),
+                _pfRentalCalledOffRow(2),
+                _pfRentalCalledOffRow(3),
+                _pfRentalCalledOffRow(4)
               ]; } },
-            { name: 'Fuel Delivery Called Off',
-              // Complete ONLY when Yes is selected AND the date is filled (Brad 2026-09-08).
+            // INLINE (Brad 2026-09-08 redline): the Yes/No toggle AND the date show side-by-side ON
+            // the main summary row (not inside an expand). bothCompleteWhen preserved — green only
+            // when Yes AND date filled. The existing Fuel-Delivery-Called-Off capture-phase listener
+            // still fires from these main-row controls (matched by data-pr-field-label).
+            { name: 'Fuel Delivery Called Off', inlineFields: true,
               bothCompleteWhen: { yesField: 'Fuel Delivery Called Off', dateField: 'Fuel Delivery Called Off - Date' },
               fieldsFn: function(){ return [
-                '<div data-pr-label="Fuel Delivery Called Off">'
-                  + '<div class="pf-vscrow">'
+                '<span class="pf-vscrow pf-vscrow-inline">'
                   +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Called Off?</span>'
                   +     field('Fuel Delivery Called Off', '') + '</span>'
                   +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Date Called Off</span>'
                   +     field('Fuel Delivery Called Off - Date', '') + '</span>'
-                  + '</div>'
-                + '</div>'
+                + '</span>'
               ]; } }
           ]), true);
       var _srN_demobNew = _srNewCollapsible('Demobilization', _srN_demob, true);
@@ -21297,7 +21364,12 @@ try {
         // over-threshold computed elevation difference, flag the whole category row red. Runs for
         // every row (before any cond continue) so the initial render + recompute both apply it.
         srow.classList.toggle('pf-safety-invrow-flag', !!detail.querySelector('.pf-elevdiff-over'));
-        var dEls = detail.querySelectorAll('.pr-field[data-pr-label]');
+        // Gather this cat's fields from the detail AND from the main summary row. inlineFields cats
+        // (Brad 2026-09-08) carry their .pr-field controls on the srow itself (right of the name);
+        // normal cats have them only in the detail (srow has none). Concatenating both makes the
+        // count + completeWhen/bothCompleteWhen/cond lookups locate the fields in EITHER placement.
+        var dEls = Array.prototype.slice.call(srow.querySelectorAll('.pr-field[data-pr-label]'))
+          .concat(Array.prototype.slice.call(detail.querySelectorAll('.pr-field[data-pr-label]')));
         var dTotal = 0, dDone = 0;
         for (var k = 0; k < dEls.length; k++){
           if (dEls[k].closest('.pf-cond-hidden')) continue;  // conditionally-hidden -> not counted
@@ -21400,15 +21472,26 @@ try {
         var forcedEmptyComplete = false;
         if (emptyCompleteField){
           var emptyVal = srow.getAttribute('data-empty-complete-val') || '';
+          // Locate the controlling field. Prefer this cat's own fields (dEls); FALL BACK to a
+          // sandbox-root-wide lookup so a cat can key its "nothing to do" state off a field in a
+          // DIFFERENT section (Brad 2026-09-08: Equipment Rental Called Off keys off Mob Prep's
+          // 'Rental Equipment - Qty'). Read live control value else read-view text.
+          var _ecEl = null;
           for (var ei = 0; ei < dEls.length; ei++){
-            if (dEls[ei].getAttribute('data-pr-label') === emptyCompleteField){
-              var ectl = dEls[ei].querySelector('select.pr-live-input, input.pr-live-input, textarea.pr-live-input');
-              var evcell = dEls[ei].querySelector('.pr-field-value');
-              var ecur = ectl ? String(ectl.value || '').trim()
-                              : (evcell ? String(evcell.textContent || '').replace(/\s+/g, ' ').trim() : '');
-              forcedEmptyComplete = (ecur === '' || ecur === emptyVal);
-              break;
+            if (dEls[ei].getAttribute('data-pr-label') === emptyCompleteField){ _ecEl = dEls[ei]; break; }
+          }
+          if (!_ecEl){
+            var _rootFields = root.querySelectorAll('.pf-srnew-scope .pr-field[data-pr-label]');
+            for (var ej = 0; ej < _rootFields.length; ej++){
+              if (_rootFields[ej].getAttribute('data-pr-label') === emptyCompleteField){ _ecEl = _rootFields[ej]; break; }
             }
+          }
+          if (_ecEl){
+            var ectl = _ecEl.querySelector('select.pr-live-input, input.pr-live-input, textarea.pr-live-input');
+            var evcell = _ecEl.querySelector('.pr-field-value');
+            var ecur = ectl ? String(ectl.value || '').trim()
+                            : (evcell ? String(evcell.textContent || '').replace(/\s+/g, ' ').trim() : '');
+            forcedEmptyComplete = (ecur === '' || ecur === emptyVal);
           }
         }
         // bothCompleteWhen (Brad 2026-09-08, Fuel Delivery Called Off): complete ONLY when the
@@ -22235,7 +22318,13 @@ try {
       'Start Fuel Delivery': true,
       'Stop Fuel Delivery': true,
       // Sandbox Demobilization section (Brad 2026-09-08): Called-Off dates, native date pickers.
-      'Equipment Rental Called Off - Date': true,
+      // Equipment Rental Called Off, per-piece (Brad 2026-09-08): one date per rented piece,
+      // auto-populated from the Rental Equipment Qty (#1..#4). Native date picker + MM/DD/YYYY. The
+      // old single 'Equipment Rental Called Off - Date' label was DROPPED (field removed, orphaned).
+      'Rental Equipment #1 - Date Called Off Rent': true,
+      'Rental Equipment #2 - Date Called Off Rent': true,
+      'Rental Equipment #3 - Date Called Off Rent': true,
+      'Rental Equipment #4 - Date Called Off Rent': true,
       'Fuel Delivery Called Off - Date': true,
       // ===== Site Readiness / Project Setup 6-subsection build (Brad 2026-08-07, batch-13) =====
       // Subsection 1: Shop Drawings
@@ -23483,6 +23572,20 @@ try {
       }
       var card = el.closest('.pr-card[data-pr-section="siteReadiness"]');
       var root = card && (card.closest('.pr-root') || card.parentElement);
+      // CROSS-SECTION (Brad 2026-09-08): the Demobilization "Equipment Rental Called Off" rows mirror
+      // this same Qty. They live in a DIFFERENT collapsible (a different .pf-safety-invdetail) but the
+      // SAME card 5 / .pr-root, so query [data-rental-calledoff-piece] from `root` (not `scope`, which
+      // is the Mob Prep detail) — same technique as the Demob listener. Show iff n <= qty.
+      if (root){
+        var coPieces = root.querySelectorAll('[data-rental-calledoff-piece]');
+        for (var j = 0; j < coPieces.length; j++){
+          var cp = coPieces[j];
+          var cn = parseInt(cp.getAttribute('data-rental-calledoff-piece'), 10) || 0;
+          var cshow = (cn <= qty);
+          cp.style.display = cshow ? '' : 'none';
+          cp.classList.toggle('pf-cond-hidden', !cshow);
+        }
+      }
       try { if (root && typeof pfRenderSandboxSubStatus === 'function') pfRenderSandboxSubStatus(root); } catch (e) {}
     }, true);
 
