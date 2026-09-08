@@ -14167,7 +14167,17 @@ try {
       safety:        { 'Safety Consultant': 'Safety Consultant' },
       siteReadiness: { 'Staking & Layout': 'Staking & Layout' },
       equipment:     { 'Equipment Transport': 'Equipment Transport', 'Rental Equipment': 'Rental Equipment' },
-      material:      { 'Material Vendor(s)': 'Material Vendor', 'Fuel Delivery': 'Fuel Delivery' }
+      // Stone Vendor / Stone Trucking Vendor (Brad 2026-09-08): two new material CRM
+      // groups so the AP - Stone Aggregate rows (Mob Prep > Materials) pull Company +
+      // Contact from Project Contacts, same as Equipment Transport / Fuel Delivery.
+      //  - 'Stone Vendor' -> master Category "Stone Vendor" (controlled-vocab value on the
+      //    PF Master Contact List; the semantically-correct home for stone suppliers).
+      //  - 'Stone Trucking Vendor' -> master Category "Trucking/Transport" (the controlled-
+      //    vocab hauler category). NOTE: the existing Paddacks/Stephan carriers are tagged
+      //    "Equipment Transport" (not "Trucking/Transport") in the sheet, so they will NOT
+      //    auto-appear under this group until (re)tagged. FLAGGED for Brad.
+      material:      { 'Material Vendor(s)': 'Material Vendor', 'Fuel Delivery': 'Fuel Delivery',
+                       'Stone Vendor': 'Stone Vendor', 'Stone Trucking Vendor': 'Trucking/Transport' }
     };
     // Read the current project's __crm map for a section key. Always an object; {}
     // when absent/malformed so callers never crash on a legacy project. Defaults to
@@ -19704,7 +19714,29 @@ try {
               cond: { field: 'AP - Stone Aggregate Required?', noValue: 'No', hideRow: '*', gate: '*' },
               fieldsFn: function(){ return [
                 field('AP - Stone Aggregate Required?', ''),
-                field('Stone Vendor & Contact', ''),
+                // Stone Vendor (Brad 2026-09-08): the old free-text 'Stone Vendor & Contact'
+                // field is SUPERSEDED by a CRM read-card host bound to material.__crm['Stone
+                // Vendor'] (PF_CRM_NEWGROUP_TRADE.material['Stone Vendor'] = "Stone Vendor").
+                // Company + Contact now come from the Project Contacts "Stone Vendor" group,
+                // same directory binding as Fuel Delivery / Equipment Transport. pfCrmRenderCards
+                // auto-discovers + fills this host on the sandbox root (document scan). It is an
+                // INERT div (no .pr-field / .pr-field-value) so pfRenderSandboxSubStatus never
+                // counts it toward the Materials completion tally. The data-pr-label sentinel
+                // only names the row "Stone Vendor". Field->CRM-host conversion: NO 1:1 alias
+                // for the old free-text value (it will not surface); AP Stone Aggregate is new
+                // this sprint so orphan risk is minimal.
+                '<div data-pr-label="Stone Vendor">'
+                  + '<div class="pr-crm-cards" data-crm-cards="Stone Vendor" '
+                  + 'data-crm-cards-key="material" data-role-tag="Stone Vendor"></div>'
+                + '</div>',
+                // Stone Trucking Vendor (Brad 2026-09-08): NEW row directly below Stone Vendor.
+                // CRM host bound to material.__crm['Stone Trucking Vendor']
+                // (PF_CRM_NEWGROUP_TRADE.material['Stone Trucking Vendor'] = "Trucking/Transport").
+                // Same static host pattern; INERT, not counted.
+                '<div data-pr-label="Stone Trucking Vendor">'
+                  + '<div class="pr-crm-cards" data-crm-cards="Stone Trucking Vendor" '
+                  + 'data-crm-cards-key="material" data-role-tag="Stone Trucking Vendor"></div>'
+                + '</div>',
                 field('Stone Name/Nomenclature', ''),
                 field('Stone Qty (TN)', bid.total_stone_tn, 'Bid Log'),
                 field('Stone Approved by Engineer (GGG)?', ''),
@@ -20844,17 +20876,25 @@ try {
               true, 'equipment')
           + '</div>');
         _curSection = _prevEqc;
-        // (12) Material Vendor(s) + (13) Fuel Delivery — material key (one card, two
-        // subhead groups; contiguous in the order).
+        // (12) Material Vendor(s) + (13) Fuel Delivery + (14) Stone Vendor + (15) Stone
+        // Trucking Vendor — material key (one card, four subhead groups; contiguous in
+        // the order). Stone Vendor + Stone Trucking Vendor added Brad 2026-09-08 so the
+        // AP - Stone Aggregate rows (Mob Prep > Materials) can pull Company + Contact
+        // from Project Contacts. Both use the generic dropdown-first company picker
+        // (pfCrmRenderOneHost + pfPcPickCompany) exactly like the other groups — trade
+        // -> master Category resolved via PF_CRM_NEWGROUP_TRADE.material.
         var _prevMatc = _curSection; _curSection = 'material';
         pcHost.insertAdjacentHTML('beforeend',
           // pr-pc-nohead: multi-subgroup group — hide the redundant parent header
-          // ("Material & Fuel Vendors"), leaving the TWO distinct sub-group headers
-          // (Material Vendor(s), Fuel Delivery) from the inner subheads.
+          // ("Material & Fuel Vendors"), leaving the FOUR distinct sub-group headers
+          // (Material Vendor(s), Fuel Delivery, Stone Vendor, Stone Trucking Vendor)
+          // from the inner subheads.
           '<div class="pr-nested-card-wrap pr-pc-nohead">'
           + card('', 'Material & Fuel Vendors', null,
               pcContactBlock('Material Vendor(s)', 'material')
-              + pcContactBlock('Fuel Delivery', 'material'),
+              + pcContactBlock('Fuel Delivery', 'material')
+              + pcContactBlock('Stone Vendor', 'material')
+              + pcContactBlock('Stone Trucking Vendor', 'material'),
               true, 'material')
           + '</div>');
         _curSection = _prevMatc;
