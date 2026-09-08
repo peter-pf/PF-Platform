@@ -18809,20 +18809,32 @@ try {
             field('Rental Actual Date Called Off Rent', '')
           ]);
 
-      // Assemble the 7 COLLAPSIBLE subsections (default expanded, mirroring E&D). The
-      // activation banner stays ABOVE the collapsibles (section-level status, not a
-      // subsection). Each collapsibleSubgroup() rolls up/expands independently.
-      var srBody =
-          siteReadinessActivationBanner()
-        + collapsibleSubgroup('1. Shop Drawings', sub1Inner)
-        + collapsibleSubgroup('2. Staking & Layout', sub3Inner)
-        + collapsibleSubgroup('3. Testing', sub2Inner)
-        + collapsibleSubgroup('4. Safety', sub4Inner)
-        + collapsibleSubgroup('5. Mobilization Preparation', sub5Inner)
-        + collapsibleSubgroup('6. Mobilization to Site', sub6Inner)
-        + collapsibleSubgroup('7. Rental Equipment', sub7Inner);
-      html += card(5, 'Site Readiness / Project Setup', null,
-        srBody + linkRow(L.site), false, 'siteReadiness');
+      // ===== OLD "Site Readiness / Project Setup" card DELETED (Brad 2026-09-08) =====
+      // The legacy 7-collapsible card (Shop Drawings / Staking / Testing / Safety /
+      // Mob Prep / Mob to Site / Rental) + its siteReadinessActivationBanner + its
+      // post-render NESTED Safety/Equipment/Material cards ('safety'/'equipment'/
+      // 'material' keys) was REMOVED. The "...- New" sandbox card below is PROMOTED to
+      // be THE live Site Readiness section (renamed to drop "- New"). Brad: "this is
+      // going to be the new format moving forward."
+      //   * The old srBody assembly + `card(5, 'Site Readiness / Project Setup', ...)`
+      //     render call are gone (this block).
+      //   * The two post-render title lookups that matched the EXACT old title
+      //     ('Site Readiness / Project Setup') + their nested-card injections
+      //     (Safety/Equipment/Material) and _surfaceExtras('equipment'/'material')
+      //     calls were removed too, so nothing re-injects legacy nested cards into the
+      //     promoted card (which already carries Safety/Equipment/Material inline under
+      //     siteReadiness in the new format).
+      //   * DATA NOTE: the new format renders Safety/Equipment/Material fields INLINE
+      //     under the siteReadiness key with Brad's redesigned labels (many with
+      //     PF_OVERRIDE_LABEL_ALIASES new->old already registered ~14272). Field data
+      //     that had been saved under the legacy 'safety'/'equipment'/'material'
+      //     override buckets (e.g. 'Safety Consultant', MSDS rows, 'Predrill Rig (Sany)',
+      //     'Stone Material *') is NOT deleted from KV but no longer surfaces here — an
+      //     accepted consequence of the format switch (Brad's own rebuild notes flag each
+      //     rename as "old value does NOT carry"). The Project Contacts CRM cards that ALSO
+      //     use those keys (pcContactBlock) are UNAFFECTED — they live outside this card.
+      //   * The unused sub1Inner..sub7Inner builder strings above are left assigned (dead,
+      //     side-effect-free) to keep this delete minimal; they are never rendered now.
 
       // ===== Site Readiness / Project Setup - NEW (SANDBOX rebuild) ============
       // (Brad 2026-09-04) A SEPARATE card where Site Readiness is rebuilt in the
@@ -19762,8 +19774,14 @@ try {
       // Shop Drawings ELIMINATED (Brad 2026-09-05) — sandbox now STARTS at Staking &
       // Layout: (1 Staking & Layout, 2 Testing, 3 Safety, 4 Mob Prep, 5 Mob to Site,
       // 6 Rental Equipment).
+      // Activation banner RESTORED (Brad 2026-09-08): the deleted old card rendered
+      // siteReadinessActivationBanner() at its top (submittal-gate status: "Waiting to
+      // start" gate list / "workflow ACTIVE"). It was NOT part of the sandbox body, so it
+      // is re-added here at the top of the promoted card so that section-level status is
+      // not lost in the format switch. Same helper, no behavior change.
       var srNewBody =
-          _srN_staking
+          siteReadinessActivationBanner()
+        + _srN_staking
         + _srN_testing
         + _srN_safety
         + _srN_mobprepNew
@@ -19772,7 +19790,11 @@ try {
       // must match Inventory can target the sandbox WITHOUT leaking into the ORIGINAL
       // Site Readiness card (both cards share data-pr-section="siteReadiness", so the
       // wrapper is the only sandbox-unique selector). Purely visual; no logic change.
-      html += card(5, 'Site Readiness / Project Setup - New', null,
+      // PROMOTED (Brad 2026-09-08): this is now THE live Site Readiness section (title
+      // dropped "- New"; the legacy twin above was deleted). Same body, same siteReadiness
+      // key, same .pf-srnew-scope wrapper (still the sandbox-unique CSS selector — kept so
+      // the Inventory-look overrides keep applying; purely cosmetic class name).
+      html += card(5, 'Site Readiness / Project Setup', null,
         '<div class="pf-srnew-scope">' + srNewBody + '</div>', false, 'siteReadiness');
 
       // ----- 6. Project Photos (LIVE, READ-ONLY gallery) -----
@@ -20780,32 +20802,21 @@ try {
         _curSection = _prevMatc;
       }
 
-      // ----- Safety NESTED card inside Site Readiness / Project Setup (Subsection 4)
-      // (Brad 2026-08-07 batch-13) -----
-      // The former standalone "Project Safety" section (#4) is REMOVED; its content lives
-      // here as a NESTED editable card that KEEPS the existing `safety` override key (in
-      // VALID_SECTIONS already) so ALL prior safety override data + Edit/Save plumbing
-      // survive with ZERO migration. The card is INSERTED before the "5. Mobilization
-      // Preparation" subgroup so it renders under the "4. Safety" blue header in order.
-      // It carries: the migrated Project-Safety fields (SSSP/consultant/MSDS/toolbox/
-      // JSA/daily-equip-checklist/hand-logs/locate ticket + the 3 locate dates) PLUS the
-      // new structural Safety fields (SSSP Pipefy action + dates + links, MSDS dates/links,
-      // Other Safety Items textarea, toolbox/JSA/checklist links, hand-log date, and the
-      // full Utility Locates group). AUTOMATION IS FUTURE (subgroupNotes only).
-      // Resolve the TOP-LEVEL Site Readiness card by TITLE, not by
-      // data-pr-section="siteReadiness" — the Project Contacts "Staking & Layout"
-      // group (injected above) now ALSO carries data-pr-section="siteReadiness" and
-      // appears EARLIER in the DOM, so a bare querySelector would wrongly target it
-      // and dump the Safety/Equipment/Material nested cards into Project Contacts.
-      // (Brad 2026-08-11, Project Contacts move.)
-      var _srTopBody = (function(){
-        var cards = root.querySelectorAll(':scope > .pr-card');
-        for (var i = 0; i < cards.length; i++){
-          var t = cards[i].querySelector('.pr-card-title');
-          if (t && t.textContent === 'Site Readiness / Project Setup') return cards[i].querySelector('.pr-card-body');
-        }
-        return null;
-      })();
+      // ----- Legacy NESTED Safety/Equipment/Material card injection DISABLED (Brad 2026-09-08)
+      // The old "Site Readiness / Project Setup" card that these post-render cards injected
+      // into was DELETED and its "...- New" twin PROMOTED to that exact title. In the new
+      // format, Safety / Equipment / Material fields render INLINE under siteReadiness (see
+      // _srN_safety / Mob Prep > Equipment / Materials above), so re-injecting the legacy
+      // 'safety'/'equipment'/'material' nested cards would DUPLICATE that content into the
+      // promoted card. _srTopBody is therefore forced to null: the two title lookups below
+      // that keyed on the exact old title would now (wrongly) resolve to the promoted card,
+      // so we short-circuit them. Every downstream block is already null-guarded (the
+      // `if (srCardForSafety)` / `if (srCard)` / `_srScoped` ternary), so this cleanly skips
+      // the Safety + Equipment + Material nested-card injections and their _surfaceExtras
+      // calls WITHOUT touching those (harmless, dead) blocks. Legacy 'safety'/'equipment'/
+      // 'material' KV data is NOT deleted (Project Contacts CRM cards still use those keys);
+      // it just no longer renders as nested field cards here (accepted format-switch tradeoff).
+      var _srTopBody = null;
       var srCardForSafety = _srTopBody;
       if (srCardForSafety) {
         var _prevSafety = _curSection; _curSection = 'safety';
@@ -21161,14 +21172,14 @@ try {
       // Site-Readiness-scoped card explicitly. The Project Contacts CRM-only cards have
       // NO .pr-field rows, so their overrides (none) never need surfacing there; the
       // real override rows always live in the Site Readiness card resolved here.
-      var srCardEl = (function(){
-        var cards = root.querySelectorAll('.pr-card');
-        for (var i = 0; i < cards.length; i++){
-          var t = cards[i].querySelector('.pr-card-title');
-          if (t && t.textContent === 'Site Readiness / Project Setup') return cards[i];
-        }
-        return null;
-      })();
+      // srCardEl forced null (Brad 2026-09-08): the old card that held the nested
+      // equipment/material field cards was deleted; the promoted new card renders those
+      // inline under siteReadiness (no nested .pr-card[data-pr-section="equipment"|"material"]
+      // exists inside it), so _srScoped() would return null anyway. Nulling srCardEl makes
+      // the intent explicit and guarantees the _surfaceExtras('equipment'/'material') calls
+      // below no-op (they already early-return on a null card body). Legacy equipment/material
+      // KV data is not deleted; it just no longer surfaces as extra rows in this deleted card.
+      var srCardEl = null;
       var _srScoped = function(sec){
         return srCardEl ? srCardEl.querySelector('.pr-card[data-pr-section="' + sec + '"] .pr-card-body') : null;
       };
