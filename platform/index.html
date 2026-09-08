@@ -2463,6 +2463,18 @@ tr.pf-dragging { opacity: 0.45; }
 .pf-sr-table .pr-field-value { font-size: 12.5px; color: var(--text-1, #2B2F36); }
 .pf-sr-table .pr-live-input { font-size: 12.5px; }
 
+/* ---- Compact embedded CRM contact host (Brad 2026-09-08) ---------------------- */
+/* The Mob-Prep / Materials inline contact hosts (data-crm-compact) SHIFT LEFT: the */
+/* row drops its 34% label cell and the card spans both columns (see _srNewRow),    */
+/* so the Name/Email/Cell line reads full-width from the left instead of wrapping    */
+/* one letter per line inside the old narrow 66% value cell. Compact = 3 columns:    */
+/* Name / Email / Cell only (Title / Office / Notes omitted in pfCrmRenderOneHost).  */
+.pf-sr-table td.pf-sr-crm-fullcell { width: auto; }
+.pf-sr-table .pr-crm-cards[data-crm-compact] { width: 100%; }
+.pr-crm-cards[data-crm-compact] .pr-crow-name  { flex: 0 0 200px; }
+.pr-crm-cards[data-crm-compact] .pr-crow-email { flex: 1 1 260px; }
+.pr-crm-cards[data-crm-compact] .pr-crow-cell  { flex: 0 0 150px; }
+
 /* ---- Staking-only collapsible title bar (Brad 2026-09-05) ---------------------- */
 /* Replaces the dark .pf-sr-headbar + "Field/Value" thead for the Staking subsection */
 /* ONLY with a single clean accent-blue full-width title bar that IS the roll-up      */
@@ -18989,6 +19001,19 @@ try {
         // data-row-label lets a conditional category (e.g. JHA) target a specific row to
         // show/hide it (Brad 2026-09-08). `name` is already attribute-escaped (extracted from
         // the field's own data-pr-label attribute).
+        //
+        // FULL-WIDTH compact CRM host (Brad 2026-09-08): a row whose value is one of the
+        // embedded compact contact hosts (data-crm-compact) SHIFTS LEFT — we drop the narrow
+        // 34% label cell and let the contact card span BOTH columns (colspan=2) so the
+        // Name/Email/Cell line starts near the left with full room (no one-letter-per-line
+        // wrap in the old 66% value cell). The row label is redundant here: the compact card
+        // shows its own company header, and the subsection headbar already names the group.
+        // The .pf-sr-crm-fullrow class also carries the section name via data-row-label so
+        // conditional show/hide (JHA-style) still targets it. Only compact hosts match.
+        if (/data-crm-compact="1"/.test(fieldHtml)) {
+          return '<tr data-row-label="' + name + '" class="pf-sr-crm-fullrow">'
+               + '<td class="pf-sr-val pf-sr-crm-fullcell" colspan="2">' + fieldHtml + '</td></tr>';
+        }
         return '<tr data-row-label="' + name + '"><td class="pf-sr-name">' + name + '</td>'
              + '<td class="pf-sr-val">' + fieldHtml + '</td></tr>';
       };
@@ -19679,6 +19704,7 @@ try {
                 '<div data-pr-label="Equipment Transportation Info">'
                   + '<div class="pr-crm-cards" data-crm-cards="Equipment Transport" '
                   + 'data-crm-cards-key="equipment" data-role-tag="Equipment Transportation Info" '
+                  + 'data-crm-compact="1" '
                   + 'data-crm-company-filter="Mob Transport Company"></div>'
                 + '</div>'
               ]; } },
@@ -19714,7 +19740,7 @@ try {
                   + '<div class="pf-vscrow">'
                   +   '<span class="pf-vscrow-main">'
                   +     '<div class="pr-crm-cards" data-crm-cards="Rental Equipment" '
-                  +     'data-crm-cards-key="equipment" data-role-tag="Rental Equipment"></div>'
+                  +     'data-crm-cards-key="equipment" data-role-tag="Rental Equipment" data-crm-compact="1"></div>'
                   +   '</span>'
                   +   '<span class="pf-vscrow-col">'
                   +     '<span class="pf-vscrow-lbl">Qty of Rental Equipment Pieces</span>'
@@ -19754,7 +19780,7 @@ try {
                 // NOT a .pr-field so never counted.
                 '<div data-pr-label="Fuel Delivery Contact">'
                   + '<div class="pr-crm-cards" data-crm-cards="Fuel Delivery" '
-                  + 'data-crm-cards-key="material" data-role-tag="Fuel Vendor"></div>'
+                  + 'data-crm-cards-key="material" data-role-tag="Fuel Vendor" data-crm-compact="1"></div>'
                 + '</div>',
                 // Fuel Delivery Dates (Brad 2026-09-08): a same-row two-column .pf-vscrow —
                 // Start Fuel Delivery + Stop Fuel Delivery (both native date pickers, registered in
@@ -19804,7 +19830,7 @@ try {
                 // this sprint so orphan risk is minimal.
                 '<div data-pr-label="Stone Vendor">'
                   + '<div class="pr-crm-cards" data-crm-cards="Stone Vendor" '
-                  + 'data-crm-cards-key="material" data-role-tag="Stone Vendor"></div>'
+                  + 'data-crm-cards-key="material" data-role-tag="Stone Vendor" data-crm-compact="1"></div>'
                 + '</div>',
                 // Stone Trucking Vendor (Brad 2026-09-08): NEW row directly below Stone Vendor.
                 // CRM host bound to material.__crm['Stone Trucking Vendor']
@@ -19812,7 +19838,7 @@ try {
                 // Same static host pattern; INERT, not counted.
                 '<div data-pr-label="Stone Trucking Vendor">'
                   + '<div class="pr-crm-cards" data-crm-cards="Stone Trucking Vendor" '
-                  + 'data-crm-cards-key="material" data-role-tag="Stone Trucking Vendor"></div>'
+                  + 'data-crm-cards-key="material" data-role-tag="Stone Trucking Vendor" data-crm-compact="1"></div>'
                 + '</div>',
                 field('Stone Name/Nomenclature', ''),
                 field('Stone Qty (TN)', bid.total_stone_tn, 'Bid Log'),
@@ -24463,6 +24489,15 @@ try {
       var roleTag = host.getAttribute('data-role-tag') || '';
       var _rowEditable = (typeof canEdit === 'function') ? canEdit() : false;
       var _prefix = pfx;
+      // COMPACT MODE (Brad 2026-09-08): the embedded Mob-Prep / Materials inline hosts
+      // (data-crm-compact="1") are DISPLAY-focused — they sit in a narrow inventory value
+      // cell and only need to show WHO is selected. Render each contact as ONE dense line
+      // showing Name / Email / Cell ONLY (omit Title, Office Phone, Notes). Company header +
+      // office Edit/×/Add controls are kept (so office users can still manage inline), but
+      // the data columns collapse to 3. The full 6-column directory format is UNCHANGED for
+      // the Project Contacts tab (hosts WITHOUT this flag). Full-width/left-shift is handled
+      // by the .pr-crm-cards[data-crm-compact] CSS on the inventory row.
+      var _compact = host.getAttribute('data-crm-compact') === '1';
       // MULTI-COMPANY (Brad 2026-08-28): normalize the __crm entry to a companies[] list.
       // Legacy single -> a synthesized 1-element list; a companies[] entry -> used as-is.
       // Each element renders its OWN company card (name/address/contacts/+Add contact/
@@ -24487,7 +24522,14 @@ try {
       // 2026-08-20). Fall through when editable; only bail when read-only.
       if (!companies.length && !seed && !_rowEditable) { host.innerHTML = ''; return; }
 
-      var headRow = '<div class="pr-crow pr-crow-head">'
+      var headRow = _compact
+        ? '<div class="pr-crow pr-crow-head">'
+          + '<span class="pr-crow-name">Name</span>'
+          + '<span class="pr-crow-email">Email</span>'
+          + '<span class="pr-crow-cell">Cell Phone</span>'
+          + (_rowEditable ? '<span class="pr-crow-act"></span>' : '')
+          + '</div>'
+        : '<div class="pr-crow pr-crow-head">'
         + '<span class="pr-crow-name">Name</span>'
         + '<span class="pr-crow-title">Title</span>'
         + '<span class="pr-crow-off">Office Phone</span>'
@@ -24582,6 +24624,17 @@ try {
               + ' data-legacy-notes="' + esc2(r.notes) + '"';
             if (r.labels) rowAttrs += ' data-legacy-labels="' + esc2(JSON.stringify(r.labels)) + '"';
             if (r.labelSection) rowAttrs += ' data-legacy-section="' + esc2(r.labelSection) + '"';
+          }
+          if (_compact) {
+            // Compact line: Name / Email / Cell ONLY (omit Title, Office Phone, Notes). All
+            // three still escaped (esc2). Edit/× act cluster kept for office; rowAttrs (cid +
+            // legacy data-*) preserved so those controls target the right directory record.
+            return '<div class="pr-crow"' + rowAttrs + '>'
+              + '<span class="pr-crow-name">'  + esc2(r.name || (r.cid || '')) + '</span>'
+              + '<span class="pr-crow-email">' + email + '</span>'
+              + '<span class="pr-crow-cell">'  + cell + '</span>'
+              + actHtml
+              + '</div>';
           }
           return '<div class="pr-crow"' + rowAttrs + '>'
             + '<span class="pr-crow-name">'  + esc2(r.name || (r.cid || '')) + '</span>'
