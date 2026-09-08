@@ -18813,7 +18813,13 @@ try {
       var _srNewSafetyInvTable = function(cats){
         var rows = '';
         cats.forEach(function(c){
-          var _prev = _curSection; _curSection = 'safety';
+          // PERSISTENCE FIX (Brad 2026-09-08): build these fields under 'siteReadiness' — the
+          // SAME section the sandbox card SAVES to (its data-pr-section). They previously built
+          // under 'safety', so live-edit saved to siteReadiness but the render READ from safety
+          // -> every value came back blank on refresh. Reading + writing the same section makes
+          // them persist (and surfaces values already saved to siteReadiness). Labels don't
+          // collide with the Staking/Testing siteReadiness fields.
+          var _prev = _curSection; _curSection = 'siteReadiness';
           var flds = c.fieldsFn();
           _curSection = _prev;
           var body = _srNewSubTable(c.name, flds, { noHeadbar: true, noThead: true });
