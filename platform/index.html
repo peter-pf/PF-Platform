@@ -2499,6 +2499,7 @@ tr.pf-dragging { opacity: 0.45; }
 /* Inline action link on a summary row (e.g. SSSP "Open Safety Folder", Brad 2026-09-08):
    sits just right of the category name; its own click opens the link without toggling the row. */
 .pf-srnew-scope .pf-safety-rowaction { margin-left: 14px; font-weight: 500; }
+.pf-srnew-scope .pf-safety-rowaction a + a { margin-left: 14px; }
 .pf-srnew-scope .pf-safety-invstatus {
   text-align: right; white-space: nowrap; color: var(--text-3, #6b7a89);
   font-size: 12px; font-weight: 600;
@@ -18365,6 +18366,12 @@ try {
       // Engineering & Design > PF Submittal Design > "Printing Drawings" (now defined
       // locally there as _fedexPrintUrl). No remaining references in Site Readiness.
       var _pipefySSSP = 'https://app.pipefy.com/public/form/7j9G40Zp';
+      // Company-wide SDS library links (Brad 2026-09-08). STATIC / global (same for every
+      // project) -> hardcoded, not per-project. The compiled-PDF URL is the exact SharePoint
+      // link Brad supplied; the folder URL is its `parent` path rendered as the standard
+      // AllItems.aspx?id=<folder> view. Location: 05 - Field Operations/Safety/PF SDS.
+      var _sdsFolderUrl = 'https://pierfoundations.sharepoint.com/sites/pf/Shared%20Documents/Forms/AllItems.aspx?id=%2Fsites%2Fpf%2FShared%20Documents%2F05%20%2D%20Field%20Operations%2FSafety%2FPF%20SDS&viewid=3a40a7db-96c1-4a97-ab1f-1065d9861e1c';
+      var _sdsCompiledUrl = 'https://pierfoundations.sharepoint.com/sites/pf/Shared%20Documents/Forms/AllItems.aspx?viewid=3a40a7db-96c1-4a97-ab1f-1065d9861e1c&FolderCTID=0x012000EAB8B17F3A8C5C4BBC3CD32AE78A256B&id=%2Fsites%2Fpf%2FShared%20Documents%2F05%20%2D%20Field%20Operations%2FSafety%2FPF%20SDS%2F00%2DPF%20SDS%20Compiled%2Epdf&parent=%2Fsites%2Fpf%2FShared%20Documents%2F05%20%2D%20Field%20Operations%2FSafety%2FPF%20SDS';
       // Site Readiness workflow ACTIVATION (Brad 2026-08-12): a banner at the top of this
       // section reading the 3 kickoff gates. Gate C (PDF-in-folder confirm) MOVED to E&D >
       // PF Submittal Design as an on-the-fly checkbox under the Approved Shop Drawings link
@@ -19091,17 +19098,35 @@ try {
               var _u = (_sf && _sf.folder_url != null) ? String(_sf.folder_url).trim() : '';
               return _u ? pfFolderLink(_u, 'Open Safety Folder') : '';
             })(),
+            fieldsFn: function(){
+              // SSSP file auto-detected in the project's "06 - Safety" folder (Brad 2026-09-08)?
+              // sync/build-safety-folder.py matches a file named SSSP / "Site Specific Safety"
+              // and exposes sssp_file_url. When present, the row shows a clickable "SSSP" link
+              // to that file IN PLACE OF the "Create / Send SSSP (Pipefy)" button (the button
+              // goes away once the plan exists). Absent -> the Create button (unchanged).
+              // Either way the row is a bare data-pr-label div (not a .pr-field): supplies the
+              // row NAME to _srNewRow, but never saves/counts toward the completion badge.
+              var _sf = pfSafetyFolder(_curNum);
+              var _ssspUrl = (_sf && _sf.sssp_file_url) ? String(_sf.sssp_file_url).trim() : '';
+              var _ssspRow = _ssspUrl
+                ? '<div class="pf-staking-resprow" data-pr-label="Site Specific Safety Plan">'
+                    + '<a class="pr-action-link" href="' + E(_ssspUrl) + '" target="_blank" rel="noopener noreferrer">&#128196; SSSP</a>'
+                  + '</div>'
+                : '<div class="pf-staking-resprow" data-pr-label="Create SSSP">'
+                    + '<a class="pr-action-link" href="' + E(_pipefySSSP) + '" target="_blank" rel="noopener noreferrer">&#128221; Create / Send SSSP (Pipefy)</a>'
+                  + '</div>';
+              return [
+                _ssspRow,
+                field('Date SSSP Sent to GC', '')
+              ];
+            } },
+          { name: 'Material Safety Data Sheets (SDS)',
+            // On the SDS row (Brad 2026-09-08): a link to the company-wide PF SDS folder + a
+            // direct link to the compiled PDF ("PF SDS Compiled"). Both static/global.
+            rowAction: pfFolderLink(_sdsFolderUrl, 'Open SDS Folder')
+              + '<a class="pf-folder-link" href="' + E(_sdsCompiledUrl) + '" target="_blank" rel="noopener noreferrer">'
+              + '&#128196; <span class="pf-folder-txt">PF SDS Compiled</span></a>',
             fieldsFn: function(){ return [
-              // "Create SSSP" row (Brad 2026-09-08): the editable text field was DELETED; the
-              // row is now just the label + the Create / Send SSSP (Pipefy) button to its right.
-              // data-pr-label on the resprow div supplies the row NAME to _srNewRow — the div is
-              // NOT a .pr-field, so it neither saves nor counts toward the completion badge.
-              '<div class="pf-staking-resprow" data-pr-label="Create SSSP">'
-                + '<a class="pr-action-link" href="' + E(_pipefySSSP) + '" target="_blank" rel="noopener noreferrer">&#128221; Create / Send SSSP (Pipefy)</a>'
-              + '</div>',
-              field('Date SSSP Sent to GC', '')
-            ]; } },
-          { name: 'Material Safety Data Sheets (SDS)', fieldsFn: function(){ return [
               // Trimmed (Brad 2026-09-08): dropped repetitive "SDS Sent?" + "SDS Copy Link"
               // rows; "Date SDS Sent" renamed to "Date SDS Sent to GC".
               field('Safety Data Sheets (SDS)', ''),
