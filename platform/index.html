@@ -14371,6 +14371,10 @@ try {
       'Testing Material Fall Off Load': 'Equipment Needed - Testing Material Fall Off Load',
       // Garbin closeout composite renames (Brad 2026-09-08). new label -> old label so any
       // saved Yes/No override carries into the renamed composite row.
+      //  GI-300 composite (drop '?'): the GI-300 Yes/No field was renamed for the composite
+      //  row; carries any saved Yes/No. (Date field 'Date QAQC As-Built Sent' kept byte-
+      //  identical -> NO date alias.)
+      'GI-300 QAQC As-Built Page Sent to Garbin': 'GI-300 QAQC As-Built Page Sent to Garbin?',
       //  Redline 1: Column Logs -> GUHMA Data. (Date field 'Date Column Logs Sent' kept
       //  byte-identical -> NO date alias.)
       'GUHMA Data (PDF) Sent to Garbin': 'Column Logs (Rig PDF) Sent to Garbin?',
@@ -19176,10 +19180,22 @@ try {
       // names the _srNewRow row `name` (NOT a .pr-field, never counted). Register '<name> - Demob
       // Date' in PF_FIELD_DATE_LABELS.
       var _pfDemobPieceRow = function(name){
+        // VISIBILITY TIGHTENED (Brad 2026-09-08): show a demob row ONLY for a piece that was
+        // ACTUALLY mobilized = Mob confirmed "Yes" AND its Mob Date is set (effVal(...'<name> - Mob
+        // Date') non-empty). "No", or "Yes" with no Mob Date, DROPS the placeholder (.pf-cond-hidden
+        // -> its Demob Date excluded from the count). (No separate delivered-date field exists on the
+        // Mob pieces — Yes+Mob Date IS the mobilized condition; report flags this for Brad.)
         var _yes = /^yes$/i.test(String(effVal('siteReadiness', name, '') || '').trim());
-        return '<div data-pr-label="' + E(name) + '">'
-          + '<div class="pf-vscrow pf-demob-piece' + (_yes ? '' : ' pf-cond-hidden')
-              + '" data-demob-piece="' + E(name) + '"' + (_yes ? '' : ' style="display:none"') + '>'
+        var _mobDate = String(effVal('siteReadiness', name + ' - Mob Date', '') || '').trim();
+        var _show = _yes && (_mobDate !== '');
+        // Append the mobilized rig NAME from the Mob dropdown so the demob row says WHICH machine is
+        // being called off, e.g. "VSC Rig — CAT with Vibro" (mirrors the rental called-off Type
+        // append). Pieces without a Which Rig (Gooseneck / Testing) show just the piece name.
+        var _rig = String(effVal('siteReadiness', name + ' - Which Rig', '') || '').trim();
+        var _label = name + (_rig ? ' — ' + _rig : '');
+        return '<div data-pr-label="' + E(_label) + '">'
+          + '<div class="pf-vscrow pf-demob-piece' + (_show ? '' : ' pf-cond-hidden')
+              + '" data-demob-piece="' + E(name) + '"' + (_show ? '' : ' style="display:none"') + '>'
           +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Demob Date</span>'
           +     field(name + ' - Demob Date', '') + '</span>'
           + '</div>'
@@ -19198,8 +19214,15 @@ try {
       var _pfRentalCalledOffRow = function(n){
         var _qtyRaw = String(effVal('siteReadiness', 'Rental Equipment - Qty', '') || '').trim();
         var _qty = /^\d+$/.test(_qtyRaw) ? parseInt(_qtyRaw, 10) : 0;
-        var _show = (n <= _qty);
         var _type = String(effVal('siteReadiness', 'Rental Equipment #' + n + ' - Type', '') || '').trim();
+        // VISIBILITY TIGHTENED (Brad 2026-09-08, screenshot): show a called-off row ONLY for a
+        // rental piece that was ACTUALLY set up = has an equipment TYPE selected up in the Rental
+        // Equipment cascade ('Rental Equipment #n - Type' non-empty), still bounded by Qty (n<=Qty
+        // AND type set). Pieces with #n<=Qty but no type chosen (empty placeholder "#3","#4") are
+        // DROPPED (.pf-cond-hidden -> excluded from the count). The live Qty listener + a new
+        // per-piece 'Rental Equipment #n - Type' change listener both re-run this via
+        // pfRenderSandboxSubStatus so the row appears/disappears the instant a Type is set/cleared.
+        var _show = (n <= _qty) && (_type !== '');
         var _label = 'Rental Equipment #' + n + (_type ? ' — ' + _type : '');
         return '<div data-pr-label="' + E(_label) + '">'
           + '<div class="pf-vscrow pf-rental-calledoff' + (_show ? '' : ' pf-cond-hidden')
@@ -20403,10 +20426,11 @@ try {
       // they render as full-width rows but are NOT counted by pfRenderSandboxSubStatus.
       var closeoutSub1Inner = ([
           subgroupNote('Standardized closeout & demob checklist the field runs before leaving, so every job gets the same consistent experience.'),
-          fieldLinked('Field Closeout & Demob Checklist Link', '', '', 'website'),
+          // REMOVED (Brad 2026-09-08): the 'Field Closeout & Demob Checklist Link' website-link row
+          // and the 'Completed By' text field. Render-only deletion (no alias — not a rename); any
+          // previously-saved values simply stop displaying. The remaining 3 items render cleanly.
           field('Field Closeout Complete?', ''),
-          field('Date Completed', ''),
-          field('Completed By', '')
+          field('Date Completed', '')
       ]);
 
       // ---- Subsection 2: Send Final As-Builts to Garbin ----
@@ -20418,9 +20442,22 @@ try {
           // design = blue, shorts = red (handled on the QAQC page itself).
           subgroupNote('Send the 3-PDF Garbin closeout package: (1) GI-300 QAQC As-Built page, (2) Column Logs (rig PDF), (3) Modulus Load Test. Routing baked in below (Jake Campbell + projects@garbingeostructural.com). 5-business-day SOP: expected GGG return auto-computes 5 business days after all files are sent; the portal flags it OVERDUE below once that date passes and Garbin has not returned.'),
           field('Responsible', 'Jonathan'),
-          // (a) NEW tracked doc #1 of the 3-PDF package: the GI-300 QAQC as-built page.
-          field('GI-300 QAQC As-Built Page Sent to Garbin?', ''),
-          field('Date QAQC As-Built Sent', ''),
+          // (a) COMPOSITE ROW — GI-300 QAQC As-Built (Brad 2026-09-08, consistency with GUHMA /
+          // Modulus): the tracked doc #1 of the 3-PDF package now shares ONE row [label | Yes/No |
+          // date], same .pf-vscrow idiom as the GUHMA + Modulus composites below. The Yes/No field
+          // drops the '?': 'GI-300 QAQC As-Built Page Sent to Garbin?' -> 'GI-300 QAQC As-Built Page
+          // Sent to Garbin'; the drop-'?' rename would orphan saved Yes/No without an alias, so
+          // PF_OVERRIDE_LABEL_ALIASES maps new->old. The date field label 'Date QAQC As-Built Sent'
+          // is KEPT BYTE-IDENTICAL (no rename, no alias). Both controls save under 'closeout' (this
+          // cat's section). Consolidates the old 2 separate rows into 1 composite.
+          '<div data-pr-label="GI-300 QAQC As-Built Page Sent to Garbin">'
+            + '<div class="pf-vscrow">'
+            +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Sent?</span>'
+            +     field('GI-300 QAQC As-Built Page Sent to Garbin', '') + '</span>'
+            +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Date Sent</span>'
+            +     field('Date QAQC As-Built Sent', '') + '</span>'
+            + '</div>'
+          + '</div>',
           // Link rows REMOVED (Brad 2026-09-08): 'GI-300 QAQC As-Built Link',
           // 'Column Logs Link', and 'Load Test Link' deleted from this Garbin cat
           // (render-only removal; the Sent?/Date tracking fields for each doc stay).
@@ -20614,6 +20651,22 @@ try {
           })()
       ]);
 
+      // ---- Subsection 3b: Sent Final As-Builts to GC (Brad 2026-09-08) ----
+      // A minimal tracking row consistent with the other closeout as-built composites: one
+      // .pf-vscrow [label | Sent? Yes/No | Date Sent]. Brad specified a Yes/No + date; the exact
+      // fields may be redlined later. Brand-new labels (no rename -> no alias). Registered in
+      // PF_FIELD_DROPDOWNS (Yes/No) + PF_FIELD_DATE_LABELS (the date). Saves under 'closeout'.
+      var closeoutSub3bInner = ([
+          '<div data-pr-label="Final As-Builts Sent to GC">'
+            + '<div class="pf-vscrow">'
+            +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Sent?</span>'
+            +     field('Final As-Builts Sent to GC', '') + '</span>'
+            +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Date Sent</span>'
+            +     field('Date Final As-Builts Sent to GC', '') + '</span>'
+            + '</div>'
+          + '</div>'
+      ]);
+
       // ---- Subsection 4: Certified Payroll Reports ----
       var closeoutSub4Inner = ([
           // Dynamic note reflecting the Contract Recap cross-read so the requirement
@@ -20736,8 +20789,14 @@ try {
             // not duplicated). closeoutSub1Inner is still defined above and consumed there.
             { name: 'Send Final As-Builts to Garbin', fieldsFn: function(){ return closeoutSub2Inner; } },
             { name: 'GGG Returns Final As-Builts', fieldsFn: function(){ return closeoutSub3Inner; } },
+            // NEW (Brad 2026-09-08): the PF-to-GC as-built send, tracked right after GGG returns the
+            // stamped set. Display-only cat name; its two fields carry their own storage keys.
+            { name: 'Sent Final As-Builts to GC', fieldsFn: function(){ return closeoutSub3bInner; } },
             { name: 'Certified Payroll Reports', fieldsFn: function(){ return closeoutSub4Inner; } },
-            { name: 'Thank-You Email to GC', fieldsFn: function(){ return closeoutSub5Inner; } }
+            // Cat header RENAMED (Brad 2026-09-08): display-only "Thank-You Email to GC" ->
+            // "Thank you Email & Survey". The FIELD labels/keys inside closeoutSub5Inner are
+            // UNCHANGED, so no saved data is orphaned and no alias is needed for the header.
+            { name: 'Thank you Email & Survey', fieldsFn: function(){ return closeoutSub5Inner; } }
           ], 'closeout'), true);
 
       // Wrapped in .pf-srnew-scope so the inventory engine's status/green-checks apply here too
@@ -22646,6 +22705,9 @@ try {
       'Field Closeout Complete?': ['Yes', 'No'],
       // Subsection 2: Send Final As-Builts to Garbin (3-PDF package: GI-300 QAQC +
       // Column Logs + Modulus Load Test).
+      // GI-300 composite drop-'?' rename (Brad 2026-09-08): NEW label + old (inert)
+      // kept for the same reason as the GUHMA / Modulus composites below.
+      'GI-300 QAQC As-Built Page Sent to Garbin': ['Yes', 'No'],
       'GI-300 QAQC As-Built Page Sent to Garbin?': ['Yes', 'No'],
       // Column Logs -> GUHMA composite (Brad 2026-09-08 redline 1): NEW label.
       // Old 'Column Logs (Rig PDF) Sent to Garbin?' entry kept below (inert — no
@@ -22656,6 +22718,8 @@ try {
       // old (inert) kept for the same reason.
       'Modulus Load Test Sent to Garbin': ['Yes', 'No'],
       'Modulus Load Test Sent to Garbin?': ['Yes', 'No'],
+      // Subsection 3b: Sent Final As-Builts to GC (Brad 2026-09-08) — Yes/No composite.
+      'Final As-Builts Sent to GC': ['Yes', 'No'],
       // Subsection 3: GGG Returns Final As-Builts (review workflow — Yes/No gates)
       'As-Builts Saved to Closeout Folder?': ['Yes', 'No'],
       'Peter Analyzed As-Builts vs Sent Files?': ['Yes', 'No'],
@@ -22809,6 +22873,8 @@ try {
       'Date Sent to GC': true,
       // Retainage-on-closeout: date the final invoice (incl. retainage) was sent.
       'Date Final Invoice Sent': true,
+      // Subsection 3b: Sent Final As-Builts to GC (Brad 2026-09-08).
+      'Date Final As-Builts Sent to GC': true,
       // Subsection 4: Certified Payroll Reports (disambiguated label to avoid the
       // Subsection-3 "Date Confirmed" key collision within the same closeout section).
       'Date Confirmed - Certified Payroll': true,
@@ -23931,9 +23997,64 @@ try {
       var pieceName = el.getAttribute && el.getAttribute('data-pr-field-label');
       if (pieceName && root){
         var demob = root.querySelector('[data-demob-piece="' + (window.CSS && CSS.escape ? CSS.escape(pieceName) : pieceName.replace(/"/g, '\\"')) + '"]');
-        if (demob){ demob.style.display = isYes ? '' : 'none'; demob.classList.toggle('pf-cond-hidden', !isYes); }
+        if (demob){
+          // MOBILIZED CONDITION (Brad 2026-09-08): show the demob row only when Mob === Yes AND the
+          // piece's Mob Date is set. Read the live Mob Date control for this piece (it lives on the
+          // SAME .pf-vscrow-cond row that the Yes/No just revealed) so flipping Yes with no date yet
+          // keeps the demob row hidden; it appears once the date is entered (see the Mob Date/Which
+          // Rig listener below, which re-evaluates on those changes).
+          var mdEl = root.querySelector('[data-pr-field-label="' + (window.CSS && CSS.escape ? CSS.escape(pieceName + ' - Mob Date') : (pieceName + ' - Mob Date').replace(/"/g, '\\"')) + '"]');
+          var mdVal = mdEl ? String(mdEl.value || '').trim() : '';
+          var showDemob = isYes && (mdVal !== '');
+          demob.style.display = showDemob ? '' : 'none'; demob.classList.toggle('pf-cond-hidden', !showDemob);
+        }
       }
       try { if (root && typeof pfRenderSandboxSubStatus === 'function') pfRenderSandboxSubStatus(root); } catch (e) {}
+    }, true);
+
+    // Sandbox Mob Prep > PF Equipment Mob — MOB DATE / WHICH RIG drive the Demob row (Brad
+    // 2026-09-08). CAPTURE phase. The demob row shows only when Mob=Yes AND Mob Date is set, and its
+    // label appends the Which Rig name; neither the Mob Date picker nor the Which Rig dropdown is the
+    // Yes/No control the listener above keys on, so THIS listener fires when a '<piece> - Mob Date'
+    // or '<piece> - Which Rig' changes. It re-evaluates the mobilized condition (Yes present on the
+    // piece's Yes/No control + Mob Date non-empty) to show/hide [data-demob-piece]. A Which Rig
+    // change also alters the demob row LABEL ("<piece> — <rig>"); rather than a heavy full re-render
+    // we update that label IN PLACE (the demob row's left .pf-sr-name cell), so the rig name refreshes
+    // instantly with no state churn. Scoped to the shared card 5 / .pr-root.
+    document.addEventListener('change', function(ev){
+      var el = ev.target;
+      if (!el || !el.getAttribute) return;
+      var lbl = el.getAttribute('data-pr-field-label') || '';
+      var mMob = lbl.match(/^(.+) - Mob Date$/);
+      var mRig = lbl.match(/^(.+) - Which Rig$/);
+      if (!mMob && !mRig) return;
+      var piece = (mMob ? mMob[1] : mRig[1]);
+      var card = el.closest ? el.closest('.pr-card[data-pr-section="siteReadiness"]') : null;
+      var root = card && (card.closest('.pr-root') || card.parentElement);
+      if (!root) return;
+      var _esc = function(s){ return (window.CSS && CSS.escape) ? CSS.escape(s) : String(s).replace(/"/g, '\\"'); };
+      // Re-evaluate the mobilized condition for this piece: Mob Yes/No control (label === piece) + its
+      // Mob Date. Toggle the matching demob row's visibility (excluded from count when hidden).
+      var yesEl = root.querySelector('[data-pr-field-label="' + _esc(piece) + '"]');
+      var isYes = yesEl ? /^yes$/i.test(String(yesEl.value || '').trim()) : false;
+      var mdEl = root.querySelector('[data-pr-field-label="' + _esc(piece + ' - Mob Date') + '"]');
+      var mdVal = mdEl ? String(mdEl.value || '').trim() : '';
+      var demob = root.querySelector('[data-demob-piece="' + _esc(piece) + '"]');
+      if (demob){
+        var show = isYes && (mdVal !== '');
+        demob.style.display = show ? '' : 'none'; demob.classList.toggle('pf-cond-hidden', !show);
+        // In-place LABEL refresh on a Which Rig change: the demob row wraps in a <tr> whose left
+        // .pf-sr-name cell holds "<piece> — <rig>". Update it live from the new rig value so the demob
+        // row names the machine being called off without a re-render.
+        if (mRig){
+          var rigVal = String(el.value || '').trim();
+          var tr = demob.closest ? demob.closest('tr') : null;
+          var nameCell = tr ? tr.querySelector('.pf-sr-name') : null;
+          if (nameCell){ nameCell.textContent = piece + (rigVal ? ' — ' + rigVal : ''); }
+          if (tr){ tr.setAttribute('data-row-label', piece + (rigVal ? ' — ' + rigVal : '')); }
+        }
+      }
+      try { if (typeof pfRenderSandboxSubStatus === 'function') pfRenderSandboxSubStatus(root); } catch (e) {}
     }, true);
 
     // Sandbox Mob Prep > Equipment > Mob Transport Company per-company CRM filter (Brad 2026-09-08).
@@ -24002,12 +24123,48 @@ try {
         for (var j = 0; j < coPieces.length; j++){
           var cp = coPieces[j];
           var cn = parseInt(cp.getAttribute('data-rental-calledoff-piece'), 10) || 0;
-          var cshow = (cn <= qty);
+          // VISIBILITY TIGHTENED (Brad 2026-09-08): a called-off row shows only when its piece is
+          // in-range AND actually rented = a Type is selected up in the cascade. Read the live Type
+          // control for #cn (in the Mob Prep scope) so lowering Qty OR clearing a Type both hide it.
+          var _typeEl = scope.querySelector('[data-pr-field-label="Rental Equipment #' + cn + ' - Type"]');
+          var _typeVal = _typeEl ? String(_typeEl.value || '').trim() : '';
+          var cshow = (cn <= qty) && (_typeVal !== '');
           cp.style.display = cshow ? '' : 'none';
           cp.classList.toggle('pf-cond-hidden', !cshow);
         }
       }
       try { if (root && typeof pfRenderSandboxSubStatus === 'function') pfRenderSandboxSubStatus(root); } catch (e) {}
+    }, true);
+
+    // Sandbox Demobilization > Equipment Rental Called Off — TYPE-driven reveal (Brad 2026-09-08,
+    // screenshot). CAPTURE phase. The Called-Off rows should show ONLY for a rental piece that was
+    // ACTUALLY set up = a Type is selected up in the Mob Prep "Rental Equipment #n - Type" cascade.
+    // The Qty listener above handles Qty changes; THIS listener fires when a per-piece Type dropdown
+    // changes (Qty unchanged) so setting/clearing a Type makes the matching Called-Off row appear/
+    // disappear live. Matches labels 'Rental Equipment #<n> - Type', parses n, then toggles
+    // [data-rental-calledoff-piece="n"] on n<=Qty AND type-non-empty (excluded from the count when
+    // hidden), and recomputes the sandbox badges. Scoped to the shared card 5 / .pr-root.
+    document.addEventListener('change', function(ev){
+      var el = ev.target;
+      if (!el || !el.getAttribute) return;
+      var lbl = el.getAttribute('data-pr-field-label') || '';
+      var m = lbl.match(/^Rental Equipment #(\d+) - Type$/);
+      if (!m) return;
+      var n = parseInt(m[1], 10) || 0;
+      var card = el.closest ? el.closest('.pr-card[data-pr-section="siteReadiness"]') : null;
+      var root = card && (card.closest('.pr-root') || card.parentElement);
+      if (!root) return;
+      var qtyEl = root.querySelector('[data-pr-field-label="Rental Equipment - Qty"]');
+      var qtyRaw = qtyEl ? String(qtyEl.value || '').trim() : '';
+      var qty = /^\d+$/.test(qtyRaw) ? parseInt(qtyRaw, 10) : 0;
+      var typeVal = String(el.value || '').trim();
+      var co = root.querySelector('[data-rental-calledoff-piece="' + n + '"]');
+      if (co){
+        var show = (n <= qty) && (typeVal !== '');
+        co.style.display = show ? '' : 'none';
+        co.classList.toggle('pf-cond-hidden', !show);
+      }
+      try { if (typeof pfRenderSandboxSubStatus === 'function') pfRenderSandboxSubStatus(root); } catch (e) {}
     }, true);
 
     // Sandbox Mob Prep > Building Pad Elevation live recompute (Brad 2026-09-08): when the
