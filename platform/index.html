@@ -18901,6 +18901,30 @@ try {
       // in the DOM either way) to drive the green check + the row's progress readout. Fields
       // build under the 'safety' override key (same _curSection swap as _srNewSubTableKeyed)
       // and render as a headerless table since the row already names the category.
+      // _pfEquipCondRow(name, whichRigOpts): a composite Yes/No equipment row (Brad 2026-09-08).
+      // The `name` field is a Yes/No dropdown; when Yes, same-row columns reveal: an optional
+      // "Which Rig" dropdown (only when whichRigOpts is a non-empty array; its options come from
+      // PF_FIELD_DROPDOWNS['<name> - Which Rig']) + a "Mob Date" date picker ('<name> - Mob Date').
+      // No -> the columns hide (.pf-cond-hidden, excluded from the completion count). A shared
+      // capture-phase listener on any .pf-vscrow-main control toggles the columns live. Caller
+      // must register the dropdowns + '<name> - Mob Date' in PF_FIELD_DROPDOWNS/DATE_LABELS.
+      var _pfEquipCondRow = function(name, whichRigOpts){
+        var _yes = /^yes$/i.test(String(effVal('siteReadiness', name, '') || '').trim());
+        var condInner = '';
+        if (whichRigOpts) {
+          condInner += '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Which Rig</span>'
+            + field(name + ' - Which Rig', '') + '</span>';
+        }
+        condInner += '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Mob Date</span>'
+          + field(name + ' - Mob Date', '') + '</span>';
+        return '<div class="pf-vscrow">'
+          + '<span class="pf-vscrow-main">' + field(name, '') + '</span>'
+          + '<span class="pf-vscrow-cond' + (_yes ? '' : ' pf-cond-hidden') + '" data-vsc-cond'
+              + (_yes ? '' : ' style="display:none"') + '>'
+          +   condInner
+          + '</span>'
+        + '</div>';
+      };
       var _srNewSafetyInvTable = function(cats){
         var rows = '';
         cats.forEach(function(c){
@@ -19324,29 +19348,13 @@ try {
           ]), true)
         + _srNewCollapsible('Equipment', _srNewSafetyInvTable([
             { name: 'PF Equipment Mob', fieldsFn: function(){ return [
-                // VSC Rig (Brad 2026-09-08): a Yes/No gate on the same row. Yes -> reveal "Which
-                // Rig" (Deere/CAT with Vibro) + "Mob Date" columns; No -> hide them. Composite
-                // .pf-vscrow flex cell; _srNewRow takes the row name from field('VSC Rig'). The
-                // conditional columns sit in .pf-vscrow-cond (+ .pf-cond-hidden when No, which
-                // pfRenderSandboxSubStatus excludes from the completion count). A capture-phase
-                // listener toggles them live.
-                (function(){
-                  var _vy = /^yes$/i.test(String(effVal('siteReadiness', 'VSC Rig', '') || '').trim());
-                  return '<div class="pf-vscrow">'
-                    + '<span class="pf-vscrow-main">' + field('VSC Rig', '') + '</span>'
-                    + '<span class="pf-vscrow-cond' + (_vy ? '' : ' pf-cond-hidden') + '" data-vsc-cond'
-                        + (_vy ? '' : ' style="display:none"') + '>'
-                    +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Which Rig</span>'
-                    +     field('VSC Rig - Which Rig', '') + '</span>'
-                    +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Mob Date</span>'
-                    +     field('VSC Rig - Mob Date', '') + '</span>'
-                    + '</span>'
-                  + '</div>';
-                })(),
-                // Brad 2026-09-08: dropped the "Equipment Needed - " prefix (aliases carry old data).
-                field('Predrill Rig', ''),
-                field('Gooseneck w/ Connex', ''),
-                field('Testing Material Fall Off Load', '')
+                // Each row is a Yes/No conditional composite (Brad 2026-09-08): Yes reveals the
+                // same-row "Which Rig" (where applicable) + "Mob Date" columns; No hides them
+                // (excluded from the completion count). See _pfEquipCondRow.
+                _pfEquipCondRow('VSC Rig', ['Deere with Vibro', 'CAT with Vibro']),
+                _pfEquipCondRow('Predrill Rig', ['Sany Predrill']),
+                _pfEquipCondRow('Gooseneck w/ Connex', null),           // no Which Rig (N/A)
+                _pfEquipCondRow('Testing Material Fall Off Load', null) // no Which Rig
               ]; } },
             { name: 'PF Equipment Demob', fieldsFn: function(){ return [
                 field('Demob Equipment', ''),
@@ -21724,6 +21732,10 @@ try {
       // Yes reveals "Which Rig" + "Mob Date" columns on the same row.
       'VSC Rig': ['Yes', 'No'],
       'VSC Rig - Which Rig': ['Deere with Vibro', 'CAT with Vibro'],
+      'Predrill Rig': ['Yes', 'No'],
+      'Predrill Rig - Which Rig': ['Sany Predrill'],
+      'Gooseneck w/ Connex': ['Yes', 'No'],
+      'Testing Material Fall Off Load': ['Yes', 'No'],
       // Safety > Toolbox Talks (Brad 2026-09-08): Prepared? Yes/No.
       'Toolbox Talks Prepared': ['Yes', 'No'],
       // Re-keyed to the new display label "Project Scope of Work Notes" (Brad 2026-08-20
@@ -21890,6 +21902,9 @@ try {
       'Date Locates Actually Called In': true,
       'Date Ticket Cleared to Start': true,
       'VSC Rig - Mob Date': true,
+      'Predrill Rig - Mob Date': true,
+      'Gooseneck w/ Connex - Mob Date': true,
+      'Testing Material Fall Off Load - Mob Date': true,
       'Date MSDS Sent': true,
       'Hand Log Sheets - Date Uploaded': true,
       'Date Locate Called In': true,
@@ -22996,19 +23011,22 @@ try {
       try { if (typeof pfRenderSandboxSubStatus === 'function') pfRenderSandboxSubStatus(root); } catch (e) {}
     }, true);
 
-    // Sandbox Mob Prep > Equipment > VSC Rig Yes/No conditional (Brad 2026-09-08). CAPTURE phase.
-    // On change, show/hide the same-row "Which Rig" + "Mob Date" columns (.pf-vscrow-cond) and
-    // toggle .pf-cond-hidden so pfRenderSandboxSubStatus excludes the hidden columns from the
-    // completion count. Then recompute the badges for THIS card's root.
+    // Sandbox Mob Prep > Equipment conditional rows (Brad 2026-09-08). CAPTURE phase. Fires for
+    // the Yes/No MAIN control of ANY .pf-vscrow (VSC Rig / Predrill Rig / Gooseneck / Testing).
+    // On change, show/hide that row's same-row "Which Rig" + "Mob Date" columns (.pf-vscrow-cond)
+    // and toggle .pf-cond-hidden so pfRenderSandboxSubStatus excludes the hidden columns from the
+    // completion count. Changes to the Which Rig / Mob Date controls (inside .pf-vscrow-cond, not
+    // .pf-vscrow-main) are ignored. Then recompute the badges for THIS card's root.
     document.addEventListener('change', function(ev){
       var el = ev.target;
-      if (!el || !el.getAttribute) return;
-      if (el.getAttribute('data-pr-field-label') !== 'VSC Rig') return;
-      var row = el.closest ? el.closest('.pf-vscrow') : null;
+      if (!el || !el.closest) return;
+      var main = el.closest('.pf-vscrow-main');
+      if (!main) return;
+      var row = main.closest('.pf-vscrow');
       var cond = row ? row.querySelector('.pf-vscrow-cond') : null;
       var isYes = /^yes$/i.test(String(el.value || '').trim());
       if (cond){ cond.style.display = isYes ? '' : 'none'; cond.classList.toggle('pf-cond-hidden', !isYes); }
-      var card = el.closest ? el.closest('.pr-card[data-pr-section="siteReadiness"]') : null;
+      var card = el.closest('.pr-card[data-pr-section="siteReadiness"]');
       var root = card && (card.closest('.pr-root') || card.parentElement);
       try { if (root && typeof pfRenderSandboxSubStatus === 'function') pfRenderSandboxSubStatus(root); } catch (e) {}
     }, true);
