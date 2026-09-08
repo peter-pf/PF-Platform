@@ -14224,12 +14224,17 @@ try {
       // Contact from Project Contacts, same as Equipment Transport / Fuel Delivery.
       //  - 'Stone Vendor' -> master Category "Stone Vendor" (controlled-vocab value on the
       //    PF Master Contact List; the semantically-correct home for stone suppliers).
-      //  - 'Stone Trucking Vendor' -> master Category "Trucking/Transport" (the controlled-
-      //    vocab hauler category). NOTE: the existing Paddacks/Stephan carriers are tagged
-      //    "Equipment Transport" (not "Trucking/Transport") in the sheet, so they will NOT
-      //    auto-appear under this group until (re)tagged. FLAGGED for Brad.
+      //  - 'Stone Trucking Vendor' -> DEDICATED master Category "Stone Trucking" (Brad
+      //    2026-09-08): stone haulers are a DISTINCT vendor pool from our equipment
+      //    haulers (Paddacks/Stephan = "Equipment Transport") and from the generic
+      //    "Trucking/Transport" bucket, so they get their own Category. This group now
+      //    filters /api/contacts?trade="Stone Trucking" and tags any company minted via
+      //    the "+ Add a company not listed…" path with Category "Stone Trucking".
+      //    NOTE: "Stone Trucking" is a NEW controlled-vocab value; if the PF Master
+      //    Contact List / Categories sheet enforces a Category allow-list backend-side,
+      //    that vocab must gain "Stone Trucking" too. FLAGGED for Brad.
       material:      { 'Material Vendor(s)': 'Material Vendor', 'Fuel Delivery': 'Fuel Delivery',
-                       'Stone Vendor': 'Stone Vendor', 'Stone Trucking Vendor': 'Trucking/Transport' }
+                       'Stone Vendor': 'Stone Vendor', 'Stone Trucking Vendor': 'Stone Trucking' }
     };
     // Read the current project's __crm map for a section key. Always an object; {}
     // when absent/malformed so callers never crash on a legacy project. Defaults to
@@ -19857,7 +19862,7 @@ try {
                 + '</div>',
                 // Stone Trucking Vendor (Brad 2026-09-08): NEW row directly below Stone Vendor.
                 // CRM host bound to material.__crm['Stone Trucking Vendor']
-                // (PF_CRM_NEWGROUP_TRADE.material['Stone Trucking Vendor'] = "Trucking/Transport").
+                // (PF_CRM_NEWGROUP_TRADE.material['Stone Trucking Vendor'] = "Stone Trucking").
                 // Same static host pattern; INERT, not counted.
                 '<div data-pr-label="Stone Trucking Vendor">'
                   + '<div class="pr-crm-cards" data-crm-cards="Stone Trucking Vendor" '
