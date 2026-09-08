@@ -2471,9 +2471,12 @@ tr.pf-dragging { opacity: 0.45; }
   font-size: 0.72rem; color: rgba(255,255,255,0.85);
   transition: transform 0.15s ease;
 }
-.pf-sr-collapse.open .pf-sr-collapse-chev { transform: rotate(90deg); }
+/* CHILD combinators (Brad 2026-09-08): a collapse's open state must control ONLY its OWN direct
+   body/chevron — with a descendant selector an open PARENT (e.g. Mob Prep) forced every NESTED
+   group body visible regardless of the group's own open state, so the groups "didn't roll up". */
+.pf-sr-collapse.open > .pf-sr-collapse-head > .pf-sr-collapse-chev { transform: rotate(90deg); }
 .pf-sr-collapse-body { display: none; margin-top: 8px; }
-.pf-sr-collapse.open .pf-sr-collapse-body { display: block; }
+.pf-sr-collapse.open > .pf-sr-collapse-body { display: block; }
 /* "X/Y Fields Complete, XX%" readout on a sandbox collapse bar (Staking & Layout, Testing,
    Safety) — white text to sit on the accent-blue bar, right-anchored just left of the chevron
    (the flex-grow title pushes it right; gap on the head handles spacing). No click handler ->
@@ -2519,11 +2522,17 @@ tr.pf-dragging { opacity: 0.45; }
 /* Nested group roll-up bars (Building Pad Prep / Equipment / Materials under Mob Prep, Brad
    2026-09-08): SMALLER + a distinct slate color vs the top-level accent-blue bar. Scoped to a
    .pf-sr-collapse nested inside another collapse's body (only the Mob Prep groups qualify). */
+.pf-srnew-scope .pf-sr-collapse-body > .pf-sr-collapse { margin-left: 14px; }
 .pf-srnew-scope .pf-sr-collapse-body > .pf-sr-collapse > .pf-sr-collapse-head {
-  background: #5a7184; border-color: #5a7184; font-size: 12.5px; padding: 6px 12px;
+  background: #6b7d8c; border-color: #6b7d8c; font-size: 11.5px; font-weight: 600;
+  padding: 3px 10px; border-radius: 6px; letter-spacing: 0.02em;
 }
 .pf-srnew-scope .pf-sr-collapse-body > .pf-sr-collapse > .pf-sr-collapse-head:hover {
-  background: #4a5f70; border-color: #4a5f70;
+  background: #596976; border-color: #596976;
+}
+/* Smaller chevron on the sub-level group bars to match the reduced header. */
+.pf-srnew-scope .pf-sr-collapse-body > .pf-sr-collapse > .pf-sr-collapse-head .pf-sr-collapse-chev {
+  font-size: 0.62rem;
 }
 /* Computed Elevation Difference (Brad 2026-09-08): red value + "notify PM" warning when > 6". */
 .pf-elevdiff-over { color: #c0392b; font-weight: 700; }
