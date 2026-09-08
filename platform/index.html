@@ -18372,6 +18372,9 @@ try {
       // AllItems.aspx?id=<folder> view. Location: 05 - Field Operations/Safety/PF SDS.
       var _sdsFolderUrl = 'https://pierfoundations.sharepoint.com/sites/pf/Shared%20Documents/Forms/AllItems.aspx?id=%2Fsites%2Fpf%2FShared%20Documents%2F05%20%2D%20Field%20Operations%2FSafety%2FPF%20SDS&viewid=3a40a7db-96c1-4a97-ab1f-1065d9861e1c';
       var _sdsCompiledUrl = 'https://pierfoundations.sharepoint.com/sites/pf/Shared%20Documents/Forms/AllItems.aspx?viewid=3a40a7db-96c1-4a97-ab1f-1065d9861e1c&FolderCTID=0x012000EAB8B17F3A8C5C4BBC3CD32AE78A256B&id=%2Fsites%2Fpf%2FShared%20Documents%2F05%20%2D%20Field%20Operations%2FSafety%2FPF%20SDS%2F00%2DPF%20SDS%20Compiled%2Epdf&parent=%2Fsites%2Fpf%2FShared%20Documents%2F05%20%2D%20Field%20Operations%2FSafety%2FPF%20SDS';
+      // Company-wide "PF Safety Plan" PDF (Brad 2026-09-08) — exact SharePoint link Brad
+      // supplied. Static/global; opens 05 - Field Operations/Safety/Pier Foundations-...-Final.
+      var _pfSafetyPlanUrl = 'https://pierfoundations.sharepoint.com/sites/pf/Shared%20Documents/Forms/AllItems.aspx?viewid=3a40a7db%2D96c1%2D4a97%2Dab1f%2D1065d9861e1c&FolderCTID=0x012000EAB8B17F3A8C5C4BBC3CD32AE78A256B&id=%2Fsites%2Fpf%2FShared%20Documents%2F05%20%2D%20Field%20Operations%2FSafety%2FPier%20Foundations%2D2025%2E02%2E28%2DFinal%2ERev%2E00%2Epdf&parent=%2Fsites%2Fpf%2FShared%20Documents%2F05%20%2D%20Field%20Operations%2FSafety';
       // Site Readiness workflow ACTIVATION (Brad 2026-08-12): a banner at the top of this
       // section reading the 3 kickoff gates. Gate C (PDF-in-folder confirm) MOVED to E&D >
       // PF Submittal Design as an on-the-fly checkbox under the Approved Shop Drawings link
@@ -19123,6 +19126,10 @@ try {
                   + '</div>';
               return [
                 _ssspRow,
+                // "PF Safety Plan" row (Brad 2026-09-08): a plain-text clickable link to the
+                // company-wide Pier Foundations Safety Plan PDF (readonlyLink, static).
+                fieldLinked('PF Safety Plan', _pfSafetyPlanUrl, '', 'website',
+                  { readonlyLink: true, linkLabel: 'PF Safety Plan', emptyText: '—' }),
                 field('Date SSSP Sent to GC', '')
               ];
             } },
@@ -19149,8 +19156,11 @@ try {
               fieldLinked('Toolbox Talks', '', '', 'website')
             ]; } },
           { name: 'Public Utility Locates', fieldsFn: function(){ return [
-              field('Locate Ticket # (Excavator ID)', ''),
-              field('Date Locates Called In', ''),
+              // Brad 2026-09-08: dropped "(Excavator ID)"; added a "need called in by" date
+              // above the actual call-in date; renamed the existing one to "...Actually...".
+              field('Locate Ticket #', ''),
+              field('Date Locates Need Called in By', ''),
+              field('Date Locates Actually Called In', ''),
               field('Date Ticket Cleared to Start', ''),
               field('Date Ticket Expires', ''),
               fieldLinked('Locate Ticket PDF Link', '', '', 'website')
@@ -21645,6 +21655,10 @@ try {
       // old 'Date MSDS Sent' below, which is kept for the ORIGINAL Site Readiness card.)
       'Date SDS Sent to GC': true,
       'Date JHA Sent to GC': true,
+      // Sandbox Public Utility Locates date fields (Brad 2026-09-08) — native pickers.
+      'Date Locates Need Called in By': true,
+      'Date Locates Actually Called In': true,
+      'Date Ticket Cleared to Start': true,
       'Date MSDS Sent': true,
       'Hand Log Sheets - Date Uploaded': true,
       'Date Locate Called In': true,
