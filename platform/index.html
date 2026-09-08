@@ -2562,6 +2562,14 @@ tr.pf-dragging { opacity: 0.45; }
 .pf-srnew-scope .pf-safety-invrow-inline { cursor: default; }
 .pf-srnew-scope .pf-safety-invrow-inline .pf-safety-invname { white-space: normal; }
 .pf-srnew-scope .pf-safety-inline { display: inline-flex; align-items: flex-end; gap: 18px; margin-left: 18px; vertical-align: middle; }
+/* Inline-row field-label suppression (Brad 2026-09-08, Fuel Delivery Called Off screenshot): controls
+   rendered ON the summary row live in the .pf-safety-invname cell, OUTSIDE the .pf-sr-table scope where
+   .pr-field-label is normally display:none — so field()'s own <span class="pr-field-label"> was showing
+   and DOUBLING the row title (e.g. "Fuel Delivery Called Off" printed above its own dropdown). Hide the
+   per-field label ONLY inside .pf-safety-inline so the row title carries the name and the .pf-vscrow-lbl
+   mini-labels (e.g. "Date Called Off") remain. Scoped to inline rows only -> normal (non-inline) field
+   labels everywhere else in the portal are UNAFFECTED. */
+.pf-srnew-scope .pf-safety-inline .pr-field-label { display: none; }
 .pf-srnew-scope .pf-vscrow-inline { display: inline-flex; gap: 18px; margin: 0; }
 /* VSC Rig conditional composite row (Brad 2026-09-08): Yes/No + conditional "Which Rig" + "Mob
    Date" columns on one flex row; the extra columns hide when No. Each labeled column stacks its
@@ -19089,16 +19097,23 @@ try {
           + '</div>'
         + '</div>';
       };
-      var _srNewSafetyInvTable = function(cats){
+      var _srNewSafetyInvTable = function(cats, sectionKey){
+        // sectionKey (Brad 2026-09-08, Project Closeout move): the override key the fields build
+        // under, so field()'s render-time READ hits the SAME bucket the card SAVES to (its
+        // data-pr-section). DEFAULTS to 'siteReadiness' so every existing sandbox caller (Staking/
+        // Testing/Safety/Mob Prep/Demob, all in the data-pr-section="siteReadiness" card) is
+        // byte-identical. Project Closeout passes 'closeout' so its inventory-style items read +
+        // write the closeout override key (the closeout card is data-pr-section="closeout").
+        sectionKey = sectionKey || 'siteReadiness';
         var rows = '';
         cats.forEach(function(c){
-          // PERSISTENCE FIX (Brad 2026-09-08): build these fields under 'siteReadiness' — the
-          // SAME section the sandbox card SAVES to (its data-pr-section). They previously built
+          // PERSISTENCE FIX (Brad 2026-09-08): build these fields under the card's OWN section —
+          // the SAME section the card SAVES to (its data-pr-section). They previously built
           // under 'safety', so live-edit saved to siteReadiness but the render READ from safety
           // -> every value came back blank on refresh. Reading + writing the same section makes
-          // them persist (and surfaces values already saved to siteReadiness). Labels don't
-          // collide with the Staking/Testing siteReadiness fields.
-          var _prev = _curSection; _curSection = 'siteReadiness';
+          // them persist (and surfaces values already saved to that section). Labels don't
+          // collide with the Staking/Testing siteReadiness fields. (Now section-parameterized.)
+          var _prev = _curSection; _curSection = sectionKey;
           var flds = c.fieldsFn();
           _curSection = _prev;
           // inlineFields (Brad 2026-09-08, Demobilization redline): render this cat's field controls
@@ -19719,74 +19734,10 @@ try {
               ]; } }
           ]), true);
       var _srN_mobprepNew = _srNewCollapsible('Mob Prep', _srN_mobprep, true);
-
-      // ===== NEW TOP-LEVEL SECTION: Demobilization (Brad 2026-09-08) =====
-      // Same collapsible + inventory-row engine as Mob Prep (identical green-check / X-Y-% behavior),
-      // rendered as another _srNewCollapsible inside the SAME sandbox card (data-pr-section=
-      // "siteReadiness") — so it lives under the SAME .pr-root as Mob Prep and the extended
-      // .pf-vscrow-main listener's root query still reaches its [data-demob-piece] rows. Three cats:
-      //   1. PF Equipment Demob — MOVED wholesale from Mob Prep > Equipment (the 4 _pfDemobPieceRow
-      //      auto-rows shown when the matching Mob piece = Yes, cross-section-read via
-      //      effVal('siteReadiness', name) which still works — both under _curSection='siteReadiness';
-      //      + the kept 'Demob Transport Company' dropdown).
-      //   2. Equipment Rental Called Off — auto-populates one row per rented piece (mirrors Mob Prep
-      //      'Rental Equipment - Qty', pieces #1..#N), each with a 'Rental Equipment #n - Date Called
-      //      Off Rent' date; Qty=0/blank -> no rows -> 100% (emptyCompleteWhen).
-      //   3. Fuel Delivery Called Off — a Yes/No + a date; completes ONLY when Yes AND date filled
-      //      (bothCompleteWhen cat flag -> data-both-yes-field / data-both-date-field, consumed in
-      //      pfRenderSandboxSubStatus; a capture-phase listener re-runs the status on either change).
-      var _srN_demob =
-          _srNewCollapsible('Equipment Demobilization', _srNewSafetyInvTable([
-            { name: 'PF Equipment Demob', fieldsFn: function(){ return [
-                // Auto-populated demob rows (Brad 2026-09-08): one per PF Equipment Mob piece, shown
-                // ONLY when that Mob piece is marked "Yes" (effVal('siteReadiness', name) === Yes).
-                // Hidden rows are .pf-cond-hidden so excluded from the count. Names MATCH the 4
-                // _pfEquipCondRow Mob pieces exactly so a Mob Yes/No flip toggles the matching Demob
-                // row (extended .pf-vscrow-main capture-phase listener). 'Demob Transport Company'
-                // is KEPT as the last field (dropdown unchanged).
-                _pfDemobPieceRow('VSC Rig'),
-                _pfDemobPieceRow('Predrill Rig'),
-                _pfDemobPieceRow('Gooseneck w/ Connex'),
-                _pfDemobPieceRow('Testing Material Fall Off Load'),
-                field('Demob Transport Company', '')
-              ]; } },
-            // INLINE (Brad 2026-09-08 redline): the date control shows ON the main summary row (right
-            // of the "Equipment Rental Called Off" label), not inside an expand. inlineFields renders
-            // the fieldsFn into the srow's name cell; the detail is empty + the row is non-clickable.
-            // completeWhen still gates the green check on the date (pfRenderSandboxSubStatus now scans
-            // the srow too). NOTE: no dropdown (Brad: "instead of having it a drop down") — just the
-            // single date field.
-            // AUTO-POPULATE per rented piece (Brad 2026-09-08 redline, SUPERSEDES the earlier inline
-            // single date): one row per Rental Equipment piece (mirrors Mob Prep 'Rental Equipment -
-            // Qty'), each with its own "Date Called Off Rent". Rendered as normal detail rows (like
-            // PF Equipment Demob), NOT inline. Qty=0/blank -> no rows -> emptyCompleteWhen forces the
-            // cat 100% complete (nothing rented to call off). Hidden rows (n>Qty) are .pf-cond-hidden
-            // -> excluded from the count; visible rows complete when their date is filled. The Qty
-            // capture-phase listener toggles these live across sections.
-            { name: 'Equipment Rental Called Off',
-              emptyCompleteWhen: { field: 'Rental Equipment - Qty', val: '0' },
-              fieldsFn: function(){ return [
-                _pfRentalCalledOffRow(1),
-                _pfRentalCalledOffRow(2),
-                _pfRentalCalledOffRow(3),
-                _pfRentalCalledOffRow(4)
-              ]; } },
-            // INLINE (Brad 2026-09-08 redline): the Yes/No toggle AND the date show side-by-side ON
-            // the main summary row (not inside an expand). bothCompleteWhen preserved — green only
-            // when Yes AND date filled. The existing Fuel-Delivery-Called-Off capture-phase listener
-            // still fires from these main-row controls (matched by data-pr-field-label).
-            { name: 'Fuel Delivery Called Off', inlineFields: true,
-              bothCompleteWhen: { yesField: 'Fuel Delivery Called Off', dateField: 'Fuel Delivery Called Off - Date' },
-              fieldsFn: function(){ return [
-                '<span class="pf-vscrow pf-vscrow-inline">'
-                  +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Called Off?</span>'
-                  +     field('Fuel Delivery Called Off', '') + '</span>'
-                  +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Date Called Off</span>'
-                  +     field('Fuel Delivery Called Off - Date', '') + '</span>'
-                + '</span>'
-              ]; } }
-          ]), true);
-      var _srN_demobNew = _srNewCollapsible('Demobilization', _srN_demob, true);
+      // Demobilization DEFINITION MOVED (Brad 2026-09-08): the demob collapsible (_srN_demobNew)
+      // is now built at the Project Closeout render location (under _curSection='closeout') so its
+      // fields read+write the closeout override key that its new card (data-pr-section="closeout")
+      // saves to. See "Demobilization (moved under Project Closeout)" below the closeout subsections.
 
       // Assemble the sandbox body: subsection order mirrors the ORIGINAL srBody
       // Shop Drawings ELIMINATED (Brad 2026-09-05) — sandbox now STARTS at Staking &
@@ -19802,8 +19753,14 @@ try {
         + _srN_staking
         + _srN_testing
         + _srN_safety
-        + _srN_mobprepNew
-        + _srN_demobNew;
+        + _srN_mobprepNew;
+        // Demobilization MOVED (Brad 2026-09-08): the _srN_demobNew collapsible was relocated
+        // OUT of this Site Readiness card and UNDER the Project Closeout header (see the closeout
+        // card render below). Mob Prep stays here. The demob auto-populate listeners resolve their
+        // root via el.closest('.pr-card[data-pr-section="siteReadiness"]').closest('.pr-root'),
+        // which is the SAME shared .pr-root the closeout card lives in (single root.innerHTML=html),
+        // so root.querySelector('[data-demob-piece]') / '[data-rental-calledoff-piece]' still reach
+        // the moved rows — cross-section reactivity preserved with NO listener change.
       // Wrap the sandbox body in a scoping div (.pf-srnew-scope) so CSS overrides that
       // must match Inventory can target the sandbox WITHOUT leaking into the ORIGINAL
       // Site Readiness card (both cards share data-pr-section="siteReadiness", so the
@@ -20204,7 +20161,17 @@ try {
       // as every other collapsible in the record.
 
       // ---- Subsection 1: Field Closeout Procedure ----
-      var closeoutSub1Inner = fields([
+      // REFORMATTED (Brad 2026-09-08): the 5 Closeout subsections are now inventory-style
+      // categories (rows with a far-left green completion check + "X/Y Fields Complete, XX%"
+      // readout) inside ONE _srNewCollapsible('Project Closeout', _srNewSafetyInvTable([...],
+      // 'closeout')) — the EXACT engine Safety & Mob Prep use. Each *Inner is now a plain ARRAY
+      // (was fields([...]) which wrapped a .pr-fields div); the array is handed to a cat's
+      // fieldsFn so _srNewSafetyInvTable builds each field() under _curSection='closeout'
+      // (its 2nd arg) — read+write hit the SAME closeout override key the card saves to. Every
+      // field(), fieldLinked(), subgroupNote(), computed-hint IIFE, mailto/jump is preserved
+      // VERBATIM (labels unchanged -> no alias needed). Notes/hints have no data-pr-label so
+      // they render as full-width rows but are NOT counted by pfRenderSandboxSubStatus.
+      var closeoutSub1Inner = ([
           subgroupNote('Standardized closeout & demob checklist the field runs before leaving, so every job gets the same consistent experience.'),
           fieldLinked('Field Closeout & Demob Checklist Link', '', '', 'website'),
           field('Field Closeout Complete?', ''),
@@ -20213,7 +20180,7 @@ try {
       ]);
 
       // ---- Subsection 2: Send Final As-Builts to Garbin ----
-      var closeoutSub2Inner = fields([
+      var closeoutSub2Inner = ([
           // SOP (Jonathan 2026-08-08): the Garbin closeout package = 3 tracked PDFs —
           // (1) GI-300 QAQC as-built page (actual install depths typed over designed),
           // (2) Column Logs (rig GUHMA combined PDF), (3) Modulus Load Test. Routing +
@@ -20298,7 +20265,7 @@ try {
       ]);
 
       // ---- Subsection 3: GGG Returns Final As-Builts ----
-      var closeoutSub3Inner = fields([
+      var closeoutSub3Inner = ([
           field('Date Final As-Builts Received from Garbin', ''),
           field('Received By', ''),
           field('As-Builts Saved to Closeout Folder?', ''),
@@ -20387,7 +20354,7 @@ try {
       ]);
 
       // ---- Subsection 4: Certified Payroll Reports ----
-      var closeoutSub4Inner = fields([
+      var closeoutSub4Inner = ([
           // Dynamic note reflecting the Contract Recap cross-read so the requirement
           // state is visible even when the item field is still empty (field() only
           // shows a source tag when the value is non-blank). This is DISPLAY-ONLY.
@@ -20403,7 +20370,7 @@ try {
       ]);
 
       // ---- Subsection 5: Thank-You Email to GC ----
-      var closeoutSub5Inner = fields([
+      var closeoutSub5Inner = ([
           subgroupNote('Send after all closeout items done; include a brief survey of how the PF team did; portal tracks date + sender + files the email. FUTURE: auto-file the sent email to the project folder.'),
           field('Thank-You Email Sent?', ''),
           field('Date Thank-You Sent', ''),
@@ -20411,15 +20378,88 @@ try {
           field('Performance Survey Notes', '')
       ]);
 
-      // De-numbered, left-aligned, collapsible (default collapsed) — matches E&D.
-      var closeoutBody =
-          collapsibleSubgroup('Field Closeout Procedure', closeoutSub1Inner)
-        + collapsibleSubgroup('Send Final As-Builts to Garbin', closeoutSub2Inner)
-        + collapsibleSubgroup('GGG Returns Final As-Builts', closeoutSub3Inner)
-        + collapsibleSubgroup('Certified Payroll Reports', closeoutSub4Inner)
-        + collapsibleSubgroup('Thank-You Email to GC', closeoutSub5Inner);
+      // ===== Demobilization (MOVED under Project Closeout, Brad 2026-09-08) =====
+      // Built HERE (not in the Site Readiness card) so its fields read+write the 'closeout'
+      // override key its new card (data-pr-section="closeout") saves to. The auto-populate rows
+      // (_pfDemobPieceRow / _pfRentalCalledOffRow) still CROSS-READ Mob Prep via the EXPLICIT
+      // effVal('siteReadiness', ...) calls inside those helpers — unaffected by the section move.
+      // The two capture-phase listeners (Mob Yes/No -> [data-demob-piece]; Rental Qty ->
+      // [data-rental-calledoff-piece]) resolve root = MobPrepCard.closest('.pr-root'), which is the
+      // SAME shared .pr-root this closeout card lives in (single root.innerHTML=html), so their
+      // root.querySelector reaches the moved rows -> live reactivity preserved with NO listener edit.
+      // Same _srNewSafetyInvTable engine (green check + X/Y readout via pfRenderSandboxSubStatus),
+      // section-keyed to 'closeout'.
+      var _srN_demob =
+          _srNewCollapsible('Equipment Demobilization', _srNewSafetyInvTable([
+            { name: 'PF Equipment Demob', fieldsFn: function(){ return [
+                // Auto-populated demob rows: one per PF Equipment Mob piece, shown ONLY when that Mob
+                // piece is marked "Yes" (effVal('siteReadiness', name) === Yes — the Mob controls live
+                // in the siteReadiness card; the cross-read is explicit + section-move-proof). Hidden
+                // rows are .pf-cond-hidden so excluded from the count. Names MATCH the 4 _pfEquipCondRow
+                // Mob pieces exactly so a Mob Yes/No flip toggles the matching Demob row. 'Demob
+                // Transport Company' is KEPT as the last field.
+                _pfDemobPieceRow('VSC Rig'),
+                _pfDemobPieceRow('Predrill Rig'),
+                _pfDemobPieceRow('Gooseneck w/ Connex'),
+                _pfDemobPieceRow('Testing Material Fall Off Load'),
+                field('Demob Transport Company', '')
+              ]; } },
+            // AUTO-POPULATE per rented piece: one row per Rental Equipment piece (mirrors Mob Prep
+            // 'Rental Equipment - Qty', pieces #1..#N), each with its own "Date Called Off Rent".
+            // Qty=0/blank -> no rows -> emptyCompleteWhen forces the cat 100% complete (nothing rented
+            // to call off — the emptyCompleteWhen field lookup falls back to a root-wide .pf-srnew-scope
+            // scan, which reaches Mob Prep's Qty across cards on the shared root). Hidden rows
+            // (n>Qty) are .pf-cond-hidden -> excluded from the count; visible rows complete on date.
+            { name: 'Equipment Rental Called Off',
+              emptyCompleteWhen: { field: 'Rental Equipment - Qty', val: '0' },
+              fieldsFn: function(){ return [
+                _pfRentalCalledOffRow(1),
+                _pfRentalCalledOffRow(2),
+                _pfRentalCalledOffRow(3),
+                _pfRentalCalledOffRow(4)
+              ]; } },
+            // INLINE (Brad 2026-09-08 redline): the Yes/No toggle AND the date show side-by-side ON the
+            // main summary row. bothCompleteWhen preserved — green only when Yes AND date filled. The
+            // Fuel-Delivery-Called-Off capture-phase listener still fires from these main-row controls
+            // (matched by data-pr-field-label). LABEL CLEANUP (Brad 2026-09-08 screenshot): the row
+            // title "Fuel Delivery Called Off" already names the item, so the redundant "Called Off?"
+            // mini-label is dropped and the per-field .pr-field-label doubling (which shows here because
+            // inline controls sit in the .pf-safety-invname cell, OUTSIDE .pf-sr-table where field
+            // labels are normally hidden) is suppressed via .pf-safety-inline .pr-field-label{display
+            // :none} (CSS below). A single "Date Called Off" mini-label is kept to mark the date column.
+            { name: 'Fuel Delivery Called Off', inlineFields: true,
+              bothCompleteWhen: { yesField: 'Fuel Delivery Called Off', dateField: 'Fuel Delivery Called Off - Date' },
+              fieldsFn: function(){ return [
+                '<span class="pf-vscrow pf-vscrow-inline">'
+                  +   '<span class="pf-vscrow-col">'
+                  +     field('Fuel Delivery Called Off', '') + '</span>'
+                  +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Date Called Off</span>'
+                  +     field('Fuel Delivery Called Off - Date', '') + '</span>'
+                + '</span>'
+              ]; } }
+          ], 'closeout'), true);
+      var _srN_demobNew = _srNewCollapsible('Demobilization', _srN_demob, true);
 
-      html += card(8, 'Project Closeout', null, closeoutBody, false, 'closeout');
+      // Project Closeout body — the 5 subsections reformatted to the Safety/Mob-Prep inventory
+      // style (one cat per subsection) + Demobilization appended. ONE _srNewCollapsible('Project
+      // Closeout', ...) wraps the inventory table; every field/note/hint preserved verbatim, all
+      // section-keyed to 'closeout' via _srNewSafetyInvTable's 2nd arg. Wrapped in .pf-srnew-scope
+      // below so pfRenderSandboxSubStatus (which scans '.pf-srnew-scope .pf-safety-invrow') counts
+      // these rows and paints their green checks + "X/Y Fields Complete, XX%" readouts.
+      var closeoutBody =
+          _srNewCollapsible('Project Closeout', _srNewSafetyInvTable([
+            { name: 'Field Closeout Procedure', fieldsFn: function(){ return closeoutSub1Inner; } },
+            { name: 'Send Final As-Builts to Garbin', fieldsFn: function(){ return closeoutSub2Inner; } },
+            { name: 'GGG Returns Final As-Builts', fieldsFn: function(){ return closeoutSub3Inner; } },
+            { name: 'Certified Payroll Reports', fieldsFn: function(){ return closeoutSub4Inner; } },
+            { name: 'Thank-You Email to GC', fieldsFn: function(){ return closeoutSub5Inner; } }
+          ], 'closeout'), true)
+        + _srN_demobNew;
+
+      // Wrapped in .pf-srnew-scope so the inventory engine's status/green-checks apply here too
+      // (same wrapper the Site Readiness sandbox uses; it is the sandbox-unique CSS selector).
+      html += card(8, 'Project Closeout', null,
+        '<div class="pf-srnew-scope">' + closeoutBody + '</div>', false, 'closeout');
       // (office renumber 2026-08-07 batch-13: standalone Project Safety REMOVED and
       // absorbed into Site Readiness > Subsection 4 (Safety). Top-level list is now
       // gap-free 1-7:
