@@ -20478,15 +20478,20 @@ try {
       // section-keyed to 'closeout' via _srNewSafetyInvTable's 2nd arg. Wrapped in .pf-srnew-scope
       // below so pfRenderSandboxSubStatus (which scans '.pf-srnew-scope .pf-safety-invrow') counts
       // these rows and paints their green checks + "X/Y Fields Complete, XX%" readouts.
+      // Brad 2026-09-08 reorder: Demobilization renders FIRST, then Project Closeout.
+      // Pure display-order swap within the same closeoutBody — both collapsibles stay
+      // inside card 8's single .pf-srnew-scope wrapper (below) under the same shared
+      // .pr-root as card 5 (siteReadiness), so the demob auto-populate + Mob Yes/No +
+      // Rental Qty capture-phase listeners still reach the moved rows (root unchanged).
       var closeoutBody =
-          _srNewCollapsible('Project Closeout', _srNewSafetyInvTable([
+          _srN_demobNew
+        + _srNewCollapsible('Project Closeout', _srNewSafetyInvTable([
             { name: 'Field Closeout Procedure', fieldsFn: function(){ return closeoutSub1Inner; } },
             { name: 'Send Final As-Builts to Garbin', fieldsFn: function(){ return closeoutSub2Inner; } },
             { name: 'GGG Returns Final As-Builts', fieldsFn: function(){ return closeoutSub3Inner; } },
             { name: 'Certified Payroll Reports', fieldsFn: function(){ return closeoutSub4Inner; } },
             { name: 'Thank-You Email to GC', fieldsFn: function(){ return closeoutSub5Inner; } }
-          ], 'closeout'), true)
-        + _srN_demobNew;
+          ], 'closeout'), true);
 
       // Wrapped in .pf-srnew-scope so the inventory engine's status/green-checks apply here too
       // (same wrapper the Site Readiness sandbox uses; it is the sandbox-unique CSS selector).
