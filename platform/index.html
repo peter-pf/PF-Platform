@@ -18952,6 +18952,27 @@ try {
           + '</div>'
         + '</div>';
       };
+      // _pfDemobPieceRow(name): one auto-populated PF Equipment Demob row (Brad 2026-09-08), shown
+      // iff the matching PF Equipment Mob piece (_pfEquipCondRow name) is marked "Yes"
+      // (effVal('siteReadiness', name) === Yes). Row label = the piece name; same-row "Demob Date"
+      // column ('<name> - Demob Date', a date field) using the .pf-vscrow / .pf-vscrow-col /
+      // .pf-vscrow-lbl idiom. Built under the caller's _curSection ('siteReadiness') so it persists.
+      // When the Mob piece is NOT Yes the row wrapper starts .pf-cond-hidden + display:none so its
+      // Demob Date is EXCLUDED from the completion count. A companion capture-phase listener toggles
+      // it live when the Mob Yes/No flips (the Mob control lives in a DIFFERENT invdetail, so that
+      // listener scopes to [data-demob-piece] under the sandbox root). The data-pr-label sentinel
+      // names the _srNewRow row `name` (NOT a .pr-field, never counted). Register '<name> - Demob
+      // Date' in PF_FIELD_DATE_LABELS.
+      var _pfDemobPieceRow = function(name){
+        var _yes = /^yes$/i.test(String(effVal('siteReadiness', name, '') || '').trim());
+        return '<div data-pr-label="' + E(name) + '">'
+          + '<div class="pf-vscrow pf-demob-piece' + (_yes ? '' : ' pf-cond-hidden')
+              + '" data-demob-piece="' + E(name) + '"' + (_yes ? '' : ' style="display:none"') + '>'
+          +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Demob Date</span>'
+          +     field(name + ' - Demob Date', '') + '</span>'
+          + '</div>'
+        + '</div>';
+      };
       var _srNewSafetyInvTable = function(cats){
         var rows = '';
         cats.forEach(function(c){
@@ -19403,8 +19424,18 @@ try {
                 + '</div>'
               ]; } },
             { name: 'PF Equipment Demob', fieldsFn: function(){ return [
-                field('Demob Equipment', ''),
-                field('Demob Date', ''),
+                // Auto-populated demob rows (Brad 2026-09-08): one per PF Equipment Mob piece, shown
+                // ONLY when that Mob piece is marked "Yes" (effVal('siteReadiness', name) === Yes).
+                // The free-text 'Demob Equipment' + single 'Demob Date' fields are SUPERSEDED by
+                // these 4 per-piece rows (each with its own '<name> - Demob Date'). Hidden rows are
+                // .pf-cond-hidden so excluded from the count. Names MATCH the 4 _pfEquipCondRow Mob
+                // pieces exactly so a Mob Yes/No flip toggles the matching Demob row (companion
+                // capture-phase listener). 'Demob Transport Company' is KEPT as the last field
+                // (dropdown unchanged, per Brad).
+                _pfDemobPieceRow('VSC Rig'),
+                _pfDemobPieceRow('Predrill Rig'),
+                _pfDemobPieceRow('Gooseneck w/ Connex'),
+                _pfDemobPieceRow('Testing Material Fall Off Load'),
                 field('Demob Transport Company', '')
               ]; } },
             { name: 'Rental Equipment',
@@ -19458,9 +19489,34 @@ try {
                 field('Rental Actual Date Called Off Rent', '')
               ]; } },
             { name: 'Equipment Fuel', fieldsFn: function(){ return [
+                // Fuel Vendor dropdown (Brad 2026-09-08): Hart Fuel / Jackson Oil (registered in
+                // PF_FIELD_DROPDOWNS). Records the chosen vendor; the CRM host below shows the
+                // fuel-delivery Company + Contact + contact info from the Project Contacts sheet.
                 field('Fuel Vendor', ''),
-                field('Fuel Contact', ''),
-                field('Fuel Delivery Dates', '')
+                // Fuel-delivery contact from the contacts sheet: an INERT .pr-crm-cards host bound to
+                // material.__crm['Fuel Delivery'] (PF_CRM_NEWGROUP_TRADE.material['Fuel Delivery'] =
+                // 'Fuel Delivery') — the SAME fuel-delivery contact Brad selects in Project Contacts.
+                // pfCrmRenderCards auto-discovers + fills it on the sandbox root (same as the
+                // Equipment Transport / Rental hosts). Faithful STATIC host (no per-company filtering
+                // — kept simple + consistent). data-pr-label sentinel names the row "Fuel Vendor";
+                // NOT a .pr-field so never counted.
+                '<div data-pr-label="Fuel Delivery Contact">'
+                  + '<div class="pr-crm-cards" data-crm-cards="Fuel Delivery" '
+                  + 'data-crm-cards-key="material" data-role-tag="Fuel Vendor"></div>'
+                + '</div>',
+                // Fuel Delivery Dates (Brad 2026-09-08): a same-row two-column .pf-vscrow —
+                // Start Fuel Delivery + Stop Fuel Delivery (both native date pickers, registered in
+                // PF_FIELD_DATE_LABELS). Replaces the old free-text 'Fuel Delivery Dates' field. A
+                // group sub-label ("Fuel Delivery Dates") sits above the two-column row. Both fields
+                // build under _curSection='siteReadiness' so they persist + count normally.
+                '<div data-pr-label="Fuel Delivery Dates">'
+                  + '<div class="pf-vscrow">'
+                  +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Start Fuel Delivery</span>'
+                  +     field('Start Fuel Delivery', '') + '</span>'
+                  +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Stop Fuel Delivery</span>'
+                  +     field('Stop Fuel Delivery', '') + '</span>'
+                  + '</div>'
+                + '</div>'
               ]; } }
           ]), true)
         + _srNewCollapsible('Materials', _srNewSafetyInvTable([
@@ -21931,6 +21987,10 @@ try {
       'Checklist Items 100% Confirmed w/ GC?': ['Yes', 'No'],
       // Subsection 6: Mobilization to Site
       'Demob Transport Company': ['Stephan', 'Paddacks', 'Other'],
+      // Sandbox Mob Prep > Equipment > Equipment Fuel (Brad 2026-09-08): fuel vendor single-select.
+      // The chosen vendor is recorded here; the fuel-delivery Company/Contact renders from the
+      // contacts sheet via the material 'Fuel Delivery' CRM host.
+      'Fuel Vendor': ['Hart Fuel', 'Jackson Oil'],
       'Stone Approved by Engineer (GGG)?': ['Yes', 'No'],
       // ===== Project Closeout 5-subsection build (Brad 2026-08-07, batch-14) =====
       // Subsection 1: Field Closeout Procedure
@@ -22007,6 +22067,16 @@ try {
       'Rental Equipment #3 - Pickup Date': true,
       'Rental Equipment #4 - Delivery Date': true,
       'Rental Equipment #4 - Pickup Date': true,
+      // Sandbox Mob Prep > Equipment > PF Equipment Demob (Brad 2026-09-08): per-Mob-piece demob
+      // dates, auto-populated for every Mob piece marked Yes. Native date picker + MM/DD/YYYY.
+      'VSC Rig - Demob Date': true,
+      'Predrill Rig - Demob Date': true,
+      'Gooseneck w/ Connex - Demob Date': true,
+      'Testing Material Fall Off Load - Demob Date': true,
+      // Sandbox Mob Prep > Equipment > Equipment Fuel (Brad 2026-09-08): Fuel Delivery Dates two-col
+      // row. Both native date pickers + MM/DD/YYYY.
+      'Start Fuel Delivery': true,
+      'Stop Fuel Delivery': true,
       // ===== Site Readiness / Project Setup 6-subsection build (Brad 2026-08-07, batch-13) =====
       // Subsection 1: Shop Drawings
       'Date Ready for Pickup': true,
@@ -23163,6 +23233,17 @@ try {
       if (cond){ cond.style.display = isYes ? '' : 'none'; cond.classList.toggle('pf-cond-hidden', !isYes); }
       var card = el.closest('.pr-card[data-pr-section="siteReadiness"]');
       var root = card && (card.closest('.pr-root') || card.parentElement);
+      // AUTO-POPULATE PF Equipment Demob (Brad 2026-09-08): the changed control is a Mob piece
+      // Yes/No; its data-pr-field-label IS the piece name (e.g. "VSC Rig"). The matching Demob row
+      // lives in a DIFFERENT invdetail (the "PF Equipment Demob" category), so we CANNOT use
+      // el.closest — instead find [data-demob-piece="<name>"] under the sandbox root and show it iff
+      // Yes (toggle .pf-cond-hidden + inline display so its Demob Date is included/excluded from the
+      // count). Scoped to `root` so it never touches another project card.
+      var pieceName = el.getAttribute && el.getAttribute('data-pr-field-label');
+      if (pieceName && root){
+        var demob = root.querySelector('[data-demob-piece="' + (window.CSS && CSS.escape ? CSS.escape(pieceName) : pieceName.replace(/"/g, '\\"')) + '"]');
+        if (demob){ demob.style.display = isYes ? '' : 'none'; demob.classList.toggle('pf-cond-hidden', !isYes); }
+      }
       try { if (root && typeof pfRenderSandboxSubStatus === 'function') pfRenderSandboxSubStatus(root); } catch (e) {}
     }, true);
 
