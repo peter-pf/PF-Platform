@@ -14239,7 +14239,14 @@ try {
       // stored under the OLD label (e.g. a Manual override scope value) still resolves and
       // the field populates exactly as before. Value binding untouched. (This is a
       // DIFFERENT field from the separate "SOW Notes" field, which is unchanged.)
-      'Project Scope of Work Notes': 'Project Scope of Work (SOW)'
+      'Project Scope of Work Notes': 'Project Scope of Work (SOW)',
+      // Sandbox Mob Prep renames (Brad 2026-09-08): carry forward values entered under the OLD
+      // label so a rename never appears to "wipe" the data. new label -> old label.
+      'Date Passed Proof Roll Confirmed': 'Date Proof Roll Received',
+      'Expected Building Pad Elevation (for design per GC)': 'Expected Building Pad Elevation',
+      'Precon Notes': 'Checklist Notes',
+      'Date Locates Actually Called In': 'Date Locates Called In',
+      'Locate Ticket #': 'Locate Ticket # (Excavator ID)'
     };
     function ovLookup(sectionKey, label){
       var sec = _curOverrides && _curOverrides[sectionKey];
@@ -17587,6 +17594,10 @@ try {
       // __site_elevations rows; blank strings when there is nothing to pull. Used by the
       // three field() calls in the Scope column below (Brad 2026-08-13).
       var _gsePull = pfSubmittalGeneralInfoPull();
+      // Live-edit for General Info (Brad 2026-09-08): every field is a save-on-change control
+      // (no Edit button), same as Site Readiness. Turned OFF right after the card so the
+      // Contacts + Subcontract sections between here and E&D stay on the Edit/Save flow.
+      _srLiveEdit = true;
       html += card(1, 'General Info', null,
         // ---- Project Info: FIXED 2-column grouping matching Brad's ProjectInfo
         // PDF (portal_20260807_022742_ProjectInfo.pdf). LEFT = identity/site/
@@ -17696,6 +17707,7 @@ try {
         // Contacts card body, post-render), NOT a re-key. General Info now holds ONLY
         // non-contact project fields (Project Info + Scope). See pcCardBody injection.
         , false, 'general');
+      _srLiveEdit = false;  // end General Info live-edit window (Contacts/Subcontract = Edit/Save)
 
       // ===== 2. PROJECT CONTACTS (Brad 2026-08-11) =========================
       // NEW top-level section positioned BETWEEN General Info and Subcontract
@@ -18002,6 +18014,10 @@ try {
       // touch section 1 + its override key). These new rows seed read-only from the
       // Bid Log for convenience but save under `engineering`. Auto-extract of these
       // values from the linked Prelim Design doc is FUTURE (see subgroupNote).
+      // Live-edit for Engineering & Design (Brad 2026-09-08): its 3 subsections' fields are
+      // built below, so turn live-edit ON here (save-on-change, no Edit button) and OFF right
+      // after the E&D card. Includes the "SOW" dropdown -> selectable without clicking Edit.
+      _srLiveEdit = true;
       var prelimInner =
           subgroupNote('The prelim design the bid was based on. FUTURE: values auto-extract from the linked Prelim Design document.')
         + fields([
@@ -18107,6 +18123,7 @@ try {
         + collapsibleSubgroup('PF Submittal Design', submittalInner)
         + collapsibleSubgroup('As Built Drawings', asBuiltInner);
       html += card(4, 'Engineering & Design', null, engBody, false, 'engineering');
+      _srLiveEdit = false;  // end Engineering & Design live-edit window
 
       // ----- Design Professionals (CONTACTS import inside General Info) -----
       // Brad (2026-08-07, batch-8 CORRECTION): the standalone "Engineering & Design"
