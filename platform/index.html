@@ -14299,12 +14299,12 @@ try {
     var PF_OVERRIDE_LABEL_ALIASES = {
       // "Taxes/Sales Tax Notes" -> "Sales Tax Notes" (Brad 2026-08-07, display rename).
       'Sales Tax Notes': 'Taxes/Sales Tax Notes',
-      // General Info SOW field DISPLAY-renamed (Brad 2026-08-20): "Project Scope of Work
-      // (SOW)" -> "Project Scope of Work Notes". Alias new->old so any override already
-      // stored under the OLD label (e.g. a Manual override scope value) still resolves and
-      // the field populates exactly as before. Value binding untouched. (This is a
-      // DIFFERENT field from the separate "SOW Notes" field, which is unchanged.)
-      'Project Scope of Work Notes': 'Project Scope of Work (SOW)',
+      // General Info notes field DISPLAY-RENAMED (Brad 2026-09-08): "SOW Notes" now SHOWS as
+      // "Project Scope of Work Notes" via PF_FIELD_DISPLAY_LABELS, but its STORAGE KEY stays
+      // 'SOW Notes'. No override alias is needed (the field keys 'SOW Notes' directly). The
+      // old dropdown field that used the key 'Project Scope of Work Notes' was REMOVED and its
+      // alias deleted — no alias points at that colliding key, so the notes field never reads
+      // the removed dropdown's stale override.
       // Sandbox Mob Prep renames (Brad 2026-09-08): carry forward values entered under the OLD
       // label so a rename never appears to "wipe" the data. new label -> old label.
       'Date Passed Proof Roll Confirmed': 'Date Proof Roll Received',
@@ -14425,8 +14425,25 @@ try {
     // ---- field renderers (label always shown; blank -> em-dash) ----
     // If a manual override exists for (_curSection, label), it WINS over the
     // synced value and the field is tagged as edited (subtle indicator).
+    // DISPLAY-LABEL map (Brad 2026-09-08). Some fields must show a friendlier LABEL in the
+    // read/edit view while KEEPING their original storage key (the label is otherwise the
+    // ovLookup key + data-pr-label save-key, so renaming the label re-keys the data). This
+    // map lets field() show a display string for a given STORAGE KEY without changing where
+    // the value is read from or saved to. Storage key -> visible label. Reusable + minimal.
+    // First user: General Info notes field — stored under 'SOW Notes' (its real data), shown
+    // as 'Project Scope of Work Notes'. (A DIFFERENT removed dropdown field also used the
+    // label 'Project Scope of Work Notes' as its OWN key; keeping this field keyed 'SOW Notes'
+    // avoids reading that removed field's stale override — no display-only rename collision.)
+    var PF_FIELD_DISPLAY_LABELS = {
+      'SOW Notes': 'Project Scope of Work Notes'
+    };
+    function pfDisplayLabel(label){ return PF_FIELD_DISPLAY_LABELS[label] || label; }
     function field(label, val, src){
       var ov = ovLookup(_curSection, label);
+      // Visible label (display-only): may differ from the STORAGE KEY `label`. Only the
+      // .pr-field-label text uses this; ovLookup / data-pr-label / pfLiveControl all keep
+      // using the real `label` so read + save round-trip under the unchanged storage key.
+      var dispLabel = pfDisplayLabel(label);
       // An override WINS over the synced/computed value — BUT ONLY when it carries a
       // real (non-empty) value. Fix (Brad 2026-08-12, POET Column Diameter blank): the
       // section editor persists EVERY field label it scans on Save, including ones left
@@ -14492,13 +14509,14 @@ try {
         // class. The completion status bar counts the same .blank spans, so the count now
         // matches the highlighting in live mode too.
         var liveBlank = (rawForCtl == null || String(rawForCtl).trim() === '') ? ' blank' : '';
-        return '<div class="pr-field" data-pr-label="'+E(label)+'"><span class="pr-field-label">'+E(label)+editMark+'</span>'
+        return '<div class="pr-field" data-pr-label="'+E(label)+'"><span class="pr-field-label">'+E(dispLabel)+editMark+'</span>'
              + '<span class="pr-field-value pr-field-live'+liveBlank+'">'+pfLiveControl(label, rawForCtl)+'</span>'
              + (src ? '<span class="pr-field-src">'+E(src)+'</span>' : '') + '</div>';
       }
       // data-pr-label lets the section editor read every field's label back out
-      // of the DOM without re-deriving it from the source expressions.
-      return '<div class="pr-field" data-pr-label="'+E(label)+'"><span class="pr-field-label">'+E(label)+editMark+'</span>'
+      // of the DOM without re-deriving it from the source expressions. It stays the
+      // STORAGE KEY (label), not the display string — save/read round-trips unchanged.
+      return '<div class="pr-field" data-pr-label="'+E(label)+'"><span class="pr-field-label">'+E(dispLabel)+editMark+'</span>'
            + '<span class="'+cls+'">'+shown+'</span>'+srcHtml+'</div>';
     }
 
@@ -17763,14 +17781,26 @@ try {
               return _cEnd || '';
             })(), 'Auto (start + duration)')
         ], [
-          // DROPDOWN (SOW). Value seeds from the confirmed subcontract scope where present.
-          // Label DISPLAY-renamed "Project Scope of Work (SOW)" -> "Project Scope of Work
-          // Notes" (Brad 2026-08-20). The label is the override/dropdown KEY, so the rename
-          // is paired with a PF_OVERRIDE_LABEL_ALIASES entry (new->old, so the existing
-          // stored override value still resolves + populates unchanged) and a re-keyed
-          // PF_FIELD_DROPDOWNS entry (so it still renders as the SOW dropdown in the editor).
-          // Value binding (SF.confirmed_scope + the override plumbing) is UNCHANGED.
-          field('Project Scope of Work Notes', SF.confirmed_scope, SF.confirmed_scope ? SS : ''),
+          // PROJECT SCOPE multi-select (Brad 2026-09-08): MOVED here to the TOP of the RIGHT
+          // column of General Info, directly ABOVE the "Project Scope of Work Notes" field
+          // (was previously rendered as a standalone block at the foot of Project Info). Each
+          // checked box saves 'Project Scope - <Option>' = 'Yes' under 'general' (live
+          // save-on-change via window.pfProjectScopeToggle, no Edit button). Office = editable;
+          // field_ops = read-only. Re-checks from the saved override every render via effVal.
+          // The save/persistence mechanism is UNCHANGED — this is purely a relocation of WHERE
+          // the .pf-pscope-wrap div renders in the card layout (now a right-column element).
+          pfProjectScopeGroup(),
+          // NOTES field, DISPLAY-RENAMED (Brad 2026-09-08): the storage KEY stays 'SOW Notes'
+          // (its real notes data, intact) while the VISIBLE label shows 'Project Scope of Work
+          // Notes' via PF_FIELD_DISPLAY_LABELS. Keying by 'SOW Notes' is deliberate: a SEPARATE
+          // dropdown field previously used the key 'Project Scope of Work Notes' and, because
+          // General Info is live-edit, projects that picked a scope have a stale override saved
+          // at general->'Project Scope of Work Notes' (e.g. "Aggregate Piers, Top Feed"). Keying
+          // this notes textarea 'SOW Notes' means ovLookup reads ONLY the real notes data and can
+          // NEVER surface that stale dropdown string. Registered in PF_FIELD_TEXTAREA_LABELS
+          // under 'SOW Notes' so the editor renders a multi-line <textarea>. No alias needed —
+          // the field reads its own key directly. (The dropdown field itself was REMOVED; its
+          // orphaned override just sits unused.)
           field('SOW Notes', ''),
           field('Total Pier Qty (Prelim)', bid.total_columns, 'Bid Log'),
           field('Total LF (Prelim)', bid.total_lf, 'Bid Log'),
@@ -17811,12 +17841,6 @@ try {
             })(), (pfTurnoverStone(_curNum) != null) ? 'Turnover Budget' : ''),
           field('Estimated Spoils (CY)', '')
         ])
-        // PROJECT SCOPE multi-select (Brad 2026-09-08): the canonical scope driver, placed at the
-        // foot of the Project Info block (project-level, below the identity/quantity fields). Each
-        // checked box saves 'Project Scope - <Option>' = 'Yes' under 'general' (live save-on-change,
-        // no Edit button). Office = editable; field_ops = read-only (disabled boxes still show the
-        // checked scopes). Re-checks from the saved override on every render via effVal.
-        + pfProjectScopeGroup()
         // ---- CONTACT GROUPS MOVED OUT (Brad 2026-08-11): the General Contractor Info
         // block + GC Project Team + GC CRM host were RELOCATED to the new top-level
         // "Project Contacts" section (rendered between General Info and Subcontract
@@ -22469,17 +22493,12 @@ try {
       'Rental Equipment #4 - Type': ['CAT Track Loader 265', 'CAT Track Loader 279', 'CAT Track Loader 289'],
       // Safety > Toolbox Talks (Brad 2026-09-08): Prepared? Yes/No.
       'Toolbox Talks Prepared': ['Yes', 'No'],
-      // Re-keyed to the new display label "Project Scope of Work Notes" (Brad 2026-08-20
-      // rename of "Project Scope of Work (SOW)"). The dropdown map is keyed BY LABEL, so
-      // it must track the rename for the field to keep rendering as the SOW dropdown in
-      // the section editor. Option list is unchanged.
-      'Project Scope of Work Notes': [
-        'Aggregate Piers, Top Feed',
-        'Aggregate Piers, Bottom Feed',
-        'Helical Pilings',
-        'Grouted Aggregate Piers',
-        'Rigid Inclusions'
-      ],
+      // REMOVED (Brad 2026-09-08): the "Project Scope of Work Notes" DROPDOWN field (formerly
+      // the "Project Scope of Work (SOW)" dropdown) was deleted from General Info. Its dropdown
+      // registration is removed here so the label is free for the RENAMED notes field (formerly
+      // "SOW Notes"), which is a multi-line textarea (see PF_FIELD_TEXTAREA_LABELS) — NOT a
+      // dropdown. Leaving this map entry would have forced the renamed field to render as a
+      // dropdown, so it is cleaned up.
       'Column Diameter': ['24"', '30"'],
       // Engineering & Design > Prelim Design (Brad 2026-08-12): unit clarified in the
       // label ("(inches)"); the label IS the dropdown/override key, so the value list
@@ -22749,7 +22768,12 @@ try {
       'Field Ops Manager Visit - Comments / Recap': true,
       // ===== Project Closeout 5-subsection build (Brad 2026-08-07, batch-14) =====
       // Subsection 5: Thank-You Email to GC — free-form performance-survey notes.
-      'Performance Survey Notes': true
+      'Performance Survey Notes': true,
+      // General Info (Brad 2026-09-08): the notes field (storage key 'SOW Notes', displayed
+      // as "Project Scope of Work Notes") is free-form multi-line scope notes -> textarea.
+      // Registered under the STORAGE KEY 'SOW Notes' (the key field() actually renders by),
+      // NOT the display label.
+      'SOW Notes': true
     };
     function pfIsTextareaLabel(label){ return !!PF_FIELD_TEXTAREA_LABELS[label]; }
     // Coerce a stored/displayed date (MM/DD/YYYY, M/D/YY, YYYY-MM-DD, ...) into the
