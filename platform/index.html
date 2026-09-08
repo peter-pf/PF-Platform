@@ -18925,6 +18925,33 @@ try {
           + '</span>'
         + '</div>';
       };
+      // _pfRentalPieceRow(n): one per-piece Rental Equipment row (Brad 2026-09-08), revealed by
+      // the "Rental Equipment - Qty" (0..4) single-select cascade. Same .pf-vscrow / .pf-vscrow-col
+      // / .pf-vscrow-lbl mini-label idiom as _pfEquipCondRow. Columns: Type (dropdown), Delivery
+      // Date, Pickup Date — all built under the CALLER'S _curSection (the fieldsFn is evaluated with
+      // _curSection swapped to 'siteReadiness' by _srNewSafetyInvTable) so they persist. The whole
+      // row is wrapped in a container with a data-rental-piece marker; when the saved Qty < n the
+      // container starts with .pf-cond-hidden + display:none so it is EXCLUDED from the completion
+      // count (pfRenderSandboxSubStatus skips any .pr-field inside .pf-cond-hidden). The
+      // data-pr-label sentinel names the _srNewRow row "Rental Equipment #n" (it is NOT a .pr-field,
+      // so it is never counted). A capture-phase 'change' listener on the Qty select re-toggles
+      // these live. Dropdowns/date labels are registered in PF_FIELD_DROPDOWNS / PF_FIELD_DATE_LABELS.
+      var _pfRentalPieceRow = function(n){
+        var _qtyRaw = String(effVal('siteReadiness', 'Rental Equipment - Qty', '') || '').trim();
+        var _qty = /^\d+$/.test(_qtyRaw) ? parseInt(_qtyRaw, 10) : 0;
+        var _show = (n <= _qty);
+        return '<div data-pr-label="Rental Equipment #' + n + '">'
+          + '<div class="pf-vscrow pf-rental-piece' + (_show ? '' : ' pf-cond-hidden')
+              + '" data-rental-piece="' + n + '"' + (_show ? '' : ' style="display:none"') + '>'
+          +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Equipment</span>'
+          +     field('Rental Equipment #' + n + ' - Type', '') + '</span>'
+          +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Delivery Date</span>'
+          +     field('Rental Equipment #' + n + ' - Delivery Date', '') + '</span>'
+          +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Pickup Date</span>'
+          +     field('Rental Equipment #' + n + ' - Pickup Date', '') + '</span>'
+          + '</div>'
+        + '</div>';
+      };
       var _srNewSafetyInvTable = function(cats){
         var rows = '';
         cats.forEach(function(c){
@@ -18949,6 +18976,12 @@ try {
           // check keys off ONLY this one field being filled (e.g. SSSP -> "Date SSSP Sent to
           // GC"), read by pfRenderSandboxSubStatus. Absent -> all-fields-filled default.
           var completeAttr = c.completeWhen ? ' data-complete-field="' + E(c.completeWhen) + '"' : '';
+          // emptyCompleteWhen (Brad 2026-09-08, Rental Equipment Qty=0): when this field's value is
+          // blank OR === the given value, force the category green-check complete (nothing to fill).
+          var emptyCompleteAttr = c.emptyCompleteWhen
+            ? ' data-empty-complete-field="' + E(c.emptyCompleteWhen.field) + '"'
+              + ' data-empty-complete-val="' + E(c.emptyCompleteWhen.val || '') + '"'
+            : '';
           // Conditional category (Brad 2026-09-08, e.g. JHA): a Yes/No controlling field whose
           // "No" value hides a row + auto-completes the category; otherwise the category gates on
           // `gate`. pfRenderSandboxSubStatus reads these + a capture-phase listener recomputes.
@@ -18958,7 +18991,7 @@ try {
               + ' data-cond-hide-row="' + E(c.cond.hideRow || '') + '"'
               + ' data-cond-gate="' + E(c.cond.gate || '') + '"'
             : '';
-          rows += '<tr class="pf-safety-invrow"' + completeAttr + condAttr + ' onclick="window.pfSafetyRowToggle(this)">'
+          rows += '<tr class="pf-safety-invrow"' + completeAttr + emptyCompleteAttr + condAttr + ' onclick="window.pfSafetyRowToggle(this)">'
                 +   '<td class="pf-safety-invname">'
                 +     '<span class="pf-safety-check" aria-hidden="true"></span>'
                 +     '<span class="pf-safety-invtitle">' + E(c.name) + '</span>'
@@ -19354,16 +19387,71 @@ try {
                 _pfEquipCondRow('VSC Rig', ['Deere with Vibro', 'CAT with Vibro']),
                 _pfEquipCondRow('Predrill Rig', ['Sany Predrill']),
                 _pfEquipCondRow('Gooseneck w/ Connex', null),           // no Which Rig (N/A)
-                _pfEquipCondRow('Testing Material Fall Off Load', null) // no Which Rig
+                _pfEquipCondRow('Testing Material Fall Off Load', null), // no Which Rig
+                // Equipment Transportation Info (Brad 2026-09-08): an inline CRM read-card host
+                // that resolves the Company + Contact selected in the Project Contacts tab's
+                // "Equipment Transport" group (equipment.__crm['Equipment Transport']) — SAME
+                // directory binding as PF_CRM_NEWGROUP_TRADE.equipment. It is an INERT div that
+                // pfCrmRenderCards fills post-render (auto-discovered under the render root, same
+                // as the Staking & Layout host ~22914). The outer <div> carries a data-pr-label
+                // sentinel ONLY so _srNewRow names the row "Equipment Transportation Info"; it is
+                // NOT a .pr-field with a .pr-field-value, so pfRenderSandboxSubStatus never counts
+                // it toward the Equipment completion tally (query is .pr-field[data-pr-label]).
+                '<div data-pr-label="Equipment Transportation Info">'
+                  + '<div class="pr-crm-cards" data-crm-cards="Equipment Transport" '
+                  + 'data-crm-cards-key="equipment" data-role-tag="Equipment Transportation Info"></div>'
+                + '</div>'
               ]; } },
             { name: 'PF Equipment Demob', fieldsFn: function(){ return [
                 field('Demob Equipment', ''),
                 field('Demob Date', ''),
                 field('Demob Transport Company', '')
               ]; } },
-            { name: 'Rental Equipment', fieldsFn: function(){ return [
-                field('Rental Equipment', ''),
-                field('Rental Company', ''),
+            { name: 'Rental Equipment',
+              // Qty=0 (or blank) => nothing is being rented => the whole category reads COMPLETE
+              // (green check on), even though all 4 piece rows are hidden. emptyCompleteWhen tells
+              // pfRenderSandboxSubStatus: if this field's value is blank OR === val, force complete
+              // (Brad 2026-09-08). When Qty>=1 the visible piece rows' Type + 2 dates are counted
+              // normally toward completion.
+              emptyCompleteWhen: { field: 'Rental Equipment - Qty', val: '0' },
+              fieldsFn: function(){ return [
+                // Rental company + contact + qty (Brad 2026-09-08). ONE composite row laid out
+                // with the same .pf-vscrow flex idiom the VSC/Predrill conditional rows use:
+                //   [ CRM read-card host (main) | "Qty of Rental Equipment Pieces" dropdown col ].
+                // - The CRM host is an INERT div pfCrmRenderCards fills post-render from
+                //   equipment.__crm['Rental Equipment'] — the SAME directory binding as Project
+                //   Contacts' "Rental Equipment" group (PF_CRM_NEWGROUP_TRADE.equipment). It has
+                //   no .pr-field/.pr-field-value, so pfRenderSandboxSubStatus never counts it.
+                // - The Qty control is a real field('Rental Equipment - Qty') built under
+                //   _curSection='siteReadiness' (the fieldsFn is evaluated with _curSection swapped
+                //   to siteReadiness by _srNewSafetyInvTable), so it persists via the live-save
+                //   path exactly like the other Mob Prep fields. It renders as a single-select
+                //   dropdown (0..4) because 'Rental Equipment - Qty' is registered in
+                //   PF_FIELD_DROPDOWNS (~21738). This field IS countable -> counts toward the
+                //   Equipment group completion (expected).
+                // The outer <div> carries a data-pr-label sentinel so _srNewRow names the row
+                // "Rental Equipment"; the Qty field()'s own data-pr-label sits later in the HTML,
+                // so the regex (first match) still picks the sentinel for the row name.
+                '<div data-pr-label="Rental Equipment">'
+                  + '<div class="pf-vscrow">'
+                  +   '<span class="pf-vscrow-main">'
+                  +     '<div class="pr-crm-cards" data-crm-cards="Rental Equipment" '
+                  +     'data-crm-cards-key="equipment" data-role-tag="Rental Equipment"></div>'
+                  +   '</span>'
+                  +   '<span class="pf-vscrow-col">'
+                  +     '<span class="pf-vscrow-lbl">Qty of Rental Equipment Pieces</span>'
+                  +     field('Rental Equipment - Qty', '')
+                  +   '</span>'
+                  + '</div>'
+                + '</div>',
+                // Per-piece cascade (Brad 2026-09-08): 4 rows always in DOM; each row n is shown
+                // only when the saved Qty >= n (initial visibility from effVal; live-toggled by the
+                // Qty capture-phase listener). Hidden rows carry .pf-cond-hidden so their fields are
+                // excluded from the completion count.
+                _pfRentalPieceRow(1),
+                _pfRentalPieceRow(2),
+                _pfRentalPieceRow(3),
+                _pfRentalPieceRow(4),
                 field('Rental Date Rented/Active', ''),
                 field('Rental Anticipated Days Needed', ''),
                 field('Rental Anticipated Return Date', ''),
@@ -21130,11 +21218,33 @@ try {
         // ONLY on "Date SSSP Sent to GC") — then the check keys off THAT one field's filled
         // state, independent of the other fields. The X/Y readout below still reflects the
         // honest full field count either way.
+        // emptyCompleteWhen (Brad 2026-09-08, Rental Equipment): if the named field's value is blank
+        // OR === the given "empty" value, the category is COMPLETE regardless of the other (hidden)
+        // fields. Read the field's live control value (else its read-view text). Computed here so it
+        // can short-circuit BOTH the green check and the X/Y readout below.
+        var emptyCompleteField = srow.getAttribute('data-empty-complete-field');
+        var forcedEmptyComplete = false;
+        if (emptyCompleteField){
+          var emptyVal = srow.getAttribute('data-empty-complete-val') || '';
+          for (var ei = 0; ei < dEls.length; ei++){
+            if (dEls[ei].getAttribute('data-pr-label') === emptyCompleteField){
+              var ectl = dEls[ei].querySelector('select.pr-live-input, input.pr-live-input, textarea.pr-live-input');
+              var evcell = dEls[ei].querySelector('.pr-field-value');
+              var ecur = ectl ? String(ectl.value || '').trim()
+                              : (evcell ? String(evcell.textContent || '').replace(/\s+/g, ' ').trim() : '');
+              forcedEmptyComplete = (ecur === '' || ecur === emptyVal);
+              break;
+            }
+          }
+        }
         var rchk = srow.querySelector('.pf-safety-check');
         if (rchk){
           var gateField = srow.getAttribute('data-complete-field');
           var rcomplete, rtitle;
-          if (gateField){
+          if (forcedEmptyComplete){
+            rcomplete = true;
+            rtitle = emptyCompleteField + ' — nothing to complete';
+          } else if (gateField){
             rcomplete = false;
             for (var g = 0; g < dEls.length; g++){
               if (dEls[g].getAttribute('data-pr-label') === gateField){
@@ -21155,9 +21265,13 @@ try {
         }
         var stCell = srow.querySelector('.pf-safety-invstatus');
         if (stCell){
-          stCell.innerHTML = (dTotal === 0) ? ''
-            : (dDone + '/' + dTotal + ' Fields Complete, '
-               + '<span class="pf-safety-invpct">' + Math.round((dDone / dTotal) * 100) + '%</span>');
+          // forcedEmptyComplete (Qty=0/blank): show an honest "0/0 Fields Complete, 100%" rather
+          // than the raw count (which would read e.g. 0/1 when Qty is blank) — nothing to fill.
+          stCell.innerHTML = forcedEmptyComplete
+            ? ('0/0 Fields Complete, <span class="pf-safety-invpct">100%</span>')
+            : ((dTotal === 0) ? ''
+               : (dDone + '/' + dTotal + ' Fields Complete, '
+                  + '<span class="pf-safety-invpct">' + Math.round((dDone / dTotal) * 100) + '%</span>'));
         }
       }
     }
@@ -21736,6 +21850,16 @@ try {
       'Predrill Rig - Which Rig': ['Sany Predrill'],
       'Gooseneck w/ Connex': ['Yes', 'No'],
       'Testing Material Fall Off Load': ['Yes', 'No'],
+      // Sandbox Mob Prep > Equipment > Rental Equipment (Brad 2026-09-08): single-select count of
+      // rental pieces (0..4). MUST be registered here — pfLiveControl has no regex fallback, so an
+      // unregistered label would render as a free-text box instead of a dropdown.
+      'Rental Equipment - Qty': ['0', '1', '2', '3', '4'],
+      // Per-piece equipment Type dropdowns (Brad 2026-09-08), #1..#4, revealed by the Qty cascade.
+      // Same option list for each; registered per label (the map is keyed by exact label string).
+      'Rental Equipment #1 - Type': ['CAT Track Loader 265', 'CAT Track Loader 279', 'CAT Track Loader 289'],
+      'Rental Equipment #2 - Type': ['CAT Track Loader 265', 'CAT Track Loader 279', 'CAT Track Loader 289'],
+      'Rental Equipment #3 - Type': ['CAT Track Loader 265', 'CAT Track Loader 279', 'CAT Track Loader 289'],
+      'Rental Equipment #4 - Type': ['CAT Track Loader 265', 'CAT Track Loader 279', 'CAT Track Loader 289'],
       // Safety > Toolbox Talks (Brad 2026-09-08): Prepared? Yes/No.
       'Toolbox Talks Prepared': ['Yes', 'No'],
       // Re-keyed to the new display label "Project Scope of Work Notes" (Brad 2026-08-20
@@ -21872,6 +21996,17 @@ try {
       // already registered below under the Site Readiness section but the map is keyed by
       // LABEL, section-agnostic, so it already picks up the calendar here too.)
       'Date Sent to Print': true,
+      // Sandbox Mob Prep > Equipment > Rental Equipment per-piece rows (Brad 2026-09-08): each of
+      // the 4 pieces has a Delivery Date + Pickup Date that MUST be registered here to render as a
+      // native date picker (else pfLiveControl emits a plain text box) and display as MM/DD/YYYY.
+      'Rental Equipment #1 - Delivery Date': true,
+      'Rental Equipment #1 - Pickup Date': true,
+      'Rental Equipment #2 - Delivery Date': true,
+      'Rental Equipment #2 - Pickup Date': true,
+      'Rental Equipment #3 - Delivery Date': true,
+      'Rental Equipment #3 - Pickup Date': true,
+      'Rental Equipment #4 - Delivery Date': true,
+      'Rental Equipment #4 - Pickup Date': true,
       // ===== Site Readiness / Project Setup 6-subsection build (Brad 2026-08-07, batch-13) =====
       // Subsection 1: Shop Drawings
       'Date Ready for Pickup': true,
@@ -23026,6 +23161,36 @@ try {
       var cond = row ? row.querySelector('.pf-vscrow-cond') : null;
       var isYes = /^yes$/i.test(String(el.value || '').trim());
       if (cond){ cond.style.display = isYes ? '' : 'none'; cond.classList.toggle('pf-cond-hidden', !isYes); }
+      var card = el.closest('.pr-card[data-pr-section="siteReadiness"]');
+      var root = card && (card.closest('.pr-root') || card.parentElement);
+      try { if (root && typeof pfRenderSandboxSubStatus === 'function') pfRenderSandboxSubStatus(root); } catch (e) {}
+    }, true);
+
+    // Sandbox Mob Prep > Equipment > Rental Equipment QTY CASCADE (Brad 2026-09-08). CAPTURE phase.
+    // Separate from the .pf-vscrow-main VSC listener above: the Qty select lives in a .pf-vscrow-col
+    // (NOT .pf-vscrow-main), so that listener correctly ignores it. Fires ONLY when the changed
+    // control's field label === 'Rental Equipment - Qty'. Parses the value as an int (blank/'0' => 0),
+    // then for each of the 4 piece containers in THIS Rental Equipment row shows it iff n <= qty
+    // (toggling .pf-cond-hidden + inline display so pfRenderSandboxSubStatus includes/excludes its
+    // fields from the count), then recomputes the sandbox badges/green-checks. Scoped to the piece
+    // containers that live INSIDE the SAME .pf-safety-invdetail as the Qty control, so it can never
+    // touch another row.
+    document.addEventListener('change', function(ev){
+      var el = ev.target;
+      if (!el || !el.getAttribute) return;
+      if (el.getAttribute('data-pr-field-label') !== 'Rental Equipment - Qty') return;
+      var raw = String(el.value || '').trim();
+      var qty = /^\d+$/.test(raw) ? parseInt(raw, 10) : 0;
+      // Scope: the detail pane (or nearest container) holding this Qty control's Rental Equipment row.
+      var scope = (el.closest && (el.closest('.pf-safety-invdetail') || el.closest('.pf-sr-collapse-body'))) || document;
+      var pieces = scope.querySelectorAll('[data-rental-piece]');
+      for (var i = 0; i < pieces.length; i++){
+        var p = pieces[i];
+        var n = parseInt(p.getAttribute('data-rental-piece'), 10) || 0;
+        var show = (n <= qty);
+        p.style.display = show ? '' : 'none';
+        p.classList.toggle('pf-cond-hidden', !show);
+      }
       var card = el.closest('.pr-card[data-pr-section="siteReadiness"]');
       var root = card && (card.closest('.pr-root') || card.parentElement);
       try { if (root && typeof pfRenderSandboxSubStatus === 'function') pfRenderSandboxSubStatus(root); } catch (e) {}
