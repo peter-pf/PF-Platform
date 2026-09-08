@@ -2474,33 +2474,49 @@ tr.pf-dragging { opacity: 0.45; }
 .pf-sr-collapse.open .pf-sr-collapse-chev { transform: rotate(90deg); }
 .pf-sr-collapse-body { display: none; margin-top: 8px; }
 .pf-sr-collapse.open .pf-sr-collapse-body { display: block; }
-/* Nested Safety subcategory bars (Brad 2026-09-07): a lighter, slightly indented collapse
-   bar so the 5 Safety subcategories read as CHILDREN of the blue "Safety" bar. Each carries a
-   far-left completion check + the shared "X/Y Fields Complete, XX%" readout. */
-.pf-safety-cat { margin-left: 16px; }
-.pf-safety-cat > .pf-sr-collapse-head {
-  background: var(--accent-light, #4a93c2); border-color: var(--accent-light, #4a93c2);
-  font-size: 13px; padding: 6px 12px;
-}
-.pf-safety-cat > .pf-sr-collapse-head:hover {
-  background: var(--accent, #006DB0); border-color: var(--accent, #006DB0);
-}
-/* Far-left completion check on a subcategory bar: an empty ring until every field is filled,
-   then a filled green check. Injected/toggled by pfRenderSandboxSubStatus. */
-.pf-safety-check {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 16px; height: 16px; flex: 0 0 16px; border-radius: 50%;
-  border: 1.5px solid rgba(255,255,255,0.65); background: transparent;
-  color: #fff; font-size: 11px; font-weight: 800; line-height: 1;
-}
-.pf-safety-check.done { background: var(--green, #2e7d32); border-color: var(--green, #2e7d32); }
-/* "X/Y Fields Complete, XX%" readout on a sandbox collapse bar — white text to sit on the
-   accent-blue bar, right-anchored just left of the chevron (the flex-grow title pushes it
-   right; gap on the head handles spacing). No click handler -> click bubbles to the toggle. */
+/* "X/Y Fields Complete, XX%" readout on a sandbox collapse bar (Staking & Layout, Testing,
+   Safety) — white text to sit on the accent-blue bar, right-anchored just left of the chevron
+   (the flex-grow title pushes it right; gap on the head handles spacing). No click handler ->
+   click bubbles to the toggle. */
 .pf-sr-collapse-status {
   font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.92); white-space: nowrap;
 }
 .pf-sr-collapse-status .pf-sr-collapse-pct { font-weight: 800; color: #fff; }
+/* Safety Inventory-style EXPANDABLE ROWS (Brad 2026-09-08): each Safety subcategory is a
+   clickable ROW (▸ caret + green check + name, with the completion readout on the right) that
+   expands INLINE to a full-width detail row — mirroring the #mod-inventory item-row -> detail-
+   pane interaction (the "Sheave" example). Scoped to .pf-srnew-scope so only the sandbox is
+   affected. */
+.pf-srnew-scope .pf-safety-invtbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.pf-srnew-scope .pf-safety-invrow { cursor: pointer; }
+.pf-srnew-scope .pf-safety-invrow > td {
+  padding: 8px 10px; background: var(--bg-0, #fff); border-bottom: 1px solid var(--border-light, #e3e8ee);
+}
+.pf-srnew-scope .pf-safety-invrow:hover > td { background: var(--accent-light, #E0F0FF); }
+.pf-srnew-scope .pf-safety-invrow.pf-safety-invrow-open > td { background: var(--accent-light, #E0F0FF); }
+.pf-srnew-scope .pf-safety-invname { font-weight: 600; color: var(--text-1, #1a2733); white-space: nowrap; }
+.pf-srnew-scope .pf-safety-invtitle { vertical-align: middle; }
+.pf-srnew-scope .pf-safety-invcaret {
+  display: inline-block; color: var(--accent, #006DB0); font-size: 0.8rem;
+  transition: transform 0.15s ease; margin-right: 5px;
+}
+.pf-srnew-scope .pf-safety-invrow-open .pf-safety-invcaret { transform: rotate(90deg); }
+.pf-srnew-scope .pf-safety-invstatus {
+  text-align: right; white-space: nowrap; color: var(--text-3, #6b7a89);
+  font-size: 12px; font-weight: 600;
+}
+.pf-srnew-scope .pf-safety-invpct { color: var(--accent, #006DB0); font-weight: 800; }
+.pf-srnew-scope .pf-safety-invdetail > td { padding: 0; background: #F7FAFD; border-bottom: 1px solid var(--border-light, #e3e8ee); }
+.pf-srnew-scope .pf-safety-invdetailcell { padding: 8px 12px 12px !important; }
+/* Far-left completion check on a subcategory row: an empty gray ring until every field is
+   filled, then a filled green check. Injected/toggled by pfRenderSandboxSubStatus. */
+.pf-safety-check {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; border-radius: 50%; vertical-align: middle; margin-right: 6px;
+  border: 1.5px solid var(--border, #c4ccd6); background: transparent;
+  color: #fff; font-size: 11px; font-weight: 800; line-height: 1;
+}
+.pf-safety-check.done { background: var(--green, #2e7d32); border-color: var(--green, #2e7d32); }
 
 /* ---- Sandbox-scoped Inventory match for the Staking doc checklist -------------- */
 /* The Staking subsection's "Documents to send the surveyor/GC" table uses the      */
@@ -18774,31 +18790,41 @@ try {
         return _srNewSubTable(title, flds, opts);
       };
 
-      // _srNewSafetyCat(catName, buildFieldsFn): a nested Inventory-style collapsible for
-      // ONE Safety subcategory (Brad 2026-09-07). Same click-to-expand idiom as
-      // _srNewCollapsible (a .pf-sr-collapse bar that rolls its body up/down), but rendered
-      // as a lighter, indented CHILD bar (.pf-safety-cat) so the 5 subcategories read as
-      // children of the blue "Safety" bar. DEFAULT COLLAPSED (rolled up) — click the bar to
-      // expand, exactly like the Inventory tab rows. Fields build under the 'safety' override
-      // key (same _curSection swap as _srNewSubTableKeyed) and render as a headerless table
-      // ({noHeadbar,noThead}) since the bar itself names the category. The far-left
-      // completion CHECK and the "X/Y Fields Complete, XX%" readout are injected AFTER render
-      // by pfRenderSandboxSubStatus (single source of truth = the .pr-field-value.blank rule,
-      // identical to the top-level section badges) — so this markup carries only an EMPTY
-      // .pf-safety-check placeholder that turns green when all fields are filled.
-      var _srNewSafetyCat = function(catName, buildFieldsFn){
-        var _prev = _curSection; _curSection = 'safety';
-        var flds = buildFieldsFn();
-        _curSection = _prev;
-        var body = _srNewSubTable(catName, flds, { noHeadbar: true, noThead: true });
-        return '<div class="pf-sr-collapse pf-safety-cat">'
-             +   '<div class="pf-sr-collapse-head" onclick="this.parentElement.classList.toggle(\'open\')">'
-             +     '<span class="pf-safety-check" aria-hidden="true"></span>'
-             +     '<span class="pf-sr-collapse-title">' + E(catName) + '</span>'
-             +     '<span class="pf-sr-collapse-chev">&#9654;</span>'
-             +   '</div>'
-             +   '<div class="pf-sr-collapse-body">' + body + '</div>'
-             + '</div>';
+      // _srNewSafetyInvTable(cats): render the Safety subcategories as INVENTORY-TAB-STYLE
+      // EXPANDABLE ROWS (Brad 2026-09-08) — NOT blue header bars. Each category is a ROW
+      // (a ▸ caret + a green completion check + the category name, with the "X/Y Fields
+      // Complete, XX%" readout on the right) that expands INLINE on click to reveal its
+      // fields in a full-width detail row directly beneath it — exactly the #mod-inventory
+      // item-row -> detail-pane interaction (the "Sheave" example). cats = [{name, fieldsFn}].
+      //
+      // Unlike #mod-inventory (which re-renders the whole module off an `expanded` state map),
+      // this uses a LIGHTWEIGHT self-contained toggle: every detail row is always in the DOM,
+      // hidden via inline display:none (DEFAULT COLLAPSED), and window.pfSafetyRowToggle flips
+      // just that one row — NO re-render. That keeps the Site Readiness live-edit save path
+      // untouched AND lets pfRenderSandboxSubStatus count each detail row's fields (they stay
+      // in the DOM either way) to drive the green check + the row's progress readout. Fields
+      // build under the 'safety' override key (same _curSection swap as _srNewSubTableKeyed)
+      // and render as a headerless table since the row already names the category.
+      var _srNewSafetyInvTable = function(cats){
+        var rows = '';
+        cats.forEach(function(c){
+          var _prev = _curSection; _curSection = 'safety';
+          var flds = c.fieldsFn();
+          _curSection = _prev;
+          var body = _srNewSubTable(c.name, flds, { noHeadbar: true, noThead: true });
+          rows += '<tr class="pf-safety-invrow" onclick="window.pfSafetyRowToggle(this)">'
+                +   '<td class="pf-safety-invname">'
+                +     '<span class="pf-safety-invcaret">&#9656;</span>'
+                +     '<span class="pf-safety-check" aria-hidden="true"></span>'
+                +     '<span class="pf-safety-invtitle">' + E(c.name) + '</span>'
+                +   '</td>'
+                +   '<td class="pf-safety-invstatus"></td>'
+                + '</tr>'
+                + '<tr class="pf-safety-invdetail" style="display:none">'
+                +   '<td colspan="2" class="pf-safety-invdetailcell">' + body + '</td>'
+                + '</tr>';
+        });
+        return '<table class="pf-safety-invtbl"><tbody>' + rows + '</tbody></table>';
       };
 
       // ---- Shop Drawings subsection ELIMINATED (Brad 2026-09-05) ----------------
@@ -19043,8 +19069,8 @@ try {
       //    catch-all "Other Safety Items" are DROPPED out of Safety per Brad.
       //  * Utility Locates DE-DUPLICATED to one clean set (the legacy card had two near-
       //    duplicate variants of each locate field); surviving labels keep their save keys.
-      var _srN_safetyInner =
-          _srNewSafetyCat('Site Specific Safety Plan (SSSP)', function(){ return [
+      var _srN_safetyInner = _srNewSafetyInvTable([
+          { name: 'Site Specific Safety Plan (SSSP)', fieldsFn: function(){ return [
               pfSspFolderRow(),
               // "Site Specific Safety Plan" row + the Create/Send SSSP button inline to its
               // right (composite value cell). field() is emitted FIRST so _srNewRow reads
@@ -19054,28 +19080,29 @@ try {
                 + '<a class="pr-action-link" href="' + E(_pipefySSSP) + '" target="_blank" rel="noopener noreferrer">&#128221; Create / Send SSSP (Pipefy)</a>'
               + '</div>',
               field('Date SSSP Sent to GC', '')
-            ]; })
-        + _srNewSafetyCat('Material Safety Data Sheets (SDS)', function(){ return [
+            ]; } },
+          { name: 'Material Safety Data Sheets (SDS)', fieldsFn: function(){ return [
               field('Safety Data Sheets (SDS)', ''),
               field('SDS Sent?', ''),
               field('Date SDS Sent', ''),
               fieldLinked('SDS Copy Link', '', '', 'website')
-            ]; })
-        + _srNewSafetyCat('Jobsite Hazard Analysis (JHA\'s/JSA\'s)', function(){ return [
+            ]; } },
+          { name: 'Jobsite Hazard Analysis (JHA\'s/JSA\'s)', fieldsFn: function(){ return [
               field('Jobsite Safety Analysis (JSA)', ''),
               fieldLinked('JSA (Jobsite Safety Analysis)', '', '', 'website')
-            ]; })
-        + _srNewSafetyCat('Toolbox Talks', function(){ return [
+            ]; } },
+          { name: 'Toolbox Talks', fieldsFn: function(){ return [
               field('Toolbox Talks Prepared', ''),
               fieldLinked('Toolbox Talks', '', '', 'website')
-            ]; })
-        + _srNewSafetyCat('Public Utility Locates', function(){ return [
+            ]; } },
+          { name: 'Public Utility Locates', fieldsFn: function(){ return [
               field('Locate Ticket # (Excavator ID)', ''),
               field('Date Locates Called In', ''),
               field('Date Ticket Cleared to Start', ''),
               field('Date Ticket Expires', ''),
               fieldLinked('Locate Ticket PDF Link', '', '', 'website')
-            ]; });
+            ]; } }
+        ]);
       var _srN_safety = _srNewCollapsible('Safety', _srN_safetyInner, true);
 
       // ---- Subsection 5: Mobilization Preparation -----------------------------
@@ -20797,7 +20824,9 @@ try {
         // Idempotency: drop any prior readout so a re-run never stacks two.
         var oldStat = head.querySelector(':scope > .pf-sr-collapse-status');
         if (oldStat) oldStat.parentNode.removeChild(oldStat);
-        // Green completion check (Safety subcategory bars only carry the .pf-safety-check span).
+        // No collapse-bar carries a .pf-safety-check span anymore (the Safety green checks
+        // moved to the inventory-style rows below) — this query harmlessly matches nothing on
+        // Staking/Testing/Safety bars; kept defensive in case a future bar wants a check.
         var chk = head.querySelector(':scope > .pf-safety-check');
         if (chk){
           var complete = (total > 0 && done === total);
@@ -20817,7 +20846,57 @@ try {
         if (chev) head.insertBefore(status, chev);
         else head.appendChild(status);
       }
+      // Safety Inventory-style rows (Brad 2026-09-08): each .pf-safety-invrow summary row is
+      // paired with the NEXT sibling .pf-safety-invdetail row holding its fields. Count that
+      // detail row's fields (same blank rule) to drive the row's far-left green check
+      // (.pf-safety-check) + the right-hand "X/Y Fields Complete, XX%" readout
+      // (.pf-safety-invstatus). Fields stay in the DOM even when the row is collapsed, so the
+      // count is correct in either state (and the parent "Safety" bar's aggregate above
+      // already includes them).
+      var invRows = root.querySelectorAll('.pf-srnew-scope .pf-safety-invrow');
+      for (var r = 0; r < invRows.length; r++){
+        var srow = invRows[r];
+        var detail = srow.nextElementSibling;
+        if (!detail || !detail.classList || !detail.classList.contains('pf-safety-invdetail')) continue;
+        var dEls = detail.querySelectorAll('.pr-field[data-pr-label]');
+        var dTotal = 0, dDone = 0;
+        for (var k = 0; k < dEls.length; k++){
+          var dv = dEls[k].querySelector('.pr-field-value');
+          if (!dv) continue;
+          dTotal++;
+          if (!dv.classList.contains('blank')) dDone++;
+        }
+        var rchk = srow.querySelector('.pf-safety-check');
+        if (rchk){
+          var rcomplete = (dTotal > 0 && dDone === dTotal);
+          rchk.classList.toggle('done', rcomplete);
+          rchk.innerHTML = rcomplete ? '&#10003;' : '';
+          rchk.setAttribute('title', rcomplete ? 'All fields complete'
+            : (dTotal ? (dDone + ' of ' + dTotal + ' complete') : 'No fields'));
+        }
+        var stCell = srow.querySelector('.pf-safety-invstatus');
+        if (stCell){
+          stCell.innerHTML = (dTotal === 0) ? ''
+            : (dDone + '/' + dTotal + ' Fields Complete, '
+               + '<span class="pf-safety-invpct">' + Math.round((dDone / dTotal) * 100) + '%</span>');
+        }
+      }
     }
+
+    // Toggle ONE Safety inventory-style row's inline detail pane (Brad 2026-09-08). The whole
+    // summary row is the click target (matching #mod-inventory's row-click-to-expand); it has
+    // no inputs, so there is nothing to guard. Flips the row's open class (rotates the caret +
+    // highlights the row via CSS) and shows/hides the paired NEXT-sibling detail row — a
+    // self-contained toggle, no re-render, so live-edit field saves in the detail pane are
+    // untouched.
+    window.pfSafetyRowToggle = function(row){
+      if (!row) return;
+      var open = row.classList.toggle('pf-safety-invrow-open');
+      var detail = row.nextElementSibling;
+      if (detail && detail.classList && detail.classList.contains('pf-safety-invdetail')){
+        detail.style.display = open ? 'table-row' : 'none';
+      }
+    };
 
     // ---- Project Photos: lazy gallery loader ---------------------------------
     // Fetches /api/project-photos?num=<number> the first time the Project Photos
