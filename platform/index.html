@@ -19173,16 +19173,25 @@ try {
               field('Toolbox Talks Prepared', ''),
               fieldLinked('Toolbox Talks', '', '', 'website')
             ]; } },
-          { name: 'Public Utility Locates', fieldsFn: function(){ return [
-              // Brad 2026-09-08: dropped "(Excavator ID)"; added a "need called in by" date
-              // above the actual call-in date; renamed the existing one to "...Actually...".
-              field('Locate Ticket #', ''),
-              field('Date Locates Need Called in By', ''),
-              field('Date Locates Actually Called In', ''),
-              field('Date Ticket Cleared to Start', ''),
-              field('Date Ticket Expires', ''),
-              fieldLinked('Locate Ticket PDF Link', '', '', 'website')
-            ]; } }
+          { name: 'Public Utility Locates', fieldsFn: function(){
+              // "Locate Ticket PDF Link" (Brad 2026-09-08): the fillable paste-a-URL is REMOVED;
+              // it now auto-links to the project's "06 - Safety/Utility Locates" SharePoint folder
+              // (detected by build-safety-folder.py -> locates_folder_url). Placeholder ("—")
+              // until Peter creates that folder for the project. Read-only text link.
+              var _sf = pfSafetyFolder(_curNum);
+              var _lu = (_sf && _sf.locates_folder_url) ? String(_sf.locates_folder_url).trim() : '';
+              return [
+                // Brad 2026-09-08: dropped "(Excavator ID)"; added a "need called in by" date
+                // above the actual call-in date; renamed the existing one to "...Actually...".
+                field('Locate Ticket #', ''),
+                field('Date Locates Need Called in By', ''),
+                field('Date Locates Actually Called In', ''),
+                field('Date Ticket Cleared to Start', ''),
+                field('Date Ticket Expires', ''),
+                fieldLinked('Locate Ticket PDF Link', _lu, '', 'website',
+                  { readonlyLink: true, linkLabel: 'Open Utility Locates Folder', emptyText: '—' })
+              ];
+            } }
         ]);
       var _srN_safety = _srNewCollapsible('Safety', _srN_safetyInner, true);
 

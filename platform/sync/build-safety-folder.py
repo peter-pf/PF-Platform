@@ -68,6 +68,11 @@ SAFETY_FOLDER_RE = re.compile(r"^(?:\d{2}\s*-\s*)?safety\b", re.I)
 # portal swaps the "Create / Send SSSP (Pipefy)" button for a clickable "SSSP" link to the file.
 SSSP_FILE_RE = re.compile(r"sssp|site\s*specific\s*safety", re.I)
 
+# The "Utility Locates" SUBFOLDER inside a project's "06 - Safety" folder (Brad 2026-09-08).
+# Peter creates it per project and saves the forwarded locate emails/data there; the portal's
+# "Locate Ticket PDF Link" row links to it. Tolerant of an optional numeric prefix.
+UTILITY_LOCATES_RE = re.compile(r"utility\s*locates?|^(?:\d{2}\s*-\s*)?locates?\b", re.I)
+
 # Only real project folders start with an "NN-NNN" number (skip "001 - Completed Jobs",
 # templates, and any non-project folders).
 PROJNUM_RE = re.compile(r"^(\d{2}-\d{3})\b")
@@ -128,7 +133,8 @@ def resolve_safety_folder(token, folder):
     child matching SAFETY_FOLDER_RE (e.g. no safety subfolder yet).
     """
     result = {"found": False, "webUrl": "", "folder_name": "", "path": "",
-              "sssp_file_url": "", "sssp_file_name": ""}
+              "sssp_file_url": "", "sssp_file_name": "",
+              "locates_folder_url": "", "locates_folder_name": ""}
     kids = try_list_children_by_path(token, f"{PROJECTS_BASE}/{folder}")
     if kids is None:
         return result  # project folder not found under Field Ops
@@ -143,24 +149,32 @@ def resolve_safety_folder(token, folder):
                 folder_name=name,
                 path=f"{folder}/{name}",
             )
-            # Look INSIDE the 06 - Safety folder for the SSSP file (Brad 2026-09-08): the first
-            # FILE whose name matches SSSP_FILE_RE. Its webUrl lets the portal show an "SSSP"
-            # link in place of the Create button. Best-effort: a listing error / no match just
-            # leaves sssp_file_url blank (portal falls back to the Create button).
+            # Scan INSIDE the 06 - Safety folder ONCE for two things (Brad 2026-09-08):
+            #   (a) the SSSP FILE (first file matching SSSP_FILE_RE) -> the portal shows an
+            #       "SSSP" link in place of the Create button.
+            #   (b) the "Utility Locates" SUBFOLDER (first folder matching UTILITY_LOCATES_RE)
+            #       -> the portal's "Locate Ticket PDF Link" row links to that folder.
+            # Best-effort: a listing error / no match leaves the respective field blank (the
+            # portal falls back to the Create button / a placeholder). No early break -- we want
+            # BOTH, so we scan all children.
             try:
                 sk = try_list_children_by_path(token, f"{PROJECTS_BASE}/{folder}/{name}")
             except urllib.error.HTTPError:
                 sk = None
             for fitem in (sk or []):
+                iname = str(fitem.get("name", ""))
                 if fitem.get("folder"):
-                    continue  # a subfolder, not the SSSP file
-                fname = str(fitem.get("name", ""))
-                if SSSP_FILE_RE.search(fname):
+                    if not result["locates_folder_url"] and UTILITY_LOCATES_RE.search(iname):
+                        result.update(
+                            locates_folder_url=fitem.get("webUrl", "") or "",
+                            locates_folder_name=iname,
+                        )
+                    continue
+                if not result["sssp_file_url"] and SSSP_FILE_RE.search(iname):
                     result.update(
                         sssp_file_url=fitem.get("webUrl", "") or "",
-                        sssp_file_name=fname,
+                        sssp_file_name=iname,
                     )
-                    break
             return result
     return result
 
@@ -179,9 +193,12 @@ def build(token, only=None, verbose=True):
             "source_path": res["path"],
             "sssp_file_url": res.get("sssp_file_url", ""),
             "sssp_file_name": res.get("sssp_file_name", ""),
+            "locates_folder_url": res.get("locates_folder_url", ""),
+            "locates_folder_name": res.get("locates_folder_name", ""),
         }
         _sssp = res.get("sssp_file_name") or "(no SSSP file)"
-        report.append((projnum, "ok", f'{res["path"]}  [SSSP: {_sssp}]'))
+        _loc = res.get("locates_folder_name") or "(no Utility Locates folder)"
+        report.append((projnum, "ok", f'{res["path"]}  [SSSP: {_sssp}] [Locates: {_loc}]'))
 
     data = {
         "projects": projects,
