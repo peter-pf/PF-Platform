@@ -18817,7 +18817,11 @@ try {
           var rowAction = c.rowAction
             ? '<span class="pf-safety-rowaction" onclick="event.stopPropagation()">' + c.rowAction + '</span>'
             : '';
-          rows += '<tr class="pf-safety-invrow" onclick="window.pfSafetyRowToggle(this)">'
+          // Optional custom green-check gate (Brad 2026-09-08): when set, the row's completion
+          // check keys off ONLY this one field being filled (e.g. SSSP -> "Date SSSP Sent to
+          // GC"), read by pfRenderSandboxSubStatus. Absent -> all-fields-filled default.
+          var completeAttr = c.completeWhen ? ' data-complete-field="' + E(c.completeWhen) + '"' : '';
+          rows += '<tr class="pf-safety-invrow"' + completeAttr + ' onclick="window.pfSafetyRowToggle(this)">'
                 +   '<td class="pf-safety-invname">'
                 +     '<span class="pf-safety-check" aria-hidden="true"></span>'
                 +     '<span class="pf-safety-invtitle">' + E(c.name) + '</span>'
@@ -19076,6 +19080,9 @@ try {
       //    duplicate variants of each locate field); surviving labels keep their save keys.
       var _srN_safetyInner = _srNewSafetyInvTable([
           { name: 'Site Specific Safety Plan (SSSP)',
+            // Green check gates ONLY on the "Date SSSP Sent to GC" field (Brad 2026-09-08):
+            // no date -> no check; date entered -> check. (Independent of the other rows.)
+            completeWhen: 'Date SSSP Sent to GC',
             // "Open Safety Folder" moved OUT of the expand and onto the SSSP summary row itself
             // (Brad 2026-09-08) — reads the project's "06 - Safety" SharePoint folder via
             // pfSafetyFolder(_curNum) (same source pfSspFolderRow used). Blank -> no link.
@@ -19095,10 +19102,10 @@ try {
               field('Date SSSP Sent to GC', '')
             ]; } },
           { name: 'Material Safety Data Sheets (SDS)', fieldsFn: function(){ return [
+              // Trimmed (Brad 2026-09-08): dropped repetitive "SDS Sent?" + "SDS Copy Link"
+              // rows; "Date SDS Sent" renamed to "Date SDS Sent to GC".
               field('Safety Data Sheets (SDS)', ''),
-              field('SDS Sent?', ''),
-              field('Date SDS Sent', ''),
-              fieldLinked('SDS Copy Link', '', '', 'website')
+              field('Date SDS Sent to GC', '')
             ]; } },
           { name: 'Jobsite Hazard Analysis (JHA\'s/JSA\'s)', fieldsFn: function(){ return [
               field('Jobsite Safety Analysis (JSA)', ''),
@@ -20879,13 +20886,33 @@ try {
           dTotal++;
           if (!dv.classList.contains('blank')) dDone++;
         }
+        // Green check: by default a row is "complete" when ALL its fields are filled. A row
+        // may instead declare data-complete-field="<label>" (Brad 2026-09-08, e.g. SSSP gates
+        // ONLY on "Date SSSP Sent to GC") — then the check keys off THAT one field's filled
+        // state, independent of the other fields. The X/Y readout below still reflects the
+        // honest full field count either way.
         var rchk = srow.querySelector('.pf-safety-check');
         if (rchk){
-          var rcomplete = (dTotal > 0 && dDone === dTotal);
+          var gateField = srow.getAttribute('data-complete-field');
+          var rcomplete, rtitle;
+          if (gateField){
+            rcomplete = false;
+            for (var g = 0; g < dEls.length; g++){
+              if (dEls[g].getAttribute('data-pr-label') === gateField){
+                var gv = dEls[g].querySelector('.pr-field-value');
+                rcomplete = !!gv && !gv.classList.contains('blank');
+                break;
+              }
+            }
+            rtitle = rcomplete ? (gateField + ' entered') : (gateField + ' required');
+          } else {
+            rcomplete = (dTotal > 0 && dDone === dTotal);
+            rtitle = rcomplete ? 'All fields complete'
+              : (dTotal ? (dDone + ' of ' + dTotal + ' complete') : 'No fields');
+          }
           rchk.classList.toggle('done', rcomplete);
           rchk.innerHTML = rcomplete ? '&#10003;' : '';
-          rchk.setAttribute('title', rcomplete ? 'All fields complete'
-            : (dTotal ? (dDone + ' of ' + dTotal + ' complete') : 'No fields'));
+          rchk.setAttribute('title', rtitle);
         }
         var stCell = srow.querySelector('.pf-safety-invstatus');
         if (stCell){
@@ -21803,6 +21830,16 @@ try {
         } catch (e) {}
         el.setAttribute('data-pr-live-prev', value);   // new baseline for the next revert
         syncBlank(value);                               // clear/apply yellow to match new value
+        // LIVE completion refresh (Brad 2026-09-08): a live-edit save toggles .blank on THIS
+        // cell but the section/subsection completion readouts + Safety green checks are
+        // computed at render time, so they'd stay stale until reload. Recompute them now off
+        // the finalized DOM (same functions renderInto calls last) so "X/Y Fields Complete"
+        // and the green checks update the instant a field is filled/cleared. Cheap DOM walk;
+        // onchange fires once per edit, not per keystroke.
+        var _root = (card && (card.closest('.pr-root') || card.parentElement))
+                    || document.getElementById('prGenericRoot');
+        try { if (typeof pfRenderAllSectionStatusBars === 'function') pfRenderAllSectionStatusBars(_root); } catch (e) {}
+        try { if (typeof pfRenderSandboxSubStatus === 'function') pfRenderSandboxSubStatus(_root); } catch (e) {}
         // No positive "Saved" readout (Brad 2026-09-05 density directive): the save
         // succeeded silently. Clear any stale error/message so nothing lingers or
         // reserves inline space in the field row. Error paths still call msg(...,true).
