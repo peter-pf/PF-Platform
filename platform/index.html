@@ -20318,13 +20318,13 @@ try {
           // (a) NEW tracked doc #1 of the 3-PDF package: the GI-300 QAQC as-built page.
           field('GI-300 QAQC As-Built Page Sent to Garbin?', ''),
           field('Date QAQC As-Built Sent', ''),
-          fieldLinked('GI-300 QAQC As-Built Link', '', '', 'website'),
+          // Link rows REMOVED (Brad 2026-09-08): 'GI-300 QAQC As-Built Link',
+          // 'Column Logs Link', and 'Load Test Link' deleted from this Garbin cat
+          // (render-only removal; the Sent?/Date tracking fields for each doc stay).
           field('Column Logs (Rig PDF) Sent to Garbin?', ''),
           field('Date Column Logs Sent', ''),
-          fieldLinked('Column Logs Link', '', '', 'website'),
           field('Modulus Load Test Sent to Garbin?', ''),
           field('Date Load Test Sent', ''),
-          fieldLinked('Load Test Link', '', '', 'website'),
           field('Date All Files Sent to GGG', ''),
           field('Expected GGG Return Date', ''),
           // COMPUTED (display-only): expected GGG return = files-sent date + 5
@@ -20565,7 +20565,23 @@ try {
                 + '</span>'
               ]; } }
           ], 'closeout'), true);
-      var _srN_demobNew = _srNewCollapsible('Demobilization', _srN_demob, true);
+      // Field Closeout (Brad 2026-09-08): NEW inner collapsible, SAME level/style as
+      // Equipment Demobilization (both are direct .pf-sr-collapse children of the
+      // Demobilization outer body -> both pick up the slate sub-bar CSS at 2538-2549,
+      // and each toggles independently via the child-combinator open rule at 2492 —
+      // rolling one does NOT force the other open). Holds the "Field Closeout Procedure"
+      // cat MOVED out of Project Closeout below (closeoutSub1Inner fields verbatim). Same
+      // _srNewSafetyInvTable engine, same sectionKey 'closeout' (moving WITHIN card 8's
+      // closeout section -> read/write key unchanged, no alias needed), same open=true
+      // default as Equipment Demobilization. pfRenderSandboxSubStatus still counts this
+      // cat's row (it stays inside card 8's .pf-srnew-scope wrapper below).
+      var _srN_fieldCloseout =
+          _srNewCollapsible('Field Closeout', _srNewSafetyInvTable([
+            { name: 'Field Closeout Procedure', fieldsFn: function(){ return closeoutSub1Inner; } }
+          ], 'closeout'), true);
+      // Demobilization outer now wraps TWO sibling inner collapsibles: Equipment
+      // Demobilization THEN Field Closeout (Brad: "same level"; order AFTER per default).
+      var _srN_demobNew = _srNewCollapsible('Demobilization', _srN_demob + _srN_fieldCloseout, true);
 
       // Project Closeout body — the 5 subsections reformatted to the Safety/Mob-Prep inventory
       // style (one cat per subsection) + Demobilization appended. ONE _srNewCollapsible('Project
@@ -20581,7 +20597,9 @@ try {
       var closeoutBody =
           _srN_demobNew
         + _srNewCollapsible('Project Closeout', _srNewSafetyInvTable([
-            { name: 'Field Closeout Procedure', fieldsFn: function(){ return closeoutSub1Inner; } },
+            // Field Closeout Procedure MOVED (Brad 2026-09-08) UP into Demobilization >
+            // Field Closeout (_srN_fieldCloseout above) — no longer rendered here (moved,
+            // not duplicated). closeoutSub1Inner is still defined above and consumed there.
             { name: 'Send Final As-Builts to Garbin', fieldsFn: function(){ return closeoutSub2Inner; } },
             { name: 'GGG Returns Final As-Builts', fieldsFn: function(){ return closeoutSub3Inner; } },
             { name: 'Certified Payroll Reports', fieldsFn: function(){ return closeoutSub4Inner; } },
