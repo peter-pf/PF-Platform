@@ -14316,7 +14316,15 @@ try {
       'VSC Rig': 'Equipment Needed - VSC Rig',
       'Predrill Rig': 'Equipment Needed - Predrill Rig',
       'Gooseneck w/ Connex': 'Equipment Needed - Gooseneck w/ Connex',
-      'Testing Material Fall Off Load': 'Equipment Needed - Testing Material Fall Off Load'
+      'Testing Material Fall Off Load': 'Equipment Needed - Testing Material Fall Off Load',
+      // Garbin closeout composite renames (Brad 2026-09-08). new label -> old label so any
+      // saved Yes/No override carries into the renamed composite row.
+      //  Redline 1: Column Logs -> GUHMA Data. (Date field 'Date Column Logs Sent' kept
+      //  byte-identical -> NO date alias.)
+      'GUHMA Data (PDF) Sent to Garbin': 'Column Logs (Rig PDF) Sent to Garbin?',
+      //  Redline 2: Modulus Load Test drop-'?'. (Date field 'Date Load Test Sent' kept
+      //  byte-identical -> NO date alias.)
+      'Modulus Load Test Sent to Garbin': 'Modulus Load Test Sent to Garbin?'
     };
     function ovLookup(sectionKey, label){
       var sec = _curOverrides && _curOverrides[sectionKey];
@@ -20321,10 +20329,41 @@ try {
           // Link rows REMOVED (Brad 2026-09-08): 'GI-300 QAQC As-Built Link',
           // 'Column Logs Link', and 'Load Test Link' deleted from this Garbin cat
           // (render-only removal; the Sent?/Date tracking fields for each doc stay).
-          field('Column Logs (Rig PDF) Sent to Garbin?', ''),
-          field('Date Column Logs Sent', ''),
-          field('Modulus Load Test Sent to Garbin?', ''),
-          field('Date Load Test Sent', ''),
+          // (b) COMPOSITE ROW — Column Logs -> GUHMA (Brad 2026-09-08 redline 1). The
+          // Yes/No "Sent to Garbin" flag and its paired "Date Sent" now share ONE row
+          // (label | Yes/No | date), same .pf-vscrow / .pf-vscrow-col / .pf-vscrow-lbl
+          // idiom as the Fuel Delivery Called Off / Rental Equipment composites. The
+          // Yes/No field is RENAMED 'Column Logs (Rig PDF) Sent to Garbin?' ->
+          // 'GUHMA Data (PDF) Sent to Garbin' (Brad's new label, no '?'); the alias at
+          // PF_OVERRIDE_LABEL_ALIASES (new->old) carries any saved Yes/No value. The
+          // date field label 'Date Column Logs Sent' is KEPT BYTE-IDENTICAL (no rename,
+          // no alias needed). Leading data-pr-label sentinel = the composite row name
+          // that _srNewRow prints in the left "Field" cell; the two field()'s own
+          // .pr-field-label spans are hidden by `.pf-sr-table .pr-field-label{display
+          // :none}` (~2459), so only the .pf-vscrow-lbl mini-labels show. Both controls
+          // save under 'closeout' (this cat's section, set by _srNewSafetyInvTable).
+          '<div data-pr-label="GUHMA Data (PDF) Sent to Garbin">'
+            + '<div class="pf-vscrow">'
+            +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Sent?</span>'
+            +     field('GUHMA Data (PDF) Sent to Garbin', '') + '</span>'
+            +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Date Sent</span>'
+            +     field('Date Column Logs Sent', '') + '</span>'
+            + '</div>'
+          + '</div>',
+          // (c) COMPOSITE ROW — Modulus Load Test (Brad 2026-09-08 redline 2). Same
+          // one-row layout. The Yes/No field drops the '?': 'Modulus Load Test Sent to
+          // Garbin?' -> 'Modulus Load Test Sent to Garbin'; the drop-? rename would
+          // orphan data without an alias, so PF_OVERRIDE_LABEL_ALIASES maps new->old.
+          // The date field label 'Date Load Test Sent' is KEPT BYTE-IDENTICAL (no
+          // alias). Same sentinel + hidden-inner-label mechanics as the GUHMA row.
+          '<div data-pr-label="Modulus Load Test Sent to Garbin">'
+            + '<div class="pf-vscrow">'
+            +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Sent?</span>'
+            +     field('Modulus Load Test Sent to Garbin', '') + '</span>'
+            +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Date Sent</span>'
+            +     field('Date Load Test Sent', '') + '</span>'
+            + '</div>'
+          + '</div>',
           field('Date All Files Sent to GGG', ''),
           field('Expected GGG Return Date', ''),
           // COMPUTED (display-only): expected GGG return = files-sent date + 5
@@ -22518,7 +22557,14 @@ try {
       // Subsection 2: Send Final As-Builts to Garbin (3-PDF package: GI-300 QAQC +
       // Column Logs + Modulus Load Test).
       'GI-300 QAQC As-Built Page Sent to Garbin?': ['Yes', 'No'],
+      // Column Logs -> GUHMA composite (Brad 2026-09-08 redline 1): NEW label.
+      // Old 'Column Logs (Rig PDF) Sent to Garbin?' entry kept below (inert — no
+      // longer rendered; retained as a harmless label-keyed no-op).
+      'GUHMA Data (PDF) Sent to Garbin': ['Yes', 'No'],
       'Column Logs (Rig PDF) Sent to Garbin?': ['Yes', 'No'],
+      // Modulus Load Test drop-'?' rename (Brad 2026-09-08 redline 2): NEW label +
+      // old (inert) kept for the same reason.
+      'Modulus Load Test Sent to Garbin': ['Yes', 'No'],
       'Modulus Load Test Sent to Garbin?': ['Yes', 'No'],
       // Subsection 3: GGG Returns Final As-Builts (review workflow — Yes/No gates)
       'As-Builts Saved to Closeout Folder?': ['Yes', 'No'],
