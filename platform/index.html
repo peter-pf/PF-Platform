@@ -2516,6 +2516,22 @@ tr.pf-dragging { opacity: 0.45; }
   color: #fff; font-size: 11px; font-weight: 800; line-height: 1;
 }
 .pf-safety-check.done { background: var(--green, #2e7d32); border-color: var(--green, #2e7d32); }
+/* Nested group roll-up bars (Building Pad Prep / Equipment / Materials under Mob Prep, Brad
+   2026-09-08): SMALLER + a distinct slate color vs the top-level accent-blue bar. Scoped to a
+   .pf-sr-collapse nested inside another collapse's body (only the Mob Prep groups qualify). */
+.pf-srnew-scope .pf-sr-collapse-body > .pf-sr-collapse > .pf-sr-collapse-head {
+  background: #5a7184; border-color: #5a7184; font-size: 12.5px; padding: 6px 12px;
+}
+.pf-srnew-scope .pf-sr-collapse-body > .pf-sr-collapse > .pf-sr-collapse-head:hover {
+  background: #4a5f70; border-color: #4a5f70;
+}
+/* Computed Elevation Difference (Brad 2026-09-08): red value + "notify PM" warning when > 6". */
+.pf-elevdiff-over { color: #c0392b; font-weight: 700; }
+.pf-elevdiff-warn { color: #c0392b; font-weight: 600; font-size: 0.85em; margin-left: 6px; }
+/* Category row flagged for concern (elevation diff > 6") -> red-tinted row + red title. Placed
+   after the hover/open rules so the flag wins in every state. */
+.pf-srnew-scope .pf-safety-invrow.pf-safety-invrow-flag > td { background: #fdecea; }
+.pf-srnew-scope .pf-safety-invrow.pf-safety-invrow-flag .pf-safety-invtitle { color: #c0392b; font-weight: 700; }
 
 /* ---- Sandbox-scoped Inventory match for the Staking doc checklist -------------- */
 /* The Staking subsection's "Documents to send the surveyor/GC" table uses the      */
@@ -16205,6 +16221,34 @@ try {
     function computedHint(html, isFlag){
       return '<div class="pr-computed-hint'+(isFlag ? ' pr-computed-flag' : '')+'">'+html+'</div>';
     }
+    // Computed, READ-ONLY "Elevation Difference" row for the sandbox Mob Prep > Building Pad
+    // Elevation (Brad 2026-09-08): |Expected - Actual| in INCHES, ALWAYS positive. When it
+    // exceeds 6" (0.5 ft) the value renders RED with a "notify PM" warning, and the Building Pad
+    // Elevation category row flags red (pfRenderSandboxSubStatus). Live-recomputed by
+    // pfUpdateElevDiff when either elevation changes. Assumes elevations are entered in FEET
+    // (diff x 12 = inches). Carries data-pr-label (row name) + data-pf-elevdiff (live-update
+    // marker). NOT user-editable — it is derived.
+    function pfElevDiffInches(exp, act){
+      if (exp === null || act === null) return null;
+      return Math.round(Math.abs(exp - act) * 12 * 10) / 10;  // inches, 1 decimal, positive
+    }
+    function pfElevDiffInner(inches){
+      if (inches === null) return { cls: 'pr-field-value pf-elevdiff-val empty blank', html: '&#8212;', over: false };
+      var over = inches > 6;
+      return {
+        cls: 'pr-field-value pf-elevdiff-val' + (over ? ' pf-elevdiff-over' : ''),
+        html: E(inches + ' in') + (over ? ' <span class="pf-elevdiff-warn">&#9888; exceeds 6&quot; &mdash; notify PM</span>' : ''),
+        over: over
+      };
+    }
+    function pfElevDiffRow(){
+      var exp = pfParseNum(effVal('siteReadiness', 'Expected Building Pad Elevation', ''));
+      var act = pfParseNum(effVal('siteReadiness', 'Actual Building Pad Elevation', ''));
+      var p = pfElevDiffInner(pfElevDiffInches(exp, act));
+      return '<div class="pr-field" data-pr-label="Elevation Difference" data-pf-elevdiff="1">'
+        + '<span class="pr-field-label">Elevation Difference</span>'
+        + '<span class="' + p.cls + '">' + p.html + '</span></div>';
+    }
     // Effective (override-wins) value of a field, matching field()'s display
     // resolution — so a computation sees exactly what the user sees.
     function effVal(sectionKey, label, synced){
@@ -19220,7 +19264,7 @@ try {
             { name: 'Building Pad Elevation', fieldsFn: function(){ return [
                 field('Expected Building Pad Elevation', ''),
                 field('Actual Building Pad Elevation', ''),
-                field('Elevation Difference', '')
+                pfElevDiffRow()   // computed |Expected-Actual| in inches; red + PM flag if >6"
               ]; } },
             { name: 'Site Readiness Checklist', fieldsFn: function(){ return [
                 field('Date Site Readiness Checklist Sent to GC', ''),
@@ -20937,6 +20981,10 @@ try {
         var srow = invRows[r];
         var detail = srow.nextElementSibling;
         if (!detail || !detail.classList || !detail.classList.contains('pf-safety-invdetail')) continue;
+        // Elevation-difference over-6" flag (Brad 2026-09-08): if this row's detail holds an
+        // over-threshold computed elevation difference, flag the whole category row red. Runs for
+        // every row (before any cond continue) so the initial render + recompute both apply it.
+        srow.classList.toggle('pf-safety-invrow-flag', !!detail.querySelector('.pf-elevdiff-over'));
         var dEls = detail.querySelectorAll('.pr-field[data-pr-label]');
         var dTotal = 0, dDone = 0;
         for (var k = 0; k < dEls.length; k++){
@@ -21052,6 +21100,38 @@ try {
         detail.style.display = open ? 'table-row' : 'none';
       }
     };
+
+    // Live-recompute the sandbox Building Pad Elevation "Elevation Difference" (Brad 2026-09-08).
+    // Reads the Expected/Actual elevation controls in `card` (live input value, else read-view
+    // text), computes |exp-act| in inches, updates the data-pf-elevdiff cell (red + "notify PM"
+    // warning when > 6") and flags the Building Pad Elevation category row red. No-op if the card
+    // has no elevdiff field (e.g. the ORIGINAL Site Readiness card uses the old computedHint).
+    function pfUpdateElevDiff(card){
+      if (!card) return;
+      var cellHost = card.querySelector('[data-pf-elevdiff]');
+      if (!cellHost) return;
+      function rd(label){
+        var inp = card.querySelector('.pr-live-input[data-pr-field-label="' + label.replace(/"/g, '\\"') + '"]');
+        if (inp) return inp.value;
+        var all = card.querySelectorAll('.pr-field[data-pr-label]');
+        for (var i = 0; i < all.length; i++){
+          if (all[i].getAttribute('data-pr-label') === label){
+            var v = all[i].querySelector('.pr-field-value');
+            return v ? v.textContent : '';
+          }
+        }
+        return '';
+      }
+      var p = pfElevDiffInner(pfElevDiffInches(pfParseNum(rd('Expected Building Pad Elevation')),
+                                               pfParseNum(rd('Actual Building Pad Elevation'))));
+      var cell = cellHost.querySelector('.pr-field-value');
+      if (cell){ cell.className = p.cls; cell.innerHTML = p.html; }
+      var detail = cellHost.closest ? cellHost.closest('.pf-safety-invdetail') : null;
+      var srow = detail ? detail.previousElementSibling : null;
+      if (srow && srow.classList && srow.classList.contains('pf-safety-invrow')){
+        srow.classList.toggle('pf-safety-invrow-flag', p.over);
+      }
+    }
 
     // ---- Project Photos: lazy gallery loader ---------------------------------
     // Fetches /api/project-photos?num=<number> the first time the Project Photos
@@ -22837,6 +22917,19 @@ try {
       if (!card) return;
       var root = (card.closest && (card.closest('.pr-root') || card.parentElement)) || document.getElementById('prGenericRoot');
       try { if (typeof pfRenderSandboxSubStatus === 'function') pfRenderSandboxSubStatus(root); } catch (e) {}
+    }, true);
+
+    // Sandbox Mob Prep > Building Pad Elevation live recompute (Brad 2026-09-08): when the
+    // Expected/Actual Building Pad Elevation change, recompute the "Elevation Difference"
+    // (|diff| in inches) + its red >6" flag instantly. CAPTURE phase (before the inline
+    // stopPropagation), same idiom as the Modulus/JHA listeners.
+    document.addEventListener('change', function(ev){
+      var el = ev.target;
+      if (!el || !el.getAttribute) return;
+      var lbl = el.getAttribute('data-pr-field-label');
+      if (lbl !== 'Expected Building Pad Elevation' && lbl !== 'Actual Building Pad Elevation') return;
+      var card = el.closest ? el.closest('.pr-card[data-pr-section="siteReadiness"]') : null;
+      if (card) { try { pfUpdateElevDiff(card); } catch (e) {} }
     }, true);
 
     // Site Readiness > Testing > "Jack to use for modulus test" AUTO-SELECT from "AP Max Test
