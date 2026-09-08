@@ -2496,6 +2496,9 @@ tr.pf-dragging { opacity: 0.45; }
 .pf-srnew-scope .pf-safety-invrow.pf-safety-invrow-open > td { background: var(--accent-light, #E0F0FF); }
 .pf-srnew-scope .pf-safety-invname { font-weight: 600; color: var(--text-1, #1a2733); white-space: nowrap; }
 .pf-srnew-scope .pf-safety-invtitle { vertical-align: middle; }
+/* Inline action link on a summary row (e.g. SSSP "Open Safety Folder", Brad 2026-09-08):
+   sits just right of the category name; its own click opens the link without toggling the row. */
+.pf-srnew-scope .pf-safety-rowaction { margin-left: 14px; font-weight: 500; }
 .pf-srnew-scope .pf-safety-invstatus {
   text-align: right; white-space: nowrap; color: var(--text-3, #6b7a89);
   font-size: 12px; font-weight: 600;
@@ -18807,10 +18810,18 @@ try {
           var flds = c.fieldsFn();
           _curSection = _prev;
           var body = _srNewSubTable(c.name, flds, { noHeadbar: true, noThead: true });
+          // Optional inline ACTION on the summary row itself (Brad 2026-09-08): e.g. the SSSP
+          // "Open Safety Folder" link sits ON the collapsed row, next to the category name —
+          // not hidden inside the expand. Wrapped so a click on it opens the folder WITHOUT
+          // toggling the row (stopPropagation on the wrapper; the <a> still navigates).
+          var rowAction = c.rowAction
+            ? '<span class="pf-safety-rowaction" onclick="event.stopPropagation()">' + c.rowAction + '</span>'
+            : '';
           rows += '<tr class="pf-safety-invrow" onclick="window.pfSafetyRowToggle(this)">'
                 +   '<td class="pf-safety-invname">'
                 +     '<span class="pf-safety-check" aria-hidden="true"></span>'
                 +     '<span class="pf-safety-invtitle">' + E(c.name) + '</span>'
+                +     rowAction
                 +   '</td>'
                 +   '<td class="pf-safety-invstatus"></td>'
                 + '</tr>'
@@ -19064,13 +19075,21 @@ try {
       //  * Utility Locates DE-DUPLICATED to one clean set (the legacy card had two near-
       //    duplicate variants of each locate field); surviving labels keep their save keys.
       var _srN_safetyInner = _srNewSafetyInvTable([
-          { name: 'Site Specific Safety Plan (SSSP)', fieldsFn: function(){ return [
-              pfSspFolderRow(),
-              // "Site Specific Safety Plan" row + the Create/Send SSSP button inline to its
-              // right (composite value cell). field() is emitted FIRST so _srNewRow reads
-              // its data-pr-label for the row name; the button sits in the same value cell.
-              '<div class="pf-staking-resprow">'
-                + field('Site Specific Safety Plan', '')
+          { name: 'Site Specific Safety Plan (SSSP)',
+            // "Open Safety Folder" moved OUT of the expand and onto the SSSP summary row itself
+            // (Brad 2026-09-08) — reads the project's "06 - Safety" SharePoint folder via
+            // pfSafetyFolder(_curNum) (same source pfSspFolderRow used). Blank -> no link.
+            rowAction: (function(){
+              var _sf = pfSafetyFolder(_curNum);
+              var _u = (_sf && _sf.folder_url != null) ? String(_sf.folder_url).trim() : '';
+              return _u ? pfFolderLink(_u, 'Open Safety Folder') : '';
+            })(),
+            fieldsFn: function(){ return [
+              // "Create SSSP" row (Brad 2026-09-08): the editable text field was DELETED; the
+              // row is now just the label + the Create / Send SSSP (Pipefy) button to its right.
+              // data-pr-label on the resprow div supplies the row NAME to _srNewRow — the div is
+              // NOT a .pr-field, so it neither saves nor counts toward the completion badge.
+              '<div class="pf-staking-resprow" data-pr-label="Create SSSP">'
                 + '<a class="pr-action-link" href="' + E(_pipefySSSP) + '" target="_blank" rel="noopener noreferrer">&#128221; Create / Send SSSP (Pipefy)</a>'
               + '</div>',
               field('Date SSSP Sent to GC', '')
