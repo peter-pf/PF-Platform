@@ -19003,6 +19003,14 @@ try {
             ? ' data-empty-complete-field="' + E(c.emptyCompleteWhen.field) + '"'
               + ' data-empty-complete-val="' + E(c.emptyCompleteWhen.val || '') + '"'
             : '';
+          // bothCompleteWhen (Brad 2026-09-08, Fuel Delivery Called Off): the category is complete
+          // ONLY when yesField === 'Yes' AND dateField is non-empty. Emitted as data-attrs, consumed
+          // as a POSITIVE-complete gate in pfRenderSandboxSubStatus (distinct from data-cond-field,
+          // which auto-completes on "No").
+          var bothCompleteAttr = c.bothCompleteWhen
+            ? ' data-both-yes-field="' + E(c.bothCompleteWhen.yesField) + '"'
+              + ' data-both-date-field="' + E(c.bothCompleteWhen.dateField) + '"'
+            : '';
           // Conditional category (Brad 2026-09-08, e.g. JHA): a Yes/No controlling field whose
           // "No" value hides a row + auto-completes the category; otherwise the category gates on
           // `gate`. pfRenderSandboxSubStatus reads these + a capture-phase listener recomputes.
@@ -19012,7 +19020,7 @@ try {
               + ' data-cond-hide-row="' + E(c.cond.hideRow || '') + '"'
               + ' data-cond-gate="' + E(c.cond.gate || '') + '"'
             : '';
-          rows += '<tr class="pf-safety-invrow"' + completeAttr + emptyCompleteAttr + condAttr + ' onclick="window.pfSafetyRowToggle(this)">'
+          rows += '<tr class="pf-safety-invrow"' + completeAttr + emptyCompleteAttr + bothCompleteAttr + condAttr + ' onclick="window.pfSafetyRowToggle(this)">'
                 +   '<td class="pf-safety-invname">'
                 +     '<span class="pf-safety-check" aria-hidden="true"></span>'
                 +     '<span class="pf-safety-invtitle">' + E(c.name) + '</span>'
@@ -19423,21 +19431,9 @@ try {
                   + 'data-crm-cards-key="equipment" data-role-tag="Equipment Transportation Info"></div>'
                 + '</div>'
               ]; } },
-            { name: 'PF Equipment Demob', fieldsFn: function(){ return [
-                // Auto-populated demob rows (Brad 2026-09-08): one per PF Equipment Mob piece, shown
-                // ONLY when that Mob piece is marked "Yes" (effVal('siteReadiness', name) === Yes).
-                // The free-text 'Demob Equipment' + single 'Demob Date' fields are SUPERSEDED by
-                // these 4 per-piece rows (each with its own '<name> - Demob Date'). Hidden rows are
-                // .pf-cond-hidden so excluded from the count. Names MATCH the 4 _pfEquipCondRow Mob
-                // pieces exactly so a Mob Yes/No flip toggles the matching Demob row (companion
-                // capture-phase listener). 'Demob Transport Company' is KEPT as the last field
-                // (dropdown unchanged, per Brad).
-                _pfDemobPieceRow('VSC Rig'),
-                _pfDemobPieceRow('Predrill Rig'),
-                _pfDemobPieceRow('Gooseneck w/ Connex'),
-                _pfDemobPieceRow('Testing Material Fall Off Load'),
-                field('Demob Transport Company', '')
-              ]; } },
+            // PF Equipment Demob cat MOVED OUT of the Equipment group into the new top-level
+            // "Demobilization" section (Brad 2026-09-08) — see _srN_demob below. Only this cat
+            // moved; PF Equipment Mob, Rental Equipment, Equipment Fuel remain here.
             { name: 'Rental Equipment',
               // Qty=0 (or blank) => nothing is being rented => the whole category reads COMPLETE
               // (green check on), even though all 4 piece rows are hidden. emptyCompleteWhen tells
@@ -19520,7 +19516,13 @@ try {
               ]; } }
           ]), true)
         + _srNewCollapsible('Materials', _srNewSafetyInvTable([
-            { name: 'Stone Aggregate', fieldsFn: function(){ return [
+            // Cat DISPLAY renames + Grout+Cement COMBINE (Brad 2026-09-08). Only the cat NAME (row
+            // display title) changes — every field() label below is UNCHANGED, and fields are keyed
+            // by their BARE label (no cat prefix), so saved values still surface with NO alias
+            // needed. 'Stone Aggregate' -> 'AP - Stone Aggregate'; 'Helicals' -> 'Helical Pilings';
+            // 'Grout Mix' + 'Cement Mix' merged into ONE 'Rigid Inclusions' cat holding BOTH field
+            // sets verbatim (grout: 3 fields, cement/concrete: 3 fields — kept, they differ).
+            { name: 'AP - Stone Aggregate', fieldsFn: function(){ return [
                 field('Stone Vendor & Contact', ''),
                 field('Stone Name/Nomenclature', ''),
                 field('Stone Qty (TN)', bid.total_stone_tn, 'Bid Log'),
@@ -19528,23 +19530,79 @@ try {
                 field('Stone Delivery Start Date', ''),
                 field('Stone Qty Day 1 (TN)', '')
               ]; } },
-            { name: 'Helicals', fieldsFn: function(){ return [
+            { name: 'Helical Pilings', fieldsFn: function(){ return [
                 field('Helical Vendor & Contact', ''),
                 field('Helical Material Approved by Eng', ''),
                 field('Helical Qty', '')
               ]; } },
-            { name: 'Grout Mix', fieldsFn: function(){ return [
+            { name: 'Rigid Inclusions', fieldsFn: function(){ return [
+                // Grout Mix fields (labels unchanged)
                 field('Grout Vendor & Contact', ''),
                 field('Grout Mix Approved by Eng', ''),
-                field('Grout Qty', '')
-              ]; } },
-            { name: 'Cement Mix', fieldsFn: function(){ return [
+                field('Grout Qty', ''),
+                // Cement Mix fields (labels unchanged) — merged in under the single Rigid Inclusions cat
                 field('Cement / Concrete Vendor & Contact', ''),
                 field('Concrete Mix (Rigid Inclusions) Approved by Eng', ''),
                 field('Cement Qty', '')
               ]; } }
           ]), true);
       var _srN_mobprepNew = _srNewCollapsible('Mob Prep', _srN_mobprep, true);
+
+      // ===== NEW TOP-LEVEL SECTION: Demobilization (Brad 2026-09-08) =====
+      // Same collapsible + inventory-row engine as Mob Prep (identical green-check / X-Y-% behavior),
+      // rendered as another _srNewCollapsible inside the SAME sandbox card (data-pr-section=
+      // "siteReadiness") — so it lives under the SAME .pr-root as Mob Prep and the extended
+      // .pf-vscrow-main listener's root query still reaches its [data-demob-piece] rows. Three cats:
+      //   1. PF Equipment Demob — MOVED wholesale from Mob Prep > Equipment (the 4 _pfDemobPieceRow
+      //      auto-rows shown when the matching Mob piece = Yes, cross-section-read via
+      //      effVal('siteReadiness', name) which still works — both under _curSection='siteReadiness';
+      //      + the kept 'Demob Transport Company' dropdown).
+      //   2. Equipment Rental Called Off — a 'Equipment Rental Called Off - Date' date; completes
+      //      normally when the date is filled.
+      //   3. Fuel Delivery Called Off — a Yes/No + a date; completes ONLY when Yes AND date filled
+      //      (bothCompleteWhen cat flag -> data-both-yes-field / data-both-date-field, consumed in
+      //      pfRenderSandboxSubStatus; a capture-phase listener re-runs the status on either change).
+      var _srN_demob =
+          _srNewCollapsible('Equipment Demobilization', _srNewSafetyInvTable([
+            { name: 'PF Equipment Demob', fieldsFn: function(){ return [
+                // Auto-populated demob rows (Brad 2026-09-08): one per PF Equipment Mob piece, shown
+                // ONLY when that Mob piece is marked "Yes" (effVal('siteReadiness', name) === Yes).
+                // Hidden rows are .pf-cond-hidden so excluded from the count. Names MATCH the 4
+                // _pfEquipCondRow Mob pieces exactly so a Mob Yes/No flip toggles the matching Demob
+                // row (extended .pf-vscrow-main capture-phase listener). 'Demob Transport Company'
+                // is KEPT as the last field (dropdown unchanged).
+                _pfDemobPieceRow('VSC Rig'),
+                _pfDemobPieceRow('Predrill Rig'),
+                _pfDemobPieceRow('Gooseneck w/ Connex'),
+                _pfDemobPieceRow('Testing Material Fall Off Load'),
+                field('Demob Transport Company', '')
+              ]; } },
+            { name: 'Equipment Rental Called Off', completeWhen: 'Equipment Rental Called Off - Date',
+              fieldsFn: function(){ return [
+                // Completes when the date is filled (completeWhen -> data-complete-field gates the
+                // green check on this one date; the X/Y readout still reflects the honest count).
+                '<div data-pr-label="Equipment Rental Called Off">'
+                  + '<div class="pf-vscrow">'
+                  +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Date Called Off Rent</span>'
+                  +     field('Equipment Rental Called Off - Date', '') + '</span>'
+                  + '</div>'
+                + '</div>'
+              ]; } },
+            { name: 'Fuel Delivery Called Off',
+              // Complete ONLY when Yes is selected AND the date is filled (Brad 2026-09-08).
+              bothCompleteWhen: { yesField: 'Fuel Delivery Called Off', dateField: 'Fuel Delivery Called Off - Date' },
+              fieldsFn: function(){ return [
+                '<div data-pr-label="Fuel Delivery Called Off">'
+                  + '<div class="pf-vscrow">'
+                  +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Called Off?</span>'
+                  +     field('Fuel Delivery Called Off', '') + '</span>'
+                  +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Date Called Off</span>'
+                  +     field('Fuel Delivery Called Off - Date', '') + '</span>'
+                  + '</div>'
+                + '</div>'
+              ]; } }
+          ]), true);
+      var _srN_demobNew = _srNewCollapsible('Demobilization', _srN_demob, true);
 
       // Assemble the sandbox body: subsection order mirrors the ORIGINAL srBody
       // Shop Drawings ELIMINATED (Brad 2026-09-05) — sandbox now STARTS at Staking &
@@ -19554,7 +19612,8 @@ try {
           _srN_staking
         + _srN_testing
         + _srN_safety
-        + _srN_mobprepNew;
+        + _srN_mobprepNew
+        + _srN_demobNew;
       // Wrap the sandbox body in a scoping div (.pf-srnew-scope) so CSS overrides that
       // must match Inventory can target the sandbox WITHOUT leaking into the ORIGINAL
       // Site Readiness card (both cards share data-pr-section="siteReadiness", so the
@@ -21293,11 +21352,37 @@ try {
             }
           }
         }
+        // bothCompleteWhen (Brad 2026-09-08, Fuel Delivery Called Off): complete ONLY when the
+        // yes-field's live value === 'Yes' AND the date-field is non-empty. Read live control value
+        // else read-view text for each; computed here so it can gate the green check below.
+        var bothYesField = srow.getAttribute('data-both-yes-field');
+        var forcedBothComplete = false;
+        if (bothYesField){
+          var bothDateField = srow.getAttribute('data-both-date-field') || '';
+          var yesOk = false, dateOk = false;
+          for (var bi = 0; bi < dEls.length; bi++){
+            var blbl = dEls[bi].getAttribute('data-pr-label');
+            if (blbl === bothYesField){
+              var bctl = dEls[bi].querySelector('select.pr-live-input, input.pr-live-input, textarea.pr-live-input');
+              var bvc = dEls[bi].querySelector('.pr-field-value');
+              var bcur = bctl ? String(bctl.value || '').trim()
+                              : (bvc ? String(bvc.textContent || '').replace(/\s+/g, ' ').trim() : '');
+              yesOk = /^yes$/i.test(bcur);
+            } else if (blbl === bothDateField){
+              var bdv = dEls[bi].querySelector('.pr-field-value');
+              dateOk = !!bdv && !bdv.classList.contains('blank');
+            }
+          }
+          forcedBothComplete = (yesOk && dateOk);
+        }
         var rchk = srow.querySelector('.pf-safety-check');
         if (rchk){
           var gateField = srow.getAttribute('data-complete-field');
           var rcomplete, rtitle;
-          if (forcedEmptyComplete){
+          if (bothYesField){
+            rcomplete = forcedBothComplete;
+            rtitle = forcedBothComplete ? 'Complete' : (bothYesField + ' = Yes + date required');
+          } else if (forcedEmptyComplete){
             rcomplete = true;
             rtitle = emptyCompleteField + ' — nothing to complete';
           } else if (gateField){
@@ -21991,6 +22076,9 @@ try {
       // The chosen vendor is recorded here; the fuel-delivery Company/Contact renders from the
       // contacts sheet via the material 'Fuel Delivery' CRM host.
       'Fuel Vendor': ['Hart Fuel', 'Jackson Oil'],
+      // Sandbox Demobilization > Fuel Delivery Called Off (Brad 2026-09-08): Yes/No selector. Row
+      // completes only when Yes AND the '- Date' is filled (bothCompleteWhen).
+      'Fuel Delivery Called Off': ['Yes', 'No'],
       'Stone Approved by Engineer (GGG)?': ['Yes', 'No'],
       // ===== Project Closeout 5-subsection build (Brad 2026-08-07, batch-14) =====
       // Subsection 1: Field Closeout Procedure
@@ -22077,6 +22165,9 @@ try {
       // row. Both native date pickers + MM/DD/YYYY.
       'Start Fuel Delivery': true,
       'Stop Fuel Delivery': true,
+      // Sandbox Demobilization section (Brad 2026-09-08): Called-Off dates, native date pickers.
+      'Equipment Rental Called Off - Date': true,
+      'Fuel Delivery Called Off - Date': true,
       // ===== Site Readiness / Project Setup 6-subsection build (Brad 2026-08-07, batch-13) =====
       // Subsection 1: Shop Drawings
       'Date Ready for Pickup': true,
@@ -23244,6 +23335,21 @@ try {
         var demob = root.querySelector('[data-demob-piece="' + (window.CSS && CSS.escape ? CSS.escape(pieceName) : pieceName.replace(/"/g, '\\"')) + '"]');
         if (demob){ demob.style.display = isYes ? '' : 'none'; demob.classList.toggle('pf-cond-hidden', !isYes); }
       }
+      try { if (root && typeof pfRenderSandboxSubStatus === 'function') pfRenderSandboxSubStatus(root); } catch (e) {}
+    }, true);
+
+    // Sandbox Demobilization > Fuel Delivery Called Off green-check refresh (Brad 2026-09-08).
+    // CAPTURE phase. The "Fuel Delivery Called Off" cat completes ONLY when its Yes/No === Yes AND
+    // its date is filled (bothCompleteWhen). Neither field is a .pf-vscrow-main control, so the VSC
+    // listener above ignores them — this fires when EITHER of the two fields changes and re-runs
+    // pfRenderSandboxSubStatus(root) so the green check + readout flip live.
+    document.addEventListener('change', function(ev){
+      var el = ev.target;
+      if (!el || !el.getAttribute) return;
+      var lbl = el.getAttribute('data-pr-field-label');
+      if (lbl !== 'Fuel Delivery Called Off' && lbl !== 'Fuel Delivery Called Off - Date') return;
+      var card = el.closest ? el.closest('.pr-card[data-pr-section="siteReadiness"]') : null;
+      var root = card && (card.closest('.pr-root') || card.parentElement);
       try { if (root && typeof pfRenderSandboxSubStatus === 'function') pfRenderSandboxSubStatus(root); } catch (e) {}
     }, true);
 
