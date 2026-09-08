@@ -16251,7 +16251,7 @@ try {
       };
     }
     function pfElevDiffRow(){
-      var exp = pfParseNum(effVal('siteReadiness', 'Expected Building Pad Elevation', ''));
+      var exp = pfParseNum(effVal('siteReadiness', 'Expected Building Pad Elevation (for design per GC)', ''));
       var act = pfParseNum(effVal('siteReadiness', 'Actual Building Pad Elevation', ''));
       var p = pfElevDiffInner(pfElevDiffInches(exp, act));
       return '<div class="pr-field" data-pr-label="Elevation Difference" data-pf-elevdiff="1">'
@@ -19271,7 +19271,7 @@ try {
                 field('Date Passed Proof Roll Confirmed', '')
               ]; } },
             { name: 'Building Pad Elevation', fieldsFn: function(){ return [
-                field('Expected Building Pad Elevation', ''),
+                field('Expected Building Pad Elevation (for design per GC)', ''),
                 field('Actual Building Pad Elevation', ''),
                 pfElevDiffRow()   // computed |Expected-Actual| in inches; red + PM flag if >6"
               ]; } },
@@ -21131,7 +21131,7 @@ try {
         }
         return '';
       }
-      var p = pfElevDiffInner(pfElevDiffInches(pfParseNum(rd('Expected Building Pad Elevation')),
+      var p = pfElevDiffInner(pfElevDiffInches(pfParseNum(rd('Expected Building Pad Elevation (for design per GC)')),
                                                pfParseNum(rd('Actual Building Pad Elevation'))));
       var cell = cellHost.querySelector('.pr-field-value');
       if (cell){ cell.className = p.cls; cell.innerHTML = p.html; }
@@ -22937,7 +22937,7 @@ try {
       var el = ev.target;
       if (!el || !el.getAttribute) return;
       var lbl = el.getAttribute('data-pr-field-label');
-      if (lbl !== 'Expected Building Pad Elevation' && lbl !== 'Actual Building Pad Elevation') return;
+      if (lbl !== 'Expected Building Pad Elevation (for design per GC)' && lbl !== 'Actual Building Pad Elevation') return;
       var card = el.closest ? el.closest('.pr-card[data-pr-section="siteReadiness"]') : null;
       if (card) { try { pfUpdateElevDiff(card); } catch (e) {} }
     }, true);
