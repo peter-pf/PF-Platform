@@ -19209,13 +19209,13 @@ try {
       //      Cement are PLACEHOLDER rows for Brad to flesh out per project).
       // Fields build under siteReadiness (the sandbox card's save key) via _srNewSafetyInvTable
       // so they persist; date labels are already registered in PF_FIELD_DATE_LABELS.
+      // Each of the 3 groups is its OWN collapsible roll-up bar (Brad 2026-09-08 redline #1),
+      // nested under the "Mob Prep" bar, each wrapping its Inventory-style row table.
       var _srN_mobprep =
-          subhead('Building Pad Prep')
-        + _srNewSafetyInvTable([
+          _srNewCollapsible('Building Pad Prep', _srNewSafetyInvTable([
             { name: 'Proof Roll', fieldsFn: function(){ return [
                 field('Building Pad Passed Proof Roll', ''),
-                field('Date Proof Roll Received', ''),
-                fieldLinked('Proof Roll Report Link', '', '', 'website')
+                field('Date Proof Roll Received', '')
               ]; } },
             { name: 'Building Pad Elevation', fieldsFn: function(){ return [
                 field('Expected Building Pad Elevation', ''),
@@ -19233,9 +19233,8 @@ try {
                 field('Field Ops Manager Visit - Actual Date Visited', ''),
                 field('Field Ops Manager Visit - Comments / Recap', '')
               ]; } }
-          ])
-        + subhead('Equipment')
-        + _srNewSafetyInvTable([
+          ]), true)
+        + _srNewCollapsible('Equipment', _srNewSafetyInvTable([
             { name: 'PF Equipment Mob & Demob', fieldsFn: function(){ return [
                 field('Equipment Needed - VSC Rig', ''),
                 field('Equipment Needed - Predrill Rig', ''),
@@ -19258,9 +19257,8 @@ try {
                 field('Fuel Contact', ''),
                 field('Fuel Delivery Dates', '')
               ]; } }
-          ])
-        + subhead('Materials')
-        + _srNewSafetyInvTable([
+          ]), true)
+        + _srNewCollapsible('Materials', _srNewSafetyInvTable([
             { name: 'Stone Aggregate', fieldsFn: function(){ return [
                 field('Stone Vendor & Contact', ''),
                 field('Stone Name/Nomenclature', ''),
@@ -19284,7 +19282,7 @@ try {
                 field('Concrete Mix (Rigid Inclusions) Approved by Eng', ''),
                 field('Cement Qty', '')
               ]; } }
-          ]);
+          ]), true);
       var _srN_mobprepNew = _srNewCollapsible('Mob Prep', _srN_mobprep, true);
 
       // Assemble the sandbox body: subsection order mirrors the ORIGINAL srBody
