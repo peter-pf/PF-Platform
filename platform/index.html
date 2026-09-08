@@ -19417,6 +19417,15 @@ try {
                 _pfEquipCondRow('Predrill Rig', ['Sany Predrill']),
                 _pfEquipCondRow('Gooseneck w/ Connex', null),           // no Which Rig (N/A)
                 _pfEquipCondRow('Testing Material Fall Off Load', null), // no Which Rig
+                // Mob Transport Company (Brad 2026-09-08): single-select dropdown of the two
+                // companies that currently transport PF equipment. VALUES ALIGNED TO THE CONTACT
+                // SHEET company names — the directory / project contacts use "Paddacks Trucking" and
+                // "Stephan Trucking" (Brad wrote "Stephen"; the sheet spells it "Stephan", so the
+                // option is 'Stephan' to match — otherwise the per-company filter below can't match).
+                // Set up like the Demob 'Demob Transport Company' dropdown; persists under
+                // siteReadiness. The selected value drives which Equipment Transport company card the
+                // CRM host shows (data-crm-company-filter -> pfCrmFilterCompanies).
+                field('Mob Transport Company', ''),
                 // Equipment Transportation Info (Brad 2026-09-08): an inline CRM read-card host
                 // that resolves the Company + Contact selected in the Project Contacts tab's
                 // "Equipment Transport" group (equipment.__crm['Equipment Transport']) — SAME
@@ -19426,9 +19435,16 @@ try {
                 // sentinel ONLY so _srNewRow names the row "Equipment Transportation Info"; it is
                 // NOT a .pr-field with a .pr-field-value, so pfRenderSandboxSubStatus never counts
                 // it toward the Equipment completion tally (query is .pr-field[data-pr-label]).
+                // data-crm-company-filter = the Mob Transport Company field label: after
+                // pfCrmRenderCards fills the host (possibly with BOTH Paddacks + Stephan company
+                // cards, since Equipment Transport is a multi-company __crm group), pfCrmFilterCompanies
+                // hides the non-selected company card by normalized name-prefix match. It FAILS OPEN
+                // (shows all cards) when the selection is blank OR no card name matches — so a
+                // spelling mismatch can never hide the real contact.
                 '<div data-pr-label="Equipment Transportation Info">'
                   + '<div class="pr-crm-cards" data-crm-cards="Equipment Transport" '
-                  + 'data-crm-cards-key="equipment" data-role-tag="Equipment Transportation Info"></div>'
+                  + 'data-crm-cards-key="equipment" data-role-tag="Equipment Transportation Info" '
+                  + 'data-crm-company-filter="Mob Transport Company"></div>'
                 + '</div>'
               ]; } },
             // PF Equipment Demob cat MOVED OUT of the Equipment group into the new top-level
@@ -19522,7 +19538,19 @@ try {
             // needed. 'Stone Aggregate' -> 'AP - Stone Aggregate'; 'Helicals' -> 'Helical Pilings';
             // 'Grout Mix' + 'Cement Mix' merged into ONE 'Rigid Inclusions' cat holding BOTH field
             // sets verbatim (grout: 3 fields, cement/concrete: 3 fields — kept, they differ).
-            { name: 'AP - Stone Aggregate', fieldsFn: function(){ return [
+            // Per-material "Required?" gate (Brad 2026-09-08): row 1 of each material is a Yes/No
+            // "<Material> Required?" dropdown. No -> hide EVERY other row in that material + the row
+            // reads 100% complete (nothing to fill); Yes -> show all fields + complete only when ALL
+            // are filled; blank/unanswered -> fields SHOWN + incomplete (mirrors the Safety JHA cat
+            // ~19331 default). Wired by the SAME data-cond-* mechanism JHA uses, with the '*' wildcard
+            // (hideRow:'*' / gate:'*') added to pfRenderSandboxSubStatus so one controller gates the
+            // whole material body without listing each row. Existing material field labels UNCHANGED
+            // (no rename, no alias). A capture-phase listener (data-pr-field-label match) recomputes
+            // pfRenderSandboxSubStatus live on flip.
+            { name: 'AP - Stone Aggregate',
+              cond: { field: 'AP - Stone Aggregate Required?', noValue: 'No', hideRow: '*', gate: '*' },
+              fieldsFn: function(){ return [
+                field('AP - Stone Aggregate Required?', ''),
                 field('Stone Vendor & Contact', ''),
                 field('Stone Name/Nomenclature', ''),
                 field('Stone Qty (TN)', bid.total_stone_tn, 'Bid Log'),
@@ -19530,12 +19558,18 @@ try {
                 field('Stone Delivery Start Date', ''),
                 field('Stone Qty Day 1 (TN)', '')
               ]; } },
-            { name: 'Helical Pilings', fieldsFn: function(){ return [
+            { name: 'Helical Pilings',
+              cond: { field: 'Helical Pilings Required?', noValue: 'No', hideRow: '*', gate: '*' },
+              fieldsFn: function(){ return [
+                field('Helical Pilings Required?', ''),
                 field('Helical Vendor & Contact', ''),
                 field('Helical Material Approved by Eng', ''),
                 field('Helical Qty', '')
               ]; } },
-            { name: 'Rigid Inclusions', fieldsFn: function(){ return [
+            { name: 'Rigid Inclusions',
+              cond: { field: 'Rigid Inclusions Required?', noValue: 'No', hideRow: '*', gate: '*' },
+              fieldsFn: function(){ return [
+                field('Rigid Inclusions Required?', ''),
                 // Grout Mix fields (labels unchanged)
                 field('Grout Vendor & Contact', ''),
                 field('Grout Mix Approved by Eng', ''),
@@ -21292,7 +21326,19 @@ try {
           var gateLabel2 = srow.getAttribute('data-cond-gate') || '';
           var isNo = (condVal === noVal);
           var answered = (condVal !== '');
-          if (hideLabel){
+          // WILDCARD '*' (Brad 2026-09-08, Materials Required? gate): hideRow='*' hides EVERY row in
+          // this cat EXCEPT the controller's own row; gate='*' completes (on Yes) only when EVERY
+          // non-controller field is filled. Named-label behavior (single hideRow/gate) is unchanged.
+          if (hideLabel === '*'){
+            var allTrs = detail.querySelectorAll('tr[data-row-label]');
+            for (var ta = 0; ta < allTrs.length; ta++){
+              var rl = allTrs[ta].getAttribute('data-row-label');
+              if (rl === condField) continue;                 // never hide the controller row
+              allTrs[ta].style.display = isNo ? 'none' : '';
+              // Toggle .pf-cond-hidden on the row's fields so the count-skip loops exclude them.
+              allTrs[ta].classList.toggle('pf-cond-hidden', isNo);
+            }
+          } else if (hideLabel){
             var trs = detail.querySelectorAll('tr[data-row-label]');
             for (var ti = 0; ti < trs.length; ti++){
               if (trs[ti].getAttribute('data-row-label') === hideLabel){ trs[ti].style.display = isNo ? 'none' : ''; break; }
@@ -21301,6 +21347,18 @@ try {
           var cComplete, cTot, cDone;
           if (!answered){ cComplete = false; cTot = 1; cDone = 0; }
           else if (isNo){ cComplete = true; cTot = 1; cDone = 1; }
+          else if (gateLabel2 === '*'){
+            // Yes + gate='*': complete when EVERY non-controller field is filled. Count them honestly.
+            var wTot = 0, wDone = 0;
+            for (var wi = 0; wi < dEls.length; wi++){
+              if (dEls[wi].getAttribute('data-pr-label') === condField) continue; // skip controller
+              var wvc = dEls[wi].querySelector('.pr-field-value');
+              if (!wvc) continue;
+              wTot++;
+              if (!wvc.classList.contains('blank')) wDone++;
+            }
+            cTot = 1 + wTot; cDone = 1 + wDone; cComplete = (wTot > 0 && wDone === wTot);
+          }
           else {
             var gFilled = false;
             if (gateLabel2){
@@ -21319,7 +21377,8 @@ try {
             rchkC.classList.toggle('done', cComplete);
             rchkC.innerHTML = cComplete ? '&#10003;' : '';
             rchkC.setAttribute('title', !answered ? (condField + ' — answer required')
-              : (isNo ? 'Not required' : (cComplete ? 'Complete' : (gateLabel2 + ' required'))));
+              : (isNo ? 'Not required' : (cComplete ? 'Complete'
+                : (gateLabel2 === '*' ? 'All fields required' : (gateLabel2 + ' required')))));
           }
           var stCellC = srow.querySelector('.pf-safety-invstatus');
           if (stCellC){
@@ -21983,6 +22042,11 @@ try {
       // the category reads 100% complete; Yes -> the "Date JHA Sent to GC" row is shown and the
       // category completes when that date is filled (handled in pfRenderSandboxSubStatus).
       'Jobsite Safety Analysis (JSA) Required?': ['Yes', 'No'],
+      // Sandbox Mob Prep > Materials per-material "Required?" gates (Brad 2026-09-08): Yes/No. No ->
+      // hide that material's fields + mark the row 100% complete; Yes -> show + gate on all filled.
+      'AP - Stone Aggregate Required?': ['Yes', 'No'],
+      'Helical Pilings Required?': ['Yes', 'No'],
+      'Rigid Inclusions Required?': ['Yes', 'No'],
       // Sandbox Mob Prep > Equipment > PF Equipment Mob > VSC Rig (Brad 2026-09-08): Yes/No gate;
       // Yes reveals "Which Rig" + "Mob Date" columns on the same row.
       'VSC Rig': ['Yes', 'No'],
@@ -22072,6 +22136,11 @@ try {
       'Checklist Items 100% Confirmed w/ GC?': ['Yes', 'No'],
       // Subsection 6: Mobilization to Site
       'Demob Transport Company': ['Stephan', 'Paddacks', 'Other'],
+      // Sandbox Mob Prep > Equipment > PF Equipment Mob (Brad 2026-09-08): the two companies that
+      // currently transport PF equipment. Spelling MATCHES the contact-sheet company names
+      // ("Paddacks Trucking" / "Stephan Trucking") so the per-company CRM filter can match; Brad's
+      // "Stephen" is the sheet's "Stephan". No "Other" here (only two carriers today).
+      'Mob Transport Company': ['Paddacks', 'Stephan'],
       // Sandbox Mob Prep > Equipment > Equipment Fuel (Brad 2026-09-08): fuel vendor single-select.
       // The chosen vendor is recorded here; the fuel-delivery Company/Contact renders from the
       // contacts sheet via the material 'Fuel Delivery' CRM host.
@@ -23307,6 +23376,25 @@ try {
       try { if (typeof pfRenderSandboxSubStatus === 'function') pfRenderSandboxSubStatus(root); } catch (e) {}
     }, true);
 
+    // Sandbox Mob Prep > Materials per-material "Required?" gate (Brad 2026-09-08). CAPTURE phase,
+    // same idiom as the JHA listener above. When any of the 3 material Required? Yes/No dropdowns
+    // changes, re-run pfRenderSandboxSubStatus for THIS card's root — the cond '*' wildcard branch
+    // then shows/hides that material's fields (No -> hidden + 100%; Yes -> shown + all-filled gate)
+    // and updates the green check + readout. Each cat's cond branch is scoped to its OWN
+    // .pf-safety-invdetail (per-srow), so flipping one material never affects the other two.
+    document.addEventListener('change', function(ev){
+      var el = ev.target;
+      if (!el || !el.getAttribute) return;
+      var mlbl = el.getAttribute('data-pr-field-label');
+      if (mlbl !== 'AP - Stone Aggregate Required?'
+        && mlbl !== 'Helical Pilings Required?'
+        && mlbl !== 'Rigid Inclusions Required?') return;
+      var card = el.closest ? el.closest('.pr-card[data-pr-section="siteReadiness"]') : null;
+      if (!card) return;
+      var root = (card.closest && (card.closest('.pr-root') || card.parentElement)) || document.getElementById('prGenericRoot');
+      try { if (typeof pfRenderSandboxSubStatus === 'function') pfRenderSandboxSubStatus(root); } catch (e) {}
+    }, true);
+
     // Sandbox Mob Prep > Equipment conditional rows (Brad 2026-09-08). CAPTURE phase. Fires for
     // the Yes/No MAIN control of ANY .pf-vscrow (VSC Rig / Predrill Rig / Gooseneck / Testing).
     // On change, show/hide that row's same-row "Which Rig" + "Mob Date" columns (.pf-vscrow-cond)
@@ -23336,6 +23424,21 @@ try {
         if (demob){ demob.style.display = isYes ? '' : 'none'; demob.classList.toggle('pf-cond-hidden', !isYes); }
       }
       try { if (root && typeof pfRenderSandboxSubStatus === 'function') pfRenderSandboxSubStatus(root); } catch (e) {}
+    }, true);
+
+    // Sandbox Mob Prep > Equipment > Mob Transport Company per-company CRM filter (Brad 2026-09-08).
+    // CAPTURE phase. When the "Mob Transport Company" dropdown changes, re-apply pfCrmFilterCompanies
+    // to THIS card's root so the Equipment Transport CRM host shows only the selected company's card
+    // (fail-open on blank/no-match). The CRM host has no countable .pr-field, so no status recompute
+    // is needed. Scoped by pfCrmFilterCompanies to the host's own detail pane, so Demob's transport
+    // company + other rows are never touched.
+    document.addEventListener('change', function(ev){
+      var el = ev.target;
+      if (!el || !el.getAttribute) return;
+      if (el.getAttribute('data-pr-field-label') !== 'Mob Transport Company') return;
+      var card = el.closest ? el.closest('.pr-card[data-pr-section="siteReadiness"]') : null;
+      var root = (card && (card.closest('.pr-root') || card.parentElement)) || document.getElementById('prGenericRoot');
+      try { if (typeof pfCrmFilterCompanies === 'function') pfCrmFilterCompanies(root); } catch (e) {}
     }, true);
 
     // Sandbox Demobilization > Fuel Delivery Called Off green-check refresh (Brad 2026-09-08).
@@ -23741,6 +23844,56 @@ try {
       };
     }
 
+    // pfCrmFilterCompanies(root) (Brad 2026-09-08, Mob Transport Company): for every CRM host that
+    // carries data-crm-company-filter="<field label>", show ONLY the .pr-pc-company card whose
+    // company name matches the value currently selected in that field (a sandbox siteReadiness
+    // dropdown living in the same .pf-safety-invdetail as the host). Match = normalized case-
+    // insensitive: the selected value is a prefix/substring of the card's company name, or vice
+    // versa (so 'Stephan' matches 'Stephan Trucking'). FAIL-OPEN: if the selection is blank OR no
+    // card matches (spelling mismatch, single-company group, etc.), ALL cards stay visible — the
+    // filter can never hide the real transport contact. Idempotent; safe to run after every render
+    // pass and on dropdown change.
+    function pfCrmFilterCompanies(root){
+      if (!root || !root.querySelectorAll) return;
+      var norm = function(s){ return String(s || '').trim().toLowerCase().replace(/\s+/g, ' '); };
+      var hosts = root.querySelectorAll('.pr-crm-cards[data-crm-company-filter]');
+      for (var h = 0; h < hosts.length; h++){
+        var host = hosts[h];
+        var lbl = host.getAttribute('data-crm-company-filter') || '';
+        if (!lbl) continue;
+        // Find the controlling dropdown's current value. It lives in the same detail pane as the
+        // host (same PF Equipment Mob category). Scope to the nearest detail/collapse container.
+        var scope = (host.closest && (host.closest('.pf-safety-invdetail') || host.closest('.pf-sr-collapse-body'))) || root;
+        var sel = null, fields = scope.querySelectorAll('.pr-field[data-pr-label]');
+        for (var f = 0; f < fields.length; f++){
+          if (fields[f].getAttribute('data-pr-label') === lbl){ sel = fields[f]; break; }
+        }
+        var want = '';
+        if (sel){
+          var ctl = sel.querySelector('select.pr-live-input, input.pr-live-input');
+          var vc = sel.querySelector('.pr-field-value');
+          want = norm(ctl ? ctl.value : (vc ? vc.textContent : ''));
+        }
+        var cards = host.querySelectorAll('.pr-pc-company');
+        if (!cards.length) continue;
+        // Determine, without mutating the DOM yet, whether ANY card matches the selection.
+        var anyMatch = false, matchIdx = [];
+        if (want){
+          for (var c = 0; c < cards.length; c++){
+            var nameEl = cards[c].querySelector('.pr-pc-company-name');
+            var cn = norm(nameEl ? nameEl.textContent : '');
+            var hit = cn && (cn.indexOf(want) === 0 || cn.indexOf(want) !== -1 || want.indexOf(cn) === 0);
+            matchIdx[c] = !!hit;
+            if (hit) anyMatch = true;
+          }
+        }
+        // FAIL-OPEN: blank selection or no matching card -> show every card.
+        for (var d = 0; d < cards.length; d++){
+          cards[d].style.display = (!want || !anyMatch || matchIdx[d]) ? '' : 'none';
+        }
+      }
+    }
+
     function pfCrmRenderCards(root){
       if (!root) root = document;
       // Each host declares which override key its selection lives under via
@@ -23787,12 +23940,17 @@ try {
       // Async pass: resolve the shared directory and (re)render EVERY working host. This
       // fills in __crm-selected rows and lets legacy rows resolve their migrated records
       // on Edit. Re-rendering the seed-only hosts is harmless (idempotent, same output).
-      if (!anyCrmWork && !_rowEditableGlobal) return; // nothing left needs the directory
+      if (!anyCrmWork && !_rowEditableGlobal) { try { pfCrmFilterCompanies(root); } catch(e){} return; } // nothing left needs the directory
       pfLoadContacts().then(function(list){
         var byId = {};
         (list || []).forEach(function(c){ if (c && c.contactId) byId[String(c.contactId).toUpperCase()] = c; });
         hosts.forEach(function(host){ if (_classify(host).work) pfCrmRenderOneHost(host, byId, mapFor); });
-      }).catch(function(){ /* fail soft: seed-only hosts already rendered above */ });
+        // Apply the per-company selection filter AFTER the async re-render populates the cards
+        // (Brad 2026-09-08, Mob Transport Company). Fail-open, idempotent.
+        try { pfCrmFilterCompanies(root); } catch(e){}
+      }).catch(function(){ /* fail soft: seed-only hosts already rendered above */
+        try { pfCrmFilterCompanies(root); } catch(e){}
+      });
     }
 
     // Render ONE Project Contacts host into the uniform .pr-crow card format. Handles
