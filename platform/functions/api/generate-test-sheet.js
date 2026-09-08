@@ -251,6 +251,31 @@ async function writeCell(env, token, itemId, address, value) {
   if (!resp.ok) throw new Error(`write ${address} failed ${resp.status}`);
 }
 
+// Write the PORTAL-OWNED cells (D1..D3, E9..E12) into a workbook. Shared by the
+// fresh-copy path AND the existing-file refresh path. We PATCH one cell at a time so a
+// bad single value can't corrupt a block, and we NEVER touch E13 (=D13*E12), E14 (the
+// calibration constant), crew cells (A4..A6 test data, AP Installed Length), or any named
+// range. A missing/blank input is SKIPPED (we never blank an existing cell). Returns the
+// list of addresses actually written.
+async function writePortalCells(env, token, itemId, params, projnum, designLoad) {
+  const wrote = [];
+  const writes = [
+    ['D1', str(params.jobName)],
+    ['D2', str(params.jobLocation)],
+    ['D3', projnum],
+    ['E9', num(params.designDiaFt)],
+    ['E10', num(params.plateDiaFt)],
+    ['E11', num(params.reactionMod)],
+    ['E12', designLoad],
+  ];
+  for (const [addr, val] of writes) {
+    if (val === null || val === '') continue; // don't blank a cell for a missing input
+    await writeCell(env, token, itemId, addr, val);
+    wrote.push(addr);
+  }
+  return wrote;
+}
+
 // Read a single cell's numeric value (used for E14 read-back).
 async function readCell(env, token, itemId, address) {
   const driveId = encodeURIComponent(env.SP_DRIVE_ID);
@@ -350,16 +375,22 @@ async function handle(context, params, allowWrite) {
       });
     }
 
-    // ----- SKIP-IF-EXISTS (protect crew-entered data) -----
+    // ----- EXISTING FILE: REFRESH the portal-owned cells (do NOT re-copy) -----
+    // We never re-copy/clobber the whole file (that protects crew-entered TEST DATA + the
+    // AP Installed Length cell). BUT the portal OWNS D1..D3 + E9..E12 (the design inputs from
+    // the approved drawings), so a Generate click must (re)write THOSE into the existing sheet
+    // — otherwise a sheet first generated before the values were populated stays empty forever
+    // (the bug Brad hit). Crew cells / E13(formula) / E14(constant) are still never touched.
+    // `force` still does a full replace-copy below.
     if (existing && !force) {
-      // Still read back E14 from the existing file so the portal can store it.
+      const wrote = await writePortalCells(env, token, existing.id, params, projnum, designLoad);
       let calibrationFactor = null;
       try { calibrationFactor = num(await readCell(env, token, existing.id, 'E14')); } catch (_) {}
       return json({
-        ok: true, alreadyExists: true, jack, fileName,
-        webUrl: existing.webUrl, itemId: existing.id, calibrationFactor,
+        ok: true, alreadyExists: true, refreshed: true, jack, fileName,
+        webUrl: existing.webUrl, itemId: existing.id, calibrationFactor, wrote,
         project: { number: projnum, folder: proj.name },
-        note: 'File already exists; not overwritten. Pass force=1 to regenerate.',
+        note: 'File already existed; portal design values refreshed (crew test data untouched).',
       });
     }
 
@@ -367,23 +398,7 @@ async function handle(context, params, allowWrite) {
     const copied = await copyTemplate(env, token, templateId, testing.id, fileName, !!existing && force);
 
     // ----- POPULATE only the portal-owned cells (D1..D3, E9..E12) -----
-    // We PATCH one cell at a time so a bad single value can't corrupt a block and
-    // so we never touch E13 (=D13*E12), E14, crew cells, or named ranges.
-    const wrote = [];
-    const writes = [
-      ['D1', str(params.jobName)],
-      ['D2', str(params.jobLocation)],
-      ['D3', projnum],
-      ['E9', num(params.designDiaFt)],
-      ['E10', num(params.plateDiaFt)],
-      ['E11', num(params.reactionMod)],
-      ['E12', designLoad],
-    ];
-    for (const [addr, val] of writes) {
-      if (val === null || val === '') continue; // don't blank a cell for a missing input
-      await writeCell(env, token, copied.id, addr, val);
-      wrote.push(addr);
-    }
+    const wrote = await writePortalCells(env, token, copied.id, params, projnum, designLoad);
 
     // ----- READ BACK E14 (calibration factor) for the portal to store -----
     let calibrationFactor = null;

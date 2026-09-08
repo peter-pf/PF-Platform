@@ -2496,11 +2496,6 @@ tr.pf-dragging { opacity: 0.45; }
 .pf-srnew-scope .pf-safety-invrow.pf-safety-invrow-open > td { background: var(--accent-light, #E0F0FF); }
 .pf-srnew-scope .pf-safety-invname { font-weight: 600; color: var(--text-1, #1a2733); white-space: nowrap; }
 .pf-srnew-scope .pf-safety-invtitle { vertical-align: middle; }
-.pf-srnew-scope .pf-safety-invcaret {
-  display: inline-block; color: var(--accent, #006DB0); font-size: 0.8rem;
-  transition: transform 0.15s ease; margin-right: 5px;
-}
-.pf-srnew-scope .pf-safety-invrow-open .pf-safety-invcaret { transform: rotate(90deg); }
 .pf-srnew-scope .pf-safety-invstatus {
   text-align: right; white-space: nowrap; color: var(--text-3, #6b7a89);
   font-size: 12px; font-weight: 600;
@@ -18814,7 +18809,6 @@ try {
           var body = _srNewSubTable(c.name, flds, { noHeadbar: true, noThead: true });
           rows += '<tr class="pf-safety-invrow" onclick="window.pfSafetyRowToggle(this)">'
                 +   '<td class="pf-safety-invname">'
-                +     '<span class="pf-safety-invcaret">&#9656;</span>'
                 +     '<span class="pf-safety-check" aria-hidden="true"></span>'
                 +     '<span class="pf-safety-invtitle">' + E(c.name) + '</span>'
                 +   '</td>'
@@ -22040,7 +22034,9 @@ try {
         if (cal !== null && cal !== undefined && cal !== '' && isFinite(Number(cal))) {
           calWrote = pfWriteCalibrationFactor(num, Number(cal), card);
         }
-        var note = already ? 'Existing sheet (not overwritten). ' : 'Test sheet generated. ';
+        // 'already' now means the file existed and its portal design values were REFRESHED
+        // (D1..D3 + E9..E12 re-written from the portal); crew test data is left untouched.
+        var note = already ? 'Existing sheet — portal values refreshed. ' : 'Test sheet generated. ';
         note += 'Link saved' + (calWrote ? ' + calibration factor written.' : '.');
         say(note, false);
       }).catch(function(){
