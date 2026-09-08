@@ -2541,6 +2541,13 @@ tr.pf-dragging { opacity: 0.45; }
    after the hover/open rules so the flag wins in every state. */
 .pf-srnew-scope .pf-safety-invrow.pf-safety-invrow-flag > td { background: #fdecea; }
 .pf-srnew-scope .pf-safety-invrow.pf-safety-invrow-flag .pf-safety-invtitle { color: #c0392b; font-weight: 700; }
+/* VSC Rig conditional composite row (Brad 2026-09-08): Yes/No + conditional "Which Rig" + "Mob
+   Date" columns on one flex row; the extra columns hide when No. Each labeled column stacks its
+   mini-label over its control. */
+.pf-srnew-scope .pf-vscrow { display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap; }
+.pf-srnew-scope .pf-vscrow-cond { display: flex; align-items: flex-end; gap: 18px; }
+.pf-srnew-scope .pf-vscrow-col { display: flex; flex-direction: column; }
+.pf-srnew-scope .pf-vscrow-lbl { font-size: 0.68rem; font-weight: 600; color: var(--text-3, #6b7a89); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 3px; }
 
 /* ---- Sandbox-scoped Inventory match for the Staking doc checklist -------------- */
 /* The Staking subsection's "Documents to send the surveyor/GC" table uses the      */
@@ -19317,8 +19324,26 @@ try {
           ]), true)
         + _srNewCollapsible('Equipment', _srNewSafetyInvTable([
             { name: 'PF Equipment Mob', fieldsFn: function(){ return [
+                // VSC Rig (Brad 2026-09-08): a Yes/No gate on the same row. Yes -> reveal "Which
+                // Rig" (Deere/CAT with Vibro) + "Mob Date" columns; No -> hide them. Composite
+                // .pf-vscrow flex cell; _srNewRow takes the row name from field('VSC Rig'). The
+                // conditional columns sit in .pf-vscrow-cond (+ .pf-cond-hidden when No, which
+                // pfRenderSandboxSubStatus excludes from the completion count). A capture-phase
+                // listener toggles them live.
+                (function(){
+                  var _vy = /^yes$/i.test(String(effVal('siteReadiness', 'VSC Rig', '') || '').trim());
+                  return '<div class="pf-vscrow">'
+                    + '<span class="pf-vscrow-main">' + field('VSC Rig', '') + '</span>'
+                    + '<span class="pf-vscrow-cond' + (_vy ? '' : ' pf-cond-hidden') + '" data-vsc-cond'
+                        + (_vy ? '' : ' style="display:none"') + '>'
+                    +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Which Rig</span>'
+                    +     field('VSC Rig - Which Rig', '') + '</span>'
+                    +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Mob Date</span>'
+                    +     field('VSC Rig - Mob Date', '') + '</span>'
+                    + '</span>'
+                  + '</div>';
+                })(),
                 // Brad 2026-09-08: dropped the "Equipment Needed - " prefix (aliases carry old data).
-                field('VSC Rig', ''),
                 field('Predrill Rig', ''),
                 field('Gooseneck w/ Connex', ''),
                 field('Testing Material Fall Off Load', '')
@@ -20891,6 +20916,7 @@ try {
         // DIRECT-fields-only: skip any field that lives inside a nested .pr-card so this
         // section never counts a subsection card's fields (or another section's).
         if (fieldEls[i].closest('.pr-card') !== card) continue;
+        if (fieldEls[i].closest('.pf-cond-hidden')) continue;  // conditionally-hidden -> not counted
         var val = fieldEls[i].querySelector('.pr-field-value');
         if (!val) continue;              // safety: not a real data field row
         total++;
@@ -20979,6 +21005,7 @@ try {
         var fieldEls = body.querySelectorAll('.pr-field[data-pr-label]');
         var total = 0, done = 0;
         for (var i = 0; i < fieldEls.length; i++){
+          if (fieldEls[i].closest('.pf-cond-hidden')) continue;  // conditionally-hidden -> not counted
           var val = fieldEls[i].querySelector('.pr-field-value');
           if (!val) continue;
           total++;
@@ -21028,6 +21055,7 @@ try {
         var dEls = detail.querySelectorAll('.pr-field[data-pr-label]');
         var dTotal = 0, dDone = 0;
         for (var k = 0; k < dEls.length; k++){
+          if (dEls[k].closest('.pf-cond-hidden')) continue;  // conditionally-hidden -> not counted
           var dv = dEls[k].querySelector('.pr-field-value');
           if (!dv) continue;
           dTotal++;
@@ -21692,6 +21720,12 @@ try {
       // the category reads 100% complete; Yes -> the "Date JHA Sent to GC" row is shown and the
       // category completes when that date is filled (handled in pfRenderSandboxSubStatus).
       'Jobsite Safety Analysis (JSA) Required?': ['Yes', 'No'],
+      // Sandbox Mob Prep > Equipment > PF Equipment Mob > VSC Rig (Brad 2026-09-08): Yes/No gate;
+      // Yes reveals "Which Rig" + "Mob Date" columns on the same row.
+      'VSC Rig': ['Yes', 'No'],
+      'VSC Rig - Which Rig': ['Deere with Vibro', 'CAT with Vibro'],
+      // Safety > Toolbox Talks (Brad 2026-09-08): Prepared? Yes/No.
+      'Toolbox Talks Prepared': ['Yes', 'No'],
       // Re-keyed to the new display label "Project Scope of Work Notes" (Brad 2026-08-20
       // rename of "Project Scope of Work (SOW)"). The dropdown map is keyed BY LABEL, so
       // it must track the rename for the field to keep rendering as the SOW dropdown in
@@ -21855,6 +21889,7 @@ try {
       'Date Locates Need Called in By': true,
       'Date Locates Actually Called In': true,
       'Date Ticket Cleared to Start': true,
+      'VSC Rig - Mob Date': true,
       'Date MSDS Sent': true,
       'Hand Log Sheets - Date Uploaded': true,
       'Date Locate Called In': true,
@@ -22959,6 +22994,23 @@ try {
       if (!card) return;
       var root = (card.closest && (card.closest('.pr-root') || card.parentElement)) || document.getElementById('prGenericRoot');
       try { if (typeof pfRenderSandboxSubStatus === 'function') pfRenderSandboxSubStatus(root); } catch (e) {}
+    }, true);
+
+    // Sandbox Mob Prep > Equipment > VSC Rig Yes/No conditional (Brad 2026-09-08). CAPTURE phase.
+    // On change, show/hide the same-row "Which Rig" + "Mob Date" columns (.pf-vscrow-cond) and
+    // toggle .pf-cond-hidden so pfRenderSandboxSubStatus excludes the hidden columns from the
+    // completion count. Then recompute the badges for THIS card's root.
+    document.addEventListener('change', function(ev){
+      var el = ev.target;
+      if (!el || !el.getAttribute) return;
+      if (el.getAttribute('data-pr-field-label') !== 'VSC Rig') return;
+      var row = el.closest ? el.closest('.pf-vscrow') : null;
+      var cond = row ? row.querySelector('.pf-vscrow-cond') : null;
+      var isYes = /^yes$/i.test(String(el.value || '').trim());
+      if (cond){ cond.style.display = isYes ? '' : 'none'; cond.classList.toggle('pf-cond-hidden', !isYes); }
+      var card = el.closest ? el.closest('.pr-card[data-pr-section="siteReadiness"]') : null;
+      var root = card && (card.closest('.pr-root') || card.parentElement);
+      try { if (root && typeof pfRenderSandboxSubStatus === 'function') pfRenderSandboxSubStatus(root); } catch (e) {}
     }, true);
 
     // Sandbox Mob Prep > Building Pad Elevation live recompute (Brad 2026-09-08): when the
