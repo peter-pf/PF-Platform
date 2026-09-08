@@ -2130,6 +2130,21 @@ tr.pf-dragging { opacity: 0.45; }
 .fin-inv-payapp-row:hover { background:var(--bg-1); }
 .fin-inv-payapp-row.selected { background:rgba(212,160,23,0.12); outline:1px solid var(--accent); }
 
+/* ---- auto pay-app rows sourced from the SharePoint Invoicing folder (derived, read-only) ---- */
+.fin-inv-pafiles { margin:2px 0 12px; border:1px solid var(--border); border-radius:6px;
+  background:var(--bg-1); padding:8px 10px; }
+.fin-inv-pafiles-head { font-size:0.72rem; font-weight:700; text-transform:uppercase;
+  letter-spacing:0.04em; color:var(--text-2); margin-bottom:6px; }
+.fin-inv-pafiles ul { list-style:none; margin:0; padding:0; }
+.fin-inv-pafiles li { display:flex; align-items:baseline; gap:10px; padding:2px 0;
+  font-size:0.83rem; }
+.fin-inv-pafiles li + li { border-top:1px solid var(--border-light); }
+.fin-inv-pafiles .pa-file-lbl { font-weight:700; color:var(--text-1); min-width:56px; }
+.fin-inv-pafiles .pa-file-link { color:var(--accent); text-decoration:none; overflow-wrap:anywhere; }
+.fin-inv-pafiles .pa-file-link:hover { text-decoration:underline; }
+.fin-inv-pafiles .pa-file-date { margin-left:auto; color:var(--text-3); font-size:0.75rem;
+  white-space:nowrap; }
+
 /* ---- G702 cover certificate ---- */
 .fin-inv-g702 { margin-top:14px; }
 .fin-inv-g702:empty { display:none; }
@@ -4223,6 +4238,7 @@ button.pr-action-link:disabled { opacity: 0.6; cursor: default; filter: none; }
                '/data/shop-dwg-info.js',
                '/data/pf-design-submittal.js',
                '/data/safety-folder.js',
+               '/data/pay-apps.js',
                '/data/cost-code-template.js',
                '/data/budget-actuals.js', '/data/invoice-ledger.js',
                '/data/awarded-projects.js', '/data/project-history.js',
@@ -4264,6 +4280,12 @@ button.pr-action-link:disabled { opacity: 0.6; cursor: default; filter: none; }
     // folder webUrls only, no $, office-only. Add for the BD-only case (admin/partner
     // loaded it in the privileged block above).
     if (!isPrivileged) feeds.push('/data/safety-folder.js');
+    // Pay Applications auto-rows (Brad 2026-09-08): per-project 'PA #NN' pay-app FILE
+    // links auto-listed from the SharePoint Invoicing folder. Same posture as
+    // safety-folder / shop-dwg-info -- file webUrls only, NO $ figures, financials-area
+    // office-only (admin/partner/business_dev), field_ops BLOCKED server-side. admin/
+    // partner loaded it in the privileged block above; add it for the BD-only case here.
+    if (!isPrivileged) feeds.push('/data/pay-apps.js');
   }
   // SEC-12: privileged roles get the raw schedule (value/gc_name); field_ops
   // gets the $/GC-stripped derivative. The raw file is server-DENIED to field_ops.
@@ -14935,6 +14957,22 @@ try {
         return g.projects[String(num)] || null;
       } catch (e) { return null; }
     }
+    // Read the current project's pay-app FILES auto-listed from the SharePoint Invoicing
+    // folder (window.PF_PAY_APPS, from data/pay-apps.js, built by sync/build-pay-apps.py).
+    // Source: 04 - Project Management/02 - Projects/<project>/02 - Project Management/Invoicing,
+    // files named "PA #NN". Returns an ASCENDING array [{num,name,url,modified}] for the
+    // project, or [] when the project has no Invoicing folder / no PA files (portal then
+    // renders NO extra rows). Fail-closed: any missing global / project returns []. Same
+    // idiom as pfSafetyFolder / pfShopDwgInfo. These rows are DERIVED / read-only (a link
+    // per file) and do NOT touch the KV invoicing record or the editable pay-app table.
+    function pfPayApps(num){
+      try {
+        var g = window.PF_PAY_APPS;
+        if (!g || !g.projects || !num) return [];
+        var arr = g.projects[String(num)];
+        return Array.isArray(arr) ? arr : [];
+      } catch (e) { return []; }
+    }
     // Read the stored __submittal_prereqs items map for the current project (from the
     // engineering override). Returns an object keyed by item key -> {responsible_name,
     // responsible_email, date_received}. Empty object when none stored. Never throws.
@@ -20210,12 +20248,43 @@ try {
         payApps.forEach(function(a){ if (Number(a.num) === latestAppNum) newestApp = a; });
         if (newestApp) g702DefaultHtml = g702CoverHtml(sovLinesFor(_curInvoicing), payApps, newestApp, finScv, retFrac);
       }
+      // Auto pay-app rows sourced from the project's SharePoint Invoicing folder (Brad
+      // 2026-09-08). One DERIVED, read-only row per "PA #NN" FILE that actually exists
+      // (window.PF_PAY_APPS via pfPayApps, built by sync/build-pay-apps.py) -- each is a
+      // link to the file. Empty array (no Invoicing folder / no PA files, e.g. a project
+      // not started) => NO extra rows at all (nothing rendered). Read-only: does NOT touch
+      // the KV invoicing record or the editable pay-app table below. Rendered in the same
+      // office-only Financials path (RBAC: field_ops never reaches this card).
+      var _paFiles = pfPayApps(_curNum);
+      var payAppFilesHtml = '';
+      if (_paFiles.length) {
+        payAppFilesHtml =
+          '<div class="fin-inv-pafiles">'
+          + '<div class="fin-inv-pafiles-head">Pay Applications on file (' + _paFiles.length + ')</div>'
+          + '<ul>'
+          + _paFiles.map(function(p){
+              var lbl = 'PA #' + E(String(p.num || ''));
+              var nm = E(String(p.name || ''));
+              var url = String(p.url || '');
+              var linkOpen = url ? '<a class="pa-file-link" href="' + E(url) + '" target="_blank" rel="noopener">' : '<span class="pa-file-link">';
+              var linkClose = url ? '</a>' : '</span>';
+              var dt = p.modified ? E(window.pfFmtDate(p.modified)) : '';
+              return '<li>'
+                + '<span class="pa-file-lbl">' + lbl + '</span>'
+                + linkOpen + nm + linkClose
+                + (dt ? '<span class="pa-file-date">' + dt + '</span>' : '')
+                + '</li>';
+            }).join('')
+          + '</ul>'
+          + '</div>';
+      }
       var finPayApps =
         '<div class="fin-inv-block" data-fin-inv-payapps="1" data-fin-inv-pct="' + (finPct != null ? E(String(finPct)) : '') + '" data-fin-inv-scv="' + (finScv != null ? E(String(finScv)) : '') + '" data-fin-inv-retfrac="' + retFrac + '">'
         +   '<div class="fin-inv-block-head">'
         +     '<span class="fin-inv-block-title">Pay Applications</span>'
         +     newBtn
         +   '</div>'
+        +   payAppFilesHtml
         +   '<div class="fin-inv-payapp-form" style="display:none"></div>'
         +   '<div class="fin-inv-wrap"><table class="ba-table"><thead><tr>'
         +     '<th>#</th><th>Date</th><th>Billing Period</th><th>Type</th>'

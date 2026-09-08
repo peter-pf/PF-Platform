@@ -374,6 +374,7 @@ const DATA_FILE_AREAS = {
   '/data/shop-dwg-info.js':        'financials',      // PROJECT: 'Shop Dwg Info' SharePoint folder webUrl per project (PF Design Submittal GC-prerequisites checklist link) — no $, office-only (admin/partner/business_dev), field_ops BLOCKED
   '/data/pf-design-submittal.js':  'financials',      // PROJECT: 'Approved Shop Dwgs' SharePoint folder webUrl per project (Engineering & Design folder link; file name/global kept from Stage 1) — no $, office-only (admin/partner/business_dev), field_ops BLOCKED
   '/data/safety-folder.js':        'financials',      // PROJECT: '06 - Safety' SharePoint folder webUrl per project (Site Specific Safety Plan (SSSP) link, Field Ops area) — no $, office-only (admin/partner/business_dev), field_ops BLOCKED
+  '/data/pay-apps.js':             'financials',      // PROJECT: per-project 'PA #NN' pay-app FILES (webUrl links) auto-listed from the Invoicing folder (Pay Applications auto-rows) — no $ figures, office-only (admin/partner/business_dev), field_ops BLOCKED
   '/data/project-history.js':      'financials',      // PROJECT: per-job ContractValue/totalContractValue
   // Estimated Stone tonnage per turnover project (Brad 2026-08-14: "Derek can see
   // that as well ... everything I and Jonathan can both see"). PROJECT-level
