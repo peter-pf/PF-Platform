@@ -2708,6 +2708,46 @@ tr.pf-dragging { opacity: 0.45; }
   grid-column: 2;
   margin-top: 1px;
 }
+/* FULL-WIDTH BLOCKS in the General Info label|value subgrid (Brad 2026-09-08 regression fix).
+   The right column is a 2-track subgrid (max-content label | 1fr value). Two elements do NOT
+   fit that one-line label|value shape and were breaking the grid:
+     1. .pf-pscope-wrap  — the Project Scope checkbox group (a bare block, NOT a .pr-field).
+        Without an explicit span it auto-placed into grid COLUMN 1 (the narrow label track),
+        leaving column 2 of that row empty; the next field's value then floated up into that
+        empty top-right cell (the disconnected textarea bug in Brad's screenshot).
+     2. the .pr-field that holds a textarea (Project Scope of Work Notes, key 'SOW Notes') —
+        a tall multi-line control does not belong on a single ellipsis'd label|value line.
+   FIX: force BOTH to span the full column width (grid-column: 1 / -1) and render as clean
+   stacked blocks (label on its own line, control full-width beneath). The checkbox group then
+   sits as a tidy header block at the TOP of the right column; the notes textarea sits inline
+   in normal field flow with its label directly above it. Aligned label|value fields below are
+   untouched. Scoped strictly to the General card body. */
+.pr-card[data-pr-section="general"] > .pr-card-body > .pr-2col > .pr-2col-col.pr-fields > .pf-pscope-wrap,
+.pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields > .pf-pscope-wrap {
+  grid-column: 1 / -1;
+  margin: 2px 0 8px;
+}
+/* Textarea field -> full-width stacked block (label above, textarea below). Detect it via the
+   value cell holding a .pr-live-textarea (live-edit view) or the read-only multiline value. */
+.pr-card[data-pr-section="general"] > .pr-card-body > .pr-2col .pr-field.pr-field-textarea,
+.pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields .pr-field.pr-field-textarea {
+  grid-column: 1 / -1;
+  display: block;                 /* leave the label|value subgrid: stack instead */
+}
+.pr-card[data-pr-section="general"] > .pr-card-body > .pr-2col .pr-field.pr-field-textarea > .pr-field-label,
+.pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields .pr-field.pr-field-textarea > .pr-field-label {
+  display: block;
+  margin-bottom: 3px;
+}
+/* value cell: full width, no one-line ellipsis clamp (the textarea/notes may wrap freely). */
+.pr-card[data-pr-section="general"] > .pr-card-body > .pr-2col .pr-field.pr-field-textarea > .pr-field-value,
+.pr-card[data-pr-section="general"] > .pr-card-body > .pr-fields .pr-field.pr-field-textarea > .pr-field-value {
+  display: block;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  width: 100%;
+}
 /* Narrow screens: fall back to stacked label-above-value so long values are not
    crushed into a tiny column on a phone (field crew / mobile). Collapse the GROUP
    grid to one column and drop each field OUT of subgrid back to its own 1-col
@@ -14488,7 +14528,12 @@ try {
       // (white-space:pre-wrap via .pr-field-value-multiline). E(v) escapes the text
       // but keeps the \n characters, and the editor reads valEl.textContent so the
       // newlines round-trip back into the textarea on the next edit.
-      if (typeof pfIsTextareaLabel === 'function' && pfIsTextareaLabel(label)) cls += ' pr-field-value-multiline';
+      var isTextarea = (typeof pfIsTextareaLabel === 'function' && pfIsTextareaLabel(label));
+      if (isTextarea) cls += ' pr-field-value-multiline';
+      // Full-width-block marker: a textarea field is tall/multi-line and must NOT sit on the
+      // one-line label|value subgrid row (General Info). The .pr-field-textarea class lets the
+      // scoped CSS span it full-width + stack (label above / control below). Harmless elsewhere.
+      var fieldWrapCls = 'pr-field' + (isTextarea ? ' pr-field-textarea' : '');
       var shown = v ? E(v) : "-";
       var srcHtml = (src && v) ? '<span class="pr-field-src">'+E(src)+'</span>' : '';
       var editMark = edited ? '<span class="pr-field-edited" title="Manually edited">&#9998;</span>' : '';
@@ -14509,14 +14554,14 @@ try {
         // class. The completion status bar counts the same .blank spans, so the count now
         // matches the highlighting in live mode too.
         var liveBlank = (rawForCtl == null || String(rawForCtl).trim() === '') ? ' blank' : '';
-        return '<div class="pr-field" data-pr-label="'+E(label)+'"><span class="pr-field-label">'+E(dispLabel)+editMark+'</span>'
+        return '<div class="'+fieldWrapCls+'" data-pr-label="'+E(label)+'"><span class="pr-field-label">'+E(dispLabel)+editMark+'</span>'
              + '<span class="pr-field-value pr-field-live'+liveBlank+'">'+pfLiveControl(label, rawForCtl)+'</span>'
              + (src ? '<span class="pr-field-src">'+E(src)+'</span>' : '') + '</div>';
       }
       // data-pr-label lets the section editor read every field's label back out
       // of the DOM without re-deriving it from the source expressions. It stays the
       // STORAGE KEY (label), not the display string — save/read round-trips unchanged.
-      return '<div class="pr-field" data-pr-label="'+E(label)+'"><span class="pr-field-label">'+E(dispLabel)+editMark+'</span>'
+      return '<div class="'+fieldWrapCls+'" data-pr-label="'+E(label)+'"><span class="pr-field-label">'+E(dispLabel)+editMark+'</span>'
            + '<span class="'+cls+'">'+shown+'</span>'+srcHtml+'</div>';
     }
 
