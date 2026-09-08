@@ -3627,6 +3627,24 @@ button.pr-action-link:disabled { opacity: 0.6; cursor: default; filter: none; }
 /* "+ Add company" foot control: below the last company card, appends a NEW company.        */
 .pr-pc-addco-foot-wrap { margin: 6px 0 2px; }
 .pr-pc-addco-foot { font-size: 0.78rem; }
+/* COMPANY PICKER (Brad 2026-09-08): dropdown-first "choose a company" flow. The foot        */
+/* control now opens this inline picker: a trade-scoped company <select> (previously-used    */
+/* companies from the master directory) whose selection prepopulates that company's contacts */
+/* as checkboxes to assign to THIS project. "+ Add a company not listed" falls through to the */
+/* existing add-company mint path (secondary option). Compact, matches .pr-crm-addform look. */
+.pr-pc-copick { border: 1px solid var(--border, #e5e7eb); border-radius: 6px; padding: 8px 10px;
+  margin: 6px 0 2px; background: var(--surface-2, #f9fafb); }
+.pr-pc-copick-note { font-size: 0.74rem; color: var(--text-2, #6b7280); margin: 0 0 6px; }
+.pr-pc-copick-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.pr-pc-copick-row select { flex: 1 1 220px; min-width: 180px; font-size: 0.82rem; padding: 4px 6px;
+  border: 1px solid var(--border, #d1d5db); border-radius: 4px; background: #fff; }
+.pr-pc-copick-contacts { margin: 8px 0 0; }
+.pr-pc-copick-contacts .pr-pc-copick-hint { font-size: 0.74rem; color: var(--text-2, #6b7280); }
+.pr-pc-copick-conrow { display: flex; align-items: center; gap: 6px; padding: 2px 0; font-size: 0.8rem; }
+.pr-pc-copick-conrow label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.pr-pc-copick-conmeta { color: var(--text-2, #6b7280); font-size: 0.74rem; }
+.pr-pc-copick-actions { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.pr-pc-copick-err { color: #b3261e; font-size: 0.72rem; display: none; margin-top: 4px; }
 /* (2) Horizontal contact rows. A lightweight table-like flex layout: header row */
 /* + one row per contact. Compact so more fits on screen; Notes wraps.           */
 .pr-crow-table { width: 100%; margin: 2px 0 0; }
@@ -24327,11 +24345,18 @@ try {
       // Brad). field_ops / read-only never see it; the server also 403s the underlying
       // write. Reuses the vetted add path (prompt name/address -> add-contact form seeded
       // with that company, assigned to a NEW companies[] element on first Save).
+      // Brad 2026-09-08: DROPDOWN-FIRST flow. The foot control now says "+ Choose a company"
+      // and opens the pfPcPickCompany picker (trade-scoped company dropdown whose selection
+      // prepopulates that company's directory contacts as checkboxes). "Add a company not
+      // listed" inside the picker falls through to the legacy pfPcAddCompany mint path
+      // (secondary option). The button label reflects the new primary action; when the group
+      // already has companies, "+ Choose another company" reads naturally for the append case.
+      var pickLabel = companies.length ? '+ Choose another company' : '+ Choose a company';
       var addCoFoot = _rowEditable
         ? '<div class="pr-pc-addco-foot-wrap"><button type="button" '
           + 'class="pr-add-contact-btn pr-pc-addbtn pr-pc-addco-foot" '
           + 'data-crm-cards="' + esc2(_prefix) + '" data-crm-cards-key="' + esc2(_skey) + '" '
-          + 'onclick="window.pfPcAddCompany(this)">+ Add company</button></div>'
+          + 'onclick="window.pfPcPickCompany(this)">' + pickLabel + '</button></div>'
         : '';
 
       // Hide the sibling legacy static horizContactBlock table so contacts do not appear
@@ -24729,6 +24754,207 @@ try {
       if (!form) return;
       if (form._addBtn) form._addBtn.style.display = '';
       form.remove();
+    };
+    // =======================================================================
+    // COMPANY PICKER — DROPDOWN-FIRST FLOW  (Brad 2026-09-08)
+    // =======================================================================
+    // Brad's spec: "instead of clicking Add Company first, the FIRST option should be to
+    // CHOOSE A COMPANY from a dropdown of previously-used companies (from our contact
+    // database). When a company is selected, the CONTACTS in that company PREPOPULATE so the
+    // user picks which contact(s) are on THIS project. If the company hasn't been used
+    // before, the user can then choose to ADD A COMPANY."
+    //
+    // This is the READ-VIEW foot control. It opens an inline picker:
+    //   1) a COMPANY <select> populated from the master directory, trade-scoped to this
+    //      group (pfCrmFetchCompanies(trade) -> /api/contacts?trade=<Category>). The trade is
+    //      resolved from the group exactly as the add-contact path does (pfPcGroupTradeSafe).
+    //      A trailing "+ Add a company not listed…" option is the SECONDARY escape hatch.
+    //   2) on company select -> that company's directory contacts prepopulate as CHECKBOXES
+    //      (pfCrmFetchContacts(company, trade)), all checked by default so the common case is
+    //      one click. The user unchecks anyone not on this project.
+    //   3) "Assign to project" persists the picked company + checked contactIds by APPENDING a
+    //      new companies[] element under this group's __crm key — the SAME store, endpoint,
+    //      and pfCrmRebuildMap round-trip the rest of the CRM uses. NO new backend/storage.
+    // Choosing "+ Add a company not listed…" falls through to the legacy pfPcAddCompany mint
+    // path (prompt name/address -> add-contact form -> POST /api/contacts add). RBAC:
+    // office-only (canEdit); the server also 403s the underlying /api/project-override write.
+    // DESIGN DECISION (flagged for Brad): the dropdown lists ONLY companies whose master-list
+    // Category matches this group's trade (e.g. Equipment Transport group -> Equipment
+    // Transport companies), consistent with how the existing cascading selector + add-contact
+    // path already scope by trade. If a group's trade is greenfield/empty, the dropdown shows
+    // no companies and the user uses "+ Add a company not listed…". If Brad wants ALL
+    // companies listed regardless of trade, drop the trade arg in pfCrmFetchCompanies below.
+    var PF_PC_ADDCO_OPT = '__pf_addco__'; // sentinel <option> value = "add not listed"
+    window.pfPcPickCompany = function(btn){
+      if (!btn) return;
+      if (typeof canEdit === 'function' && !canEdit()) return; // office-only (defense in depth)
+      var prefix = btn.getAttribute('data-crm-cards') || '';
+      var skey = btn.getAttribute('data-crm-cards-key') || 'design_professionals';
+      var host = btn.closest ? btn.closest('.pr-crm-cards') : null;
+      if (!prefix || !host) return;
+      // Toggle: if a picker (or the legacy add form) is already open on this host, focus it.
+      if (host.querySelector('.pr-pc-copick') || host.querySelector('.pr-crm-addform')) {
+        var openEl = host.querySelector('.pr-pc-copick select, .pr-crm-addform input');
+        if (openEl) openEl.focus();
+        return;
+      }
+      var trade = (typeof pfPcGroupTradeSafe === 'function') ? pfPcGroupTradeSafe(skey, prefix) : '';
+      var pick = document.createElement('div');
+      pick.className = 'pr-pc-copick';
+      pick.setAttribute('data-crm-cards', prefix);
+      pick.setAttribute('data-crm-cards-key', skey);
+      pick.setAttribute('data-crm-trade', trade || '');
+      pick.innerHTML = ''
+        + '<div class="pr-pc-copick-note">Choose a company already in the directory, then pick which of its contacts are on this project.</div>'
+        + '<div class="pr-pc-copick-row">'
+        +   '<select class="pr-pc-copick-select" data-af="company">'
+        +     '<option value="">Loading companies&hellip;</option>'
+        +   '</select>'
+        + '</div>'
+        + '<div class="pr-pc-copick-contacts" data-copick-contacts>'
+        +   '<div class="pr-pc-copick-hint">Select a company to choose its contacts.</div>'
+        + '</div>'
+        + '<div class="pr-pc-copick-err"></div>'
+        + '<div class="pr-pc-copick-actions">'
+        +   '<button type="button" class="pr-save-btn" data-copick-assign disabled onclick="window.pfPcPickAssign(this)">Assign to project</button>'
+        +   '<button type="button" class="pr-cancel-btn" onclick="window.pfPcPickCancel(this)">Cancel</button>'
+        + '</div>';
+      host.appendChild(pick);
+      pick._footBtn = btn;
+      btn.style.display = 'none';
+      var sel = pick.querySelector('.pr-pc-copick-select');
+      // Populate the company dropdown from the master directory (trade-scoped, fail-soft).
+      pfCrmFetchCompanies(trade).then(function(companies){
+        var opts = '<option value="">Select a company&hellip;</option>';
+        (companies || []).forEach(function(co){
+          var name = (typeof co === 'string') ? co : (co && (co.company || co.name) || '');
+          if (!name) return;
+          opts += '<option value="' + esc2(name) + '">' + esc2(name) + '</option>';
+        });
+        // SECONDARY option: add a company not already in the directory.
+        opts += '<option value="' + PF_PC_ADDCO_OPT + '">+ Add a company not listed&hellip;</option>';
+        sel.innerHTML = opts;
+      }).catch(function(){
+        sel.innerHTML = '<option value="">Select a company&hellip;</option>'
+          + '<option value="' + PF_PC_ADDCO_OPT + '">+ Add a company not listed&hellip;</option>';
+      });
+      sel.addEventListener('change', function(){ window.pfPcPickCompanyChanged(sel); });
+      sel.focus();
+    };
+    // Company <select> changed: if the sentinel was chosen, hand off to the legacy add path;
+    // otherwise prepopulate that company's directory contacts as checkboxes (all checked).
+    window.pfPcPickCompanyChanged = function(sel){
+      var pick = sel.closest ? sel.closest('.pr-pc-copick') : null;
+      if (!pick) return;
+      var val = sel.value || '';
+      var contactsEl = pick.querySelector('[data-copick-contacts]');
+      var assignBtn = pick.querySelector('[data-copick-assign]');
+      var errEl = pick.querySelector('.pr-pc-copick-err');
+      if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+      // SECONDARY path: "+ Add a company not listed…" -> reuse the vetted mint flow.
+      if (val === PF_PC_ADDCO_OPT) {
+        var foot = pick._footBtn;
+        pick.remove();
+        // Re-show + re-target the original foot button, then open the legacy add-company path.
+        if (foot) {
+          foot.style.display = '';
+          window.pfPcAddCompany(foot);
+        }
+        return;
+      }
+      if (assignBtn) assignBtn.disabled = true;
+      if (!val) {
+        if (contactsEl) contactsEl.innerHTML = '<div class="pr-pc-copick-hint">Select a company to choose its contacts.</div>';
+        return;
+      }
+      var trade = pick.getAttribute('data-crm-trade') || '';
+      if (contactsEl) contactsEl.innerHTML = '<div class="pr-pc-copick-hint">Loading contacts&hellip;</div>';
+      pfCrmFetchContacts(val, trade).then(function(list){
+        list = Array.isArray(list) ? list : [];
+        if (!list.length) {
+          if (contactsEl) contactsEl.innerHTML = '<div class="pr-pc-copick-hint">This company has no contacts in the directory yet. Assigning it will add the company; use &ldquo;+ Add contact&rdquo; afterward to add people.</div>';
+          if (assignBtn) assignBtn.disabled = false; // allow assigning the company alone
+          return;
+        }
+        var rows = list.map(function(c){
+          var cid = String((c && c.contactId) || '').toUpperCase();
+          if (!/^C\d+$/.test(cid)) return '';
+          var nm = ((c.name || ((c.firstName||'') + ' ' + (c.lastName||''))) || '').trim();
+          var meta = [];
+          if (c.title) meta.push(c.title);
+          if (c.email) meta.push(c.email);
+          var metaStr = meta.length ? ' <span class="pr-pc-copick-conmeta">(' + esc2(meta.join(' · ')) + ')</span>' : '';
+          return '<div class="pr-pc-copick-conrow"><label>'
+            + '<input type="checkbox" class="pr-pc-copick-cb" value="' + esc2(cid) + '" checked>'
+            + '<span>' + esc2(nm || cid) + metaStr + '</span>'
+            + '</label></div>';
+        }).join('');
+        if (contactsEl) contactsEl.innerHTML = rows || '<div class="pr-pc-copick-hint">No valid contacts found.</div>';
+        if (assignBtn) assignBtn.disabled = false;
+      }).catch(function(){
+        if (contactsEl) contactsEl.innerHTML = '<div class="pr-pc-copick-hint">Could not load this company’s contacts. You can still assign the company and add contacts afterward.</div>';
+        if (assignBtn) assignBtn.disabled = false;
+      });
+    };
+    window.pfPcPickCancel = function(btn){
+      var pick = btn.closest ? btn.closest('.pr-pc-copick') : null;
+      if (!pick) return;
+      if (pick._footBtn) pick._footBtn.style.display = '';
+      pick.remove();
+    };
+    // Persist the picked company + checked contactIds by APPENDING a NEW companies[] element
+    // under this group's __crm key (same store/endpoint/round-trip as the rest of the CRM).
+    // FAIL CLOSED: any non-{ok,saved} response leaves the store unchanged + shows an inline
+    // error; nothing is fabricated. Office-gated (canEdit) + server 403 (requireArea 'crm').
+    window.pfPcPickAssign = function(btn){
+      var pick = btn.closest ? btn.closest('.pr-pc-copick') : null;
+      if (!pick) return;
+      if (typeof canEdit === 'function' && !canEdit()) return; // defense in depth
+      var prefix = pick.getAttribute('data-crm-cards') || '';
+      var skey = pick.getAttribute('data-crm-cards-key') || 'design_professionals';
+      var host = btn.closest ? btn.closest('.pr-crm-cards') : null;
+      var errEl = pick.querySelector('.pr-pc-copick-err');
+      function showErr(m){ if (errEl){ errEl.textContent = m; errEl.style.display = 'block'; } }
+      var sel = pick.querySelector('.pr-pc-copick-select');
+      var company = (sel && sel.value) || '';
+      if (!company || company === PF_PC_ADDCO_OPT) { showErr('Please choose a company.'); return; }
+      var num = _curNum || '';
+      if (!num || !prefix) { showErr('Could not resolve the project or group; refresh and retry.'); return; }
+      var ids = [];
+      pick.querySelectorAll('.pr-pc-copick-cb:checked').forEach(function(cb){
+        var v = String(cb.value || '').toUpperCase();
+        if (/^C\d+$/.test(v)) ids.push(v);
+      });
+      // Append a NEW company element (company + the checked ids). Siblings + other groups are
+      // preserved by pfCrmRebuildMap. A company with zero checked ids is still recorded so the
+      // card appears and "+ Add contact" is reachable (parity with the legacy add path).
+      var out = pfCrmRebuildMap(skey, prefix, function(cos){
+        cos.push({ company: company, address: '', contactIds: ids });
+        return cos;
+      });
+      var body = {}; body[PF_CRM_KEY] = out;
+      btn.disabled = true; btn.textContent = 'Assigning…';
+      fetch('/api/project-override', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ num: num, section: skey, fields: body })
+      }).then(function(res){ return res.json().then(function(b){ return { ok: res.ok, status: res.status, body: b }; })
+          .catch(function(){ return { ok: res.ok, status: res.status, body: null }; }); })
+        .then(function(r){
+          if (!r.ok || !r.body || r.body.ok !== true || r.body.saved !== true) {
+            btn.disabled = false; btn.textContent = 'Assign to project';
+            showErr((r.body && r.body.message) ? r.body.message
+              : (r.status === 403 ? 'You do not have permission to edit this project.'
+                 : 'Assign failed (' + r.status + '). Nothing was changed — please retry.'));
+            return;
+          }
+          window.PF_PROJECT_OVERRIDES[num] = { sections: (r.body.sections) || {}, _meta: (r.body._meta) || null };
+          try { if (String(num) === String(_curNum) && r.body.sections) _curOverrides = r.body.sections; } catch(e){}
+          if (window.pfCrmRenderCards) window.pfCrmRenderCards(document);
+        }).catch(function(){
+          btn.disabled = false; btn.textContent = 'Assign to project';
+          showErr('Assign failed: could not reach the server. Nothing was changed — please retry.');
+        });
     };
     // "+ Add company" for a Project Contacts sub-group from the READ VIEW.
     // MULTI-COMPANY (Brad 2026-08-28): this now lives at the SECTION FOOT (below the last
