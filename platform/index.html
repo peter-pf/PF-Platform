@@ -18714,7 +18714,10 @@ try {
       var _srNewRow = function(fieldHtml){
         var m = /data-pr-label="([^"]*)"/.exec(fieldHtml);
         var name = m ? m[1] : '';
-        return '<tr><td class="pf-sr-name">' + name + '</td>'
+        // data-row-label lets a conditional category (e.g. JHA) target a specific row to
+        // show/hide it (Brad 2026-09-08). `name` is already attribute-escaped (extracted from
+        // the field's own data-pr-label attribute).
+        return '<tr data-row-label="' + name + '"><td class="pf-sr-name">' + name + '</td>'
              + '<td class="pf-sr-val">' + fieldHtml + '</td></tr>';
       };
       // _srNewSubTable(title, fieldHtmls, opts): a subsection rendered as an Inventory-
@@ -18837,7 +18840,16 @@ try {
           // check keys off ONLY this one field being filled (e.g. SSSP -> "Date SSSP Sent to
           // GC"), read by pfRenderSandboxSubStatus. Absent -> all-fields-filled default.
           var completeAttr = c.completeWhen ? ' data-complete-field="' + E(c.completeWhen) + '"' : '';
-          rows += '<tr class="pf-safety-invrow"' + completeAttr + ' onclick="window.pfSafetyRowToggle(this)">'
+          // Conditional category (Brad 2026-09-08, e.g. JHA): a Yes/No controlling field whose
+          // "No" value hides a row + auto-completes the category; otherwise the category gates on
+          // `gate`. pfRenderSandboxSubStatus reads these + a capture-phase listener recomputes.
+          var condAttr = c.cond
+            ? ' data-cond-field="' + E(c.cond.field) + '"'
+              + ' data-cond-no-value="' + E(c.cond.noValue || 'No') + '"'
+              + ' data-cond-hide-row="' + E(c.cond.hideRow || '') + '"'
+              + ' data-cond-gate="' + E(c.cond.gate || '') + '"'
+            : '';
+          rows += '<tr class="pf-safety-invrow"' + completeAttr + condAttr + ' onclick="window.pfSafetyRowToggle(this)">'
                 +   '<td class="pf-safety-invname">'
                 +     '<span class="pf-safety-check" aria-hidden="true"></span>'
                 +     '<span class="pf-safety-invtitle">' + E(c.name) + '</span>'
@@ -19145,10 +19157,16 @@ try {
                 { readonlyLink: true, linkLabel: 'PF SDS Compiled', emptyText: '—' }),
               field('Date SDS Sent to GC', '')
             ]; } },
-          { name: 'Jobsite Hazard Analysis (JHA\'s/JSA\'s)', fieldsFn: function(){ return [
-              field('Jobsite Safety Analysis (JSA)', ''),
-              // Second row (Brad 2026-09-08): renamed from the "Paste a URL" link to a native
-              // DATE picker "Date JHA Sent to GC" (registered in PF_FIELD_DATE_LABELS below).
+          { name: 'Jobsite Hazard Analysis (JHA\'s/JSA\'s)',
+            // Conditional (Brad 2026-09-08): row 1 is a Yes/No "Required?" dropdown. No -> hide
+            // the date row + category reads 100% complete; Yes -> show the date row + complete
+            // when the date is filled; unanswered -> incomplete. Wired by pfRenderSandboxSubStatus
+            // via these data-cond-* attrs + a capture-phase change listener for instant show/hide.
+            cond: { field: 'Jobsite Safety Analysis (JSA) Required?', noValue: 'No',
+                    hideRow: 'Date JHA Sent to GC', gate: 'Date JHA Sent to GC' },
+            fieldsFn: function(){ return [
+              field('Jobsite Safety Analysis (JSA) Required?', ''),
+              // Native DATE picker (PF_FIELD_DATE_LABELS); shown only when Required? = Yes.
               field('Date JHA Sent to GC', '')
             ]; } },
           { name: 'Toolbox Talks', fieldsFn: function(){ return [
@@ -20929,6 +20947,62 @@ try {
           dTotal++;
           if (!dv.classList.contains('blank')) dDone++;
         }
+        // CONDITIONAL category (Brad 2026-09-08, e.g. JHA): a Yes/No controlling field. When its
+        // value == the "no" value, HIDE the dependent row and mark the category 100% complete;
+        // otherwise SHOW the row and gate completion on `gate` (the date); unanswered -> 0%.
+        var condField = srow.getAttribute('data-cond-field');
+        if (condField){
+          var condVal = '';
+          for (var ci = 0; ci < dEls.length; ci++){
+            if (dEls[ci].getAttribute('data-pr-label') === condField){
+              var ctl = dEls[ci].querySelector('select.pr-live-input, input.pr-live-input, textarea.pr-live-input');
+              var vcell = dEls[ci].querySelector('.pr-field-value');
+              condVal = ctl ? String(ctl.value || '').trim()
+                            : (vcell ? String(vcell.textContent || '').replace(/\s+/g, ' ').trim() : '');
+              break;
+            }
+          }
+          var noVal = srow.getAttribute('data-cond-no-value') || 'No';
+          var hideLabel = srow.getAttribute('data-cond-hide-row') || '';
+          var gateLabel2 = srow.getAttribute('data-cond-gate') || '';
+          var isNo = (condVal === noVal);
+          var answered = (condVal !== '');
+          if (hideLabel){
+            var trs = detail.querySelectorAll('tr[data-row-label]');
+            for (var ti = 0; ti < trs.length; ti++){
+              if (trs[ti].getAttribute('data-row-label') === hideLabel){ trs[ti].style.display = isNo ? 'none' : ''; break; }
+            }
+          }
+          var cComplete, cTot, cDone;
+          if (!answered){ cComplete = false; cTot = 1; cDone = 0; }
+          else if (isNo){ cComplete = true; cTot = 1; cDone = 1; }
+          else {
+            var gFilled = false;
+            if (gateLabel2){
+              for (var gi = 0; gi < dEls.length; gi++){
+                if (dEls[gi].getAttribute('data-pr-label') === gateLabel2){
+                  var gvc = dEls[gi].querySelector('.pr-field-value');
+                  gFilled = !!gvc && !gvc.classList.contains('blank');
+                  break;
+                }
+              }
+            }
+            cTot = 2; cDone = 1 + (gFilled ? 1 : 0); cComplete = gFilled;
+          }
+          var rchkC = srow.querySelector('.pf-safety-check');
+          if (rchkC){
+            rchkC.classList.toggle('done', cComplete);
+            rchkC.innerHTML = cComplete ? '&#10003;' : '';
+            rchkC.setAttribute('title', !answered ? (condField + ' — answer required')
+              : (isNo ? 'Not required' : (cComplete ? 'Complete' : (gateLabel2 + ' required'))));
+          }
+          var stCellC = srow.querySelector('.pf-safety-invstatus');
+          if (stCellC){
+            stCellC.innerHTML = cDone + '/' + cTot + ' Fields Complete, '
+              + '<span class="pf-safety-invpct">' + Math.round((cDone / cTot) * 100) + '%</span>';
+          }
+          continue; // conditional row fully handled
+        }
         // Green check: by default a row is "complete" when ALL its fields are filled. A row
         // may instead declare data-complete-field="<label>" (Brad 2026-09-08, e.g. SSSP gates
         // ONLY on "Date SSSP Sent to GC") — then the check keys off THAT one field's filled
@@ -21496,6 +21570,10 @@ try {
     // value is saved as a plain string through the same override plumbing, so the
     // read/display path is unchanged.
     var PF_FIELD_DROPDOWNS = {
+      // Sandbox Safety > JHA (Brad 2026-09-08): Yes/No gate. No -> the date row is hidden and
+      // the category reads 100% complete; Yes -> the "Date JHA Sent to GC" row is shown and the
+      // category completes when that date is filled (handled in pfRenderSandboxSubStatus).
+      'Jobsite Safety Analysis (JSA) Required?': ['Yes', 'No'],
       // Re-keyed to the new display label "Project Scope of Work Notes" (Brad 2026-08-20
       // rename of "Project Scope of Work (SOW)"). The dropdown map is keyed BY LABEL, so
       // it must track the rename for the field to keep rendering as the SOW dropdown in
@@ -22745,6 +22823,22 @@ try {
       if (!body) return;
       var isYes = /^yes$/i.test(String(el.value || '').trim());
       body.style.display = isYes ? '' : 'none';
+    }, true);
+
+    // Sandbox Safety > JHA "Jobsite Safety Analysis (JSA) Required?" conditional (Brad
+    // 2026-09-08). CAPTURE phase (3rd arg true) so it runs BEFORE the dropdown's inline
+    // onchange stopPropagation. On change, recompute pfRenderSandboxSubStatus for THIS card's
+    // root — that single function reads the new Yes/No value, shows/hides the "Date JHA Sent to
+    // GC" row, and updates the green check + readout (No -> 100%, Yes -> date-gated). Instant,
+    // no re-render; the dropdown's own save (pfLiveFieldChange, siteReadiness) still fires.
+    document.addEventListener('change', function(ev){
+      var el = ev.target;
+      if (!el || !el.getAttribute) return;
+      if (el.getAttribute('data-pr-field-label') !== 'Jobsite Safety Analysis (JSA) Required?') return;
+      var card = el.closest ? el.closest('.pr-card[data-pr-section="siteReadiness"]') : null;
+      if (!card) return;
+      var root = (card.closest && (card.closest('.pr-root') || card.parentElement)) || document.getElementById('prGenericRoot');
+      try { if (typeof pfRenderSandboxSubStatus === 'function') pfRenderSandboxSubStatus(root); } catch (e) {}
     }, true);
 
     // Site Readiness > Testing > "Jack to use for modulus test" AUTO-SELECT from "AP Max Test
