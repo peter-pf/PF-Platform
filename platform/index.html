@@ -19195,104 +19195,97 @@ try {
         ]);
       var _srN_safety = _srNewCollapsible('Safety', _srN_safetyInner, true);
 
-      // ---- Subsection 5: Mobilization Preparation -----------------------------
-      // Mirrors sub5Inner: proof-roll fields, elevation fields, checklist fields, and
-      // the "Field Ops Manager Jobsite Visit" sub-group, all as Inventory-style tables
-      // (siteReadiness key). The computed elevation-difference hint is omitted from the
-      // sandbox for now (display-only; the original keeps it) — flagged to Brad.
+      // ---- "Mob Prep" section (Brad 2026-09-08) -------------------------------
+      // FIRST PASS to redline: a full "Mob Prep" section built EXACTLY like Safety — reuses
+      // _srNewSafetyInvTable (Inventory-style expandable rows + far-left green completion check
+      // + "X/Y Fields Complete, XX%" readout, all driven by pfRenderSandboxSubStatus, class-
+      // based so it applies here automatically) and the _srNewCollapsible roll-up bar. Three
+      // subheaded groups, each a set of expandable item-rows reworked from the OLD sandbox
+      // Mob Prep / Mob-to-Site / Rental / Equipment / Material subsections (which this REPLACES):
+      //   1. Building Pad Prep -> Proof Roll / Building Pad Elevation / Site Readiness Checklist /
+      //      Field Ops Manager Jobsite Visit
+      //   2. Equipment -> PF Equipment Mob & Demob / Rental Equipment / Equipment Fuel
+      //   3. Materials -> Stone Aggregate / Helicals / Grout Mix / Cement Mix (Helicals/Grout/
+      //      Cement are PLACEHOLDER rows for Brad to flesh out per project).
+      // Fields build under siteReadiness (the sandbox card's save key) via _srNewSafetyInvTable
+      // so they persist; date labels are already registered in PF_FIELD_DATE_LABELS.
       var _srN_mobprep =
-          subgroupNote('Proof roll: obtain from GC on geotech letterhead before mobilizing.')
-        + _srNewSubTable('Proof Roll', [
-              field('Building Pad Passed Proof Roll', ''),
-              field('Date Proof Roll Received', ''),
-              fieldLinked('Proof Roll Report Link', '', '', 'website')
-            ])
-        + subgroupNote('FUTURE automation: flag red + notify PM / Field Ops Mgr / Owners if the elevation difference exceeds 2 ft.')
-        + _srNewSubTable('Building Pad Elevation', [
-              field('Expected Building Pad Elevation', ''),
-              field('Actual Building Pad Elevation', ''),
-              field('Elevation Difference', '')
-            ])
-        + subgroupNote('Send site readiness checklist >= 3 weeks prior; PM confirms all items with GC/Super; 100% complete = clear to mobilize.')
-        + _srNewSubTable('Site Readiness Checklist', [
-              // "Site Readiness Checklist Sent?" row DELETED entirely (Brad 2026-09-05).
-              // Removing the field() removes the row; any saved siteReadiness override under
-              // that label is now ORPHANED (no longer read or shown) — harmless, not purged.
-              field('Date Site Readiness Checklist Sent to GC', ''),
-              field('Checklist Items 100% Confirmed w/ GC?', ''),
-              fieldLinked('Site Readiness Checklist Link', '', '', 'website'),
-              field('Checklist Notes', '')
-            ])
-        + _srNewSubTable('Field Ops Manager Jobsite Visit', [
-              field('Field Ops Manager Visit - Scheduled Date', ''),
-              field('Field Ops Manager Visit - Actual Date Visited', ''),
-              field('Field Ops Manager Visit - Comments / Recap', '')
-            ]);
-
-      // ---- Subsection 6: Mobilization to Site ---------------------------------
-      // Mirrors sub6Inner (the siteReadiness-owned MOB/DEMOB/Materials/Fuel tables)
-      // PLUS the two nested cards (Equipment / Material) rendered INLINE here as
-      // Inventory-style tables instead of the original post-render nested-card
-      // injection (same SIMPLIFICATION note as Safety — the injection is title-keyed
-      // to the original card, so it won't fire for "...- New"). Equipment/Material
-      // fields are built with _curSection='equipment' / 'material' so their read
-      // values map to the right override bucket; final save key is Brad's call on
-      // sign-off (currently the sandbox DOM section is siteReadiness).
-      var _srN_mob =
-          _srNewSubTable('PF Equipment MOB', [
-              field('Equipment Needed - VSC Rig', ''),
-              field('Equipment Needed - Predrill Rig', ''),
-              field('Equipment Needed - Gooseneck w/ Connex', ''),
-              field('Equipment Needed - Testing Material Fall Off Load', '')
-            ])
-        + _srNewSubTable('PF Equipment DEMOB', [
-              field('Demob Equipment', ''),
-              field('Demob Date', ''),
-              field('Demob Transport Company', '')
-            ])
-        + subgroupNote('Helical -> piling form (TBD); Rigid Inclusions -> other items.')
-        + _srNewSubTable('Materials (Stone, if Aggregate Pier)', [
-              field('Stone Vendor & Contact', ''),
-              field('Stone Name/Nomenclature', ''),
-              field('Stone Qty (TN)', bid.total_stone_tn, 'Bid Log'),
-              field('Stone Approved by Engineer (GGG)?', ''),
-              field('Stone Delivery Start Date', ''),
-              field('Stone Qty Day 1 (TN)', '')
-            ])
-        + _srNewSubTable('Equipment Fuel', [
-              field('Fuel Vendor', ''),
-              field('Fuel Contact', ''),
-              field('Fuel Delivery Dates', '')
-            ])
-        // Equipment nested card -> inline table ('equipment' key)
-        + _srNewSubTableKeyed('Equipment - PF Equipment Mobilization to Site', function(){ return [
-              field('Predrill Rig (Sany)', ''),
-              field('Mast, Vibro Rig (Deere 350G)', ''),
-              field('PF Parts Load - Gooseneck Trailer', ''),
-              field('Fall Off Load', '')
-            ]; }, 'equipment')
-        // Material nested card -> inline table ('material' key)
-        + _srNewSubTableKeyed('Material - Material Detail', function(){ return [
-              field('Stone Material Approved by Eng', ''),
-              field('Stone Material Name/Nomenclature', ''),
-              field('Stone Material Qty (TN)', bid.total_stone_tn, 'Bid Log'),
-              field('Stone Delivery Setup/Ordered', ''),
-              field('Concrete Mix (Rigid Inclusions)', ''),
-              field('Helical Material Approved by Eng', ''),
-              field('Fuel Tank/Containment', ''),
-              field('Fuel Delivery', '')
-            ]; }, 'material');
-
-      // ---- Subsection 7: Rental Equipment -------------------------------------
-      // Mirrors sub7Inner (siteReadiness key), Inventory-style table.
-      var _srN_rental = _srNewSubTable('Rental Equipment', [
-              field('Rental Equipment', ''),
-              field('Rental Company', ''),
-              field('Rental Date Rented/Active', ''),
-              field('Rental Anticipated Days Needed', ''),
-              field('Rental Anticipated Return Date', ''),
-              field('Rental Actual Date Called Off Rent', '')
-            ]);
+          subhead('Building Pad Prep')
+        + _srNewSafetyInvTable([
+            { name: 'Proof Roll', fieldsFn: function(){ return [
+                field('Building Pad Passed Proof Roll', ''),
+                field('Date Proof Roll Received', ''),
+                fieldLinked('Proof Roll Report Link', '', '', 'website')
+              ]; } },
+            { name: 'Building Pad Elevation', fieldsFn: function(){ return [
+                field('Expected Building Pad Elevation', ''),
+                field('Actual Building Pad Elevation', ''),
+                field('Elevation Difference', '')
+              ]; } },
+            { name: 'Site Readiness Checklist', fieldsFn: function(){ return [
+                field('Date Site Readiness Checklist Sent to GC', ''),
+                field('Checklist Items 100% Confirmed w/ GC?', ''),
+                fieldLinked('Site Readiness Checklist Link', '', '', 'website'),
+                field('Checklist Notes', '')
+              ]; } },
+            { name: 'Field Ops Manager Jobsite Visit', fieldsFn: function(){ return [
+                field('Field Ops Manager Visit - Scheduled Date', ''),
+                field('Field Ops Manager Visit - Actual Date Visited', ''),
+                field('Field Ops Manager Visit - Comments / Recap', '')
+              ]; } }
+          ])
+        + subhead('Equipment')
+        + _srNewSafetyInvTable([
+            { name: 'PF Equipment Mob & Demob', fieldsFn: function(){ return [
+                field('Equipment Needed - VSC Rig', ''),
+                field('Equipment Needed - Predrill Rig', ''),
+                field('Equipment Needed - Gooseneck w/ Connex', ''),
+                field('Equipment Needed - Testing Material Fall Off Load', ''),
+                field('Demob Equipment', ''),
+                field('Demob Date', ''),
+                field('Demob Transport Company', '')
+              ]; } },
+            { name: 'Rental Equipment', fieldsFn: function(){ return [
+                field('Rental Equipment', ''),
+                field('Rental Company', ''),
+                field('Rental Date Rented/Active', ''),
+                field('Rental Anticipated Days Needed', ''),
+                field('Rental Anticipated Return Date', ''),
+                field('Rental Actual Date Called Off Rent', '')
+              ]; } },
+            { name: 'Equipment Fuel', fieldsFn: function(){ return [
+                field('Fuel Vendor', ''),
+                field('Fuel Contact', ''),
+                field('Fuel Delivery Dates', '')
+              ]; } }
+          ])
+        + subhead('Materials')
+        + _srNewSafetyInvTable([
+            { name: 'Stone Aggregate', fieldsFn: function(){ return [
+                field('Stone Vendor & Contact', ''),
+                field('Stone Name/Nomenclature', ''),
+                field('Stone Qty (TN)', bid.total_stone_tn, 'Bid Log'),
+                field('Stone Approved by Engineer (GGG)?', ''),
+                field('Stone Delivery Start Date', ''),
+                field('Stone Qty Day 1 (TN)', '')
+              ]; } },
+            { name: 'Helicals', fieldsFn: function(){ return [
+                field('Helical Vendor & Contact', ''),
+                field('Helical Material Approved by Eng', ''),
+                field('Helical Qty', '')
+              ]; } },
+            { name: 'Grout Mix', fieldsFn: function(){ return [
+                field('Grout Vendor & Contact', ''),
+                field('Grout Mix Approved by Eng', ''),
+                field('Grout Qty', '')
+              ]; } },
+            { name: 'Cement Mix', fieldsFn: function(){ return [
+                field('Cement / Concrete Vendor & Contact', ''),
+                field('Concrete Mix (Rigid Inclusions) Approved by Eng', ''),
+                field('Cement Qty', '')
+              ]; } }
+          ]);
+      var _srN_mobprepNew = _srNewCollapsible('Mob Prep', _srN_mobprep, true);
 
       // Assemble the sandbox body: subsection order mirrors the ORIGINAL srBody
       // Shop Drawings ELIMINATED (Brad 2026-09-05) — sandbox now STARTS at Staking &
@@ -19302,9 +19295,7 @@ try {
           _srN_staking
         + _srN_testing
         + _srN_safety
-        + _srN_mobprep
-        + _srN_mob
-        + _srN_rental;
+        + _srN_mobprepNew;
       // Wrap the sandbox body in a scoping div (.pf-srnew-scope) so CSS overrides that
       // must match Inventory can target the sandbox WITHOUT leaking into the ORIGINAL
       // Site Readiness card (both cards share data-pr-section="siteReadiness", so the
