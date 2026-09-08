@@ -20096,6 +20096,19 @@ try {
         +   '<div class="fin-inv-g702" data-fin-inv-g702="1">' + g702DefaultHtml + '</div>'
         + '</div>';
 
+      /* ===== REMOVED 2026-09-08 per Brad — Schedule of Values, may recreate later. =====
+         Render disabled ONLY: the SOV block ('finSov') no longer builds or appends into
+         finInvoicingBody, so the "Schedule of Values" block is gone from Financials >
+         Project Invoicing. NOTHING in the data layer changed — the KV record
+         `project_invoicing_v1:<num>` (its .sov lines) is untouched, and every SOV helper
+         (sovLinesWithPayApps, sovIsSaved, sovTableHtml, sovDerive, sovTotals, the
+         window.pfSov* handlers, g703ForApp, g702CoverForApp, etc.) is STILL DEFINED because
+         the Pay Apps / G702-G703 invoicing feature shares them. Nothing else references the
+         local vars below (sovLines/sovSaved/sovHtmlRO/sovSeedNote/sovEditBtn/sovViewBtn/finSov),
+         so removing them from the render is safe. `retFrac` (line ~20017) is KEPT — Pay Apps use it.
+         TO RESTORE: un-comment this whole block AND add `+ finSov` back onto the
+         finInvoicingBody line just below (currently `finInvBand + finPayApps`).
+
       // --- AIA G703 Schedule of Values (SOV) ---
       // Full 13-column G703 SOV per project (matches the "G703 - Schedule of Values"
       // tab cell-for-cell). Derived columns (Current Scheduled Value, Total Completed
@@ -20128,14 +20141,96 @@ try {
         +     '<div class="fin-inv-sov-editor" style="display:none"></div>'
         +   '</div>'
         + '</div>';
+         ===== END REMOVED 2026-09-08 (Schedule of Values render) ===== */
 
-      var finInvoicingBody = finInvBand + finPayApps + finSov;
+      var finInvoicingBody = finInvBand + finPayApps;
 
       var finBody = finRollup
         + finSub('Project Invoicing', finInvoicingBody, false)
         + finSub('Project Costs (Budget vs Actual)', baHtml, false);
 
       html += card(7, 'Financials', baMeta, finBody, false);
+
+      // ===== SANDBOX 2026-09-08 per Brad — "Financials - New" (parallel inventory-format card) =====
+      // WHY: Brad wants Financials reformatted into the SAME inventory style as the new Site Readiness /
+      // Project Setup sandbox (expandable rows + far-left green completion checks + "X/Y Fields Complete,
+      // XX%" readouts) but is NOT ready to replace the live tab yet — "create a financial sandbox tab for
+      // the time being until we are ready to fully implement, so we can update that as we go." So this is a
+      // PARALLEL card built with the EXISTING inventory engine (_srNewSafetyInvTable / _srNewCollapsible /
+      // pfRenderSandboxSubStatus, wrapped in .pf-srnew-scope) — EXACTLY how the Site Readiness sandbox was
+      // built alongside the live one. The LIVE Financials card above is UNTOUCHED (minus Schedule of Values).
+      //
+      // DATA KEY: this sandbox passes 'financials' to _srNewSafetyInvTable so its field()s read+write the
+      // SAME 'financials' override section the live card's field-override editor uses (read==write, no blanks;
+      // 'financials' is a VALID_SECTIONS key — line ~8720). Labels here are NEW sandbox labels (no collision
+      // with anything the live card persists, because the live card's editable inputs live in the SEPARATE
+      // invoicing KV record project_invoicing_v1, not the 'financials' override section) so NO alias is needed.
+      //
+      // FIRST PASS (incremental — "update that as we go"): this pass mirrors the READ-ONLY computed financial
+      // figures already derived above for the live card — the Job Financials Roll-Up (Invoiced / Budget /
+      // Actual / Profit + Profit%), the Project Invoicing info-band values (identity + Subcontract Value +
+      // retainage + roll-ups), and a Budget-vs-Actual summary — VERBATIM (same variables: finCostBudget,
+      // finCostActual, finProfitMoney, finProfitPctStr, finInvRoll, finScvVal, finPctInput, finInvoicedVal,
+      // finPaidVal, finRetDueVal, finRetPaidVal, etc.), so every number is byte-identical to the live card.
+      // These are shown via subgroupNote() read-only value lines (display-only; not counted by the status
+      // engine). The interactive editors (Pay Applications entry, G702/G703 pay-app tables, the Budget-vs-
+      // Actual editable grid, the inline Subcontract/Retainage input editor) are DELIBERATELY NOT duplicated
+      // into the sandbox — they depend on bespoke .fin-inv-* / .ba-* DOM markers + ~88 window.pfInv*/pfPayApp*/
+      // budget handlers that query that exact structure; they stay in the LIVE card only. REMAINING for later
+      // sandbox passes: convert those interactive pieces to inventory-style field() rows once Brad confirms
+      // the read-only layout. Flagged in the report.
+      //
+      // RBAC: this card renders inside the SAME project-record render path as the live Financials card, which
+      // field_ops never reaches (its project view strips financials; the server 403s /api/project-* for
+      // field_ops via requireArea('financials')). Adding a second financials-derived card here does NOT create
+      // a new endpoint or a new data path — it re-displays values already computed in this office-only render —
+      // so it inherits the identical gating. No financials exposure to field_ops.
+      var _finNewRoRow = function(label, val){
+        var has = (val != null && String(val).trim() !== '');
+        return subgroupNote(label + ': ' + (has ? String(val).replace(/<[^>]*>/g, '') : '—'));
+      };
+      var _finNewRollupInner = _srNewSafetyInvTable([
+        { name: 'Job Financials Roll-Up', fieldsFn: function(){ return [
+            _finNewRoRow('Project Invoicing (Invoiced to date)', (finInvRoll.ok && finInvRoll.invoiced != null) ? baMoney(finInvRoll.invoiced) : ''),
+            _finNewRoRow('Project Budget (Budgeted cost)', finCostBudget),
+            _finNewRoRow('Actual Cost to Date (Actual cost incurred)', finCostActual),
+            _finNewRoRow('Project Profit', finProfitMoney),
+            _finNewRoRow('Profit %', finProfitPctStr)
+        ]; } }
+      ], 'financials');
+      var _finNewInvoicingInner = _srNewSafetyInvTable([
+        { name: 'Project Invoicing (summary)', fieldsFn: function(){ return [
+            _finNewRoRow('Project #', finPNum),
+            _finNewRoRow('Project Name', finPName),
+            _finNewRoRow('Project Address', finPAddr),
+            _finNewRoRow('Project % Complete (work completed)', finPctVal),
+            _finNewRoRow('Subcontract Value', finScvVal),
+            _finNewRoRow('Amount Invoiced to Date', finInvoicedVal),
+            _finNewRoRow('Amount Paid to Date', finPaidVal),
+            _finNewRoRow('Retainage %', finPctInput),
+            _finNewRoRow('Retainage Amount Due', finRetDueVal),
+            _finNewRoRow('Retainage Paid', finRetPaidVal)
+        ]; } }
+      ], 'financials');
+      var _finNewCostsInner = _srNewSafetyInvTable([
+        { name: 'Project Costs (Budget vs Actual)', fieldsFn: function(){ return [
+            _finNewRoRow('Project Budget', finCostBudget),
+            _finNewRoRow('Actual Cost to Date', finCostActual),
+            _finNewRoRow('Project Profit', finProfitMoney),
+            subgroupNote('Full cost-code Budget-vs-Actual grid + editor remain on the live Financials tab; the editable grid will move here in a later sandbox pass.')
+        ]; } }
+      ], 'financials');
+      var _finNewBody =
+          subgroupNote('SANDBOX (in progress) — new inventory-style layout of the Financials tab for review. Live Financials tab above is unchanged. Values mirror the live figures; interactive editors (pay apps, budget grid) stay on the live tab for now.')
+        + _srNewCollapsible('Job Financials Roll-Up', _finNewRollupInner, true)
+        + _srNewCollapsible('Project Invoicing', _finNewInvoicingInner, true)
+        + _srNewCollapsible('Project Costs (Budget vs Actual)', _finNewCostsInner, true);
+      // NO sectionKey passed to card() (6th arg omitted) — same as the live Financials card, which
+      // intentionally has no per-section field-override Edit button (its editing is the budget/invoicing
+      // editors). The sandbox is display-only for now, so it needs no Edit button either.
+      html += card(7, 'Financials - New', baMeta,
+        '<div class="pf-srnew-scope">' + _finNewBody + '</div>', false);
+      // ===== END SANDBOX (Financials - New) =====
 
       // ----- 7. Project Closeout -----
       // Brad 2026-08-07 (batch-14): rebuilt the Closeout placeholder into 5 blue
