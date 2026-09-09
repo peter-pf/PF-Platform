@@ -19666,7 +19666,23 @@ try {
               // Native DATE picker (PF_FIELD_DATE_LABELS); shown only when Required? = Yes.
               field('Date JHA Sent to GC', '')
             ]; } },
-          { name: 'Safety Training & Toolbox Talks', fieldsFn: function(){ return [
+          { name: 'Safety Training & Toolbox Talks',
+            // Conditional (Brad 2026-09-09): row 1 is a Yes/No "Jobsite Safety Training Required"
+            // dropdown (ALWAYS visible). Yes -> reveal the "Onsite Crew Training Link" row + gate
+            // category completion on that link being filled; No/blank -> hide the link row (No reads
+            // 100% complete, blank reads incomplete). Same proven mechanism as the JHA sibling above
+            // and the Testing > "Modulus Load Test Required?" toggle: an always-rendered dropdown +
+            // data-cond-* attrs consumed by pfRenderSandboxSubStatus + a capture-phase change
+            // listener for instant show/hide (no re-render). hideRow/gate target the link row by its
+            // data-row-label (== the field label).
+            cond: { field: 'Jobsite Safety Training Required', noValue: 'No',
+                    hideRow: 'Onsite Crew Training Link', gate: 'Onsite Crew Training Link' },
+            fieldsFn: function(){ return [
+              // Always-visible Yes/No controller (PF_FIELD_DROPDOWNS -> pfLiveControl select).
+              field('Jobsite Safety Training Required', ''),
+              // Enterable/clickable link to the onsite crew safety training (paste-a-URL in edit
+              // mode, clickable in read mode) — shown ONLY when the controller = Yes.
+              fieldLinked('Onsite Crew Training Link', '', '', 'website'),
               // Brad 2026-09-08: dropped the "Toolbox Talks" paste-a-URL link row.
               field('Toolbox Talks Prepared', '')
             ]; } },
@@ -22732,6 +22748,10 @@ try {
       // the category reads 100% complete; Yes -> the "Date JHA Sent to GC" row is shown and the
       // category completes when that date is filled (handled in pfRenderSandboxSubStatus).
       'Jobsite Safety Analysis (JSA) Required?': ['Yes', 'No'],
+      // Sandbox Safety > Safety Training & Toolbox Talks (Brad 2026-09-09): Yes/No gate. No/blank ->
+      // hide the "Onsite Crew Training Link" row (No reads 100% complete); Yes -> show the link row
+      // and gate completion on it being filled (handled in pfRenderSandboxSubStatus).
+      'Jobsite Safety Training Required': ['Yes', 'No'],
       // Sandbox Mob Prep > Materials per-material "Required?" gates (Brad 2026-09-08): Yes/No. No ->
       // hide that material's fields + mark the row 100% complete; Yes -> show + gate on all filled.
       'AP - Stone Aggregate Required?': ['Yes', 'No'],
@@ -24080,6 +24100,23 @@ try {
       var el = ev.target;
       if (!el || !el.getAttribute) return;
       if (el.getAttribute('data-pr-field-label') !== 'Jobsite Safety Analysis (JSA) Required?') return;
+      var card = el.closest ? el.closest('.pr-card[data-pr-section="siteReadiness"]') : null;
+      if (!card) return;
+      var root = (card.closest && (card.closest('.pr-root') || card.parentElement)) || document.getElementById('prGenericRoot');
+      try { if (typeof pfRenderSandboxSubStatus === 'function') pfRenderSandboxSubStatus(root); } catch (e) {}
+    }, true);
+
+    // Sandbox Safety > "Jobsite Safety Training Required" conditional (Brad 2026-09-09). CAPTURE
+    // phase (3rd arg true) so it runs BEFORE the dropdown's inline onchange stopPropagation — the
+    // same idiom as the JHA listener above and the Testing > "Modulus Load Test Required?" toggle.
+    // On change, recompute pfRenderSandboxSubStatus for THIS card's root — that single function
+    // reads the new Yes/No value, shows/hides the "Onsite Crew Training Link" row (via the cat's
+    // data-cond-* attrs), and updates the green check + readout (No -> 100%, Yes -> link-gated).
+    // Instant, no re-render; the dropdown's own save (pfLiveFieldChange, siteReadiness) still fires.
+    document.addEventListener('change', function(ev){
+      var el = ev.target;
+      if (!el || !el.getAttribute) return;
+      if (el.getAttribute('data-pr-field-label') !== 'Jobsite Safety Training Required') return;
       var card = el.closest ? el.closest('.pr-card[data-pr-section="siteReadiness"]') : null;
       if (!card) return;
       var root = (card.closest && (card.closest('.pr-root') || card.parentElement)) || document.getElementById('prGenericRoot');
