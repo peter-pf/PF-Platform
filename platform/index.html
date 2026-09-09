@@ -14710,8 +14710,13 @@ try {
             liveOpen = '<a class="pr-field-openlink" href="'+E(ohref)+'" target="_blank" rel="noopener noreferrer">Open &#8599;</a>';
           }
         }
+        // Positive link marker (Brad 2026-09-09): tag ONLY the fieldLinked() live-edit value
+        // cell with its kind. A plain field()/textarea live cell renders the byte-identical
+        // "pr-field-value pr-field-live" span with NO such attr, so pfLiveFieldChange can tell a
+        // link field apart from a plain text field and only patches the "Open ↗" anchor on the
+        // former (fixes the regression where any typed text got a bogus Open link).
         return '<div class="pr-field" data-pr-label="'+E(label)+'"><span class="pr-field-label">'+E(label)+editMark+'</span>'
-             + '<span class="pr-field-value pr-field-live'+liveBlank+'">'
+             + '<span class="pr-field-value pr-field-live'+liveBlank+'" data-pr-linkkind="'+E(kind)+'">'
              +   '<input type="text" class="pr-live-input" data-pr-field-label="'+E(label)+'" '
              +     'data-pr-live-prev="'+esc2(String(rawUrl||''))+'" placeholder="Paste a URL" '
              +     'value="'+esc2(String(rawUrl||''))+'" onchange="event.stopPropagation();window.pfLiveFieldChange(this)">'
@@ -23117,6 +23122,49 @@ try {
         } catch (e) {}
         el.setAttribute('data-pr-live-prev', value);   // new baseline for the next revert
         syncBlank(value);                               // clear/apply yellow to match new value
+        // LIVE "Open" link refresh (Brad 2026-09-09): a fieldLinked(...,'website') in the office
+        // live-edit branch renders a text INPUT plus a sibling "Open ↗" anchor (a.pr-field-openlink),
+        // but that anchor is built at RENDER time. This save path deliberately does NOT re-render
+        // (the input already holds the new value), so a freshly pasted URL never surfaced its
+        // clickable link until a full reload — Brad's "Onsite Crew Training Link isn't clickable
+        // after saving". Patch the sibling anchor in place now (same no-re-render DOM-patch idiom
+        // as syncBlank / the status-bar refresh below).
+        // GATED BY A POSITIVE MARKER (verifier fix): act ONLY on a cell that fieldLinked() tagged
+        // data-pr-linkkind, AND only for kind 'website'. A plain field()/textarea live cell has the
+        // BYTE-IDENTICAL "pr-field-value pr-field-live" span with NO data-pr-linkkind, so plain
+        // text/number/select/textarea edits never get a bogus Open link. email/phone kinds render a
+        // span.pr-field-openlink (not an anchor) and are handled by their own render — left untouched.
+        try {
+          if (el.classList && el.classList.contains('pr-live-input')) {
+            var _cell = el.closest ? el.closest('.pr-field-value.pr-field-live') : null;
+            var _kind = _cell ? (_cell.getAttribute('data-pr-linkkind') || '') : '';
+            if (_cell && _kind === 'website') {
+              var _open = _cell.querySelector('a.pr-field-openlink');
+              // Scheme-sanitize exactly as linkWebsite / the render branch: keep an existing
+              // http(s):// scheme, else prepend https:// (strip leading slashes). Block anything
+              // that resolves to a dangerous scheme (javascript:/data:/etc) — those never match the
+              // http(s) allow-test, so they get https:// prepended and can't execute.
+              var _sanitize = function(v){
+                if (/^https?:\/\//i.test(v)) return v;                 // allow only http/https as-is
+                return 'https://' + String(v).replace(/^\/+/, '');     // bare domain / other -> https://
+              };
+              if (value) {
+                var _href = _sanitize(value);
+                if (!_open) {
+                  _open = document.createElement('a');
+                  _open.className = 'pr-field-openlink';
+                  _open.target = '_blank';
+                  _open.rel = 'noopener noreferrer';
+                  _cell.appendChild(_open);
+                }
+                _open.setAttribute('href', _href);
+                _open.textContent = 'Open ↗';
+              } else if (_open) {
+                _open.parentNode.removeChild(_open);   // URL cleared -> drop the stale link
+              }
+            }
+          }
+        } catch (e) {}
         // LIVE completion refresh (Brad 2026-09-08): a live-edit save toggles .blank on THIS
         // cell but the section/subsection completion readouts + Safety green checks are
         // computed at render time, so they'd stay stale until reload. Recompute them now off
