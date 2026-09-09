@@ -26023,12 +26023,13 @@ try {
           PF_CONTACTS = null;
         }
         _pfContactsPromise = null;
-        // Re-render the whole record so every group using this contact refreshes.
-        var card = ed.closest ? ed.closest('.pr-card') : null;
-        var num = _curNum || '';
-        var root = (card && (card.closest('.pr-root') || card.parentElement)) || document.getElementById('prGenericRoot');
-        if (num && window.renderProjectRecord) window.renderProjectRecord(num, root);
-        else if (window.pfCrmRenderCards) window.pfCrmRenderCards(document);
+        // Refresh the resolved read cards IN PLACE — NO renderProjectRecord (no page
+        // bounce / no card collapse), matching the add (pfPcAddContactSave) + remove
+        // (pfCrmRemoveContactConfirm) inline-CRUD paths so the office user stays on the
+        // expanded Project Contacts sheet and can keep editing/adding. pfCrmRenderCards
+        // re-renders EVERY .pr-crm-cards host in the document from the freshly-updated
+        // PF_CONTACTS cache, so every group using this contact still shows the new values.
+        if (window.pfCrmRenderCards) window.pfCrmRenderCards(document);
       }).catch(function(){
         busy(false);
         showErr('Save failed: could not reach the server. Your changes were NOT saved - please retry.');
