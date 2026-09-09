@@ -24856,9 +24856,31 @@ try {
           var off = r.office ? '<a href="tel:' + esc2(r.office) + '">' + esc2(pfFmtPhone(r.office)) + '</a>' : '';
           var cell = r.cell ? '<a href="tel:' + esc2(r.cell) + '">' + esc2(pfFmtPhone(r.cell)) + '</a>' : '';
           var email = r.email ? '<a href="mailto:' + esc2(r.email) + '">' + esc2(r.email) + '</a>' : '';
+          // LIVE INLINE EDIT (Brad 2026-09-09): for OFFICE users (_rowEditable === canEdit())
+          // AND a resolved directory contact (r.cid, non-legacy), every field renders as a
+          // contenteditable .pr-pc-inline cell that saves on blur/Enter via the existing
+          // pfPcInlineFieldSave path (delegated focusout/keydown listeners in pfPcMountInline).
+          // NO Edit button — the office user edits directly in place. data-cf is the directory
+          // field key {name,title,officePhone,cellPhone,email,notes}; data-crm-cid targets the
+          // shared directory record; data-pf-prev is the fail-closed revert baseline. Phone/email
+          // are edited as RAW text (no tel:/mailto: link) so the raw value round-trips to save;
+          // the read-only render below keeps the clickable links. field_ops NEVER reach this
+          // branch (guarded by _rowEditable) — they get the static read-only cells only.
+          var liveInline = _rowEditable && !r.legacy && r.cid;
+          var ic = function(key, val){
+            // One inline-editable field cell. The wrapping <span class="pr-crow-*"> keeps the
+            // column alignment; the inner contenteditable is the editable surface.
+            return '<span class="pr-pc-inline" contenteditable="true" spellcheck="false"'
+              + ' data-cf="' + esc2(key) + '"'
+              + ' data-crm-cid="' + esc2(r.cid) + '"'
+              + ' data-pf-prev="' + esc2(val || '') + '">' + esc2(val || '') + '</span>';
+          };
           var actHtml = '';
           if (_rowEditable) {
             if (r.legacy) {
+              // Legacy (un-migrated) row: no directory cid yet, so inline field-save cannot
+              // target a record. Keep the Edit button — it MIGRATES this contact into the
+              // shared directory first, then re-renders as a live-inline row.
               actHtml = '<span class="pr-crow-act">'
                 + '<button type="button" class="pr-crow-editbtn" '
                 +   'title="Edit this contact (adds it to the shared PF directory, then edits it there)" '
@@ -24868,11 +24890,9 @@ try {
                 +   'onclick="window.pfCrmRemoveContactRow(this)">&#10005;</button>'
                 + '</span>';
             } else {
+              // Directory row: live-inline (no Edit button), keep ONLY the × remove control.
               actHtml = r.cid
                 ? '<span class="pr-crow-act">'
-                  + '<button type="button" class="pr-crow-editbtn" '
-                  +   'data-crm-cid="' + esc2(r.cid) + '" title="Edit this contact (updates the shared directory)" '
-                  +   'onclick="window.pfCrmEditContactRow(this)">&#9998; Edit</button>'
                   + '<button type="button" class="pr-crow-rmbtn" '
                   +   'data-crm-cid="' + esc2(r.cid) + '" title="Remove this contact from THIS project (keeps them in the directory)" '
                   +   'onclick="window.pfCrmRemoveContactRow(this)">&#10005;</button>'
@@ -24894,23 +24914,24 @@ try {
             if (r.labelSection) rowAttrs += ' data-legacy-section="' + esc2(r.labelSection) + '"';
           }
           if (_compact) {
-            // Compact line: Name / Email / Cell ONLY (omit Title, Office Phone, Notes). All
-            // three still escaped (esc2). Edit/× act cluster kept for office; rowAttrs (cid +
-            // legacy data-*) preserved so those controls target the right directory record.
+            // Compact line: Name / Email / Cell ONLY (omit Title, Office Phone, Notes). Office
+            // (liveInline) gets contenteditable cells (save-on-blur); read-only keeps the static
+            // escaped text + clickable links. rowAttrs (cid + legacy data-*) preserved so the
+            // remove/edit controls still target the right directory record.
             return '<div class="pr-crow"' + rowAttrs + '>'
-              + '<span class="pr-crow-name">'  + esc2(r.name || (r.cid || '')) + '</span>'
-              + '<span class="pr-crow-email">' + email + '</span>'
-              + '<span class="pr-crow-cell">'  + cell + '</span>'
+              + '<span class="pr-crow-name">'  + (liveInline ? ic('name', r.name)  : esc2(r.name || (r.cid || ''))) + '</span>'
+              + '<span class="pr-crow-email">' + (liveInline ? ic('email', r.email) : email) + '</span>'
+              + '<span class="pr-crow-cell">'  + (liveInline ? ic('cellPhone', r.cell) : cell) + '</span>'
               + actHtml
               + '</div>';
           }
           return '<div class="pr-crow"' + rowAttrs + '>'
-            + '<span class="pr-crow-name">'  + esc2(r.name || (r.cid || '')) + '</span>'
-            + '<span class="pr-crow-title">' + esc2(r.title || '') + '</span>'
-            + '<span class="pr-crow-off">'   + off + '</span>'
-            + '<span class="pr-crow-cell">'  + cell + '</span>'
-            + '<span class="pr-crow-email">' + email + '</span>'
-            + '<span class="pr-crow-notes">' + esc2(r.notes || '') + '</span>'
+            + '<span class="pr-crow-name">'  + (liveInline ? ic('name', r.name)   : esc2(r.name || (r.cid || ''))) + '</span>'
+            + '<span class="pr-crow-title">' + (liveInline ? ic('title', r.title) : esc2(r.title || '')) + '</span>'
+            + '<span class="pr-crow-off">'   + (liveInline ? ic('officePhone', r.office) : off) + '</span>'
+            + '<span class="pr-crow-cell">'  + (liveInline ? ic('cellPhone', r.cell)     : cell) + '</span>'
+            + '<span class="pr-crow-email">' + (liveInline ? ic('email', r.email)        : email) + '</span>'
+            + '<span class="pr-crow-notes">' + (liveInline ? ic('notes', r.notes)        : esc2(r.notes || '')) + '</span>'
             + actHtml
             + '</div>';
         });
