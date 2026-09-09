@@ -20091,17 +20091,8 @@ try {
         +   '</div>'
         + '</div>';
 
-      // Collapsible subcategory (same open/toggle mechanic as the section cards,
-      // scoped class so it never collides with .pr-card). open=false by default.
-      function finSub(title, bodyHtml, open){
-        return '<div class="fin-sub' + (open ? ' open' : '') + '">'
-          + '<div class="fin-sub-head" onclick="this.parentElement.classList.toggle(\'open\')">'
-          +   '<span class="fin-sub-title">' + E(title) + '</span>'
-          +   '<span class="fin-sub-chev">&#9654;</span>'
-          + '</div>'
-          + '<div class="fin-sub-body">' + bodyHtml + '</div>'
-          + '</div>';
-      }
+      // (finSub helper removed 2026-09-09 — the old live card's collapsibles used it;
+      //  the promoted inventory-style card uses _srNewCollapsible instead.)
 
       // Project Invoicing layout: labeled INFO BLOCK (11 fields) + Pay Applications
       // table + expandable Schedule of Values. Identity fields (Project #, Name, Address,
@@ -20154,7 +20145,7 @@ try {
       var finEditableRow = function(label, val, key){
         var has = (val != null && String(val) !== '');
         var pencil = canEdit()
-          ? '<button type="button" class="fin-inv-edit-pencil" title="Edit" onclick="window.pfInvEditInputs()">&#9998;</button>'
+          ? '<button type="button" class="fin-inv-edit-pencil" title="Edit" onclick="window.pfInvEditInputs(this)">&#9998;</button>'
           : '';
         return '<div class="fin-inv-row">'
           + '<div class="fin-inv-row-label">' + E(label) + pencil + '</div>'
@@ -20228,7 +20219,7 @@ try {
           var acts = '';
           if (canEdit() && !locked) {
             acts += '<button type="button" class="fin-inv-rowbtn fin-inv-rowbtn-approve" '
-              + 'onclick="event.stopPropagation();window.pfInvApprovePayApp(' + E(String(a.num)) + ')" '
+              + 'onclick="event.stopPropagation();window.pfInvApprovePayApp(' + E(String(a.num)) + ',this)" '
               + 'title="Approve &amp; lock this pay application">Approve</button>';
           }
           acts += '<button type="button" class="fin-inv-rowbtn fin-inv-rowbtn-print' + (locked ? ' primary' : '') + '" '
@@ -20359,154 +20350,55 @@ try {
         + '</div>';
          ===== END REMOVED 2026-09-08 (Schedule of Values render) ===== */
 
+      // Full interactive invoicing body (info band + editable Pay Applications table +
+      // G702 preview + auto pay-app file list). Embedded into the promoted Financials
+      // card below. The old separate live "Financials" card + its finSub/finBody
+      // assembly were removed 2026-09-09 (Strategy B promotion) — this body now lives
+      // ONLY inside the promoted inventory-style card, so there is exactly ONE invoicing
+      // editor on the page (no cross-edit) and zero feature loss.
       var finInvoicingBody = finInvBand + finPayApps;
 
-      var finBody = finRollup
-        + finSub('Project Invoicing', finInvoicingBody, false)
-        + finSub('Project Costs (Budget vs Actual)', baHtml, false);
-
-      html += card(7, 'Financials', baMeta, finBody, false);
-
-      // ===== SANDBOX 2026-09-08 per Brad — "Financials - New" (parallel inventory-format card) =====
-      // WHY: Brad wants Financials reformatted into the SAME inventory style as the new Site Readiness /
-      // Project Setup sandbox (expandable rows + far-left green completion checks + "X/Y Fields Complete,
-      // XX%" readouts) but is NOT ready to replace the live tab yet — "create a financial sandbox tab for
-      // the time being until we are ready to fully implement, so we can update that as we go." So this is a
-      // PARALLEL card built with the EXISTING inventory engine (_srNewSafetyInvTable / _srNewCollapsible /
-      // pfRenderSandboxSubStatus, wrapped in .pf-srnew-scope) — EXACTLY how the Site Readiness sandbox was
-      // built alongside the live one. The LIVE Financials card above is UNTOUCHED (minus Schedule of Values).
+      // ===== PROMOTED Financials card (2026-09-09 per Brad — Strategy B) =====
+      // Brad wants Financials in the inventory style of the new Site Readiness sandbox
+      // (expandable collapsibles + far-left green completion checks), and this card is now
+      // THE Financials card — the old separate live "Financials" card (finSub/finBody
+      // assembly) was DELETED above. STRATEGY B = zero feature loss: every interactive
+      // piece from the old card is embedded here, not summarized.
       //
-      // DATA KEY: this sandbox passes 'financials' to _srNewSafetyInvTable so its field()s read+write the
-      // SAME 'financials' override section the live card's field-override editor uses (read==write, no blanks;
-      // 'financials' is a VALID_SECTIONS key — line ~8720). Labels here are NEW sandbox labels (no collision
-      // with anything the live card persists, because the live card's editable inputs live in the SEPARATE
-      // invoicing KV record project_invoicing_v1, not the 'financials' override section) so NO alias is needed.
+      // Built with the inventory engine (_srNewCollapsible, wrapped in .pf-srnew-scope).
+      // Three collapsibles render the SAME live builder OUTPUT so nothing can drift:
+      //   - Job Financials Roll-Up  -> `finRollup` band (pure display HTML: no ids/handlers).
+      //   - Pay Applications        -> `finInvoicingBody` = finInvBand + finPayApps: the FULL
+      //     interactive invoicing (info band + inline Subcontract/Retainage pencil editor,
+      //     editable Pay Applications table, + New Pay App, Approve/lock, Print/Export PDF,
+      //     row-click G702 preview, and the auto "Pay Applications on file" list from
+      //     data/pay-apps.js).
+      //   - Project Costs (Budget vs Actual) -> `baHtml` grid (fully interactive editable grid).
       //
-      // FIRST PASS (incremental — "update that as we go"): this pass mirrors the READ-ONLY computed financial
-      // figures already derived above for the live card — the Job Financials Roll-Up (Invoiced / Budget /
-      // Actual / Profit + Profit%), the Project Invoicing info-band values (identity + Subcontract Value +
-      // retainage + roll-ups), and a Budget-vs-Actual summary — VERBATIM (same variables: finCostBudget,
-      // finCostActual, finProfitMoney, finProfitPctStr, finInvRoll, finScvVal, finPctInput, finInvoicedVal,
-      // finPaidVal, finRetDueVal, finRetPaidVal, etc.), so every number is byte-identical to the live card.
-      // These are shown via subgroupNote() read-only value lines (display-only; not counted by the status
-      // engine). The interactive editors (Pay Applications entry, G702/G703 pay-app tables, the Budget-vs-
-      // Actual editable grid, the inline Subcontract/Retainage input editor) are DELIBERATELY NOT duplicated
-      // into the sandbox — they depend on bespoke .fin-inv-* / .ba-* DOM markers + ~88 window.pfInv*/pfPayApp*/
-      // budget handlers that query that exact structure; they stay in the LIVE card only. REMAINING for later
-      // sandbox passes: convert those interactive pieces to inventory-style field() rows once Brad confirms
-      // the read-only layout. Flagged in the report.
+      // CROSS-EDIT SAFETY: every invoicing/budget handler resolves its DOM within the clicked
+      // element's own .pr-card (btn.closest('.pr-card') / row.closest('[data-fin-inv-payapps]')).
+      // The two handlers that formerly used a document-wide singular querySelector
+      // (pfInvEditInputs + invRerenderFromDoc) were made card-scoped 2026-09-09, mirroring the
+      // Budget grid's baScope precedent. With the old card gone there is exactly ONE invoicing
+      // editor on the page anyway; the scoping is belt-and-suspenders against any future 2nd card.
       //
-      // RBAC: this card renders inside the SAME project-record render path as the live Financials card, which
-      // field_ops never reaches (its project view strips financials; the server 403s /api/project-* for
-      // field_ops via requireArea('financials')). Adding a second financials-derived card here does NOT create
-      // a new endpoint or a new data path — it re-displays values already computed in this office-only render —
-      // so it inherits the identical gating. No financials exposure to field_ops.
-      // ===== SANDBOX EMBED (Brad 2026-09-08): render the FULL LIVE builders =====
-      // Brad wants the sandbox collapsibles to open the SAME interactive views as the
-      // live Financials card, not read-only summaries. So we render the EXISTING live
-      // builder OUTPUT verbatim inside each sandbox collapsible body — same source, so
-      // it can never drift from the live card:
-      //   - Job Financials Roll-Up  -> the live `finRollup` band (pure display HTML: no
-      //     ids, no handlers — 100% safe to duplicate).
-      //   - Pay Applications        -> a DISPLAY-ONLY mirror of the live invoicing block.
-      //     VERIFIED-UNSAFE-TO-FULLY-DUPLICATE: two of the invoicing handlers use a
-      //     document-wide (global-singleton) querySelector rather than a .pr-card/closest
-      //     scope — pfInvEditInputs() = document.querySelector('.fin-inv-inputs-editor')
-      //     (grabs the FIRST editor in the whole document) and invRerenderFromDoc() =
-      //     document.querySelector('[data-fin-inv-payapps]') (first anchor). Rendering a
-      //     SECOND live copy would let a sandbox pencil open the LIVE editor (and vice
-      //     versa) and mis-anchor the Approve re-render — exactly the cross-edit the task
-      //     forbids. So per the CRITICAL rule we render this collapsible DISPLAY-ONLY:
-      //     same info-band values + the same pay-apps rows/columns/formatting are shown,
-      //     but the sandbox edit actions (edit pencils, +New Pay App, Approve, Print,
-      //     G702 row-click, the inline Subcontract/Retainage editor) are removed so the
-      //     sandbox never touches the live editor's singleton DOM. The LIVE Pay
-      //     Applications block (in the Financials card above) stays fully interactive.
-      //     REPORTED as a limitation. (Roll-up + Budget grid have no such global handler,
-      //     so THEY are embedded fully live.)
-      //   - Project Costs (Budget vs Actual) -> the live `baHtml` grid. VERIFIED: the
-      //     budget grid uses NO id= attributes (only .ba-table-wrap / .ba-edit-actions /
-      //     .ba-budget-input classes + data-* attrs). Its edit/save/cancel handlers all
-      //     resolve via baScope(btn)=btn.closest('.pr-card') then card.querySelector(
-      //     '.ba-table-wrap'|'.ba-edit-actions'), and pfRefreshActuals scopes via
-      //     btn.closest('.ba-edit-actions'). Because this "Financials - New" card is a
-      //     SEPARATE .pr-card, the sandbox grid's buttons scope to the SANDBOX card's own
-      //     grid instance — zero cross-edit with the live card's grid. Save re-renders the
-      //     whole record (renderProjectRecord) so both cards stay in sync. Safe to
-      //     duplicate + fully interactive.
-      // RBAC unchanged: same office-only render path; field_ops never reaches this render.
+      // RBAC: renders inside the office-only project-record path field_ops never reaches (its
+      // project view strips financials; the server 403s /api/project-* + invoicing/budget
+      // endpoints via requireArea('financials')). No new endpoint, no new data path — same
+      // gating as before. data/pay-apps.js stays guarded by !isPrivileged. No field_ops exposure.
       //
-      // DISPLAY-ONLY invoicing mirror for the sandbox (see note above): same info-band
-      // values (identity + Subcontract Value + roll-ups + retainage) rendered WITHOUT the
-      // edit pencils / inline input editor, plus the same Pay Applications rows/columns/
-      // formatting rendered WITHOUT row-click (G702) or action buttons. Reuses the exact
-      // value vars already computed for the live band, so numbers are byte-identical.
-      var _finNewInvInfoRO =
-        '<div class="fin-inv-info">'
-        + finInvRow('Project #', finPNum)
-        + finInvRow('Project Name', finPName)
-        + finInvRow('Project Address', finPAddr)
-        + finInvRow('Project % Complete (work completed)', finPctVal)
-        + finInvRow('Subcontract Value', finScvVal)
-        + finInvRow('Amount Invoiced to Date', finInvoicedVal)
-        + finInvRow('Amount Paid to Date', finPaidVal)
-        + finInvRow('Invoice Due By Date', '')
-        + finInvRow('Retainage %', finPctInput)
-        + finInvRow('Retainage Amount Due', finRetDueVal)
-        + finInvRow('Retainage Paid', finRetPaidVal)
-        + '</div>';
-      var _finNewPayRowsRO;
-      if (invErr) {
-        _finNewPayRowsRO = '<tr class="fin-inv-empty"><td colspan="9">Could not load invoicing data. Please retry.</td></tr>';
-      } else if (!payApps.length) {
-        _finNewPayRowsRO = '<tr class="fin-inv-empty"><td colspan="9">No pay applications yet</td></tr>';
-      } else {
-        _finNewPayRowsRO = payApps.map(function(a){
-          var typeLabel = (a.type === 'retainage') ? 'Retainage Release' : 'Progress';
-          var locked = payAppIsLocked(a);
-          var st = a.status || 'Draft';
-          var stCls = 'fin-inv-st fin-inv-st-' + st.toLowerCase();
-          var stHtml = '<span class="' + stCls + '">'
-            + (locked ? '<span class="fin-inv-lock" title="Locked (final)">&#128274;</span> ' : '')
-            + E(st) + '</span>';
-          return '<tr>'
-            + '<td>' + E(String(a.num)) + '</td>'
-            + '<td>' + (a.date ? E(window.pfFmtDate(a.date)) : finDash) + '</td>'
-            + '<td>' + (a.period ? E(a.period) : finDash) + '</td>'
-            + '<td>' + E(typeLabel) + '</td>'
-            + '<td class="num">' + E(baMoney(a.amount)) + '</td>'
-            + '<td class="num">' + E(baMoney(a.retainage)) + '</td>'
-            + '<td class="num">' + E(baMoney(a.netDue)) + '</td>'
-            + '<td>' + stHtml + '</td>'
-            + '<td>' + (a.paidDate ? E(a.paidDate) : finDash) + '</td>'
-            + '</tr>';
-        }).join('');
-      }
-      var _finNewInvoicingDisplay =
-        _finNewInvInfoRO
-        + '<div class="fin-inv-block">'
-        +   '<div class="fin-inv-block-head"><span class="fin-inv-block-title">Pay Applications</span></div>'
-        +   '<div class="fin-inv-wrap"><table class="ba-table"><thead><tr>'
-        +     '<th>#</th><th>Date</th><th>Billing Period</th><th>Type</th>'
-        +     '<th class="num">This Period</th><th class="num">Retainage</th><th class="num">Net Due</th>'
-        +     '<th>Status</th><th>Paid Date</th>'
-        +   '</tr></thead><tbody>'
-        +     _finNewPayRowsRO
-        +   '</tbody></table></div>'
-        +   subgroupNote('Display-only in the sandbox. Create / approve / print pay applications and edit Subcontract Value / Retainage % on the live Financials tab above.')
-        + '</div>';
-
+      // KV KEYS UNCHANGED: editable invoicing data still lives in project_invoicing_v1:<num>
+      // and KV budgets, keyed by project number (not tied to card DOM) — no data migration.
       var _finNewBody =
-          subgroupNote('SANDBOX (in progress) — new inventory-style layout of the Financials tab for review. Live Financials tab above is unchanged. Job Financials Roll-Up and the Budget-vs-Actual grid below are the SAME live, fully-interactive views; Pay Applications is display-only here (edit on the live tab).')
-        + _srNewCollapsible('Job Financials Roll-Up', finRollup, true)
-        + _srNewCollapsible('Pay Applications', _finNewInvoicingDisplay, true)
+          _srNewCollapsible('Job Financials Roll-Up', finRollup, true)
+        + _srNewCollapsible('Pay Applications', finInvoicingBody, true)
         + _srNewCollapsible('Project Costs (Budget vs Actual)', baHtml, true);
-      // NO sectionKey passed to card() (6th arg omitted) — same as the live Financials card, which
-      // intentionally has no per-section field-override Edit button (its editing is the budget/invoicing
-      // editors). The sandbox is display-only for now, so it needs no Edit button either.
-      html += card(7, 'Financials - New', baMeta,
+      // NO sectionKey passed to card() (6th arg omitted) — matches the old Financials card,
+      // which intentionally had no per-section field-override Edit button (its editing IS the
+      // budget/invoicing editors). Keeping no sectionKey means no stray Edit button.
+      html += card(7, 'Financials', baMeta,
         '<div class="pf-srnew-scope">' + _finNewBody + '</div>', false);
-      // ===== END SANDBOX (Financials - New) =====
+      // ===== END PROMOTED Financials card =====
 
       // ----- 7. Project Closeout -----
       // Brad 2026-08-07 (batch-14): rebuilt the Closeout placeholder into 5 blue
@@ -28572,8 +28464,13 @@ try {
     }
 
     // ---- Subcontract Value + Retainage % editor (project-level inputs) ----
-    window.pfInvEditInputs = function(){
-      var ed = document.querySelector('.fin-inv-inputs-editor');
+    // CARD-SCOPED (2026-09-09): resolve the editor within the clicked pencil's own
+    // .pr-card (mirror of baScope) instead of a document-wide querySelector, so two
+    // Financials editors on one page could never cross-edit. `btn` is the pencil.
+    window.pfInvEditInputs = function(btn){
+      var card = (btn && btn.closest) ? btn.closest('.pr-card') : null;
+      var ed = card ? card.querySelector('.fin-inv-inputs-editor')
+                    : document.querySelector('.fin-inv-inputs-editor');
       if (!ed) return;
       ed.style.display = 'block';
       var err = ed.querySelector('.fin-inv-ie-err'); if (err) err.style.display='none';
@@ -28633,7 +28530,7 @@ try {
     // and the app becomes final: it can no longer be edited (there is no edit path for a
     // submitted app; new apps only append), so the From-Previous accumulation for later
     // apps stays correct. Office-only; the server re-gates.
-    window.pfInvApprovePayApp = function(num){
+    window.pfInvApprovePayApp = function(num, btn){
       num = Number(num);
       var inv = _curInvoicing || { payApps:[] };
       var apps = Array.isArray(inv.payApps) ? inv.payApps : [];
@@ -28643,12 +28540,15 @@ try {
       if (!window.confirm('Approve Pay Application No. ' + num + '?\n\nAn approved pay app is FINAL and cannot be edited. Its export becomes the completed pay application.')) return;
       invPost(invPayload({ setAppStatus: { num: num, status: 'Approved' } }),
         function(msg){ alert('Approve failed: ' + msg); },
-        function(){ invRerenderFromDoc(); });
+        function(){ invRerenderFromDoc(btn); });
     };
-    // Re-render the record from a global anchor (row buttons have no `this` element to
-    // hand to invRerender). Falls back to reloading if the anchor is not found.
-    function invRerenderFromDoc(){
-      var anchor = document.querySelector('[data-fin-inv-payapps]');
+    // Re-render the record. CARD-SCOPED (2026-09-09): prefer the clicked Approve
+    // button's own invoicing block (btn.closest) so the re-render anchors to the
+    // correct .pr-card even with two Financials cards present; fall back to the
+    // first invoicing anchor, then a reload, only if no button was handed in.
+    function invRerenderFromDoc(btn){
+      var anchor = (btn && btn.closest) ? btn.closest('[data-fin-inv-payapps]') : null;
+      if (!anchor) anchor = document.querySelector('[data-fin-inv-payapps]');
       if (anchor) { invRerender(anchor); }
       else { location.reload(); }
     }
