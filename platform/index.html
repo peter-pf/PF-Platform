@@ -18458,17 +18458,18 @@ try {
         false);
 
       // ----- 3. Subcontract Agreement -----
-      // Reorganized into two blue-headered (.pr-subhead) subsections within the ONE
-      // `contract` card body: "Bid Recap" (pre-award dates) then "Contract Recap"
-      // (award/subcontract terms + the live executed-contract embed). These are
-      // subhead() DIVIDERS inside the single card body -- NOT nested cards -- so all
-      // fields stay direct children of the `contract` section and the existing
-      // pfEditSection/pfSaveSection scan (body.querySelectorAll('.pr-field[data-pr-label]'))
-      // still captures every field. The `contract` override key round-trips unchanged.
-      // New fields (LOI/NOI Date, GC Subcontract #) are plain field() rows => editable
-      // + saveable via the same override mechanism. (Fields are intended to be populated
-      // by later extraction from the GC's subcontract; this round is formatting only.)
+      // PROMOTED (Brad 2026-09-10): the ORIGINAL subgroup/twoCol Subcontract Agreement card
+      // (Edit/Save flow, _srLiveEdit=false) has been DELETED. The former "Subcontract
+      // Agreement - New" sandbox (Inventory-style, live save-on-change) is now THE live
+      // Subcontract Agreement card — see the block immediately below. It keeps the SAME
+      // data-pr-section="contract" bucket + every field label (label IS the storage key),
+      // so all saved `contract` data + reserved keys (__subcontract_analysis /
+      // __change_orders / __contract_pull) round-trip unchanged. The Closeout
+      // "Certified Payroll" cross-read (~L21410) was updated to read the new
+      // 'Prevailing Wage Rate / Certified Payroll Required?' gate (with legacy fallbacks).
       _curSection = 'contract';
+      // ===== (ORIGINAL Subcontract Agreement card removed on promotion) =====
+      // Legacy build notes retained for history:
       // COLLAPSIBLE RESTRUCTURE (Brad 2026-08-14): the three subcategories (Bid Recap,
       // Contract Recap, Subcontract Analysis) each roll up/expand independently via the
       // shared collapsibleSubgroup() helper (same .pr-card collapse idiom E&D uses), plus
@@ -18482,217 +18483,17 @@ try {
       // closest('.pr-card')===card, wrapper-agnostic), so the `contract` override key +
       // edit/save behavior round-trip UNCHANGED. The reserved keys (__contract_pull /
       // __subcontract_analysis / __change_orders) all live on the same `contract` section.
-      var bidRecapInner =
-        fields([
-          field('Bid Invite Date', bid.invite_date, 'Bid Log'),
-          field('Bid Due Date', bid.due_date, 'Bid Log'),
-          field('Prelim Completed By', bid.design_completed_date, 'Bid Log'),
-          field('Date Bid Submitted', bid.date_submitted, 'Bid Log'),
-          // Total Pier Qty / LF (Prelim) surfaced here (Brad 2026-08-11) so the Bid
-          // Recap matches General Info. IDENTICAL source as General Info > Project
-          // Info (lines 13906-13907): bid.total_columns / bid.total_lf, 'Bid Log'.
-          // Reusing the same expression guarantees the two views agree; commas come
-          // free via field()'s pfIsQtyLabel gate (label has \bpier\b / \bLF\b).
-          field('Total Pier Qty (Prelim)', bid.total_columns, 'Bid Log'),
-          field('Total LF (Prelim)', bid.total_lf, 'Bid Log'),
-          field('LOI/NOI Date', ''),
-          // Released to Start Submittals (Brad 2026-08-07): a DATE milestone in the
-          // bid->award handoff. Empty by default (manual entry now via the editor's
-          // native date picker; intended to be auto-populated by later
-          // upload->extract). Display auto-normalizes to MM/DD/YYYY: the label hits
-          // pfIsDateLabel (\bstart\b) so field() routes it through pfFmtDate, and the
-          // editor renders it as <input type="date"> via PF_FIELD_DATE_LABELS. Saves
-          // + round-trips under the SAME `contract` override key as its siblings.
-          // Released to Start Submittals is now the LAST field in Bid Recap.
-          // ("Bid Sent to GC" link field removed per Brad 2026-08-07.)
-          field('Released to Start Submittals', '')
-        ]);
-      // ---- Contract Recap (INNER content; wrapped collapsible below) ----
-      var contractRecapInner =
-        // "Pull from Executed Subcontract" control (Stage 2, Brad 2026-08-13). OFFICE-ONLY
-        // button + provenance line, rendered at the top of Contract Recap. Clicking records a
-        // request; Peter's engine writes the flat contract fields (Subcontract Value /
-        // Liquidated Damages / Retainage / Payment Terms / ...) + provenance out-of-band.
-        pfContractPullControl()
-        // RESTRUCTURED (Brad 2026-08-07) from a single twoCol grouping into FOUR
-        // nested sub-groups under the Contract Recap subhead: Contract Info,
-        // Invoicing & Payment Terms, Scope of Work, and Needed for Contract
-        // Completion, plus a "To Be Placed" holding group at the BOTTOM for existing
-        // fields with no confirmed home. subgroup() dividers are NOT wrappers, so
-        // every field stays a direct .pr-field[data-pr-label] descendant of the ONE
-        // `contract` card — pfEditSection/pfSaveSection scan
-        // (body.querySelectorAll('.pr-field[data-pr-label]') filtered to
-        // closest('.pr-card')===card) is UNCHANGED, and the `contract` override key
-        // round-trip is preserved. PRESERVATION RULE: existing fields keep their
-        // EXACT labels (the label IS the override key) so stored override data still
-        // renders; only NEW fields use new labels. twoCol() groups fields 2-up where
-        // it reads cleanly. Folder link for the executed subcontract replaces the
-        // removed live-PDF embed (see below).
 
-        // --- Sub-section 1: Contract Info ---
-        + subgroup('Contract Info')
-        + twoCol([
-          field('GC Project #', SF.gc_project_number, SS),
-          field('GC Subcontract #', SF.subcontract_number, SS),
-          field('Subcontract Value', SF.subcontract_value, SS),
-          // NEW dropdown: Draft / Revisions Needed / Fully Executed.
-          field('Contract Status', ''),
-          // Existing executed-date field (label unchanged = data preserved); now a
-          // native date picker via PF_FIELD_DATE_LABELS + MM/DD/YYYY display.
-          field('Fully Executed Contract Date', SF.fully_executed_date, SS),
-          // Commencement / Notice to Proceed (Brad 2026-08-13, Part A): surface the
-          // Commencement Date (NTP) IN this Subcontract Agreement card too (it also renders
-          // on the General Info card ~L30000). Same `subcontract.fields.commencement_date`
-          // source (SF.commencement_date) that Peter's FE-contract auto-fill populates, so
-          // the two views always agree. In the FE data model Commencement and Notice-to-
-          // Proceed are ONE field: the value is either a real NTP-fixed date (rendered
-          // MM/DD/YYYY — the label matches PF_DATE_LABEL_RE via "Date", so field() routes it
-          // through pfFmtDate) OR the NTP-trigger statement when the date is set by a later
-          // written Notice to Proceed. FAIL CLOSED: no FE extraction / no NTP => blank ("-"
-          // amber), never fabricated. Placed directly under Fully Executed Contract Date so
-          // the executed-date + commencement/NTP read together; stays a plain `contract`
-          // override field (label IS the key), editable + saveable like its siblings.
-          field('Commencement Date (NTP)', SF.commencement_date, SS),
-          field('Project Substantial Completion Date', SF.completion_dates, SS),
-          // Sales Tax (Brad 2026-08-07): a Yes / No-Exempt selector (dropdown via
-          // PF_FIELD_DROPDOWNS) with an ADJACENT "Sales Tax %" field for the state/
-          // city rate captured when "Yes" is selected. Both always visible; the % is
-          // filled only when Yes (No-Exempt -> leave % blank). Each saves as a plain
-          // string through the SAME `contract` override key. The 3 legacy tax fields
-          // remain PARKED in "To Be Placed" pending Brad's confirm.
-          field('Sales Tax', ''),
-          field('Sales Tax %', ''),
-          // Renamed from "Taxes/Sales Tax Notes" -> "Sales Tax Notes" (display label).
-          // ovLookup() aliases the old label so any stored override still renders.
-          field('Sales Tax Notes', '')
-        ], [
-          field('Prevailing Wage? Rate?', SF.prevailing_wage || bid.wage_req, SF.prevailing_wage ? SS : 'Bid Log'),
-          field('Certified Payroll?', SF.certified_payroll, SS),
-          // NEW prevailing-wage operator rates (from the Wage Rate Determination Sheet).
-          field('Prevailing Wage Operators — Hourly Rate', ''),
-          field('Prevailing Wage Operators — Fringe Rate', ''),
-          field('Minimum Insurance Requirement', bid.min_insurance_req, 'Bid Log'),
-          field('Insurance Requirements (per subcontract)', SF.insurance_requirements, SS),
-          field('Liquidated Damages', SF.liquidated_damages, SS),
-          field('Personal / Performance Guaranty', SF.personal_guaranty, SS),
-          // NEW bonding requirements field.
-          field('Bonding Requirements', ''),
-          field('Project Working Hours', SF.working_hours, SS)
-        ])
-
-        // --- Sub-section 2: Invoicing & Payment Terms ---
-        + subgroup('Invoicing & Payment Terms')
-        + subgroupNote('Payment terms extracted from the subcontract agreement.')
-        + twoCol([
-          // NEW: Approved SOV — an editable SharePoint LINK (Excel file), same
-          // clickable pattern as "Bid Sent to GC". Blank until set.
-          fieldLinked('Approved SOV', '', '', 'website'),
-          field('Payment Terms', SF.payment_terms, SS),
-          field('Retainage % Withheld', SF.retainage_pct, SS),
-          field('Retainage Release', SF.retainage_release, SS)
-        ], [
-          // NEW pay-app timing fields.
-          field('Pay App Due by (Day of Month)', ''),
-          field('Pay App Bill Through Date', '')
-        ])
-
-        // --- Sub-section 3: Scope of Work ---
-        + subgroup('Scope of Work')
-        + fields([
-          // NEW: Staking & Layout inclusion. (The existing "Surveying & Staking
-          // (who performs)" field is PARKED in "To Be Placed" — do not assume it is
-          // the same as this yes/no inclusion field; Brad to confirm mapping.)
-          field('Staking & Layout Included? (Yes/No)', ''),
-          // NEW: extra SOW language. MULTI-LINE: registered in
-          // PF_FIELD_TEXTAREA_LABELS so the section editor renders a <textarea> and the
-          // read view preserves line breaks (Brad 2026-08-07).
-          field('Extra Scope of Work Language', '')
-        ])
-
-        // --- Sub-section 4: Needed for Contract Completion ---
-        + subgroup('Needed for Contract Completion')
-        + subgroupNote('Upon NOI issue the following items will be needed.')
-        + twoCol([
-          // COI tracking (expands the concept of the old "Date COI Sent to GC",
-          // which is PARKED in To Be Placed to preserve any stored value). All new,
-          // all native date pickers via PF_FIELD_DATE_LABELS.
-          field('COI Date Requested from MJ', ''),
-          field('COI Date Received from MJ', ''),
-          field('COI Date Sent to GC', ''),
-          field('COI Email History', '')
-        ], [
-          // W9 (expands the old "Date W9 Sent to GC", which is PARKED in To Be Placed).
-          field('W9 Date Sent to GC', '')
-        ])
-
-        // --- Holding group: To Be Placed (pending Brad's direction) REMOVED ---
-        // Brad 2026-08-11: the "To Be Placed (pending Brad's direction)" holding group
-        // and all its parked fields are deleted. The 3 legacy tax fields
-        // ("Tax Exempt? / Tax", "Tax Status (per subcontract)",
-        // "If not Tax Exempt, Sales Tax Rate") and the parked "Surveyor" field are
-        // removed from the render/editor. The group became empty after their removal,
-        // so the group container is removed too (no empty labeled box). Stored override
-        // data for these specific labels, if any, is simply no longer surfaced (Brad's
-        // explicit decision); no other override keys are touched.
-
-        // --- Subcontract Agreement Folder subsection REMOVED (Brad 2026-08-11) ---
-        // The "Subcontract Agreement Folder" subhead and its lone
-        // "Subcontract Agreement Folder (SharePoint)" link field are deleted.
-
-        // --- Documents subhead renamed to "Subcontract Agreement" (Brad 2026-08-11) ---
-        // The card's trailing document-links block previously rendered via the shared
-        // linkRow() helper, which hard-codes a "Documents" subhead used by MANY other
-        // sections. To rename ONLY this card's subhead (display label) without altering
-        // every other section, the linkRow() output is inlined here with a
-        // "Subcontract Agreement" subhead. Same L.contract links, same markup, same
-        // classes — display-label change only, no stored data affected.
-        + (function(){
-            var links = L.contract;
-            if (!links || !links.length) return '';
-            var out = links.map(function(l){
-              if (l.found && l.url) {
-                return '<a class="pr-link" href="'+E(l.url)+'" target="_blank" rel="noopener noreferrer">'+pfFolderIcoSvg()+'<span class="pf-folder-txt">'+E(l.label)+'</span></a>';
-              }
-              return '<span class="pr-link missing" title="Folder not found in SharePoint">'+pfFolderIcoSvg()+'<span class="pf-folder-txt">'+E(l.label)+'</span></span>';
-            }).join('');
-            return '<div class="pr-subhead">Subcontract Agreement</div><div class="pr-links">'+out+'</div>';
-          })();
-      // ---- Subcontract Analysis (INNER content; wrapped collapsible below) ----
-      // NESTED into this Subcontract Agreement card (formerly a standalone "3b. Subcontract
-      // Analysis" card — now removed). ALWAYS renders (every job): full render when analysis
-      // data exists, a compact one-line empty state otherwise. DUAL SOURCE: the reserved
-      // `__subcontract_analysis` override under `contract` WINS, else the legacy synced
-      // `D.analysis` block (Indy Housing Hub) — see pfSubcontractAnalysis(). PM-view only:
-      // the fo-projects field view uses a separate renderer and never calls this. Every field
-      // is escaped via E() (document-derived payload = untrusted). noHead=true suppresses the
-      // renderer's own "Subcontract Analysis" subhead since collapsibleSubgroup supplies the
-      // clickable header (avoids a double label).
-      var subAnalysisInner = pfSubcontractAnalysisSub(pfSubcontractAnalysis(D), true);
-      // ---- Change Orders (INNER content; wrapped collapsible below, LAST subgroup) ----
-      // NEW first-pass change-order tracker (Brad 2026-08-14). Reserved `__change_orders`
-      // ARRAY under `contract`. Own inline editor (mirrors the __site_elevations pattern):
-      // Edit -> per-row editor (CO # / Date / Description / Amount / Status) with + Add /
-      // × Delete, Save POSTs the COMPLETE array. Office-gated (canEdit()); server 403s
-      // field_ops. Dates render MM/DD/YYYY via pfFmtDate; Amount comma-formatted via pfFmtQty.
-      var changeOrdersInner = pfChangeOrdersInline();
-      // Assemble the FOUR collapsible subgroups. First three DEFAULT EXPANDED (open=true);
-      // Change Orders also expanded so its empty-state hint is visible. Each rolls up/expands
-      // independently via the shared .pr-card collapse idiom.
-      html += card(3, 'Subcontract Agreement', null,
-          collapsibleSubgroup('Bid Recap', bidRecapInner)
-        + collapsibleSubgroup('Contract Recap', contractRecapInner)
-        + collapsibleSubgroup('Subcontract Analysis', subAnalysisInner)
-        + collapsibleSubgroup('Change Orders', changeOrdersInner),
-        false, 'contract');
-
-      // ===== SANDBOX: Subcontract Agreement - New (Brad 2026-09-10) ==============
-      // A PARALLEL, additive sandbox rebuild of the Subcontract Agreement card in the
-      // Site Readiness / Mob Prep / Safety INVENTORY style (accent-blue collapse bars via
-      // _srNewCollapsible + Inventory-style Field|Value rows via _srNewSubTable, with the
-      // "X/Y Fields Complete, XX%" readout auto-injected by pfRenderSandboxSubStatus because
-      // the whole body is wrapped in .pf-srnew-scope). The ORIGINAL "Subcontract Agreement"
-      // card (rendered immediately ABOVE) is UNTOUCHED — Brad redlines this twin, we promote
-      // later.
+      // ===== Subcontract Agreement (PROMOTED from sandbox, Brad 2026-09-10) ======
+      // This is now THE live Subcontract Agreement card (the original subgroup/twoCol
+      // Edit/Save card above was DELETED on promotion). Built in the Site Readiness /
+      // Mob Prep / Safety INVENTORY style (accent-blue collapse bars via _srNewCollapsible
+      // + Inventory-style Field|Value rows via _srNewSubTable, with the "X/Y Fields
+      // Complete, XX%" readout auto-injected by pfRenderSandboxSubStatus because the whole
+      // body is wrapped in .pf-srnew-scope). The .pf-srnew-scope class is KEPT on the
+      // promoted card so all its scoped CSS (Invoicing full-width, wage-rate table, CO
+      // summary, slate sub-bars, etc.) continues to apply — renaming the scope class was
+      // deliberately avoided as the higher-risk option.
       //
       // PLACEMENT (Brad 2026-09-10): this twin now renders IMMEDIATELY BELOW its original
       // Subcontract Agreement card. That is safe because the sandbox helpers
@@ -18984,11 +18785,11 @@ try {
         + _srNewCollapsible('Change Orders', _subN_changeOrders, false);
       // _srLiveEdit STAYS true through card() so its Edit button is suppressed (no duplicate
       // pr-edit-btn data-pr-section="contract"); restored AFTER the append.
-      html += card(3, 'Subcontract Agreement - New', null,
+      html += card(3, 'Subcontract Agreement', null,
         '<div class="pf-srnew-scope">' + _subNewBody + '</div>', false, 'contract');
       _srLiveEdit = _subNewPrevLive;
       _curSection = _subNewPrevSection;
-      // ===== END SANDBOX: Subcontract Agreement - New ===========================
+      // ===== END Subcontract Agreement (promoted from sandbox) ===================
 
       // ----- 3. Engineering & Design (RESTORED standalone top-level section) -----
       // Brad (2026-08-07, batch-8 CORRECTION): batch-4 wrongly ELIMINATED this
@@ -21407,8 +21208,24 @@ try {
       // user to confirm submission. This is a DISPLAY DEFAULT only — a manual override
       // on THIS closeout field still wins (field()/ovLookup handles that), so the user
       // can always change it. No data is mutated; no cross-section write occurs.
-      var _certReqOv = ovLookup('contract', 'Certified Payroll?');
-      var _certReqRaw = _certReqOv.has ? _certReqOv.value : (SF.certified_payroll || '');
+      // SOURCE PRECEDENCE (Brad 2026-09-10 promotion): the live Subcontract Agreement card
+      // no longer writes a 'Certified Payroll?' override — that free-text field was folded
+      // into the Yes/No gate 'Prevailing Wage Rate / Certified Payroll Required?' (which
+      // aliases to the legacy 'Prevailing Wage? Rate?' storage key). So read, in order:
+      //   1) the NEW gate override ('Prevailing Wage Rate / Certified Payroll Required?')
+      //   2) the LEGACY 'Certified Payroll?' override (data saved by the now-deleted card)
+      //   3) the synced SF.certified_payroll value.
+      // ovLookup already resolves PF_OVERRIDE_LABEL_ALIASES, so #1 also picks up any value
+      // stored under the aliased 'Prevailing Wage? Rate?' key. First non-empty wins; a manual
+      // override on THIS closeout field still trumps the whole default (unchanged below).
+      var _pwGateReqOv = ovLookup('contract', 'Prevailing Wage Rate / Certified Payroll Required?');
+      var _certLegacyOv = ovLookup('contract', 'Certified Payroll?');
+      var _certReqRaw =
+          (_pwGateReqOv.has && String(_pwGateReqOv.value == null ? '' : _pwGateReqOv.value).trim() !== '')
+            ? _pwGateReqOv.value
+        : (_certLegacyOv.has && String(_certLegacyOv.value == null ? '' : _certLegacyOv.value).trim() !== '')
+            ? _certLegacyOv.value
+        : (SF.certified_payroll || '');
       var _certReqNorm = String(_certReqRaw == null ? '' : _certReqRaw).trim().toLowerCase();
       // "Not required" if blank OR an explicit no/none/n-a/not-required style answer.
       var _certNotRequired = (_certReqNorm === '' ||
