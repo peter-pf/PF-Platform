@@ -2533,6 +2533,45 @@ tr.pf-dragging { opacity: 0.45; }
   width: 100%;
 }
 
+/* ---- Contract Info -> WIDER stacked value fields (Brad 2026-09-10) --------------- */
+/* Contract Info's fields rendered as the standard Inventory-style 2-cell row (34%     */
+/* Field name | 66% Value), so each value input was clamped to ~66% of the row and     */
+/* read cramped. Brad wants these roomier/easier to work with. FIX (mirrors the Locate */
+/* Notes / General-Info SOW full-width stacking convention): for EVERY row in the      */
+/* Contract Info subsection ONLY, drop the 2-column split and stack it — the field     */
+/* name on its own line, the value input spanning the FULL row width beneath. This     */
+/* gives every value the full card width (much wider than the old 66% column) while    */
+/* staying inside the sandbox Inventory look (same slate collapse bar, same zebra-free */
+/* rows). Scoped by BOTH .pf-sr-wide (the extraClass on Contract Info's                */
+/* _srNewCollapsible wrapper) AND .pf-sr-table, so NO other _srNewSubTable user is     */
+/* touched — not Invoicing/Scope/Items-Needed (same card, no .pf-sr-wide), not the     */
+/* ORIGINAL Subcontract card (no .pf-sr-table at all), not the E&D sandbox. Save/RBAC  */
+/* untouched: identical field() output + same siteReadiness bucket; layout-only.       */
+.pf-sr-wide .pf-sr-table td.pf-sr-name,
+.pf-sr-wide .pf-sr-table td.pf-sr-val {
+  display: block;
+  width: 100%;
+  overflow: visible;
+}
+/* Field name sits as a compact header line directly above its full-width value box.   */
+.pf-sr-wide .pf-sr-table td.pf-sr-name {
+  padding-bottom: 2px;
+  border-bottom: none;
+}
+/* The value cell (and the field/input within) fill the full row width. */
+.pf-sr-wide .pf-sr-table td.pf-sr-val .pr-field,
+.pf-sr-wide .pf-sr-table td.pf-sr-val .pr-field-value { width: 100%; }
+.pf-sr-wide .pf-sr-table td.pf-sr-val .pr-live-input,
+.pf-sr-wide .pf-sr-table td.pf-sr-val .pr-live-select,
+.pf-sr-wide .pf-sr-table td.pf-sr-val input,
+.pf-sr-wide .pf-sr-table td.pf-sr-val select {
+  width: 100%;
+  /* lift the base .pr-live-input (340px) / .pr-live-select (260px) caps so the        */
+  /* stacked value box actually fills the full row width in this subsection only.      */
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 /* ---- Staking-only collapsible title bar (Brad 2026-09-05) ---------------------- */
 /* Replaces the dark .pf-sr-headbar + "Field/Value" thead for the Staking subsection */
 /* ONLY with a single clean accent-blue full-width title bar that IS the roll-up      */
@@ -18429,7 +18468,7 @@ try {
           field('Personal / Performance Guaranty', SF.personal_guaranty, SS),
           field('Bonding Requirements', ''),
           field('Project Working Hours', SF.working_hours, SS)
-        ], { noHeadbar: true, noThead: true }), false);
+        ], { noHeadbar: true, noThead: true }), false, 'pf-sr-wide');
       var _subN_invoicing = _srNewCollapsible('Invoicing & Payment Terms',
           subgroupNote('Payment terms extracted from the subcontract agreement.')
         + _srNewSubTable('Invoicing & Payment Terms', [
@@ -19505,9 +19544,14 @@ try {
       // past this wrapper, to the card) then card.querySelector finds the markers inside
       // this body — collapse state does not remove them from the DOM. open===true starts
       // expanded (Brad: expanded default is safest).
-      function _srNewCollapsible(headerLabel, innerHtml, open){
+      // extraClass (optional, Brad 2026-09-10): an extra class appended to the outer
+      // .pf-sr-collapse wrapper so a specific subsection can be CSS-targeted without a new
+      // helper. Used by Contract Info ('pf-sr-wide') to widen its value fields (see the
+      // .pf-sr-wide full-width-stack CSS block). Omitting it leaves every other caller
+      // byte-identical.
+      function _srNewCollapsible(headerLabel, innerHtml, open, extraClass){
         var isOpen = (open === true);
-        return '<div class="pf-sr-collapse' + (isOpen ? ' open' : '') + '">'
+        return '<div class="pf-sr-collapse' + (isOpen ? ' open' : '') + (extraClass ? ' ' + extraClass : '') + '">'
              +   '<div class="pf-sr-collapse-head" onclick="this.parentElement.classList.toggle(\'open\')">'
              +     '<span class="pf-sr-collapse-title">' + E(headerLabel) + '</span>'
              +     '<span class="pf-sr-collapse-chev">&#9654;</span>'
@@ -23163,8 +23207,20 @@ try {
       // label ("(inches)"); the label IS the dropdown/override key, so the value list
       // is registered under the new key too (same 24"/30" options).
       'Column Diameter (inches)': ['24"', '30"'],
-      // Contract Recap > Contract Info (Brad 2026-08-07): execution state of the subcontract.
-      'Contract Status': ['Draft', 'Revisions Needed', 'Fully Executed'],
+      // Contract Recap > Contract Info (Brad 2026-08-07; options revised 2026-09-10): the
+      // subcontract execution lifecycle. SHARED key — same 'Contract Status' picker in both
+      // the original Subcontract Agreement (line ~18176) and the "- New" sandbox twin
+      // (~18415). Revising this list re-options BOTH (expected — same field). Old options
+      // dropped: 'Draft' / 'Revisions Needed' (any already-saved value stays stored, just no
+      // longer selectable — no data migration). 'Fully Executed' carries over unchanged.
+      'Contract Status': [
+        'LOI Issued',
+        'Draft Subcontract Sent to PF for review',
+        'PF sent Comments back to GC',
+        'PF Executed',
+        'Awaiting GC Signature',
+        'Fully Executed'
+      ],
       // Contract Recap > Contract Info (Brad 2026-08-07): sales-tax posture. "Yes" =
       // taxable (capture the rate in the adjacent "Sales Tax %" field); "No-Exempt" =
       // tax-exempt (leave % blank).
