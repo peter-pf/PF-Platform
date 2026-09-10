@@ -2490,6 +2490,49 @@ tr.pf-dragging { opacity: 0.45; }
 .pr-crm-cards[data-crm-compact] .pr-crow-email { flex: 1 1 260px; }
 .pr-crm-cards[data-crm-compact] .pr-crow-cell  { flex: 0 0 150px; }
 
+/* ---- Locate Notes -> FULL-WIDTH textarea row (Brad 2026-09-10) ------------------ */
+/* Safety > Public Utility Locates "Locate Notes" is a multi-line locate-activity log */
+/* (tickets, clears, hand-dig conflicts). In the sandbox Inventory-style .pf-sr-table */
+/* every field is a 2-cell row (34% Field name | 66% Value), so the textarea inside   */
+/* the value cell — already width:100% (.pr-live-textarea) — was clamped to that ~66% */
+/* value column and read as a cramped ~300px box. FIX (mirrors the General-Info SOW   */
+/* Notes full-width stacking convention, adapted to this table): drop the 2-column    */
+/* split for THIS ONE row only and stack it — the "Locate Notes" label on its own     */
+/* line, the textarea spanning the full row width beneath, and taller so multi-line    */
+/* notes read without scrolling a tiny box. Save/RBAC untouched: still the same        */
+/* field() output (data-pr-label="Locate Notes") in the same siteReadiness bucket;    */
+/* only layout changes. Scoped by BOTH .pf-sr-table (sandbox-only) AND the exact       */
+/* data-row-label, so no other sandbox field/textarea is affected (local, zero blast). */
+/* The name/value cells are display:block so they leave table-cell layout and stack.   */
+.pf-sr-table tr[data-row-label="Locate Notes"] > td.pf-sr-name,
+.pf-sr-table tr[data-row-label="Locate Notes"] > td.pf-sr-val {
+  display: block;
+  width: 100%;
+  overflow: visible;
+}
+/* Row label reads as a header above the box (unhide the .pr-field-label? no — the     */
+/* left .pf-sr-name cell already carries the row name text; keep it, just let it sit    */
+/* on its own line above the full-width value cell). Tighten the gap between them.      */
+.pf-sr-table tr[data-row-label="Locate Notes"] > td.pf-sr-name {
+  padding-bottom: 2px;
+  border-bottom: none;
+}
+/* The value cell (and the textarea within) now fill the full row width and grow tall. */
+.pf-sr-table tr[data-row-label="Locate Notes"] .pr-field,
+.pf-sr-table tr[data-row-label="Locate Notes"] .pr-field-value { width: 100%; }
+.pf-sr-table tr[data-row-label="Locate Notes"] .pr-live-textarea,
+.pf-sr-table tr[data-row-label="Locate Notes"] textarea {
+  width: 100%;
+  min-height: 120px;   /* ~5-6 rows, resize:vertical inherited from .pr-live-textarea */
+  box-sizing: border-box;
+}
+/* Read-only (field_ops) view: let the saved multi-line value wrap freely + show full. */
+.pf-sr-table tr[data-row-label="Locate Notes"] .pr-field-value-multiline {
+  white-space: pre-wrap;
+  display: block;
+  width: 100%;
+}
+
 /* ---- Staking-only collapsible title bar (Brad 2026-09-05) ---------------------- */
 /* Replaces the dark .pf-sr-headbar + "Field/Value" thead for the Staking subsection */
 /* ONLY with a single clean accent-blue full-width title bar that IS the roll-up      */
