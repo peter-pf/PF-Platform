@@ -23468,8 +23468,27 @@ try {
     // "Add contact" button to append a fresh numbered block.
     var PF_CONTACT_FIELDS = ['Contact Name', 'Title', 'Office Phone', 'Cell Phone', 'Email'];
 
+    // SYSTEMIC DATE DETECTION (Brad 2026-09-10) — single source of truth for
+    // "should this EDIT/live control render a native <input type=date>?". Unifies the
+    // edit path with the READ path: the read side already routes ANY label matching
+    // window.pfIsDateLabel through pfFmtDate (MM/DD/YYYY). Previously the edit side gated
+    // SOLELY on the hand-curated PF_FIELD_DATE_LABELS allowlist, so any date field not
+    // manually registered rendered a plain text input showing raw ISO (2026-09-18) — the
+    // recurring bug. Now the allowlist is a SUPPLEMENT and the regex is the primary gate:
+    //   - PF_FIELD_DATE_LABELS[label]  -> explicit opt-in (always a date), OR
+    //   - pfIsDateLabel(label)         -> automatic detection (same regex as read path)
+    // FALSE-POSITIVE GUARD: a label that is ALSO a dropdown or textarea is NEVER coerced
+    // to a date picker (e.g. 'Certified Payroll Submitted & Confirmed?' is Yes/No/N/A yet
+    // matches the "certified payroll submitted" regex — the dropdown wins). This makes
+    // every genuine date field (old + new) correct in read AND edit with zero per-field
+    // registration, while never turning a text/dropdown field into a calendar.
+    function pfLabelIsDateControl(label){
+      if (PF_FIELD_TEXTAREA_LABELS[label] || PF_FIELD_DROPDOWNS[label]) return false;
+      return !!PF_FIELD_DATE_LABELS[label] || window.pfIsDateLabel(label);
+    }
+
     // Render one editor input row (text, select for dropdown labels, OR a native
-    // date picker for PF_FIELD_DATE_LABELS labels).
+    // date picker for date labels — see pfLabelIsDateControl).
     function pfEditInputRow(label, value){
       var opts = PF_FIELD_DROPDOWNS[label];
       var control;
@@ -23481,11 +23500,13 @@ try {
         control = '<textarea class="pr-edit-input pr-edit-textarea" rows="4" '
           + 'data-pr-field-label="' + esc2(label) + '">'
           + esc2(value == null ? '' : value) + '</textarea>';
-      } else if (PF_FIELD_DATE_LABELS[label]) {
+      } else if (pfLabelIsDateControl(label)) {
         // Native date picker. Seed from the displayed value (MM/DD/YYYY) converted
         // to the required YYYY-MM-DD; a non-date/blank stored value -> empty picker.
         // pfSaveSection reads inp.value (YYYY-MM-DD) exactly like any text input, so
-        // the override save + MM/DD/YYYY re-display round-trip is unchanged.
+        // the override save + MM/DD/YYYY re-display round-trip is unchanged. Gate is
+        // pfLabelIsDateControl: explicit allowlist OR automatic pfIsDateLabel match
+        // (dropdown/textarea labels excluded — never coerced to a calendar).
         control = '<input class="pr-edit-input" type="date" data-pr-field-label="' + esc2(label) + '" '
           + 'value="' + esc2(pfToDateInputValue(value)) + '">';
       } else if (opts) {
@@ -23525,7 +23546,11 @@ try {
           + 'data-pr-field-label="'+esc2(label)+'" data-pr-live-prev="'+esc2(v)+'" '
           + 'onchange="event.stopPropagation();window.pfLiveFieldChange(this)">'+esc2(v)+'</textarea>';
       }
-      if (PF_FIELD_DATE_LABELS[label]) {
+      if (pfLabelIsDateControl(label)) {
+        // Native date picker (MM/DD/YYYY display, YYYY-MM-DD internal). Gate is
+        // pfLabelIsDateControl: explicit PF_FIELD_DATE_LABELS OR automatic pfIsDateLabel
+        // match, with dropdown/textarea labels excluded — same unified detection as the
+        // read path and pfEditInputRow, so no date field needs manual registration.
         return '<input type="date" '+common+' value="'+esc2(pfToDateInputValue(v))+'">';
       }
       var opts = PF_FIELD_DROPDOWNS[label];
