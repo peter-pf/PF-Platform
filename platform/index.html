@@ -20050,6 +20050,169 @@ try {
       html += card(5, 'Site Readiness / Project Setup', null,
         '<div class="pf-srnew-scope">' + srNewBody + '</div>', false, 'siteReadiness');
 
+      // ===== SANDBOX: Subcontract Agreement - New (Brad 2026-09-10) ==============
+      // A PARALLEL, additive sandbox rebuild of the Subcontract Agreement card in the
+      // Site Readiness / Mob Prep / Safety INVENTORY style (accent-blue collapse bars via
+      // _srNewCollapsible + Inventory-style Field|Value rows via _srNewSubTable, with the
+      // "X/Y Fields Complete, XX%" readout auto-injected by pfRenderSandboxSubStatus because
+      // the whole body is wrapped in .pf-srnew-scope). The ORIGINAL "Subcontract Agreement"
+      // card (rendered far ABOVE, ~L18262) is UNTOUCHED — Brad redlines this twin, we promote
+      // later.
+      //
+      // PLACEMENT (verifier fix 2026-09-10): this block was FIRST inserted at ~L18269, ABOVE
+      // where _srNewSubTable/_srNewCollapsible are ASSIGNED (var X = function(){} at L19129/
+      // L19164 — function EXPRESSIONS, NOT hoisted), so calling them there threw "not a
+      // function" and crashed the whole record render. It now runs HERE, immediately after the
+      // Site Readiness sandbox card append (L20050) — i.e. AFTER both helper defs — exactly
+      // where every other working sandbox (Site Readiness / Safety / Mob Prep / Financials) is
+      // built. The block only appends to `html`, so its DOM position is unaffected by moving the
+      // build down; the card still renders as its own top-level card in the record.
+      //
+      // DATA BINDING — SAME KEYS, NO ORPHAN: card(..., 'contract') -> data-pr-section="contract",
+      // the IDENTICAL override bucket the original Subcontract card reads/writes. Every field()
+      // reuses the EXACT label string the original uses (label IS the storage key), so the
+      // sandbox reads the same saved values and its live save-on-change writes land in the same
+      // `contract` bucket. _srLiveEdit is ON through the card() call (like Site Readiness/Mob
+      // Prep), so field()/fieldLinked() emit save-on-change controls AND card() suppresses its
+      // Edit button (no duplicate pr-edit-btn on the contract bucket). pfLiveFieldChange saves
+      // ONE field at a time keyed on the card's data-pr-section ("contract") and the server
+      // MERGES (Object.assign(existing, fields)) — so per-field sandbox saves never blank the
+      // original's fields OR the reserved keys (__subcontract_analysis / __change_orders /
+      // __contract_pull all survive the merge).
+      //
+      // NO SAVE-SCAN COLLISION with the original card: the original is _srLiveEdit=false, so it
+      // uses the Edit/Save flow (pfSaveSection scans card.querySelector('.pr-editor')
+      // .pr-edit-input WITHIN its OWN card). This sandbox has NO .pr-editor (Edit button
+      // suppressed while _srLiveEdit) and renders .pr-live-input controls, so the original's
+      // Save scan never sees these fields and vice-versa. Two cards sharing data-pr-section=
+      // "contract" is SAFE (same precedent as the two data-pr-section="siteReadiness" cards).
+      //
+      // FORMULAS / COMPUTED preserved by REUSING the original builders verbatim:
+      //   - Subcontract Analysis: pfSubcontractAnalysisSub(pfSubcontractAnalysis(D), true) —
+      //     the SAME dual-source (reserved __subcontract_analysis override wins, else synced
+      //     D.analysis) verdict/exec-status/key-terms render. Pure read-view HTML (no ids/
+      //     handlers) so embedding it a second time is inert.
+      //   - Change Orders: pfChangeOrdersInline() — the SAME inline array editor (CO # / Date /
+      //     Description / Amount / Status, + Add / Delete, Totals row via pfCoSumAmount). Its
+      //     Edit/Save/Add resolve within the clicked button's own .pf-co-wrap
+      //     (pfCoWrap = btn.closest('.pf-co-wrap')), so the sandbox wrap and the original wrap
+      //     operate independently; pfCoSave POSTs the shared project-level __change_orders array
+      //     (single source of truth) — editing either wrap updates the same data (expected for a
+      //     review twin; flagged for Brad).
+      //
+      // RBAC unchanged: this whole PM-view render path is office-only (field_ops uses a separate
+      // field view + the server 403s /api/project-override via requireArea). field()'s live
+      // controls only emit for canEdit(); non-office falls back to read spans. No loosening.
+      var _subNewPrevSection = _curSection;
+      var _subNewPrevLive = _srLiveEdit;
+      _curSection = 'contract';
+      _srLiveEdit = true;   // Inventory-style live save-on-change controls (like Mob Prep)
+
+      // ---- Bid Recap (Inventory rows) — mirrors bidRecapInner field-for-field ----
+      var _subN_bidRecap = _srNewSubTable('Bid Recap', [
+          field('Bid Invite Date', bid.invite_date, 'Bid Log'),
+          field('Bid Due Date', bid.due_date, 'Bid Log'),
+          field('Prelim Completed By', bid.design_completed_date, 'Bid Log'),
+          field('Date Bid Submitted', bid.date_submitted, 'Bid Log'),
+          field('Total Pier Qty (Prelim)', bid.total_columns, 'Bid Log'),
+          field('Total LF (Prelim)', bid.total_lf, 'Bid Log'),
+          field('LOI/NOI Date', ''),
+          field('Released to Start Submittals', '')
+        ], { noHeadbar: true, noThead: true });
+
+      // ---- Contract Recap (Inventory rows) — mirrors contractRecapInner ----
+      // The original nests four subgroup() dividers (Contract Info / Invoicing & Payment Terms /
+      // Scope of Work / Needed for Contract Completion) inside one Contract Recap collapsible.
+      // Here each becomes its OWN Inventory sub-table under the "Contract Recap" collapse bar,
+      // preserving every field + label. The pfContractPullControl() office button + provenance
+      // and the trailing Subcontract Agreement folder links are carried verbatim.
+      var _subN_contractInfo = _srNewSubTable('Contract Info', [
+          field('GC Project #', SF.gc_project_number, SS),
+          field('GC Subcontract #', SF.subcontract_number, SS),
+          field('Subcontract Value', SF.subcontract_value, SS),
+          field('Contract Status', ''),
+          field('Fully Executed Contract Date', SF.fully_executed_date, SS),
+          field('Commencement Date (NTP)', SF.commencement_date, SS),
+          field('Project Substantial Completion Date', SF.completion_dates, SS),
+          field('Sales Tax', ''),
+          field('Sales Tax %', ''),
+          field('Sales Tax Notes', ''),
+          field('Prevailing Wage? Rate?', SF.prevailing_wage || bid.wage_req, SF.prevailing_wage ? SS : 'Bid Log'),
+          field('Certified Payroll?', SF.certified_payroll, SS),
+          field('Prevailing Wage Operators — Hourly Rate', ''),
+          field('Prevailing Wage Operators — Fringe Rate', ''),
+          field('Minimum Insurance Requirement', bid.min_insurance_req, 'Bid Log'),
+          field('Insurance Requirements (per subcontract)', SF.insurance_requirements, SS),
+          field('Liquidated Damages', SF.liquidated_damages, SS),
+          field('Personal / Performance Guaranty', SF.personal_guaranty, SS),
+          field('Bonding Requirements', ''),
+          field('Project Working Hours', SF.working_hours, SS)
+        ]);
+      var _subN_invoicing =
+          subgroupNote('Payment terms extracted from the subcontract agreement.')
+        + _srNewSubTable('Invoicing & Payment Terms', [
+          fieldLinked('Approved SOV', '', '', 'website'),
+          field('Payment Terms', SF.payment_terms, SS),
+          field('Retainage % Withheld', SF.retainage_pct, SS),
+          field('Retainage Release', SF.retainage_release, SS),
+          field('Pay App Due by (Day of Month)', ''),
+          field('Pay App Bill Through Date', '')
+        ]);
+      var _subN_scope = _srNewSubTable('Scope of Work', [
+          field('Staking & Layout Included? (Yes/No)', ''),
+          field('Extra Scope of Work Language', '')
+        ]);
+      var _subN_needed =
+          subgroupNote('Upon NOI issue the following items will be needed.')
+        + _srNewSubTable('Needed for Contract Completion', [
+          field('COI Date Requested from MJ', ''),
+          field('COI Date Received from MJ', ''),
+          field('COI Date Sent to GC', ''),
+          field('COI Email History', ''),
+          field('W9 Date Sent to GC', '')
+        ]);
+      // Trailing document-links block — inlined identically to the original (its "Subcontract
+      // Agreement" subhead + L.contract folder links; display-only, same markup).
+      var _subN_docs = (function(){
+          var links = L.contract;
+          if (!links || !links.length) return '';
+          var out = links.map(function(l){
+            if (l.found && l.url) {
+              return '<a class="pr-link" href="'+E(l.url)+'" target="_blank" rel="noopener noreferrer">'+pfFolderIcoSvg()+'<span class="pf-folder-txt">'+E(l.label)+'</span></a>';
+            }
+            return '<span class="pr-link missing" title="Folder not found in SharePoint">'+pfFolderIcoSvg()+'<span class="pf-folder-txt">'+E(l.label)+'</span></span>';
+          }).join('');
+          return '<div class="pr-subhead">Subcontract Agreement</div><div class="pr-links">'+out+'</div>';
+        })();
+      var _subN_contractRecap =
+          pfContractPullControl()
+        + _subN_contractInfo
+        + _subN_invoicing
+        + _subN_scope
+        + _subN_needed
+        + _subN_docs;
+
+      // ---- Subcontract Analysis (same dual-source read-view) ----
+      var _subN_analysis = pfSubcontractAnalysisSub(pfSubcontractAnalysis(D), true);
+      // ---- Change Orders (same inline array editor) ----
+      var _subN_changeOrders = pfChangeOrdersInline();
+
+      // Assemble the four collapsible subgroups in the SAME order as the original card, each
+      // via _srNewCollapsible (accent-blue toggle bar + auto "X/Y Fields Complete" readout).
+      // DEFAULT COLLAPSED (open omitted -> false) for density; Brad can expand to redline.
+      var _subNewBody =
+          _srNewCollapsible('Bid Recap', _subN_bidRecap, false)
+        + _srNewCollapsible('Contract Recap', _subN_contractRecap, false)
+        + _srNewCollapsible('Subcontract Analysis', _subN_analysis, false)
+        + _srNewCollapsible('Change Orders', _subN_changeOrders, false);
+      // _srLiveEdit STAYS true through card() so its Edit button is suppressed (no duplicate
+      // pr-edit-btn data-pr-section="contract"); restored AFTER the append.
+      html += card(3, 'Subcontract Agreement - New', null,
+        '<div class="pf-srnew-scope">' + _subNewBody + '</div>', false, 'contract');
+      _srLiveEdit = _subNewPrevLive;
+      _curSection = _subNewPrevSection;
+      // ===== END SANDBOX: Subcontract Agreement - New ===========================
+
       // ----- 6. Project Photos (LIVE, READ-ONLY gallery) -----
       // A live thumbnail gallery of this project's SharePoint "02 - Project Photos"
       // folder, fetched on-expand from /api/project-photos?num=<project number>.
