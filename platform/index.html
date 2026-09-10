@@ -2548,6 +2548,29 @@ tr.pf-dragging { opacity: 0.45; }
 /* 260px) sit directly right of the label; textareas fill the 66% value cell (title still */
 /* left-aligned). Save keys / RBAC unchanged — layout-only, byte-identical field() calls. */
 
+/* ---- Invoicing & Payment Terms: full-width value fields (Brad 2026-09-10, Req C) --- */
+/* The Payment Terms + Retainage Release values were TRUNCATED because the shared live  */
+/* control cap (.pr-live-input max-width:340px / .pr-live-select max-width:260px) clamps */
+/* every value box. For THIS subsection ONLY, override those caps so the value cell/box  */
+/* fills the full available width — the value spans from the right of the field name to  */
+/* the far right of the row (NO stacking: the default .pf-sr-table 2-cell row keeps      */
+/* title-left / value-right). Scoped to the .pf-srnew-invwide collapsible (extraClass on */
+/* _srNewCollapsible for Invoicing & Payment Terms), so Contract Info and every other    */
+/* subsection keep their 340/260 caps — zero blast radius outside Invoicing.             */
+.pf-srnew-invwide .pf-sr-table td.pf-sr-val,
+.pf-srnew-invwide .pf-sr-table th.pf-sr-val { width: auto; }
+.pf-srnew-invwide .pf-sr-table .pr-field,
+.pf-srnew-invwide .pf-sr-table .pr-field-value { width: 100%; }
+.pf-srnew-invwide .pf-sr-table .pr-live-input,
+.pf-srnew-invwide .pf-sr-table .pr-live-select,
+.pf-srnew-invwide .pf-sr-table input.pr-live-input,
+.pf-srnew-invwide .pf-sr-table .pr-field-value input,
+.pf-srnew-invwide .pf-sr-table .pr-field-value textarea {
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+}
+
 /* ---- Staking-only collapsible title bar (Brad 2026-09-05) ---------------------- */
 /* Replaces the dark .pf-sr-headbar + "Field/Value" thead for the Staking subsection */
 /* ONLY with a single clean accent-blue full-width title bar that IS the roll-up      */
@@ -18490,7 +18513,23 @@ try {
       // (.pf-srnew-scope .pf-sr-collapse-body > .pf-sr-collapse > .pf-sr-collapse-head)
       // paints them #6b7d8c / 11.5px / pad 3px 10px — slate-identical to Mob Prep, with
       // NO new CSS. Any subgroupNote is carried INSIDE the collapse body (under the bar).
-      var _subN_contractInfo = _srNewCollapsible('Contract Info', _srNewSubTable('Contract Info', [
+      // ---- Sales Tax conditional (Brad 2026-09-10, Request A) ----
+      // Sales Tax Yes/No (PF_FIELD_DROPDOWNS -> pfLiveControl select, siteReadiness-style live
+      // save on the 'contract' key). No -> the "Sales Tax %" row disappears entirely AND the
+      // "Sales Tax Notes" auto-shows EXEMPT (still user-editable). Yes -> "Sales Tax %" present,
+      // Notes untouched. Initial state is set at render from the effective Sales Tax value; the
+      // capture-phase 'change' listener (Contract card) flips it live WITHOUT a re-render — same
+      // idiom as the Testing "Modulus Load Test Required?" toggle (~24756). effVal reads the
+      // 'contract' override bucket (matches the card's data-pr-section).
+      var _salesTaxEff = String(effVal('contract', 'Sales Tax', '') || '').trim();
+      var _salesTaxNo  = /^no$/i.test(_salesTaxEff);
+      // Notes default: when Sales Tax = No AND no non-empty Notes override exists yet, seed the
+      // field VALUE with "EXEMPT" (field() only uses this passed value when there is no saved
+      // override, so a human edit to the Notes still wins and is never clobbered on re-render).
+      var _salesTaxNotesOv = ovLookup('contract', 'Sales Tax Notes');
+      var _salesTaxNotesHasVal = _salesTaxNotesOv.has && String(_salesTaxNotesOv.value == null ? '' : _salesTaxNotesOv.value).trim() !== '';
+      var _salesTaxNotesDefault = (_salesTaxNo && !_salesTaxNotesHasVal) ? 'EXEMPT' : '';
+      var _contractInfoRows = _srNewSubTable('Contract Info', [
           field('GC Project #', SF.gc_project_number, SS),
           field('GC Subcontract #', SF.subcontract_number, SS),
           field('Subcontract Value', SF.subcontract_value, SS),
@@ -18500,7 +18539,7 @@ try {
           field('Project Substantial Completion Date', SF.completion_dates, SS),
           field('Sales Tax', ''),
           field('Sales Tax %', ''),
-          field('Sales Tax Notes', ''),
+          field('Sales Tax Notes', _salesTaxNotesDefault),
           field('Prevailing Wage? Rate?', SF.prevailing_wage || bid.wage_req, SF.prevailing_wage ? SS : 'Bid Log'),
           field('Certified Payroll?', SF.certified_payroll, SS),
           field('Prevailing Wage Operators — Hourly Rate', ''),
@@ -18508,20 +18547,58 @@ try {
           field('Minimum Insurance Requirement', bid.min_insurance_req, 'Bid Log'),
           field('Insurance Requirements (per subcontract)', SF.insurance_requirements, SS),
           field('Liquidated Damages', SF.liquidated_damages, SS),
-          field('Personal / Performance Guaranty', SF.personal_guaranty, SS),
-          field('Bonding Requirements', ''),
+          // Personal / Performance Guaranty split into TWO Yes/No dropdowns (Brad 2026-09-10,
+          // Request B). Both registered in PF_FIELD_DROPDOWNS -> render as live selects on the
+          // 'contract' key. The original combined 'Personal / Performance Guaranty' storage key
+          // is retired from the sandbox render (any legacy value stays stored, just not shown).
+          field('Personal Guaranty', SF.personal_guaranty, SF.personal_guaranty ? SS : ''),
+          field('Performance Guaranty', ''),
+          // Bond (Brad 2026-09-10, Request B): "Bond Required" Yes/No; Yes reveals the
+          // "Bond Requirements" fillable text box row (conditional-reveal, same listener idiom).
+          field('Bond Required', ''),
+          field('Bond Requirements', ''),
           field('Project Working Hours', SF.working_hours, SS)
-        ], { noHeadbar: true, noThead: true }), false);
+        ], { noHeadbar: true, noThead: true });
+      // Initial conditional visibility (render-time), toggled live by the Contract-card change
+      // listener afterwards. Hide the full <tr> (name + value cells) so no stray label shows:
+      //   - "Sales Tax %" row hidden when Sales Tax = No.
+      //   - "Bond Requirements" row hidden unless Bond Required = Yes.
+      // _srNewRow emits <tr data-row-label="<field>">; splice display:none onto the matching
+      // opening tag. Escape-safe: labels are literal known strings (no user data).
+      var _bondReqEff = String(effVal('contract', 'Bond Required', '') || '').trim();
+      var _bondYes = /^yes$/i.test(_bondReqEff);
+      if (_salesTaxNo) {
+        _contractInfoRows = _contractInfoRows.replace(
+          '<tr data-row-label="Sales Tax %">',
+          '<tr data-row-label="Sales Tax %" style="display:none">');
+      }
+      if (!_bondYes) {
+        _contractInfoRows = _contractInfoRows.replace(
+          '<tr data-row-label="Bond Requirements">',
+          '<tr data-row-label="Bond Requirements" style="display:none">');
+      }
+      var _subN_contractInfo = _srNewCollapsible('Contract Info', _contractInfoRows, false);
+      // Invoicing & Payment Terms (Brad 2026-09-10, Request C):
+      //   - "Approved SOV" (was a URL/link fieldLinked) RENAMED to "SOV Approved" and changed to
+      //     a Yes/No dropdown (registered in PF_FIELD_DROPDOWNS -> live select on the 'contract'
+      //     key). The field TYPE changed (link -> Yes/No), so there is no compatible legacy value
+      //     to preserve; the old 'Approved SOV' URL override (if any) simply stops rendering
+      //     (stays stored, inert). New storage key = the visible label 'SOV Approved'.
+      //   - ALL value fields in THIS subsection widened to full width via the scoped extraClass
+      //     'pf-srnew-invwide' on the collapsible wrapper (CSS overrides the .pr-live-input
+      //     340px / .pr-live-select 260px caps ONLY inside this subsection). Title stays left,
+      //     value fills to the far right on the SAME row (no stacking). Blast radius = this one
+      //     subsection (scoped class), so Contract Info et al. keep the 340/260 caps.
       var _subN_invoicing = _srNewCollapsible('Invoicing & Payment Terms',
           subgroupNote('Payment terms extracted from the subcontract agreement.')
         + _srNewSubTable('Invoicing & Payment Terms', [
-          fieldLinked('Approved SOV', '', '', 'website'),
+          field('SOV Approved', ''),
           field('Payment Terms', SF.payment_terms, SS),
           field('Retainage % Withheld', SF.retainage_pct, SS),
           field('Retainage Release', SF.retainage_release, SS),
           field('Pay App Due by (Day of Month)', ''),
           field('Pay App Bill Through Date', '')
-        ], { noHeadbar: true, noThead: true }), false);
+        ], { noHeadbar: true, noThead: true }), false, 'pf-srnew-invwide');
       var _subN_scope = _srNewCollapsible('Scope of Work', _srNewSubTable('Scope of Work', [
           field('Staking & Layout Included? (Yes/No)', ''),
           field('Extra Scope of Work Language', '')
@@ -23335,10 +23412,23 @@ try {
         'Awaiting GC Signature',
         'Fully Executed'
       ],
-      // Contract Recap > Contract Info (Brad 2026-08-07): sales-tax posture. "Yes" =
-      // taxable (capture the rate in the adjacent "Sales Tax %" field); "No-Exempt" =
-      // tax-exempt (leave % blank).
-      'Sales Tax': ['Yes', 'No-Exempt'],
+      // Contract Recap > Contract Info sales-tax posture (Brad 2026-09-10, Request A): now a
+      // plain Yes/No. Yes -> the "Sales Tax %" field is shown to be filled in (Notes untouched);
+      // No -> the "Sales Tax %" row disappears entirely AND "Sales Tax Notes" auto-populates with
+      // "EXEMPT" (user-editable). Conditional visibility driven by the Contract-card capture-phase
+      // 'change' listener (mirrors the Testing "Modulus Load Test Required?" toggle). Old option
+      // 'No-Exempt' dropped (any saved 'No-Exempt' value stays stored, just no longer selectable).
+      'Sales Tax': ['Yes', 'No'],
+      // Contract Recap > Contract Info guaranty split (Brad 2026-09-10, Request B): the combined
+      // "Personal / Performance Guaranty" field is replaced by TWO independent Yes/No dropdowns.
+      'Personal Guaranty': ['Yes', 'No'],
+      'Performance Guaranty': ['Yes', 'No'],
+      // Contract Recap > Contract Info Bond (Brad 2026-09-10, Request B): "Bond Required" Yes/No;
+      // Yes reveals the "Bond Requirements" fillable text row (conditional-reveal, same listener).
+      'Bond Required': ['Yes', 'No'],
+      // Invoicing & Payment Terms (Brad 2026-09-10, Request C): "SOV Approved" Yes/No (renamed
+      // from the old "Approved SOV" URL/link field; the storage key is the new label).
+      'SOV Approved': ['Yes', 'No'],
       // Engineering & Design > Prelim Design (Brad 2026-08-07, batch-12): SOW reuses the
       // SAME value list as the General Info "Project Scope of Work (SOW)" dropdown so the
       // two stay in lock-step (one source of truth for the scope options).
@@ -24763,6 +24853,51 @@ try {
       if (!body) return;
       var isYes = /^yes$/i.test(String(el.value || '').trim());
       body.style.display = isYes ? '' : 'none';
+    }, true);
+
+    // Subcontract-New Contract Info > "Sales Tax" conditional (Brad 2026-09-10, Request A).
+    // CAPTURE phase (3rd arg true) so it runs BEFORE the select's inline onchange stopPropagation
+    // — SAME idiom as the Testing "Modulus Load Test Required?" toggle above. Scoped to the
+    // Subcontract card (data-pr-section="contract"). On change:
+    //   No  -> hide the "Sales Tax %" row entirely; if the "Sales Tax Notes" control is empty,
+    //          seed it with "EXEMPT" AND persist that via the notes control's OWN save path
+    //          (pfLiveFieldChange, 'contract' key) so it survives reload — never clobbers a
+    //          non-empty note the human already typed.
+    //   Yes -> show the "Sales Tax %" row (Notes left as-is, no auto-EXEMPT).
+    // The Sales Tax select's own save-on-change (pfLiveFieldChange) still fires independently.
+    document.addEventListener('change', function(ev){
+      var el = ev.target;
+      if (!el || !el.getAttribute) return;
+      if (el.getAttribute('data-pr-field-label') !== 'Sales Tax') return;
+      var card = el.closest ? el.closest('.pr-card[data-pr-section="contract"]') : null;
+      if (!card) return;
+      var isYes = /^yes$/i.test(String(el.value || '').trim());
+      var pctRow = card.querySelector('tr[data-row-label="Sales Tax %"]');
+      if (pctRow) pctRow.style.display = isYes ? '' : 'none';
+      if (!isYes) {
+        // Auto-populate Sales Tax Notes with EXEMPT only when currently empty (don't overwrite
+        // a human note). Persist through the notes control so it's saved, not just visual.
+        var notesCtl = card.querySelector('.pr-live-input[data-pr-field-label="Sales Tax Notes"]');
+        if (notesCtl && String(notesCtl.value == null ? '' : notesCtl.value).trim() === '') {
+          notesCtl.value = 'EXEMPT';
+          try { if (typeof window.pfLiveFieldChange === 'function') window.pfLiveFieldChange(notesCtl); } catch (e) {}
+        }
+      }
+    }, true);
+
+    // Subcontract-New Contract Info > "Bond Required" conditional (Brad 2026-09-10, Request B).
+    // CAPTURE phase, same idiom. Scoped to the Subcontract card. Yes -> show the "Bond
+    // Requirements" fillable text-box row; No/blank -> hide it entirely. The "Bond Required"
+    // select's own save-on-change (pfLiveFieldChange, 'contract' key) fires independently.
+    document.addEventListener('change', function(ev){
+      var el = ev.target;
+      if (!el || !el.getAttribute) return;
+      if (el.getAttribute('data-pr-field-label') !== 'Bond Required') return;
+      var card = el.closest ? el.closest('.pr-card[data-pr-section="contract"]') : null;
+      if (!card) return;
+      var isYes = /^yes$/i.test(String(el.value || '').trim());
+      var reqRow = card.querySelector('tr[data-row-label="Bond Requirements"]');
+      if (reqRow) reqRow.style.display = isYes ? '' : 'none';
     }, true);
 
     // Sandbox Safety > JHA "Jobsite Safety Analysis (JSA) Required?" conditional (Brad
