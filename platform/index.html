@@ -22218,6 +22218,15 @@ try {
         // section never counts a subsection card's fields (or another section's).
         if (fieldEls[i].closest('.pr-card') !== card) continue;
         if (fieldEls[i].closest('.pf-cond-hidden')) continue;  // conditionally-hidden -> not counted
+        // Scope-conditional prelim rows (Brad 2026-09-10): a General Info prelim Qty/LF row
+        // (data-pf-scope-row="<opt>") is HIDDEN via inline display:none whenever its scope box
+        // (Aggregate Piers / Helical Pilings / Rigid Inclusions) is UNCHECKED. An unchecked
+        // scope must count "as if it doesn't exist for that project" — so skip a scope row that
+        // is currently hidden. Gate on data-pf-scope-row (General-Info-only attribute) so this
+        // NEVER excludes genuinely-empty-but-visible fields or any other section's rows: a
+        // visible scope row (box checked) has display:'' and is still counted normally.
+        var _scopeRow = fieldEls[i].closest('[data-pf-scope-row]');
+        if (_scopeRow && _scopeRow.style && _scopeRow.style.display === 'none') continue;
         var val = fieldEls[i].querySelector('.pr-field-value');
         if (!val) continue;              // safety: not a real data field row
         total++;
@@ -24202,6 +24211,49 @@ try {
       // editor (fail-soft: no backend => no menu, manual entry unaffected).
       var _editorEl = body.querySelector('.pr-editor');
       if (_editorEl) { pfWireTypeahead(_editorEl); pfCrmHydrate(_editorEl); }
+
+      // LIVE PROJECT-COMPLETION RECOMPUTE (Brad 2026-09-10) — General Info editor only.
+      // BUG: "Project Completion" was computed ONCE at render (= Anticipated Project Start
+      // + Projected Duration (Days), calendar days). While the Edit form is open, changing
+      // the Start date or the Duration did NOT update the Completion date input — it stayed
+      // stale until Save + re-render. Fix: wire an INPUT listener on the Start + Duration
+      // controls that recomputes Completion in place, reusing the SAME compute helpers as the
+      // render path (pfParseDate + pfParseNum + pfAddCalendarDays) so the math can't drift.
+      //   * OVERRIDE-PRESERVING: if a NON-EMPTY manual override for "Project Completion" is
+      //     already saved (Project Completion is now a date picker the user can hand-set), we
+      //     do NOT auto-recompute — the user's chosen date wins (mirrors field()'s override
+      //     precedence). Only when there is no manual override does the auto-calc drive it.
+      //   * FAIL-CLOSED: if Start OR Duration is blank/unparseable, the Completion input is
+      //     left UNCHANGED (never a garbage date).
+      //   * The date input stores YYYY-MM-DD (HTML date value); we format the computed Date to
+      //     MM/DD/YYYY (pfFmtDateObj) then back through pfToDateInputValue -> YYYY-MM-DD, reusing
+      //     the exact helpers the editor already uses, so the stored value shape is correct and
+      //     the picker displays MM/DD/YYYY. No re-render — the input value is patched in place.
+      if (section === 'general' && _editorEl) {
+        var _startInp = _editorEl.querySelector('[data-pr-field-label="Anticipated Project Start"]');
+        var _durInp   = _editorEl.querySelector('[data-pr-field-label="Projected Duration (Days)"]');
+        var _complInp = _editorEl.querySelector('[data-pr-field-label="Project Completion"]');
+        // Manual-override signal: a non-empty saved 'Project Completion' under the general key.
+        var _genOv = (_curOverrides && _curOverrides['general']) || {};
+        var _complOvRaw = Object.prototype.hasOwnProperty.call(_genOv, 'Project Completion')
+          ? _genOv['Project Completion'] : '';
+        var _hasComplOverride = !(_complOvRaw === undefined || _complOvRaw === null
+          || String(_complOvRaw).trim() === '');
+        if (_startInp && _durInp && _complInp && !_hasComplOverride) {
+          var _pfRecomputeCompletion = function(){
+            var _s = pfParseDate(_startInp.value);
+            var _d = pfParseNum(_durInp.value);
+            if (!_s || _d === null) return;                 // fail-closed: leave Completion as-is
+            var _end = pfAddCalendarDays(_s, _d);
+            if (!_end) return;                              // fail-closed
+            _complInp.value = pfToDateInputValue(pfFmtDateObj(_end));  // YYYY-MM-DD for the picker
+          };
+          _startInp.addEventListener('input', _pfRecomputeCompletion);
+          _startInp.addEventListener('change', _pfRecomputeCompletion);
+          _durInp.addEventListener('input', _pfRecomputeCompletion);
+          _durInp.addEventListener('change', _pfRecomputeCompletion);
+        }
+      }
     };
 
     // Append a fresh numbered contact block (5 inputs) for a repeatable group. The
@@ -24578,6 +24630,11 @@ try {
       var sel = '[data-pf-scope-row="' + (window.CSS && CSS.escape ? CSS.escape(opt) : opt.replace(/"/g, '\\"')) + '"]';
       var rows = card.querySelectorAll(sel);
       for (var i = 0; i < rows.length; i++) { rows[i].style.display = on ? '' : 'none'; }
+      // Recompute this General Info card's completion badge (Brad 2026-09-10): the counter
+      // now IGNORES hidden-by-unchecked-scope rows, so the "X/Y Fields Complete, XX%" must
+      // recompute the instant a scope box toggles rows in/out of visibility. Recompute ONLY
+      // this one card's badge (no full re-render) — mirrors the in-place live-update idiom.
+      try { if (typeof pfRenderSectionStatusBar === 'function') pfRenderSectionStatusBar(card); } catch (e) {}
     }, true);
 
     // Sandbox Safety > "Jobsite Safety Training Required" conditional (Brad 2026-09-09). CAPTURE
