@@ -14495,7 +14495,7 @@ try {
     //   building  -> "Total Bldg SF"
     //   acres     -> "Site Size (Acres)"
     // NOTE: money fields ($-prefixed, already grouped) are NOT routed here.
-    var PF_QTY_LABEL_RE = /\bLF\b|\bpier\b|\bpiers\b|\bcolumns?\b|\bstone\b|\bspoils\b|\bTN\b|\bSF\b|\bacres?\b/i;
+    var PF_QTY_LABEL_RE = /\bLF\b|\bpier\b|\bpiers\b|\bcolumns?\b|\bstone\b|\bspoils\b|\bTN\b|\bSF\b|\bacres?\b|\bQty\b/i;
     // Explicit EXCLUDES so a stray unit token in an identifier-style label can
     // never trip the allow-list (e.g. a label containing "SF" as part of a code).
     var PF_QTY_LABEL_EXCLUDE_RE = /project\s*#|\bGC\b.*#|zip|\byear\b|\bdate\b|cost\s*code|\bphone\b/i;
@@ -14521,12 +14521,22 @@ try {
       'SOW Notes': 'Project Scope of Work Notes'
     };
     function pfDisplayLabel(label){ return PF_FIELD_DISPLAY_LABELS[label] || label; }
-    function field(label, val, src){
+    function field(label, val, src, opts){
       var ov = ovLookup(_curSection, label);
       // Visible label (display-only): may differ from the STORAGE KEY `label`. Only the
       // .pr-field-label text uses this; ovLookup / data-pr-label / pfLiveControl all keep
       // using the real `label` so read + save round-trip under the unchanged storage key.
-      var dispLabel = pfDisplayLabel(label);
+      // opts (Brad 2026-09-10, additive/optional — all existing 3-arg callers unchanged):
+      //   opts.dispLabel  = a PER-CALL display-label override (wins over the global
+      //                     PF_FIELD_DISPLAY_LABELS map). Used by the General Info scope
+      //                     conditionals to SHOW "Total AP Qty (Prelim)" while the STORAGE
+      //                     KEY stays the original "Total Pier Qty (Prelim)" — so existing
+      //                     prelim data is read/saved under its unchanged key (never orphaned).
+      //   opts.rowAttr    = extra raw attribute string spliced onto the .pr-field wrapper
+      //                     (e.g. data-pf-scope-row + an inline display:none) so the
+      //                     capture-phase scope listener can show/hide the row instantly.
+      var dispLabel = (opts && opts.dispLabel) ? opts.dispLabel : pfDisplayLabel(label);
+      var extraRowAttr = (opts && opts.rowAttr) ? (' ' + opts.rowAttr) : '';
       // An override WINS over the synced/computed value — BUT ONLY when it carries a
       // real (non-empty) value. Fix (Brad 2026-08-12, POET Column Diameter blank): the
       // section editor persists EVERY field label it scans on Save, including ones left
@@ -14597,14 +14607,14 @@ try {
         // class. The completion status bar counts the same .blank spans, so the count now
         // matches the highlighting in live mode too.
         var liveBlank = (rawForCtl == null || String(rawForCtl).trim() === '') ? ' blank' : '';
-        return '<div class="'+fieldWrapCls+'" data-pr-label="'+E(label)+'"><span class="pr-field-label">'+E(dispLabel)+editMark+'</span>'
+        return '<div class="'+fieldWrapCls+'" data-pr-label="'+E(label)+'"'+extraRowAttr+'><span class="pr-field-label">'+E(dispLabel)+editMark+'</span>'
              + '<span class="pr-field-value pr-field-live'+liveBlank+'">'+pfLiveControl(label, rawForCtl)+'</span>'
              + (src ? '<span class="pr-field-src">'+E(src)+'</span>' : '') + '</div>';
       }
       // data-pr-label lets the section editor read every field's label back out
       // of the DOM without re-deriving it from the source expressions. It stays the
       // STORAGE KEY (label), not the display string — save/read round-trips unchanged.
-      return '<div class="'+fieldWrapCls+'" data-pr-label="'+E(label)+'"><span class="pr-field-label">'+E(dispLabel)+editMark+'</span>'
+      return '<div class="'+fieldWrapCls+'" data-pr-label="'+E(label)+'"'+extraRowAttr+'><span class="pr-field-label">'+E(dispLabel)+editMark+'</span>'
            + '<span class="'+cls+'">'+shown+'</span>'+srcHtml+'</div>';
     }
 
@@ -16387,7 +16397,7 @@ try {
     // editing this one array. The per-option field label is derived from the option text, so
     // a new option needs NO other change (no PF_FIELD_* registration — these are plain
     // 'general' string overves read via effVal, not editor-scanned fields).
-    var PF_PROJECT_SCOPE_OPTIONS = ['Aggregate Piers', 'Helical Pilings', 'Rigid Inclusions', 'Grouted Columns'];
+    var PF_PROJECT_SCOPE_OPTIONS = ['Aggregate Piers', 'Helical Pilings', 'Rigid Inclusions'];
     var PF_PROJECT_SCOPE_LABEL = function(opt){ return 'Project Scope - ' + opt; };
     function pfProjectScopeGroup(){
       var editable = canEdit();
@@ -17911,8 +17921,38 @@ try {
           // the field reads its own key directly. (The dropdown field itself was REMOVED; its
           // orphaned override just sits unused.)
           field('SOW Notes', ''),
-          field('Total Pier Qty (Prelim)', bid.total_columns, 'Bid Log'),
-          field('Total LF (Prelim)', bid.total_lf, 'Bid Log'),
+          // ---- SCOPE-CONDITIONAL PRELIM QTY / LF ROWS (Brad 2026-09-10) ---------------------
+          // Stacked AP -> Helical -> RI; each pair renders ONLY when that scope's box is checked
+          // in the Project Scope group above (read via effVal('general','Project Scope - <opt>')).
+          // Initial visibility is baked here (display:none when unchecked); the .pf-pscope-box
+          // capture-phase change listener toggles it INSTANTLY on check/uncheck (no re-render,
+          // mirrors the JHA/Testing conditional idiom). Each row carries data-pf-scope-row="<opt>"
+          // so the listener can target the exact pair.
+          //
+          // DATA INTEGRITY: the AP pair KEEPS the ORIGINAL storage keys "Total Pier Qty (Prelim)"
+          // / "Total LF (Prelim)" — only the DISPLAY label changes to "Total AP ..." via
+          // opts.dispLabel. Existing saved prelim data (keyed by those labels) is read + saved
+          // under the unchanged key, so NOTHING is orphaned. Helical/RI keys are brand-new
+          // (no prior data). A per-call dispLabel is used (NOT the global PF_FIELD_DISPLAY_LABELS)
+          // so the Engineering & Design copies of "Total Pier Qty (Prelim)" are NOT affected.
+          (function(){
+            var scopeRow = function(scopeOpt, dispLabel, storageKey, val, src){
+              var on = String(effVal('general', 'Project Scope - ' + scopeOpt, '') || '').trim().toLowerCase() === 'yes';
+              var attr = 'data-pf-scope-row="' + E(scopeOpt) + '"' + (on ? '' : ' style="display:none"');
+              return field(storageKey, val, src, { dispLabel: dispLabel, rowAttr: attr });
+            };
+            return [
+              // AP: original keys preserved, shown relabeled as "Total AP ..." only when AP checked.
+              scopeRow('Aggregate Piers', 'Total AP Qty (Prelim)', 'Total Pier Qty (Prelim)', bid.total_columns, 'Bid Log'),
+              scopeRow('Aggregate Piers', 'Total AP LF (Prelim)',  'Total LF (Prelim)',       bid.total_lf,      'Bid Log'),
+              // Helical: brand-new keys, shown only when Helical Pilings checked.
+              scopeRow('Helical Pilings', 'Total Helical Qty (Prelim)', 'Total Helical Qty (Prelim)', '', ''),
+              scopeRow('Helical Pilings', 'Total Helical LF (Prelim)',  'Total Helical LF (Prelim)',  '', ''),
+              // Rigid Inclusions: brand-new keys, shown only when Rigid Inclusions checked.
+              scopeRow('Rigid Inclusions', 'Total RI Qty (Prelim)', 'Total RI Qty (Prelim)', '', ''),
+              scopeRow('Rigid Inclusions', 'Total RI LF (Prelim)',  'Total RI LF (Prelim)',  '', '')
+            ].join('');
+          })(),
           // AUTO-PULL FROM THE SUBMITTAL SUMMARY (Brad 2026-08-13). These three fields are
           // COMPUTED from the E&D Submittal Summary (__site_elevations area rows):
           //   Total Pier Qty (Approved Submittal) = SUM of the Total Pier Qty column,
@@ -24052,6 +24092,27 @@ try {
       if (!card) return;
       var root = (card.closest && (card.closest('.pr-root') || card.parentElement)) || document.getElementById('prGenericRoot');
       try { if (typeof pfRenderSandboxSubStatus === 'function') pfRenderSandboxSubStatus(root); } catch (e) {}
+    }, true);
+
+    // General Info > Project Scope conditional Prelim Qty/LF rows (Brad 2026-09-10). CAPTURE phase
+    // (same idiom as the JHA/Testing/Modulus toggles) so it runs alongside the checkbox's inline
+    // onchange (pfProjectScopeToggle, which SAVES but does NOT re-render the card). When a
+    // .pf-pscope-box toggles, show/hide the matching data-pf-scope-row="<opt>" rows INSTANTLY in
+    // THIS project's General Info card — AP -> "Total AP Qty/LF (Prelim)", Helical -> "Total Helical
+    // Qty/LF (Prelim)", RI -> "Total RI Qty/LF (Prelim)". Scoped to the general card that owns the
+    // toggled box, so it never touches another project's card. Purely visual (no data change); the
+    // checkbox's own save path is untouched.
+    document.addEventListener('change', function(ev){
+      var el = ev.target;
+      if (!el || !el.classList || !el.classList.contains('pf-pscope-box')) return;
+      var opt = el.getAttribute('data-pscope-opt') || '';
+      if (!opt) return;
+      var card = el.closest ? el.closest('.pr-card[data-pr-section="general"]') : null;
+      if (!card) return;
+      var on = !!el.checked;
+      var sel = '[data-pf-scope-row="' + (window.CSS && CSS.escape ? CSS.escape(opt) : opt.replace(/"/g, '\\"')) + '"]';
+      var rows = card.querySelectorAll(sel);
+      for (var i = 0; i < rows.length; i++) { rows[i].style.display = on ? '' : 'none'; }
     }, true);
 
     // Sandbox Safety > "Jobsite Safety Training Required" conditional (Brad 2026-09-09). CAPTURE
