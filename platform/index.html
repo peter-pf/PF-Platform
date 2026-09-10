@@ -2618,6 +2618,33 @@ tr.pf-dragging { opacity: 0.45; }
    expands INLINE to a full-width detail row — mirroring the #mod-inventory item-row -> detail-
    pane interaction (the "Sheave" example). Scoped to .pf-srnew-scope so only the sandbox is
    affected. */
+/* Change Orders "Contract Amount" summary (Brad 2026-09-10): three stacked lines — Original
+   Contract Amount / Approved Change Orders / Revised Contract Amount — rendered ABOVE the CO
+   table in the Subcontract-New sandbox ONLY (scoped to .pf-srnew-scope so the original card is
+   untouched). Original + Approved are plain rows; Revised is emphasized with a top rule + azure
+   accent. Amounts right-aligned + tabular for column alignment (Brad's table rule). */
+.pf-srnew-scope .pf-subnew-co-summary {
+  margin: 4px 0 12px; border: 1px solid var(--border-light, #e3e8ee); border-radius: 6px;
+  background: var(--bg-0, #fff); overflow: hidden; max-width: 480px;
+}
+.pf-srnew-scope .pf-subnew-co-sumrow {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 16px;
+  padding: 7px 12px; font-size: 13px;
+}
+.pf-srnew-scope .pf-subnew-co-sumrow + .pf-subnew-co-sumrow { border-top: 1px solid var(--border-light, #eef2f6); }
+.pf-srnew-scope .pf-subnew-co-sumlabel { color: var(--text-2, #52606d); }
+.pf-srnew-scope .pf-subnew-co-sumval {
+  font-variant-numeric: tabular-nums; font-weight: 600; color: var(--text-1, #1a2733); white-space: nowrap;
+}
+.pf-srnew-scope .pf-subnew-co-sumrow-revised {
+  border-top: 2px solid var(--accent, #006DB0); background: var(--accent-light, #E0F0FF);
+}
+.pf-srnew-scope .pf-subnew-co-sumrow-revised .pf-subnew-co-sumlabel { color: var(--accent-dark, #005A91); font-weight: 700; }
+.pf-srnew-scope .pf-subnew-co-sumrow-revised .pf-subnew-co-sumval { color: var(--accent-dark, #005A91); font-weight: 800; }
+.pf-srnew-scope .pf-subnew-co-summeta { font-weight: 400; color: var(--text-3, #7a8794); font-size: 11.5px; }
+.pf-srnew-scope .pf-subnew-co-sumnote {
+  padding: 4px 12px 8px; font-size: 11px; color: var(--text-3, #7a8794); line-height: 1.4;
+}
 .pf-srnew-scope .pf-safety-invtbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 .pf-srnew-scope .pf-safety-invrow { cursor: pointer; }
 .pf-srnew-scope .pf-safety-invrow > td {
@@ -16392,6 +16419,73 @@ try {
         + '<div class="pf-sge-msg" style="display:none"></div>'
         + '</div>';
     }
+    // ===== Subcontract-New ONLY: Change Orders "Contract Amount" summary =============
+    // (Brad 2026-09-10) A running contract-amount calc rendered ABOVE the shared Change
+    // Orders table, EXCLUSIVE to the "Subcontract Agreement - New" sandbox card (the
+    // original Subcontract card never calls this — zero blast radius there). Three lines:
+    //   - Original Contract Amount = the subcontract's "Subcontract Value" field (read at
+    //     the sandbox render site via effVal('contract','Subcontract Value', SF...) and
+    //     passed in as origRaw). Blank => shows blank, NEVER fabricated.
+    //   - Approved Change Orders = SUM of ONLY the COs whose status === 'Approved'. A CO
+    //     that is Pending/Rejected/blank contributes $0 (the KEY rule). Uses the existing
+    //     pfChangeOrders() reader + pfCoAmtNum() money parser.
+    //   - Revised Contract Amount = Original + Approved-sum (auto-calculated). When Original
+    //     is blank/non-numeric, Revised = the Approved-sum alone (still honest, no guess).
+    // Amounts render with a leading "$" + pfFmtQty comma-grouping (portal money convention).
+    // Returns { origNum, approvedNum, revisedNum, approvedCount, origBlank } — the raw compute,
+    // so both the initial HTML builder and the live-recalc listener share ONE math path.
+    function pfSubNewCoCompute(origRaw){
+      var cos = pfChangeOrders();
+      var approvedNum = 0, approvedCount = 0;
+      for (var i = 0; i < cos.length; i++){
+        if (String(cos[i].status || '').trim() === 'Approved') {
+          var n = pfCoAmtNum(cos[i].amount);
+          if (!isNaN(n)) { approvedNum += n; approvedCount++; }
+        }
+      }
+      var s = (origRaw == null ? '' : String(origRaw)).trim();
+      var origBlank = (s === '');
+      var origNum = origBlank ? NaN : pfCoAmtNum(origRaw);   // "$320,200.00" -> 320200 ; blank -> NaN
+      var origForSum = isNaN(origNum) ? 0 : origNum;
+      var revisedNum = origForSum + approvedNum;
+      return { origNum: origNum, approvedNum: approvedNum, revisedNum: revisedNum,
+               approvedCount: approvedCount, origBlank: origBlank };
+    }
+    // Format a JS number as portal money: "$" + comma-grouped. NaN/blank sentinel -> a yellow
+    // placeholder dash (matches pf-sge-blank). Reuses window.pfFmtQty for the grouping.
+    function pfSubNewMoney(n, blank){
+      if (blank || n == null || isNaN(n)) return '<span class="pf-sge-blank">-</span>';
+      // Keep cents only when the value actually has a fractional part (avoids ".00" noise on
+      // whole-dollar figures while still showing 320200.50 -> $320,200.50).
+      var fixed = (n % 1 === 0) ? String(n) : n.toFixed(2);
+      return '$' + E(String(window.pfFmtQty(fixed)));
+    }
+    // Build the three-line summary HTML for a given Original Contract Amount (raw string).
+    // Wrapped in .pf-subnew-co-summary carrying data-orig-raw so the live-recalc listener can
+    // recompute from the SAME original after a CO save without re-reading the SF/effVal scope.
+    function pfSubNewCoSummaryHtml(origRaw){
+      var c = pfSubNewCoCompute(origRaw);
+      var origBlank = c.origBlank || isNaN(c.origNum);
+      var coWord = c.approvedCount === 1 ? 'change order' : 'change orders';
+      var approvedMeta = c.approvedCount > 0
+        ? ' <span class="pf-subnew-co-summeta">('+c.approvedCount+' approved '+coWord+')</span>'
+        : ' <span class="pf-subnew-co-summeta">(none approved yet)</span>';
+      return '<div class="pf-subnew-co-summary" data-orig-raw="'+E(origRaw == null ? '' : String(origRaw))+'">'
+        + '<div class="pf-subnew-co-sumrow">'
+        +   '<span class="pf-subnew-co-sumlabel">Original Contract Amount</span>'
+        +   '<span class="pf-subnew-co-sumval">'+pfSubNewMoney(c.origNum, origBlank)+'</span>'
+        + '</div>'
+        + '<div class="pf-subnew-co-sumrow">'
+        +   '<span class="pf-subnew-co-sumlabel">Approved Change Orders'+approvedMeta+'</span>'
+        +   '<span class="pf-subnew-co-sumval">'+pfSubNewMoney(c.approvedNum, false)+'</span>'
+        + '</div>'
+        + '<div class="pf-subnew-co-sumrow pf-subnew-co-sumrow-revised">'
+        +   '<span class="pf-subnew-co-sumlabel">Revised Contract Amount</span>'
+        +   '<span class="pf-subnew-co-sumval">'+pfSubNewMoney(c.revisedNum, false)+'</span>'
+        + '</div>'
+        + '<div class="pf-subnew-co-sumnote">Only change orders marked <strong>Approved</strong> add to the revised amount; pending or rejected change orders below contribute $0.</div>'
+        + '</div>';
+    }
     // Read-view of ONE area as a COMPACT single row (Brad 2026-08-12 density pass): a small
     // table-like row — Area | Site Grade Elev | FFE — NOT a collapsible card. Blank values
     // show a yellow placeholder; a blank area name falls back to "Untitled Area".
@@ -18770,7 +18864,15 @@ try {
       // ---- Subcontract Analysis (same dual-source read-view) ----
       var _subN_analysis = pfSubcontractAnalysisSub(pfSubcontractAnalysis(D), true);
       // ---- Change Orders (same inline array editor) ----
-      var _subN_changeOrders = pfChangeOrdersInline();
+      // Brad 2026-09-10: PREPEND a running "Contract Amount" summary (Original / Approved COs /
+      // Revised) ABOVE the shared CO table — Subcontract-New ONLY (the original card never adds
+      // this). Original Contract Amount = the effective "Subcontract Value" field (override wins,
+      // else the synced SF value); passed raw into pfSubNewCoSummaryHtml, which sums ONLY Approved
+      // COs and computes Revised = Original + Approved. Blank Subcontract Value -> Original shows a
+      // dash and Revised = Approved-sum alone (never fabricated). The live-recalc listener below
+      // re-renders this block from data-orig-raw after any CO save.
+      var _subN_coOrigRaw = effVal('contract', 'Subcontract Value', SF.subcontract_value);
+      var _subN_changeOrders = pfSubNewCoSummaryHtml(_subN_coOrigRaw) + pfChangeOrdersInline();
 
       // Assemble the four collapsible subgroups in the SAME order as the original card, each
       // via _srNewCollapsible (accent-blue toggle bar + auto "X/Y Fields Complete" readout).
@@ -29054,6 +29156,20 @@ try {
           var acts = wrap.querySelector('.pf-sge-inline-actions');
           if (acts) acts.style.display = '';
           pfCoMsg(wrap, 'Saved.', false);
+          // Subcontract-New ONLY (Brad 2026-09-10): live-recalc the "Contract Amount" summary
+          // that sits directly BEFORE this CO wrap. _curOverrides already holds server truth
+          // (adopted above), so pfSubNewCoSummaryHtml re-reads the fresh Approved statuses/amounts.
+          // Original stays the same (data-orig-raw). No such sibling on the original card -> no-op.
+          try {
+            var _coSum = wrap.previousElementSibling;
+            if (_coSum && _coSum.classList && _coSum.classList.contains('pf-subnew-co-summary')) {
+              var _origRaw = _coSum.getAttribute('data-orig-raw') || '';
+              var _tmpS = document.createElement('div');
+              _tmpS.innerHTML = pfSubNewCoSummaryHtml(_origRaw);
+              var _freshSum = _tmpS.querySelector('.pf-subnew-co-summary');
+              if (_freshSum) _coSum.parentNode.replaceChild(_freshSum, _coSum);
+            }
+          } catch (e2) {}
         } catch (e) {
           // Fail-soft: fall back to a full re-render (still correct data) rather than a stale editor.
           var card = wrap.closest('.pr-card');
