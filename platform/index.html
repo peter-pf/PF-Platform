@@ -2330,6 +2330,13 @@ tr.pf-dragging { opacity: 0.45; }
 .pr-live-msg-ok { color: #2e7d32; }
 .pr-live-msg-err { color: #c0392b; font-weight: 600; }
 
+/* ---- Project Working Hours: ONE ROW, two time selectors (Brad 2026-09-10) ---- */
+/* Label sits left (the .pr-field / .pr-edit-row grid handles that); the value cell */
+/* holds a Start picker, a small "to" separator, and an End picker on ONE line.    */
+.pf-wh-row { display: inline-flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+.pf-wh-time { width: auto; max-width: 150px; }
+.pf-wh-sep { color: var(--text-2, #6b7280); font-size: 0.8rem; }
+
 /* ---- Staking "Documents to send the surveyor" table (Brad 2026-09-04) ------ */
 /* One row per doc: left cell = doc NAME, right cell = the SAME field()-emitted   */
 /* Date Sent control (input/date in live-edit, MM/DD/YYYY read view). The full    */
@@ -14536,6 +14543,9 @@ try {
     var PF_OVERRIDE_LABEL_ALIASES = {
       // "Taxes/Sales Tax Notes" -> "Sales Tax Notes" (Brad 2026-08-07, display rename).
       'Sales Tax Notes': 'Taxes/Sales Tax Notes',
+      // Scope of Work label simplified + typed to Yes/No (Brad 2026-09-10). new -> old
+      // so any value saved under the old label still renders under the new key.
+      'Staking & Layout Included': 'Staking & Layout Included? (Yes/No)',
       // General Info notes field DISPLAY-RENAMED (Brad 2026-09-08): "SOW Notes" now SHOWS as
       // "Project Scope of Work Notes" via PF_FIELD_DISPLAY_LABELS, but its STORAGE KEY stays
       // 'SOW Notes'. No override alias is needed (the field keys 'SOW Notes' directly). The
@@ -14726,9 +14736,15 @@ try {
       // an invalid Date -> '' -> amber blank "-".
       if (val instanceof Date) { val = String(pfFmtDate(val)); }
       var v = (val === undefined || val === null || String(val).trim() === "") ? "" : String(val);
+      // DISPLAY-ONLY: Working Hours "HH:MM - HH:MM" -> "7:00 AM - 3:30 PM" (Brad
+      // 2026-09-10). Checked BEFORE the date/phone gates (the label has no "Date"
+      // token so it never matched pfIsDateLabel anyway; this is the explicit route).
+      if (v && pfIsWorkingHoursLabel(label)) v = String(pfFmtWorkingHours(v));
       // DISPLAY-ONLY: normalize date fields to MM/DD/YYYY. The underlying data /
-      // override value is untouched; only the shown text changes.
-      if (v && pfIsDateLabel(label)) v = String(pfFmtDate(v));
+      // override value is untouched; only the shown text changes. FORCE-TEXT labels
+      // (PF_FIELD_TEXT_LABELS, e.g. "Pay App Bill Through Date" = "15th"/"30th") are
+      // EXCLUDED so the raw typed value shows verbatim, never date-mangled.
+      else if (v && pfIsDateLabel(label) && !pfIsPlainTextLabel(label)) v = String(pfFmtDate(v));
       // DISPLAY-ONLY: normalize phone fields to (111) 111-1111 (same approach).
       else if (v && pfIsPhoneLabel(label)) v = String(pfFmtPhone(v));
       // DISPLAY-ONLY: thousands-separator standard for quantity/amount fields
@@ -18600,7 +18616,13 @@ try {
           field('Pay App Bill Through Date', '')
         ], { noHeadbar: true, noThead: true }), false, 'pf-srnew-invwide');
       var _subN_scope = _srNewCollapsible('Scope of Work', _srNewSubTable('Scope of Work', [
-          field('Staking & Layout Included? (Yes/No)', ''),
+          // Brad 2026-09-10: label simplified to "Staking & Layout Included" (dropped
+          // the "? (Yes/No)" text) and the control is a Yes/No dropdown (registered in
+          // PF_FIELD_DROPDOWNS). LABEL-IS-STORAGE-KEY: the new label is the new key, so
+          // PF_OVERRIDE_LABEL_ALIASES maps it back to the old key
+          // 'Staking & Layout Included? (Yes/No)' — any value saved under the old label
+          // still renders (no data orphaned).
+          field('Staking & Layout Included', ''),
           field('Extra Scope of Work Language', '')
         ], { noHeadbar: true, noThead: true }), false);
       var _subN_needed = _srNewCollapsible('Items Needed for Contract Completion',
@@ -18609,7 +18631,9 @@ try {
           field('COI Date Requested from MJ', ''),
           field('COI Date Received from MJ', ''),
           field('COI Date Sent to GC', ''),
-          field('COI Email History', ''),
+          // 'COI Email History' row REMOVED (Brad 2026-09-10). Field-only deletion — no
+          // dropdown/date/alias registration referenced this label, so nothing else in
+          // this subsection is affected; any previously stored value stays inert.
           field('W9 Date Sent to GC', '')
         ], { noHeadbar: true, noThead: true }), false);
       // Trailing document-links block — inlined identically to the original (its "Subcontract
@@ -23429,6 +23453,10 @@ try {
       // Invoicing & Payment Terms (Brad 2026-09-10, Request C): "SOV Approved" Yes/No (renamed
       // from the old "Approved SOV" URL/link field; the storage key is the new label).
       'SOV Approved': ['Yes', 'No'],
+      // Scope of Work (Brad 2026-09-10): "Staking & Layout Included" simplified label
+      // (dropped "? (Yes/No)") + Yes/No dropdown. New label = new storage key;
+      // PF_OVERRIDE_LABEL_ALIASES carries any value saved under the old label.
+      'Staking & Layout Included': ['Yes', 'No'],
       // Engineering & Design > Prelim Design (Brad 2026-08-07, batch-12): SOW reuses the
       // SAME value list as the General Info "Project Scope of Work (SOW)" dropdown so the
       // two stay in lock-step (one source of truth for the scope options).
@@ -23744,9 +23772,144 @@ try {
       return '';
     }
 
+    // ====== WORKING HOURS = ONE ROW, TWO TIME SELECTORS (Brad 2026-09-10) ==========
+    // "Project Working Hours" is stored as a SINGLE combined string "HH:MM - HH:MM"
+    // (24-hour internal, e.g. "07:00 - 15:30") under its unchanged storage key
+    // 'Project Working Hours' — no re-key, no new section, saves through the SAME
+    // override plumbing (live: pfWorkingHoursChange -> /api/project-override;
+    // edit: a hidden .pr-edit-input the two <input type=time> write into, harvested
+    // verbatim by pfSaveSection). PF_WORKING_HOURS_LABELS gates the special render so
+    // the field() display path + both control paths route to the time-selector row and
+    // NEVER fall through to the date auto-detector (the label has no "Date" token, so
+    // it was never a date risk, but the gate keeps it explicit).
+    var PF_WORKING_HOURS_LABELS = { 'Project Working Hours': true };
+    function pfIsWorkingHoursLabel(label){ return !!PF_WORKING_HOURS_LABELS[label]; }
+    // Split a stored "HH:MM - HH:MM" into {start, end} in the "HH:MM" 24h form a
+    // native <input type="time"> requires. Tolerant of legacy free-text (e.g.
+    // "7:00-3:30", "7 AM - 3:30 PM", or a single value) — anything not parseable to a
+    // clean HH:MM pair leaves that side blank rather than mangling it.
+    function pfSplitWorkingHours(v){
+      var s = (v == null ? '' : String(v)).trim();
+      if (!s) return { start: '', end: '' };
+      var parts = s.split(/\s*[-–—]\s*/);   // hyphen / en / em dash
+      return { start: pfToTimeInputValue(parts[0]), end: pfToTimeInputValue(parts[1]) };
+    }
+    // Coerce a time token to 24h "HH:MM" for <input type=time>; blank on unrecognized.
+    function pfToTimeInputValue(t){
+      if (t == null) return '';
+      var s = String(t).trim();
+      if (!s) return '';
+      var m = /^(\d{1,2}):(\d{2})\s*([AaPp][Mm])?$/.exec(s);
+      if (!m) { m = /^(\d{1,2})\s*([AaPp][Mm])$/.exec(s); if (m) { m = [s, m[1], '00', m[2]]; } }
+      if (!m) return '';
+      var hh = Number(m[1]), mm = Number(m[2]);
+      var ap = m[3] ? m[3].toUpperCase() : '';
+      if (ap === 'PM' && hh < 12) hh += 12;
+      if (ap === 'AM' && hh === 12) hh = 0;
+      if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return '';
+      return _pf2(hh) + ':' + _pf2(mm);
+    }
+    // Combine two "HH:MM" 24h values into the stored "HH:MM - HH:MM". If BOTH are
+    // blank -> '' (a true clear). If only one side is set, still emit the pair with a
+    // blank other side so a half-entered range is not silently dropped.
+    function pfJoinWorkingHours(start, end){
+      var a = pfToTimeInputValue(start), b = pfToTimeInputValue(end);
+      if (!a && !b) return '';
+      return a + ' - ' + b;
+    }
+    // Read-view display: "7:00 AM - 3:30 PM" from the stored "HH:MM - HH:MM".
+    // Passes unrecognized text through unchanged (fail-safe).
+    function pfFmtWorkingHours(v){
+      var sp = pfSplitWorkingHours(v);
+      if (!sp.start && !sp.end) return (v == null ? '' : String(v));
+      function to12(hm){
+        if (!hm) return '';
+        var p = hm.split(':'); var hh = Number(p[0]), mm = p[1];
+        var ap = hh >= 12 ? 'PM' : 'AM'; var h12 = hh % 12; if (h12 === 0) h12 = 12;
+        return h12 + ':' + mm + ' ' + ap;
+      }
+      return (to12(sp.start) || '—') + ' - ' + (to12(sp.end) || '—');
+    }
+    // The two <input type=time> markup shared by the live + edit controls. onchange
+    // reads BOTH sibling time inputs (scoped to the .pf-wh-row wrapper) and calls the
+    // supplied combiner. Wrapper carries the label so the handler can resolve it.
+    function pfWorkingHoursInputs(label, value, onchangeAttr, extraInputClass){
+      var sp = pfSplitWorkingHours(value);
+      var cls = 'pf-wh-time' + (extraInputClass ? (' ' + extraInputClass) : '');
+      return '<span class="pf-wh-row" data-pf-wh-label="' + esc2(label) + '">'
+        + '<input type="time" class="' + cls + ' pf-wh-start" aria-label="Start time" value="' + esc2(sp.start) + '"' + onchangeAttr + '>'
+        + '<span class="pf-wh-sep">to</span>'
+        + '<input type="time" class="' + cls + ' pf-wh-end" aria-label="End time" value="' + esc2(sp.end) + '"' + onchangeAttr + '>'
+        + '</span>';
+    }
+    // LIVE save-on-change (office live-edit / Subcontract-New). Combines the two
+    // sibling time inputs into "HH:MM - HH:MM" and POSTs through the SAME fail-closed
+    // path pfLiveFieldChange uses. Resolves section from the containing .pr-card.
+    window.pfWorkingHoursChange = function(el){
+      if (!canEdit()) return;
+      var row = el && el.closest ? el.closest('.pf-wh-row') : null;
+      if (!row) return;
+      var start = (row.querySelector('.pf-wh-start') || {}).value || '';
+      var end = (row.querySelector('.pf-wh-end') || {}).value || '';
+      var combined = pfJoinWorkingHours(start, end);
+      var card = row.closest ? row.closest('.pr-card') : null;
+      var section = card ? card.getAttribute('data-pr-section') : '';
+      var label = row.getAttribute('data-pf-wh-label') || 'Project Working Hours';
+      var num = _curNum || '';
+      if (!section || !num) return;
+      var inputs = row.querySelectorAll('.pf-wh-time');
+      inputs.forEach(function(i){ i.disabled = true; });
+      var fields = {}; fields[label] = combined;
+      fetch('/api/project-override', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ num: num, section: section, fields: fields })
+      }).then(function(res){
+        return res.json().then(function(b){ return { ok: res.ok, status: res.status, body: b }; })
+          .catch(function(){ return { ok: res.ok, status: res.status, body: null }; });
+      }).then(function(r){
+        inputs.forEach(function(i){ i.disabled = false; });
+        if (!r.ok || !r.body || r.body.ok !== true || r.body.saved !== true) {
+          pfLiveMsg(el, (r.body && r.body.message) ? r.body.message
+            : (r.status === 403 ? 'You do not have permission to edit this project.'
+                                 : 'Save failed (' + r.status + '). Not saved — please retry.'), true);
+          return;
+        }
+        window.PF_PROJECT_OVERRIDES[num] = { sections: (r.body.sections) || {}, _meta: (r.body._meta) || null };
+        try { if (String(num) === String(_curNum) && r.body.sections && typeof r.body.sections === 'object') _curOverrides = r.body.sections; } catch (e) {}
+      }).catch(function(){
+        inputs.forEach(function(i){ i.disabled = false; });
+        pfLiveMsg(el, 'Save failed (network). Not saved — please retry.', true);
+      });
+    };
+    // EDIT-mode: the two time inputs write their combined value into the hidden
+    // sibling .pr-edit-input[data-pr-field-label="Project Working Hours"] so
+    // pfSaveSection harvests ONE combined value (the two time inputs are NOT
+    // .pr-edit-input, so they are never double-scanned).
+    window.pfWorkingHoursEditSync = function(el){
+      var row = el && el.closest ? el.closest('.pf-wh-row') : null;
+      if (!row) return;
+      var start = (row.querySelector('.pf-wh-start') || {}).value || '';
+      var end = (row.querySelector('.pf-wh-end') || {}).value || '';
+      var hidden = row.querySelector('.pf-wh-hidden');
+      if (hidden) hidden.value = pfJoinWorkingHours(start, end);
+    };
+
     // The 5 fields that make up one repeatable contact block, in order. Used by the
     // "Add contact" button to append a fresh numbered block.
     var PF_CONTACT_FIELDS = ['Contact Name', 'Title', 'Office Phone', 'Cell Phone', 'Email'];
+
+    // FORCE-PLAIN-TEXT allowlist (Brad 2026-09-10) — labels that CONTAIN a "Date"
+    // token (so PF_DATE_LABEL_RE / pfIsDateLabel would auto-coerce them to a native
+    // date picker) but are NOT calendar dates. "Pay App Bill Through Date" is a
+    // DAY-OF-MONTH free-text value ("15th", "30th", "last business day"), never a
+    // specific calendar date. Listing it here makes pfLabelIsDateControl return false
+    // (so BOTH the edit path and the live-control path render a plain <input type=text>)
+    // AND makes the read display skip the MM/DD/YYYY date formatter — the value shows
+    // exactly as typed. Storage key unchanged. Highest-priority gate (checked before
+    // any date/dropdown/textarea branch).
+    var PF_FIELD_TEXT_LABELS = { 'Pay App Bill Through Date': true };
+    function pfIsPlainTextLabel(label){ return !!PF_FIELD_TEXT_LABELS[label]; }
 
     // SYSTEMIC DATE DETECTION (Brad 2026-09-10) — single source of truth for
     // "should this EDIT/live control render a native <input type=date>?". Unifies the
@@ -23763,6 +23926,10 @@ try {
     // every genuine date field (old + new) correct in read AND edit with zero per-field
     // registration, while never turning a text/dropdown field into a calendar.
     function pfLabelIsDateControl(label){
+      // FORCE-TEXT wins over everything: a label in PF_FIELD_TEXT_LABELS is never a
+      // date control even though it contains a "Date" token (e.g. "Pay App Bill
+      // Through Date" = a day-of-month text value, not a calendar date).
+      if (PF_FIELD_TEXT_LABELS[label]) return false;
       if (PF_FIELD_TEXTAREA_LABELS[label] || PF_FIELD_DROPDOWNS[label]) return false;
       return !!PF_FIELD_DATE_LABELS[label] || window.pfIsDateLabel(label);
     }
@@ -23772,6 +23939,17 @@ try {
     function pfEditInputRow(label, value){
       var opts = PF_FIELD_DROPDOWNS[label];
       var control;
+      if (pfIsWorkingHoursLabel(label)) {
+        // ONE ROW, two <input type=time> (Start / End) + a HIDDEN .pr-edit-input that
+        // holds the combined "HH:MM - HH:MM" (Brad 2026-09-10). pfSaveSection harvests
+        // ONLY the hidden input (the two time pickers are not .pr-edit-input), so one
+        // combined value saves under the unchanged 'Project Working Hours' key. Each
+        // picker's onchange rewrites the hidden value via pfWorkingHoursEditSync.
+        control = '<input type="hidden" class="pr-edit-input pf-wh-hidden" data-pr-field-label="' + esc2(label) + '" '
+          + 'value="' + esc2(pfJoinWorkingHours(pfSplitWorkingHours(value).start, pfSplitWorkingHours(value).end)) + '">'
+          + pfWorkingHoursInputs(label, value, ' onchange="window.pfWorkingHoursEditSync(this)"', 'pr-edit-input-inline');
+        return '<div class="pr-edit-row"><label class="pr-edit-label">' + esc2(label) + '</label>' + control + '</div>';
+      }
       if (PF_FIELD_TEXTAREA_LABELS[label]) {
         // Multi-line textarea. The value is placed as TEXT CONTENT (not a value=
         // attribute) so embedded newlines survive. pfSaveSection reads inp.value the
@@ -23819,6 +23997,14 @@ try {
     // multi-key routing with zero per-field wiring.
     function pfLiveControl(label, value){
       var v = (value == null ? '' : String(value));
+      if (pfIsWorkingHoursLabel(label)) {
+        // ONE ROW, two <input type=time> (Start / End) that SAVE ON CHANGE via
+        // pfWorkingHoursChange (combines both into "HH:MM - HH:MM" and POSTs through
+        // the same fail-closed /api/project-override path). No date coercion, no
+        // dropdown. Office-gated by the caller (field() only emits the live branch for
+        // canEdit()); field_ops sees the read-view formatted string instead.
+        return pfWorkingHoursInputs(label, v, ' onchange="event.stopPropagation();window.pfWorkingHoursChange(this)"', 'pr-live-input');
+      }
       var common = 'class="pr-live-input" data-pr-field-label="'+esc2(label)+'" '
         + 'data-pr-live-prev="'+esc2(v)+'" onchange="event.stopPropagation();window.pfLiveFieldChange(this)"';
       if (PF_FIELD_TEXTAREA_LABELS[label]) {
