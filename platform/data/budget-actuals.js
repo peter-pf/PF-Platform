@@ -848,17 +848,17 @@ window.PF_BUDGET_ACTUALS = {
     "source_folder": "04 - Project Management/02 - Projects/25-026 - The Granary - FlCo",
     "source_file": "25-1229 The Granary - Turnover Budget.xlsm",
     "source_kind": "active",
-    "location": "Noblesville, IN",
+    "location": "",
     "grand_total": {
       "label": "Total Construction Contract",
-      "budget": 320200.0,
-      "actual": 17600.0,
-      "variance": 302600.0
+      "budget": null,
+      "actual": null,
+      "variance": 0.0
     },
     "actuals_by_group": {
       "general conditions oh": {
         "5600": 0.0,
-        "5710": 0.0,
+        "5710": 271.46,
         "5720": 0.0,
         "5730": 0.0,
         "6100": 0.0,
@@ -1132,17 +1132,17 @@ window.PF_BUDGET_ACTUALS = {
   },
   "26-002": {
     "job": "26-002",
-    "name": "POET Bioprocessing",
+    "name": "POET Projects",
     "status": "ok",
-    "source_folder": "04 - Project Management/02 - Projects/26-002 - POET Projects - POET",
+    "source_folder": "04 - Project Management/02 - Projects/001 - Completed Projects/2026/26-002 - POET Projects - POET",
     "source_file": "26-0709 POET Turnover Budget w add'l Bin CO.xlsm",
-    "source_kind": "active",
+    "source_kind": "completed/2026",
     "location": "",
     "grand_total": {
       "label": "Total Construction Contract",
-      "budget": 418037.07,
-      "actual": 141674.23,
-      "variance": 276362.84
+      "budget": null,
+      "actual": null,
+      "variance": 0.0
     },
     "actuals_by_group": {
       "general conditions oh": {
@@ -1171,10 +1171,10 @@ window.PF_BUDGET_ACTUALS = {
       "project professional services fees": {
         "5051": 38000.0,
         "5052": 0.0,
-        "5053": 14644.0
+        "5053": 21489.0
       },
       "project material costs": {
-        "5110": 37068.23,
+        "5110": 13178.05,
         "5130": 1496.0,
         "5190": 0.0
       },
@@ -1189,10 +1189,13 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 703.49
       },
       "project equipment costs": {
-        "5405": 16550.0,
-        "5410": 8699.94,
+        "5406": 8635.0,
+        "5407": 6385.0,
+        "5408": 6125.0,
+        "5409": 1865.0,
+        "5410": 17035.51,
         "5420": 0.0,
-        "5430": 6653.33,
+        "5430": 9276.23,
         "5500": 0.0
       },
       "project incentives contingencies": {
@@ -1493,14 +1496,14 @@ window.PF_BUDGET_ACTUALS = {
     "name": "Madison Lifestyle District Parking Garage",
     "status": "ok",
     "source_folder": "04 - Project Management/02 - Projects/26-007 - Madison Lifestyle Garage - Wilhelm",
-    "source_file": "26-0518 Madison Lifestyle Turnover Budget.xlsm",
+    "source_file": "26-0821 Madison Lifestyle Turnover Budget_RI CO.xlsm",
     "source_kind": "active",
     "location": "South Bend, IN",
     "grand_total": {
       "label": "Total Construction Contract",
-      "budget": 357049.69,
+      "budget": 365485.22,
       "actual": 91425.45,
-      "variance": 265624.24
+      "variance": 274059.77
     },
     "actuals_by_group": {
       "general conditions oh": {
@@ -1546,7 +1549,10 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 0.0
       },
       "project equipment costs": {
-        "5405": 7660.0,
+        "5406": 2435.0,
+        "5407": 1850.0,
+        "5408": 1275.0,
+        "5409": 2100.0,
         "5410": 9241.38,
         "5420": 0.0,
         "5430": 5822.71,
@@ -1618,7 +1624,10 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 0.0
       },
       "project equipment costs": {
-        "5405": 0.0,
+        "5406": 0.0,
+        "5407": 0.0,
+        "5408": 0.0,
+        "5409": 0.0,
         "5410": 0.0,
         "5420": 0.0,
         "5430": 0.0,
@@ -1777,17 +1786,17 @@ window.PF_BUDGET_ACTUALS = {
   },
   "26-011": {
     "job": "26-011",
-    "name": "Indianapolis Housing Hub",
+    "name": "Indy Housing",
     "status": "ok",
-    "source_folder": "04 - Project Management/02 - Projects/26-011 - Indy Housing - Shiel Sexton",
+    "source_folder": "04 - Project Management/02 - Projects/001 - Completed Projects/2026/26-011 - Indy Housing - Shiel Sexton",
     "source_file": "26-0518 Indy Housing Hub Turnover Budget.xlsm",
-    "source_kind": "active",
-    "location": "Indianapolis, IN",
+    "source_kind": "completed/2026",
+    "location": "",
     "grand_total": {
       "label": "Total Construction Contract",
-      "budget": 69700.0,
-      "actual": 8900.0,
-      "variance": 60800.0
+      "budget": null,
+      "actual": null,
+      "variance": 0.0
     },
     "actuals_by_group": {
       "general conditions oh": {
@@ -1819,7 +1828,7 @@ window.PF_BUDGET_ACTUALS = {
         "5053": 0.0
       },
       "project material costs": {
-        "5110": 0.0,
+        "5110": 2662.34,
         "5190": 0.0
       },
       "project labor costs": {
@@ -1834,10 +1843,13 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 0.0
       },
       "project equipment costs": {
-        "5405": 0.0,
-        "5410": 0.0,
+        "5406": 1745.0,
+        "5407": 1250.0,
+        "5408": 980.0,
+        "5409": 0.0,
+        "5410": 2040.91,
         "5420": 0.0,
-        "5430": 0.0,
+        "5430": 1314.34,
         "5500": 0.0
       },
       "project incentives contingencies": {
@@ -1924,14 +1936,14 @@ window.PF_BUDGET_ACTUALS = {
     "name": "Park & Poplar",
     "status": "ok",
     "source_folder": "04 - Project Management/02 - Projects/26-013 - Park & Poplar - OldTown",
-    "source_file": "26-0526 Park & Poplar Turnover Budget.xlsm",
+    "source_file": "26-0826 Park & Poplar Turnover Budget_Rev1.xlsm",
     "source_kind": "active",
     "location": "Westfield, IN",
     "grand_total": {
       "label": "Total Construction Contract",
-      "budget": 396910.0,
-      "actual": 19480.0,
-      "variance": 377430.0
+      "budget": 396393.19,
+      "actual": 20480.0,
+      "variance": 375913.19
     },
     "actuals_by_group": {
       "general conditions oh": {
@@ -1958,7 +1970,7 @@ window.PF_BUDGET_ACTUALS = {
         "6920": 0.0
       },
       "project professional services fees": {
-        "5051": 19480.0,
+        "5051": 20480.0,
         "5052": 0.0,
         "5053": 0.0
       },
@@ -1978,7 +1990,10 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 0.0
       },
       "project equipment costs": {
-        "5405": 0.0,
+        "5406": 0.0,
+        "5407": 0.0,
+        "5408": 0.0,
+        "5409": 0.0,
         "5410": 0.0,
         "5420": 0.0,
         "5430": 0.0,
@@ -2049,7 +2064,10 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 0.0
       },
       "project equipment costs": {
-        "5405": 0.0,
+        "5406": 0.0,
+        "5407": 0.0,
+        "5408": 0.0,
+        "5409": 0.0,
         "5410": 0.0,
         "5420": 0.0,
         "5430": 0.0,
@@ -2191,7 +2209,10 @@ window.PF_BUDGET_ACTUALS = {
         "5360": 0.0
       },
       "project equipment costs": {
-        "5405": 0.0,
+        "5406": 0.0,
+        "5407": 0.0,
+        "5408": 0.0,
+        "5409": 0.0,
         "5410": 0.0,
         "5420": 0.0,
         "5430": 0.0,
@@ -2275,17 +2296,168 @@ window.PF_BUDGET_ACTUALS = {
   },
   "26-018": {
     "job": "26-018",
-    "name": "Pivotal Perrysburg",
+    "name": "Pivitol Perrysburg",
     "status": "ok",
     "source_folder": "04 - Project Management/02 - Projects/26-018 - Pivitol Perrysburg - Ruscilli",
     "source_file": "26-0713 Pivotal Perrysburg Turnover Budget.xlsm",
     "source_kind": "active",
-    "location": "Perrysburg, OH",
+    "location": "",
     "grand_total": {
       "label": "Total Construction Contract",
-      "budget": 64233.0,
+      "budget": null,
+      "actual": null,
+      "variance": 0.0
+    },
+    "actuals_by_group": {
+      "general conditions oh": {
+        "5600": 0.0,
+        "5710": 90.49,
+        "5720": 0.0,
+        "5730": 0.0,
+        "6100": 0.0,
+        "6200": 0.0,
+        "6300": 0.0,
+        "6400": 0.0,
+        "6500": 0.0,
+        "6600": 0.0,
+        "7020": 0.0,
+        "7100": 0.0,
+        "7210": 0.0,
+        "7230": 0.0,
+        "7240": 0.0,
+        "7245": 0.0,
+        "7250": 0.0,
+        "7260": 0.0,
+        "7700": 0.0,
+        "6910": 0.0,
+        "6920": 0.0
+      },
+      "project professional services fees": {
+        "5051": 8500.0,
+        "5052": 0.0
+      },
+      "project material costs": {
+        "5110": 0.0,
+        "5190": 0.0
+      },
+      "project labor costs": {
+        "5210": 0.0,
+        "5220": 0.0,
+        "5230": 0.0
+      },
+      "project equipment costs": {
+        "5406": 3595.0,
+        "5407": 2675.0,
+        "5408": 1850.0,
+        "5420": 0.0,
+        "5500": 0.0
+      },
+      "project incentives contingencies": {
+        "5910": 0.0,
+        "5920": 0.0,
+        "5950": 0.0
+      }
+    }
+  },
+  "26-019": {
+    "job": "26-019",
+    "name": "Vivera Northbrook",
+    "status": "no-workbook",
+    "source_folder": "04 - Project Management/02 - Projects/26-019 - Vivera Northbrook - Marion Group",
+    "source_file": "",
+    "source_kind": "active",
+    "actuals_by_group": {},
+    "grand_total": {
+      "budget": null,
+      "actual": null,
+      "variance": null
+    }
+  },
+  "26-020": {
+    "job": "26-020",
+    "name": "Evansville Vanderburgh Library",
+    "status": "ok",
+    "source_folder": "04 - Project Management/02 - Projects/26-020 - Evansville Library - Arc Const",
+    "source_file": "26-0813 Evansville Vanderburgh Library - Turnover Budget.xlsm",
+    "source_kind": "active",
+    "location": "Evansville, IN",
+    "grand_total": {
+      "label": "Total Construction Contract",
+      "budget": 110768.5,
+      "actual": 0.0,
+      "variance": 110768.5
+    },
+    "actuals_by_group": {
+      "general conditions oh": {
+        "5600": 0.0,
+        "5710": 0.0,
+        "5720": 0.0,
+        "5730": 0.0,
+        "6100": 0.0,
+        "6200": 0.0,
+        "6300": 0.0,
+        "6400": 0.0,
+        "6500": 0.0,
+        "6600": 0.0,
+        "7020": 0.0,
+        "7100": 0.0,
+        "7210": 0.0,
+        "7230": 0.0,
+        "7240": 0.0,
+        "7245": 0.0,
+        "7250": 0.0,
+        "7260": 0.0,
+        "7700": 0.0,
+        "6910": 0.0,
+        "6920": 0.0
+      },
+      "project professional services fees": {
+        "5051": 0.0,
+        "5052": 0.0,
+        "5053": 0.0
+      },
+      "project material costs": {
+        "5110": 0.0,
+        "5190": 0.0
+      },
+      "project labor costs": {
+        "5210": 0.0,
+        "5220": 0.0,
+        "5230": 0.0,
+        "5310": 0.0,
+        "5320": 0.0,
+        "5330": 0.0,
+        "5340": 0.0,
+        "5350": 0.0,
+        "5360": 0.0
+      },
+      "project equipment costs": {
+        "5405": 0.0,
+        "5410": 0.0,
+        "5420": 0.0,
+        "5430": 0.0,
+        "5500": 0.0
+      },
+      "project incentives contingencies": {
+        "5910": 0.0,
+        "5920": 0.0,
+        "5950": 0.0
+      }
+    }
+  },
+  "26-021": {
+    "job": "26-021",
+    "name": "Townplace Suites",
+    "status": "ok",
+    "source_folder": "04 - Project Management/02 - Projects/26-021 - TPS Greenwood - Brackett",
+    "source_file": "26-0819 TPS Greenwood - Turnover Budget.xlsm",
+    "source_kind": "active",
+    "location": "Greenwood, IN",
+    "grand_total": {
+      "label": "Total Construction Contract",
+      "budget": 67699.83,
       "actual": 19420.0,
-      "variance": 44813.0
+      "variance": 48279.83
     },
     "actuals_by_group": {
       "general conditions oh": {
@@ -2345,25 +2517,83 @@ window.PF_BUDGET_ACTUALS = {
       }
     }
   },
-  "26-019": {
-    "job": "26-019",
-    "name": "Vivera Northbrook",
-    "status": "no-workbook",
-    "source_folder": "04 - Project Management/02 - Projects/26-019 - Vivera Northbrook - Marion Group",
-    "source_file": "",
+  "26-022": {
+    "job": "26-022",
+    "name": "DFS Grain Bins",
+    "status": "ok",
+    "source_folder": "04 - Project Management/02 - Projects/26-022 - DFS Grain Bins - Mid-States",
+    "source_file": "26-0908 DFS Grain Turnover Budget.xlsm",
     "source_kind": "active",
-    "actuals_by_group": {},
+    "location": "Oskaloosa, IA",
     "grand_total": {
-      "budget": null,
-      "actual": null,
-      "variance": null
+      "label": "Total Construction Contract",
+      "budget": 180700.0,
+      "actual": 0.0,
+      "variance": 180700.0
+    },
+    "actuals_by_group": {
+      "general conditions oh": {
+        "5600": 0.0,
+        "5710": 0.0,
+        "5720": 0.0,
+        "5730": 0.0,
+        "6100": 0.0,
+        "6200": 0.0,
+        "6300": 0.0,
+        "6400": 0.0,
+        "6500": 0.0,
+        "6600": 0.0,
+        "7020": 0.0,
+        "7100": 0.0,
+        "7210": 0.0,
+        "7230": 0.0,
+        "7240": 0.0,
+        "7245": 0.0,
+        "7250": 0.0,
+        "7260": 0.0,
+        "7700": 0.0,
+        "6910": 0.0,
+        "6920": 0.0
+      },
+      "project professional services fees": {
+        "5051": 0.0,
+        "5052": 0.0,
+        "5053": 0.0
+      },
+      "project material costs": {
+        "5110": 0.0,
+        "5190": 0.0
+      },
+      "project labor costs": {
+        "5210": 0.0,
+        "5220": 0.0,
+        "5230": 0.0,
+        "5310": 0.0,
+        "5320": 0.0,
+        "5330": 0.0,
+        "5340": 0.0,
+        "5350": 0.0,
+        "5360": 0.0
+      },
+      "project equipment costs": {
+        "5405": 0.0,
+        "5410": 0.0,
+        "5420": 0.0,
+        "5430": 0.0,
+        "5500": 0.0
+      },
+      "project incentives contingencies": {
+        "5910": 0.0,
+        "5920": 0.0,
+        "5950": 0.0
+      }
     }
   },
   "_meta": {
-    "generated": "2026-08-11T14:20:11.226344Z",
+    "generated": "2026-09-10T11:32:22.683027Z",
     "source": "Turnover Budget workbooks (sheet 'Budget vs Actual') via MS Graph. QuickBooks-independent.",
-    "jobs": 42,
-    "ok_count": 31,
+    "jobs": 45,
+    "ok_count": 34,
     "missing": [
       {
         "job": "24-010",
@@ -2432,7 +2662,20 @@ window.PF_BUDGET_ACTUALS = {
         "file": ""
       }
     ],
-    "unmatched_actuals": [],
+    "unmatched_actuals": [
+      {
+        "job": "26-002",
+        "group": "Project Material Costs",
+        "description": "Vibratory Stone Columns - Stone",
+        "actual": 49213.95
+      },
+      {
+        "job": "26-011",
+        "group": "Project Material Costs",
+        "description": "Vibratory Stone Columns - Stone",
+        "actual": 9193.33
+      }
+    ],
     "note": "Per-project ACTUAL costs parsed from each Turnover Budget workbook. Overlaid onto the standard cost-code template by (group title + cost code). Variance recomputed = Budget - Actual. Blanks stay blank; a job with no resolvable workbook shows a dash (never a fabricated 0)."
   }
 };

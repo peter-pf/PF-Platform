@@ -27,15 +27,68 @@ BRANCH="main"
 DOCS_DONE=0
 DRYRUN=0
 
+# Recognized deploy targets. A --branch value MUST match one of these or the
+# deploy FAILS LOUDLY (see the branch-trap fix below). 'main' = PRODUCTION.
+is_recognized_branch() {
+  case "$1" in
+    main|website-build-*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# BRANCH-TRAP FIX (2026-09-10): the previous loop treated `--branch` as a no-op
+# and swallowed any unrecognized branch VALUE via `*) ;;`, leaving BRANCH="main"
+# (PRODUCTION). That is exactly how the budget_actuals daemon's staging branch
+# deployed to prod (July incident). Now we CAPTURE the value after --branch and
+# VALIDATE it; an unrecognized branch aborts the deploy instead of silently
+# publishing to production.
+EXPECT_BRANCH_VALUE=0
+BRANCH_EXPLICIT=""
 for a in "$@"; do
+  if [ "$EXPECT_BRANCH_VALUE" -eq 1 ]; then
+    BRANCH_EXPLICIT="$a"
+    EXPECT_BRANCH_VALUE=0
+    continue
+  fi
   case "$a" in
     --docs-done) DOCS_DONE=1 ;;
     --dry-run)   DRYRUN=1 ;;
-    --branch)    : ;;            # handled below
-    main|website-build-*) BRANCH="$a" ;;
-    *) ;;
+    --branch)    EXPECT_BRANCH_VALUE=1 ;;   # the NEXT arg is the branch value
+    main|website-build-*) BRANCH="$a" ;;    # bare positional target (back-compat)
+    -*)
+      echo "  X DEPLOY BLOCKED: unknown flag '$a'." >&2
+      exit 4 ;;
+    *)
+      echo "  X DEPLOY BLOCKED: unrecognized argument '$a'." >&2
+      echo "     A stray argument will NOT be silently deployed to production." >&2
+      exit 4 ;;
   esac
 done
+
+# If --branch was given without a following value, abort (do NOT default to prod).
+if [ "$EXPECT_BRANCH_VALUE" -eq 1 ]; then
+  echo "  X DEPLOY BLOCKED: --branch given with no branch value." >&2
+  exit 4
+fi
+
+# Validate an explicit --branch value. Unrecognized => FAIL LOUDLY (no prod deploy).
+if [ -n "$BRANCH_EXPLICIT" ]; then
+  if is_recognized_branch "$BRANCH_EXPLICIT"; then
+    BRANCH="$BRANCH_EXPLICIT"
+  else
+    echo "  X DEPLOY BLOCKED: unrecognized --branch '$BRANCH_EXPLICIT'." >&2
+    echo "     Recognized targets: main | website-build-*" >&2
+    echo "     (This guard replaces the old silent fall-through that deployed" >&2
+    echo "      any unknown branch straight to PRODUCTION main — the July incident.)" >&2
+    exit 4
+  fi
+fi
+
+# Final belt-and-suspenders: whatever BRANCH ended up as, it must be recognized.
+if ! is_recognized_branch "$BRANCH"; then
+  echo "  X DEPLOY BLOCKED: resolved branch '$BRANCH' is not a recognized target." >&2
+  exit 4
+fi
 
 cd "$REPO"
 
