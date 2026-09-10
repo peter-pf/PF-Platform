@@ -20226,6 +20226,121 @@ try {
       _curSection = _subNewPrevSection;
       // ===== END SANDBOX: Subcontract Agreement - New ===========================
 
+      // ===== SANDBOX: Engineering & Design - New (Brad 2026-09-10) ==============
+      // Second big sandbox rebuild (mirrors the "Subcontract Agreement - New" model
+      // above): an ADDITIVE, PARALLEL twin of the Engineering & Design card rendered
+      // in the Site Readiness / Mob Prep / Safety sandbox format (blue _srNewCollapsible
+      // roll-up bars + Inventory-style rows, all wrapped in .pf-srnew-scope). The
+      // ORIGINAL E&D card (card(4,'Engineering & Design',...) at ~L18435) is UNTOUCHED —
+      // Brad redlines this twin, then we promote later.
+      //
+      // PLACEMENT / EXECUTION ORDER (the crash the Subcontract sandbox first hit): the
+      // sandbox helpers _srNewSubTable / _srNewCollapsible / _srNewSafetyInvTable are
+      // var-function-EXPRESSIONS (defined ~L19142-19426, NOT hoisted). This block runs
+      // HERE (~L20228, immediately after the Subcontract sandbox append) so those
+      // assignments have already executed — calling them up in the original E&D render
+      // region (~L18318) would hit them before assignment => TypeError => whole PM view
+      // crashes. Do NOT relocate this block above ~L19426.
+      //
+      // SAME-KEY DATA BINDING (no orphan, no migration): card(...,'engineering') so this
+      // twin reads/writes the SAME 'engineering' override bucket as the original. Every
+      // field label is BYTE-IDENTICAL to the original E&D fields (no renames), so values
+      // already saved under 'engineering' surface here and vice-versa. Two cards sharing
+      // data-pr-section="engineering" is SAFE (same precedent as the two siteReadiness
+      // cards + the two 'contract' cards): the original is _srLiveEdit=false (Edit/Save
+      // flow, scans its OWN card's .pr-editor) and this twin is _srLiveEdit=true (live
+      // save-on-change .pr-live-input, Edit button suppressed), so their save scans never
+      // cross.
+      //
+      // FORMULAS / COMPUTED preserved by REUSING the original builders VERBATIM — logic
+      // cannot drift:
+      //   - Prelim Design: garbinPrelimWorkbookField/garbinPrelimFolderField/garbinDiaInches/
+      //     garbinTotalStoneField + the same Garbin-vs-BidLog seed precedence (gp recomputed
+      //     locally via pfGarbinPrelim(_curNum)).
+      //   - PF Submittal Design: submittalPrereqsBlock(pfShopDwgInfo) + submittalWorkflowBlock(
+      //     pfDesignSubmittalFolder) — the SAME builders that render the GC Prerequisites
+      //     checklist (reserved __submittal_prereqs), the revision-cycle workflow (reserved
+      //     __submittal_cycles), the Submittal Summary table (reserved __site_elevations, whose
+      //     Pier Qty/Total LF rows feed the header Total LF / # Piers via
+      //     pfSubmittalSummaryTotalsFor — untouched, still ONE source) AND the Printing Drawings
+      //     block (rendered inside submittalWorkflowBlock below the Summary). These builders emit
+      //     NO .pr-card and do NOT touch _curSection/_srLiveEdit; they read the ambient
+      //     _curSection='engineering' at call time exactly as in the original render — so their
+      //     inline editors + reserved keys round-trip identically. Their own handlers resolve via
+      //     their internal markers (walk UP past the .pf-srnew-scope + .pf-sr-collapse wrappers),
+      //     which is ancestor-agnostic to the extra layers.
+      //   - As Built Drawings: same subgroupSub + subgroupNote + linkRow(engineering+general).
+      //
+      // RBAC UNCHANGED: this whole PM-view render path is office-only (field_ops uses the
+      // separate 4-arg field view at ~L35154 and the server 403s /api/project-override via
+      // requireArea('engineering'/'financials')). field()'s live controls only emit for
+      // canEdit(); non-office falls back to read spans. No loosening. LOCAL: no shared helper
+      // or CSS touched (reuses _srNewCollapsible/_srNewSubTable + the original E&D builders
+      // verbatim).
+      var _engNewPrevSection = _curSection;
+      var _engNewPrevLive = _srLiveEdit;
+      _curSection = 'engineering';
+      _srLiveEdit = true;   // live save-on-change controls (like Mob Prep); suppresses Edit btn
+
+      // Garbin Prelim for THIS project (local — the original engBody's `gp` is out of scope
+      // here). null when no Garbin workbook -> the Garbin display fields render blank.
+      var _engN_gp = pfGarbinPrelim(_curNum);
+
+      // ---- Subsection 1: Prelim Design (Inventory rows) — mirrors prelimInner ----
+      // Field-for-field identical to the original prelimInner (same values, same seed
+      // precedence, same conditional Total Stone row), rendered as an Inventory sub-table.
+      var _engN_prelimFields = [
+          garbinPrelimWorkbookField(_engN_gp),
+          garbinPrelimFolderField(_engN_gp),
+          field('Total LF (Prelim)',
+                (_engN_gp && _engN_gp.lf != null && _engN_gp.lf !== '') ? _engN_gp.lf : (bid.total_lf || ''),
+                (_engN_gp && _engN_gp.lf != null && _engN_gp.lf !== '') ? 'Garbin Prelim' : (bid.total_lf ? 'Bid Log' : '')),
+          field('Total Pier Qty (Prelim)',
+                (_engN_gp && _engN_gp.total_columns != null && _engN_gp.total_columns !== '') ? _engN_gp.total_columns : (bid.total_columns || ''),
+                (_engN_gp && _engN_gp.total_columns != null && _engN_gp.total_columns !== '') ? 'Garbin Prelim' : (bid.total_columns ? 'Bid Log' : '')),
+          field('Column Diameter (inches)', garbinDiaInches(_engN_gp),
+                garbinDiaInches(_engN_gp) ? 'Garbin Prelim' : '')
+        ].concat(
+          garbinTotalStoneField(_engN_gp) ? [garbinTotalStoneField(_engN_gp)] : []
+        ).concat([
+          field('SOW', '')
+        ]);
+      var _engN_prelimInner =
+          subgroupNote('The prelim design the bid was based on. FUTURE: values auto-extract from the linked Prelim Design document.')
+        + _srNewSubTable('Prelim Design', _engN_prelimFields, { noHeadbar: true, noThead: true });
+
+      // ---- Subsection 2: PF Submittal Design — REUSE the original builders VERBATIM ----
+      // submittalPrereqsBlock + submittalWorkflowBlock carry the GC Prerequisites checklist,
+      // the revision-cycle workflow, the Submittal Summary (__site_elevations -> header totals
+      // via pfSubmittalSummaryTotalsFor) AND the Printing Drawings block (inside the workflow
+      // block, below the Summary). Wrapped directly under the blue bar (same way the Financials
+      // sandbox wraps finPayApps/baHtml directly) so every computed value + inline editor is
+      // preserved with ZERO drift.
+      var _engN_submittalInner =
+          submittalPrereqsBlock(pfShopDwgInfo(_curNum))
+        + submittalWorkflowBlock(pfDesignSubmittalFolder(_curNum));
+
+      // ---- Subsection 3: As Built Drawings — mirrors asBuiltInner ----
+      var _engN_asBuiltInner =
+          subgroupSub('Field As-Built Drawings')
+        + subgroupNote('Each daily-report upload saves a dated file per day; Peter compares installed vs the Approved Shop Drawing and posts a daily summary (LF, columns, start/end from rig data).')
+        + linkRow((L.engineering || []).concat(L.general || []));
+
+      // Assemble the 3 subgroups in the SAME order as the original (Prelim Design / PF
+      // Submittal Design / As Built Drawings) via _srNewCollapsible. DEFAULT COLLAPSED
+      // (open omitted -> false) for density; Brad expands to redline.
+      var _engNewBody =
+          _srNewCollapsible('Prelim Design', _engN_prelimInner, false)
+        + _srNewCollapsible('PF Submittal Design', _engN_submittalInner, false)
+        + _srNewCollapsible('As Built Drawings', _engN_asBuiltInner, false);
+      // _srLiveEdit STAYS true through card() so its Edit button is suppressed (no duplicate
+      // pr-edit-btn data-pr-section="engineering"); restored AFTER the append.
+      html += card(4, 'Engineering & Design - New', null,
+        '<div class="pf-srnew-scope">' + _engNewBody + '</div>', false, 'engineering');
+      _srLiveEdit = _engNewPrevLive;
+      _curSection = _engNewPrevSection;
+      // ===== END SANDBOX: Engineering & Design - New ============================
+
       // ----- 6. Project Photos (LIVE, READ-ONLY gallery) -----
       // A live thumbnail gallery of this project's SharePoint "02 - Project Photos"
       // folder, fetched on-expand from /api/project-photos?num=<project number>.
