@@ -3237,6 +3237,15 @@ tr.pf-dragging { opacity: 0.45; }
 .bid-note { color: var(--text-3); font-size: 0.75rem; margin-top: 2px; }
 .bid-table a { color: var(--accent); text-decoration: none; white-space: nowrap; }
 .bid-table a:hover { text-decoration: underline; }
+/* CANONICAL PHONE-LINK STYLE (Brad 2026-09-10). Every phone rendered via
+   window.pfPhoneLink() carries class="pf-tel" so it reads identically EVERYWHERE:
+   PF brand blue (--accent), no underline until hover, never wraps mid-number. This
+   is the single class that makes Garbin, the PF Project Team, the Project Contacts
+   CRM, the subcontractor directory, emergency contacts, and field-ops answer cards
+   all look the same. Uses !important so it wins even inside table/contact contexts
+   that set their own darker anchor color. */
+a.pf-tel { color: var(--accent) !important; text-decoration: none; white-space: nowrap; }
+a.pf-tel:hover { text-decoration: underline; }
 .bid-foot { display: flex; justify-content: space-between; align-items: center;
   padding: 12px 20px; border-top: 1px solid var(--border);
   background: var(--bg-1); font-weight: 700; }
@@ -4448,6 +4457,55 @@ window.pfFmtPhone = function(v){
   if (digits.length === 11 && digits.charAt(0) === '1') digits = digits.slice(1);
   if (digits.length !== 10) return s;
   return '(' + digits.slice(0,3) + ') ' + digits.slice(3,6) + '-' + digits.slice(6) + ext;
+};
+
+// ---- CANONICAL PHONE LINK RENDERER (global, Brad 2026-09-10) ----------------
+// SINGLE source of truth for how a phone renders EVERYWHERE in the portal: a BLUE,
+// CLICKABLE tel: link showing (xxx) xxx-xxxx — identical to how Ed Garbin's contact
+// info already reads (that path used the local linkPhone()). Brad: "All phone
+// numbers throughout the entire portal need to be reflected as (xxx) xxx-xxxx and
+// highlight in blue and be clickable similar to how Ed Garbins Contact info
+// populates." So Garbin, the PF Project Team, the Project Contacts CRM, GC/owner/
+// engineer contacts, the subcontractor directory, emergency contacts, and the
+// field-ops answer cards ALL route through THIS one function → they finally look
+// identical.
+//   RETURNS an HTML STRING (escaped) — callers splice it straight into innerHTML.
+//   Display : window.pfFmtPhone(v) — normalizes standard 10-digit US numbers to
+//             (xxx) xxx-xxxx, strips a leading +1/1, preserves a trailing extension,
+//             and passes ANYTHING it does not recognize through UNCHANGED.
+//   Link    : <a href="tel:+1XXXXXXXXXX" class="pf-tel"> for a clean 10-digit US
+//             number; best-effort tel: on the raw dialable chars otherwise; the .pf-tel
+//             class carries the portal blue link styling (see the global a.pf-tel rule).
+//   FAIL SAFE: empty / null / "—" / a non-phone string (name, arbitrary text, too few
+//             or too many digits to dial) renders as PLAIN escaped text — NEVER wrapped
+//             in tel:, NEVER fabricated into digits. An empty value returns the caller's
+//             placeholder (default em-dash "—"). International/non-standard numbers get a
+//             best-effort tel: on their digits but keep their original (unmasked) display.
+//   XSS-safe: the visible text is escaped via window.esc and the href is built only from
+//             sanitized [0-9+] characters — no untrusted string reaches the DOM unescaped.
+window.pfPhoneLink = function(v, placeholder){
+  var ph = (placeholder === undefined) ? '—' : placeholder; // em-dash default
+  var esc = window.esc ? window.esc : function(s){ return String(s == null ? '' : s); };
+  if (v === undefined || v === null) return ph;
+  var s = String(v).trim();
+  if (!s || s === '—' || s === '-') return ph;
+  // Dialable chars only (keep a leading + for international). Strip everything else.
+  var tel = s.replace(/[^0-9+]/g, '');
+  // Count real digits to decide "is this even a phone?" (ignore a leading +).
+  var digits = tel.replace(/\D/g, '');
+  var shown = window.pfFmtPhone(s); // (xxx) xxx-xxxx for a clean US number, else unchanged
+  // Not dialable at all (no digits) OR clearly not a phone (fewer than 7 digits — too
+  // short for any real number): render as-is, never a bogus tel:. Words like a name
+  // ("Sales Desk") have no digits → fall through to plain text here.
+  if (!tel || digits.length < 7) return esc(shown);
+  // A clean US number → canonical tel:+1XXXXXXXXXX. 11-digit leading-1 → drop the 1 and
+  // re-prefix +1. Everything else (already +intl, 7-digit local, >11 digits) → best-effort
+  // tel: on the dialable chars exactly as given (display stays whatever pfFmtPhone returned).
+  var href;
+  if (digits.length === 10) href = 'tel:+1' + digits;
+  else if (digits.length === 11 && digits.charAt(0) === '1') href = 'tel:+1' + digits.slice(1);
+  else href = 'tel:' + tel;
+  return '<a href="' + esc(href) + '" class="pf-tel">' + esc(shown) + '</a>';
 };
 
 // Defined at global scope so every inlined module can call window.pfFmtQty().
@@ -12502,7 +12560,7 @@ try {
       var bold = e === 0 ? ' style="color:var(--red);font-weight:600"' : '';
       html += '<tr' + bold + '>';
       html += '<td><strong>' + esc(ec.name) + '</strong></td>';
-      html += '<td>' + esc(window.pfFmtPhone(ec.phone)) + '</td>';
+      html += '<td>' + window.pfPhoneLink(ec.phone) + '</td>';
       html += '<td>' + esc(ec.role) + '</td>';
       html += '</tr>';
     }
@@ -13586,7 +13644,7 @@ try {
       html += '<td><strong>' + esc(v.name) + '</strong></td>';
       html += '<td>' + esc(v.service) + '</td>';
       html += '<td>' + esc(v.contact) + '</td>';
-      html += '<td>' + esc(window.pfFmtPhone(v.phone)) + '</td>';
+      html += '<td>' + window.pfPhoneLink(v.phone, '--') + '</td>';
       html += '<td>' + (v.email ? '<a href="mailto:' + esc(v.email) + '">' + esc(v.email) + '</a>' : '--') + '</td>';
       html += '<td>' + v.rate + '</td>';
       html += '<td><span class="badge-status ' + statusClass(v.status) + '">' + esc(v.status) + '</span></td>';
@@ -14744,14 +14802,14 @@ try {
       return '<a href="'+E(href)+'" target="_blank" rel="noopener noreferrer">'+E(s)+'</a>';
     }
     function linkPhone(v){
-      var s = v == null ? '' : String(v).trim();
-      if (!s) return '';
-      // href = dialable digits (+ preserved); visible text = (111) 111-1111 when
-      // it is a clean 10-digit US number, else the original text unchanged.
-      var tel = s.replace(/[^0-9+]/g, '');
-      var shown = pfFmtPhone(s);
-      if (!tel) return E(shown);
-      return '<a href="tel:'+E(tel)+'">'+E(shown)+'</a>';
+      // Delegate to the SINGLE canonical phone renderer (window.pfPhoneLink) so the
+      // section-editor phone fields — the path Ed Garbin's contact info uses — emit the
+      // EXACT same blue, clickable, (xxx) xxx-xxxx .pf-tel link as every other phone in the
+      // portal (Brad 2026-09-10, "one code path"). Empty placeholder ('') keeps the prior
+      // "blank -> empty string" behavior so fieldLinked's blank/em-dash handling is unchanged.
+      // fieldLinked reads valEl.textContent back to a plain string on edit, and the anchor's
+      // textContent is the shown number, so the save round-trip is unaffected.
+      return window.pfPhoneLink(v, '');
     }
     // fieldLinked(label,val,src,kind): a field() whose VALUE is rendered as a
     // clickable link ('email'|'website'|'phone'). Keeps the SAME
@@ -16907,8 +16965,8 @@ try {
     // ---- contact card ----
     function contactBlock(c){
       var lines = [];
-      if (c.phone) lines.push('<span>Office: '+E(pfFmtPhone(c.phone))+'</span>');
-      if (c.cell)  lines.push('<span>Cell: '+E(pfFmtPhone(c.cell))+'</span>');
+      if (c.phone) lines.push('<span>Office: '+window.pfPhoneLink(c.phone)+'</span>');
+      if (c.cell)  lines.push('<span>Cell: '+window.pfPhoneLink(c.cell)+'</span>');
       if (c.email) lines.push('<span>Email: <a href="mailto:'+E(c.email)+'">'+E(c.email)+'</a></span>');
       if (c.website) lines.push('<span>'+E(c.website)+'</span>');
       if (c.address) lines.push('<span>'+E(c.address)+'</span>');
@@ -21396,6 +21454,39 @@ try {
       // get first-class contact blocks with a cascading CRM selector where a
       // master-list Category exists (see PF_CRM_CONTACT_TRADE); Category strings are
       // FLAGGED for Brad to confirm.
+      // ---- PRESERVE EXPANDED-CARD STATE + SCROLL ACROSS RE-RENDER (Brad 2026-09-10) ----
+      // A section-editor Save (pfSaveSection) re-runs renderInto to show the override merge.
+      // renderInto rebuilds ALL .pr-card innerHTML from scratch, so every card reverts to its
+      // DEFAULT collapsed state and the page jumps to the top — the exact symptom Brad reported
+      // ("after making an edit it closes the Project Contacts section and goes back to the main
+      // page"). Capture which top-level cards were expanded (keyed by data-pr-section, with the
+      // visible card title as a fallback key for cards that carry no section attr — e.g. the
+      // Project Contacts container) plus the scrollY, THEN restore both after the rebuild. This
+      // is a pure UI-STATE fix: it never touches the record data, overrides, or RBAC. It fixes
+      // EVERY save path that re-renders the record (contacts add/edit/remove routed through the
+      // section editor, and any other section edit) in one place.
+      var _pfPrevOpenState = (function(){
+        var st = { keys: {}, scrollY: 0, hadCards: false };
+        try {
+          var prev = root.querySelectorAll(':scope > .pr-card');
+          st.hadCards = prev.length > 0;
+          for (var i = 0; i < prev.length; i++){
+            var c = prev[i];
+            if (!c.classList.contains('open')) continue;
+            var sk = c.getAttribute('data-pr-section');
+            if (sk) { st.keys['sec:' + sk] = 1; }
+            else {
+              var t = c.querySelector(':scope > .pr-card-head > .pr-card-title');
+              if (t && t.textContent) st.keys['title:' + t.textContent.trim()] = 1;
+            }
+          }
+          st.scrollY = (typeof window !== 'undefined' && typeof window.scrollY === 'number') ? window.scrollY : 0;
+          var _sc = document.scrollingElement || document.documentElement;
+          if (_sc && typeof _sc.scrollTop === 'number' && !st.scrollY) st.scrollY = _sc.scrollTop;
+        } catch(e){}
+        return st;
+      })();
+
       root.innerHTML = html;
 
       var genCard = root.querySelector('.pr-card[data-pr-section="general"] .pr-card-body');
@@ -22222,6 +22313,43 @@ try {
       // "X/Y Fields Complete, XX%" readout on each sandbox collapse bar (Staking & Layout,
       // Testing, Safety, and each Safety subcategory), computed from the identical blank rule.
       try { pfRenderSandboxSubStatus(root); } catch (e) {}
+
+      // ---- RESTORE EXPANDED-CARD STATE + SCROLL (Brad 2026-09-10) ---------------------
+      // Re-open exactly the top-level cards that were open before this re-render, and return
+      // the viewport to where the user was. Only runs when the PRIOR render actually had cards
+      // (a re-render, e.g. after a Save) — the FIRST open of a project has no prior state, so
+      // default collapse behavior is untouched (cards still open rolled-up on first view).
+      // Matches by data-pr-section, falling back to the visible title (Project Contacts has no
+      // section attr). Fail-soft: any miss just leaves that card at its default state.
+      try {
+        if (_pfPrevOpenState && _pfPrevOpenState.hadCards && Object.keys(_pfPrevOpenState.keys).length) {
+          var _nowCards = root.querySelectorAll(':scope > .pr-card');
+          for (var _ci = 0; _ci < _nowCards.length; _ci++){
+            var _cc = _nowCards[_ci];
+            var _sk = _cc.getAttribute('data-pr-section');
+            var _open = false;
+            if (_sk && _pfPrevOpenState.keys['sec:' + _sk]) _open = true;
+            if (!_open) {
+              var _t = _cc.querySelector(':scope > .pr-card-head > .pr-card-title');
+              if (_t && _t.textContent && _pfPrevOpenState.keys['title:' + _t.textContent.trim()]) _open = true;
+            }
+            if (_open) _cc.classList.add('open');
+          }
+          // Restore scroll AFTER the DOM has laid out the re-expanded cards, so the position
+          // maps to the same content height (rAF lets layout settle first; a 0ms fallback
+          // covers environments without rAF). Never scrolls on a first-open (no prior state).
+          var _sy = _pfPrevOpenState.scrollY || 0;
+          var _doScroll = function(){
+            try {
+              if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') window.scrollTo(0, _sy);
+              var _sc2 = document.scrollingElement || document.documentElement;
+              if (_sc2 && typeof _sc2.scrollTop === 'number') _sc2.scrollTop = _sy;
+            } catch(e){}
+          };
+          if (typeof requestAnimationFrame === 'function') requestAnimationFrame(_doScroll);
+          else setTimeout(_doScroll, 0);
+        }
+      } catch(e){}
 
       _curSection = ''; // done rendering this record
     }
@@ -25509,8 +25637,13 @@ try {
         }
 
         var rowHtml = rows.map(function(r){
-          var off = r.office ? '<a href="tel:' + esc2(r.office) + '">' + esc2(pfFmtPhone(r.office)) + '</a>' : '';
-          var cell = r.cell ? '<a href="tel:' + esc2(r.cell) + '">' + esc2(pfFmtPhone(r.cell)) + '</a>' : '';
+          // Route through the SINGLE canonical phone renderer (window.pfPhoneLink) so these
+          // Project Contacts rows are byte-identical to Garbin / PF Team / every other phone
+          // in the portal — blue, clickable tel:, (xxx) xxx-xxxx (Brad 2026-09-10). Empty
+          // placeholder ('') preserves the row layout's blank-cell behavior (the .pr-crow-off /
+          // .pr-crow-cell wrapper handles an empty string; a filled value is a .pf-tel link).
+          var off = r.office ? window.pfPhoneLink(r.office, '') : '';
+          var cell = r.cell ? window.pfPhoneLink(r.cell, '') : '';
           var email = r.email ? '<a href="mailto:' + esc2(r.email) + '">' + esc2(r.email) + '</a>' : '';
           // LIVE INLINE EDIT (Brad 2026-09-09): for OFFICE users (_rowEditable === canEdit())
           // AND a resolved directory contact (r.cid, non-legacy), every field renders as a
@@ -34962,8 +35095,8 @@ try {
 
     function contactBlock(c){
       var lines = [];
-      if (c.phone) lines.push('<span>Office: '+E(window.pfFmtPhone(c.phone))+'</span>');
-      if (c.cell)  lines.push('<span>Cell: '+E(window.pfFmtPhone(c.cell))+'</span>');
+      if (c.phone) lines.push('<span>Office: '+window.pfPhoneLink(c.phone)+'</span>');
+      if (c.cell)  lines.push('<span>Cell: '+window.pfPhoneLink(c.cell)+'</span>');
       if (c.email) lines.push('<span>Email: <a href="mailto:'+E(c.email)+'">'+E(c.email)+'</a></span>');
       if (c.address) lines.push('<span>'+E(c.address)+'</span>');
       var noteTxt = scrubMoney(c.notes);
@@ -35138,8 +35271,8 @@ try {
       if (c.scope && c.scope.toLowerCase() !== String(category||'').toLowerCase()) who.push('<span class="fo-ans-scope">'+E(c.scope)+'</span>');
       if (who.length) lines.push('<div class="fo-ans-name">'+who.join(' &middot; ')+'</div>');
       var ct = [];
-      if (c.phone) ct.push('Office: '+E(window.pfFmtPhone(c.phone)));
-      if (c.cell)  ct.push('Cell: '+E(window.pfFmtPhone(c.cell)));
+      if (c.phone) ct.push('Office: '+window.pfPhoneLink(c.phone));
+      if (c.cell)  ct.push('Cell: '+window.pfPhoneLink(c.cell));
       if (c.email) ct.push('<a href="mailto:'+E(c.email)+'">'+E(c.email)+'</a>');
       if (c.website) ct.push('<a href="'+(/^https?:/i.test(c.website)?E(c.website):'https://'+E(c.website))+'" target="_blank" rel="noopener noreferrer">'+E(c.website)+'</a>');
       if (ct.length) lines.push('<div class="fo-ans-contact">'+ct.join(' &nbsp; ')+'</div>');
@@ -40948,16 +41081,22 @@ try {
   }
   function telHref(v) {
     // tel: URIs allow digits, +, and a few separators; strip everything else.
-    return 'tel:' + String(v).replace(/[^0-9+]/g, '');
+    return 'tel:' + String(v == null ? '' : v).replace(/[^0-9+]/g, '');
   }
   // CHANGE F (Derek 8/27 "auto format the phone number field to read with () and -"):
   // format a US phone number for DISPLAY as (XXX) XXX-XXXX. We do NOT mangle the stored
   // value — the store keeps the digits/text as typed; this formats only at render/blur.
-  // - 10 digits           -> (XXX) XXX-XXXX
-  // - 11 digits leading 1  -> (XXX) XXX-XXXX (drop the US country code for display)
-  // - anything else        -> returned as-entered (incomplete/international/extension left alone)
+  // Delegates to the SINGLE global window.pfFmtPhone (Brad 2026-09-10, "one code path")
+  // so this supplier-detail phone formats byte-identically to every other phone in the
+  // portal (Garbin, PF Team, Project Contacts). Same rules: 10 digits -> (XXX) XXX-XXXX;
+  // 11 digits leading 1 -> drop the country code; extension preserved; anything else
+  // returned as-entered (never mangled). Fallback keeps the old local logic if the global
+  // is somehow unavailable.
   function fmtUsPhone(v) {
     if (v == null) return '';
+    if (typeof window !== 'undefined' && typeof window.pfFmtPhone === 'function') {
+      return String(window.pfFmtPhone(v));
+    }
     var s = String(v);
     var d = s.replace(/[^0-9]/g, '');
     if (d.length === 11 && d.charAt(0) === '1') d = d.slice(1);
@@ -41088,8 +41227,11 @@ try {
       } else if (kind === 'tel' && display) {
         // tel link so a tap on a phone dials (or texts) the supplier contact.
         // CHANGE F: link href uses RAW digits (telHref); the visible text is the
-        // formatted (XXX) XXX-XXXX (fmtUsPhone). Non-standard values show as-entered.
-        h += '<a class="inv-df-val inv-df-link" href="' + E(telHref(display)) + '">' + E(fmtUsPhone(display)) + '</a>';
+        // formatted (XXX) XXX-XXXX (fmtUsPhone, now delegating to the global normalizer).
+        // Non-standard values show as-entered. inv-df-link keeps this module's margin/layout
+        // CSS; pf-tel adds the portal-wide canonical blue phone-link color so this supplier
+        // phone reads identically to Garbin / PF Team / Project Contacts (Brad 2026-09-10).
+        h += '<a class="inv-df-val inv-df-link pf-tel" href="' + E(telHref(display)) + '">' + E(fmtUsPhone(display)) + '</a>';
       } else {
         h += '<div class="inv-df-val">' + (display ? E(display) : '<span class="inv-df-empty">—</span>') + '</div>';
       }
