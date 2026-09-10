@@ -18764,7 +18764,11 @@ try {
           field('Certified Payroll?', SF.certified_payroll, SS),
           field('Prevailing Wage Operators — Hourly Rate', ''),
           field('Prevailing Wage Operators — Fringe Rate', ''),
-          field('Minimum Insurance Requirement', bid.min_insurance_req, 'Bid Log'),
+          // Minimum Insurance Requirement now AUTO-PULLS from the executed subcontract
+          // (Brad 2026-09-10): prefer SF.min_insurance_req (written by the FE contract-pull,
+          // e.g. Granary Exhibit J) and fall back to the Bid-Log value when the pull has none.
+          // Same source-precedence idiom as Prevailing Wage above. A manual override still wins.
+          field('Minimum Insurance Requirement', SF.min_insurance_req || bid.min_insurance_req, SF.min_insurance_req ? SS : 'Bid Log'),
           field('Insurance Requirements (per subcontract)', SF.insurance_requirements, SS),
           field('Liquidated Damages', SF.liquidated_damages, SS),
           // Personal / Performance Guaranty split into TWO Yes/No dropdowns (Brad 2026-09-10,
