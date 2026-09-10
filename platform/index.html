@@ -18397,7 +18397,18 @@ try {
       // Here each becomes its OWN Inventory sub-table under the "Contract Recap" collapse bar,
       // preserving every field + label. The pfContractPullControl() office button + provenance
       // and the trailing Subcontract Agreement folder links are carried verbatim.
-      var _subN_contractInfo = _srNewSubTable('Contract Info', [
+      // Mob-Prep slate sub-header parity (Brad 2026-09-10): these four sub-sections
+      // were the only Subcontract-New subheads still rendering the dark .pf-sr-headbar
+      // band (via _srNewSubTable's default headbar) instead of the small slate
+      // .pf-sr-collapse bar Mob Prep uses for Building Pad Prep / Equipment. Fix mirrors
+      // the Staking/Testing convention EXACTLY: build the table headerless
+      // ({noHeadbar,noThead}) and wrap it in _srNewCollapsible so ONE slate bar names
+      // the section. Because each wrapped .pf-sr-collapse sits directly inside Contract
+      // Recap's .pf-sr-collapse-body, the existing nested-slate selector
+      // (.pf-srnew-scope .pf-sr-collapse-body > .pf-sr-collapse > .pf-sr-collapse-head)
+      // paints them #6b7d8c / 11.5px / pad 3px 10px — slate-identical to Mob Prep, with
+      // NO new CSS. Any subgroupNote is carried INSIDE the collapse body (under the bar).
+      var _subN_contractInfo = _srNewCollapsible('Contract Info', _srNewSubTable('Contract Info', [
           field('GC Project #', SF.gc_project_number, SS),
           field('GC Subcontract #', SF.subcontract_number, SS),
           field('Subcontract Value', SF.subcontract_value, SS),
@@ -18418,8 +18429,8 @@ try {
           field('Personal / Performance Guaranty', SF.personal_guaranty, SS),
           field('Bonding Requirements', ''),
           field('Project Working Hours', SF.working_hours, SS)
-        ]);
-      var _subN_invoicing =
+        ], { noHeadbar: true, noThead: true }), false);
+      var _subN_invoicing = _srNewCollapsible('Invoicing & Payment Terms',
           subgroupNote('Payment terms extracted from the subcontract agreement.')
         + _srNewSubTable('Invoicing & Payment Terms', [
           fieldLinked('Approved SOV', '', '', 'website'),
@@ -18428,20 +18439,20 @@ try {
           field('Retainage Release', SF.retainage_release, SS),
           field('Pay App Due by (Day of Month)', ''),
           field('Pay App Bill Through Date', '')
-        ]);
-      var _subN_scope = _srNewSubTable('Scope of Work', [
+        ], { noHeadbar: true, noThead: true }), false);
+      var _subN_scope = _srNewCollapsible('Scope of Work', _srNewSubTable('Scope of Work', [
           field('Staking & Layout Included? (Yes/No)', ''),
           field('Extra Scope of Work Language', '')
-        ]);
-      var _subN_needed =
+        ], { noHeadbar: true, noThead: true }), false);
+      var _subN_needed = _srNewCollapsible('Items Needed for Contract Completion',
           subgroupNote('Upon NOI issue the following items will be needed.')
-        + _srNewSubTable('Needed for Contract Completion', [
+        + _srNewSubTable('Items Needed for Contract Completion', [
           field('COI Date Requested from MJ', ''),
           field('COI Date Received from MJ', ''),
           field('COI Date Sent to GC', ''),
           field('COI Email History', ''),
           field('W9 Date Sent to GC', '')
-        ]);
+        ], { noHeadbar: true, noThead: true }), false);
       // Trailing document-links block — inlined identically to the original (its "Subcontract
       // Agreement" subhead + L.contract folder links; display-only, same markup).
       var _subN_docs = (function(){
