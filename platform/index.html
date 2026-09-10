@@ -3540,6 +3540,12 @@ button.pr-action-link:disabled { opacity: 0.6; cursor: default; filter: none; }
 .pf-cpull-src { font-size: 0.7rem; color: var(--text-3); margin: 3px 0; }
 .pf-cpull-note { font-size: 0.72rem; color: #b06a00; font-style: italic; margin: 3px 0; }
 .pf-cpull-msg { font-size: 0.72rem; margin: 3px 0; }
+/* Green "extraction complete" confirmation note (Feature 2). Prominent success
+   state shown when a contract pull has populated the fields (status 'pulled').
+   Scoped class -- does not touch other styles. */
+.pf-cpull-done { font-size: 0.74rem; font-weight: 600; color: #166534;
+  background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 4px;
+  padding: 4px 8px; margin: 4px 0; }
 /* GC Prerequisites checklist (PF Design Submittal, Brad 2026-08-12). A table at the
    TOP of the subsection: Item | Responsible Party | Date Received (+ Reminder for office).
    Received rows read green/checked, outstanding rows amber. NOT .pr-field rows, so the
@@ -15895,18 +15901,26 @@ try {
     // requested…" state. Peter's engine later writes the flat contract fields + provenance
     // out-of-band. Provenance line renders whenever a pull has populated the fields (status
     // 'pulled' with a source_doc). Every rendered value goes through E() (document-derived).
+    // Feature 2: build the prominent GREEN "extraction complete" confirmation note,
+    // shown for BOTH office + non-office whenever a pull has populated the fields
+    // (status 'pulled' with a source_doc). Replaces the old subtle 📄 line. Dates via
+    // the portal MM/DD/YYYY convention: pfFmtDate formats an ISO/date string to
+    // MM/DD/YYYY and passes anything unparseable through unchanged. All document-
+    // derived values go through E() (escape). Returns '' when there is nothing to show.
+    function pfContractPullDoneNote(pr){
+      if (!(pr && pr.status === 'pulled' && pr.source_doc)) return '';
+      return '<div class="pf-cpull-done">✅ Extraction complete — contract fields populated from '
+        + E(pr.source_doc)
+        + (pr.fully_executed_date ? ', fully executed ' + E(pfFmtDate(pr.fully_executed_date)) : '')
+        + (pr.pulled_at ? ' on ' + E(pfFmtDate(pr.pulled_at)) : '')
+        + '.</div>';
+    }
     function pfContractPullControl(){
       if (!canEdit()) {
-        // Non-office: no button, but still surface the provenance line when a pull populated
-        // the fields (read-only visibility of where the contract terms came from).
+        // Non-office: no button, but still surface the DONE confirmation when a pull
+        // populated the fields (read-only visibility of where the terms came from).
         var pr0 = pfContractPull();
-        if (pr0 && pr0.status === 'pulled' && pr0.source_doc) {
-          return '<div class="pf-cpull-src">📄 Contract fields pulled from '
-            + E(pr0.source_doc)
-            + (pr0.fully_executed_date ? ', fully executed ' + E(pr0.fully_executed_date) : '')
-            + '.</div>';
-        }
-        return '';
+        return pfContractPullDoneNote(pr0);
       }
       var pr = pfContractPull();
       var pending = pr && pr.status === 'requested';
@@ -15918,12 +15932,7 @@ try {
       var pendingNote = pending
         ? '<div class="pf-cpull-note">⏳ Pull requested — Peter is extracting from the executed subcontract. The contract fields will populate when the read completes.</div>'
         : '';
-      var srcLine = (pr && pr.status === 'pulled' && pr.source_doc)
-        ? '<div class="pf-cpull-src">📄 Contract fields pulled from '
-            + E(pr.source_doc)
-            + (pr.fully_executed_date ? ', fully executed ' + E(pr.fully_executed_date) : '')
-            + '.</div>'
-        : '';
+      var srcLine = pfContractPullDoneNote(pr);
       return '<div class="pf-cpull-wrap" data-cpull-num="'+E(_curNum)+'">'
         + '<div class="pf-cpull-head"><span class="pf-cpull-actions">'+btn+'</span></div>'
         + srcLine

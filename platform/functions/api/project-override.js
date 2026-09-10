@@ -825,6 +825,52 @@ function s(v, cap) {
 
 function kvKey(num) { return KV_PREFIX + num; }
 
+// ---- Contract-pull NOTIFY beacon (Feature 1, notify-on-push) -----------------
+// When the OFFICE "Pull from Executed Subcontract" button saves a request marker
+// (sections.contract.__contract_pull.status === 'requested'), we ALSO append a
+// tiny notify marker to a SINGLE well-known KV beacon key. An ALREADY-RUNNING
+// container-side poller (the drawing_extract_worker poll loop -- it already runs
+// every 60s, already has CF creds, already polls KV) drains this beacon and pings
+// Peter's tmux session so the extraction runs promptly instead of waiting for a
+// later BOOP. It reuses the EXISTING portal->Peter channel: NO new daemon, NO
+// daemon-manifest entry, NO browser secret. Mirrors request-drawing-extraction's
+// proven addToBeacon() pattern (read-modify-write of one array key, defensively
+// capped, TTL'd). DEDUP is keyed on (num, requested_at): the poller tracks seen
+// (num,requested_at) pairs so a re-render/re-save with the SAME requested_at
+// notifies exactly once. This is BEST-EFFORT: any failure here is swallowed and
+// NEVER fails the save (the save already succeeded before we are called).
+const CPULL_NOTIFY_BEACON = 'contract_pull_notify_v1';
+const CPULL_NOTIFY_TTL_SEC = 6 * 60 * 60;   // 6h: a stranded notify self-clears
+const CPULL_NOTIFY_MAX = 200;               // bound the beacon against abuse
+async function addToContractPullNotify(env, num, requestedAt) {
+  try {
+    const raw = await env.PF_SCHEDULE.get(CPULL_NOTIFY_BEACON);
+    let arr;
+    try { arr = raw ? JSON.parse(raw) : []; } catch { arr = []; }
+    if (!Array.isArray(arr)) arr = [];
+    // Keep only well-formed markers; de-dupe on (num, requested_at); add this one.
+    const seen = new Set();
+    const kept = [];
+    for (const m of arr) {
+      if (!m || typeof m !== 'object') continue;
+      const n = String(m.num || '');
+      const r = String(m.requested_at || '');
+      if (!/^[A-Za-z0-9-]{1,20}$/.test(n)) continue;
+      const key = n + ' ' + r;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      kept.push({ num: n, requested_at: r });
+    }
+    const thisKey = String(num) + ' ' + String(requestedAt || '');
+    if (!seen.has(thisKey)) kept.push({ num: String(num), requested_at: String(requestedAt || '') });
+    const out = kept.slice(-CPULL_NOTIFY_MAX); // keep the most recent markers
+    await env.PF_SCHEDULE.put(CPULL_NOTIFY_BEACON, JSON.stringify(out), { expirationTtl: CPULL_NOTIFY_TTL_SEC });
+  } catch (err) {
+    // best-effort notify accelerator -- never fail the save over it.
+    console.error('project-override: contract-pull notify beacon add failed (non-fatal):', err && err.message);
+  }
+}
+
 // Load the stored override object for one project, or an empty shell.
 async function loadOverride(env, num) {
   const raw = await env.PF_SCHEDULE.get(kvKey(num));
@@ -1198,6 +1244,17 @@ export async function onRequestPost(context) {
 
     const toStore = { version: 1, num: rec.num, sections: rec.sections, _meta: rec._meta };
     await env.PF_SCHEDULE.put(kvKey(num), JSON.stringify(toStore));
+
+    // Feature 1 (notify-on-push): the save is DONE and persisted. If THIS save is
+    // the office button recording a fresh contract-pull request marker
+    // (__contract_pull.status==='requested'), append a notify marker so the
+    // already-running poller pings Peter to run the extraction promptly. Keyed on
+    // requested_at so a given request notifies exactly once. Strictly ADDITIVE and
+    // best-effort: awaited but its own try/catch NEVER throws, so it can neither
+    // fail the save nor alter the {ok,saved,...} response above.
+    if (cpullUpdate !== undefined && cpullUpdate && cpullUpdate.status === 'requested') {
+      await addToContractPullNotify(env, num, cpullUpdate.requested_at);
+    }
 
     return json({ ok: true, saved: true, num, section, sections: rec.sections, _meta: rec._meta });
   } catch (err) {
