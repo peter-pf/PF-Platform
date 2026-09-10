@@ -22842,6 +22842,15 @@ try {
     // and DISPLAYS back as MM/DD/YYYY via pfFmtDate (which normalizes YYYY-MM-DD).
     // Add future date fields here to give them a picker without touching anything else.
     var PF_FIELD_DATE_LABELS = {
+      // General Info > Project Info (Brad 2026-09-10): the "Anticipated Project Start"
+      // date field is office live-edit. Without this entry pfLiveControl rendered a plain
+      // TEXT input seeded with the RAW stored value (ISO 2026-08-22), so office users saw
+      // ISO here while the adjacent computed "Project Completion" showed MM/DD/YYYY — the
+      // inconsistency Brad reported on Park & Poplar (26-013). Registering the label makes
+      // pfLiveControl emit a native <input type="date"> (browser displays MM/DD/YYYY;
+      // internal value stays YYYY-MM-DD per the standing date rule). pfToDateInputValue
+      // coerces the ISO source for pre-fill — DISPLAY-ONLY, no data change.
+      'Anticipated Project Start': true,
       'Released to Start Submittals': true,
       // Contract Recap 4-group restructure (Brad 2026-08-07). Each gets the native
       // date picker in the editor + MM/DD/YYYY display. (The existing "Fully Executed
