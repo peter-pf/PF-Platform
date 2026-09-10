@@ -2382,6 +2382,40 @@ tr.pf-dragging { opacity: 0.45; }
 .pf-staking-doc-table .pr-field { padding: 0; border-bottom: none; }
 .pf-staking-doc-table .pr-field-label { display: none; }
 
+/* ---- Wage Rate Determination table (Brad 2026-09-10) ------------------------- */
+/* Subcontract-New ONLY: the "Wage Rate Determination" collapsible reveals a small  */
+/* rate table = Classification | Hourly Rate | Overtime Rate | Fringe Rate. Only     */
+/* emitted by _srNewWageRateTable (called once, inside the Subcontract-New sandbox), */
+/* so no other card is touched. Classification column runs ~2x the rate columns per  */
+/* Brad's name/description-column-is-wider rule (40 / 20 / 20 / 20). Header row is    */
+/* the transparent uppercase accent-dark band shared with the staking doc table.     */
+.pf-wagerate-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.pf-wagerate-table td {
+  padding: 6px 12px; border-bottom: 1px solid var(--border-light); vertical-align: middle;
+}
+.pf-wagerate-table th {
+  background: transparent; text-align: left;
+  font-size: 0.8rem; font-weight: 700; color: var(--accent-dark);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  padding: 4px 12px; padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-light); vertical-align: bottom;
+}
+.pf-wagerate-table tr:last-child td { border-bottom: none; }
+.pf-wagerate-table th.pf-wr-class,
+.pf-wagerate-table td.pf-wr-class { width: 40%; word-break: break-word; }
+.pf-wagerate-table td.pf-wr-class { font-size: 0.9rem; color: var(--text-1); }
+.pf-wagerate-table th.pf-wr-rate,
+.pf-wagerate-table td.pf-wr-rate { width: 20%; }
+/* Neutralize the embedded .pr-field so each rate input sits flush in its cell (the */
+/* column header + row Classification cell already label it, so hide the field label). */
+.pf-wagerate-table .pr-field { padding: 0; border-bottom: none; }
+.pf-wagerate-table .pr-field-label { display: none; }
+.pf-srnew-scope .pf-wagerate-table { font-size: 12.5px; }
+.pf-srnew-scope .pf-wagerate-table td { font-size: 12.5px; }
+.pf-srnew-scope .pf-wagerate-table td.pf-wr-class { font-size: 12.5px; color: var(--text-1, #2B2F36); }
+.pf-srnew-scope .pf-wagerate-table .pr-field-value { font-size: 12.5px; color: var(--text-1, #2B2F36); }
+.pf-srnew-scope .pf-wagerate-table .pr-live-input { font-size: 12.5px; }
+
 /* ---- Staking "GC's responsibility" note placement (Brad 2026-09-05) --------- */
 /* The GC-has-it note now sits to the RIGHT of the "Staking & Layout PF's         */
 /* responsibility?" dropdown, on the SAME row, and appears only when No is chosen  */
@@ -14573,6 +14607,10 @@ try {
       // Scope of Work label simplified + typed to Yes/No (Brad 2026-09-10). new -> old
       // so any value saved under the old label still renders under the new key.
       'Staking & Layout Included': 'Staking & Layout Included? (Yes/No)',
+      // Prevailing-wage gate renamed + typed to Yes/No (Brad 2026-09-10, Subcontract-New).
+      // new label -> old key so any value saved under 'Prevailing Wage? Rate?' still renders
+      // under the new gate (a legacy free-text rate becomes the current-value option).
+      'Prevailing Wage Rate / Certified Payroll Required?': 'Prevailing Wage? Rate?',
       // General Info notes field DISPLAY-RENAMED (Brad 2026-09-08): "SOW Notes" now SHOWS as
       // "Project Scope of Work Notes" via PF_FIELD_DISPLAY_LABELS, but its STORAGE KEY stays
       // 'SOW Notes'. No override alias is needed (the field keys 'SOW Notes' directly). The
@@ -18760,10 +18798,19 @@ try {
           field('Sales Tax', ''),
           field('Sales Tax %', ''),
           field('Sales Tax Notes', _salesTaxNotesDefault),
-          field('Prevailing Wage? Rate?', SF.prevailing_wage || bid.wage_req, SF.prevailing_wage ? SS : 'Bid Log'),
-          field('Certified Payroll?', SF.certified_payroll, SS),
-          field('Prevailing Wage Operators — Hourly Rate', ''),
-          field('Prevailing Wage Operators — Fringe Rate', ''),
+          // Prevailing Wage / Certified Payroll (Brad 2026-09-10). The old free-text
+          // "Prevailing Wage? Rate?" + separate "Certified Payroll?" + the two loose
+          // Operators rate fields are REPLACED by ONE Yes/No gate:
+          // "Prevailing Wage Rate / Certified Payroll Required?" (registered in
+          // PF_FIELD_DROPDOWNS -> live Yes/No select on the 'contract' key). LABEL-IS-
+          // STORAGE-KEY: the new label is the new key, so PF_OVERRIDE_LABEL_ALIASES maps
+          // it back to the old 'Prevailing Wage? Rate?' key (any saved value/rate carries
+          // over). No -> the "Wage Rate Determination" subgroup below is hidden entirely.
+          // Yes -> the subgroup reveals its Operators rate table (Hourly/OT/Fringe).
+          // NOTE: the original Subcontract card (not this sandbox) still carries its own
+          // 'Certified Payroll?' field, so the Closeout "Certified Payroll" cross-read
+          // (ovLookup('contract','Certified Payroll?'), ~L21314) is UNAFFECTED.
+          field('Prevailing Wage Rate / Certified Payroll Required?', SF.prevailing_wage || bid.wage_req, SF.prevailing_wage ? SS : 'Bid Log'),
           // Minimum Insurance Requirement now AUTO-PULLS from the executed subcontract
           // (Brad 2026-09-10): prefer SF.min_insurance_req (written by the FE contract-pull,
           // e.g. Granary Exhibit J) and fall back to the Bid-Log value when the pull has none.
@@ -18802,6 +18849,54 @@ try {
           '<tr data-row-label="Bond Requirements" style="display:none">');
       }
       var _subN_contractInfo = _srNewCollapsible('Contract Info', _contractInfoRows, false);
+      // ---- Wage Rate Determination (Brad 2026-09-10) --------------------------------
+      // Revealed ONLY when the Contract Info gate "Prevailing Wage Rate / Certified
+      // Payroll Required?" = Yes; hidden entirely on No/blank. Inside is a small rate
+      // table: Classification | Hourly Rate | Overtime Rate | Fringe Rate, with one
+      // data row "Prevailing Wage Rate - Operators" (three fillable rate inputs). Each
+      // rate input is a plain field() -> saves under the 'contract' override key (the
+      // card is data-pr-section="contract"), label IS the storage key:
+      //   'Operators Hourly Rate' / 'Operators Overtime Rate' / 'Operators Fringe Rate'.
+      // The table builder (_srNewWageRateTable) takes a list of classification rows so
+      // more classifications can be added later; only "Operators" is wired now.
+      // _srNewWageRateTable(rows): rows = [{ cls, hourly, overtime, fringe }] where each
+      // rate value is the field() storage-key/label. Returns the Classification|Hourly|
+      // Overtime|Fringe rate table (scoped .pf-wagerate-table CSS). Hoisted function
+      // declaration -> safe to reference before its textual definition below.
+      function _srNewWageRateTable(rows){
+        var body = rows.map(function(r){
+          return '<tr>'
+            + '<td class="pf-wr-class">' + E(r.cls) + '</td>'
+            + '<td class="pf-wr-rate">' + field(r.hourly, '') + '</td>'
+            + '<td class="pf-wr-rate">' + field(r.overtime, '') + '</td>'
+            + '<td class="pf-wr-rate">' + field(r.fringe, '') + '</td>'
+            + '</tr>';
+        }).join('');
+        return '<div class="table-wrap"><table class="pf-wagerate-table">'
+          + '<thead><tr>'
+          +   '<th class="pf-wr-class">Classification</th>'
+          +   '<th class="pf-wr-rate">Hourly Rate</th>'
+          +   '<th class="pf-wr-rate">Overtime Rate</th>'
+          +   '<th class="pf-wr-rate">Fringe Rate</th>'
+          + '</tr></thead>'
+          + '<tbody>' + body + '</tbody></table></div>';
+      }
+      var _subN_wageRate = _srNewCollapsible('Wage Rate Determination',
+          _srNewWageRateTable([
+            { cls: 'Prevailing Wage Rate - Operators',
+              hourly:   'Operators Hourly Rate',
+              overtime: 'Operators Overtime Rate',
+              fringe:   'Operators Fringe Rate' }
+          ]), false);
+      // Conditional visibility: the whole "Wage Rate Determination" collapsible (the outer
+      // .pf-sr-collapse) is hidden on render when the gate != Yes, and the capture-phase
+      // listener below flips it live. Read the effective 'contract' value of the gate (same
+      // effVal idiom as Sales Tax / Bond). We wrap the collapsible in a marker div so the
+      // listener can target it precisely without a re-render.
+      var _pwGateEff = String(effVal('contract', 'Prevailing Wage Rate / Certified Payroll Required?', '') || '').trim();
+      var _pwYes = /^yes$/i.test(_pwGateEff);
+      _subN_wageRate = '<div class="pf-wagerate-wrap" data-pf-wagerate="1"'
+        + (_pwYes ? '' : ' style="display:none"') + '>' + _subN_wageRate + '</div>';
       // Invoicing & Payment Terms (Brad 2026-09-10, Request C):
       //   - "Approved SOV" (was a URL/link fieldLinked) RENAMED to "SOV Approved" and changed to
       //     a Yes/No dropdown (registered in PF_FIELD_DROPDOWNS -> live select on the 'contract'
@@ -18860,6 +18955,7 @@ try {
       var _subN_contractRecap =
           pfContractPullControl()
         + _subN_contractInfo
+        + _subN_wageRate
         + _subN_invoicing
         + _subN_scope
         + _subN_needed
@@ -23669,6 +23765,12 @@ try {
       // Contract Recap > Contract Info Bond (Brad 2026-09-10, Request B): "Bond Required" Yes/No;
       // Yes reveals the "Bond Requirements" fillable text row (conditional-reveal, same listener).
       'Bond Required': ['Yes', 'No'],
+      // Contract Recap > Contract Info prevailing-wage gate (Brad 2026-09-10): the old free-text
+      // "Prevailing Wage? Rate?" is now a Yes/No gate. Yes -> reveal the "Wage Rate Determination"
+      // subgroup (Operators Hourly/OT/Fringe rate table); No -> hide it. PF_OVERRIDE_LABEL_ALIASES
+      // maps this new label back to the old 'Prevailing Wage? Rate?' key so any saved value carries
+      // over. Subcontract-New sandbox ONLY (the original card keeps its own free-text field).
+      'Prevailing Wage Rate / Certified Payroll Required?': ['Yes', 'No'],
       // Invoicing & Payment Terms (Brad 2026-09-10, Request C): "SOV Approved" Yes/No (renamed
       // from the old "Approved SOV" URL/link field; the storage key is the new label).
       'SOV Approved': ['Yes', 'No'],
@@ -25303,6 +25405,23 @@ try {
       var isYes = /^yes$/i.test(String(el.value || '').trim());
       var reqRow = card.querySelector('tr[data-row-label="Bond Requirements"]');
       if (reqRow) reqRow.style.display = isYes ? '' : 'none';
+    }, true);
+
+    // Subcontract-New Contract Info > "Prevailing Wage Rate / Certified Payroll Required?"
+    // conditional (Brad 2026-09-10). CAPTURE phase, same idiom. Scoped to the Subcontract
+    // card. Yes -> reveal the whole "Wage Rate Determination" collapsible (the .pf-wagerate-wrap
+    // marker div wrapping it) so its Operators Hourly/OT/Fringe rate table is available;
+    // No/blank -> hide it entirely. The gate select's own save-on-change (pfLiveFieldChange,
+    // 'contract' key) fires independently. Purely visual — no data mutation, no re-render.
+    document.addEventListener('change', function(ev){
+      var el = ev.target;
+      if (!el || !el.getAttribute) return;
+      if (el.getAttribute('data-pr-field-label') !== 'Prevailing Wage Rate / Certified Payroll Required?') return;
+      var card = el.closest ? el.closest('.pr-card[data-pr-section="contract"]') : null;
+      if (!card) return;
+      var isYes = /^yes$/i.test(String(el.value || '').trim());
+      var wrap = card.querySelector('.pf-wagerate-wrap[data-pf-wagerate="1"]');
+      if (wrap) wrap.style.display = isYes ? '' : 'none';
     }, true);
 
     // Sandbox Safety > JHA "Jobsite Safety Analysis (JSA) Required?" conditional (Brad
