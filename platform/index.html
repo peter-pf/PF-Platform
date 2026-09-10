@@ -15313,6 +15313,96 @@ try {
       out.sort(function(a,b){ return (a.name||'').toLowerCase() < (b.name||'').toLowerCase() ? -1 : 1; });
       return out;
     }
+    // GC-ONLY responsible-party source (Brad 2026-09-10, E&D-New sandbox fix): Brad wants
+    // the PF Submittal Design "Responsible Party" list to pull DIRECTLY from EACH project's
+    // GENERAL CONTRACTOR (GC) contacts — the names preloaded on that project's contact
+    // sheet under the GC — NOT the Owner, and NOT a hardcoded/first-project fallback (the
+    // old symptom was "only POET's contacts populate"). This is a NARROWED sibling of
+    // pfProjectContacts(): identical harvesting mechanics but the Owner storage models are
+    // dropped so ONLY the current project's GC people surface. It reads the SAME per-project
+    // stores keyed by _curNum/_curOverrides, so each project shows its OWN GC contacts.
+    //   Source 1: __crm 'general' key -> "GC" section directory selections (contactIds
+    //             resolved to the live PF directory record).
+    //   Source 2: legacy synced GC role slots (PM / Superintendent / Project Engineer),
+    //             each override-aware via effVal (matches the Owner & GC card's display).
+    //   Source 2b: manually-added GC* contact overrides ("GC ... - Name"/"- Email").
+    //   Source 3: any responsible party ALREADY STORED on a prereq item — surfaced so an
+    //             existing selection is NEVER lost even if that person isn't a current GC
+    //             contact (Brad's "preserve the current saved value" fail-safe).
+    // FAIL-SAFE: when a project has NO GC contacts loaded, this returns ONLY whatever was
+    // already saved (usually empty) -> the datalist is empty (placeholder input) — it does
+    // NOT fall back to POET or fabricate names.
+    function pfGcContacts(){
+      var out = [];
+      var seen = {};
+      function push(entry){
+        var cid = entry.contactId ? String(entry.contactId).toUpperCase() : '';
+        var nm = String(entry.name || '').trim();
+        var em = String(entry.email || '').trim();
+        if (!nm && !em) return;
+        var k = cid || (nm.toLowerCase() + '|' + em.toLowerCase());
+        if (seen[k]) return;
+        seen[k] = 1;
+        out.push({ contactId: cid || null, name: nm, email: em });
+      }
+      // 1. Directory selections under the `general` key — GC section ONLY.
+      try {
+        var gcrm = pfCrmMap('general');
+        var e = gcrm['GC'];
+        var ids = (e && Array.isArray(e.contactIds)) ? e.contactIds : [];
+        ids.forEach(function(id){
+          var c = pfContactById(id);
+          if (c) push({ contactId: c.contactId, name: pfContactName(c), email: String(c.email || '').trim() });
+        });
+      } catch (e) {}
+      // 2. Legacy per-project GC role slots (PM / Superintendent / Project Engineer),
+      //    override-aware — same resolution the Owner & GC card uses.
+      try {
+        var D = null; try { D = resolveRecord(_curNum); } catch (e2) { D = null; }
+        var g = (D && D.contacts && D.contacts.groups) || {};
+        var _gcAll = Array.isArray(g.gc) ? g.gc : [];
+        var _gcRole = function(re){ return _gcAll.find(function(c){ return re.test(c.scope || ''); }) || {}; };
+        var _gcPM  = _gcAll[0] || _gcRole(/pm|project manager/i);
+        var _gcSup = _gcRole(/super/i);
+        var _gcPE  = _gcRole(/project eng|proj eng|\bpe\b/i);
+        push({ contactId: null,
+          name:  effVal('general', 'GC Project Manager - Name', _gcPM.name || ''),
+          email: effVal('general', 'GC Project Manager - Email', _gcPM.email || '') });
+        push({ contactId: null,
+          name:  effVal('general', 'GC Superintendent - Name', _gcSup.name || ''),
+          email: effVal('general', 'GC Superintendent - Email', _gcSup.email || '') });
+        push({ contactId: null,
+          name:  effVal('general', 'GC Project Engineer - Name', _gcPE.name || ''),
+          email: effVal('general', 'GC Project Engineer - Email', _gcPE.email || '') });
+      } catch (e) {}
+      // 2b. Manually-added GC* contact overrides ("GC ... - Contact Name"/"- Name").
+      try {
+        var gsec = (_curOverrides && _curOverrides['general']) || {};
+        Object.keys(gsec).forEach(function(lbl){
+          if (lbl === PF_CRM_KEY) return;
+          var m = /^(GC\b.*?)\s-\s(?:Contact Name|Name)$/i.exec(lbl);
+          if (!m) return;
+          var prefix = m[1];
+          var nm = effVal('general', lbl, '');
+          var em = effVal('general', prefix + ' - Email', '');
+          push({ contactId: null, name: nm, email: em });
+        });
+      } catch (e) {}
+      // 3. Preserve already-stored responsible parties so a saved selection never drops.
+      try {
+        var data = pfPrereqData();
+        Object.keys(data).forEach(function(k){
+          var d = data[k] || {};
+          if (d.responsible_contact_id) {
+            var c = pfContactById(d.responsible_contact_id);
+            if (c) { push({ contactId: c.contactId, name: pfContactName(c), email: String(c.email || '').trim() }); return; }
+          }
+          push({ contactId: null, name: String(d.responsible_name || '').trim(), email: String(d.responsible_email || '').trim() });
+        });
+      } catch (e) {}
+      out.sort(function(a,b){ return (a.name||'').toLowerCase() < (b.name||'').toLowerCase() ? -1 : 1; });
+      return out;
+    }
     // Resolve a stored prereq item's { responsible_contact_id, responsible_name,
     // responsible_email } to the EFFECTIVE { name, email } at render/click time.
     // Prefers the directory record for the tied contactId (so a later email change
@@ -15364,7 +15454,17 @@ try {
     // A received item (Date Received filled) is marked green; an outstanding one amber.
     // Per-row "Send Reminder" (office + outstanding + has email) is preserved. The Shop
     // Dwg Info folder link renders above the table.
-    function submittalPrereqsBlock(sdi){
+    // opts (optional, Brad 2026-09-10): { contactSource:fn, dlId:string }. When omitted the
+    // block behaves EXACTLY as before (original E&D card + in-place refresh are unchanged):
+    // datalist id 'pf-prq-contacts-dl', sourced from pfProjectContacts() (Owner+GC). The
+    // E&D-New sandbox passes { contactSource: pfGcContacts, dlId: 'pf-prq-contacts-dl-engnew' }
+    // so its Responsible Party typeahead pulls ONLY the project's GC contacts (Brad's fix)
+    // AND uses a DISTINCT datalist id (avoids a duplicate-id clash with the original card
+    // when both render). The typeahead resolver (pfPrqOnPartyLive) reads the row's own
+    // attached datalist, so email/contactId auto-fill resolves against whichever source
+    // rendered the row.
+    function submittalPrereqsBlock(sdi, opts){
+      opts = opts || {};
       var data = pfPrereqData();
       var total = PF_SUBMITTAL_PREREQ_ITEMS.length;
       var received = 0;
@@ -15372,10 +15472,11 @@ try {
       // Build the project's contact list ONCE (for the office typeahead datalist). The
       // name input is a <datalist>-backed typeahead of those names; selecting/typing a
       // matching name auto-associates that contact's email + contactId (pfPrqOnPartyLive).
-      var dlId = 'pf-prq-contacts-dl';
+      var dlId = opts.dlId || 'pf-prq-contacts-dl';
+      var _contactSrc = (typeof opts.contactSource === 'function') ? opts.contactSource : pfProjectContacts;
       var datalistHtml = '';
       if (edit) {
-        var projContacts = (typeof pfProjectContacts === 'function') ? pfProjectContacts() : [];
+        var projContacts = (typeof _contactSrc === 'function') ? _contactSrc() : [];
         var dlOpts = projContacts.map(function(pc){
           var lbl = pc.email ? (pc.name + ' <' + pc.email + '>') : pc.name;
           return '<option value="'+esc2(pc.name)+'" label="'+esc2(lbl)+'"></option>';
@@ -16639,7 +16740,16 @@ try {
           for (var i = 0; i < wraps.length; i++) {
             var w = wraps[i];
             if (!w || w.getAttribute('data-prq-orig') != null) continue; // editor open — leave it
-            var fresh = submittalPrereqsBlock(pfShopDwgInfo(_curNum));
+            // Preserve the E&D-New sandbox variant (Brad 2026-09-10): a wrap inside
+            // .pf-srnew-scope was rendered with the GC-only source + distinct datalist id,
+            // so re-render it the SAME way — otherwise this refresh would clobber it back
+            // to the Owner+GC list. The original card's wrap (no .pf-srnew-scope ancestor)
+            // re-renders with defaults, unchanged.
+            var _isEngNew = !!(w.closest && w.closest('.pf-srnew-scope'));
+            var fresh = _isEngNew
+              ? submittalPrereqsBlock(pfShopDwgInfo(_curNum),
+                  { contactSource: pfGcContacts, dlId: 'pf-prq-contacts-dl-engnew' })
+              : submittalPrereqsBlock(pfShopDwgInfo(_curNum));
             // Replace in place (fresh returns a full .pf-prq-wrap; swap outerHTML).
             var tmp = document.createElement('div');
             tmp.innerHTML = fresh;
@@ -18895,11 +19005,13 @@ try {
       var _engN_gp = pfGarbinPrelim(_curNum);
 
       // ---- Subsection 1: Prelim Design (Inventory rows) — mirrors prelimInner ----
-      // Field-for-field identical to the original prelimInner (same values, same seed
-      // precedence, same conditional Total Stone row), rendered as an Inventory sub-table.
+      // (Brad 2026-09-10) Deleted the FIRST TWO rows of this sandbox subsection — the
+      // "Garbin Prelim Workbook" and "Garbin Prelim Folder" fields (the two yellow rows in
+      // Brad's snip). Removed entirely from this twin ONLY; the original E&D card still
+      // renders them via garbinPrelimWorkbookField/garbinPrelimFolderField in prelimInner.
+      // The remaining rows (Total LF / Total Pier Qty / Column Diameter / [Total Stone] /
+      // SOW) are unchanged and still seeded from the same Garbin-vs-BidLog precedence.
       var _engN_prelimFields = [
-          garbinPrelimWorkbookField(_engN_gp),
-          garbinPrelimFolderField(_engN_gp),
           field('Total LF (Prelim)',
                 (_engN_gp && _engN_gp.lf != null && _engN_gp.lf !== '') ? _engN_gp.lf : (bid.total_lf || ''),
                 (_engN_gp && _engN_gp.lf != null && _engN_gp.lf !== '') ? 'Garbin Prelim' : (bid.total_lf ? 'Bid Log' : '')),
@@ -18925,7 +19037,8 @@ try {
       // sandbox wraps finPayApps/baHtml directly) so every computed value + inline editor is
       // preserved with ZERO drift.
       var _engN_submittalInner =
-          submittalPrereqsBlock(pfShopDwgInfo(_curNum))
+          submittalPrereqsBlock(pfShopDwgInfo(_curNum),
+            { contactSource: pfGcContacts, dlId: 'pf-prq-contacts-dl-engnew' })
         + submittalWorkflowBlock(pfDesignSubmittalFolder(_curNum));
 
       // ---- Subsection 3: As Built Drawings — mirrors asBuiltInner ----
@@ -27826,14 +27939,38 @@ try {
         var emailEl = tr.querySelector('.pf-prq-live-email');
         var cidEl = tr.querySelector('.pf-prq-live-cid');
         var typed = String(nameEl.value || '').trim().toLowerCase();
-        var contacts = (typeof pfProjectContacts === 'function') ? pfProjectContacts() : [];
+        // Resolve against the ROW'S OWN attached datalist (Brad 2026-09-10) so the E&D-New
+        // sandbox row (list="pf-prq-contacts-dl-engnew", GC-only options) auto-fills email
+        // from its GC list, while the original card row (list="pf-prq-contacts-dl") still
+        // resolves against its Owner+GC list. The <option> carries value="Name" and
+        // label="Name <email>", so the email is parsed from the label. Falls back to the
+        // full pfProjectContacts() scan if the datalist can't be found (defensive).
         var match = null;
-        for (var i = 0; i < contacts.length; i++) {
-          if (String(contacts[i].name || '').trim().toLowerCase() === typed && typed) { match = contacts[i]; break; }
+        var dl = null;
+        var listId = nameEl.getAttribute ? nameEl.getAttribute('list') : '';
+        if (listId && document.getElementById) dl = document.getElementById(listId);
+        if (dl) {
+          var opts = dl.querySelectorAll ? dl.querySelectorAll('option') : [];
+          for (var i = 0; i < opts.length; i++) {
+            var ov = String(opts[i].getAttribute('value') || '').trim();
+            if (ov.toLowerCase() === typed && typed) {
+              var lab = String(opts[i].getAttribute('label') || '');
+              var em = '';
+              var mEm = /<\s*([^>]+?)\s*>\s*$/.exec(lab);
+              if (mEm) em = mEm[1].trim();
+              match = { contactId: null, name: ov, email: em };
+              break;
+            }
+          }
+        } else {
+          var contacts = (typeof pfProjectContacts === 'function') ? pfProjectContacts() : [];
+          for (var j = 0; j < contacts.length; j++) {
+            if (String(contacts[j].name || '').trim().toLowerCase() === typed && typed) { match = contacts[j]; break; }
+          }
         }
         if (match) {
           if (cidEl) cidEl.value = match.contactId || '';
-          // Auto-fill the tied email (directory email is the source of truth).
+          // Auto-fill the tied email when the option carried one.
           if (emailEl && match.email) emailEl.value = match.email;
         } else {
           // No exact project-contact match: drop the tie; keep whatever email is typed.
