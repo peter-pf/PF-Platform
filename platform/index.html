@@ -19707,7 +19707,17 @@ try {
                 field('Date Ticket Cleared to Start', ''),
                 field('Date Ticket Expires', ''),
                 fieldLinked('Locate Ticket Link', _lu, '', 'website',
-                  { readonlyLink: true, linkLabel: 'Open Utility Locates Folder', emptyText: '—' })
+                  { readonlyLink: true, linkLabel: 'Open Utility Locates Folder', emptyText: '—' }),
+                // Locate Notes (Brad 2026-09-09): free-form multi-line log of locate activity
+                // (tickets called in, responses/clears, conflicts, hand-dig requirements).
+                // Phase 1 = editable/persisted textarea; Phase 2 will auto-append dated lines as
+                // 811 locate emails arrive (a plain accumulating text area is the right shape).
+                // Registered in PF_FIELD_TEXTAREA_LABELS -> renders/saves as a multi-line textarea.
+                // Binds under _curSection='siteReadiness' (swapped in by _srNewSafetyInvTable, the
+                // SAME bucket the sibling Locate Ticket Link + card save to) so it round-trips.
+                // RBAC is inherited from field(): office (_srLiveEdit && canEdit()) gets the live
+                // save-on-change control; field_ops falls through to the read-only span = view-only.
+                field('Locate Notes', '')
               ];
             } }
         ]);
@@ -22955,7 +22965,11 @@ try {
       // as "Project Scope of Work Notes") is free-form multi-line scope notes -> textarea.
       // Registered under the STORAGE KEY 'SOW Notes' (the key field() actually renders by),
       // NOT the display label.
-      'SOW Notes': true
+      'SOW Notes': true,
+      // Safety > Public Utility Locates (Brad 2026-09-09): free-form locate-activity log
+      // (tickets called in, responses/clears, conflicts, hand-dig requirements). Phase 1 =
+      // manual textarea; Phase 2 auto-appends dated lines from 811 locate emails. Multi-line.
+      'Locate Notes': true
     };
     function pfIsTextareaLabel(label){ return !!PF_FIELD_TEXTAREA_LABELS[label]; }
     // Coerce a stored/displayed date (MM/DD/YYYY, M/D/YY, YYYY-MM-DD, ...) into the
