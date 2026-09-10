@@ -20411,7 +20411,53 @@ try {
       // assembly were removed 2026-09-09 (Strategy B promotion) — this body now lives
       // ONLY inside the promoted inventory-style card, so there is exactly ONE invoicing
       // editor on the page (no cross-edit) and zero feature loss.
-      var finInvoicingBody = finInvBand + finPayApps;
+      // ---- "Invoicing Procedures" sub-header (Brad 2026-09-10) -----------------
+      // Mirror the Mob Prep formatting (_srNewCollapsible roll-up bar + the
+      // _srNewSafetyInvTable inventory-style rows w/ far-left green check + "X/Y
+      // Fields Complete, XX%" readout) at the TOP of the Pay Applications &
+      // Invoicing section body, ABOVE all existing invoicing content (finInvBand +
+      // finPayApps preserved verbatim below). First sub-header = "Invoicing
+      // Procedures" holding one inventory row "GC Invoicing Contact" — who the
+      // invoice goes to when it's ready to send. Built EXACTLY like the Mob Prep
+      // groups (same helpers, same classes) so it reads consistent. STRUCTURED so a
+      // 2nd sub-header is a trivial one-line add later (Brad will name it) — just
+      // append another _srNewCollapsible(...) inside finInvProcInner.
+      //
+      // PERSISTENCE: _curSection is already 'financials' here (set ~20093) and
+      // _srLiveEdit is TRUE at the Financials render, so field('GC Invoicing
+      // Contact') renders an office live save-on-change control seeded from the
+      // 'financials' override key. _srNewSafetyInvTable's 2nd arg ('financials')
+      // makes the field READ from that same key (belt+suspenders w/ _curSection).
+      // The WRITE side (pfLiveFieldChange) resolves its section from the field's
+      // nearest .pr-card[data-pr-section]; the promoted Financials card carries NO
+      // sectionKey (no data-pr-section — intentional, no stray Edit button), so we
+      // wrap ONLY this new sub-header in a self-contained
+      // .pr-card[data-pr-section="financials"] whose card chrome is neutralized
+      // inline (border/background/margin/overflow) — invisible, but closest('.pr-card')
+      // now resolves to 'financials' so the value POSTs + persists under the
+      // standard project-override 'financials' bucket (server-validated key;
+      // requireArea('financials') = office only). NARROWEST
+      // change: this wrapper contains ONLY the new bar; finInvBand/finPayApps sit
+      // OUTSIDE it, wholly unaffected. LOCAL (no shared helper touched). RBAC: the
+      // whole Financials render path is office-only (field_ops strips financials +
+      // server 403s /api/project-override financials); the live control only renders
+      // for canEdit(). pfRenderSandboxSubStatus already scans '.pf-srnew-scope
+      // .pf-sr-collapse' + '.pf-safety-invrow' GLOBALLY, so this bar's readout +
+      // the row's green check populate with no extra wiring (same as Mob Prep).
+      var finInvProcInner =
+          _srNewCollapsible('Invoicing Procedures', _srNewSafetyInvTable([
+            { name: 'GC Invoicing Contact', inlineFields: true, fieldsFn: function(){ return [
+                field('GC Invoicing Contact', '')
+              ]; } }
+          ], 'financials'), true);
+      // Invisible section-carrier wrapper (see note above): chrome neutralized so it
+      // renders flush like a Mob Prep sub-header, but resolves data-pr-section for save.
+      var finInvProc =
+          '<div class="pr-card" data-pr-section="financials" '
+        +   'style="border:0;background:none;border-radius:0;margin:0;overflow:visible">'
+        +   finInvProcInner
+        + '</div>';
+      var finInvoicingBody = finInvProc + finInvBand + finPayApps;
 
       // ===== PROMOTED Financials card (2026-09-09 per Brad — Strategy B) =====
       // Brad wants Financials in the inventory style of the new Site Readiness sandbox
