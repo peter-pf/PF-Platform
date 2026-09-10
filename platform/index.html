@@ -14518,7 +14518,13 @@ try {
     // label 'Project Scope of Work Notes' as its OWN key; keeping this field keyed 'SOW Notes'
     // avoids reading that removed field's stale override — no display-only rename collision.)
     var PF_FIELD_DISPLAY_LABELS = {
-      'SOW Notes': 'Project Scope of Work Notes'
+      'SOW Notes': 'Project Scope of Work Notes',
+      // Subcontract Agreement > Bid Recap (Brad 2026-09-10): show the fuller label
+      // "Date Released to Start Submittals" while the STORAGE KEY stays the original
+      // "Released to Start Submittals" — existing saved override values (keyed by the
+      // original label) are read + saved under the unchanged key, never orphaned.
+      // DISPLAY-ONLY relabel (same pattern as the AP prelim dispLabel work).
+      'Released to Start Submittals': 'Date Released to Start Submittals'
     };
     function pfDisplayLabel(label){ return PF_FIELD_DISPLAY_LABELS[label] || label; }
     function field(label, val, src, opts){
@@ -22851,6 +22857,13 @@ try {
       // internal value stays YYYY-MM-DD per the standing date rule). pfToDateInputValue
       // coerces the ISO source for pre-fill — DISPLAY-ONLY, no data change.
       'Anticipated Project Start': true,
+      // Subcontract Agreement > Bid Recap (Brad 2026-09-10): "LOI/NOI Date" was a plain
+      // TEXT field in the section editor. Registering it makes pfEditInputRow emit a
+      // native <input type="date"> (browser shows MM/DD/YYYY; stored value stays
+      // YYYY-MM-DD per the standing date rule). Read-view already formats MM/DD/YYYY
+      // (label matches PF_DATE_LABEL_RE via "Date"). Storage key unchanged — additive,
+      // display-only, no data migration.
+      'LOI/NOI Date': true,
       'Released to Start Submittals': true,
       // Contract Recap 4-group restructure (Brad 2026-08-07). Each gets the native
       // date picker in the editor + MM/DD/YYYY display. (The existing "Fully Executed
