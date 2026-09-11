@@ -3697,6 +3697,31 @@ button.pr-action-link:disabled { opacity: 0.6; cursor: default; filter: none; }
   border-top: 2px solid var(--text-2, #4b5563);
   font-size: 0.78rem; font-weight: 700; color: var(--text-1, #2B2F36);
 }
+/* PROJECT-TO-DATE rollup (Brad 2026-09-11): running piers + LF installed across all days
+   with % complete vs planned. Dense, azure accent, sits under the per-day list / in editor. */
+.pf-hl-rollup {
+  margin: 10px 0 2px; padding: 10px 12px; border-radius: 8px;
+  border: 1px solid var(--accent, #006DB0);
+  background: var(--accent-light, #E0F0FF);
+}
+.pf-hl-editor-rollup .pf-hl-rollup { margin-top: 12px; }
+.pf-hl-roll-title {
+  font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--accent-dark, #005A91); margin-bottom: 6px;
+}
+.pf-hl-roll-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 6px 20px;
+}
+.pf-hl-roll-stat { min-width: 0; }
+.pf-hl-roll-lbl { font-size: 0.7rem; font-weight: 600; color: var(--text-2, #4b5563); }
+.pf-hl-roll-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; }
+.pf-hl-roll-num { font-size: 1.15rem; font-weight: 800; color: var(--text-1, #2B2F36); line-height: 1.2; }
+.pf-hl-roll-pct { font-size: 0.95rem; font-weight: 800; color: var(--accent, #006DB0); }
+.pf-hl-roll-pct-lbl { font-size: 0.68rem; font-weight: 600; color: var(--text-2, #4b5563); }
+.pf-hl-roll-pct-na { font-size: 0.72rem; font-weight: 600; color: var(--text-3, #6b7280); font-style: italic; }
+.pf-hl-roll-plan { font-size: 0.68rem; color: var(--text-3, #6b7280); }
+.pf-hl-roll-buckets { font-size: 0.7rem; color: var(--text-2, #4b5563); margin-top: 4px; }
 /* per-day Save-as-PDF affordance (read-only, shows for any viewer) */
 .pf-hl-day-actions { display: flex; justify-content: flex-end; margin: 0 0 4px 0; }
 .pf-hl-pdf {
@@ -16778,7 +16803,10 @@ try {
       var s = (v == null ? '' : String(v)).replace(/[,\s]/g, '').trim();
       if (!s) return 0;
       var n = parseFloat(s);
-      return isNaN(n) ? 0 : n;
+      // Guard BOTH NaN and non-finite (a runaway cell like "1e999" parses to
+      // Infinity, which would poison every downstream sum / %). Only a real,
+      // finite number counts; anything else degrades to 0. (Verifier hardening.)
+      return isFinite(n) ? n : 0;
     }
     // Compute the per-day totals row from an array of pier rows:
     //   count   = # of pier rows (each row = 1, Brad's "Total Qty" for the AP # column)
@@ -16801,9 +16829,107 @@ try {
     // sum (30 not 30.0) yet keeps genuine decimals (30.5), then applies the portal-wide
     // comma grouping via window.pfFmtQty (17003 -> 17,003).
     function pfHlFmtTotal(n){
-      if (n == null || isNaN(n)) n = 0;
+      if (n == null || !isFinite(n)) n = 0;
       var s = (Math.round(n * 1e6) / 1e6).toString();   // kill float dust, keep real decimals
       return window.pfFmtQty ? window.pfFmtQty(s) : s;
+    }
+    // ===== PROJECT-TO-DATE ROLLUP + % COMPLETE (Brad 2026-09-11) ======================
+    // The Hand Logs card is PER-PROJECT (keyed by _curNum) so every day in it IS the same
+    // job. This rollup sums INSTALLED work across ALL days in this project and compares it
+    // to the project's PLANNED totals to give the site/field team a live "PROJECT TO DATE"
+    // + "% complete", updating as the crew adds/edits rows.
+    //
+    // INSTALLED (running totals across every day):
+    //   piers = COUNT of all pier rows across all days (Brad's "Total Qty" for AP #)
+    //   lf    = SUM of the Depth (LF) column across all days
+    //   buckets = SUM of the # Buckets column across all days (bonus; Brad specified AP#/LF)
+    // Blank / non-numeric cells contribute 0 via pfHlNum (already isFinite-hardened).
+    function pfHlRollupInstalled(days){
+      days = Array.isArray(days) ? days : [];
+      var t = { piers: 0, lf: 0, buckets: 0 };
+      for (var i = 0; i < days.length; i++){
+        var dt = pfHlTotals((days[i] && days[i].rows) || []);
+        t.piers   += dt.count;
+        t.lf      += dt.depth;
+        t.buckets += dt.buckets;
+      }
+      return t;
+    }
+    // PLANNED project totals sourced from the CANONICAL Submittal-Summary global
+    // (window.pfSubmittalSummaryTotalsFor, keyed by project number) — the SAME single
+    // source of truth the Project Summary header strip + Active Projects Summary page +
+    // General Info auto-pull all read (the E&D Submittal Summary __site_elevations table:
+    // "Pier Qty" -> Total Pier Qty, "Total LF" -> Total LF). FAIL-CLOSED: if there is no
+    // Submittal Summary data the global returns '' and we surface null (planned-not-set),
+    // NEVER a fabricated number. Returns { pierQty: <num|null>, totalLf: <num|null> }.
+    function pfHlPlannedTotals(){
+      var out = { pierQty: null, totalLf: null };
+      try {
+        if (typeof window.pfSubmittalSummaryTotalsFor !== 'function') return out;
+        var raw = window.pfSubmittalSummaryTotalsFor(String(_curNum || ''));
+        var pq = pfHlNum(raw && raw.pierQty);
+        var lf = pfHlNum(raw && raw.totalLf);
+        // pfHlNum turns blank / non-numeric into 0; only treat a genuinely populated
+        // planned value as "set" (a real planned total is > 0).
+        if (raw && raw.pierQty !== '' && raw.pierQty != null && isFinite(pq) && pq > 0) out.pierQty = pq;
+        if (raw && raw.totalLf  !== '' && raw.totalLf  != null && isFinite(lf) && lf > 0) out.totalLf  = lf;
+      } catch (e) {}
+      return out;
+    }
+    // % complete = installed / planned * 100, guarded against divide-by-zero + non-finite.
+    // Returns a display STRING ("42.3%") or null (planned total not set / not computable) —
+    // the caller renders a dash / "planned total not set" for null. NEVER NaN / Infinity.
+    function pfHlPct(installed, planned){
+      if (planned == null || !isFinite(planned) || planned <= 0) return null;   // no divide-by-zero
+      if (installed == null || !isFinite(installed)) installed = 0;
+      var pct = (installed / planned) * 100;
+      if (!isFinite(pct)) return null;
+      // Whole number when clean (50%), else one decimal (42.3%). Never negative-guard needed
+      // (counts/LF are non-negative), but clamp any float dust off a whole value.
+      var rounded = Math.round(pct * 10) / 10;
+      var s = (rounded % 1 === 0) ? String(rounded) : rounded.toFixed(1);
+      return s + '%';
+    }
+    // Build the once-per-card PROJECT-TO-DATE rollup block (rendered UNDER the per-day list).
+    // Shows running piers installed + running LF installed, each with its % complete NEXT TO
+    // it, plus the planned totals for context. install = { piers, lf, buckets }; planned =
+    // { pierQty, totalLf } (either may be null = not set). Two stat cells (AP # / Depth LF)
+    // per Brad; buckets shown as a muted third line. Live-updated in the editor via
+    // pfHlRefreshRollup (same math path).
+    function pfHlRollupHtml(install, planned){
+      function pctCell(installed, plannedVal){
+        var pct = pfHlPct(installed, plannedVal);
+        if (pct == null){
+          return '<span class="pf-hl-roll-pct pf-hl-roll-pct-na" title="Planned total not set on the E&amp;D Submittal Summary">planned total not set</span>';
+        }
+        return '<span class="pf-hl-roll-pct">' + E(pct) + '<span class="pf-hl-roll-pct-lbl"> complete</span></span>';
+      }
+      function plannedTxt(v){ return (v == null) ? '<span class="pf-sge-blank">—</span>' : E(pfHlFmtTotal(v)); }
+      var piersCell = ''
+        + '<div class="pf-hl-roll-stat">'
+        +   '<div class="pf-hl-roll-lbl">Piers Installed (Project to Date)</div>'
+        +   '<div class="pf-hl-roll-row">'
+        +     '<span class="pf-hl-roll-num">' + E(pfHlFmtTotal(install.piers)) + '</span>'
+        +     pctCell(install.piers, planned.pierQty)
+        +   '</div>'
+        +   '<div class="pf-hl-roll-plan">Planned Total Pier Qty: ' + plannedTxt(planned.pierQty) + '</div>'
+        + '</div>';
+      var lfCell = ''
+        + '<div class="pf-hl-roll-stat">'
+        +   '<div class="pf-hl-roll-lbl">LF Installed (Project to Date)</div>'
+        +   '<div class="pf-hl-roll-row">'
+        +     '<span class="pf-hl-roll-num">' + E(pfHlFmtTotal(install.lf)) + ' LF</span>'
+        +     pctCell(install.lf, planned.totalLf)
+        +   '</div>'
+        +   '<div class="pf-hl-roll-plan">Planned Total LF: ' + plannedTxt(planned.totalLf) + '</div>'
+        + '</div>';
+      var bucketsLine = '<div class="pf-hl-roll-buckets">Buckets of Stone (Project to Date): '
+        + E(pfHlFmtTotal(install.buckets)) + '</div>';
+      return '<div class="pf-hl-rollup" aria-label="Project to date rollup">'
+        + '<div class="pf-hl-roll-title">PROJECT TO DATE</div>'
+        + '<div class="pf-hl-roll-grid">' + piersCell + lfCell + '</div>'
+        + bucketsLine
+        + '</div>';
     }
     // Read-view of ONE pier row. Blank cells show the yellow placeholder used elsewhere.
     // 8 columns matching Brad's paper PF Hand Log template (Additional Notes runs widest).
@@ -16878,6 +17004,10 @@ try {
       var listHtml;
       if (days.length){
         listHtml = days.map(function(d){ return pfHlDayRead(d, jobNum, jobName); }).join('');
+        // PROJECT-TO-DATE rollup: running piers + LF installed across ALL days in this
+        // project, each with its % complete vs the planned Submittal-Summary totals. Once
+        // per card, UNDER the per-day list (Brad 2026-09-11). Visible to site + field team.
+        listHtml += pfHlRollupHtml(pfHlRollupInstalled(days), pfHlPlannedTotals());
       } else {
         listHtml = '<div class="pf-sge-empty">No hand logs recorded.'
           + (canEdit() ? ' <strong>Edit</strong> &rarr; <strong>+ Add Hand Log Day</strong> to start one.' : '')
@@ -16922,7 +17052,7 @@ try {
     ];
     // Build the standalone print document (HTML string) for ONE day. jobNum/jobName are the
     // project's number/name; day is a normalized day {id,date,rows:[...]}. E() escapes.
-    function pfHlPrintHtml(day, jobNum, jobName){
+    function pfHlPrintHtml(day, jobNum, jobName, projRollup){
       var dateTxt = (day && day.date && String(day.date).trim())
         ? E(String(window.pfFmtDate(day.date))) : '';
       var head = ''
@@ -16976,8 +17106,34 @@ try {
         + '.hlp-tbl td { border:1px solid #999; padding:3px 4px; font-size:10px; height:18px; vertical-align:top; }'
         + '.hlp-tbl tr.hlp-total td { font-weight:700; border-top:2px solid #333; background:#eee; }'
         + '.hlp-wide { text-align:left; width:38%; }'
+        + '.hlp-roll { width:100%; border-collapse:collapse; border:1px solid #333; margin-top:8px; }'
+        + '.hlp-roll td { border:1px solid #333; padding:4px 6px; font-size:10px; }'
+        + '.hlp-roll .hlp-roll-cap { font-weight:700; letter-spacing:0.04em; background:#111; color:#fff; text-align:center; }'
+        + '.hlp-roll .hlp-roll-lbl { font-weight:700; background:#f7f7f7; white-space:nowrap; width:1%; }'
+        + '.hlp-roll .hlp-roll-pct { font-weight:700; }'
         + '.hlp-foot { margin-top:8px; font-size:8px; color:#666; }'
         + '@media print { .hlp-toolbar { display:none; } .hlp-page { margin:0; width:auto; } }';
+      // Optional PROJECT-TO-DATE band (a clean bordered table above the footer). Only when
+      // the caller passes a rollup; each % may be null (planned total not set -> dash).
+      var rollHtml = '';
+      if (projRollup){
+        function pRoll(v){ return E(pfHlFmtTotal(v)); }
+        function pRollPct(installed, planned){
+          var pct = pfHlPct(installed, planned);
+          return pct == null ? '&mdash;' : E(pct);
+        }
+        rollHtml = '<table class="hlp-roll"><tbody>'
+          + '<tr><td class="hlp-roll-cap" colspan="4">PROJECT TO DATE (all logged days &mdash; ' + E(String(jobNum||'')) + ')</td></tr>'
+          + '<tr>'
+          +   '<td class="hlp-roll-lbl">Piers Installed</td><td>' + pRoll(projRollup.install.piers)
+          +     ' <span class="hlp-roll-pct">(' + pRollPct(projRollup.install.piers, projRollup.planned.pierQty)
+          +     ' of ' + (projRollup.planned.pierQty == null ? '&mdash;' : pRoll(projRollup.planned.pierQty)) + ' planned)</span></td>'
+          +   '<td class="hlp-roll-lbl">LF Installed</td><td>' + pRoll(projRollup.install.lf) + ' LF'
+          +     ' <span class="hlp-roll-pct">(' + pRollPct(projRollup.install.lf, projRollup.planned.totalLf)
+          +     ' of ' + (projRollup.planned.totalLf == null ? '&mdash;' : pRoll(projRollup.planned.totalLf)) + ' LF planned)</span></td>'
+          + '</tr>'
+          + '</tbody></table>';
+      }
       return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>'
         + E('PF Hand Log - ' + (jobNum||'') + (dateTxt ? ' - ' + String(window.pfFmtDate(day.date)) : ''))
         + '</title><style>' + css + '</style></head><body>'
@@ -16987,6 +17143,7 @@ try {
         +   '<div class="hlp-title"><div class="hlp-co">PIER FOUNDATIONS, LLC</div><div class="hlp-doc">HAND LOG</div></div>'
         +   '<table class="hlp-hdr"><tbody>' + head + '</tbody></table>'
         +   '<table class="hlp-tbl"><thead><tr>' + thead + '</tr></thead><tbody>' + bodyRows + '</tbody><tfoot>' + totalRow + '</tfoot></table>'
+        +   rollHtml
         +   '<div class="hlp-foot">Pier Foundations &middot; Hand Log' + (dateTxt ? ' &middot; ' + dateTxt : '') + '</div>'
         + '</div>'
         + '</body></html>';
@@ -17002,10 +17159,13 @@ try {
       var day = null;
       for (var i = 0; i < days.length; i++){ if (String(days[i].id) === String(dayId)) { day = days[i]; break; } }
       if (!day) day = { id: dayId, date: '', rows: [] };   // print an empty sheet rather than fail
+      // PROJECT-TO-DATE rollup for the PDF footer band: running piers + LF across ALL days
+      // (not just the printed one) vs planned totals. Same math path as the on-screen rollup.
+      var projRollup = { install: pfHlRollupInstalled(days), planned: pfHlPlannedTotals() };
       var win = window.open('', '_blank');
       if (!win) { alert('Please allow pop-ups to save the hand log PDF.'); return; }
       win.document.open();
-      win.document.write(pfHlPrintHtml(day, jobNum, jobName));
+      win.document.write(pfHlPrintHtml(day, jobNum, jobName, projRollup));
       win.document.close();
     };
     // ===== Subcontract-New ONLY: Change Orders "Contract Amount" summary =============
@@ -30086,6 +30246,36 @@ try {
       if (dEl) dEl.innerHTML = pfHlFmtTotal(t.depth) + ' LF';
       if (bEl) bEl.innerHTML = pfHlFmtTotal(t.buckets);
     };
+    // Recompute + repaint the editor's PROJECT-TO-DATE rollup from LIVE inputs across EVERY
+    // day-editor (so running piers/LF + % complete track unsaved edits in real time). Reads
+    // the same math path as the read view (pfHlRollupInstalled / pfHlPlannedTotals / pfHlPct).
+    // Given the editor element (or any node inside it). Rebuilds the rollup block in place.
+    window.pfHlRefreshRollup = function(editorEl){
+      if (!editorEl) return;
+      var editor = editorEl.classList && editorEl.classList.contains('pf-hl-editor')
+        ? editorEl
+        : (editorEl.closest ? editorEl.closest('.pf-hl-editor') : null);
+      if (!editor) return;
+      var host = editor.querySelector('.pf-hl-editor-rollup');
+      if (!host) return;
+      // Gather live rows per day-editor -> the same {rows:[{depth,buckets}]} shape the
+      // installed-rollup summer expects (count comes from row COUNT, LF from depth).
+      var dayEls = editor.querySelectorAll('.pf-hl-eday');
+      var days = [];
+      for (var i = 0; i < dayEls.length; i++){
+        var rowEls = dayEls[i].querySelectorAll('.pf-hl-erow');
+        var rows = [];
+        for (var j = 0; j < rowEls.length; j++){
+          var rEl = rowEls[j];
+          rows.push({
+            depth:   (rEl.querySelector('.pf-hl-in-depth')   || {}).value || '',
+            buckets: (rEl.querySelector('.pf-hl-in-buckets') || {}).value || ''
+          });
+        }
+        days.push({ rows: rows });
+      }
+      host.innerHTML = pfHlRollupHtml(pfHlRollupInstalled(days), pfHlPlannedTotals());
+    };
     // Enter edit mode: replace the read-view body with the day editors + "+ Add Hand Log Day".
     window.pfHlEdit = function(btn){
       if (!canEdit()) return;                          // defense-in-depth (server also 403s)
@@ -30100,6 +30290,10 @@ try {
       var editorHtml = '<div class="pf-sge-editor pf-hl-editor">'
         + '<div class="pf-hl-edays">'+daysHtml+'</div>'
         + '<button type="button" class="pf-sge-add pf-hl-add-day" onclick="event.stopPropagation();window.pfHlAddDay(this)">+ Add Hand Log Day</button>'
+        // Live PROJECT-TO-DATE rollup inside the editor: running piers + LF installed across
+        // every day-editor's UNSAVED inputs, each with its % complete. Refreshed by
+        // pfHlRefreshRollup on every input / add / remove (Brad 2026-09-11).
+        + '<div class="pf-hl-editor-rollup">' + pfHlRollupHtml(pfHlRollupInstalled(days), pfHlPlannedTotals()) + '</div>'
         + '<div class="pf-sge-edit-err" style="display:none"></div>'
         + '<div class="pf-sge-edit-actions">'
         +   '<button type="button" class="pf-sge-save" onclick="event.stopPropagation();window.pfHlSave(this)">Save</button>'
@@ -30118,6 +30312,7 @@ try {
         edEl.addEventListener('input', function(ev){
           var dayEl = ev.target && ev.target.closest ? ev.target.closest('.pf-hl-eday') : null;
           if (dayEl) window.pfHlRecalcDay(dayEl);
+          window.pfHlRefreshRollup(edEl);          // project-to-date rollup tracks live edits
         });
       }
     };
@@ -30136,6 +30331,7 @@ try {
       days.appendChild(node);
       var dateInput = node.querySelector('.pf-hl-in-date');
       if (dateInput) dateInput.focus();
+      window.pfHlRefreshRollup(days);              // new (empty) day -> rollup unchanged but keep in sync
     };
     // Delete one day (with confirm). Editor DOM only; Save persists.
     window.pfHlRemoveDay = function(btn){
@@ -30143,7 +30339,9 @@ try {
       var day = btn && btn.closest ? btn.closest('.pf-hl-eday') : null;
       if (!day) return;
       if (!window.confirm('Delete this whole hand-log day? Not saved until you click Save.')) return;
+      var editor = day.closest ? day.closest('.pf-hl-editor') : null;
       day.parentNode.removeChild(day);
+      if (editor) window.pfHlRefreshRollup(editor);   // day removed -> project totals drop
     };
     // Append a fresh empty pier row to THIS day's editor.
     window.pfHlAddRow = function(btn){
@@ -30159,14 +30357,17 @@ try {
       var apInput = node.querySelector('.pf-hl-in-ap');
       if (apInput) apInput.focus();
       window.pfHlRecalcDay(day);                       // count changed -> refresh footer
+      window.pfHlRefreshRollup(day);                   // project piers-to-date +1
     };
     // Delete one pier row (no confirm — cheap to re-add). Editor DOM only; Save persists.
     window.pfHlRemoveRow = function(btn){
       if (!canEdit()) return;
       var row = btn && btn.closest ? btn.closest('.pf-hl-erow') : null;
       var day = row && row.closest ? row.closest('.pf-hl-eday') : null;
+      var editor = row && row.closest ? row.closest('.pf-hl-editor') : null;
       if (row && row.parentNode) row.parentNode.removeChild(row);
       if (day) window.pfHlRecalcDay(day);              // count/sum changed -> refresh footer
+      if (editor) window.pfHlRefreshRollup(editor);    // project piers/LF-to-date drop
     };
     // Cancel: restore the read-view body verbatim, re-show the Edit affordance.
     window.pfHlCancel = function(btn){
