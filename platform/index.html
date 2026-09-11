@@ -2310,6 +2310,17 @@ tr.pf-dragging { opacity: 0.45; }
 .pr-live-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0,109,176,0.12); }
 .pr-live-select { max-width: 260px; }
 .pr-live-textarea { max-width: 100%; width: 100%; resize: vertical; }
+/* Auto-growing textarea (Brad 2026-09-11): long-prose Contract Recap fields (Liquidated
+   Damages, Minimum Insurance Requirement, etc.). Height is managed by pfAutogrowTextarea
+   (set to scrollHeight on render + input), so hide overflow and disable manual resize — the
+   box is always exactly tall enough for its content. Full-width in the value cell; starts at
+   ~1 line (density-conscious) and grows as needed. Applies to BOTH the live-inline control
+   and the section-editor control. min-height keeps a single empty line visible. */
+textarea.pf-autogrow {
+  width: 100%; max-width: 100%; box-sizing: border-box;
+  overflow-y: hidden; resize: none;
+  min-height: 1.9em; line-height: 1.35;
+}
 .pr-live-msg { font-size: 0.72rem; margin-left: 8px; }
 /* "Open" link beside a live-edit URL input (Brad 2026-09-07): compact clickable link so a
    saved SharePoint/file URL opens directly in office edit mode, without hiding the input. */
@@ -23888,7 +23899,22 @@ try {
       // Safety > Public Utility Locates (Brad 2026-09-09): free-form locate-activity log
       // (tickets called in, responses/clears, conflicts, hand-dig requirements). Phase 1 =
       // manual textarea; Phase 2 auto-appends dated lines from 811 locate emails. Multi-line.
-      'Locate Notes': true
+      'Locate Notes': true,
+      // ===== Subcontract Agreement > Contract Recap: long-prose contract fields (Brad
+      // 2026-09-11) — auto-growing textareas so cells that hold long content (paragraphs
+      // pulled from the executed subcontract) render tall enough to read WITHOUT truncation.
+      // Brad named Liquidated Damages + Minimum Insurance Requirement explicitly; the
+      // sibling free-form prose fields that suffer the SAME cramping are converted with them.
+      // The value box stays in the right (66%) value cell, title left; it grows in HEIGHT via
+      // .pf-autogrow (see pfAutogrowTextarea). All are PLAIN text fields (none appear in
+      // PF_FIELD_DROPDOWNS / PF_FIELD_DATE_LABELS), so there is NO dropdown/date conflict.
+      'Liquidated Damages': true,
+      'Minimum Insurance Requirement': true,
+      'Insurance Requirements (per subcontract)': true,
+      'Payment Terms': true,
+      'Retainage Release': true,
+      'Bond Requirements': true,
+      'Sales Tax Notes': true
     };
     function pfIsTextareaLabel(label){ return !!PF_FIELD_TEXTAREA_LABELS[label]; }
     // Coerce a stored/displayed date (MM/DD/YYYY, M/D/YY, YYYY-MM-DD, ...) into the
@@ -24120,8 +24146,9 @@ try {
         // Multi-line textarea. The value is placed as TEXT CONTENT (not a value=
         // attribute) so embedded newlines survive. pfSaveSection reads inp.value the
         // same as any input, so the override save + multi-line re-display round-trip
-        // is unchanged. Full-width + a reasonable default height (grows/scrolls).
-        control = '<textarea class="pr-edit-input pr-edit-textarea" rows="4" '
+        // is unchanged. Full-width; AUTO-GROW in height via .pf-autogrow (Brad 2026-09-11) —
+        // rows="1" start, sized to content after render + on input by pfAutogrowTextarea.
+        control = '<textarea class="pr-edit-input pr-edit-textarea pf-autogrow" rows="1" '
           + 'data-pr-field-label="' + esc2(label) + '">'
           + esc2(value == null ? '' : value) + '</textarea>';
       } else if (pfLabelIsDateControl(label)) {
@@ -24174,7 +24201,11 @@ try {
       var common = 'class="pr-live-input" data-pr-field-label="'+esc2(label)+'" '
         + 'data-pr-live-prev="'+esc2(v)+'" onchange="event.stopPropagation();window.pfLiveFieldChange(this)"';
       if (PF_FIELD_TEXTAREA_LABELS[label]) {
-        return '<textarea '+common+' rows="3" class="pr-live-input pr-live-textarea" '
+        // AUTO-GROW (Brad 2026-09-11): .pf-autogrow + rows="1" so the box starts at ~1 line
+        // (density-conscious) and grows in HEIGHT to fit content — sized once after render and
+        // on every input via the delegated 'input' listener (pfAutogrowTextarea). Save path is
+        // unchanged (textarea.value round-trips through pfLiveFieldChange like any input).
+        return '<textarea '+common+' rows="1" class="pr-live-input pr-live-textarea pf-autogrow" '
           + 'data-pr-field-label="'+esc2(label)+'" data-pr-live-prev="'+esc2(v)+'" '
           + 'onchange="event.stopPropagation();window.pfLiveFieldChange(this)">'+esc2(v)+'</textarea>';
       }
@@ -25268,6 +25299,60 @@ try {
       var wrap = card.querySelector('.pf-wagerate-wrap[data-pf-wagerate="1"]');
       if (wrap) wrap.style.display = isYes ? '' : 'none';
     }, true);
+
+    // ===== AUTO-GROW TEXTAREAS (Brad 2026-09-11) ==================================
+    // The long-prose Contract Info / Contract Recap fields (Liquidated Damages, Minimum
+    // Insurance Requirement, etc. — registered in PF_FIELD_TEXTAREA_LABELS + rendered with
+    // class .pf-autogrow) must GROW IN HEIGHT to fit their content instead of scrolling in a
+    // fixed box. pfAutogrowTextarea(el) resets height then sets it to scrollHeight so the box
+    // is exactly tall enough for the text (min ~1 line, grows as needed — density-conscious).
+    // GENERIC: keyed off the .pf-autogrow class, not any one section, so it works for BOTH the
+    // office live-inline control (.pr-live-input) AND the section-editor control (.pr-edit-input),
+    // and for any future .pf-autogrow field. Save path is untouched (value round-trips as before).
+    window.pfAutogrowTextarea = function(el){
+      if (!el || el.tagName !== 'TEXTAREA') return;
+      // Reset to auto first so the box can SHRINK when text is deleted, then grow to fit.
+      el.style.height = 'auto';
+      var h = el.scrollHeight;
+      if (h && h > 0) el.style.height = h + 'px';
+    };
+    // Size every .pf-autogrow textarea currently in the DOM (call after a render). rAF so the
+    // element has been laid out (scrollHeight is 0 before layout). Safe to call repeatedly.
+    window.pfAutogrowSizeAll = function(root){
+      var scope = root || document;
+      var run = function(){
+        var tas = scope.querySelectorAll ? scope.querySelectorAll('textarea.pf-autogrow') : [];
+        for (var i = 0; i < tas.length; i++) window.pfAutogrowTextarea(tas[i]);
+      };
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run); else run();
+    };
+    // Delegated 'input' listener (bubble phase) so a .pf-autogrow textarea rendered at ANY time
+    // (initial render, edit-mode swap, re-render) grows/shrinks live as the user types. One
+    // listener for the whole document — no per-field wiring.
+    document.addEventListener('input', function(ev){
+      var el = ev.target;
+      if (!el || el.tagName !== 'TEXTAREA') return;
+      if (!el.classList || !el.classList.contains('pf-autogrow')) return;
+      window.pfAutogrowTextarea(el);
+    });
+    // Initial sizing: run once when the DOM is ready, and observe the generic project-record
+    // root so every open/re-render of a project sizes its autogrow textareas (the record is
+    // rendered into #prGenericRoot by renderProjectRecord, which does not fire a load event).
+    (function(){
+      var sizeSoon = function(){ window.pfAutogrowSizeAll(document); };
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', sizeSoon);
+      } else { sizeSoon(); }
+      var attach = function(){
+        var host = document.getElementById('prGenericRoot');
+        if (!host || typeof MutationObserver !== 'function') return;
+        var mo = new MutationObserver(function(){ window.pfAutogrowSizeAll(host); });
+        mo.observe(host, { childList: true, subtree: true });
+      };
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', attach);
+      } else { attach(); }
+    })();
 
     // Sandbox Safety > JHA "Jobsite Safety Analysis (JSA) Required?" conditional (Brad
     // 2026-09-08). CAPTURE phase (3rd arg true) so it runs BEFORE the dropdown's inline
