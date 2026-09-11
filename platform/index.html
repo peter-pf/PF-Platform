@@ -2393,39 +2393,33 @@ textarea.pf-autogrow {
 .pf-staking-doc-table .pr-field { padding: 0; border-bottom: none; }
 .pf-staking-doc-table .pr-field-label { display: none; }
 
-/* ---- Wage Rate Determination table (Brad 2026-09-10) ------------------------- */
-/* Subcontract-New ONLY: the "Wage Rate Determination" collapsible reveals a small  */
-/* rate table = Classification | Hourly Rate | Overtime Rate | Fringe Rate. Only     */
-/* emitted by _srNewWageRateTable (called once, inside the Subcontract-New sandbox), */
-/* so no other card is touched. Classification column runs ~2x the rate columns per  */
-/* Brad's name/description-column-is-wider rule (40 / 20 / 20 / 20). Header row is    */
-/* the transparent uppercase accent-dark band shared with the staking doc table.     */
-.pf-wagerate-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-.pf-wagerate-table td {
-  padding: 6px 12px; border-bottom: 1px solid var(--border-light); vertical-align: middle;
+/* ---- Prevailing-Wage Operators rate row (Brad 2026-09-11, FIX #17) ----------- */
+/* Subcontract-New ONLY: when the Contract Info gate = Yes, TWO inline rows are      */
+/* revealed directly under the gate line inside the Contract Info .pf-sr-table (no    */
+/* separate "Wage Rate Determination" collapsible header): a caption row (three rate  */
+/* column labels) + the "Prevailing Wage Rate - Operators" data row (three rate       */
+/* inputs). The three rate cells share the value column as an even 3-up flex so they  */
+/* line up under their captions. Scoped to the marker rows so no other row is touched.*/
+.pf-sr-table tr[data-pf-wage-row="1"] td.pf-wr-class {
+  font-size: 12.5px; color: var(--text-1, #2B2F36); word-break: break-word;
 }
-.pf-wagerate-table th {
-  background: transparent; text-align: left;
-  font-size: 0.8rem; font-weight: 700; color: var(--accent-dark);
+.pf-sr-table tr.pf-wage-caption-row td.pf-wr-class {
+  font-weight: 700; color: var(--accent-dark);
+  text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.72rem;
+}
+.pf-wage-rate-hdr, .pf-wage-rate-cells { display: flex; gap: 12px; width: 100%; }
+.pf-wage-rate-hdr > span {
+  flex: 1 1 0; min-width: 0;
+  font-size: 0.72rem; font-weight: 700; color: var(--accent-dark);
   text-transform: uppercase; letter-spacing: 0.04em;
-  padding: 4px 12px; padding-bottom: 4px;
-  border-bottom: 1px solid var(--border-light); vertical-align: bottom;
 }
-.pf-wagerate-table tr:last-child td { border-bottom: none; }
-.pf-wagerate-table th.pf-wr-class,
-.pf-wagerate-table td.pf-wr-class { width: 40%; word-break: break-word; }
-.pf-wagerate-table td.pf-wr-class { font-size: 0.9rem; color: var(--text-1); }
-.pf-wagerate-table th.pf-wr-rate,
-.pf-wagerate-table td.pf-wr-rate { width: 20%; }
-/* Neutralize the embedded .pr-field so each rate input sits flush in its cell (the */
-/* column header + row Classification cell already label it, so hide the field label). */
-.pf-wagerate-table .pr-field { padding: 0; border-bottom: none; }
-.pf-wagerate-table .pr-field-label { display: none; }
-.pf-srnew-scope .pf-wagerate-table { font-size: 12.5px; }
-.pf-srnew-scope .pf-wagerate-table td { font-size: 12.5px; }
-.pf-srnew-scope .pf-wagerate-table td.pf-wr-class { font-size: 12.5px; color: var(--text-1, #2B2F36); }
-.pf-srnew-scope .pf-wagerate-table .pr-field-value { font-size: 12.5px; color: var(--text-1, #2B2F36); }
-.pf-srnew-scope .pf-wagerate-table .pr-live-input { font-size: 12.5px; }
+.pf-wage-rate-cells > span.pf-wr-rate { flex: 1 1 0; min-width: 0; }
+/* Neutralize the embedded .pr-field so each rate input sits flush (the caption row */
+/* already labels the three columns, so hide the per-field label). */
+.pf-wage-rate-cells .pr-field { padding: 0; border-bottom: none; }
+.pf-wage-rate-cells .pr-field-label { display: none; }
+.pf-srnew-scope .pf-wage-rate-cells .pr-field-value { font-size: 12.5px; color: var(--text-1, #2B2F36); }
+.pf-srnew-scope .pf-wage-rate-cells .pr-live-input { font-size: 12.5px; }
 
 /* ---- Staking "GC's responsibility" note placement (Brad 2026-09-05) --------- */
 /* The GC-has-it note now sits to the RIGHT of the "Staking & Layout PF's         */
@@ -18703,55 +18697,57 @@ try {
           '<tr data-row-label="Bond Requirements">',
           '<tr data-row-label="Bond Requirements" style="display:none">');
       }
-      var _subN_contractInfo = _srNewCollapsible('Contract Info', _contractInfoRows, false);
-      // ---- Wage Rate Determination (Brad 2026-09-10) --------------------------------
-      // Revealed ONLY when the Contract Info gate "Prevailing Wage Rate / Certified
-      // Payroll Required?" = Yes; hidden entirely on No/blank. Inside is a small rate
-      // table: Classification | Hourly Rate | Overtime Rate | Fringe Rate, with one
-      // data row "Prevailing Wage Rate - Operators" (three fillable rate inputs). Each
-      // rate input is a plain field() -> saves under the 'contract' override key (the
-      // card is data-pr-section="contract"), label IS the storage key:
+      // ---- Prevailing-Wage Operators rate row (Brad 2026-09-11, FIX #17) ------------
+      // Brad: when the gate "Prevailing Wage Rate / Certified Payroll Required?" = Yes we
+      // want ONLY a ROW added directly under that line — NOT a whole "Wage Rate
+      // Determination" collapsible header/section. So the old _srNewCollapsible wrapper is
+      // REMOVED; instead the Operators rate row is spliced INLINE into the Contract Info
+      // table immediately after the gate row. A small caption row (Classification | Hourly |
+      // Overtime | Fringe) precedes it so the three rate inputs read correctly. Both rows are
+      // full-width (colspan=2) and hidden with inline display:none when the gate != Yes — the
+      // SAME conditional mechanism as Sales Tax % / Bond Requirements (a single capture-phase
+      // change listener flips their display live). Save keys are UNCHANGED — each rate input is
+      // a plain field() saving under the 'contract' override key (card is data-pr-section=
+      //   "contract"), label IS the storage key:
       //   'Operators Hourly Rate' / 'Operators Overtime Rate' / 'Operators Fringe Rate'.
-      // The table builder (_srNewWageRateTable) takes a list of classification rows so
-      // more classifications can be added later; only "Operators" is wired now.
-      // _srNewWageRateTable(rows): rows = [{ cls, hourly, overtime, fringe }] where each
-      // rate value is the field() storage-key/label. Returns the Classification|Hourly|
-      // Overtime|Fringe rate table (scoped .pf-wagerate-table CSS). Hoisted function
-      // declaration -> safe to reference before its textual definition below.
-      function _srNewWageRateTable(rows){
-        var body = rows.map(function(r){
-          return '<tr>'
-            + '<td class="pf-wr-class">' + E(r.cls) + '</td>'
-            + '<td class="pf-wr-rate">' + field(r.hourly, '') + '</td>'
-            + '<td class="pf-wr-rate">' + field(r.overtime, '') + '</td>'
-            + '<td class="pf-wr-rate">' + field(r.fringe, '') + '</td>'
-            + '</tr>';
-        }).join('');
-        return '<div class="table-wrap"><table class="pf-wagerate-table">'
-          + '<thead><tr>'
-          +   '<th class="pf-wr-class">Classification</th>'
-          +   '<th class="pf-wr-rate">Hourly Rate</th>'
-          +   '<th class="pf-wr-rate">Overtime Rate</th>'
-          +   '<th class="pf-wr-rate">Fringe Rate</th>'
-          + '</tr></thead>'
-          + '<tbody>' + body + '</tbody></table></div>';
-      }
-      var _subN_wageRate = _srNewCollapsible('Wage Rate Determination',
-          _srNewWageRateTable([
-            { cls: 'Prevailing Wage Rate - Operators',
-              hourly:   'Operators Hourly Rate',
-              overtime: 'Operators Overtime Rate',
-              fringe:   'Operators Fringe Rate' }
-          ]), false);
-      // Conditional visibility: the whole "Wage Rate Determination" collapsible (the outer
-      // .pf-sr-collapse) is hidden on render when the gate != Yes, and the capture-phase
-      // listener below flips it live. Read the effective 'contract' value of the gate (same
-      // effVal idiom as Sales Tax / Bond). We wrap the collapsible in a marker div so the
-      // listener can target it precisely without a re-render.
+      // The data-pf-wage-row marker lets the listener + the render-time hide target exactly
+      // these two rows; the completion counter's inline-hidden guard (pfFieldRowHidden) now
+      // excludes them from the count while hidden, so gate=No no longer inflates "X/Y".
       var _pwGateEff = String(effVal('contract', 'Prevailing Wage Rate / Certified Payroll Required?', '') || '').trim();
       var _pwYes = /^yes$/i.test(_pwGateEff);
-      _subN_wageRate = '<div class="pf-wagerate-wrap" data-pf-wagerate="1"'
-        + (_pwYes ? '' : ' style="display:none"') + '>' + _subN_wageRate + '</div>';
+      var _pwHideAttr = _pwYes ? '' : ' style="display:none"';
+      var _wageCaptionRow =
+          '<tr data-pf-wage-row="1" class="pf-wage-caption-row"' + _pwHideAttr + '>'
+        +   '<td class="pf-wr-class">Classification</td>'
+        +   '<td class="pf-sr-val"><div class="pf-wage-rate-hdr">'
+        +     '<span>Hourly Rate</span><span>Overtime Rate</span><span>Fringe Rate</span>'
+        +   '</div></td>'
+        + '</tr>';
+      var _wageDataRow =
+          '<tr data-pf-wage-row="1" class="pf-wage-data-row"' + _pwHideAttr + '>'
+        +   '<td class="pf-wr-class">Prevailing Wage Rate - Operators</td>'
+        +   '<td class="pf-sr-val"><div class="pf-wage-rate-cells">'
+        +     '<span class="pf-wr-rate">' + field('Operators Hourly Rate', '') + '</span>'
+        +     '<span class="pf-wr-rate">' + field('Operators Overtime Rate', '') + '</span>'
+        +     '<span class="pf-wr-rate">' + field('Operators Fringe Rate', '') + '</span>'
+        +   '</div></td>'
+        + '</tr>';
+      // Splice the two rows in DIRECTLY AFTER the gate row's closing </tr>. The gate row is a
+      // standard _srNewRow (<tr data-row-label="...">…</tr>); insert right after it so the rate
+      // row sits under the "Prevailing Wage Rate / Certified Payroll Required?" line, before
+      // "Minimum Insurance Requirement".
+      var _gateRowOpen = '<tr data-row-label="Prevailing Wage Rate / Certified Payroll Required?">';
+      var _gateRowIdx = _contractInfoRows.indexOf(_gateRowOpen);
+      if (_gateRowIdx !== -1) {
+        var _gateRowEnd = _contractInfoRows.indexOf('</tr>', _gateRowIdx);
+        if (_gateRowEnd !== -1) {
+          var _insertAt = _gateRowEnd + '</tr>'.length;
+          _contractInfoRows = _contractInfoRows.slice(0, _insertAt)
+            + _wageCaptionRow + _wageDataRow
+            + _contractInfoRows.slice(_insertAt);
+        }
+      }
+      var _subN_contractInfo = _srNewCollapsible('Contract Info', _contractInfoRows, false);
       // Invoicing & Payment Terms (Brad 2026-09-10, Request C):
       //   - "Approved SOV" (was a URL/link fieldLinked) RENAMED to "SOV Approved" and changed to
       //     a Yes/No dropdown (registered in PF_FIELD_DROPDOWNS -> live select on the 'contract'
@@ -18810,7 +18806,6 @@ try {
       var _subN_contractRecap =
           pfContractPullControl()
         + _subN_contractInfo
-        + _subN_wageRate
         + _subN_invoicing
         + _subN_scope
         + _subN_needed
@@ -22737,6 +22732,23 @@ try {
       }
     }
 
+    // pfFieldRowHidden(fieldEl, stopAt): true if fieldEl lives inside an ancestor that is
+    // currently hidden via inline style.display==='none' (walking UP to, but not past, stopAt).
+    // Used to EXCLUDE conditionally-hidden Contract Info rows (Sales Tax %, Bond Requirements,
+    // the inlined Prevailing-Wage Operators rate row) from the completion count — the same
+    // "an unchecked/hidden field doesn't count" rule the General Info scope-row guard applies.
+    // Cheap: only reads the already-set inline style (no getComputedStyle), matching how the
+    // conditional listeners toggle these rows (el.style.display = ''|'none'). Hoisted function
+    // declaration -> safe to reference from pfRenderSandboxSubStatus below.
+    function pfFieldRowHidden(fieldEl, stopAt){
+      var n = fieldEl;
+      while (n && n !== stopAt){
+        if (n.style && n.style.display === 'none') return true;
+        n = n.parentElement;
+      }
+      return false;
+    }
+
     // pfRenderSandboxSubStatus(root): put the SAME "X/Y Fields Complete, XX%" readout that
     // the top-level section headers carry (pfRenderSectionStatusBar) onto EVERY collapse bar
     // inside the sandbox "Site Readiness / Project Setup - New" card — Staking & Layout,
@@ -22761,6 +22773,15 @@ try {
         var total = 0, done = 0;
         for (var i = 0; i < fieldEls.length; i++){
           if (fieldEls[i].closest('.pf-cond-hidden')) continue;  // conditionally-hidden -> not counted
+          // Inline-display:none guard (Brad 2026-09-11): Contract Info's conditional rows
+          // (Sales Tax %, Bond Requirements, and the inlined Prevailing-Wage Operators rate
+          // row) are hidden with inline style="display:none" on an ANCESTOR <tr>/wrapper — NOT
+          // the .pf-cond-hidden class. A hidden-but-blank row was inflating the denominator
+          // (the "18/19" phantom-field bug: Sales Tax % counts as a needed-but-empty field even
+          // when Sales Tax=No hides it). Skip any field whose nearest hidden ancestor is
+          // display:none so conditionally-hidden fields don't count as "needs input" — mirrors
+          // the General Info hidden-scope-row guard in pfRenderSectionStatusBar.
+          if (pfFieldRowHidden(fieldEls[i], body)) continue;
           var val = fieldEls[i].querySelector('.pr-field-value');
           if (!val) continue;
           total++;
@@ -25277,6 +25298,20 @@ try {
       body.style.display = isYes ? '' : 'none';
     }, true);
 
+    // pfContractSubStatusRecalc(card): recompute the Subcontract-New collapse-bar completion
+    // readouts ("X/Y Fields Complete") in place after a conditional row is shown/hidden, WITHOUT
+    // a full re-render (Brad 2026-09-11). The counter (pfRenderSandboxSubStatus) now skips
+    // inline-hidden rows, so any listener that flips a Contract Info row's display MUST call this
+    // so the badge updates the same tick — mirrors the General Info scope-row live recompute.
+    // Resolves the sandbox root from the card (same idiom as the Jobsite Safety listener) and
+    // recomputes every .pf-srnew-scope bar under it (cheap; scoped to this one project record).
+    function pfContractSubStatusRecalc(card){
+      if (!card) return;
+      var root = (card.closest && (card.closest('.pr-root') || card.parentElement))
+                 || document.getElementById('prGenericRoot');
+      try { if (typeof pfRenderSandboxSubStatus === 'function') pfRenderSandboxSubStatus(root); } catch (e) {}
+    }
+
     // Subcontract-New Contract Info > "Sales Tax" conditional (Brad 2026-09-10, Request A).
     // CAPTURE phase (3rd arg true) so it runs BEFORE the select's inline onchange stopPropagation
     // — SAME idiom as the Testing "Modulus Load Test Required?" toggle above. Scoped to the
@@ -25305,6 +25340,10 @@ try {
           try { if (typeof window.pfLiveFieldChange === 'function') window.pfLiveFieldChange(notesCtl); } catch (e) {}
         }
       }
+      // Recompute the Contract Info collapse-bar "X/Y Fields Complete" (Brad 2026-09-11): the
+      // counter now skips inline-hidden rows, so hiding/showing "Sales Tax %" must recompute the
+      // badge instantly (no re-render), mirroring the General Info scope-row live recompute.
+      pfContractSubStatusRecalc(card);
     }, true);
 
     // Subcontract-New Contract Info > "Bond Required" conditional (Brad 2026-09-10, Request B).
@@ -25320,14 +25359,17 @@ try {
       var isYes = /^yes$/i.test(String(el.value || '').trim());
       var reqRow = card.querySelector('tr[data-row-label="Bond Requirements"]');
       if (reqRow) reqRow.style.display = isYes ? '' : 'none';
+      pfContractSubStatusRecalc(card);   // recompute skip-hidden count (Brad 2026-09-11)
     }, true);
 
     // Subcontract-New Contract Info > "Prevailing Wage Rate / Certified Payroll Required?"
-    // conditional (Brad 2026-09-10). CAPTURE phase, same idiom. Scoped to the Subcontract
-    // card. Yes -> reveal the whole "Wage Rate Determination" collapsible (the .pf-wagerate-wrap
-    // marker div wrapping it) so its Operators Hourly/OT/Fringe rate table is available;
-    // No/blank -> hide it entirely. The gate select's own save-on-change (pfLiveFieldChange,
-    // 'contract' key) fires independently. Purely visual — no data mutation, no re-render.
+    // conditional (Brad 2026-09-10; reworked 2026-09-11, FIX #17). CAPTURE phase, same idiom.
+    // Scoped to the Subcontract card. The old "Wage Rate Determination" collapsible is GONE —
+    // now Yes reveals the two INLINE Operators rate rows (data-pf-wage-row) spliced under the
+    // gate line; No/blank hides them. Same conditional mechanism as Sales Tax % / Bond
+    // Requirements. Then recompute the collapse-bar count so the hidden/shown rate row is
+    // added/removed from "X/Y Fields Complete" the same tick. The gate select's own
+    // save-on-change (pfLiveFieldChange, 'contract' key) fires independently.
     document.addEventListener('change', function(ev){
       var el = ev.target;
       if (!el || !el.getAttribute) return;
@@ -25335,8 +25377,9 @@ try {
       var card = el.closest ? el.closest('.pr-card[data-pr-section="contract"]') : null;
       if (!card) return;
       var isYes = /^yes$/i.test(String(el.value || '').trim());
-      var wrap = card.querySelector('.pf-wagerate-wrap[data-pf-wagerate="1"]');
-      if (wrap) wrap.style.display = isYes ? '' : 'none';
+      var wageRows = card.querySelectorAll('tr[data-pf-wage-row="1"]');
+      for (var i = 0; i < wageRows.length; i++) wageRows[i].style.display = isYes ? '' : 'none';
+      pfContractSubStatusRecalc(card);   // recompute skip-hidden count (Brad 2026-09-11)
     }, true);
 
     // ===== AUTO-GROW TEXTAREAS (Brad 2026-09-11) ==================================
