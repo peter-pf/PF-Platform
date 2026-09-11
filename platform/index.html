@@ -3663,13 +3663,48 @@ button.pr-action-link:disabled { opacity: 0.6; cursor: default; filter: none; }
 .pf-hl-eday-head .pf-hl-in-date { min-width: 150px; }
 .pf-hl-ro { font-size: 0.8rem; color: var(--text-2, #4b5563); display: flex; flex-direction: column; gap: 3px; }
 .pf-hl-rm-day { margin-left: auto; }
-/* editor: pier-row grid — 3 inputs + delete, column headers align above */
-.pf-hl-erow-head, .pf-hl-erow { display: grid; grid-template-columns: 1fr 1fr 1.4fr 34px; gap: 6px; align-items: center; }
+/* editor: pier-row grid — 8 template inputs + delete, column headers align above.
+   Notes column is widest. Grid can exceed card width; the .pf-hl-edays wrapper scrolls
+   horizontally so the 8 columns stay aligned rather than wrapping/misaligning. */
+.pf-hl-erow-head, .pf-hl-erow {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr 0.9fr 1fr 0.9fr 0.85fr 0.85fr 2.2fr 30px;
+  gap: 6px; align-items: center; min-width: 900px;
+}
 .pf-hl-erow-head { font-size: 0.68rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3, #6b7280); font-weight: 600; margin: 2px 2px 4px; }
 .pf-hl-erow { margin: 0 0 5px 0; }
 .pf-hl-erow .pf-sge-in { width: 100%; box-sizing: border-box; }
+.pf-hl-erows, .pf-hl-erow-head { overflow: visible; }
+.pf-hl-eday { overflow-x: auto; }
 .pf-hl-rm-row { padding: 3px 7px; }
 .pf-hl-add-row { margin-top: 2px; }
+/* read view: 8-column table scrolls horizontally on narrow screens; Notes runs widest */
+.pf-hl-rtable-wrap { overflow-x: auto; }
+.pf-hl-rtable { min-width: 860px; }
+.pf-hl-rtable th, .pf-hl-rtable td { white-space: nowrap; }
+.pf-hl-notes-cell { white-space: normal; min-width: 200px; text-align: left; }
+/* totals row (read view): bold summary with a heavy top border + tinted band */
+.pf-hl-rtable tfoot tr.pf-hl-total td {
+  font-weight: 700; border-top: 2px solid var(--text-2, #4b5563);
+  background: var(--accent-light, #E0F0FF);
+}
+/* totals footer (editor): grid-aligned to .pf-hl-erow so numbers sit under their columns */
+.pf-hl-etotal {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr 0.9fr 1fr 0.9fr 0.85fr 0.85fr 2.2fr 30px;
+  gap: 6px; align-items: center; min-width: 900px;
+  margin: 6px 2px 0; padding-top: 6px;
+  border-top: 2px solid var(--text-2, #4b5563);
+  font-size: 0.78rem; font-weight: 700; color: var(--text-1, #2B2F36);
+}
+/* per-day Save-as-PDF affordance (read-only, shows for any viewer) */
+.pf-hl-day-actions { display: flex; justify-content: flex-end; margin: 0 0 4px 0; }
+.pf-hl-pdf {
+  font-size: 0.72rem; padding: 3px 10px; cursor: pointer;
+  border: 1px solid var(--accent, #006DB0); color: var(--accent, #006DB0);
+  background: var(--bg-0, #fff); border-radius: 5px;
+}
+.pf-hl-pdf:hover { background: var(--accent-light, #E0F0FF); }
 /* "Pull from Approved Drawings" (Stage 2, Brad 2026-08-13). The Submittal Summary table
    populates its Area / Pier Qty / LF rows from a vision-read extraction (Peter's engine),
    with a reconciliation flag on the TOTAL row + a structural/civil source indicator + an
@@ -16712,11 +16747,19 @@ try {
             date: String(d.date == null ? '' : d.date),
             rows: rows.map(function(r, ri){
               r = (r && typeof r === 'object') ? r : {};
+              // v2 (Brad 2026-09-11): 8 template columns. Old v1 rows carried only
+              // ap/depth/buckets; the new fields (diameter/elevation/startTime/stopTime/
+              // notes) default to '' so old logs render/save with blanks, never crash.
               return {
-                id:      String(r.id == null ? '' : r.id).trim() || ('hlr-' + di + '-' + ri),
-                ap:      String(r.ap == null ? '' : r.ap),
-                depth:   String(r.depth == null ? '' : r.depth),
-                buckets: String(r.buckets == null ? '' : r.buckets)
+                id:        String(r.id == null ? '' : r.id).trim() || ('hlr-' + di + '-' + ri),
+                ap:        String(r.ap == null ? '' : r.ap),
+                diameter:  String(r.diameter == null ? '' : r.diameter),
+                depth:     String(r.depth == null ? '' : r.depth),
+                buckets:   String(r.buckets == null ? '' : r.buckets),
+                elevation: String(r.elevation == null ? '' : r.elevation),
+                startTime: String(r.startTime == null ? '' : r.startTime),
+                stopTime:  String(r.stopTime == null ? '' : r.stopTime),
+                notes:     String(r.notes == null ? '' : r.notes)
               };
             })
           };
@@ -16727,13 +16770,54 @@ try {
     // Mint stable client-side ids (same idiom as pfCoNewId).
     function pfHlDayId(){ return 'hld_' + Date.now().toString(36) + '_' + Math.floor(Math.random()*1e6).toString(36); }
     function pfHlRowId(){ return 'hlr_' + Date.now().toString(36) + '_' + Math.floor(Math.random()*1e6).toString(36); }
+    // Parse ONE cell as a number for the totals row. Blank / non-numeric -> 0 (never NaN),
+    // so a stray text note or empty cell degrades gracefully. Tolerates group commas
+    // ("1,200") and a leading unit-less decimal. Mirrors the pfCoAmtNum leniency but
+    // WITHOUT stripping a currency symbol (these are counts / linear feet, not money).
+    function pfHlNum(v){
+      var s = (v == null ? '' : String(v)).replace(/[,\s]/g, '').trim();
+      if (!s) return 0;
+      var n = parseFloat(s);
+      return isNaN(n) ? 0 : n;
+    }
+    // Compute the per-day totals row from an array of pier rows:
+    //   count   = # of pier rows (each row = 1, Brad's "Total Qty" for the AP # column)
+    //   depth   = SUM of the Depth (LF) column (total linear feet)
+    //   buckets = SUM of the # Buckets of Stone column
+    // Blank/non-numeric depth/buckets cells contribute 0. Used by the read view, the
+    // PDF print view, and the live editor footer so all three share ONE math path.
+    function pfHlTotals(rows){
+      rows = Array.isArray(rows) ? rows : [];
+      var t = { count: 0, depth: 0, buckets: 0 };
+      for (var i = 0; i < rows.length; i++){
+        var r = rows[i] || {};
+        t.count += 1;
+        t.depth += pfHlNum(r.depth);
+        t.buckets += pfHlNum(r.buckets);
+      }
+      return t;
+    }
+    // Format a totals magnitude for display: trims a pointless trailing ".0" from a whole
+    // sum (30 not 30.0) yet keeps genuine decimals (30.5), then applies the portal-wide
+    // comma grouping via window.pfFmtQty (17003 -> 17,003).
+    function pfHlFmtTotal(n){
+      if (n == null || isNaN(n)) n = 0;
+      var s = (Math.round(n * 1e6) / 1e6).toString();   // kill float dust, keep real decimals
+      return window.pfFmtQty ? window.pfFmtQty(s) : s;
+    }
     // Read-view of ONE pier row. Blank cells show the yellow placeholder used elsewhere.
+    // 8 columns matching Brad's paper PF Hand Log template (Additional Notes runs widest).
     function pfHlReadRow(r){
       function val(v){ var s = (v==null?'':String(v)).trim(); return s ? E(s) : '<span class="pf-sge-blank">-</span>'; }
       return '<tr>'
         + '<td class="pf-sr-name">'+val(r.ap)+'</td>'
+        + '<td class="pf-sr-val">'+val(r.diameter)+'</td>'
         + '<td class="pf-sr-val">'+val(r.depth)+'</td>'
         + '<td class="pf-sr-val">'+val(r.buckets)+'</td>'
+        + '<td class="pf-sr-val">'+val(r.elevation)+'</td>'
+        + '<td class="pf-sr-val">'+val(r.startTime)+'</td>'
+        + '<td class="pf-sr-val">'+val(r.stopTime)+'</td>'
+        + '<td class="pf-hl-notes-cell">'+val(r.notes)+'</td>'
         + '</tr>';
     }
     // Read-view of ONE day: the auto-populated header block (Date / Job # / Job Name) +
@@ -16747,15 +16831,44 @@ try {
         + '<span class="pf-hl-dfield"><span class="pf-hl-dlabel">Job #</span> '+E(jobNum || '-')+'</span>'
         + '<span class="pf-hl-dfield"><span class="pf-hl-dlabel">Job Name</span> '+E(jobName || '-')+'</span>'
         + '</div>';
+      // Save-as-PDF button: prints THIS day's log in the paper PF Hand Log layout via a
+      // standalone print window (window.print -> browser "Save as PDF"). Read-only, so it
+      // shows for anyone viewing (no canEdit gate). data-hl-day-id lets the printer find
+      // this exact day in the stored structure.
+      var pdfBtn = '<button type="button" class="pf-hl-pdf" data-hl-day-id="'+E(String(d.id||''))
+        + '" onclick="event.stopPropagation();window.pfHlPrintDay(this)" title="Save this day as a PDF">Save as PDF</button>';
       var body;
       if (d.rows && d.rows.length){
-        body = '<table class="pf-sr-table"><thead><tr>'
-          + '<th class="pf-sr-name">AP #</th><th class="pf-sr-val">Depth (LF)</th><th class="pf-sr-val"># Buckets of Stone</th>'
-          + '</tr></thead><tbody>' + d.rows.map(pfHlReadRow).join('') + '</tbody></table>';
+        var tot = pfHlTotals(d.rows);
+        // Totals row: AP # -> Total Qty (count of pier rows), Depth -> total LF, Buckets ->
+        // total buckets. Other columns blank. Distinct bold/top-border style (.pf-hl-total).
+        var totalRow = '<tr class="pf-hl-total">'
+          + '<td class="pf-sr-name">TOTAL (' + E(String(tot.count)) + ' pier' + (tot.count === 1 ? '' : 's') + ')</td>'
+          + '<td class="pf-sr-val"></td>'
+          + '<td class="pf-sr-val">' + pfHlFmtTotal(tot.depth) + ' LF</td>'
+          + '<td class="pf-sr-val">' + pfHlFmtTotal(tot.buckets) + '</td>'
+          + '<td class="pf-sr-val"></td>'
+          + '<td class="pf-sr-val"></td>'
+          + '<td class="pf-sr-val"></td>'
+          + '<td class="pf-hl-notes-cell"></td>'
+          + '</tr>';
+        body = '<table class="pf-sr-table pf-hl-rtable"><thead><tr>'
+          + '<th class="pf-sr-name">Aggregate Pier ID #</th>'
+          + '<th class="pf-sr-val">Pier Diameter</th>'
+          + '<th class="pf-sr-val">Depth (LF)</th>'
+          + '<th class="pf-sr-val"># Buckets of Stone</th>'
+          + '<th class="pf-sr-val">Elevation</th>'
+          + '<th class="pf-sr-val">Start Time</th>'
+          + '<th class="pf-sr-val">Stop Time</th>'
+          + '<th class="pf-hl-notes-cell">Additional Notes</th>'
+          + '</tr></thead><tbody>' + d.rows.map(pfHlReadRow).join('') + '</tbody>'
+          + '<tfoot>' + totalRow + '</tfoot></table>';
       } else {
         body = '<div class="pf-sge-empty">No piers logged for this day.</div>';
       }
-      return '<div class="pf-hl-day">' + head + body + '</div>';
+      return '<div class="pf-hl-day">'
+        + '<div class="pf-hl-day-actions">' + pdfBtn + '</div>'
+        + head + '<div class="pf-hl-rtable-wrap">' + body + '</div></div>';
     }
     // Build the whole Hand Logs card body: a .pf-hl-wrap host (data-hl-num) with a read
     // view (every day + its piers, or an empty hint) + an inline Edit affordance (office
@@ -16781,12 +16894,120 @@ try {
         +   '<span class="pf-sge-inline-title">Hand Logs</span>'
         +   '<span class="pf-sge-inline-actions">'+editBtn+'</span>'
         + '</div>'
-        + '<div class="pf-hl-note">Electronic hand logs — the crew enters each day’s pier data (AP #, Depth, Buckets) as they go. '
+        + '<div class="pf-hl-note">Electronic hand logs — the crew enters each day’s pier data (Aggregate Pier ID #, Pier Diameter, Depth, Buckets, Elevation, Start/Stop Time, Notes) as they go. Use <strong>Save as PDF</strong> on a day for the paper PF Hand Log layout. '
         + '<em>Office-editable in this first version; direct field-crew entry + auto-feed into the Daily Log are the next iteration.</em></div>'
         + '<div class="pf-sge-body pf-hl-body">'+listHtml+'</div>'
         + '<div class="pf-sge-msg" style="display:none"></div>'
         + '</div>';
     }
+    // ===== Hand Logs "Save as PDF" (print-to-PDF, no dependency) ======================
+    // (Brad 2026-09-11) A per-day printable of the hand log in the paper PF Hand Log
+    // layout. Opens a standalone window with a light-theme print doc (title band +
+    // Job Name / Job # / Date header + the 8-column grid) and calls window.print() so the
+    // browser's "Save as PDF" destination downloads it. Same window.open idiom as the
+    // pay-app PDF export (payAppPrintHtml). Read-only -> available to any viewer.
+    //
+    // GENERIC OVER COLUMNS: one PF_HL_COLUMNS array (key -> header label) drives BOTH the
+    // printed <thead> and each row's <td>s, so the printout stays correct as the row model
+    // evolves — add a column here (and to the row model) and the PDF picks it up.
+    var PF_HL_COLUMNS = [
+      { key: 'ap',        label: 'Aggregate Pier ID #' },
+      { key: 'diameter',  label: 'Pier Diameter' },
+      { key: 'depth',     label: 'Depth (LF)' },
+      { key: 'buckets',   label: '# Buckets of Stone' },
+      { key: 'elevation', label: 'Elevation' },
+      { key: 'startTime', label: 'Start Time' },
+      { key: 'stopTime',  label: 'Stop Time' },
+      { key: 'notes',     label: 'Additional Notes', wide: true }
+    ];
+    // Build the standalone print document (HTML string) for ONE day. jobNum/jobName are the
+    // project's number/name; day is a normalized day {id,date,rows:[...]}. E() escapes.
+    function pfHlPrintHtml(day, jobNum, jobName){
+      var dateTxt = (day && day.date && String(day.date).trim())
+        ? E(String(window.pfFmtDate(day.date))) : '';
+      var head = ''
+        + '<tr>'
+        +   '<td class="hlp-lbl">Job Name:</td><td class="hlp-val hlp-name">'+E(String(jobName||''))+'</td>'
+        +   '<td class="hlp-lbl hlp-lbl2">Job #:</td><td class="hlp-val">'+E(String(jobNum||''))+'</td>'
+        +   '<td class="hlp-lbl hlp-lbl2">Date:</td><td class="hlp-val">'+dateTxt+'</td>'
+        + '</tr>';
+      var thead = PF_HL_COLUMNS.map(function(c){
+        return '<th class="'+(c.wide?'hlp-wide':'')+'">'+E(c.label)+'</th>';
+      }).join('');
+      var rowsArr = (day && Array.isArray(day.rows)) ? day.rows : [];
+      var bodyRows = '';
+      // Pad to a full page of ruled rows like the paper form (min 30 rows total).
+      var MIN_ROWS = 30;
+      var total = Math.max(rowsArr.length, MIN_ROWS);
+      for (var i = 0; i < total; i++){
+        var r = rowsArr[i] || {};
+        bodyRows += '<tr>' + PF_HL_COLUMNS.map(function(c){
+          var v = (r[c.key] == null) ? '' : String(r[c.key]).trim();
+          return '<td class="'+(c.wide?'hlp-wide':'')+'">'+E(v)+'</td>';
+        }).join('') + '</tr>';
+      }
+      // Totals row at the bottom of the grid: AP # -> Total Qty (count), Depth -> total LF,
+      // Buckets -> total. Other columns blank. Mirrors the on-screen totals row.
+      var pTot = pfHlTotals(rowsArr);
+      var totalRow = '<tr class="hlp-total">' + PF_HL_COLUMNS.map(function(c){
+        var v = '';
+        if (c.key === 'ap')      v = 'TOTAL (' + pTot.count + ' pier' + (pTot.count === 1 ? '' : 's') + ')';
+        else if (c.key === 'depth')   v = pfHlFmtTotal(pTot.depth) + ' LF';
+        else if (c.key === 'buckets') v = pfHlFmtTotal(pTot.buckets);
+        return '<td class="'+(c.wide?'hlp-wide':'')+'">'+E(v)+'</td>';
+      }).join('') + '</tr>';
+      var css = ''
+        + '@page { size: letter portrait; margin: 0.5in; }'
+        + 'body { font-family: Arial, Helvetica, sans-serif; color:#111; margin:0; font-size:11px; }'
+        + '.hlp-toolbar { padding:10px 16px; background:#f2f2f2; border-bottom:1px solid #ccc; position:sticky; top:0; }'
+        + '.hlp-toolbar button { padding:8px 16px; font-size:13px; cursor:pointer; }'
+        + '.hlp-toolbar .hlp-hint { margin-left:12px; color:#666; font-size:12px; }'
+        + '.hlp-page { width:7.5in; margin:16px auto; background:#fff; }'
+        + '.hlp-title { text-align:center; font-weight:700; line-height:1.3; margin-bottom:8px; }'
+        + '.hlp-title .hlp-co { font-size:15px; letter-spacing:0.02em; }'
+        + '.hlp-title .hlp-doc { font-size:13px; }'
+        + '.hlp-hdr { width:100%; border-collapse:collapse; border:1px solid #333; margin-bottom:0; }'
+        + '.hlp-hdr td { border:1px solid #333; padding:4px 6px; font-size:11px; }'
+        + '.hlp-lbl { font-weight:700; white-space:nowrap; width:1%; background:#f7f7f7; }'
+        + '.hlp-lbl2 { border-left:2px solid #333; }'
+        + '.hlp-name { min-width:2.5in; }'
+        + '.hlp-tbl { width:100%; border-collapse:collapse; border:1px solid #333; }'
+        + '.hlp-tbl th { background:#111; color:#fff; border:1px solid #333; padding:4px 3px; font-size:9px; text-align:center; line-height:1.15; }'
+        + '.hlp-tbl td { border:1px solid #999; padding:3px 4px; font-size:10px; height:18px; vertical-align:top; }'
+        + '.hlp-tbl tr.hlp-total td { font-weight:700; border-top:2px solid #333; background:#eee; }'
+        + '.hlp-wide { text-align:left; width:38%; }'
+        + '.hlp-foot { margin-top:8px; font-size:8px; color:#666; }'
+        + '@media print { .hlp-toolbar { display:none; } .hlp-page { margin:0; width:auto; } }';
+      return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>'
+        + E('PF Hand Log - ' + (jobNum||'') + (dateTxt ? ' - ' + String(window.pfFmtDate(day.date)) : ''))
+        + '</title><style>' + css + '</style></head><body>'
+        + '<div class="hlp-toolbar"><button onclick="window.print()">Print / Save as PDF</button>'
+        +   '<span class="hlp-hint">Choose &ldquo;Save as PDF&rdquo; as the print destination to download.</span></div>'
+        + '<div class="hlp-page">'
+        +   '<div class="hlp-title"><div class="hlp-co">PIER FOUNDATIONS, LLC</div><div class="hlp-doc">HAND LOG</div></div>'
+        +   '<table class="hlp-hdr"><tbody>' + head + '</tbody></table>'
+        +   '<table class="hlp-tbl"><thead><tr>' + thead + '</tr></thead><tbody>' + bodyRows + '</tbody><tfoot>' + totalRow + '</tfoot></table>'
+        +   '<div class="hlp-foot">Pier Foundations &middot; Hand Log' + (dateTxt ? ' &middot; ' + dateTxt : '') + '</div>'
+        + '</div>'
+        + '</body></html>';
+    }
+    // Click handler: locate this day in the stored structure, open a print window with the
+    // paper-layout doc. Re-reads Job #/Name off the .pf-hl-wrap (project number/name).
+    window.pfHlPrintDay = function(btn){
+      var dayId = btn && btn.getAttribute ? btn.getAttribute('data-hl-day-id') : '';
+      var wrap = btn && btn.closest ? btn.closest('.pf-hl-wrap') : null;
+      var jobNum = (wrap && wrap.getAttribute('data-hl-jobnum')) || String(_curNum || '');
+      var jobName = (wrap && wrap.getAttribute('data-hl-jobname')) || '';
+      var days = pfHandLogDays();
+      var day = null;
+      for (var i = 0; i < days.length; i++){ if (String(days[i].id) === String(dayId)) { day = days[i]; break; } }
+      if (!day) day = { id: dayId, date: '', rows: [] };   // print an empty sheet rather than fail
+      var win = window.open('', '_blank');
+      if (!win) { alert('Please allow pop-ups to save the hand log PDF.'); return; }
+      win.document.open();
+      win.document.write(pfHlPrintHtml(day, jobNum, jobName));
+      win.document.close();
+    };
     // ===== Subcontract-New ONLY: Change Orders "Contract Amount" summary =============
     // (Brad 2026-09-10) A running contract-amount calc rendered ABOVE the shared Change
     // Orders table, EXCLUSIVE to the "Subcontract Agreement - New" sandbox card (the
@@ -29771,13 +29992,20 @@ try {
       el.className = 'pf-sge-msg ' + (isErr ? 'pf-sge-msg-err' : 'pf-sge-msg-ok');
       el.style.display = 'block';
     }
-    // Editor HTML for ONE pier row (AP # / Depth (LF) / # Buckets of Stone).
+    // Editor HTML for ONE pier row. 8 template columns: Aggregate Pier ID # / Pier Diameter
+    // / Depth (LF) / # Buckets of Stone / Elevation / Start Time / Stop Time / Additional
+    // Notes. Start/Stop use <input type=time> (clean field entry); Notes is the wide input.
     function pfHlRowEditorHtml(r){
       r = r || {};
       return '<div class="pf-hl-erow" data-hl-row-id="'+esc2(r.id || pfHlRowId())+'">'
-        + '<input type="text" class="pf-sge-in pf-hl-in-ap" placeholder="AP #" value="'+esc2(r.ap||'')+'" aria-label="AP number">'
+        + '<input type="text" class="pf-sge-in pf-hl-in-ap" placeholder="AP ID #" value="'+esc2(r.ap||'')+'" aria-label="Aggregate Pier ID number">'
+        + '<input type="text" class="pf-sge-in pf-hl-in-diameter" placeholder="Diameter" value="'+esc2(r.diameter||'')+'" aria-label="Pier diameter">'
         + '<input type="text" inputmode="decimal" class="pf-sge-in pf-hl-in-depth" placeholder="Depth (LF)" value="'+esc2(r.depth||'')+'" aria-label="Depth in linear feet">'
         + '<input type="text" inputmode="numeric" class="pf-sge-in pf-hl-in-buckets" placeholder="# Buckets" value="'+esc2(r.buckets||'')+'" aria-label="Number of buckets of stone">'
+        + '<input type="text" class="pf-sge-in pf-hl-in-elevation" placeholder="Elevation" value="'+esc2(r.elevation||'')+'" aria-label="Elevation">'
+        + '<input type="time" class="pf-sge-in pf-hl-in-start" value="'+esc2(r.startTime||'')+'" aria-label="Start time">'
+        + '<input type="time" class="pf-sge-in pf-hl-in-stop" value="'+esc2(r.stopTime||'')+'" aria-label="Stop time">'
+        + '<input type="text" class="pf-sge-in pf-hl-in-notes" placeholder="Additional Notes" value="'+esc2(r.notes||'')+'" aria-label="Additional notes">'
         + '<button type="button" class="pf-sge-remove pf-hl-rm-row" onclick="event.stopPropagation();window.pfHlRemoveRow(this)" title="Delete this pier row">&times;</button>'
         + '</div>';
     }
@@ -29792,7 +30020,7 @@ try {
         else { var m2 = String(d.date).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
           if (m2){ dIso = m2[3] + '-' + ('0'+m2[1]).slice(-2) + '-' + ('0'+m2[2]).slice(-2); } }
       }
-      var rows = (d.rows && d.rows.length) ? d.rows : [{ id: pfHlRowId(), ap:'', depth:'', buckets:'' }];
+      var rows = (d.rows && d.rows.length) ? d.rows : [{ id: pfHlRowId() }];
       var rowsHtml = rows.map(pfHlRowEditorHtml).join('');
       return '<div class="pf-hl-eday" data-hl-day-id="'+esc2(d.id || pfHlDayId())+'">'
         + '<div class="pf-hl-eday-head">'
@@ -29801,11 +30029,63 @@ try {
         +   '<span class="pf-hl-ro"><span class="pf-hl-dlabel">Job Name</span> '+esc2(jobName||'-')+'</span>'
         +   '<button type="button" class="pf-sge-remove pf-hl-rm-day" onclick="event.stopPropagation();window.pfHlRemoveDay(this)" title="Delete this day">&times; Delete Day</button>'
         + '</div>'
-        + '<div class="pf-hl-erow-head"><span class="pf-hl-col-ap">AP #</span><span class="pf-hl-col-depth">Depth (LF)</span><span class="pf-hl-col-buckets"># Buckets of Stone</span><span class="pf-hl-col-x"></span></div>'
+        + '<div class="pf-hl-erow-head">'
+        +   '<span class="pf-hl-col-ap">Aggregate Pier ID #</span>'
+        +   '<span class="pf-hl-col-diameter">Pier Diameter</span>'
+        +   '<span class="pf-hl-col-depth">Depth (LF)</span>'
+        +   '<span class="pf-hl-col-buckets"># Buckets of Stone</span>'
+        +   '<span class="pf-hl-col-elevation">Elevation</span>'
+        +   '<span class="pf-hl-col-start">Start Time</span>'
+        +   '<span class="pf-hl-col-stop">Stop Time</span>'
+        +   '<span class="pf-hl-col-notes">Additional Notes</span>'
+        +   '<span class="pf-hl-col-x"></span>'
+        + '</div>'
         + '<div class="pf-hl-erows">'+rowsHtml+'</div>'
         + '<button type="button" class="pf-sge-add pf-hl-add-row" onclick="event.stopPropagation();window.pfHlAddRow(this)">+ Add Pier</button>'
+        + pfHlDayTotalsHtml(d.rows || [])
         + '</div>';
     }
+    // Live totals footer for ONE day's editor. Grid-aligned to the row editor so the three
+    // totalled numbers sit under their columns (AP# -> Total Qty, Depth -> LF, Buckets ->
+    // sum). Recomputed on every input/add/remove via pfHlRecalcDay. Blank cells else.
+    function pfHlDayTotalsHtml(rows){
+      var t = pfHlTotals(rows);
+      return '<div class="pf-hl-etotal" aria-label="Day totals">'
+        + '<span class="pf-hl-col-ap pf-hl-t-count">TOTAL (' + esc2(String(t.count)) + ' pier' + (t.count === 1 ? '' : 's') + ')</span>'
+        + '<span class="pf-hl-col-diameter"></span>'
+        + '<span class="pf-hl-col-depth pf-hl-t-depth">' + pfHlFmtTotal(t.depth) + ' LF</span>'
+        + '<span class="pf-hl-col-buckets pf-hl-t-buckets">' + pfHlFmtTotal(t.buckets) + '</span>'
+        + '<span class="pf-hl-col-elevation"></span>'
+        + '<span class="pf-hl-col-start"></span>'
+        + '<span class="pf-hl-col-stop"></span>'
+        + '<span class="pf-hl-col-notes"></span>'
+        + '<span class="pf-hl-col-x"></span>'
+        + '</div>';
+    }
+    // Recompute + repaint ONE day's editor totals footer from its LIVE input values. Called
+    // on input in the day (delegated), and after add/remove pier. Reads the raw input
+    // strings (not the saved model) so the footer tracks unsaved edits in real time.
+    window.pfHlRecalcDay = function(dayEl){
+      if (!dayEl || !dayEl.querySelectorAll) return;
+      var foot = dayEl.querySelector('.pf-hl-etotal');
+      if (!foot) return;
+      var rowEls = dayEl.querySelectorAll('.pf-hl-erow');
+      var rows = [];
+      for (var i = 0; i < rowEls.length; i++){
+        var rEl = rowEls[i];
+        rows.push({
+          depth:   (rEl.querySelector('.pf-hl-in-depth')   || {}).value || '',
+          buckets: (rEl.querySelector('.pf-hl-in-buckets') || {}).value || ''
+        });
+      }
+      var t = pfHlTotals(rows);
+      var cEl = foot.querySelector('.pf-hl-t-count');
+      var dEl = foot.querySelector('.pf-hl-t-depth');
+      var bEl = foot.querySelector('.pf-hl-t-buckets');
+      if (cEl) cEl.textContent = 'TOTAL (' + t.count + ' pier' + (t.count === 1 ? '' : 's') + ')';
+      if (dEl) dEl.innerHTML = pfHlFmtTotal(t.depth) + ' LF';
+      if (bEl) bEl.innerHTML = pfHlFmtTotal(t.buckets);
+    };
     // Enter edit mode: replace the read-view body with the day editors + "+ Add Hand Log Day".
     window.pfHlEdit = function(btn){
       if (!canEdit()) return;                          // defense-in-depth (server also 403s)
@@ -29830,6 +30110,16 @@ try {
       bodyEl.innerHTML = editorHtml;
       var bar = wrap.querySelector('.pf-sge-inline-actions');
       if (bar) bar.style.display = 'none';
+      // Live totals: delegate a single input listener on the editor. Any change to a
+      // Depth/Buckets input (or any input) recomputes THAT day's footer in real time.
+      var edEl = bodyEl.querySelector('.pf-hl-editor');
+      if (edEl && !edEl.__hlTotalBound){
+        edEl.__hlTotalBound = true;
+        edEl.addEventListener('input', function(ev){
+          var dayEl = ev.target && ev.target.closest ? ev.target.closest('.pf-hl-eday') : null;
+          if (dayEl) window.pfHlRecalcDay(dayEl);
+        });
+      }
     };
     // Append a fresh empty day (with one empty pier row) to the editor.
     window.pfHlAddDay = function(btn){
@@ -29863,17 +30153,20 @@ try {
       var rows = day.querySelector('.pf-hl-erows');
       if (!rows) return;
       var tmp = document.createElement('div');
-      tmp.innerHTML = pfHlRowEditorHtml({ id: pfHlRowId(), ap:'', depth:'', buckets:'' });
+      tmp.innerHTML = pfHlRowEditorHtml({ id: pfHlRowId() });
       var node = tmp.firstChild;
       rows.appendChild(node);
       var apInput = node.querySelector('.pf-hl-in-ap');
       if (apInput) apInput.focus();
+      window.pfHlRecalcDay(day);                       // count changed -> refresh footer
     };
     // Delete one pier row (no confirm — cheap to re-add). Editor DOM only; Save persists.
     window.pfHlRemoveRow = function(btn){
       if (!canEdit()) return;
       var row = btn && btn.closest ? btn.closest('.pf-hl-erow') : null;
+      var day = row && row.closest ? row.closest('.pf-hl-eday') : null;
       if (row && row.parentNode) row.parentNode.removeChild(row);
+      if (day) window.pfHlRecalcDay(day);              // count/sum changed -> refresh footer
     };
     // Cancel: restore the read-view body verbatim, re-show the Edit affordance.
     window.pfHlCancel = function(btn){
@@ -29908,16 +30201,24 @@ try {
         var rows = [];
         for (var j = 0; j < rowEls.length; j++){
           var rEl = rowEls[j];
-          var ap      = String((rEl.querySelector('.pf-hl-in-ap')      || {}).value || '').trim();
-          var depth   = String((rEl.querySelector('.pf-hl-in-depth')   || {}).value || '').trim();
-          var buckets = String((rEl.querySelector('.pf-hl-in-buckets') || {}).value || '').trim();
-          if (!ap && !depth && !buckets) continue;   // drop fully-blank pier rows
-          rows.push({ id: rEl.getAttribute('data-hl-row-id') || pfHlRowId(), ap: ap, depth: depth, buckets: buckets });
+          var ap        = String((rEl.querySelector('.pf-hl-in-ap')        || {}).value || '').trim();
+          var diameter  = String((rEl.querySelector('.pf-hl-in-diameter')  || {}).value || '').trim();
+          var depth     = String((rEl.querySelector('.pf-hl-in-depth')     || {}).value || '').trim();
+          var buckets   = String((rEl.querySelector('.pf-hl-in-buckets')   || {}).value || '').trim();
+          var elevation = String((rEl.querySelector('.pf-hl-in-elevation') || {}).value || '').trim();
+          var startTime = String((rEl.querySelector('.pf-hl-in-start')     || {}).value || '').trim();
+          var stopTime  = String((rEl.querySelector('.pf-hl-in-stop')      || {}).value || '').trim();
+          var notes     = String((rEl.querySelector('.pf-hl-in-notes')     || {}).value || '').trim();
+          // Drop fully-blank pier rows (all 8 fields empty).
+          if (!ap && !diameter && !depth && !buckets && !elevation && !startTime && !stopTime && !notes) continue;
+          rows.push({ id: rEl.getAttribute('data-hl-row-id') || pfHlRowId(),
+            ap: ap, diameter: diameter, depth: depth, buckets: buckets,
+            elevation: elevation, startTime: startTime, stopTime: stopTime, notes: notes });
         }
         if (!date && !rows.length) continue;          // drop empty days
         days.push({ id: dayId, date: date, rows: rows });
       }
-      var payload = JSON.stringify({ v: 1, days: days });
+      var payload = JSON.stringify({ v: 2, days: days });
       // MVP cap guard: /api/project-override caps a plain field value at 4000 chars.
       if (payload.length > 4000){
         showErr('This hand log is too large for the first-version store (' + payload.length
