@@ -3644,6 +3644,32 @@ button.pr-action-link:disabled { opacity: 0.6; cursor: default; filter: none; }
 .pf-sge-msg { font-size: 0.76rem; margin: 6px 0 0 8px; }
 .pf-sge-msg-ok { color: #2e7d32; }
 .pf-sge-msg-err { color: #c0392b; font-weight: 600; }
+/* ---- Hand Logs (electronic hand logs, Brad 2026-09-11) ------------------------ */
+/* Reuses the Inventory-style .pf-sr-table (accent th + bordered rows) for each day's
+   pier table + the shared .pf-sge-* editor chrome. These rules only add the per-day
+   header block, the read-only Job#/Job Name chips, and the editor row grid. */
+.pf-hl-note { font-size: 0.74rem; color: var(--text-3); margin: 2px 0 8px 0; }
+.pf-hl-day { margin: 0 0 14px 0; }
+.pf-hl-dayhead {
+  display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline;
+  background: var(--accent-light, #E0F0FF); border: 1px solid var(--border, #C8D5DC);
+  border-radius: 6px; padding: 6px 12px; margin: 0 0 6px 0; font-size: 0.82rem;
+}
+.pf-hl-dayhead .pf-hl-dfield { color: var(--text-1, #2B2F36); }
+.pf-hl-dlabel { font-size: 0.68rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3, #6b7280); font-weight: 600; }
+/* editor: per-day block */
+.pf-hl-eday { border: 1px solid var(--border-light); border-radius: 6px; padding: 8px 10px; margin: 0 0 10px 0; background: var(--bg-0); }
+.pf-hl-eday-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 18px; margin-bottom: 8px; }
+.pf-hl-eday-head .pf-hl-in-date { min-width: 150px; }
+.pf-hl-ro { font-size: 0.8rem; color: var(--text-2, #4b5563); display: flex; flex-direction: column; gap: 3px; }
+.pf-hl-rm-day { margin-left: auto; }
+/* editor: pier-row grid — 3 inputs + delete, column headers align above */
+.pf-hl-erow-head, .pf-hl-erow { display: grid; grid-template-columns: 1fr 1fr 1.4fr 34px; gap: 6px; align-items: center; }
+.pf-hl-erow-head { font-size: 0.68rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3, #6b7280); font-weight: 600; margin: 2px 2px 4px; }
+.pf-hl-erow { margin: 0 0 5px 0; }
+.pf-hl-erow .pf-sge-in { width: 100%; box-sizing: border-box; }
+.pf-hl-rm-row { padding: 3px 7px; }
+.pf-hl-add-row { margin-top: 2px; }
 /* "Pull from Approved Drawings" (Stage 2, Brad 2026-08-13). The Submittal Summary table
    populates its Area / Pier Qty / LF rows from a vision-read extraction (Peter's engine),
    with a reconciliation flag on the TOTAL row + a structural/civil source indicator + an
@@ -16607,6 +16633,143 @@ try {
         + '<div class="pf-sge-msg" style="display:none"></div>'
         + '</div>';
     }
+    // ===== Hand Logs (electronic hand logs — Field Operations) ======================
+    // (Brad 2026-09-11, FIRST VERSION — a baseline Brad will redline.) Vision: replace
+    // paper-and-pen hand logs in the excavator cab. The CREW enters pier data directly
+    // into the portal as they go, per DAY; this data is intended to feed the Daily Log.
+    //
+    // WHY IT LOOKS LIKE INVENTORY: reuses the Inventory-module table idiom (dark-blue
+    // header bar `.pf-sr-headbar` + accent column-header row `.pf-sr-table th` + bordered
+    // rows) already shared by the Site Readiness "Inventory-style" sandbox, and the
+    // add-row / inline-editor idiom of the Change Orders block (pfChangeOrders* — read
+    // table + Edit -> per-row editor + "+ Add" + "× Delete" + whole-array Save/POST).
+    //
+    // PER-DAY STRUCTURE: each hand-log entry is ONE day. A day carries a header block —
+    // Date (entered), Job # (auto = this project's number, read-only), Job Name (auto =
+    // this project's name, read-only) — and a table of pier rows the crew adds as they
+    // go: AP # / Depth (LF) / # Buckets of Stone. Multiple days + multiple pier rows/day.
+    //
+    // STORAGE (NO BACKEND CHANGE): the ENTIRE structure (all days + all pier rows) is
+    // serialized to a JSON string and stored as ONE PLAIN-STRING field under the ALREADY-
+    // ALLOWLISTED `siteReadiness` section override, label "Hand Logs (JSON)". Plain
+    // strings up to MAX_VALUE (4000 chars) are accepted by /api/project-override under any
+    // valid section with ZERO server allowlist change — unlike a reserved structured key
+    // (__crm / __change_orders) which each require an explicit server-side validator +
+    // allowlist. MVP cap note: ~4000 chars holds a healthy number of days/piers for a
+    // baseline; a large multi-week log would need the Stage-2 structured store below.
+    //
+    // DAILY-LOG FEED (NOT BUILT — next iteration): the intent is that a day's pier rows
+    // become SELECTABLE to auto-populate the Daily Report's columnsInstalled / lfInstalled
+    // / work-completed. This MVP builds ONLY the entry structure cleanly; the daily-log
+    // auto-feed is deferred (see the report + note returned to the caller).
+    //
+    // CREW-WRITE (STAGE 2 — BACKEND): the whole point is field_ops entering this directly.
+    // This MVP is OFFICE-EDITABLE ONLY because its save path is /api/project-override,
+    // which areaForPath maps to the 'financials' area (admin/partner/business_dev) and
+    // 403s field_ops on BOTH read and write. Crew-write requires a backend change (NOT in
+    // this index.html-only scope): EITHER (a) add a `__hand_logs` reserved ARRAY key to
+    // functions/api/project-override.js (validator + allowlist) AND move its area to
+    // 'field_ops' for that key — but that would also expose the rest of the override store
+    // to the crew, so NOT viable — OR (b, RECOMMENDED) a NEW dedicated endpoint
+    // /api/hand-log gated requireArea(session,'field_ops') (mirrors daily-report.js: crew
+    // read+write, ZERO financials) with its own KV key `hand_log_v1:<num>`, then point the
+    // save/read helpers below at it. Until then this card is office-editable and clearly
+    // labeled as such.
+    var PF_HL_FIELD = 'Hand Logs (JSON)';   // plain-string override label under siteReadiness
+    // Read the stored Hand Logs structure from the siteReadiness override JSON string.
+    // Returns a NORMALIZED array of days: [{ id, date, rows:[{id, ap, depth, buckets}] }].
+    // None stored / malformed => [] (blank-graceful; NEVER a fabricated default). No throw.
+    function pfHandLogDays(){
+      try {
+        var sr = _curOverrides && _curOverrides.siteReadiness;
+        var raw = sr && sr[PF_HL_FIELD];
+        if (!raw) return [];
+        var parsed = (typeof raw === 'string') ? JSON.parse(raw) : raw;
+        var days = (parsed && Array.isArray(parsed.days)) ? parsed.days
+                 : (Array.isArray(parsed) ? parsed : []);
+        return days.map(function(d, di){
+          d = (d && typeof d === 'object') ? d : {};
+          var rows = Array.isArray(d.rows) ? d.rows : [];
+          return {
+            id:   String(d.id == null ? '' : d.id).trim() || ('hld-' + di),
+            date: String(d.date == null ? '' : d.date),
+            rows: rows.map(function(r, ri){
+              r = (r && typeof r === 'object') ? r : {};
+              return {
+                id:      String(r.id == null ? '' : r.id).trim() || ('hlr-' + di + '-' + ri),
+                ap:      String(r.ap == null ? '' : r.ap),
+                depth:   String(r.depth == null ? '' : r.depth),
+                buckets: String(r.buckets == null ? '' : r.buckets)
+              };
+            })
+          };
+        });
+      } catch (e) {}
+      return [];
+    }
+    // Mint stable client-side ids (same idiom as pfCoNewId).
+    function pfHlDayId(){ return 'hld_' + Date.now().toString(36) + '_' + Math.floor(Math.random()*1e6).toString(36); }
+    function pfHlRowId(){ return 'hlr_' + Date.now().toString(36) + '_' + Math.floor(Math.random()*1e6).toString(36); }
+    // Read-view of ONE pier row. Blank cells show the yellow placeholder used elsewhere.
+    function pfHlReadRow(r){
+      function val(v){ var s = (v==null?'':String(v)).trim(); return s ? E(s) : '<span class="pf-sge-blank">-</span>'; }
+      return '<tr>'
+        + '<td class="pf-sr-name">'+val(r.ap)+'</td>'
+        + '<td class="pf-sr-val">'+val(r.depth)+'</td>'
+        + '<td class="pf-sr-val">'+val(r.buckets)+'</td>'
+        + '</tr>';
+    }
+    // Read-view of ONE day: the auto-populated header block (Date / Job # / Job Name) +
+    // the pier-row table (or an empty hint). Job # / Job Name come from the CURRENT
+    // project (read-only, never editable — they ARE the project's number/name).
+    function pfHlDayRead(d, jobNum, jobName){
+      var dateTxt = (d.date && String(d.date).trim())
+        ? E(String(window.pfFmtDate(d.date))) : '<span class="pf-sge-blank">no date</span>';
+      var head = '<div class="pf-hl-dayhead">'
+        + '<span class="pf-hl-dfield"><span class="pf-hl-dlabel">Date</span> '+dateTxt+'</span>'
+        + '<span class="pf-hl-dfield"><span class="pf-hl-dlabel">Job #</span> '+E(jobNum || '-')+'</span>'
+        + '<span class="pf-hl-dfield"><span class="pf-hl-dlabel">Job Name</span> '+E(jobName || '-')+'</span>'
+        + '</div>';
+      var body;
+      if (d.rows && d.rows.length){
+        body = '<table class="pf-sr-table"><thead><tr>'
+          + '<th class="pf-sr-name">AP #</th><th class="pf-sr-val">Depth (LF)</th><th class="pf-sr-val"># Buckets of Stone</th>'
+          + '</tr></thead><tbody>' + d.rows.map(pfHlReadRow).join('') + '</tbody></table>';
+      } else {
+        body = '<div class="pf-sge-empty">No piers logged for this day.</div>';
+      }
+      return '<div class="pf-hl-day">' + head + body + '</div>';
+    }
+    // Build the whole Hand Logs card body: a .pf-hl-wrap host (data-hl-num) with a read
+    // view (every day + its piers, or an empty hint) + an inline Edit affordance (office
+    // only; field_ops never reaches this renderer AND the server 403s the save).
+    function pfHandLogsInline(jobNum, jobName){
+      var days = pfHandLogDays();
+      var listHtml;
+      if (days.length){
+        listHtml = days.map(function(d){ return pfHlDayRead(d, jobNum, jobName); }).join('');
+      } else {
+        listHtml = '<div class="pf-sge-empty">No hand logs recorded.'
+          + (canEdit() ? ' <strong>Edit</strong> &rarr; <strong>+ Add Hand Log Day</strong> to start one.' : '')
+          + '</div>';
+      }
+      var editBtn = canEdit()
+        ? '<button type="button" class="pf-sge-edit" onclick="event.stopPropagation();window.pfHlEdit(this)">Edit</button>'
+        : '';
+      // Stash the auto-populated Job #/Name on the wrap so the editor + save re-read them
+      // without another lookup (they are the project's number/name, never user-typed).
+      return '<div class="pf-hl-wrap pf-sge-wrap" data-hl-num="'+E(String(_curNum || ''))+'" '
+        + 'data-hl-jobnum="'+E(String(jobNum || ''))+'" data-hl-jobname="'+E(String(jobName || ''))+'">'
+        + '<div class="pf-sge-inline-head">'
+        +   '<span class="pf-sge-inline-title">Hand Logs</span>'
+        +   '<span class="pf-sge-inline-actions">'+editBtn+'</span>'
+        + '</div>'
+        + '<div class="pf-hl-note">Electronic hand logs — the crew enters each day’s pier data (AP #, Depth, Buckets) as they go. '
+        + '<em>Office-editable in this first version; direct field-crew entry + auto-feed into the Daily Log are the next iteration.</em></div>'
+        + '<div class="pf-sge-body pf-hl-body">'+listHtml+'</div>'
+        + '<div class="pf-sge-msg" style="display:none"></div>'
+        + '</div>';
+    }
     // ===== Subcontract-New ONLY: Change Orders "Contract Amount" summary =============
     // (Brad 2026-09-10) A running contract-amount calc rendered ABOVE the shared Change
     // Orders table, EXCLUSIVE to the "Subcontract Agreement - New" sandbox card (the
@@ -20735,8 +20898,19 @@ try {
       // dropped "- New"; the legacy twin above was deleted). Same body, same siteReadiness
       // key, same .pf-srnew-scope wrapper (still the sandbox-unique CSS selector — kept so
       // the Inventory-look overrides keep applying; purely cosmetic class name).
-      html += card(5, 'Site Readiness / Project Setup', null,
+      html += card(5, 'Precon Project Setup', null,
         '<div class="pf-srnew-scope">' + srNewBody + '</div>', false, 'siteReadiness');
+
+      // ----- Hand Logs (electronic hand logs — Field Operations) -----
+      // First-version MVP (Brad 2026-09-11). Inventory-style per-day pier table; Job #/Job
+      // Name auto-populate from THIS project (read-only); crew enters AP #/Depth/Buckets
+      // per pier as they go. Stored as a JSON string under the siteReadiness override key
+      // (no backend change). Office-editable in v1; direct crew-write + Daily-Log auto-feed
+      // are Stage 2 (see the pfHandLogsInline header comment). NO sectionKey arg here — the
+      // card's own inline Edit/Save (pfHlEdit/pfHlSave) drives persistence, not the generic
+      // field-override editor, so no duplicate per-section Edit button.
+      html += card(6, 'Hand Logs', null,
+        pfHandLogsInline(String(_curNum || ''), String((D && D.project_name) || '')), false);
 
       // ----- 6. Project Photos (LIVE, READ-ONLY gallery) -----
       // A live thumbnail gallery of this project's SharePoint "02 - Project Photos"
@@ -29532,6 +29706,230 @@ try {
         }
       }).catch(function(){
         if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.getAttribute('data-co-t') || 'Save'; }
+        if (onErr) onErr('Save failed: could not reach the server. Your changes were NOT saved - please retry.');
+      });
+    }
+
+    // ===== Hand Logs inline editor + save (mirrors the Change Orders handlers) =======
+    // Office-only (canEdit gate + server 403s field_ops). Edit -> per-DAY editor: each day
+    // shows its Date input + auto-filled Job #/Job Name (read-only) + a pier-row editor
+    // (AP # / Depth / Buckets) with "+ Add Pier" and "× Delete" per row, plus a
+    // "+ Add Hand Log Day" and a per-day "× Delete Day". Save serializes the WHOLE
+    // structure to JSON and POSTs it as a plain string field under the siteReadiness
+    // section (no reserved key -> no backend allowlist change). Same fail-closed +
+    // surgical-refresh contract as pfCoPersist.
+    function pfHlWrap(btn){ return btn && btn.closest ? btn.closest('.pf-hl-wrap') : null; }
+    function pfHlMsg(wrap, msg, isErr){
+      var el = wrap && wrap.querySelector('.pf-sge-msg');
+      if (!el) return;
+      el.textContent = msg;
+      el.className = 'pf-sge-msg ' + (isErr ? 'pf-sge-msg-err' : 'pf-sge-msg-ok');
+      el.style.display = 'block';
+    }
+    // Editor HTML for ONE pier row (AP # / Depth (LF) / # Buckets of Stone).
+    function pfHlRowEditorHtml(r){
+      r = r || {};
+      return '<div class="pf-hl-erow" data-hl-row-id="'+esc2(r.id || pfHlRowId())+'">'
+        + '<input type="text" class="pf-sge-in pf-hl-in-ap" placeholder="AP #" value="'+esc2(r.ap||'')+'" aria-label="AP number">'
+        + '<input type="text" inputmode="decimal" class="pf-sge-in pf-hl-in-depth" placeholder="Depth (LF)" value="'+esc2(r.depth||'')+'" aria-label="Depth in linear feet">'
+        + '<input type="text" inputmode="numeric" class="pf-sge-in pf-hl-in-buckets" placeholder="# Buckets" value="'+esc2(r.buckets||'')+'" aria-label="Number of buckets of stone">'
+        + '<button type="button" class="pf-sge-remove pf-hl-rm-row" onclick="event.stopPropagation();window.pfHlRemoveRow(this)" title="Delete this pier row">&times;</button>'
+        + '</div>';
+    }
+    // Editor HTML for ONE day: header (Date input + read-only Job #/Job Name) + the pier
+    // rows + "+ Add Pier". jobNum/jobName are the project's number/name (auto, read-only).
+    function pfHlDayEditorHtml(d, jobNum, jobName){
+      d = d || {};
+      var dIso = (window.pfDateToIso ? window.pfDateToIso(d.date) : '') || '';
+      if (!dIso && d.date){
+        var m = String(d.date).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (m) dIso = m[0];
+        else { var m2 = String(d.date).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+          if (m2){ dIso = m2[3] + '-' + ('0'+m2[1]).slice(-2) + '-' + ('0'+m2[2]).slice(-2); } }
+      }
+      var rows = (d.rows && d.rows.length) ? d.rows : [{ id: pfHlRowId(), ap:'', depth:'', buckets:'' }];
+      var rowsHtml = rows.map(pfHlRowEditorHtml).join('');
+      return '<div class="pf-hl-eday" data-hl-day-id="'+esc2(d.id || pfHlDayId())+'">'
+        + '<div class="pf-hl-eday-head">'
+        +   '<label class="pf-sge-elabel">Date<input type="date" class="pf-sge-in pf-hl-in-date" value="'+esc2(dIso)+'"></label>'
+        +   '<span class="pf-hl-ro"><span class="pf-hl-dlabel">Job #</span> '+esc2(jobNum||'-')+'</span>'
+        +   '<span class="pf-hl-ro"><span class="pf-hl-dlabel">Job Name</span> '+esc2(jobName||'-')+'</span>'
+        +   '<button type="button" class="pf-sge-remove pf-hl-rm-day" onclick="event.stopPropagation();window.pfHlRemoveDay(this)" title="Delete this day">&times; Delete Day</button>'
+        + '</div>'
+        + '<div class="pf-hl-erow-head"><span class="pf-hl-col-ap">AP #</span><span class="pf-hl-col-depth">Depth (LF)</span><span class="pf-hl-col-buckets"># Buckets of Stone</span><span class="pf-hl-col-x"></span></div>'
+        + '<div class="pf-hl-erows">'+rowsHtml+'</div>'
+        + '<button type="button" class="pf-sge-add pf-hl-add-row" onclick="event.stopPropagation();window.pfHlAddRow(this)">+ Add Pier</button>'
+        + '</div>';
+    }
+    // Enter edit mode: replace the read-view body with the day editors + "+ Add Hand Log Day".
+    window.pfHlEdit = function(btn){
+      if (!canEdit()) return;                          // defense-in-depth (server also 403s)
+      var wrap = pfHlWrap(btn);
+      if (!wrap) return;
+      var bodyEl = wrap.querySelector('.pf-hl-body');
+      if (!bodyEl) return;
+      var jobNum = wrap.getAttribute('data-hl-jobnum') || '';
+      var jobName = wrap.getAttribute('data-hl-jobname') || '';
+      var days = pfHandLogDays();
+      var daysHtml = days.map(function(d){ return pfHlDayEditorHtml(d, jobNum, jobName); }).join('');
+      var editorHtml = '<div class="pf-sge-editor pf-hl-editor">'
+        + '<div class="pf-hl-edays">'+daysHtml+'</div>'
+        + '<button type="button" class="pf-sge-add pf-hl-add-day" onclick="event.stopPropagation();window.pfHlAddDay(this)">+ Add Hand Log Day</button>'
+        + '<div class="pf-sge-edit-err" style="display:none"></div>'
+        + '<div class="pf-sge-edit-actions">'
+        +   '<button type="button" class="pf-sge-save" onclick="event.stopPropagation();window.pfHlSave(this)">Save</button>'
+        +   '<button type="button" class="pf-sge-cancel" onclick="event.stopPropagation();window.pfHlCancel(this)">Cancel</button>'
+        + '</div>'
+        + '</div>';
+      wrap.setAttribute('data-hl-orig', bodyEl.innerHTML);
+      bodyEl.innerHTML = editorHtml;
+      var bar = wrap.querySelector('.pf-sge-inline-actions');
+      if (bar) bar.style.display = 'none';
+    };
+    // Append a fresh empty day (with one empty pier row) to the editor.
+    window.pfHlAddDay = function(btn){
+      if (!canEdit()) return;
+      var wrap = pfHlWrap(btn);
+      if (!wrap) return;
+      var days = wrap.querySelector('.pf-hl-edays');
+      if (!days) return;
+      var jobNum = wrap.getAttribute('data-hl-jobnum') || '';
+      var jobName = wrap.getAttribute('data-hl-jobname') || '';
+      var tmp = document.createElement('div');
+      tmp.innerHTML = pfHlDayEditorHtml({ id: pfHlDayId(), date:'', rows:[] }, jobNum, jobName);
+      var node = tmp.firstChild;
+      days.appendChild(node);
+      var dateInput = node.querySelector('.pf-hl-in-date');
+      if (dateInput) dateInput.focus();
+    };
+    // Delete one day (with confirm). Editor DOM only; Save persists.
+    window.pfHlRemoveDay = function(btn){
+      if (!canEdit()) return;
+      var day = btn && btn.closest ? btn.closest('.pf-hl-eday') : null;
+      if (!day) return;
+      if (!window.confirm('Delete this whole hand-log day? Not saved until you click Save.')) return;
+      day.parentNode.removeChild(day);
+    };
+    // Append a fresh empty pier row to THIS day's editor.
+    window.pfHlAddRow = function(btn){
+      if (!canEdit()) return;
+      var day = btn && btn.closest ? btn.closest('.pf-hl-eday') : null;
+      if (!day) return;
+      var rows = day.querySelector('.pf-hl-erows');
+      if (!rows) return;
+      var tmp = document.createElement('div');
+      tmp.innerHTML = pfHlRowEditorHtml({ id: pfHlRowId(), ap:'', depth:'', buckets:'' });
+      var node = tmp.firstChild;
+      rows.appendChild(node);
+      var apInput = node.querySelector('.pf-hl-in-ap');
+      if (apInput) apInput.focus();
+    };
+    // Delete one pier row (no confirm — cheap to re-add). Editor DOM only; Save persists.
+    window.pfHlRemoveRow = function(btn){
+      if (!canEdit()) return;
+      var row = btn && btn.closest ? btn.closest('.pf-hl-erow') : null;
+      if (row && row.parentNode) row.parentNode.removeChild(row);
+    };
+    // Cancel: restore the read-view body verbatim, re-show the Edit affordance.
+    window.pfHlCancel = function(btn){
+      var wrap = pfHlWrap(btn);
+      if (!wrap) return;
+      var orig = wrap.getAttribute('data-hl-orig');
+      var bodyEl = wrap.querySelector('.pf-hl-body');
+      if (orig != null && bodyEl){ bodyEl.innerHTML = orig; wrap.removeAttribute('data-hl-orig'); }
+      var bar = wrap.querySelector('.pf-sge-inline-actions');
+      if (bar) bar.style.display = '';
+    };
+    // Save: gather every day + its pier rows into the COMPLETE structure, serialize to
+    // JSON, and POST it as the plain-string siteReadiness field. Empty days (no date AND
+    // no non-blank rows) are dropped; blank pier rows within a kept day are dropped.
+    window.pfHlSave = function(btn){
+      if (!canEdit()) return;
+      var wrap = pfHlWrap(btn);
+      if (!wrap) return;
+      var num = wrap.getAttribute('data-hl-num') || _curNum || '';
+      var editor = wrap.querySelector('.pf-hl-editor');
+      var errEl = wrap.querySelector('.pf-sge-edit-err');
+      function showErr(m){ if (errEl){ errEl.textContent = m; errEl.style.display = 'block'; } }
+      if (!num || !editor){ showErr('Missing project number; nothing was saved.'); return; }
+      if (errEl) errEl.style.display = 'none';
+      var days = [];
+      var dayEls = editor.querySelectorAll('.pf-hl-eday');
+      for (var i = 0; i < dayEls.length; i++){
+        var dEl = dayEls[i];
+        var dayId = dEl.getAttribute('data-hl-day-id') || pfHlDayId();
+        var date = String((dEl.querySelector('.pf-hl-in-date') || {}).value || '').trim();
+        var rowEls = dEl.querySelectorAll('.pf-hl-erow');
+        var rows = [];
+        for (var j = 0; j < rowEls.length; j++){
+          var rEl = rowEls[j];
+          var ap      = String((rEl.querySelector('.pf-hl-in-ap')      || {}).value || '').trim();
+          var depth   = String((rEl.querySelector('.pf-hl-in-depth')   || {}).value || '').trim();
+          var buckets = String((rEl.querySelector('.pf-hl-in-buckets') || {}).value || '').trim();
+          if (!ap && !depth && !buckets) continue;   // drop fully-blank pier rows
+          rows.push({ id: rEl.getAttribute('data-hl-row-id') || pfHlRowId(), ap: ap, depth: depth, buckets: buckets });
+        }
+        if (!date && !rows.length) continue;          // drop empty days
+        days.push({ id: dayId, date: date, rows: rows });
+      }
+      var payload = JSON.stringify({ v: 1, days: days });
+      // MVP cap guard: /api/project-override caps a plain field value at 4000 chars.
+      if (payload.length > 4000){
+        showErr('This hand log is too large for the first-version store (' + payload.length
+          + ' chars > 4000). Split it, or ask for the Stage-2 dedicated Hand Logs store.');
+        return;
+      }
+      var saveBtn = wrap.querySelector('.pf-sge-save');
+      var jobNum = wrap.getAttribute('data-hl-jobnum') || '';
+      var jobName = wrap.getAttribute('data-hl-jobname') || '';
+      pfHlPersist(wrap, num, payload, jobNum, jobName, saveBtn, showErr);
+    };
+    // Shared POST helper: persist the Hand Logs JSON string under siteReadiness, adopt
+    // server truth, surgically refresh ONLY this block. Same fail-closed contract as
+    // pfCoPersist (only {ok:true, saved:true} is success).
+    function pfHlPersist(wrap, num, payload, jobNum, jobName, saveBtn, onErr){
+      if (saveBtn){ saveBtn.disabled = true; saveBtn.setAttribute('data-hl-t', saveBtn.textContent); saveBtn.textContent = 'Saving...'; }
+      fetch('/api/project-override', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ num: num, section: 'siteReadiness', fields: { 'Hand Logs (JSON)': payload } })
+      }).then(function(res){
+        return res.json().then(function(b){ return { ok: res.ok, status: res.status, body: b }; })
+          .catch(function(){ return { ok: res.ok, status: res.status, body: null }; });
+      }).then(function(r){
+        if (!r.ok || !r.body || r.body.ok !== true || r.body.saved !== true){
+          var msg = (r.body && r.body.message) ? r.body.message
+            : (r.status === 403 ? 'You do not have permission to edit this project.'
+                                 : 'Save failed (' + r.status + '). Your changes were NOT saved - please retry.');
+          if (saveBtn){ saveBtn.disabled = false; saveBtn.textContent = saveBtn.getAttribute('data-hl-t') || 'Save'; }
+          if (onErr) onErr(msg);
+          return;
+        }
+        window.PF_PROJECT_OVERRIDES[num] = { sections: (r.body.sections) || {}, _meta: (r.body._meta) || null };
+        try {
+          if (String(num) === String(_curNum) && r.body.sections && typeof r.body.sections === 'object') { _curOverrides = r.body.sections; }
+        } catch (e) {}
+        try {
+          var bodyEl = wrap.querySelector('.pf-hl-body');
+          if (bodyEl){
+            var freshInner = pfHandLogsInline(jobNum, jobName);
+            var tmp = document.createElement('div');
+            tmp.innerHTML = freshInner;
+            var freshBody = tmp.querySelector('.pf-hl-body');
+            bodyEl.innerHTML = freshBody ? freshBody.innerHTML : '';
+          }
+          wrap.removeAttribute('data-hl-orig');
+          var acts = wrap.querySelector('.pf-sge-inline-actions');
+          if (acts) acts.style.display = '';
+          pfHlMsg(wrap, 'Saved.', false);
+        } catch (e) {
+          var card = wrap.closest('.pr-card');
+          var root = (card && card.closest('.pr-root')) || (card && card.parentElement) || document.getElementById('prGenericRoot');
+          window.renderProjectRecord(num, root);
+        }
+      }).catch(function(){
+        if (saveBtn){ saveBtn.disabled = false; saveBtn.textContent = saveBtn.getAttribute('data-hl-t') || 'Save'; }
         if (onErr) onErr('Save failed: could not reach the server. Your changes were NOT saved - please retry.');
       });
     }
