@@ -15598,37 +15598,54 @@ try {
       out.sort(function(a,b){ return (a.name||'').toLowerCase() < (b.name||'').toLowerCase() ? -1 : 1; });
       return out;
     }
-    // PIER FOUNDATIONS contacts (Brad 2026-09-11, FIX #31): the "Responsibility" dropdown on
-    // the Closeout "Final As-Builts Sent to GC" row wants to pick WHO on the PF team is
-    // responsible — so this returns the Pier Foundations DIRECTORY contacts, the PF analog of
-    // pfGcContacts (which is GC-only). Source of truth = the master contact directory
-    // (PF_CONTACTS from /api/contacts, cached by pfLoadContacts): every contact whose company
-    // reads "Pier Foundations" (case/space-insensitive; also matches an explicit
-    // category === 'Pier Foundations'). Deduped by contactId (or name|email), sorted by name.
-    // FAIL-SAFE: PF_CONTACTS not yet loaded / no PF rows -> returns [] (empty datalist, no
-    // suggestions, still usable) — it NEVER fabricates a name and NEVER falls back to GC/Owner.
-    // The read view re-renders once pfLoadContacts resolves (same hook that hydrates the E&D
-    // Responsible-Party + GC-invoicing datalists), so an initially-empty list fills in.
+    // PIER FOUNDATIONS contacts (Brad 2026-09-11, FIX #31 -> revised same day): the
+    // "Responsibility" dropdown on the Closeout "Final As-Builts Sent to GC" row wants to
+    // pick WHO on the PF team is responsible — and Brad specified the source is the PF
+    // contacts LOADED + SAVED IN THIS PROJECT via Project Contacts, NOT the global
+    // directory. Those live in the project's PF Project Team CRM group:
+    // _curOverrides['pfTeam'].__crm['PF Project Team'] = { company:'Pier Foundations',
+    // contactIds:['C0010', ...] } (multi-company-aware via companies[]). This is the
+    // PROJECT-SCOPED analog of pfGcContacts (general.__crm.GC): each project shows only the
+    // PF-team members its Project Contacts card has loaded. contactIds are resolved to the
+    // live master-directory record (pfContactById), so a later name/email change in the
+    // directory is picked up automatically. Deduped by contactId (else name|email), sorted
+    // by name.
+    //   NOTE (project-scoped vs global): the OLD implementation read the GLOBAL directory
+    //   filtered by company/category = "Pier Foundations", which showed the SAME PF list on
+    //   every project. Brad wants the ones actually loaded in THIS project — so the source is
+    //   now the per-project 'pfTeam' __crm selection (keyed by _curOverrides), NOT the global
+    //   PF_CONTACTS scan. The two are only "the same" for a project that happens to have
+    //   loaded every PF-team member; in general the project-scoped list is a subset.
+    // FAIL-SAFE: no PF Project Team contacts loaded on this project (or PF_CONTACTS not yet
+    // resolved so an id can't be looked up) -> returns [] -> the <select> shows only the
+    // blank "— select —" option. It NEVER fabricates a name and NEVER falls back to the
+    // global directory or GC/Owner. The read view re-renders once pfLoadContacts resolves
+    // (same hook that hydrates the E&D Responsible-Party + GC-invoicing lists), so an
+    // initially-empty list fills in.
     function pfPfContacts(){
       var out = [];
       var seen = {};
-      if (!Array.isArray(PF_CONTACTS)) return out;   // not loaded yet -> empty, never guess
-      var norm = function(s){ return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, ''); };
-      var target = norm('Pier Foundations');   // 'pierfoundations'
-      PF_CONTACTS.forEach(function(c){
-        if (!c) return;
-        var co = norm(c.company);
-        var cat = norm(c.category);
-        if (co !== target && cat !== target) return;
-        var nm = pfContactName(c);
-        var em = String(c.email || '').trim();
-        if (!nm && !em) return;
-        var cid = c.contactId ? String(c.contactId).toUpperCase() : '';
-        var k = cid || (nm.toLowerCase() + '|' + em.toLowerCase());
-        if (seen[k]) return;
-        seen[k] = 1;
-        out.push({ contactId: cid || null, name: nm, email: em });
-      });
+      try {
+        // pfCrmCompanies normalizes legacy single {company,contactIds} AND multi-company
+        // companies[] into an array of {company,address,contactIds}. Collect the contactIds
+        // across every company under the 'PF Project Team' section of the 'pfTeam' key.
+        var companies = pfCrmCompanies('pfTeam', 'PF Project Team') || [];
+        companies.forEach(function(co){
+          var ids = (co && Array.isArray(co.contactIds)) ? co.contactIds : [];
+          ids.forEach(function(id){
+            var c = pfContactById(id);
+            if (!c) return;                       // id can't resolve yet -> skip, never guess
+            var nm = pfContactName(c);
+            var em = String(c.email || '').trim();
+            if (!nm && !em) return;
+            var cid = c.contactId ? String(c.contactId).toUpperCase() : '';
+            var k = cid || (nm.toLowerCase() + '|' + em.toLowerCase());
+            if (seen[k]) return;
+            seen[k] = 1;
+            out.push({ contactId: cid || null, name: nm, email: em });
+          });
+        });
+      } catch (e) { /* fail-safe: empty list, never fabricate */ }
       out.sort(function(a,b){ return (a.name||'').toLowerCase() < (b.name||'').toLowerCase() ? -1 : 1; });
       return out;
     }
@@ -21790,28 +21807,20 @@ try {
       // .pf-vscrow [label | Sent? Yes/No | Date Sent]. Brad specified a Yes/No + date; the exact
       // fields may be redlined later. Brand-new labels (no rename -> no alias). Registered in
       // PF_FIELD_DROPDOWNS (Yes/No) + PF_FIELD_DATE_LABELS (the date). Saves under 'closeout'.
-      // FIX #31 (Brad 2026-09-11): PIER FOUNDATIONS contact datalist for the "Responsibility"
-      // column on the "Final As-Builts Sent to GC" row. Built ONCE here from pfPfContacts() (the
-      // PF-team analog of the GC-invoicing datalist). Distinct id 'pf-pf-resp-dl' so it never
-      // collides with 'pf-gc-invoicing-dl' / 'pf-prq-contacts-dl-engnew'. The <input> is wired
-      // via PF_FIELD_PF_DATALIST -> list='pf-pf-resp-dl' in pfLiveControl; it saves through the
-      // ordinary 'closeout' live path. FAIL-SAFE: no PF contacts -> empty datalist (placeholder
-      // only, still usable, never fabricated).
-      var pfRespContacts = [];
-      try { pfRespContacts = pfPfContacts() || []; } catch (e) { pfRespContacts = []; }
-      var pfRespDlOpts = pfRespContacts.map(function(pc){
-        var lbl = pc.email ? (pc.name + ' <' + pc.email + '>') : pc.name;
-        return '<option value="'+esc2(pc.name)+'" label="'+esc2(lbl)+'"></option>';
-      }).join('');
-      var pfRespDatalist = '<datalist id="pf-pf-resp-dl">'+pfRespDlOpts+'</datalist>';
+      // FIX #31 (Brad 2026-09-11, revised same day): the "Responsibility" column on the
+      // "Final As-Builts Sent to GC" row is now a TRUE <select> DROPDOWN of THIS project's
+      // loaded PF Project Team contacts — NOT the old datalist typeahead (Brad: it looked
+      // like a free-type text box). The <select> + its dynamic <option>s are emitted inline
+      // by pfLiveControl / pfEditInputRow (via PF_FIELD_PF_SELECT + pfPfSelectOptions), so
+      // there is NO datalist element to pre-emit here anymore (the pf-pf-resp-dl datalist and
+      // its pfPfContacts pre-build were removed).
       var closeoutSub3bInner = ([
           // COMPOSITE ROW (FIX #31): [ Final As-Builts Sent to GC (Yes/No) | Date Sent |
-          // Responsibility (PF-contact typeahead) ]. The new Responsibility select/typeahead
-          // lives on the SAME row (density-conscious). Its own storage key 'Final As-Builts to
-          // GC - Responsibility' saves under the row's section ('closeout') via the ordinary
-          // pfLiveFieldChange path; PF_FIELD_PF_DATALIST[label] attaches the pf-pf-resp-dl list.
-          pfRespDatalist
-          + '<div data-pr-label="Final As-Builts Sent to GC">'
+          // Responsibility (PF-contact SELECT dropdown) ]. The Responsibility dropdown lives on
+          // the SAME row (density-conscious). Its own storage key 'Final As-Builts to GC -
+          // Responsibility' saves under the row's section ('closeout') via the ordinary
+          // pfLiveFieldChange path; PF_FIELD_PF_SELECT[label] renders it as a <select>.
+          '<div data-pr-label="Final As-Builts Sent to GC">'
             + '<div class="pf-vscrow">'
             +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Sent?</span>'
             +     field('Final As-Builts Sent to GC', '') + '</span>'
@@ -24087,18 +24096,44 @@ try {
       'GC Invoicing Contact 2': 'pf-gc-invoicing-dl'
     };
 
-    // Labels whose editor input is a PIER FOUNDATIONS-CONTACT TYPEAHEAD (Brad 2026-09-11,
-    // FIX #31): identical mechanism to PF_FIELD_GC_DATALIST but the shared <datalist> lists
-    // THIS deployment's Pier Foundations DIRECTORY contacts (pfPfContacts — company/category
-    // === "Pier Foundations"). Key = exact field label; VALUE = the datalist id the CALLER
-    // emits (closeoutSub3bInner emits <datalist id="pf-pf-resp-dl"> from pfPfContacts()).
-    // Saves through the ordinary pfLiveFieldChange path (an ordinary .pr-live-input); the
-    // datalist is only a suggestion list, so a free-typed or already-saved value not in the
-    // PF list survives. FAIL-SAFE: no PF contacts -> empty datalist (usable, never fabricated,
-    // never a GC/Owner fallback — pfPfContacts is PF-only).
-    var PF_FIELD_PF_DATALIST = {
-      'Final As-Builts to GC - Responsibility': 'pf-pf-resp-dl'
+    // Labels rendered as a TRUE <select> DROPDOWN of PIER FOUNDATIONS contacts (Brad
+    // 2026-09-11, FIX #31 revised): Brad rejected the datalist typeahead (it looked like a
+    // free-type text box reading "Select or type a PF contact") — he wants a real dropdown
+    // the user PICKS from, sourced from the project's LOADED + SAVED PF Project Team contacts
+    // (pfPfContacts, now project-scoped via the 'pfTeam' __crm group). Any label in this map
+    // renders a <select> (in BOTH the always-live office control pfLiveControl AND the
+    // section-editor pfEditInputRow) whose <option>s are built at render time from
+    // pfPfContacts(); the option VALUE + shown text is the contact NAME (matching how the row
+    // saves + displays a plain name string). A blank "— select —" first option is always
+    // present. SAVED-VALUE PRESERVATION: if the currently-saved value is not among the current
+    // PF-team names (e.g. a member was removed from Project Contacts, or a legacy free-typed
+    // value), it is kept as a selected "(current)" option so it is never silently dropped.
+    // FAIL-SAFE: no PF contacts loaded -> the <select> shows only the blank option (never
+    // fabricated, never a global-directory / GC / Owner fallback — pfPfContacts is
+    // project-PF-only). Saves through the ordinary pfLiveFieldChange / pfSaveSection path (an
+    // ordinary .pr-live-input / .pr-edit-input select), storage key unchanged.
+    var PF_FIELD_PF_SELECT = {
+      'Final As-Builts to GC - Responsibility': true
     };
+    // Shared <option> builder for a PF-contact <select>: blank first option, current-value
+    // preservation, name-valued options. Used by BOTH pfLiveControl and pfEditInputRow so the
+    // office live control and the section editor render an identical dropdown.
+    function pfPfSelectOptions(cur){
+      cur = (cur == null ? '' : String(cur));
+      var list = [];
+      try { list = pfPfContacts() || []; } catch (e) { list = []; }
+      var names = list.map(function(pc){ return String(pc.name || ''); }).filter(function(n){ return n !== ''; });
+      var o = '<option value=""'+(cur===''?' selected':'')+'>— select —</option>';
+      // Preserve a saved value that is not in the current PF-team list (removed member /
+      // legacy free-typed name) so it is never silently lost.
+      if (cur && names.indexOf(cur) === -1) {
+        o += '<option value="'+esc2(cur)+'" selected>'+esc2(cur)+' (current)</option>';
+      }
+      names.forEach(function(nm){
+        o += '<option value="'+esc2(nm)+'"'+(nm===cur?' selected':'')+'>'+esc2(nm)+'</option>';
+      });
+      return o;
+    }
 
     // Labels whose editor input is a NATIVE DATE PICKER (Brad 2026-08-07: "hard
     // enter or select from a date function/feature"). Key = exact field label.
@@ -24569,6 +24604,13 @@ try {
           o += '<option value="' + esc2(op) + '"' + (op === cur ? ' selected' : '') + '>' + esc2(op) + '</option>';
         });
         control = '<select class="pr-edit-input pr-edit-select" data-pr-field-label="' + esc2(label) + '">' + o + '</select>';
+      } else if (PF_FIELD_PF_SELECT[label]) {
+        // PF-contact SELECT in the section editor (parity with pfLiveControl). Same dynamic
+        // dropdown of the project's loaded PF Project Team contacts; pfSaveSection reads
+        // sel.value (the picked NAME) exactly like any dropdown, so the save round-trip is
+        // unchanged. pfPfSelectOptions preserves a saved value not in the current list.
+        control = '<select class="pr-edit-input pr-edit-select" data-pr-field-label="' + esc2(label) + '">'
+          + pfPfSelectOptions(value == null ? '' : String(value)) + '</select>';
       } else {
         control = '<input class="pr-edit-input" type="text" placeholder=" " data-pr-field-label="' + esc2(label) + '" '
           + 'value="' + esc2(value == null ? '' : value) + '">';
@@ -24647,13 +24689,16 @@ try {
         return '<input type="text" '+common+' list="'+esc2(gcDl)+'" autocomplete="off" '
           + 'placeholder="Select or type a GC contact" value="'+esc2(v)+'">';
       }
-      // Pier Foundations contact typeahead (Brad 2026-09-11, FIX #31): same idiom as the GC
-      // datalist above, wired to the caller-emitted <datalist> of PF-team contacts. Still an
-      // ordinary .pr-live-input (unchanged save path); a free-typed / saved value survives.
-      var pfDl = PF_FIELD_PF_DATALIST[label];
-      if (pfDl) {
-        return '<input type="text" '+common+' list="'+esc2(pfDl)+'" autocomplete="off" '
-          + 'placeholder="Select or type a PF contact" value="'+esc2(v)+'">';
+      // Pier Foundations contact SELECT (Brad 2026-09-11, FIX #31 revised): a real <select>
+      // DROPDOWN (NOT the old datalist typeahead) of THIS project's loaded PF Project Team
+      // contacts (pfPfContacts, project-scoped). Options are built at render time by
+      // pfPfSelectOptions (blank first option + current-value preservation). Ordinary
+      // .pr-live-input .pr-live-select -> saves the picked NAME through the unchanged
+      // pfLiveFieldChange path. FAIL-SAFE: no PF contacts -> only the blank option shows.
+      if (PF_FIELD_PF_SELECT[label]) {
+        return '<select '+common+' class="pr-live-input pr-live-select" data-pr-field-label="'+esc2(label)+'" '
+          + 'data-pr-live-prev="'+esc2(v)+'" onchange="event.stopPropagation();window.pfLiveFieldChange(this)">'
+          + pfPfSelectOptions(v) + '</select>';
       }
       // placeholder=" " (display-only, Brad 2026-09-11 #19): a blank single space so the
       // CSS :placeholder-shown blank-yellow rule fires while empty and self-clears on type.
