@@ -24019,6 +24019,30 @@ try {
         }
         window.PF_PROJECT_OVERRIDES[num] = { sections: (r.body.sections) || {}, _meta: (r.body._meta) || null };
         try { if (String(num) === String(_curNum) && r.body.sections && typeof r.body.sections === 'object') _curOverrides = r.body.sections; } catch (e) {}
+        // FILLED-STATE SYNC (Brad 2026-09-10): the completion readouts + yellow blank
+        // highlight key off .blank on the containing .pr-field-value.pr-field-live cell.
+        // The two time pickers save through THIS handler (not pfLiveFieldChange), so
+        // without this the cell kept its render-time .blank even after the user entered
+        // the times — the portal "didn't recognize" Working Hours as filled and the
+        // "X/Y Fields Complete" counts + green checks stayed stale until reload. FILLED
+        // RULE: Working Hours is filled when the COMBINED value is a non-empty time range
+        // (same `combined` we just saved / that field() + pfFmtWorkingHours treat as a
+        // real value) — a fully empty range clears .blank back on. Mirrors pfLiveFieldChange's
+        // syncBlank + status-bar recompute; DOM-patch only (no re-render), so save/display
+        // are untouched.
+        try {
+          var _whCell = row && row.closest ? row.closest('.pr-field-value.pr-field-live') : null;
+          if (_whCell) {
+            if (combined && String(combined).trim() !== '') _whCell.classList.remove('blank');
+            else _whCell.classList.add('blank');
+          }
+        } catch (e) {}
+        try {
+          var _whRoot = (card && (card.closest('.pr-root') || card.parentElement))
+                        || document.getElementById('prGenericRoot');
+          if (typeof pfRenderAllSectionStatusBars === 'function') pfRenderAllSectionStatusBars(_whRoot);
+          if (typeof pfRenderSandboxSubStatus === 'function') pfRenderSandboxSubStatus(_whRoot);
+        } catch (e) {}
       }).catch(function(){
         inputs.forEach(function(i){ i.disabled = false; });
         pfLiveMsg(el, 'Save failed (network). Not saved — please retry.', true);
