@@ -3650,6 +3650,28 @@ button.pr-action-link:disabled { opacity: 0.6; cursor: default; filter: none; }
    header block, the read-only Job#/Job Name chips, and the editor row grid. */
 .pf-hl-note { font-size: 0.74rem; color: var(--text-3); margin: 2px 0 8px 0; }
 .pf-hl-day { margin: 0 0 14px 0; }
+/* Collapsible day (Brad 2026-09-11, #40): native <details>/<summary>. The summary IS the
+   compact header (Date/Job#/Job Name + Total Piers + Total LF); clicking it rolls the day
+   up to just that header. Chevron rotates on open. Reuses the .pf-hl-dayhead look. */
+.pf-hl-daysum {
+  display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline;
+  background: var(--accent-light, #E0F0FF); border: 1px solid var(--border, #C8D5DC);
+  border-radius: 6px; padding: 6px 12px; margin: 0 0 6px 0; font-size: 0.82rem;
+  cursor: pointer; list-style: none; user-select: none;
+}
+.pf-hl-daysum::-webkit-details-marker { display: none; }   /* hide native triangle (Safari) */
+.pf-hl-daysum:hover { background: #d6ebfc; }
+.pf-hl-daysum .pf-hl-dfield { color: var(--text-1, #2B2F36); }
+.pf-hl-sum-chev {
+  width: 0; height: 0; border-left: 5px solid var(--accent-dark, #005A91);
+  border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+  transition: transform 0.15s ease; margin-right: 2px; align-self: center;
+}
+.pf-hl-day[open] .pf-hl-sum-chev { transform: rotate(90deg); }
+/* the day's two summary stats (Total Piers / Total LF) sit at the right, accented */
+.pf-hl-sum-stat { margin-left: auto; }
+.pf-hl-sum-stat + .pf-hl-sum-stat { margin-left: 0; }
+.pf-hl-sum-stat { font-weight: 700; color: var(--accent-dark, #005A91); }
 .pf-hl-dayhead {
   display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline;
   background: var(--accent-light, #E0F0FF); border: 1px solid var(--border, #C8D5DC);
@@ -3657,6 +3679,11 @@ button.pr-action-link:disabled { opacity: 0.6; cursor: default; filter: none; }
 }
 .pf-hl-dayhead .pf-hl-dfield { color: var(--text-1, #2B2F36); }
 .pf-hl-dlabel { font-size: 0.68rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3, #6b7280); font-weight: 600; }
+/* auto-numbered "Row" column (Brad 2026-09-11, #41): narrow, centered, muted. Read table +
+   editor grid + PDF share the leftmost ordinal. */
+.pf-hl-rownum { width: 1%; white-space: nowrap; text-align: center; color: var(--text-3, #6b7280); font-weight: 600; }
+th.pf-hl-rownum { color: var(--text-3, #6b7280); }
+.pf-hl-erow-num { font-size: 0.8rem; }
 /* editor: per-day block */
 .pf-hl-eday { border: 1px solid var(--border-light); border-radius: 6px; padding: 8px 10px; margin: 0 0 10px 0; background: var(--bg-0); }
 .pf-hl-eday-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 18px; margin-bottom: 8px; }
@@ -3668,9 +3695,10 @@ button.pr-action-link:disabled { opacity: 0.6; cursor: default; filter: none; }
    horizontally so the 8 columns stay aligned rather than wrapping/misaligning. */
 .pf-hl-erow-head, .pf-hl-erow {
   display: grid;
-  grid-template-columns: 1.1fr 0.9fr 0.9fr 1fr 0.9fr 0.85fr 0.85fr 2.2fr 30px;
-  gap: 6px; align-items: center; min-width: 900px;
+  grid-template-columns: 34px 1.1fr 0.9fr 0.9fr 1fr 0.9fr 0.85fr 0.85fr 2.2fr 30px;
+  gap: 6px; align-items: center; min-width: 934px;
 }
+.pf-hl-col-rownum { text-align: center; }
 .pf-hl-erow-head { font-size: 0.68rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3, #6b7280); font-weight: 600; margin: 2px 2px 4px; }
 .pf-hl-erow { margin: 0 0 5px 0; }
 .pf-hl-erow .pf-sge-in { width: 100%; box-sizing: border-box; }
@@ -3680,7 +3708,7 @@ button.pr-action-link:disabled { opacity: 0.6; cursor: default; filter: none; }
 .pf-hl-add-row { margin-top: 2px; }
 /* read view: 8-column table scrolls horizontally on narrow screens; Notes runs widest */
 .pf-hl-rtable-wrap { overflow-x: auto; }
-.pf-hl-rtable { min-width: 860px; }
+.pf-hl-rtable { min-width: 900px; }
 .pf-hl-rtable th, .pf-hl-rtable td { white-space: nowrap; }
 .pf-hl-notes-cell { white-space: normal; min-width: 200px; text-align: left; }
 /* totals row (read view): bold summary with a heavy top border + tinted band */
@@ -3691,8 +3719,8 @@ button.pr-action-link:disabled { opacity: 0.6; cursor: default; filter: none; }
 /* totals footer (editor): grid-aligned to .pf-hl-erow so numbers sit under their columns */
 .pf-hl-etotal {
   display: grid;
-  grid-template-columns: 1.1fr 0.9fr 0.9fr 1fr 0.9fr 0.85fr 0.85fr 2.2fr 30px;
-  gap: 6px; align-items: center; min-width: 900px;
+  grid-template-columns: 34px 1.1fr 0.9fr 0.9fr 1fr 0.9fr 0.85fr 0.85fr 2.2fr 30px;
+  gap: 6px; align-items: center; min-width: 934px;
   margin: 6px 2px 0; padding-top: 6px;
   border-top: 2px solid var(--text-2, #4b5563);
   font-size: 0.78rem; font-weight: 700; color: var(--text-1, #2B2F36);
@@ -16932,10 +16960,13 @@ try {
         + '</div>';
     }
     // Read-view of ONE pier row. Blank cells show the yellow placeholder used elsewhere.
-    // 8 columns matching Brad's paper PF Hand Log template (Additional Notes runs widest).
-    function pfHlReadRow(r){
+    // 9 columns: a leading auto-numbered "Row" (position within the day, index+1 — computed,
+    // NOT stored) then the 8 template columns matching Brad's paper PF Hand Log template
+    // (Additional Notes runs widest). rowNo is passed by the caller (day.rows.map index+1).
+    function pfHlReadRow(r, rowNo){
       function val(v){ var s = (v==null?'':String(v)).trim(); return s ? E(s) : '<span class="pf-sge-blank">-</span>'; }
       return '<tr>'
+        + '<td class="pf-hl-rownum">'+E(String(rowNo))+'</td>'
         + '<td class="pf-sr-name">'+val(r.ap)+'</td>'
         + '<td class="pf-sr-val">'+val(r.diameter)+'</td>'
         + '<td class="pf-sr-val">'+val(r.depth)+'</td>'
@@ -16946,17 +16977,28 @@ try {
         + '<td class="pf-hl-notes-cell">'+val(r.notes)+'</td>'
         + '</tr>';
     }
-    // Read-view of ONE day: the auto-populated header block (Date / Job # / Job Name) +
-    // the pier-row table (or an empty hint). Job # / Job Name come from the CURRENT
-    // project (read-only, never editable — they ARE the project's number/name).
+    // Read-view of ONE day, COLLAPSIBLE (Brad 2026-09-11, #40). Uses a native
+    // <details>/<summary> so the day rolls up to just a compact summary header — Date /
+    // Job # / Job Name + that day's Total Piers (count) + Total LF (sum of depth) — and
+    // expands to the full 9-column pier table + daily totals row. No JS wiring: the chevron
+    // + open/close are the browser's own <details> behavior, styled via .pf-hl-daysum. Job #
+    // / Job Name come from the CURRENT project (read-only — they ARE the project's number/
+    // name). The header's Total Piers + Total LF reuse pfHlTotals (same math path).
     function pfHlDayRead(d, jobNum, jobName){
       var dateTxt = (d.date && String(d.date).trim())
         ? E(String(window.pfFmtDate(d.date))) : '<span class="pf-sge-blank">no date</span>';
-      var head = '<div class="pf-hl-dayhead">'
+      var dayTot = pfHlTotals((d && d.rows) || []);
+      // Collapsed summary header: Date / Job # / Job Name + Total Piers + Total LF. The
+      // two summary stats surface the day's daily totals so a rolled-up day still tells the
+      // story at a glance (Brad's ask). Live-updated on save via the read-view rebuild.
+      var summary = '<summary class="pf-hl-daysum">'
+        + '<span class="pf-hl-sum-chev" aria-hidden="true"></span>'
         + '<span class="pf-hl-dfield"><span class="pf-hl-dlabel">Date</span> '+dateTxt+'</span>'
         + '<span class="pf-hl-dfield"><span class="pf-hl-dlabel">Job #</span> '+E(jobNum || '-')+'</span>'
         + '<span class="pf-hl-dfield"><span class="pf-hl-dlabel">Job Name</span> '+E(jobName || '-')+'</span>'
-        + '</div>';
+        + '<span class="pf-hl-dfield pf-hl-sum-stat"><span class="pf-hl-dlabel">Total Piers</span> '+E(String(dayTot.count))+'</span>'
+        + '<span class="pf-hl-dfield pf-hl-sum-stat"><span class="pf-hl-dlabel">Total LF</span> '+pfHlFmtTotal(dayTot.depth)+'</span>'
+        + '</summary>';
       // Save-as-PDF button: prints THIS day's log in the paper PF Hand Log layout via a
       // standalone print window (window.print -> browser "Save as PDF"). Read-only, so it
       // shows for anyone viewing (no canEdit gate). data-hl-day-id lets the printer find
@@ -16965,10 +17007,12 @@ try {
         + '" onclick="event.stopPropagation();window.pfHlPrintDay(this)" title="Save this day as a PDF">Save as PDF</button>';
       var body;
       if (d.rows && d.rows.length){
-        var tot = pfHlTotals(d.rows);
-        // Totals row: AP # -> Total Qty (count of pier rows), Depth -> total LF, Buckets ->
-        // total buckets. Other columns blank. Distinct bold/top-border style (.pf-hl-total).
+        var tot = dayTot;
+        // Totals row: Row col label sits under Row, AP# -> Total Qty (count of pier rows),
+        // Depth -> total LF, Buckets -> total buckets. Other columns blank. Distinct bold/
+        // top-border style (.pf-hl-total). Now 9 columns (leading Row).
         var totalRow = '<tr class="pf-hl-total">'
+          + '<td class="pf-hl-rownum"></td>'
           + '<td class="pf-sr-name">TOTAL (' + E(String(tot.count)) + ' pier' + (tot.count === 1 ? '' : 's') + ')</td>'
           + '<td class="pf-sr-val"></td>'
           + '<td class="pf-sr-val">' + pfHlFmtTotal(tot.depth) + ' LF</td>'
@@ -16979,6 +17023,7 @@ try {
           + '<td class="pf-hl-notes-cell"></td>'
           + '</tr>';
         body = '<table class="pf-sr-table pf-hl-rtable"><thead><tr>'
+          + '<th class="pf-hl-rownum">Row</th>'
           + '<th class="pf-sr-name">Aggregate Pier ID #</th>'
           + '<th class="pf-sr-val">Pier Diameter</th>'
           + '<th class="pf-sr-val">Depth (LF)</th>'
@@ -16987,14 +17032,19 @@ try {
           + '<th class="pf-sr-val">Start Time</th>'
           + '<th class="pf-sr-val">Stop Time</th>'
           + '<th class="pf-hl-notes-cell">Additional Notes</th>'
-          + '</tr></thead><tbody>' + d.rows.map(pfHlReadRow).join('') + '</tbody>'
+          + '</tr></thead><tbody>'
+          + d.rows.map(function(r, ri){ return pfHlReadRow(r, ri + 1); }).join('') + '</tbody>'
           + '<tfoot>' + totalRow + '</tfoot></table>';
       } else {
         body = '<div class="pf-sge-empty">No piers logged for this day.</div>';
       }
-      return '<div class="pf-hl-day">'
+      // <details open> so a freshly-rendered day defaults expanded; Brad clicks the summary
+      // to roll it up to just the header + Total Piers/LF. The PDF button + table live in
+      // the expanded body only.
+      return '<details class="pf-hl-day" open>'
+        + summary
         + '<div class="pf-hl-day-actions">' + pdfBtn + '</div>'
-        + head + '<div class="pf-hl-rtable-wrap">' + body + '</div></div>';
+        + '<div class="pf-hl-rtable-wrap">' + body + '</div></details>';
     }
     // Build the whole Hand Logs card body: a .pf-hl-wrap host (data-hl-num) with a read
     // view (every day + its piers, or an empty hint) + an inline Edit affordance (office
@@ -17041,6 +17091,7 @@ try {
     // printed <thead> and each row's <td>s, so the printout stays correct as the row model
     // evolves — add a column here (and to the row model) and the PDF picks it up.
     var PF_HL_COLUMNS = [
+      { key: 'rownum',    label: 'Row', rownum: true },
       { key: 'ap',        label: 'Aggregate Pier ID #' },
       { key: 'diameter',  label: 'Pier Diameter' },
       { key: 'depth',     label: 'Depth (LF)' },
@@ -17071,7 +17122,11 @@ try {
       var total = Math.max(rowsArr.length, MIN_ROWS);
       for (var i = 0; i < total; i++){
         var r = rowsArr[i] || {};
+        var isDataRow = i < rowsArr.length;       // padded ruled rows below the data get no Row #
         bodyRows += '<tr>' + PF_HL_COLUMNS.map(function(c){
+          // Row column: the row's sequential position (index+1) — computed, not a stored
+          // field. Padded (empty ruled) rows leave it blank.
+          if (c.rownum) return '<td class="hlp-rownum">'+(isDataRow ? (i + 1) : '')+'</td>';
           var v = (r[c.key] == null) ? '' : String(r[c.key]).trim();
           return '<td class="'+(c.wide?'hlp-wide':'')+'">'+E(v)+'</td>';
         }).join('') + '</tr>';
@@ -17105,6 +17160,7 @@ try {
         + '.hlp-tbl th { background:#111; color:#fff; border:1px solid #333; padding:4px 3px; font-size:9px; text-align:center; line-height:1.15; }'
         + '.hlp-tbl td { border:1px solid #999; padding:3px 4px; font-size:10px; height:18px; vertical-align:top; }'
         + '.hlp-tbl tr.hlp-total td { font-weight:700; border-top:2px solid #333; background:#eee; }'
+        + '.hlp-rownum { text-align:center; width:1%; white-space:nowrap; color:#555; font-weight:700; }'
         + '.hlp-wide { text-align:left; width:38%; }'
         + '.hlp-roll { width:100%; border-collapse:collapse; border:1px solid #333; margin-top:8px; }'
         + '.hlp-roll td { border:1px solid #333; padding:4px 6px; font-size:10px; }'
@@ -30158,6 +30214,7 @@ try {
     function pfHlRowEditorHtml(r){
       r = r || {};
       return '<div class="pf-hl-erow" data-hl-row-id="'+esc2(r.id || pfHlRowId())+'">'
+        + '<span class="pf-hl-rownum pf-hl-erow-num" aria-label="Row number"></span>'
         + '<input type="text" class="pf-sge-in pf-hl-in-ap" placeholder="AP ID #" value="'+esc2(r.ap||'')+'" aria-label="Aggregate Pier ID number">'
         + '<input type="text" class="pf-sge-in pf-hl-in-diameter" placeholder="Diameter" value="'+esc2(r.diameter||'')+'" aria-label="Pier diameter">'
         + '<input type="text" inputmode="decimal" class="pf-sge-in pf-hl-in-depth" placeholder="Depth (LF)" value="'+esc2(r.depth||'')+'" aria-label="Depth in linear feet">'
@@ -30168,6 +30225,15 @@ try {
         + '<input type="text" class="pf-sge-in pf-hl-in-notes" placeholder="Additional Notes" value="'+esc2(r.notes||'')+'" aria-label="Additional notes">'
         + '<button type="button" class="pf-sge-remove pf-hl-rm-row" onclick="event.stopPropagation();window.pfHlRemoveRow(this)" title="Delete this pier row">&times;</button>'
         + '</div>';
+    }
+    // Auto-number the pier rows in ONE day-editor: fill each .pf-hl-erow-num with its
+    // sequential position (1,2,3…) within that day (Brad 2026-09-11, #41). Position-based
+    // and read-only — NOT a stored field; recomputed on add-row / remove-row so numbering
+    // stays gapless. Idempotent; safe to call any time.
+    function pfHlRenumberDay(dayEl){
+      if (!dayEl || !dayEl.querySelectorAll) return;
+      var nums = dayEl.querySelectorAll('.pf-hl-erow .pf-hl-erow-num');
+      for (var i = 0; i < nums.length; i++){ nums[i].textContent = String(i + 1); }
     }
     // Editor HTML for ONE day: header (Date input + read-only Job #/Job Name) + the pier
     // rows + "+ Add Pier". jobNum/jobName are the project's number/name (auto, read-only).
@@ -30190,6 +30256,7 @@ try {
         +   '<button type="button" class="pf-sge-remove pf-hl-rm-day" onclick="event.stopPropagation();window.pfHlRemoveDay(this)" title="Delete this day">&times; Delete Day</button>'
         + '</div>'
         + '<div class="pf-hl-erow-head">'
+        +   '<span class="pf-hl-col-rownum">Row</span>'
         +   '<span class="pf-hl-col-ap">Aggregate Pier ID #</span>'
         +   '<span class="pf-hl-col-diameter">Pier Diameter</span>'
         +   '<span class="pf-hl-col-depth">Depth (LF)</span>'
@@ -30211,6 +30278,7 @@ try {
     function pfHlDayTotalsHtml(rows){
       var t = pfHlTotals(rows);
       return '<div class="pf-hl-etotal" aria-label="Day totals">'
+        + '<span class="pf-hl-col-rownum"></span>'
         + '<span class="pf-hl-col-ap pf-hl-t-count">TOTAL (' + esc2(String(t.count)) + ' pier' + (t.count === 1 ? '' : 's') + ')</span>'
         + '<span class="pf-hl-col-diameter"></span>'
         + '<span class="pf-hl-col-depth pf-hl-t-depth">' + pfHlFmtTotal(t.depth) + ' LF</span>'
@@ -30302,6 +30370,9 @@ try {
         + '</div>';
       wrap.setAttribute('data-hl-orig', bodyEl.innerHTML);
       bodyEl.innerHTML = editorHtml;
+      // Seed the auto-number "Row" column on every day-editor (positions 1..n).
+      var edDays0 = bodyEl.querySelectorAll('.pf-hl-eday');
+      for (var di0 = 0; di0 < edDays0.length; di0++){ pfHlRenumberDay(edDays0[di0]); }
       var bar = wrap.querySelector('.pf-sge-inline-actions');
       if (bar) bar.style.display = 'none';
       // Live totals: delegate a single input listener on the editor. Any change to a
@@ -30329,6 +30400,7 @@ try {
       tmp.innerHTML = pfHlDayEditorHtml({ id: pfHlDayId(), date:'', rows:[] }, jobNum, jobName);
       var node = tmp.firstChild;
       days.appendChild(node);
+      pfHlRenumberDay(node);                        // number the new day's seed row (1)
       var dateInput = node.querySelector('.pf-hl-in-date');
       if (dateInput) dateInput.focus();
       window.pfHlRefreshRollup(days);              // new (empty) day -> rollup unchanged but keep in sync
@@ -30354,6 +30426,7 @@ try {
       tmp.innerHTML = pfHlRowEditorHtml({ id: pfHlRowId() });
       var node = tmp.firstChild;
       rows.appendChild(node);
+      pfHlRenumberDay(day);                            // new row -> assign its sequential Row #
       var apInput = node.querySelector('.pf-hl-in-ap');
       if (apInput) apInput.focus();
       window.pfHlRecalcDay(day);                       // count changed -> refresh footer
@@ -30366,6 +30439,7 @@ try {
       var day = row && row.closest ? row.closest('.pf-hl-eday') : null;
       var editor = row && row.closest ? row.closest('.pf-hl-editor') : null;
       if (row && row.parentNode) row.parentNode.removeChild(row);
+      if (day) pfHlRenumberDay(day);                   // recompute Row # so numbering stays gapless
       if (day) window.pfHlRecalcDay(day);              // count/sum changed -> refresh footer
       if (editor) window.pfHlRefreshRollup(editor);    // project piers/LF-to-date drop
     };
