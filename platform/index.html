@@ -15572,6 +15572,40 @@ try {
       out.sort(function(a,b){ return (a.name||'').toLowerCase() < (b.name||'').toLowerCase() ? -1 : 1; });
       return out;
     }
+    // PIER FOUNDATIONS contacts (Brad 2026-09-11, FIX #31): the "Responsibility" dropdown on
+    // the Closeout "Final As-Builts Sent to GC" row wants to pick WHO on the PF team is
+    // responsible — so this returns the Pier Foundations DIRECTORY contacts, the PF analog of
+    // pfGcContacts (which is GC-only). Source of truth = the master contact directory
+    // (PF_CONTACTS from /api/contacts, cached by pfLoadContacts): every contact whose company
+    // reads "Pier Foundations" (case/space-insensitive; also matches an explicit
+    // category === 'Pier Foundations'). Deduped by contactId (or name|email), sorted by name.
+    // FAIL-SAFE: PF_CONTACTS not yet loaded / no PF rows -> returns [] (empty datalist, no
+    // suggestions, still usable) — it NEVER fabricates a name and NEVER falls back to GC/Owner.
+    // The read view re-renders once pfLoadContacts resolves (same hook that hydrates the E&D
+    // Responsible-Party + GC-invoicing datalists), so an initially-empty list fills in.
+    function pfPfContacts(){
+      var out = [];
+      var seen = {};
+      if (!Array.isArray(PF_CONTACTS)) return out;   // not loaded yet -> empty, never guess
+      var norm = function(s){ return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, ''); };
+      var target = norm('Pier Foundations');   // 'pierfoundations'
+      PF_CONTACTS.forEach(function(c){
+        if (!c) return;
+        var co = norm(c.company);
+        var cat = norm(c.category);
+        if (co !== target && cat !== target) return;
+        var nm = pfContactName(c);
+        var em = String(c.email || '').trim();
+        if (!nm && !em) return;
+        var cid = c.contactId ? String(c.contactId).toUpperCase() : '';
+        var k = cid || (nm.toLowerCase() + '|' + em.toLowerCase());
+        if (seen[k]) return;
+        seen[k] = 1;
+        out.push({ contactId: cid || null, name: nm, email: em });
+      });
+      out.sort(function(a,b){ return (a.name||'').toLowerCase() < (b.name||'').toLowerCase() ? -1 : 1; });
+      return out;
+    }
     // Resolve a stored prereq item's { responsible_contact_id, responsible_name,
     // responsible_email } to the EFFECTIVE { name, email } at render/click time.
     // Prefers the directory record for the tied contactId (so a later email change
@@ -21151,6 +21185,30 @@ try {
         return '<option value="'+esc2(pc.name)+'" label="'+esc2(lbl)+'"></option>';
       }).join('');
       var gcInvDatalist = '<datalist id="pf-gc-invoicing-dl">'+gcInvDlOpts+'</datalist>';
+      // FIX #28 (Brad 2026-09-11): the two "Final Invoice (incl. Retainage) Sent?" /
+      // "Date Final Invoice Sent" fields moved here from Project Closeout > GGG Returns.
+      // SECTION-KEY CONTINUITY: they keep their ORIGINAL 'closeout' storage so any value
+      // already saved there carries over verbatim (no alias, no migration). To do that while
+      // rendering inside the Financials card, they are built as their OWN inventory-table with
+      // sectionKey='closeout' (so field()'s render-time READ hits closeout) AND wrapped in a
+      // nested data-pr-section="closeout" carrier (so pfLiveFieldChange's closest('.pr-card')
+      // WRITE resolves to closeout, not the outer financials carrier). RBAC unaffected: the
+      // whole Financials render path is office-only and 'closeout' is a server-validated key
+      // (requireArea) same as financials. Rendered as a second slate sub-header under
+      // Invoicing Procedures ("Final Invoice / Retainage").
+      var finRetainageInvTbl = _srNewSafetyInvTable([
+        { name: 'Final Invoice (incl. Retainage) Sent?', inlineFields: true, fieldsFn: function(){ return [
+            field('Final Invoice (incl. Retainage) Sent?', '')
+          ]; } },
+        { name: 'Date Final Invoice Sent', inlineFields: true, fieldsFn: function(){ return [
+            field('Date Final Invoice Sent', '')
+          ]; } }
+      ], 'closeout');
+      var finRetainageInvCat =
+          '<div class="pr-card" data-pr-section="closeout" '
+        +   'style="border:0;background:none;border-radius:0;margin:0;overflow:visible">'
+        +   _srNewCollapsible('Final Invoice / Retainage', finRetainageInvTbl, true)
+        + '</div>';
       var finInvProcInner =
           _srNewCollapsible('Invoicing Procedures', gcInvDatalist + _srNewSafetyInvTable([
             { name: 'GC Invoicing Contact 1', inlineFields: true, fieldsFn: function(){ return [
@@ -21159,7 +21217,8 @@ try {
             { name: 'GC Invoicing Contact 2', inlineFields: true, fieldsFn: function(){ return [
                 field('GC Invoicing Contact 2', '')
               ]; } }
-          ], 'financials'), true);
+          ], 'financials'), true)
+          + finRetainageInvCat;
       // Invisible section-carrier wrapper (see note above): chrome neutralized so it
       // renders flush like a Mob Prep sub-header, but resolves data-pr-section for save.
       var finInvProc =
@@ -21529,22 +21588,73 @@ try {
           // at PF_OVERRIDE_LABEL_ALIASES (new -> old) carries any previously saved Yes/No value.
           field('Confirmed to Project Manager', ''),
           subgroupNote('Peter compares the GGG stamped set against the files sent to confirm all notes/depths carried; attach the comparison result above. If a discrepancy, back to Garbin (Jake) to revise/resubmit, repeat until confirmed. FUTURE (backend): auto-run the stamped-vs-sent compare and auto-populate the result link.'),
-          field('Ready to Send to GC?', ''),
-          field('Date Sent to GC', ''),
-          field('Sent By', ''),
-          fieldLinked('Final GGG As-Built Set Link', '', '', 'website'),
-          // (f) ONE-CLICK SEND-TO-GC DRAFT. A mailto pre-filled with the GC recipient
-          // (read from Project Contacts > General Contractor override, general.'GC'),
-          // a project-scoped subject, and the final GGG as-built set LINK in the body
-          // (so the recipient gets the set link; a true attach-the-file draft is a
-          // Graph follow-up). Gated read-only for crew: only office roles (canEdit)
-          // see the actionable draft button; crew see a static "ready to send" note.
+          field('Ready to Send to GC?', '')
+          // DELETED (Brad 2026-09-11, FIX #30): the "Date Sent to GC", "Sent By" and
+          // "Final GGG As-Built Set Link" rows were removed ENTIRELY from this GGG Returns
+          // subsection (render-only deletion; no alias — not a rename). Their PF_FIELD_DROPDOWNS/
+          // PF_FIELD_DATE_LABELS registrations are also dropped below (see the closeout dropdown/
+          // date maps). NOTE: 'Date Sent to GC' matched PF_DATE_LABEL_RE by name anyway; its
+          // explicit date-picker registration is removed. No listener/alias/computed-hint
+          // referenced these three, so no dangling refs remain.
+          //
+          // MOVED — FIX #29: the "Draft 'Send to GC' email" row (the mailto-draft IIFE that
+          // formerly sat here) was moved DOWN into Subsection 3b "Sent Final As-Builts to GC"
+          // (see closeoutSub3bInner below) — behavior + section ('closeout') preserved verbatim.
+          //
+          // MOVED — FIX #28: the "Final Invoice (incl. Retainage) Sent?" / "Date Final Invoice
+          // Sent" fields (plus the retainage-readiness bridge hint) were moved OUT of here and
+          // INTO Financials > Pay Applications & Invoicing > Invoicing Procedures (built as
+          // `finRetainageInvCat`, ~L21160). CONTINUITY: they still READ + WRITE the SAME
+          // 'closeout' override key (new render carrier is data-pr-section="closeout" + invtable
+          // passed 'closeout'), so any value previously saved under closeout carries over
+          // verbatim — no alias, no migration, no orphaning. The old cross-page "go to
+          // Financials" jump is dropped (the fields now LIVE in Financials).
+      ]);
+
+      // ---- Subsection 3b: Sent Final As-Builts to GC (Brad 2026-09-08) ----
+      // A minimal tracking row consistent with the other closeout as-built composites: one
+      // .pf-vscrow [label | Sent? Yes/No | Date Sent]. Brad specified a Yes/No + date; the exact
+      // fields may be redlined later. Brand-new labels (no rename -> no alias). Registered in
+      // PF_FIELD_DROPDOWNS (Yes/No) + PF_FIELD_DATE_LABELS (the date). Saves under 'closeout'.
+      // FIX #31 (Brad 2026-09-11): PIER FOUNDATIONS contact datalist for the "Responsibility"
+      // column on the "Final As-Builts Sent to GC" row. Built ONCE here from pfPfContacts() (the
+      // PF-team analog of the GC-invoicing datalist). Distinct id 'pf-pf-resp-dl' so it never
+      // collides with 'pf-gc-invoicing-dl' / 'pf-prq-contacts-dl-engnew'. The <input> is wired
+      // via PF_FIELD_PF_DATALIST -> list='pf-pf-resp-dl' in pfLiveControl; it saves through the
+      // ordinary 'closeout' live path. FAIL-SAFE: no PF contacts -> empty datalist (placeholder
+      // only, still usable, never fabricated).
+      var pfRespContacts = [];
+      try { pfRespContacts = pfPfContacts() || []; } catch (e) { pfRespContacts = []; }
+      var pfRespDlOpts = pfRespContacts.map(function(pc){
+        var lbl = pc.email ? (pc.name + ' <' + pc.email + '>') : pc.name;
+        return '<option value="'+esc2(pc.name)+'" label="'+esc2(lbl)+'"></option>';
+      }).join('');
+      var pfRespDatalist = '<datalist id="pf-pf-resp-dl">'+pfRespDlOpts+'</datalist>';
+      var closeoutSub3bInner = ([
+          // COMPOSITE ROW (FIX #31): [ Final As-Builts Sent to GC (Yes/No) | Date Sent |
+          // Responsibility (PF-contact typeahead) ]. The new Responsibility select/typeahead
+          // lives on the SAME row (density-conscious). Its own storage key 'Final As-Builts to
+          // GC - Responsibility' saves under the row's section ('closeout') via the ordinary
+          // pfLiveFieldChange path; PF_FIELD_PF_DATALIST[label] attaches the pf-pf-resp-dl list.
+          pfRespDatalist
+          + '<div data-pr-label="Final As-Builts Sent to GC">'
+            + '<div class="pf-vscrow">'
+            +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Sent?</span>'
+            +     field('Final As-Builts Sent to GC', '') + '</span>'
+            +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Date Sent</span>'
+            +     field('Date Final As-Builts Sent to GC', '') + '</span>'
+            +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Responsibility</span>'
+            +     field('Final As-Builts to GC - Responsibility', '') + '</span>'
+            + '</div>'
+          + '</div>',
+          // MOVED DOWN (FIX #29): the "Draft 'Send to GC' email" row, relocated verbatim from
+          // Subsection 3 (GGG Returns Final As-Builts). Same mailto builder, same GC-name lookup
+          // (general override 'GC'), same 'closeout' reads for the final GGG set link, same
+          // canEdit()-gated actionable-button vs crew read-only note. Behavior + save context
+          // unchanged — it is a computed control (no storage key of its own).
           (function(){
             var _pname = String(D.project_name || '');
             var _pnum = String(_curNum || D.project_number || '');
-            // GC name from Project Contacts (general override 'GC'); no email is stored
-            // structured, so the To is left blank for the user to pick — subject + body
-            // are pre-filled. If a GC email override ever exists it is used.
             var _gcNameOv = ovLookup('general', 'GC');
             var _gcName = _gcNameOv.has ? String(_gcNameOv.value || '') : '';
             var _setLinkRaw = String(effVal('closeout', 'Final GGG As-Built Set Link', '') || '').trim();
@@ -21567,48 +21677,7 @@ try {
                 + '; pick the GC recipient, BCC Peter, and send. (Outlook draft + auto-attach = backend follow-up.)</span></div>';
             }
             return computedHint('When ready, an office user drafts the "Send to GC" email here (final stamped as-builts + set link).', false);
-          })(),
-          // (c) RETAINAGE-ON-CLOSEOUT LINK. Ties closeout completion to the final
-          // invoice / retainage release: once the stamped set has gone to the GC, the
-          // final invoice INCLUDING RETAINAGE goes out (Jonathan SOP 2026-08-08). This
-          // surfaces the readiness + a jump to the Financials > Project Invoicing step.
-          field('Final Invoice (incl. Retainage) Sent?', ''),
-          field('Date Final Invoice Sent', ''),
-          (function(){
-            // Retainage release becomes actionable once the stamped set is out to the GC.
-            var _readyGC = String(effVal('closeout', 'Ready to Send to GC?', '') || '').trim().toLowerCase();
-            var _sentGC = pfParseDate(effVal('closeout', 'Date Sent to GC', ''));
-            var _invSent = String(effVal('closeout', 'Final Invoice (incl. Retainage) Sent?', '') || '').trim().toLowerCase();
-            var _closeoutDone = (_readyGC === 'yes' || !!_sentGC);
-            // Jump link to the Financials card's Project Invoicing block (same page).
-            var _jump = '<a href="#" class="pr-closeout-fin-jump" onclick="event.preventDefault();'
-              + 'var c=document.querySelector(\'.pr-card[data-pr-section=&quot;financials&quot;]\')'
-              + '||Array.prototype.filter.call(document.querySelectorAll(\'.pr-card-title\'),function(t){return t.textContent===\'Financials\';})[0];'
-              + 'if(c){var card=c.closest?c.closest(\'.pr-card\'):c;(card||c).scrollIntoView({behavior:&quot;smooth&quot;,block:&quot;start&quot;});}">'
-              + 'go to Financials &gt; Project Invoicing</a>';
-            if (_closeoutDone && _invSent !== 'yes') {
-              return computedHint('Closeout is out to the GC — the final invoice INCLUDING RETAINAGE can now go out. '
-                + _jump + '.', true);
-            }
-            return computedHint('Retainage releases with the final invoice once the stamped set is sent to the GC. '
-              + _jump + '.', false);
           })()
-      ]);
-
-      // ---- Subsection 3b: Sent Final As-Builts to GC (Brad 2026-09-08) ----
-      // A minimal tracking row consistent with the other closeout as-built composites: one
-      // .pf-vscrow [label | Sent? Yes/No | Date Sent]. Brad specified a Yes/No + date; the exact
-      // fields may be redlined later. Brand-new labels (no rename -> no alias). Registered in
-      // PF_FIELD_DROPDOWNS (Yes/No) + PF_FIELD_DATE_LABELS (the date). Saves under 'closeout'.
-      var closeoutSub3bInner = ([
-          '<div data-pr-label="Final As-Builts Sent to GC">'
-            + '<div class="pf-vscrow">'
-            +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Sent?</span>'
-            +     field('Final As-Builts Sent to GC', '') + '</span>'
-            +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Date Sent</span>'
-            +     field('Date Final As-Builts Sent to GC', '') + '</span>'
-            + '</div>'
-          + '</div>'
       ]);
 
       // ---- Subsection 4: Certified Payroll Reports ----
@@ -23844,6 +23913,19 @@ try {
       'GC Invoicing Contact 2': 'pf-gc-invoicing-dl'
     };
 
+    // Labels whose editor input is a PIER FOUNDATIONS-CONTACT TYPEAHEAD (Brad 2026-09-11,
+    // FIX #31): identical mechanism to PF_FIELD_GC_DATALIST but the shared <datalist> lists
+    // THIS deployment's Pier Foundations DIRECTORY contacts (pfPfContacts — company/category
+    // === "Pier Foundations"). Key = exact field label; VALUE = the datalist id the CALLER
+    // emits (closeoutSub3bInner emits <datalist id="pf-pf-resp-dl"> from pfPfContacts()).
+    // Saves through the ordinary pfLiveFieldChange path (an ordinary .pr-live-input); the
+    // datalist is only a suggestion list, so a free-typed or already-saved value not in the
+    // PF list survives. FAIL-SAFE: no PF contacts -> empty datalist (usable, never fabricated,
+    // never a GC/Owner fallback — pfPfContacts is PF-only).
+    var PF_FIELD_PF_DATALIST = {
+      'Final As-Builts to GC - Responsibility': 'pf-pf-resp-dl'
+    };
+
     // Labels whose editor input is a NATIVE DATE PICKER (Brad 2026-08-07: "hard
     // enter or select from a date function/feature"). Key = exact field label.
     // Rendered as <input type="date"> so the user can either type or pick from the
@@ -23992,8 +24074,12 @@ try {
       'Date Analyzed': true,
       'Date Sent Back': true,
       'Date Confirmed': true,
-      'Date Sent to GC': true,
-      // Retainage-on-closeout: date the final invoice (incl. retainage) was sent.
+      // 'Date Sent to GC' date-picker registration REMOVED (Brad 2026-09-11, FIX #30): the
+      // row was DELETED from Subsection 3 (GGG Returns Final As-Builts), so this label no
+      // longer renders. (It matched PF_DATE_LABEL_RE by name anyway; no other ref.)
+      // Retainage-on-closeout: date the final invoice (incl. retainage) was sent. STILL
+      // registered (FIX #28 MOVED the field into Financials > Invoicing Procedures but it
+      // keeps its 'closeout' storage + label, so the date picker registration stays valid).
       'Date Final Invoice Sent': true,
       // Subsection 3b: Sent Final As-Builts to GC (Brad 2026-09-08).
       'Date Final As-Builts Sent to GC': true,
@@ -24386,6 +24472,14 @@ try {
       if (gcDl) {
         return '<input type="text" '+common+' list="'+esc2(gcDl)+'" autocomplete="off" '
           + 'placeholder="Select or type a GC contact" value="'+esc2(v)+'">';
+      }
+      // Pier Foundations contact typeahead (Brad 2026-09-11, FIX #31): same idiom as the GC
+      // datalist above, wired to the caller-emitted <datalist> of PF-team contacts. Still an
+      // ordinary .pr-live-input (unchanged save path); a free-typed / saved value survives.
+      var pfDl = PF_FIELD_PF_DATALIST[label];
+      if (pfDl) {
+        return '<input type="text" '+common+' list="'+esc2(pfDl)+'" autocomplete="off" '
+          + 'placeholder="Select or type a PF contact" value="'+esc2(v)+'">';
       }
       // placeholder=" " (display-only, Brad 2026-09-11 #19): a blank single space so the
       // CSS :placeholder-shown blank-yellow rule fires while empty and self-clears on type.
