@@ -2341,6 +2341,56 @@ textarea.pf-autogrow {
 .pr-field-value.pr-field-live.blank .pr-live-input {
   background: var(--amber-light); border-color: #f1d18a;
 }
+/* Bulletproof: the live SELECT and TEXTAREA both also carry .pr-live-input, so the
+   rule above already tints them amber when the cell is .blank — but state it
+   explicitly so a future class rename can't silently drop the dropdown/textarea. */
+.pr-field-value.pr-field-live.blank .pr-live-select,
+.pr-field-value.pr-field-live.blank .pr-live-textarea,
+.pr-field-value.pr-field-live.blank textarea {
+  background: var(--amber-light); border-color: #f1d18a;
+}
+
+/* =====================================================================
+   PORTAL-WIDE BLANK-CELL HIGHLIGHT — CONSISTENCY (Brad 2026-09-11, #19)
+   ---------------------------------------------------------------------
+   Brad: "throughout the entire portal any blank cells or fields with no data
+   please highlight in the yellow color you have in some cells but not all."
+   The existing yellow = --amber-light (#fef3c7) bg + --amber (#d97706) text,
+   applied via .pr-field-value.blank (read spans) and .blank .pr-live-input
+   (Site-Readiness live controls). It was INCONSISTENT because:
+     * field()-emitted read spans + live controls got .blank from JS -> yellow;
+     * but the SECTION-EDITOR controls (.pr-edit-input, Edit-button mode) and any
+       raw form control NOT emitted by field() never received the yellow at all.
+   This block extends the SAME yellow to every empty field control portal-wide,
+   using RELIABLE, SELF-CLEARING CSS empty-state selectors (no JS, no markup, no
+   data/save/RBAC change — DISPLAY ONLY). A control with data clears instantly:
+     - <select>: :has(option[value=""]:checked) is true ONLY while the blank
+       "— select —" option is chosen; picking a real option removes the yellow.
+     - <input>/<textarea>: :placeholder-shown is true ONLY while empty; the moment
+       the user types (or a value is present) the yellow clears. Controls with no
+       placeholder are covered by the existing JS .blank path (field()/live).
+   Uses the EXACT existing amber tokens — no new shade invented.
+   SCOPE: ONLY field controls (.pr-live-input / .pr-edit-input families) + the
+   .pr-field-value.blank read spans. Buttons, labels, headers, section bars,
+   computed-rollup cards (legit dashes) are NOT field controls -> untouched.
+   ===================================================================== */
+/* Empty DROPDOWNS (both live + section-editor), portal-wide. */
+select.pr-live-input:has(option[value=""]:checked),
+select.pr-edit-input:has(option[value=""]:checked) {
+  background: var(--amber-light); border-color: #f1d18a;
+}
+/* Empty TEXT / DATE inputs + TEXTAREAS that expose a placeholder, portal-wide.
+   :placeholder-shown self-clears the instant a value is entered. */
+input.pr-live-input:placeholder-shown,
+input.pr-edit-input:placeholder-shown,
+textarea.pr-live-input:placeholder-shown,
+textarea.pr-edit-input:placeholder-shown {
+  background: var(--amber-light); border-color: #f1d18a;
+}
+/* SECTION-EDITOR (Edit-button) empty controls: mirror the Site-Readiness live
+   .blank yellow so blanks are equally obvious in edit mode. The section editor
+   re-renders empty controls with no value; :placeholder-shown handles those that
+   carry a placeholder, and empty <select> is handled by the :has() rule above. */
 .pr-live-msg-ok { color: #2e7d32; }
 .pr-live-msg-err { color: #c0392b; font-weight: 600; }
 
@@ -2572,6 +2622,10 @@ textarea.pf-autogrow {
 .pf-sr-table tr[data-row-label="Locate Notes"] .pr-live-textarea,
 .pf-sr-table tr[data-row-label="Locate Notes"] textarea {
   width: 100%;
+  /* The live textarea also carries .pr-live-input, whose max-width:340px was CLAMPING
+     it to the narrow ~340px box in Brad's screenshot. Force full row width here (this
+     ONE row only) so the Locate Notes box spans side-to-side. Brad 2026-09-11. */
+  max-width: 100% !important;
   min-height: 120px;   /* ~5-6 rows, resize:vertical inherited from .pr-live-textarea */
   box-sizing: border-box;
 }
@@ -24175,6 +24229,7 @@ try {
         // is unchanged. Full-width; AUTO-GROW in height via .pf-autogrow (Brad 2026-09-11) —
         // rows="1" start, sized to content after render + on input by pfAutogrowTextarea.
         control = '<textarea class="pr-edit-input pr-edit-textarea pf-autogrow" rows="1" '
+          + 'placeholder=" " '  /* display-only #19: enables :placeholder-shown blank-yellow */
           + 'data-pr-field-label="' + esc2(label) + '">'
           + esc2(value == null ? '' : value) + '</textarea>';
       } else if (pfLabelIsDateControl(label)) {
@@ -24184,7 +24239,7 @@ try {
         // the override save + MM/DD/YYYY re-display round-trip is unchanged. Gate is
         // pfLabelIsDateControl: explicit allowlist OR automatic pfIsDateLabel match
         // (dropdown/textarea labels excluded — never coerced to a calendar).
-        control = '<input class="pr-edit-input" type="date" data-pr-field-label="' + esc2(label) + '" '
+        control = '<input class="pr-edit-input" type="date" placeholder=" " data-pr-field-label="' + esc2(label) + '" '
           + 'value="' + esc2(pfToDateInputValue(value)) + '">';
       } else if (opts) {
         var cur = value == null ? '' : String(value);
@@ -24198,7 +24253,7 @@ try {
         });
         control = '<select class="pr-edit-input pr-edit-select" data-pr-field-label="' + esc2(label) + '">' + o + '</select>';
       } else {
-        control = '<input class="pr-edit-input" type="text" data-pr-field-label="' + esc2(label) + '" '
+        control = '<input class="pr-edit-input" type="text" placeholder=" " data-pr-field-label="' + esc2(label) + '" '
           + 'value="' + esc2(value == null ? '' : value) + '">';
       }
       return '<div class="pr-edit-row"><label class="pr-edit-label">' + esc2(label) + '</label>' + control + '</div>';
@@ -24232,6 +24287,7 @@ try {
         // on every input via the delegated 'input' listener (pfAutogrowTextarea). Save path is
         // unchanged (textarea.value round-trips through pfLiveFieldChange like any input).
         return '<textarea '+common+' rows="1" class="pr-live-input pr-live-textarea pf-autogrow" '
+          + 'placeholder=" " '  /* display-only #19: enables :placeholder-shown blank-yellow */
           + 'data-pr-field-label="'+esc2(label)+'" data-pr-live-prev="'+esc2(v)+'" '
           + 'onchange="event.stopPropagation();window.pfLiveFieldChange(this)">'+esc2(v)+'</textarea>';
       }
@@ -24240,7 +24296,10 @@ try {
         // pfLabelIsDateControl: explicit PF_FIELD_DATE_LABELS OR automatic pfIsDateLabel
         // match, with dropdown/textarea labels excluded — same unified detection as the
         // read path and pfEditInputRow, so no date field needs manual registration.
-        return '<input type="date" '+common+' value="'+esc2(pfToDateInputValue(v))+'">';
+        // placeholder=" " (display-only, Brad 2026-09-11 #19) enables the CSS
+        // :placeholder-shown blank-yellow highlight; it never appears (date inputs
+        // don't render placeholder text) and does not touch the saved value.
+        return '<input type="date" '+common+' placeholder=" " value="'+esc2(pfToDateInputValue(v))+'">';
       }
       var opts = PF_FIELD_DROPDOWNS[label];
       if (opts) {
@@ -24271,7 +24330,10 @@ try {
         return '<input type="text" '+common+' list="'+esc2(gcDl)+'" autocomplete="off" '
           + 'placeholder="Select or type a GC contact" value="'+esc2(v)+'">';
       }
-      return '<input type="text" '+common+' value="'+esc2(v)+'">';
+      // placeholder=" " (display-only, Brad 2026-09-11 #19): a blank single space so the
+      // CSS :placeholder-shown blank-yellow rule fires while empty and self-clears on type.
+      // Whitespace-only placeholder shows no visible hint text; saved value is untouched.
+      return '<input type="text" '+common+' placeholder=" " value="'+esc2(v)+'">';
     }
     // Save-on-change for any always-live Site Readiness field. Resolves the field's SECTION
     // KEY from its containing .pr-card[data-pr-section] (multi-key: siteReadiness / safety /
