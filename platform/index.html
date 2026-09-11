@@ -14728,7 +14728,12 @@ try {
       // ("GC Invoicing Contact 1" / "... 2"). new slot-1 label -> old key so any value
       // already saved under 'GC Invoicing Contact' carries forward into slot 1 and shows
       // as the current selection. (Slot 2 is new -> no alias / starts blank.)
-      'GC Invoicing Contact 1': 'GC Invoicing Contact'
+      'GC Invoicing Contact 1': 'GC Invoicing Contact',
+      // Project Closeout > GGG Returns Final As-Builts (Brad 2026-09-11, FIX #27): the
+      // "Confirmed to PM (Brad)?" Yes/No field was renamed to "Confirmed to Project Manager".
+      // new label -> old key so any Yes/No value already saved under the old label still
+      // renders (and round-trips) under the renamed field.
+      'Confirmed to Project Manager': 'Confirmed to PM (Brad)?'
     };
     function ovLookup(sectionKey, label){
       var sec = _curOverrides && _curOverrides[sectionKey];
@@ -21472,9 +21477,39 @@ try {
       var closeoutSub3Inner = ([
           field('Date Final As-Builts Received from Garbin', ''),
           field('Received By', ''),
-          field('As-Builts Saved to Closeout Folder?', ''),
-          fieldLinked('Closeout Folder Link', '', '', 'website'),
-          subgroupNote('Save to …\\001 - Completed Projects\\[year]\\[project]\\03 - Engineering & Design\\Closeout. FUTURE: Peter auto-saves on receipt.'),
+          // COMPOSITE ROW (Brad 2026-09-11, FIX #25/#26): the "As-Builts Saved to Closeout
+          // Folder?" Yes/No confirmation now shares ONE row with the clickable Closeout-folder
+          // link — the link moved ONTO this row and the former standalone "Closeout Folder Link"
+          // field on the line below is DELETED (redundant). Same .pf-vscrow composite idiom as
+          // the GI-300 / GUHMA / Modulus rows above: a wrapping data-pr-label sentinel names the
+          // row ("As-Builts Saved to Closeout Folder?") in _srNewRow's left "Field" cell, and the
+          // two inner controls render side-by-side in the value cell (their own .pr-field-label
+          // spans are hidden by `.pf-sr-table .pr-field-label{display:none}`, so only the
+          // .pf-vscrow-lbl mini-labels show). BOTH controls keep their OWN storage keys/data-pr-
+          // label so pfSaveSection's `.pr-field[data-pr-label]` descendant scan finds + saves each
+          // independently (the Yes/No under 'As-Builts Saved to Closeout Folder?', the URL under
+          // the UNCHANGED key 'Closeout Folder Link' -> any previously saved link value carries
+          // over verbatim, no alias needed).
+          //
+          // FOLDER-LINK MECHANISM / FAIL-SAFE (investigated 2026-09-11): the portal builds every
+          // per-project SharePoint folder link from a SYNCED folder_url captured by a Graph sync
+          // (pfSafetyFolder / pfShopDwgInfo / pfDesignSubmittalFolder / garbinPrelimFolderField all
+          // read window.PF_*.projects[num].folder_url). There is NO closeout/eng-folder sync data
+          // source and the portal NEVER fabricates a SharePoint URL from a base + path. So the link
+          // stays the MANUAL entry it already was (the field being deleted was a manual
+          // fieldLinked website URL, empty by default) — moved onto this row, NOT auto-constructed.
+          // fieldLinked() is already graceful: empty -> amber "-" (NO broken link), a saved value
+          // renders as a clickable linkWebsite() anchor. Office paste-URL entry preserved (Site
+          // Readiness live-edit input); read view for all roles = clickable "Open" link.
+          '<div data-pr-label="As-Builts Saved to Closeout Folder?">'
+            + '<div class="pf-vscrow">'
+            +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Saved?</span>'
+            +     field('As-Builts Saved to Closeout Folder?', '') + '</span>'
+            +   '<span class="pf-vscrow-col"><span class="pf-vscrow-lbl">Closeout Folder Link</span>'
+            +     fieldLinked('Closeout Folder Link', '', '', 'website') + '</span>'
+            + '</div>'
+          + '</div>',
+          subgroupNote('Save to …\\001 - Completed Projects\\[year]\\[project]\\03 - Engineering & Design\\Closeout. Paste the project Closeout-folder link on this row (…\\04 - Project Management\\02 - Projects\\[project]\\03 - Engineering & Design\\Closeout). FUTURE: Peter auto-saves on receipt.'),
           // Review checklist — each Yes/No paired with a Date + who where the spec asks.
           // (e) AUTO-COMPARE HOOK: the "Peter analyzed vs sent" step. The tracked action
           // (Yes/No + date) stays; a NEW link field holds the QAQC comparison RESULT
@@ -21489,7 +21524,10 @@ try {
           field('Date Sent Back', ''),
           field('Jonathan Reviewed & Confirmed Match?', ''),
           field('Date Confirmed', ''),
-          field('Confirmed to PM (Brad)?', ''),
+          // Renamed (Brad 2026-09-11, FIX #27): 'Confirmed to PM (Brad)?' -> 'Confirmed to
+          // Project Manager'. Label-is-key, so the rename changes the storage key; the alias
+          // at PF_OVERRIDE_LABEL_ALIASES (new -> old) carries any previously saved Yes/No value.
+          field('Confirmed to Project Manager', ''),
           subgroupNote('Peter compares the GGG stamped set against the files sent to confirm all notes/depths carried; attach the comparison result above. If a discrepancy, back to Garbin (Jake) to revise/resubmit, repeat until confirmed. FUTURE (backend): auto-run the stamped-vs-sent compare and auto-populate the result link.'),
           field('Ready to Send to GC?', ''),
           field('Date Sent to GC', ''),
@@ -23775,7 +23813,10 @@ try {
       'All Notes / Comments / Depths Picked Up?': ['Yes', 'No'],
       'Discrepancy - Sent Back to Garbin (Jake)?': ['Yes', 'No'],
       'Jonathan Reviewed & Confirmed Match?': ['Yes', 'No'],
-      'Confirmed to PM (Brad)?': ['Yes', 'No'],
+      // Renamed (Brad 2026-09-11, FIX #27): 'Confirmed to PM (Brad)?' -> 'Confirmed to
+      // Project Manager'. Dropdown keyed under the NEW label so the renamed field's <select>
+      // resolves; the PF_OVERRIDE_LABEL_ALIASES entry (new -> old) carries any saved Yes/No.
+      'Confirmed to Project Manager': ['Yes', 'No'],
       'Ready to Send to GC?': ['Yes', 'No'],
       // Retainage-on-closeout: final invoice (incl. retainage release) sent to GC.
       'Final Invoice (incl. Retainage) Sent?': ['Yes', 'No'],
