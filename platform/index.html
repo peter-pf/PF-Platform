@@ -3703,6 +3703,11 @@ th.pf-hl-rownum { color: var(--text-3, #6b7280); }
 .pf-hl-erow-head { font-size: 0.68rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3, #6b7280); font-weight: 600; margin: 2px 2px 4px; }
 .pf-hl-erow { margin: 0 0 5px 0; }
 .pf-hl-erow .pf-sge-in { width: 100%; box-sizing: border-box; }
+/* Center editor grid to match read view / PDF (Brad 2026-09-11): each column header label
+   and each input's typed text centered so the editor "flows down" like the read table.
+   Grid-cell alignment only — grid-template-columns / widths above are untouched. */
+.pf-hl-erow-head > * { text-align: center; }
+.pf-hl-erow .pf-sge-in { text-align: center; }
 .pf-hl-erows, .pf-hl-erow-head { overflow: visible; }
 .pf-hl-eday { overflow-x: auto; }
 .pf-hl-rm-row { padding: 3px 7px; }
@@ -3720,12 +3725,22 @@ th.pf-hl-rownum { color: var(--text-3, #6b7280); }
 .pf-hl-rtable-wrap { overflow-x: auto; }
 .pf-hl-rtable { min-width: 720px; table-layout: auto; }
 .pf-hl-rtable th, .pf-hl-rtable td { white-space: nowrap; }
+/* Center every Hand Log column header + data so the table reads clean/linear (Brad
+   2026-09-11). Scoped to .pf-hl-rtable ONLY — the shared .pf-sr-table inventory tables
+   keep their own alignment. Text-align only; does NOT touch table-layout:auto or the
+   width overrides above (no re-trigger of the fixed-layout header blowup). */
+.pf-hl-rtable th, .pf-hl-rtable td { text-align: center; }
 /* Kill the 34%/66% two-column widths for this multi-column table (auto-size instead). */
 .pf-hl-rtable td.pf-sr-name, .pf-hl-rtable th.pf-sr-name { width: auto; }
 .pf-hl-rtable td.pf-sr-val,  .pf-hl-rtable th.pf-sr-val  { width: auto; }
 /* Row column: readable fixed width so the "Row" label sits on ONE line (was width:1%). */
 .pf-hl-rtable td.pf-hl-rownum, .pf-hl-rtable th.pf-hl-rownum { width: 44px; }
 .pf-hl-notes-cell { white-space: normal; min-width: 200px; width: auto; text-align: left; }
+/* Notes column: center it too per Brad's "each column" ask (default centered). Scoped to
+   the read table via 2-class specificity so it overrides the base .pf-hl-notes-cell left.
+   NOTE: long free-text notes may read better left-aligned — flip this one rule back to
+   text-align:left if Brad prefers prose left after seeing it on screen. */
+.pf-hl-rtable td.pf-hl-notes-cell, .pf-hl-rtable th.pf-hl-notes-cell { text-align: center; }
 /* totals row (read view): bold summary with a heavy top border + tinted band */
 .pf-hl-rtable tfoot tr.pf-hl-total td {
   font-weight: 700; border-top: 2px solid var(--text-2, #4b5563);
@@ -3740,6 +3755,8 @@ th.pf-hl-rownum { color: var(--text-3, #6b7280); }
   border-top: 2px solid var(--text-2, #4b5563);
   font-size: 0.78rem; font-weight: 700; color: var(--text-1, #2B2F36);
 }
+/* Center editor totals cells to match the centered columns above (Brad 2026-09-11). */
+.pf-hl-etotal > * { text-align: center; }
 /* PROJECT-TO-DATE rollup (Brad 2026-09-11): running piers + LF installed across all days
    with % complete vs planned. Dense, azure accent, sits under the per-day list / in editor. */
 .pf-hl-rollup {
@@ -17165,10 +17182,10 @@ try {
         + '.hlp-name { min-width:2.5in; }'
         + '.hlp-tbl { width:100%; border-collapse:collapse; border:1px solid #333; }'
         + '.hlp-tbl th { background:#111; color:#fff; border:1px solid #333; padding:4px 3px; font-size:9px; text-align:center; line-height:1.15; }'
-        + '.hlp-tbl td { border:1px solid #999; padding:3px 4px; font-size:10px; height:18px; vertical-align:top; }'
+        + '.hlp-tbl td { border:1px solid #999; padding:3px 4px; font-size:10px; height:18px; vertical-align:top; text-align:center; }'
         + '.hlp-tbl tr.hlp-total td { font-weight:700; border-top:2px solid #333; background:#eee; }'
         + '.hlp-rownum { text-align:center; width:1%; white-space:nowrap; color:#555; font-weight:700; }'
-        + '.hlp-wide { text-align:left; width:38%; }'
+        + '.hlp-wide { text-align:center; width:38%; }'
         + '.hlp-roll { width:100%; border-collapse:collapse; border:1px solid #333; margin-top:8px; }'
         + '.hlp-roll td { border:1px solid #333; padding:4px 6px; font-size:10px; }'
         + '.hlp-roll .hlp-roll-cap { font-weight:700; letter-spacing:0.04em; background:#111; color:#fff; text-align:center; }'
