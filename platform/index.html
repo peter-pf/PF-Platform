@@ -14668,7 +14668,13 @@ try {
       'GUHMA Data (PDF) Sent to Garbin': 'Column Logs (Rig PDF) Sent to Garbin?',
       //  Redline 2: Modulus Load Test drop-'?'. (Date field 'Date Load Test Sent' kept
       //  byte-identical -> NO date alias.)
-      'Modulus Load Test Sent to Garbin': 'Modulus Load Test Sent to Garbin?'
+      'Modulus Load Test Sent to Garbin': 'Modulus Load Test Sent to Garbin?',
+      // Pay Applications & Invoicing > Invoicing Procedures (Brad 2026-09-11): the single
+      // free-text "GC Invoicing Contact" was split into TWO GC-sourced dropdowns
+      // ("GC Invoicing Contact 1" / "... 2"). new slot-1 label -> old key so any value
+      // already saved under 'GC Invoicing Contact' carries forward into slot 1 and shows
+      // as the current selection. (Slot 2 is new -> no alias / starts blank.)
+      'GC Invoicing Contact 1': 'GC Invoicing Contact'
     };
     function ovLookup(sectionKey, label){
       var sec = _curOverrides && _curOverrides[sectionKey];
@@ -21034,8 +21040,9 @@ try {
       // Fields Complete, XX%" readout) at the TOP of the Pay Applications &
       // Invoicing section body, ABOVE all existing invoicing content (finInvBand +
       // finPayApps preserved verbatim below). First sub-header = "Invoicing
-      // Procedures" holding one inventory row "GC Invoicing Contact" — who the
-      // invoice goes to when it's ready to send. Built EXACTLY like the Mob Prep
+      // Procedures" holding two inventory rows "GC Invoicing Contact 1"/"... 2" —
+      // who the invoice goes to when it's ready to send, each a GC-sourced dropdown
+      // (see the pfGcContacts datalist build below). Built EXACTLY like the Mob Prep
       // groups (same helpers, same classes) so it reads consistent. The 2nd
       // sub-header Brad asked for ("Pay Apps") is added below as a SIBLING wrapper
       // around finPayApps (see finPayAppsWrapped) — NOT inside finInvProcInner,
@@ -21063,10 +21070,35 @@ try {
       // for canEdit(). pfRenderSandboxSubStatus already scans '.pf-srnew-scope
       // .pf-sr-collapse' + '.pf-safety-invrow' GLOBALLY, so this bar's readout +
       // the row's green check populate with no extra wiring (same as Mob Prep).
+      // GC Invoicing Contact -> GC-SOURCED DROPDOWN x2 (Brad 2026-09-11) -----------
+      // "the 'GC Invoicing Contact' should be a drop down from the GC contacts section,
+      //  also want to be sure to have option to have potentially 2 contacts."
+      // Two inventory rows ("GC Invoicing Contact 1" / "... 2"), each a datalist-backed
+      // typeahead of THIS project's GC contacts. Both slots share ONE <datalist>
+      // (id 'pf-gc-invoicing-dl'), built ONCE here from pfGcContacts() — the SAME GC-only
+      // source that feeds the E&D "Responsible Party" (for Granary = Flaherty & Collins /
+      // C0026 Shane Hart). pfGcContacts is a top-level fn in this IIFE, in scope here.
+      // The row inputs are wired via PF_FIELD_GC_DATALIST -> list='pf-gc-invoicing-dl'
+      // in pfLiveControl (they still save through the ordinary financials live path).
+      // OLD-VALUE ALIAS: 'GC Invoicing Contact 1' -> 'GC Invoicing Contact' in
+      // PF_OVERRIDE_LABEL_ALIASES, so a value saved under the pre-split single field
+      // carries forward into slot 1. Slot 2 is optional (blank OK). FAIL-SAFE: no GC
+      // contacts -> the datalist is empty (no suggestions, still usable, NEVER
+      // Owner/POET). A distinct id keeps it from colliding with the prereq datalist.
+      var gcInvContacts = [];
+      try { gcInvContacts = pfGcContacts() || []; } catch (e) { gcInvContacts = []; }
+      var gcInvDlOpts = gcInvContacts.map(function(pc){
+        var lbl = pc.email ? (pc.name + ' <' + pc.email + '>') : pc.name;
+        return '<option value="'+esc2(pc.name)+'" label="'+esc2(lbl)+'"></option>';
+      }).join('');
+      var gcInvDatalist = '<datalist id="pf-gc-invoicing-dl">'+gcInvDlOpts+'</datalist>';
       var finInvProcInner =
-          _srNewCollapsible('Invoicing Procedures', _srNewSafetyInvTable([
-            { name: 'GC Invoicing Contact', inlineFields: true, fieldsFn: function(){ return [
-                field('GC Invoicing Contact', '')
+          _srNewCollapsible('Invoicing Procedures', gcInvDatalist + _srNewSafetyInvTable([
+            { name: 'GC Invoicing Contact 1', inlineFields: true, fieldsFn: function(){ return [
+                field('GC Invoicing Contact 1', '')
+              ]; } },
+            { name: 'GC Invoicing Contact 2', inlineFields: true, fieldsFn: function(){ return [
+                field('GC Invoicing Contact 2', '')
               ]; } }
           ], 'financials'), true);
       // Invisible section-carrier wrapper (see note above): chrome neutralized so it
@@ -23687,6 +23719,21 @@ try {
       'Thank-You Sent By': ['Project Manager', 'Business Development', 'Peter']
     };
 
+    // Labels whose editor input is a GC-CONTACT TYPEAHEAD (Brad 2026-09-11): a plain
+    // text <input> wired via list=<id> to a shared <datalist> of THIS project's GENERAL
+    // CONTRACTOR contacts (pfGcContacts — the SAME GC-only source that feeds the E&D
+    // "Responsible Party"). Key = exact field label; VALUE = the datalist id the CALLER
+    // emits its <datalist> under (the caller builds the <datalist> from pfGcContacts()).
+    // The input still saves through the ordinary pfLiveFieldChange path (it IS an
+    // ordinary .pr-live-input) — the datalist is only a suggestion list, so a free-typed
+    // or already-saved value that is not in the GC list survives. GC-only + fail-closed:
+    // no Owner/POET fallback (that's guaranteed by pfGcContacts). Both invoicing slots
+    // share ONE datalist id so only a single <datalist> element is emitted.
+    var PF_FIELD_GC_DATALIST = {
+      'GC Invoicing Contact 1': 'pf-gc-invoicing-dl',
+      'GC Invoicing Contact 2': 'pf-gc-invoicing-dl'
+    };
+
     // Labels whose editor input is a NATIVE DATE PICKER (Brad 2026-08-07: "hard
     // enter or select from a date function/feature"). Key = exact field label.
     // Rendered as <input type="date"> so the user can either type or pick from the
@@ -24204,6 +24251,25 @@ try {
         opts.forEach(function(op){ o += '<option value="'+esc2(op)+'"'+(op===cur?' selected':'')+'>'+esc2(op)+'</option>'; });
         return '<select '+common+' class="pr-live-input pr-live-select" data-pr-field-label="'+esc2(label)+'" '
           + 'data-pr-live-prev="'+esc2(v)+'" onchange="event.stopPropagation();window.pfLiveFieldChange(this)">'+o+'</select>';
+      }
+      // GC-sourced datalist typeahead (Brad 2026-09-11): a label registered in
+      // PF_FIELD_GC_DATALIST renders as a plain text INPUT wired to a shared
+      // <datalist> of THIS project's GC contacts (name, w/ email as the option
+      // label). The <datalist> element itself is emitted ONCE by the caller
+      // (finInvProcInner emits <datalist id="pf-gc-invoicing-dl">), so here we
+      // only attach it via list=. Save path is UNCHANGED — this is still an
+      // ordinary .pr-live-input, so pfLiveFieldChange reads el.value and POSTs it
+      // under the field's section exactly like a free-text field (the typeahead is
+      // a UI convenience, not a new persistence path). A datalist input still
+      // accepts free-typed text, so a saved value not in the GC list survives
+      // (shown as the current input value). FAIL-SAFE: if the project has no GC
+      // contacts the <datalist> is empty -> the input shows no suggestions but is
+      // still usable; it NEVER falls back to Owner/POET options (pfGcContacts is
+      // GC-only). The dlId here MUST match the id the caller emits.
+      var gcDl = PF_FIELD_GC_DATALIST[label];
+      if (gcDl) {
+        return '<input type="text" '+common+' list="'+esc2(gcDl)+'" autocomplete="off" '
+          + 'placeholder="Select or type a GC contact" value="'+esc2(v)+'">';
       }
       return '<input type="text" '+common+' value="'+esc2(v)+'">';
     }
