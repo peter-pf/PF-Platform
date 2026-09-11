@@ -1950,6 +1950,9 @@ tr.pf-dragging { opacity: 0.45; }
 .fin-rc-val { font-size: 1.25rem; font-weight: 700; color: var(--text-1); }
 .fin-rc-val.fin-rc-tbd { font-size: 0.95rem; color: var(--text-3); font-weight: 600; }
 .fin-rc-sub { font-size: 0.72rem; color: var(--text-3); margin-top: 3px; }
+/* Computed roll-up cards: subtle azure left-border so partners can tell a derived
+   figure from a sourced/manual one at a glance (color used sparingly, per house rule). */
+.fin-rc-computed { border-left: 3px solid var(--accent, #006DB0); }
 .fin-sub {
   border: 1px solid var(--border); border-radius: 8px;
   margin-bottom: 10px; overflow: hidden; background: var(--bg-0);
@@ -20695,45 +20698,73 @@ try {
       // and Project Costs (Budget vs Actual, the existing seeded editable grid).
       // Scoped by .fin-* / #fin-* so nothing bleeds to other tables/sections.
       var finTot = baGrandTotals(_curNum);
-      var finBudgetNum = finTot.ok ? Number(finTot.budget) : null;
-      var finActualNum = finTot.ok ? Number(finTot.actual) : null;
-      var finCostBudget = finTot.ok ? baMoney(finTot.budget) : '';
-      var finCostActual = finTot.ok ? baMoney(finTot.actual) : '';
-      // Project Profit = Project Budget - Actual Cost to Date.
-      // Profit % = Profit / Budget * 100, guarded: a null/0 budget yields a dash
-      // (never NaN/Infinity/#DIV/0). Fail closed: dashes whenever the budget roll-up
-      // errored (finTot.ok false), never a fabricated profit figure.
-      var finProfitNum = (finBudgetNum != null && finActualNum != null) ? (finBudgetNum - finActualNum) : null;
-      var finProfitMoney = (finProfitNum != null) ? baMoney(finProfitNum) : '';
-      var finProfitPct = (finProfitNum != null && finBudgetNum) ? (finProfitNum / finBudgetNum * 100) : null;
-      var finProfitPctStr = (finProfitPct != null && isFinite(finProfitPct)) ? (finProfitPct.toFixed(1) + '%') : '';
+      var finActualNum = finTot.ok ? (finTot.actual != null ? Number(finTot.actual) : null) : null;
       // Invoicing roll-up: sums computed CLIENT-SIDE from the loaded invoicing
       // record (fail closed: an errored/unloaded record yields ok:false so the
       // band shows an em-dash, never a fabricated total).
       var finInvRoll = invRollup(_curInvoicing);
+
+      // ---- Job Financials Roll-Up inputs + computed rows (Brad's 10-row spec) ----
+      // MANUAL/SOURCED inputs (each null when unavailable -> em-dash, never fabricated $0):
+      //   Subcontract Amount   = _curInvoicing.subcontractValue (office-entered on the invoicing record)
+      //   Approved Change Orders = SUM of Approved-status COs (pfSubNewCoCompute reuses the
+      //                            SAME pfChangeOrders()+pfCoAmtNum() path as the Change Orders
+      //                            "Revised Contract Amount"; Pending/Rejected/blank = $0).
+      //   Total Invoiced to Date = invRollup.invoiced (sum of pay-app this-period totals)
+      //   Paid to Date           = invRollup.paid
+      //   Actual Cost to Date    = baGrandTotals.actual (budget-vs-actual money pipeline; null when no synced actuals)
+      // COMPUTED rows (display-only; each null-guarded so a missing input dashes, never NaN):
+      //   Total Contract Amount  = Subcontract Amount + Approved Change Orders
+      //   Remaining to Invoice   = Total Contract Amount - Total Invoiced to Date
+      //   Remainder to be Paid   = Total Contract Amount - Paid to Date   (ASSUMPTION - flagged for Brad)
+      //   Project Profit         = Total Contract Amount - Actual Cost to Date
+      //   Profit %               = Project Profit / Total Contract Amount * 100 (guarded /0 -> dash)
+      // Subcontract Amount: same source as the invoicing info-block's "Subcontract Value"
+      // (_curInvoicing.subcontractValue). Read directly here (the finScv alias is assigned
+      // further down in this function, so we cannot rely on it before its assignment).
+      var finSubAmt = (_curInvoicing && typeof _curInvoicing.subcontractValue === 'number' && isFinite(_curInvoicing.subcontractValue))
+        ? Number(_curInvoicing.subcontractValue) : null;
+      var finApprovedCO = pfSubNewCoCompute('').approvedNum;   // origRaw irrelevant; only .approvedNum used
+      if (!isFinite(finApprovedCO)) finApprovedCO = null;
+      var finInvoicedNum = (finInvRoll.ok && finInvRoll.invoiced != null) ? Number(finInvRoll.invoiced) : null;
+      var finPaidNum     = (finInvRoll.ok && finInvRoll.paid != null)     ? Number(finInvRoll.paid)     : null;
+      // Total Contract Amount: present when EITHER input is present (a job with a subcontract
+      // but no COs still has a contract amount = subcontract alone, and vice versa). Only both-null dashes.
+      var finTotalContract = (finSubAmt != null || finApprovedCO != null)
+        ? ((finSubAmt || 0) + (finApprovedCO || 0)) : null;
+      var finRemToInvoice = (finTotalContract != null && finInvoicedNum != null) ? (finTotalContract - finInvoicedNum) : null;
+      var finRemToPay     = (finTotalContract != null && finPaidNum != null)     ? (finTotalContract - finPaidNum)     : null;
+      var finProfitNum    = (finTotalContract != null && finActualNum != null)   ? (finTotalContract - finActualNum)   : null;
+      var finProfitPct    = (finProfitNum != null && finTotalContract) ? (finProfitNum / finTotalContract * 100) : null;
+      var finProfitPctStr = (finProfitPct != null && isFinite(finProfitPct)) ? (finProfitPct.toFixed(1) + '%') : '';
+
+      // Roll-up card: label, numeric value (null -> em-dash), optional sub-line, computed flag.
+      var finRcCard = function(label, num, sub, computed){
+        var has = (num != null && isFinite(num));
+        var valHtml = has ? E(baMoney(num)) : '<span class="ba-blank">-</span>';
+        return '<div class="fin-rc' + (computed ? ' fin-rc-computed' : '') + '">'
+          +   '<div class="fin-rc-label">' + E(label) + '</div>'
+          +   '<div class="fin-rc-val">' + valHtml + '</div>'
+          +   (sub ? '<div class="fin-rc-sub">' + sub + '</div>' : '')
+          + '</div>';
+      };
       var finRollup =
         '<div class="fin-rollup">'
         +   '<div class="fin-rollup-title">Job Financials Roll-Up</div>'
         +   '<div class="fin-rollup-cards">'
-        +     '<div class="fin-rc">'
-        +       '<div class="fin-rc-label">Project Invoicing</div>'
-        +       '<div class="fin-rc-val">' + ((finInvRoll.ok && finInvRoll.invoiced != null) ? E(baMoney(finInvRoll.invoiced)) : '<span class="ba-blank">-</span>') + '</div>'
-        +       '<div class="fin-rc-sub">Invoiced to date</div>'
-        +     '</div>'
-        +     '<div class="fin-rc">'
-        +       '<div class="fin-rc-label">Project Budget</div>'
-        +       '<div class="fin-rc-val">' + (finCostBudget ? E(finCostBudget) : '<span class="ba-blank">-</span>') + '</div>'
-        +       '<div class="fin-rc-sub">Budgeted cost</div>'
-        +     '</div>'
-        +     '<div class="fin-rc">'
-        +       '<div class="fin-rc-label">Actual Cost to Date</div>'
-        +       '<div class="fin-rc-val">' + (finCostActual ? E(finCostActual) : '<span class="ba-blank">-</span>') + '</div>'
-        +       '<div class="fin-rc-sub">Actual cost incurred</div>'
-        +     '</div>'
-        +     '<div class="fin-rc">'
-        +       '<div class="fin-rc-label">Project Profit</div>'
-        +       '<div class="fin-rc-val">' + (finProfitMoney ? E(finProfitMoney) : '<span class="ba-blank">-</span>') + '</div>'
-        +       '<div class="fin-rc-sub">Profit %' + (finProfitPctStr ? ' ' + E(finProfitPctStr) : ' -') + '</div>'
+        +     finRcCard('Subcontract Amount', finSubAmt, '')
+        +     finRcCard('Approved Change Orders', finApprovedCO, 'Approved COs only')
+        +     finRcCard('Total Contract Amount', finTotalContract, '= Subcontract + Approved COs', true)
+        +     finRcCard('Total Invoiced to Date', finInvoicedNum, '')
+        +     finRcCard('Remaining to Invoice', finRemToInvoice, '= Contract &minus; Invoiced', true)
+        +     finRcCard('Paid to Date', finPaidNum, '')
+        +     finRcCard('Remainder to be Paid', finRemToPay, '= Contract &minus; Paid', true)
+        +     finRcCard('Actual Cost to Date', finActualNum, 'Actual cost incurred')
+        +     finRcCard('Project Profit', finProfitNum, '= Contract &minus; Actual Cost', true)
+        +     '<div class="fin-rc fin-rc-computed">'
+        +       '<div class="fin-rc-label">Profit %</div>'
+        +       '<div class="fin-rc-val">' + (finProfitPctStr ? E(finProfitPctStr) : '<span class="ba-blank">-</span>') + '</div>'
+        +       '<div class="fin-rc-sub">= Profit &divide; Contract</div>'
         +     '</div>'
         +   '</div>'
         + '</div>';
