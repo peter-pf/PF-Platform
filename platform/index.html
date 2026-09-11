@@ -3970,6 +3970,10 @@ button.pr-action-link:disabled { opacity: 0.6; cursor: default; filter: none; }
   box-shadow: 0 0 0 2px var(--accent, #2a7ab0); border-bottom-color: transparent;
 }
 .pr-pc-inline:empty::before { content: '—'; color: var(--muted, #9aa4b0); }
+/* OFFICE inline phone cells read in the pf-tel blue so they match Garbin / the read-only
+   clickable tel: link (Brad 2026-09-11). Still contenteditable (edit in place); the blue is
+   display-only, so the color survives hover/focus states above. */
+.pr-pc-inline-tel { color: var(--accent, #006DB0); }
 .pr-pc-company-edit { display: inline-block; min-width: 120px; }
 .pr-pc-addbtn { margin-top: 6px; }
 .pf-pc-inline-msg { margin-top: 4px; }
@@ -26112,10 +26116,26 @@ try {
           var ic = function(key, val){
             // One inline-editable field cell. The wrapping <span class="pr-crow-*"> keeps the
             // column alignment; the inner contenteditable is the editable surface.
-            return '<span class="pr-pc-inline" contenteditable="true" spellcheck="false"'
+            // PHONE DISPLAY FIX (Brad 2026-09-11): the OFFICE live-inline branch previously
+            // rendered the RAW phone digits ("3177525569") in the contenteditable cell — only
+            // the read-only (field_ops) path routed through pfPhoneLink, so office users (Brad)
+            // saw unformatted numbers while Garbin's non-inline card showed (xxx) xxx-xxxx. Now
+            // phone keys DISPLAY the formatted value via the idempotent window.pfFmtPhone and
+            // carry .pr-pc-inline-tel for the pf-tel blue. data-pf-prev MUST equal the DISPLAYED
+            // (formatted) text so the revert baseline + the no-change short-circuit in
+            // pfPcInlineFieldSave stay consistent (no spurious save-on-first-blur). On save the
+            // cell's text (the formatted string) round-trips into the directory; pfFmtPhone is
+            // idempotent and pfPhoneLink derives its tel: from the digits, so a stored formatted
+            // value re-renders + re-dials identically. It cannot ALSO be a click-to-dial <a> here
+            // because the cell is contenteditable (click = edit, not dial) — click-to-dial stays
+            // on the read-only path; you don't dial a number you're editing.
+            var isTel = (key === 'officePhone' || key === 'cellPhone');
+            var disp = isTel ? window.pfFmtPhone(val || '') : (val || '');
+            var cls = isTel ? 'pr-pc-inline pr-pc-inline-tel' : 'pr-pc-inline';
+            return '<span class="' + cls + '" contenteditable="true" spellcheck="false"'
               + ' data-cf="' + esc2(key) + '"'
               + ' data-crm-cid="' + esc2(r.cid) + '"'
-              + ' data-pf-prev="' + esc2(val || '') + '">' + esc2(val || '') + '</span>';
+              + ' data-pf-prev="' + esc2(disp || '') + '">' + esc2(disp || '') + '</span>';
           };
           var actHtml = '';
           if (_rowEditable) {
