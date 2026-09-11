@@ -3375,6 +3375,22 @@ a.pf-tel:hover { text-decoration: underline; }
 .pr-cgroup.open .pr-cgroup-chev { transform: rotate(90deg); }
 .pr-cgroup-body { display: none; }
 .pr-cgroup.open .pr-cgroup-body { display: block; }
+/* Thin-gray "Mob Prep" style collapsible sub-header (Brad 2026-09-11): match the slate
+   nested roll-up bar Mob Prep uses (Building Pad Prep / Equipment / Materials) — copied
+   verbatim from .pf-srnew-scope .pf-sr-collapse-body > .pf-sr-collapse > .pf-sr-collapse-head
+   (#6b7d8c, 11.5px, weight 600, pad 3px 10px, radius 6px, letter-spacing 0.02em). Made a
+   SELF-CONTAINED class (NOT scoped to .pf-srnew-scope) so it renders identically on BOTH
+   the LIVE Engineering & Design card (no .pf-srnew-scope ancestor) and the E&D-New sandbox.
+   Reuses the .pr-cgroup roll-up mechanism (header click toggles .open on the parent). */
+.pr-cgroup-head.pr-cgroup-mob {
+  background: #6b7d8c; color: #fff; border: 1px solid #6b7d8c;
+  font-size: 11.5px; font-weight: 600; letter-spacing: 0.02em;
+  padding: 3px 10px; border-radius: 6px; text-transform: none;
+  margin: 8px 0 4px 10px;
+}
+.pr-cgroup-head.pr-cgroup-mob:hover { background: #596976; border-color: #596976; }
+.pr-cgroup-head.pr-cgroup-mob .pr-cgroup-title { color: #fff; }
+.pr-cgroup-head.pr-cgroup-mob .pr-cgroup-chev { color: #fff; font-size: 0.62rem; }
 /* Site Readiness batch-13: clickable action buttons under a subgroup (FedEx print,
    Pipefy SSSP). Display-only launcher links; open in a new tab. */
 .pr-subgroup-actions { margin: 2px 0 6px 18px; }
@@ -15046,6 +15062,21 @@ try {
         + '<div class="pr-cgroup-body">'+innerHtml+'</div>'
         + '</div>';
     }
+    // THIN-GRAY (Mob Prep style) collapsible subgroup (Brad 2026-09-11): identical roll-up
+    // mechanics to collapsibleSubgroup() but the header carries the .pr-cgroup-mob class so
+    // it renders as the slate #6b7d8c bar Mob Prep uses (font/size/color/thin-gray-bar copied
+    // from the Mob Prep nested .pf-sr-collapse head). Self-contained (works on the LIVE E&D
+    // card AND the sandbox). DEFAULT = collapsed (rolled up); only open===true starts open.
+    function collapsibleSubgroupMob(title, innerHtml, open){
+      var isOpen = (open === true);
+      return '<div class="pr-cgroup'+(isOpen ? ' open' : '')+'">'
+        + '<div class="pr-cgroup-head pr-cgroup-mob" onclick="this.parentElement.classList.toggle(\'open\')">'
+        +   '<span class="pr-cgroup-title">'+E(title)+'</span>'
+        +   '<span class="pr-chev pr-cgroup-chev">&#9654;</span>'
+        + '</div>'
+        + '<div class="pr-cgroup-body">'+innerHtml+'</div>'
+        + '</div>';
+    }
 
     // ---- Garbin Prelim (Engineering & Design) --------------------------------
     // Reads window.PF_GARBIN_PRELIM.projects[num] (from data/garbin-prelim.js, built
@@ -15406,12 +15437,17 @@ try {
     //   Source 2: legacy synced GC role slots (PM / Superintendent / Project Engineer),
     //             each override-aware via effVal (matches the Owner & GC card's display).
     //   Source 2b: manually-added GC* contact overrides ("GC ... - Name"/"- Email").
-    //   Source 3: any responsible party ALREADY STORED on a prereq item — surfaced so an
-    //             existing selection is NEVER lost even if that person isn't a current GC
-    //             contact (Brad's "preserve the current saved value" fail-safe).
-    // FAIL-SAFE: when a project has NO GC contacts loaded, this returns ONLY whatever was
-    // already saved (usually empty) -> the datalist is empty (placeholder input) — it does
-    // NOT fall back to POET or fabricate names.
+    // NO "already-stored party" source (Brad 2026-09-11 POET-exclusion): pfProjectContacts
+    // surfaced any party PREVIOUSLY SAVED on a prereq item so it stayed a dropdown OPTION —
+    // but that reintroduced stale non-GC parties (e.g. "POET") into the option list for
+    // EVERY row. Because each row's CURRENT value is resolved independently at render time
+    // by pfPrqResolveParty(responsible_contact_id -> live directory name/email), a genuinely
+    // SELECTED party still displays correctly even when it is NOT an option here. So this
+    // GC-only list is deliberately restricted to Source 1/2/2b (the project's actual GC
+    // people). A stored non-GC party is preserved on the ITEM that has it selected, but is
+    // NOT offered as a fresh option elsewhere -> no POET clutter.
+    // FAIL-SAFE: when a project has NO GC contacts loaded, this returns an EMPTY list -> the
+    // datalist is empty (placeholder input); it does NOT fall back to Owner/POET or fabricate.
     function pfGcContacts(){
       var out = [];
       var seen = {};
@@ -15468,18 +15504,9 @@ try {
           push({ contactId: null, name: nm, email: em });
         });
       } catch (e) {}
-      // 3. Preserve already-stored responsible parties so a saved selection never drops.
-      try {
-        var data = pfPrereqData();
-        Object.keys(data).forEach(function(k){
-          var d = data[k] || {};
-          if (d.responsible_contact_id) {
-            var c = pfContactById(d.responsible_contact_id);
-            if (c) { push({ contactId: c.contactId, name: pfContactName(c), email: String(c.email || '').trim() }); return; }
-          }
-          push({ contactId: null, name: String(d.responsible_name || '').trim(), email: String(d.responsible_email || '').trim() });
-        });
-      } catch (e) {}
+      // NO Source 3: stored non-GC parties are intentionally NOT surfaced as options here
+      // (POET-exclusion, Brad 2026-09-11). A row's own selected value still renders via
+      // pfPrqResolveParty regardless of this option list.
       out.sort(function(a,b){ return (a.name||'').toLowerCase() < (b.name||'').toLowerCase() ? -1 : 1; });
       return out;
     }
@@ -15534,15 +15561,21 @@ try {
     // A received item (Date Received filled) is marked green; an outstanding one amber.
     // Per-row "Send Reminder" (office + outstanding + has email) is preserved. The Shop
     // Dwg Info folder link renders above the table.
-    // opts (optional, Brad 2026-09-10): { contactSource:fn, dlId:string }. When omitted the
-    // block behaves EXACTLY as before (original E&D card + in-place refresh are unchanged):
-    // datalist id 'pf-prq-contacts-dl', sourced from pfProjectContacts() (Owner+GC). The
-    // E&D-New sandbox passes { contactSource: pfGcContacts, dlId: 'pf-prq-contacts-dl-engnew' }
-    // so its Responsible Party typeahead pulls ONLY the project's GC contacts (Brad's fix)
-    // AND uses a DISTINCT datalist id (avoids a duplicate-id clash with the original card
-    // when both render). The typeahead resolver (pfPrqOnPartyLive) reads the row's own
-    // attached datalist, so email/contactId auto-fill resolves against whichever source
-    // rendered the row.
+    // opts (optional): { contactSource:fn, dlId:string }.
+    // DEFAULT SOURCE = pfGcContacts (Brad 2026-09-11): the "Responsible Party" typeahead
+    // must pull DIRECTLY from EACH project's GENERAL CONTRACTOR (GC) contacts on that
+    // project's contact sheet — NOT the Owner. The earlier fix wired pfGcContacts into the
+    // E&D-New SANDBOX only (via explicit opts), so the LIVE Engineering & Design card Brad
+    // actually uses still defaulted to pfProjectContacts() (Owner+GC) and showed the wrong
+    // parties. Making pfGcContacts the DEFAULT here flips ALL no-opts renders — the LIVE
+    // card (line ~18917), the in-place refresh path (~16899), and any future caller — to
+    // GC-only, in ONE place, so every PF Submittal Design "Responsible Party" list is the
+    // project's GC. The DEFAULT datalist id stays 'pf-prq-contacts-dl' (distinct from the
+    // sandbox's 'pf-prq-contacts-dl-engnew') so when BOTH cards render there is no
+    // duplicate-<datalist>-id clash. The E&D-New sandbox still passes its own explicit
+    // { contactSource: pfGcContacts, dlId: 'pf-prq-contacts-dl-engnew' } (same GC source,
+    // distinct id). The typeahead resolver (pfPrqOnPartyLive) reads the row's OWN attached
+    // datalist, so email/contactId auto-fill resolves against whichever source rendered it.
     function submittalPrereqsBlock(sdi, opts){
       opts = opts || {};
       var data = pfPrereqData();
@@ -15553,7 +15586,7 @@ try {
       // name input is a <datalist>-backed typeahead of those names; selecting/typing a
       // matching name auto-associates that contact's email + contactId (pfPrqOnPartyLive).
       var dlId = opts.dlId || 'pf-prq-contacts-dl';
-      var _contactSrc = (typeof opts.contactSource === 'function') ? opts.contactSource : pfProjectContacts;
+      var _contactSrc = (typeof opts.contactSource === 'function') ? opts.contactSource : pfGcContacts;
       var datalistHtml = '';
       if (edit) {
         var projContacts = (typeof _contactSrc === 'function') ? _contactSrc() : [];
@@ -15674,15 +15707,21 @@ try {
       // this checklist block down next to "Stamped Drawings" in submittalWorkflowBlock
       // (see shopDwgInfoLinkRow's call there). It no longer renders here. `sdi` is now
       // unused by this function but the param is kept for call-site stability.
-      return '<div class="pf-prq-wrap" data-prq-num="'+E(_curNum)+'">'
-        + subgroup('PF Info Needed for Submittal Design')
-        + subgroupNote('Items PF needs from the GC before starting the full Submittal Design. Fill a Date Received to mark an item received; PF begins once all are received.')
+      // Header restyle + roll-up (Brad 2026-09-11): the plain accent-blue subgroup() header
+      // "PF Info Needed for Submittal Design" is replaced by the thin-gray Mob Prep-style
+      // collapsibleSubgroupMob() so it (a) matches the portal-wide Mob Prep sub-header and
+      // (b) rolls up/down. The note + status + datalist + table + reminder bar + msg div all
+      // move INSIDE the collapsible body (they roll up with the header). Same text label.
+      var _prqBody =
+          subgroupNote('Items PF needs from the GC before starting the full Submittal Design. Fill a Date Received to mark an item received; PF begins once all are received.')
         + editNote
         + statusLine
         + datalistHtml
         + '<table class="pf-prq-table">'+thead+'<tbody>'+rowsHtml+'</tbody></table>'
         + (remindAll ? '<div class="pf-prq-bar">'+remindAll+'</div>' : '')
-        + '<div class="pf-prq-msg" style="display:none"></div>'
+        + '<div class="pf-prq-msg" style="display:none"></div>';
+      return '<div class="pf-prq-wrap" data-prq-num="'+E(_curNum)+'">'
+        + collapsibleSubgroupMob('PF Info Needed for Submittal Design', _prqBody)
         + '</div>';
     }
     // ---- PF Design Submittal WORKFLOW (Stage 1, Brad 2026-08-12) --------------
@@ -28379,7 +28418,12 @@ try {
             var nb = document.createElement('div');
             nb.className = 'pf-prq-bar';
             nb.innerHTML = '<button type="button" class="pf-prq-remind-all" onclick="event.stopPropagation();window.pfPrereqRemindAll(this)">Remind all outstanding</button>';
-            if (msgEl) wrap.insertBefore(nb, msgEl); else wrap.appendChild(nb);
+            // The bar + msg now live INSIDE the thin-gray collapsible body (Brad 2026-09-11),
+            // so insert relative to msgEl's ACTUAL parent (the .pr-cgroup-body), not `wrap`
+            // (msgEl is no longer a direct child of .pf-prq-wrap -> insertBefore on wrap would
+            // throw NotFoundError). Falls back to the msg parent / the collapsible body.
+            var _host = (msgEl && msgEl.parentNode) ? msgEl.parentNode : (wrap.querySelector('.pr-cgroup-body') || wrap);
+            if (msgEl) _host.insertBefore(nb, msgEl); else _host.appendChild(nb);
           }
         }
       } catch (e) { /* fail-soft: a refresh hiccup never navigates away */ }
