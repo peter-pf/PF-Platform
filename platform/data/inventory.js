@@ -86,8 +86,7 @@ window.PF_INVENTORY = {
     'Vibroflot Parts',
     'Side Dump Bucket',
     'Testing Equipment',
-    'Hardware',
-    'Pump'
+    'Hardware'
   ],
   // Items. reqTrailer / reqHome = required STOCK quantities (SPEC fields 5 & 6).
   // actualOnHand = SPEC field 8 (the only editable field in v1); the value here is
@@ -177,15 +176,18 @@ window.PF_INVENTORY = {
     { id: 'hw-30', category: 'Hardware', description: 'SHCS, M18 X 2.5 X 50MM, SOCKET HEAD CAP',  manufacturer: 'PRO-DIG', mfrPart: '5-100-077', reqTrailer: null, reqHome: null, altSources: 'McMaster 91290A036 (per manual note); Fastenal cross-ref pending', actualOnHand: null, notes: 'MMS3 mast p34; machine uses 18. Manual lists McMaster 91290A036.' },
     { id: 'hw-31', category: 'Hardware', description: 'DIN 7984 - M18 X 100 (LOW-HEAD SHCS)',      manufacturer: 'PRO-DIG', mfrPart: '5-100-083', reqTrailer: null, reqHome: null, altSources: 'Fastenal/McMaster cross-ref pending', actualOnHand: null, notes: 'MMS3 mast p34; machine uses 6.' },
 
-    // ---- Pump ----
+    // ---- Mast Components (pump/hydraulic rig parts) ----
     // Pump/hydraulic rig parts (aggregate pier install equipment). Added 2026-09-15
-    // per Derek Franke ("inventory tab" email). Names only given; manufacturer/mfrPart/
-    // altSources/notes blank and reqTrailer/reqHome/actualOnHand=null (TBD) until Derek
-    // fills them inline via Edit rows.
-    { id: 'pump-1', category: 'Pump', description: 'Transducer Cables',             manufacturer: '', mfrPart: '', reqTrailer: null, reqHome: null, altSources: '', actualOnHand: null, notes: '' },
-    { id: 'pump-2', category: 'Pump', description: 'Manifold Transducer',           manufacturer: '', mfrPart: '', reqTrailer: null, reqHome: null, altSources: '', actualOnHand: null, notes: '' },
-    { id: 'pump-3', category: 'Pump', description: 'Manifold Solenoid',             manufacturer: '', mfrPart: '', reqTrailer: null, reqHome: null, altSources: '', actualOnHand: null, notes: '' },
-    { id: 'pump-4', category: 'Pump', description: 'Last Chance Filter',            manufacturer: '', mfrPart: '', reqTrailer: null, reqHome: null, altSources: '', actualOnHand: null, notes: '' },
-    { id: 'pump-5', category: 'Pump', description: 'Tension Cylinder Shutoff Valve', manufacturer: '', mfrPart: '', reqTrailer: null, reqHome: null, altSources: '', actualOnHand: null, notes: '' }
+    // per Derek Franke ("inventory tab" email); moved from a standalone 'Pump' category
+    // into 'Mast Components' per Derek's follow-up ("they all belong in Mast Components").
+    // Names only given; manufacturer/mfrPart/altSources/notes blank and reqTrailer/reqHome/
+    // actualOnHand=null (TBD) until Derek fills them inline via Edit rows. ids kept as
+    // pump-* (KV key for the editable actualOnHand path; not displayed) to avoid path churn.
+    // They render under the existing Mast Components section (render groups by category).
+    { id: 'pump-1', category: 'Mast Components', description: 'Transducer Cables',             manufacturer: '', mfrPart: '', reqTrailer: null, reqHome: null, altSources: '', actualOnHand: null, notes: '' },
+    { id: 'pump-2', category: 'Mast Components', description: 'Manifold Transducer',           manufacturer: '', mfrPart: '', reqTrailer: null, reqHome: null, altSources: '', actualOnHand: null, notes: '' },
+    { id: 'pump-3', category: 'Mast Components', description: 'Manifold Solenoid',             manufacturer: '', mfrPart: '', reqTrailer: null, reqHome: null, altSources: '', actualOnHand: null, notes: '' },
+    { id: 'pump-4', category: 'Mast Components', description: 'Last Chance Filter',            manufacturer: '', mfrPart: '', reqTrailer: null, reqHome: null, altSources: '', actualOnHand: null, notes: '' },
+    { id: 'pump-5', category: 'Mast Components', description: 'Tension Cylinder Shutoff Valve', manufacturer: '', mfrPart: '', reqTrailer: null, reqHome: null, altSources: '', actualOnHand: null, notes: '' }
   ]
 };
