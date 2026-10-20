@@ -1,0 +1,41 @@
+# wrangler.toml -- PF Field Portal (Cloudflare Pages project: pf-field)
+#
+# Standalone mobile-first field portal: Daily Field Report only.
+# Requested by Derek (owner) 2026-10-20.
+#
+# IMPORTANT: bindings point at the SAME KV namespace and D1 database as
+# pf-platform so daily reports land in the same data store the main portal
+# reads. Do NOT create new data stores.
+#
+# Secrets (set via CF dashboard or `npx wrangler pages secret put NAME
+# --project-name pf-field`):
+#   PF_TOKEN_SECRET          -- HMAC signing secret (must match pf-platform)
+#   AZURE_CLIENT_ID          -- Graph app credentials (same as pf-platform)
+#   AZURE_CLIENT_SECRET
+#   AZURE_TENANT_ID
+#   SP_DRIVE_ID              -- SharePoint drive id (same as pf-platform)
+#   PF_AUTH_USER             -- Legacy shared-auth fallback (same as pf-platform)
+#   PF_AUTH_PASS
+#
+# Optional override (no deploy required to flip email recipients):
+#   DAILY_REPORT_RECIPIENTS  -- Comma-separated list overrides ACTIVE_RECIPIENTS.
+#                               Set to prod addresses when Derek approves go-live.
+#
+# NOTE: Authoritative bindings must be set in the CF Pages dashboard
+# (Settings > Functions > KV + D1 bindings) as well as here. This file
+# documents them; the dashboard is the live source for Pages Functions.
+
+name = "pf-field"
+pages_build_output_dir = "."
+compatibility_date = "2026-06-01"
+
+# D1 binding -- same database as pf-platform (auth / RBAC)
+[[d1_databases]]
+binding = "DB"
+database_name = "pf-platform-db"
+database_id = "cf66893b-9b5c-4731-9046-880e25728a4e"
+
+# KV binding -- same namespace as pf-platform (daily_reports_v1 / field_lists_v1)
+[[kv_namespaces]]
+binding = "PF_SCHEDULE"
+id = "6c8bd3b9bf3a464ca8d1a5d939231858"
