@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>PF Site Readiness</title>
+<meta name="theme-color" content="#006DB0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="PF Field">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --accent:#006DB0;--accent-dark:#005A91;--accent-light:#E0F0FF;
+    --surface:#131820;--surface-2:#1b212c;--surface-3:#222830;
+    --border:#2a2f3a;--text:#e2e8f0;--text-2:#aab1c0;--text-3:#8a93a6;
+    --amber:#d29922;--green:#3fb950;--red:#e5534b;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;line-height:1.5;color:var(--text);background:var(--surface);}
+  a{color:var(--accent-light);text-decoration:none;}
+  a:hover{text-decoration:underline;}
+  input,select,textarea,button{font-family:inherit;font-size:inherit;}
+  input,select,textarea{background:var(--surface-2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 10px;width:100%;}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,109,176,.25);}
+  button{cursor:pointer;}
+  .btn{display:inline-block;padding:9px 18px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-weight:600;font-size:14px;cursor:pointer;transition:background .15s;}
+  .btn:hover{background:var(--accent-dark);}
+  .btn:disabled{opacity:.55;cursor:default;}
+  .btn-sm{padding:4px 12px;background:var(--surface-3);color:var(--text-2);border:1px solid var(--border);border-radius:5px;font-size:12px;font-weight:500;cursor:pointer;transition:border-color .15s,color .15s;}
+  .btn-sm:hover{border-color:var(--accent);color:var(--accent-light);}
+
+  /* top bar */
+  #topbar{position:sticky;top:0;z-index:100;background:var(--surface-2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:10px 16px;gap:12px;}
+  #topbar .logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;color:var(--text);}
+  #topbar .logo .mark{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:7px;background:var(--accent);color:#fff;font-weight:700;font-size:13px;}
+  #topbar .right{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--text-3);}
+  #topbar .right #userLabel{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #topbar .right a{color:var(--text-3);font-size:13px;}
+  #topbar .right a:hover{color:var(--text);}
+  #topbar .nav-links{display:flex;align-items:center;gap:10px;font-size:13px;}
+  #topbar .nav-links a{color:var(--text-3);}
+  #topbar .nav-links a:hover{color:var(--text);}
+
+  /* layout */
+  #main{padding:14px;max-width:720px;margin:0 auto;}
+  #loading{display:flex;align-items:center;justify-content:center;min-height:60vh;color:var(--text-3);font-size:14px;}
+  #authError{display:none;padding:32px 16px;text-align:center;color:var(--text-3);}
+
+  /* site readiness module */
+  #mod-sr .sr-card{border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:10px;}
+  #mod-sr label{display:block;font-size:12px;color:var(--text-3);margin:6px 0 2px;}
+  #mod-sr input,#mod-sr select,#mod-sr textarea{padding:7px 10px;}
+  #mod-sr textarea{min-height:48px;font-family:inherit;}
+  #mod-sr .sr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:4px 14px;}
+  #mod-sr .sr-section-h{font-size:13px;font-weight:700;color:var(--accent-light);margin:12px 0 4px;padding:4px 0 4px 2px;border-bottom:1px solid var(--border);}
+  #mod-sr .sr-item{padding:6px 0 8px;border-top:1px solid var(--border);}
+  #mod-sr .sr-item:first-child{border-top:none;}
+  #mod-sr .sr-item-label{font-size:13px;color:var(--text-2);margin-bottom:4px;line-height:1.35;}
+  #mod-sr .sr-item-row{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;}
+  #mod-sr .sr-item-row select.sr-ans{flex:0 0 90px;min-width:80px;}
+  #mod-sr .sr-item-row input.sr-note{flex:1 1 160px;min-width:120px;}
+  #mod-sr .sr-key{font-size:11px;font-weight:700;color:var(--text-3);min-width:22px;padding-top:10px;}
+  #mod-sr .sr-upload{border:1px dashed var(--border);border-radius:6px;padding:8px 10px;margin-top:6px;}
+  #mod-sr .sr-up-hint{font-size:11px;color:var(--text-3);}
+  #mod-sr .sr-up-list{margin-top:4px;}
+  #mod-sr .sr-up-row{display:flex;align-items:center;gap:8px;font-size:12px;padding:2px 0;}
+  #mod-sr .sr-up-row .sr-up-name{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #mod-sr .sr-up-row.done .sr-up-stat{color:var(--green);}
+  #mod-sr .sr-up-row.err .sr-up-stat{color:var(--red);}
+  #mod-sr .sr-up-msg{font-size:12px;margin-top:4px;}
+  #mod-sr input[type=file]:disabled{opacity:.55;cursor:not-allowed;}
+  #mod-sr .sr-result-banner{border-radius:6px;padding:7px 12px;font-size:13px;font-weight:600;margin-bottom:8px;}
+  #mod-sr .sr-result-banner.ready{background:rgba(63,185,80,.15);color:var(--green);border:1px solid rgba(63,185,80,.35);}
+  #mod-sr .sr-result-banner.not-ready{background:rgba(210,153,34,.15);color:var(--amber);border:1px solid rgba(210,153,34,.35);}
+  #mod-sr .sr-msg{font-size:13px;margin-top:8px;}
+  #mod-sr .sr-msg.ok{color:var(--green);}
+  #mod-sr .sr-msg.err{color:var(--red);}
+  #mod-sr .sr-item-flag{font-size:11px;color:var(--text-3);margin-left:4px;}
+  #mod-sr .sr-history-item{border-top:1px solid var(--border);padding:8px 0;}
+  #mod-sr .sr-badge{font-size:11px;padding:1px 8px;border-radius:10px;}
+  #mod-sr .sr-badge.ready{background:rgba(63,185,80,.15);color:var(--green);}
+  #mod-sr .sr-badge.not-ready{background:rgba(210,153,34,.14);color:var(--amber);}
+  #mod-sr .sr-badge.draft{background:var(--surface-2);color:var(--text-3);}
+  #mod-sr .sr-muted{color:var(--text-3);}
+  @media(max-width:460px){
+    #mod-sr .sr-grid{grid-template-columns:1fr;}
+    #mod-sr .sr-item-row select.sr-ans{flex:0 0 80px;}
+  }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div class="logo">
+    <div class="mark">PF</div>
+    Site Readiness
+  </div>
+  <div class="right">
+    <div class="nav-links">
+      <a href="/index.html">Daily Report</a>
+    </div>
+    <span id="userLabel"></span>
+    <a href="/api/logout" id="logoutLink">Sign out</a>
+  </div>
+</div>
+
+<div id="loading">Loading...</div>
+<div id="authError">
+  <p>Session expired. <a href="/login.html">Sign in again</a></p>
+</div>
+
+<div id="main" style="display:none">
+  <div id="mod-sr">
+    <div id="srNoData" class="sr-muted" style="display:none">Site readiness forms not available for your role.</div>
+    <div id="srWrap">
+      <div class="sr-card sr-muted" style="font-size:13px">
+        Complete this checklist before PF mobilizes to the project. All items must be confirmed (Yes or N/A) for the form to submit as READY. The form generates a PDF, emails it to the project team, and saves it to SharePoint.
+      </div>
+      <div class="sr-card">
+        <h3 style="margin:0 0 8px">New site readiness inspection</h3>
+        <div id="srEditBanner" style="display:none;background:rgba(210,153,34,.14);border:1px solid rgba(210,153,34,.4);border-radius:6px;padding:8px 10px;margin:0 0 10px;font-size:13px;color:#d29922">
+          Editing an existing form (id <code data-edit-id></code>). Use <strong>Start new form</strong> to cancel.
+        </div>
+
+        <!-- Header section -->
+        <div class="sr-grid">
+          <div>
+            <label>Project</label>
+            <select id="srProject"><option value="">Select project</option></select>
+            <input type="hidden" id="srProjectId">
+          </div>
+          <div><label>Date</label><input type="date" id="srDate"></div>
+          <div><label>GC / Site Contact</label><input type="text" id="srGcContact" placeholder="Name or company"></div>
+          <div><label>Site Address</label><input type="text" id="srSiteAddress" placeholder="Project site address"></div>
+          <div><label>Inspected By</label><input type="text" id="srInspectedBy" placeholder="Auto-filled from login" readonly></div>
+        </div>
+
+        <!-- Live result banner -->
+        <div id="srResultBanner" style="margin-top:8px"></div>
+
+        <!-- Checklist sections rendered by JS -->
+        <div id="srChecklist"></div>
+
+        <!-- Sign-off -->
+        <div class="sr-section-h">Sign-off</div>
+        <div class="sr-grid">
+          <div><label>Signed by (print name)</label><input type="text" id="srSigName" placeholder="Name"></div>
+          <div><label>Sign-off date</label><input type="date" id="srSigDate"></div>
+        </div>
+
+        <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+          <button type="button" class="btn" id="srSaveDraft">Save draft</button>
+          <button type="button" class="btn" id="srSubmit">Submit &amp; send form</button>
+          <button type="button" class="btn btn-sm" id="srNewForm" style="display:none">Start new form</button>
+        </div>
+        <div class="sr-msg" id="srMsg" style="margin-top:6px"></div>
+      </div>
+
+      <h3 style="margin:14px 0 6px">Recent site readiness forms</h3>
+      <div id="srList"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// XSS-safe escape for all data-to-DOM insertions.
+window.esc = (function () {
+  var map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+  return function (s) { if (s == null) return ''; return String(s).replace(/[&<>"']/g, function (c) { return map[c]; }); };
+})();
+
+// Date formatter: YYYY-MM-DD -> MM/DD/YYYY.
+window.pfFmtDate = function (s) {
+  if (!s) return '';
+  var m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return String(s);
+  return m[2] + '/' + m[3] + '/' + m[1];
+};
+
+window.showModule = function () {};
+
+// Auth check.
+(function () {
+  var loadingEl = document.getElementById('loading');
+  var mainEl    = document.getElementById('main');
+  var authErrEl = document.getElementById('authError');
+  var userLabel = document.getElementById('userLabel');
+
+  fetch('/api/me', { credentials: 'same-origin' })
+    .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+    .then(function (r) {
+      if (r.ok && r.d && r.d.status === 'ok') {
+        window.PF_ME = { name: r.d.name || '', role: r.d.role || 'field_ops' };
+        if (userLabel) userLabel.textContent = r.d.name || r.d.role || '';
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (mainEl) mainEl.style.display = '';
+        if (typeof window.showModule === 'function') window.showModule('site-readiness');
+      } else if (r.d && r.d.status === 'must_reset') {
+        window.location.href = '/reset-password.html';
+      } else {
+        window.location.href = '/login.html?next=' + encodeURIComponent(window.location.pathname);
+      }
+    })
+    .catch(function () {
+      if (loadingEl) loadingEl.style.display = 'none';
+      if (authErrEl) authErrEl.style.display = '';
+    });
+})();
+</script>
+
+<script>
+// ============================================================
+// MODULE: site-readiness
+// ============================================================
+try {
+(function () {
+  'use strict';
+  var E = window.esc || function (s) { return s == null ? '' : String(s); };
+
+  // Canonical checklist definition (mirrors site-readiness-store.js CHECKLIST_ITEMS).
+  var ITEMS = [
+    { key: '1a', section: '1', secLabel: '1. Site Prep',
+      label: 'Temp construction stone drive from street to pad (each truck entry)' },
+    { key: '1b', section: '1', secLabel: '1. Site Prep',
+      label: 'Spoil pile locations identified off the building pad' },
+    { key: '2a', section: '2', secLabel: '2. Utilities',
+      label: 'Private utilities located and marked by GC' },
+    { key: '2b', section: '2', secLabel: '2. Utilities',
+      label: 'Public utilities located and marked (PF)' },
+    { key: '2c', section: '2', secLabel: '2. Utilities',
+      label: "No new utilities within 10' of pad until PF scope complete" },
+    { key: '3a', section: '3', secLabel: '3. Building Pad',
+      label: 'At working grade elevation per GC (variance >3" may be change order)',
+      uploadBucket: 'grade_photo', uploadLabel: 'Grade stake / elevation photo' },
+    { key: '3b', section: '3', secLabel: '3. Building Pad',
+      label: "Pad overbuilt 10' on all sides" },
+    { key: '3c', section: '3', secLabel: '3. Building Pad',
+      label: '4"-6" stone working platform placed' },
+    { key: '3d', section: '3', secLabel: '3. Building Pad',
+      label: 'Proof rolled and inspected by 3rd party testing agency',
+      uploadBucket: 'proof_roll', uploadLabel: 'Passing proof-roll letter from 3rd party' },
+    { key: '4a', section: '4', secLabel: '4. PF General Operations',
+      label: "Stone delivery plan: 200-300 TN/day, dumped within ~50' of work" },
+    { key: '4b', section: '4', secLabel: '4. PF General Operations',
+      label: 'Lowboy access for mob/demob confirmed (or GC notified of constraints)' },
+  ];
+
+  // Allowed file types for site readiness uploads.
+  var UP_ALLOWED = ['.jpg', '.jpeg', '.png', '.heic', '.pdf'];
+  var UP_MAX_BYTES = 50 * 1024 * 1024;
+
+  var state = {
+    records: [],
+    editingId: null,
+    projects: [],
+    // items: [{key, answer, note}]
+    items: ITEMS.map(function (d) { return { key: d.key, answer: '', note: '' }; }),
+    // attachments: [{key, name, itemId, webUrl, bucket}] — refs from /api/field-upload
+    attachments: [],
+    // pending uploads per bucket key: { grade_photo: [{name, error?}], proof_roll: [...] }
+    pendingUploads: {},
+  };
+
+  function api(path, opts) {
+    return fetch(path, Object.assign({ credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' } }, opts || {}))
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); });
+  }
+
+  function loadProjects() {
+    return api('/api/field-projects').then(function (r) {
+      var out = [];
+      if (r.ok && r.body && Array.isArray(r.body.projects)) {
+        r.body.projects.forEach(function (p) {
+          var number = p.number != null ? String(p.number) : '';
+          var name   = p.name   != null ? String(p.name)   : '';
+          if (!number && !name) return;
+          out.push({ id: number || name, name: name,
+            label: (number ? number + ' - ' : '') + name });
+        });
+      }
+      out.sort(function (a, b) { return a.label.localeCompare(b.label); });
+      state.projects = out;
+    }).catch(function () { state.projects = []; });
+  }
+
+  // Compute READY / NOT READY from current state.items (mirrors server logic).
+  function computeResult() {
+    var open = [];
+    state.items.forEach(function (it) {
+      if (it.answer !== 'Yes' && it.answer !== 'N/A') open.push(it.key);
+    });
+    return { result: open.length === 0 ? 'READY' : 'NOT READY', openItems: open };
+  }
+
+  // Update the live result banner above the checklist.
+  function updateResultBanner() {
+    var r = computeResult();
+    var banner = document.getElementById('srResultBanner');
+    if (!banner) return;
+    var cls = r.result === 'READY' ? 'ready' : 'not-ready';
+    var txt = r.result === 'READY'
+      ? 'READY — all items confirmed.'
+      : 'NOT READY — ' + r.openItems.length + ' item(s) need attention: ' + r.openItems.join(', ');
+    banner.innerHTML = '<div class="sr-result-banner ' + cls + '">' + E(txt) + '</div>';
+  }
+
+  // ---- Project dropdown -------------------------------------------------------
+  function opts(vals, selected, placeholder) {
+    var html = '<option value="">' + E(placeholder || 'Select') + '</option>';
+    var sel = (selected == null) ? '' : String(selected);
+    (vals || []).forEach(function (v) {
+      var s2 = (String(v) === sel) ? ' selected' : '';
+      html += '<option value="' + E(v) + '"' + s2 + '>' + E(v) + '</option>';
+    });
+    return html;
+  }
+
+  function renderProject() {
+    var sel = document.getElementById('srProject');
+    if (!sel) return;
+    var cur = sel.value;
+    var html = '<option value="">Select project</option>';
+    state.projects.forEach(function (p) {
+      var s2 = (String(p.id) === String(cur)) ? ' selected' : '';
+      html += '<option value="' + E(p.id) + '" data-name="' + E(p.name || p.label) + '"' + s2 + '>' + E(p.label) + '</option>';
+    });
+    sel.innerHTML = html;
+  }
+
+  function selectedProjectNumber() {
+    var psel = document.getElementById('srProject');
+    var v = psel ? String(psel.value || '').trim() : '';
+    return /^[0-9]{2}-[0-9]{2,4}$/.test(v) ? v : '';
+  }
+  function selectedProjectName() {
+    var psel = document.getElementById('srProject');
+    var o = (psel && psel.selectedIndex >= 0) ? psel.options[psel.selectedIndex] : null;
+    return o ? (o.getAttribute('data-name') || '') : '';
+  }
+
+  // ---- Checklist render -------------------------------------------------------
+  function renderChecklist() {
+    var host = document.getElementById('srChecklist');
+    if (!host) return;
+    // Group items by section.
+    var sections = [];
+    ITEMS.forEach(function (def) {
+      var sec = sections.find(function (s2) { return s2.secLabel === def.secLabel; });
+      if (!sec) { sec = { secLabel: def.secLabel, defs: [] }; sections.push(sec); }
+      sec.defs.push(def);
+    });
+
+    var html = '';
+    sections.forEach(function (sec) {
+      html += '<div class="sr-section-h">' + E(sec.secLabel) + '</div>';
+      html += '<div class="sr-section-items">';
+      sec.defs.forEach(function (def) {
+        var stateItem = state.items.find(function (it) { return it.key === def.key; }) || { key: def.key, answer: '', note: '' };
+        // Note when the item is answered No (highlight).
+        var noClass = stateItem.answer === 'No' ? ' style="background:rgba(229,83,75,.07)"' : '';
+        html += '<div class="sr-item" data-item-key="' + E(def.key) + '"' + noClass + '>';
+        html += '<div class="sr-item-label"><strong>' + E(def.key) + '.</strong> ' + E(def.label) + '</div>';
+        html += '<div class="sr-item-row">';
+        html += '<select class="sr-ans" data-key="' + E(def.key) + '" aria-label="Answer for ' + E(def.key) + '">';
+        html += '<option value="">Select</option>';
+        ['Yes', 'No', 'N/A'].forEach(function (a) {
+          html += '<option value="' + a + '"' + (stateItem.answer === a ? ' selected' : '') + '>' + a + '</option>';
+        });
+        html += '</select>';
+        html += '<input type="text" class="sr-note" data-key="' + E(def.key) + '" placeholder="Note (optional)" value="' + E(stateItem.note) + '" aria-label="Note for ' + E(def.key) + '">';
+        html += '</div>';
+
+        // File upload for items with hasUpload.
+        if (def.uploadBucket) {
+          var bk = def.uploadBucket;
+          var bkAttach = state.attachments.filter(function (a) { return a.bucket === bk; });
+          var bkPending = state.pendingUploads[bk] || [];
+          html += renderUploadWidget(def.key, bk, def.uploadLabel, bkAttach, bkPending);
+        }
+
+        html += '</div>'; // .sr-item
+      });
+      html += '</div>'; // .sr-section-items
+    });
+    host.innerHTML = html;
+
+    // Wire answer dropdowns.
+    host.querySelectorAll('select.sr-ans').forEach(function (el) {
+      el.addEventListener('change', function () {
+        var key = this.getAttribute('data-key');
+        var it = state.items.find(function (x) { return x.key === key; });
+        if (it) it.answer = this.value;
+        updateResultBanner();
+        // Re-render only the one item div to update its highlight without losing focus.
+        var itemDiv = host.querySelector('[data-item-key="' + key + '"]');
+        if (itemDiv && this.value === 'No') {
+          itemDiv.style.background = 'rgba(229,83,75,.07)';
+        } else if (itemDiv) {
+          itemDiv.style.background = '';
+        }
+      });
+    });
+
+    // Wire note inputs.
+    host.querySelectorAll('input.sr-note').forEach(function (el) {
+      el.addEventListener('input', function () {
+        var key = this.getAttribute('data-key');
+        var it = state.items.find(function (x) { return x.key === key; });
+        if (it) it.note = this.value;
+      });
+    });
+
+    // Wire file inputs.
+    host.querySelectorAll('input[type=file][data-bucket]').forEach(function (el) {
+      if (!el.dataset.wired) {
+        el.dataset.wired = '1';
+        el.addEventListener('change', function () {
+          var bk = this.getAttribute('data-bucket');
+          var itemKey = this.getAttribute('data-item-key');
+          var files = this.files ? Array.prototype.slice.call(this.files) : [];
+          if (files.length) uploadFiles(bk, itemKey, files);
+          this.value = '';
+        });
+      }
+    });
+    updateUploadEnabled();
+    updateResultBanner();
+  }
+
+  function renderUploadWidget(itemKey, bucket, uploadLabel, attached, pending) {
+    var inputId = 'srFile_' + bucket;
+    var html = '<div class="sr-upload">';
+    html += '<div class="sr-up-hint">' + E(uploadLabel) + '</div>';
+    html += '<input type="file" id="' + E(inputId) + '" data-bucket="' + E(bucket) + '" data-item-key="' + E(itemKey) + '" accept="' + E(UP_ALLOWED.join(',')) + '" disabled>';
+    // Saved refs.
+    var listHtml = '';
+    attached.forEach(function (a) {
+      var nm = E(a.name || a.itemId || 'file');
+      var link = (a.webUrl && /^https?:\/\//i.test(a.webUrl))
+        ? '<a href="' + E(a.webUrl) + '" target="_blank" rel="noopener">' + nm + '</a>'
+        : nm;
+      listHtml += '<div class="sr-up-row done"><span class="sr-up-name">' + link + '</span><span class="sr-up-stat">uploaded</span></div>';
+    });
+    // In-flight.
+    (pending || []).forEach(function (p) {
+      var cls = p.error ? 'err' : '';
+      var stat = p.error ? E(p.error) : 'uploading...';
+      listHtml += '<div class="sr-up-row ' + cls + '"><span class="sr-up-name">' + E(p.name) + '</span><span class="sr-up-stat">' + stat + '</span></div>';
+    });
+    if (listHtml) html += '<div class="sr-up-list">' + listHtml + '</div>';
+    html += '<div class="sr-up-msg" data-up-msg-bucket="' + E(bucket) + '"></div>';
+    html += '</div>';
+    return html;
+  }
+
+  function updateUploadEnabled() {
+    var num = selectedProjectNumber();
+    ITEMS.forEach(function (def) {
+      if (!def.uploadBucket) return;
+      var inp = document.getElementById('srFile_' + def.uploadBucket);
+      if (inp) {
+        inp.disabled = !num;
+        var hint = inp.closest('.sr-upload') ? inp.closest('.sr-upload').querySelector('.sr-up-hint') : null;
+        // hint text is fixed (the label), no need to change it; just disable/enable the input.
+      }
+    });
+  }
+
+  function upMsg(bucket, text, ok) {
+    var m = document.querySelector('[data-up-msg-bucket="' + bucket + '"]');
+    if (m) {
+      m.textContent = text || '';
+      m.className = 'sr-up-msg ' + (ok === true ? 'ok' : (ok === false ? 'err' : ''));
+    }
+  }
+
+  function uploadFiles(bucket, itemKey, files) {
+    var num = selectedProjectNumber();
+    if (!num) { upMsg(bucket, 'Select a project first.', false); return; }
+    var dateEl = document.getElementById('srDate');
+    var date = dateEl ? String(dateEl.value || '').trim() : '';
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) { upMsg(bucket, 'Set the date first.', false); return; }
+
+    var accepted = 0;
+    var pending = [];
+    var fd = new FormData();
+    fd.append('projectNumber', num);
+    fd.append('projectName', selectedProjectName());
+    fd.append('bucket', bucket);
+    fd.append('reportDate', date);
+
+    files.forEach(function (f) {
+      var n = String(f.name || '').toLowerCase();
+      var dot = n.lastIndexOf('.');
+      var ext = dot >= 0 ? n.slice(dot) : '';
+      if (UP_ALLOWED.indexOf(ext) < 0) { pending.push({ name: f.name, error: 'type not allowed' }); return; }
+      if (f.size > UP_MAX_BYTES) { pending.push({ name: f.name, error: 'over 50MB' }); return; }
+      fd.append('file', f, f.name);
+      pending.push({ name: f.name });
+      accepted++;
+    });
+
+    state.pendingUploads[bucket] = pending;
+    renderChecklist();
+    if (!accepted) { upMsg(bucket, 'No valid files.', false); return; }
+    upMsg(bucket, 'Uploading ' + accepted + ' file(s)...', null);
+
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/field-upload', true);
+    xhr.withCredentials = true;
+    xhr.onload = function () {
+      var body = null;
+      try { body = JSON.parse(xhr.responseText); } catch (e) { body = null; }
+      state.pendingUploads[bucket] = [];
+      if (xhr.status >= 200 && xhr.status < 300 && body && body.ok && Array.isArray(body.refs)) {
+        body.refs.forEach(function (r) {
+          state.attachments.push({ key: itemKey, name: r.name, itemId: r.itemId, webUrl: r.webUrl, bucket: r.bucket });
+        });
+        upMsg(bucket, body.refs.length + ' uploaded.', true);
+      } else {
+        upMsg(bucket, (body && body.message) || 'Upload failed.', false);
+      }
+      renderChecklist();
+    };
+    xhr.onerror = function () { state.pendingUploads[bucket] = []; upMsg(bucket, 'Network error.', false); renderChecklist(); };
+    xhr.send(fd);
+  }
+
+  // ---- form wiring -----------------------------------------------------------
+  function wireForm() {
+    var pi = document.getElementById('srProject');
+    if (pi && !pi.dataset.wired) {
+      pi.dataset.wired = '1';
+      pi.addEventListener('change', function () {
+        var hid = document.getElementById('srProjectId');
+        if (hid) hid.value = this.value;
+        updateUploadEnabled();
+      });
+    }
+    var sd = document.getElementById('srSaveDraft');
+    if (sd && !sd.dataset.wired) { sd.dataset.wired = '1'; sd.addEventListener('click', function () { save(false); }); }
+    var sub = document.getElementById('srSubmit');
+    if (sub && !sub.dataset.wired) { sub.dataset.wired = '1'; sub.addEventListener('click', function () { save(true); }); }
+    var nf = document.getElementById('srNewForm');
+    if (nf && !nf.dataset.wired) { nf.dataset.wired = '1'; nf.addEventListener('click', function () { resetForm(); msg('Started a new form.', true); }); }
+  }
+
+  function collectBody() {
+    var psel = document.getElementById('srProject');
+    var pid  = psel ? psel.value : '';
+    var pOpt = (psel && psel.selectedIndex >= 0) ? psel.options[psel.selectedIndex] : null;
+    var pname = pOpt ? (pOpt.getAttribute('data-name') || '') : '';
+    var inspected = document.getElementById('srInspectedBy');
+    var sigName   = document.getElementById('srSigName');
+    var sigDate   = document.getElementById('srSigDate');
+    return {
+      projectId:   pid,
+      projectName: pname,
+      date:        (document.getElementById('srDate') || {}).value || '',
+      gcContact:   (document.getElementById('srGcContact') || {}).value || '',
+      siteAddress: (document.getElementById('srSiteAddress') || {}).value || '',
+      inspectedBy: (inspected || {}).value || '',
+      items:       state.items.map(function (it) { return { key: it.key, answer: it.answer, note: it.note }; }),
+      attachments: state.attachments.slice(),
+      sigName:     (sigName || {}).value || '',
+      sigDate:     (sigDate || {}).value || '',
+    };
+  }
+
+  function msg(t, ok) {
+    var m = document.getElementById('srMsg');
+    if (m) { m.textContent = t; m.className = 'sr-msg ' + (ok ? 'ok' : 'err'); }
+  }
+
+  function updateEditBanner() {
+    var b = document.getElementById('srEditBanner');
+    if (b) {
+      if (state.editingId) {
+        b.style.display = '';
+        var eid = b.querySelector('[data-edit-id]');
+        if (eid) eid.textContent = state.editingId;
+      } else {
+        b.style.display = 'none';
+      }
+    }
+    var sub = document.getElementById('srSubmit');
+    if (sub) sub.textContent = state.editingId ? 'Update & re-send form' : 'Submit & send form';
+    var nf = document.getElementById('srNewForm');
+    if (nf) nf.style.display = state.editingId ? '' : 'none';
+  }
+
+  function upsertRecord(rec) {
+    if (!rec || !rec.id) return;
+    var idx = -1;
+    for (var i = 0; i < state.records.length; i++) { if (state.records[i].id === rec.id) { idx = i; break; } }
+    if (idx >= 0) state.records[idx] = rec; else state.records.push(rec);
+  }
+
+  function save(submit) {
+    var body = collectBody();
+    if (!body.projectId && !body.projectName) { msg('A project is required.', false); return; }
+    var editing = !!state.editingId;
+    var first = editing
+      ? Object.assign({ action: 'update', id: state.editingId }, body)
+      : Object.assign({ action: 'create' }, body);
+    api('/api/site-readiness', { method: 'POST', body: JSON.stringify(first) }).then(function (res) {
+      if (!res.ok || !res.body || !res.body.saved) { msg((res.body && res.body.message) || 'Save failed.', false); return; }
+      var rec = res.body.record;
+      if (submit) {
+        api('/api/site-readiness', { method: 'POST', body: JSON.stringify({ action: 'submit', id: rec.id }) })
+          .then(function (r2) {
+            if (r2.ok && r2.body && r2.body.saved) {
+              upsertRecord(r2.body.record);
+              var to = (r2.body.distribution && r2.body.distribution.emailedTo) || [];
+              msg((editing ? 'Form updated and re-sent' : 'Form sent') +
+                ': emailed' + (to.length ? ' to ' + to.length + ' recipient(s)' : '') + ' and saved to SharePoint.', true);
+              resetForm(); renderList();
+            } else {
+              upsertRecord(rec);
+              msg((r2.body && r2.body.message) || 'Changes saved but the form could not be sent. Please retry.', false);
+              renderList();
+            }
+          });
+      } else {
+        upsertRecord(rec); msg(editing ? 'Changes saved.' : 'Draft saved.', true); resetForm(); renderList();
+      }
+    }).catch(function () { msg('Network error.', false); });
+  }
+
+  function resetForm() {
+    state.editingId = null;
+    state.attachments = [];
+    state.pendingUploads = {};
+    state.items = ITEMS.map(function (d) { return { key: d.key, answer: '', note: '' }; });
+    ['srProject', 'srProjectId', 'srDate', 'srGcContact', 'srSiteAddress', 'srSigName', 'srSigDate'].forEach(function (id) {
+      var el = document.getElementById(id); if (el) el.value = '';
+    });
+    // inspectedBy is auto-filled from session — re-apply.
+    var ib = document.getElementById('srInspectedBy');
+    if (ib && window.PF_ME) ib.value = window.PF_ME.name || '';
+    updateEditBanner();
+    renderProject();
+    renderChecklist();
+  }
+
+  function loadRecordIntoForm(id) {
+    var r = state.records.find(function (x) { return x.id === id; });
+    if (!r) { msg('Record not found.', false); return; }
+    state.editingId = r.id;
+
+    function setVal(elId, v) { var el = document.getElementById(elId); if (el) el.value = (v == null ? '' : String(v)); }
+    setVal('srDate', r.date);
+    setVal('srGcContact', r.gcContact);
+    setVal('srSiteAddress', r.siteAddress);
+    setVal('srInspectedBy', r.inspectedBy);
+    setVal('srSigName', r.sigName);
+    setVal('srSigDate', r.sigDate);
+
+    var pid = (r.projectId != null && String(r.projectId).trim()) ? String(r.projectId) : (r.projectName || '');
+    var present = state.projects.some(function (p) { return String(p.id) === pid; });
+    if (!present && pid) {
+      state.projects.unshift({ id: pid, name: r.projectName || pid,
+        label: (r.projectId ? r.projectId + ' - ' : '') + (r.projectName || pid) });
+    }
+    var psel = document.getElementById('srProject');
+    if (psel) { psel.value = pid; var hid = document.getElementById('srProjectId'); if (hid) hid.value = pid; }
+
+    state.items = ITEMS.map(function (def) {
+      var saved = (Array.isArray(r.items) ? r.items : []).find(function (it) { return it.key === def.key; });
+      return { key: def.key, answer: (saved && saved.answer) || '', note: (saved && saved.note) || '' };
+    });
+
+    state.attachments = Array.isArray(r.attachments) ? r.attachments.slice() : [];
+    state.pendingUploads = {};
+
+    updateEditBanner();
+    renderProject();
+    renderChecklist();
+    msg('Editing form ' + (window.pfFmtDate(r.date) || '') + ' - ' + E(r.projectName || r.projectId || '') + '.', true);
+    var wrap = document.getElementById('srWrap');
+    if (wrap && wrap.scrollIntoView) wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // ---- History list ----------------------------------------------------------
+  function badgeClass(rec) {
+    if (rec.status === 'sent') return rec.result === 'READY' ? 'ready' : 'not-ready';
+    return 'draft';
+  }
+  function badgeLabel(rec) {
+    if (rec.status === 'sent') return rec.result || 'sent';
+    return 'draft';
+  }
+
+  function renderList() {
+    var host = document.getElementById('srList');
+    if (!host) return;
+    var rs = state.records.slice().sort(function (a, b) {
+      return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+    });
+    if (!rs.length) { host.innerHTML = '<div class="sr-muted">No site readiness forms yet.</div>'; return; }
+    host.innerHTML = rs.map(function (r) {
+      var dateStr = window.pfFmtDate(r.date) || '';
+      var projStr = E(r.projectName || r.projectId || '');
+      var openStr = (r.openItems && r.openItems.length) ? ' — open: ' + E(r.openItems.join(', ')) : '';
+      var actions = '<button type="button" class="btn btn-sm" data-edit="' + E(r.id) + '">Edit</button> ';
+      if (r.status === 'sent' && r.pdfWebUrl && /^https?:\/\//i.test(r.pdfWebUrl)) {
+        actions += '<a href="' + E(r.pdfWebUrl) + '" target="_blank" rel="noopener">View PDF</a> ';
+      }
+      return '<div class="sr-history-item">'
+        + '<div><strong>' + E(dateStr) + ' - ' + projStr + '</strong> '
+        + '<span class="sr-badge ' + badgeClass(r) + '">' + E(badgeLabel(r)) + '</span>'
+        + E(openStr) + '</div>'
+        + '<div class="sr-muted" style="font-size:12px">Inspected by ' + E(r.inspectedBy || '-')
+        + (r.gcContact ? ' — GC/Contact: ' + E(r.gcContact) : '')
+        + (r.siteAddress ? ' — ' + E(r.siteAddress) : '') + '</div>'
+        + (r.submittedBy ? '<div class="sr-muted" style="font-size:11px">submitted by ' + E(r.submittedBy) + ' ' + E((r.submittedAt || '').slice(0, 10)) + '</div>' : '')
+        + '<div style="margin-top:4px">' + actions + '</div>'
+        + '</div>';
+    }).join('');
+    host.querySelectorAll('button[data-edit]').forEach(function (b) {
+      b.addEventListener('click', function () { loadRecordIntoForm(this.getAttribute('data-edit')); });
+    });
+  }
+
+  // ---- Load everything -------------------------------------------------------
+  function load() {
+    var noData = document.getElementById('srNoData');
+    var wrap   = document.getElementById('srWrap');
+    var me = window.PF_ME || {};
+    Promise.all([api('/api/site-readiness'), loadProjects()]).then(function (rs) {
+      var dr = rs[0];
+      if (dr.status === 403) { if (noData) noData.style.display = ''; if (wrap) wrap.style.display = 'none'; return; }
+      if (noData) noData.style.display = 'none';
+      if (wrap) wrap.style.display = '';
+      state.records = (dr.ok && dr.body && Array.isArray(dr.body.records)) ? dr.body.records : [];
+      // Auto-fill inspectedBy from session.
+      var ib = document.getElementById('srInspectedBy');
+      if (ib && me.name) ib.value = me.name;
+      // Default date to today.
+      var dateEl = document.getElementById('srDate');
+      if (dateEl && !dateEl.value) {
+        var today = new Date();
+        var mm = String(today.getMonth() + 1).padStart(2, '0');
+        var dd = String(today.getDate()).padStart(2, '0');
+        dateEl.value = today.getFullYear() + '-' + mm + '-' + dd;
+      }
+      wireForm();
+      renderProject();
+      renderChecklist();
+      renderList();
+    }).catch(function () {
+      if (wrap) wrap.style.display = '';
+      wireForm(); renderProject(); renderChecklist(); renderList();
+    });
+  }
+
+  // Register with the showModule shim.
+  var prev = window.showModule;
+  window.showModule = function (id) {
+    if (typeof prev === 'function') prev(id);
+    if (id === 'site-readiness') load();
+  };
+})();
+} catch (e) {
+  console.error('Module site-readiness failed to load:', e);
+}
+</script>
+
+</body>
+</html>

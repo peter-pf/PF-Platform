@@ -474,6 +474,10 @@ const FIELD_PAGES = {
   // they cannot serve it from cache). Same field_ops gate. Old URLs kept working.
   '/field-companion.html':   'field_ops',
   '/field-companion':        'field_ops',          // CF Pages clean-URL form
+  // Site Readiness Form standalone page (Derek 2026-10-20). field_ops area so
+  // the crew and office can both access it. Operational data only, no financials.
+  '/site-readiness.html':    'field_ops',
+  '/site-readiness':         'field_ops',           // CF Pages clean-URL form
 };
 
 // Filename keywords that mark a page as financial/contract/precon even if it is
@@ -542,6 +546,11 @@ export function areaForPath(pathname) {
     // validated against the 5 fixed categories. ZERO financials (category + type
     // + free-text + optional equipment/subcategory only).
     if (pathname.startsWith('/api/maintenance-manual')) return 'field_ops';
+    // Site Readiness Form (Derek 2026-10-20). field_ops area = admin/partner/
+    // business_dev/field_ops so the crew can submit site readiness forms. The
+    // endpoint also calls requireArea(session, 'field_ops'). ZERO financials
+    // (checklist answers, notes, and attachment refs only).
+    if (pathname.startsWith('/api/site-readiness')) return 'field_ops';
     // Equipment Log (EDITABLE per-rig digital logbook: machine info, HOURS,
     // dated service history). CARRIES DOLLARS (dailyRate per rig, cost per
     // service entry) -> OFFICE-ONLY. financials area = admin/partner/business_dev;

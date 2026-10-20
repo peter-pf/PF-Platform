@@ -54,7 +54,13 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const ALLOWED_EXT = new Set(['.guh', '.jpg', '.jpeg', '.png', '.heic', '.pdf', '.zip', '.xlsx']);
 
 // bucket key -> the human folder name created under the dated QAQC folder.
-const BUCKETS = { handlogs: 'Hand Logs', guhma: 'GUHMA Data' };
+// grade_photo + proof_roll are used by the Site Readiness Form (2026-10-20).
+const BUCKETS = {
+  handlogs:    'Hand Logs',
+  guhma:       'GUHMA Data',
+  grade_photo: 'Site Readiness - Grade Photo',
+  proof_roll:  'Site Readiness - Proof Roll Letter',
+};
 
 const JSON_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' };
 function json(body, status = 200) {
