@@ -53,14 +53,20 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // Allowed file extensions (lower-case, with dot). Reject anything else.
 const ALLOWED_EXT = new Set(['.guh', '.jpg', '.jpeg', '.png', '.heic', '.pdf', '.zip', '.xlsx']);
 
-// bucket key -> the human folder name created under the dated QAQC folder.
-// grade_photo + proof_roll are used by the Site Readiness Form (2026-10-20).
+// bucket key -> the human folder name created under the dated upload folder.
+// handlogs + guhma go under the QAQC dated path (DFR area).
+// grade_photo + proof_roll are used by the Site Readiness Form (2026-10-20) and
+// go under <projectFolder>/Site Readiness/<YYYY-MM-DD>/ (not the QAQC tree).
 const BUCKETS = {
   handlogs:    'Hand Logs',
   guhma:       'GUHMA Data',
-  grade_photo: 'Site Readiness - Grade Photo',
-  proof_roll:  'Site Readiness - Proof Roll Letter',
+  grade_photo: 'Grade Photo',
+  proof_roll:  'Proof Roll Letter',
 };
+
+// Buckets that belong under the Site Readiness folder tree instead of QAQC.
+const SR_BUCKETS = new Set(['grade_photo', 'proof_roll']);
+const SR_SUBFOLDER = 'Site Readiness';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' };
 function json(body, status = 200) {
@@ -232,9 +238,21 @@ async function ensureChildFolder(env, token, parentId, name) {
 }
 
 // Ensure the full destination path exists under the project folder and return the
-// final (bucket) folder id:
+// final (bucket) folder id.
+//
+// QAQC path (handlogs, guhma):
 //   <projectFolder>/03 - Engineering & Design/QAQC/<reportDate>/<bucket folder>
-async function ensureDestination(env, token, projectFolderId, reportDate, bucketFolder) {
+//
+// Site Readiness path (grade_photo, proof_roll):
+//   <projectFolder>/Site Readiness/<reportDate>/<bucket folder>
+async function ensureDestination(env, token, projectFolderId, reportDate, bucketKey, bucketFolder) {
+  if (SR_BUCKETS.has(bucketKey)) {
+    const sr = await ensureChildFolder(env, token, projectFolderId, SR_SUBFOLDER);
+    const dated = await ensureChildFolder(env, token, sr, reportDate);
+    const bucket = await ensureChildFolder(env, token, dated, bucketFolder);
+    return bucket;
+  }
+  // Default: QAQC tree (DFR buckets).
   const eng = await ensureChildFolder(env, token, projectFolderId, '03 - Engineering & Design');
   const qaqc = await ensureChildFolder(env, token, eng, 'QAQC');
   const dated = await ensureChildFolder(env, token, qaqc, reportDate);
@@ -329,7 +347,7 @@ export async function onRequestPost(context) {
       return json({ status: 'error', message: 'A valid project number is required.' }, 400);
     }
     if (!Object.prototype.hasOwnProperty.call(BUCKETS, bucketKey)) {
-      return json({ status: 'error', message: "bucket must be 'handlogs' or 'guhma'." }, 400);
+      return json({ status: 'error', message: 'Unknown upload bucket.' }, 400);
     }
     if (!DATE_RE.test(reportDate)) {
       return json({ status: 'error', message: 'A valid report date (YYYY-MM-DD) is required.' }, 400);
@@ -357,7 +375,7 @@ export async function onRequestPost(context) {
       return json({ status: 'error', message: 'Could not find that project folder in SharePoint.' }, 404);
     }
     const bucketFolderName = BUCKETS[bucketKey];
-    const destFolderId = await ensureDestination(env, token, proj.id, reportDate, bucketFolderName);
+    const destFolderId = await ensureDestination(env, token, proj.id, reportDate, bucketKey, bucketFolderName);
 
     const refs = [];
     const errors = [];

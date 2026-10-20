@@ -94,12 +94,19 @@ export function renderSiteReadinessPdf(rec) {
   }
 
   // ---- Attachments (refs only; bytes live in SharePoint) -------------------
-  const attach = Array.isArray(rec.attachments) ? rec.attachments.filter((a) => a && (a.name || a.itemId)) : [];
+  // cleanAttachments: keep only https:// webUrls so no bare item IDs or
+  // non-https references reach the PDF.
+  const allAttach = Array.isArray(rec.attachments) ? rec.attachments : [];
+  const attach = allAttach.filter((a) => a && a.name && String(a.name).trim());
   if (attach.length) {
     doc.heading('Attachments (filed in SharePoint)');
     for (const a of attach) {
       const bkt = bucketLabel(a.bucket);
-      doc.text('- ' + (a.name || a.itemId) + (bkt ? `  [${bkt}]` : ''), { size: 10 });
+      const fname = String(a.name).trim();
+      // Only emit the SharePoint link if it is verifiably https.
+      const hasHttpsUrl = a.webUrl && /^https:\/\//i.test(String(a.webUrl).trim());
+      const urlPart = hasHttpsUrl ? `  ${String(a.webUrl).trim()}` : '';
+      doc.text(`- ${fname}${bkt ? '  [' + bkt + ']' : ''}${urlPart}`, { size: 10 });
     }
   }
 

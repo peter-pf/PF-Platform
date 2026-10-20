@@ -202,6 +202,10 @@ export const CHECKLIST_ITEMS = [
     label: 'Stone delivery plan: 200-300 TN/day, dumped within ~50\' of work' },
   { key: '4b', section: '4', sectionLabel: 'PF General Operations',
     label: 'Lowboy access for mob/demob confirmed (or GC notified of constraints)' },
+  // From Mob Prep > Building Pad Prep > Field Ops Manager Jobsite Visit (platform/index.html ~21137):
+  // pre-mob site walk by PF Field Ops Manager to verify site conditions in person.
+  { key: '4c', section: '4', sectionLabel: 'PF General Operations',
+    label: 'Field Ops Manager jobsite visit completed prior to mob' },
 ];
 
 // Derive the upload bucket key from an item key.

@@ -272,9 +272,9 @@ await testAsync('loadRecordById falls back to KV', async () => {
 // ============================================================
 console.log('\n--- CHECKLIST_ITEMS ---');
 
-test('CHECKLIST_ITEMS has exactly 11 items', () => {
-  assert.equal((CHECKLIST_ITEMS || []).length, 11,
-    `expected 11, got ${(CHECKLIST_ITEMS || []).length}`);
+test('CHECKLIST_ITEMS has exactly 12 items', () => {
+  assert.equal((CHECKLIST_ITEMS || []).length, 12,
+    `expected 12, got ${(CHECKLIST_ITEMS || []).length}`);
 });
 
 test('items 3a and 3d have hasUpload=true', () => {
@@ -284,7 +284,7 @@ test('items 3a and 3d have hasUpload=true', () => {
 });
 
 test('items without upload do not have hasUpload', () => {
-  const withoutUp = ['1a', '1b', '2a', '2b', '2c', '3b', '3c', '4a', '4b'];
+  const withoutUp = ['1a', '1b', '2a', '2b', '2c', '3b', '3c', '4a', '4b', '4c'];
   const by = Object.fromEntries((CHECKLIST_ITEMS || []).map(d => [d.key, d]));
   withoutUp.forEach(k => {
     assert(!by[k].hasUpload, k + ' should not have hasUpload');
