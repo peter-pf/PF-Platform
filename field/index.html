@@ -413,22 +413,28 @@ try {
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); });
   }
 
-  // Pull the project list from the EXISTING feed already loaded in the SPA. The
-  // field crew gets the field-safe derivative (PF_FO_PROJECTS, no $/GC);
-  // admin/partner fall back to PF_AWARDED. We only read name/number (no $).
+  // Load the field-safe project list from the authenticated API endpoint.
+  // Returns a Promise that resolves when state.projects is populated.
+  // Replaces the old window.PF_FO_PROJECTS / window.PF_AWARDED approach, which
+  // required static JS files that are not deployed to the standalone field portal.
   function loadProjects() {
-    var D = window.PF_FO_PROJECTS || window.PF_AWARDED;
-    var out = [];
-    if (D && Array.isArray(D.projects)) {
-      D.projects.forEach(function (p) {
-        var number = p.number != null ? String(p.number) : '';
-        var name = p.name != null ? String(p.name) : '';
-        if (!number && !name) return;
-        out.push({ id: number || name, name: name, label: (number ? number + ' - ' : '') + name });
-      });
-    }
-    out.sort(function (a, b) { return a.label.localeCompare(b.label); });
-    state.projects = out;
+    return api('/api/field-projects').then(function (r) {
+      var out = [];
+      if (r.ok && r.body && Array.isArray(r.body.projects)) {
+        r.body.projects.forEach(function (p) {
+          var number = p.number != null ? String(p.number) : '';
+          var name = p.name != null ? String(p.name) : '';
+          if (!number && !name) return;
+          out.push({ id: number || name, name: name, label: (number ? number + ' - ' : '') + name });
+        });
+      }
+      out.sort(function (a, b) { return a.label.localeCompare(b.label); });
+      state.projects = out;
+    }).catch(function () {
+      // Non-fatal: project dropdown will be empty but the form is still usable.
+      console.warn('field-projects: could not load project list');
+      state.projects = [];
+    });
   }
 
   function emptyMaintRow(cat) {
@@ -447,10 +453,10 @@ try {
     var wrap = document.getElementById('drWrap');
     var me = window.PF_ME || {};
     state.priv = (me.role === 'admin' || me.role === 'partner');
-    loadProjects();
-    // Load the field lists (owned equipment / personnel / foremen + categories)
-    // and the daily reports in parallel.
-    Promise.all([api('/api/field-lists'), api('/api/daily-report')]).then(function (rs) {
+    // Load projects, field lists, and daily reports in parallel.
+    // loadProjects() is now async (calls /api/field-projects); include it in
+    // the Promise.all so the project dropdown is populated before render.
+    Promise.all([api('/api/field-lists'), api('/api/daily-report'), loadProjects()]).then(function (rs) {
       var lr = rs[0], dr = rs[1];
       if (dr.status === 403) { if (noData) noData.style.display = ''; if (wrap) wrap.style.display = 'none'; return; }
       if (noData) noData.style.display = 'none';

@@ -59,6 +59,9 @@ import {
   renderDailyReportPdf, pdfFilename,
   sendReportEmail, buildEmailBody, uploadReportPdf,
 } from '../lib/daily-report-doc.js';
+import {
+  upsertReport, loadReportById, listReports, countReports,
+} from '../lib/daily-report-store.js';
 
 // ===========================================================================
 // RECIPIENTS  --  *** THE ONE PLACE TO FLIP TEST -> PRODUCTION ***
@@ -106,7 +109,7 @@ function outputFolderId(env) {
   return (v && String(v).trim()) ? String(v).trim() : DAILY_OUTPUT_FOLDER_ID_DEFAULT;
 }
 
-const KV_KEY = 'daily_reports_v1';
+// KV_KEY is owned by daily-report-store.js (KV_KEY = 'daily_reports_v1').
 const MAX_BODY_BYTES = 32 * 1024;
 const MAX_REPORTS = 20000;
 const MAX_CREW = 60;
@@ -292,45 +295,21 @@ function cleanAttachments(input) {
   return out;
 }
 
-// KNOWN LIMITATION: KV read-modify-write (load list -> mutate -> put), no
-// transaction, so two simultaneous writes can last-writer-wins and drop one.
-// Acceptable for the field daily-report flow (one foreman per report); the
-// durable fix is a D1 migration with a row per report. No behavior change now.
-async function loadList(env) {
-  const raw = await env.PF_SCHEDULE.get(KV_KEY);
-  if (!raw) return { reports: [], meta: { updated: null } };
-  try {
-    const p = JSON.parse(raw);
-    return { reports: Array.isArray(p && p.reports) ? p.reports : [], meta: (p && p.meta) || { updated: null } };
-  } catch {
-    return { reports: [], meta: { updated: null } };
-  }
-}
-
-async function saveList(env, reports) {
-  const stamp = new Date().toISOString();
-  await env.PF_SCHEDULE.put(KV_KEY, JSON.stringify({ version: 1, reports, meta: { updated: stamp } }));
-  return stamp;
-}
-
 // ---- GET: list reports (optional ?projectId= / ?date= filters) -------------
 export async function onRequestGet(context) {
   const { request, env } = context;
   const denied = requireArea(context.data && context.data.session, 'field_ops');
   if (denied) return denied;
   try {
-    if (!env.PF_SCHEDULE) {
+    if (!env.PF_SCHEDULE && !env.DB) {
       return json({ ok: true, reports: [], meta: { updated: null }, fallback: true,
-        note: 'KV binding PF_SCHEDULE not available; no daily reports yet.' });
+        note: 'No data store (KV + D1) available on this deployment.' });
     }
     const url = new URL(request.url);
     const projectId = s(url.searchParams.get('projectId'), MAX_SHORT);
     const date = s(url.searchParams.get('date'), MAX_SHORT);
-    const list = await loadList(env);
-    let reports = list.reports;
-    if (projectId) reports = reports.filter((r) => r.projectId === projectId);
-    if (date) reports = reports.filter((r) => r.date === date);
-    return json({ ok: true, reports, meta: list.meta });
+    const result = await listReports(env, { projectId: projectId || undefined, date: date || undefined });
+    return json({ ok: true, reports: result.reports, meta: result.meta });
   } catch (err) {
     console.error('api/daily-report GET error:', err);
     return json({ status: 'error', message: 'An internal error occurred.' }, 500);
@@ -359,12 +338,11 @@ export async function onRequestPost(context) {
         message: "action must be 'create', 'update' or 'submit'." }, 400);
     }
 
-    if (!env.PF_SCHEDULE) {
+    if (!env.PF_SCHEDULE && !env.DB) {
       return json({ status: 'error',
-        message: 'Persistence unavailable: KV binding PF_SCHEDULE is not configured on this deployment.' }, 503);
+        message: 'Persistence unavailable: neither KV (PF_SCHEDULE) nor D1 (DB) is configured on this deployment.' }, 503);
     }
 
-    const list = await loadList(env);
     const who = (session && (session.name || session.uid)) ? s(session.name || session.uid) : 'unknown';
     const nowIso = new Date().toISOString();
 
@@ -402,7 +380,8 @@ export async function onRequestPost(context) {
     }
 
     if (action === 'create') {
-      if (list.reports.length >= MAX_REPORTS) {
+      const total = await countReports(env);
+      if (total >= MAX_REPORTS) {
         return json({ status: 'error', message: 'Daily report storage is full.' }, 413);
       }
       const body = buildBody(parsed, {});
@@ -421,20 +400,21 @@ export async function onRequestPost(context) {
         // who it was emailed to, and when the 3-step submit completed.
         pdfName: null, pdfWebUrl: null, emailedTo: null, sentAt: null,
       }, body);
-      list.reports.push(rec);
-      const stamp = await saveList(env, list.reports);
+      // D1 upsert: atomic per-row INSERT OR REPLACE — no read-modify-write on the
+      // full list, so two portals writing concurrently cannot drop each other's record.
+      const stamp = await upsertReport(env, rec);
       return json({ ok: true, saved: true, action, record: rec, meta: { updated: stamp } });
     }
 
     // all other actions need an id
     const id = s(parsed.id, MAX_SHORT);
-    const rec = list.reports.find((r) => r.id === id);
+    const rec = await loadReportById(env, id);
     if (!rec) return json({ status: 'error', message: 'Daily report not found.' }, 404);
 
     if (action === 'update') {
       Object.assign(rec, buildBody(parsed, rec));
       rec.updatedAt = nowIso;
-      const stamp = await saveList(env, list.reports);
+      const stamp = await upsertReport(env, rec);
       return json({ ok: true, saved: true, action, record: rec, meta: { updated: stamp } });
     }
 
@@ -519,7 +499,7 @@ export async function onRequestPost(context) {
     rec.sentAt = new Date().toISOString();
     rec.updatedAt = rec.sentAt;
 
-    const stamp = await saveList(env, list.reports);
+    const stamp = await upsertReport(env, rec);
     return json({
       ok: true, saved: true, action, record: rec, meta: { updated: stamp },
       distribution: { emailedTo: recipients, pdf: filename, sharepoint: uploaded },

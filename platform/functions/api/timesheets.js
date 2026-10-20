@@ -36,8 +36,8 @@
 
 import { requireArea } from '../lib/auth.js';
 import { buildWeeks, buildEmployeeYear } from '../lib/timesheet-rollup.mjs';
+import { listReports } from '../lib/daily-report-store.js';
 
-const KV_KEY = 'daily_reports_v1';
 const JSON_HEADERS = {
   'Content-Type': 'application/json',
   'Cache-Control': 'private, no-store',
@@ -47,28 +47,20 @@ function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
 }
 
-async function loadReports(env) {
-  const raw = await env.PF_SCHEDULE.get(KV_KEY);
-  if (!raw) return [];
-  try {
-    const p = JSON.parse(raw);
-    return Array.isArray(p && p.reports) ? p.reports : [];
-  } catch { return []; }
-}
-
 export async function onRequestGet(context) {
   const { request, env } = context;
   const denied = requireArea(context.data && context.data.session, 'field_ops');
   if (denied) return denied;
   try {
-    if (!env.PF_SCHEDULE) {
+    if (!env.PF_SCHEDULE && !env.DB) {
       return json({ ok: true, source: 'daily-reports', weeks: [], by_employee_year: [],
         year_grand_total: { regular: 0, ot: 0, total: 0, per_diem_nights: 0 },
-        fallback: true, note: 'KV binding PF_SCHEDULE not available; no daily reports yet.' });
+        fallback: true, note: 'No data store (KV + D1) available; no daily reports yet.' });
     }
     const url = new URL(request.url);
     const includeDrafts = url.searchParams.get('includeDrafts') === '1';
-    const reports = await loadReports(env);
+    // listReports reads from D1 (primary) with automatic KV fallback.
+    const { reports } = await listReports(env, {});
     const weeks = buildWeeks(reports, { includeDrafts });
     const { rows, grand } = buildEmployeeYear(weeks);
     const weeksWithHours = weeks.filter((w) => w.has_hours);

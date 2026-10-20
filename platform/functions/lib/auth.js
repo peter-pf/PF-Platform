@@ -499,6 +499,10 @@ export function areaForPath(pathname) {
     // daily reports. This area exposes ZERO financials. The approve / send-to-hr
     // transitions are further restricted to admin/partner IN the handler.
     if (pathname.startsWith('/api/daily-report'))  return 'field_ops';
+    // Field-safe project list (field portal GET /api/field-projects).
+    // Returns ONLY {number, name} — ZERO financials, ZERO GC data. field_ops area
+    // so the crew can populate the project dropdown. Handler also calls requireArea.
+    if (pathname.startsWith('/api/field-projects')) return 'field_ops';
     // Field reference lists (owned equipment / personnel / foremen + the FIXED
     // rental + maintenance categories) that the daily-report FORM pulls from.
     // field_ops area so the crew can READ the lists to fill the form; EDITING a
