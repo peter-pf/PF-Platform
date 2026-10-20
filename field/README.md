@@ -100,6 +100,21 @@ curl -sI https://<preview>.pf-field.pages.dev/
 curl -sI https://<preview>.pf-field.pages.dev/api/me
 ```
 
+## Project list refresh
+
+`field/functions/lib/fo-projects-data.js` is a bundled snapshot generated from
+`platform/data/fo-projects-field.js`. Whenever `platform/data/fo-projects-field.js`
+changes (new awarded jobs, scope updates), the field portal snapshot must be
+regenerated and redeployed:
+
+1. Run `python3 platform/scripts/build-fo-projects-field.py` — rewrites
+   `field/functions/lib/fo-projects-data.js` from the platform source.
+2. Commit the updated `fo-projects-data.js` on the working branch.
+3. Redeploy `pf-field` (same deploy command as in the Deploy section above).
+
+This is a known gap — the snapshot can drift if regeneration is skipped.
+Tracked as follow-on work to wire a live `/api/projects` endpoint instead.
+
 ## What is NOT in Phase 1
 
 - Timesheets / OT summary view

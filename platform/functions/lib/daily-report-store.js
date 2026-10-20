@@ -13,7 +13,7 @@
 //   Used if env.DB is missing, the table doesn't exist yet (pre-migration), or a
 //   D1 query throws. Writes AND reads fall back transparently. This lets the field
 //   portal keep working on preview deployments where D1 isn't bound, and ensures
-//   a smooth cut-over (deploy functions first, run backfill, D1 takes over).
+//   a smooth cut-over (apply migration 0005, run backfill, then deploy functions).
 //
 // D1 table schema (migration 0005_daily_reports.sql):
 //   id TEXT PRIMARY KEY

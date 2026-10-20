@@ -119,7 +119,7 @@ async function main() {
     const data         = JSON.stringify(rec);
     const createdAt    = String(rec.createdAt || new Date().toISOString());
     const updatedAt    = String(rec.updatedAt || createdAt);
-    const updatedBy    = String(rec.updittedBy || rec.createdBy || '');
+    const updatedBy    = String(rec.updatedBy || rec.createdBy || '');
 
     try {
       // INSERT OR IGNORE: if the row already exists (previous backfill run), skip it.
