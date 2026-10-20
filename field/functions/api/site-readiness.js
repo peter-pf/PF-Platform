@@ -13,7 +13,7 @@
 // DATA MODEL:
 //   site_readiness_v1 -> JSON { records:[{
 //     id, date, projectId, projectName, gcContact, siteAddress, inspectedBy,
-//     items:[{key, answer, note}],  // 11 checklist items; answer='Yes'|'No'|'N/A'|''
+//     items:[{key, answer, note}],  // 12 checklist items; answer='Yes'|'No'|'N/A'|''
 //     attachments:[{key,name,itemId,webUrl,bucket}], // SP refs from /api/field-upload
 //     sigName, sigDate,
 //     result,       // 'READY' | 'NOT READY' (computed, server-set on save)
@@ -77,7 +77,6 @@ const VALID_ANSWERS = { 'Yes': 1, 'No': 1, 'N/A': 1 };
 const VALID_ITEM_KEYS = new Set(CHECKLIST_ITEMS.map((d) => d.key));
 
 const VALID_ACTIONS = { create: 1, update: 1, submit: 1 };
-const VALID_STATUS  = { draft: 1, sent: 1 };
 
 const JSON_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' };
 
