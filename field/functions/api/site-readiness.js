@@ -306,7 +306,8 @@ export async function onRequestPost(context) {
 
     // 2) Email.
     try {
-      const subject = `PF Site Readiness - ${rec.projectName || rec.projectId || 'Project'} - ${fmtDate(rec.date) || rec.date || ''} - ${rec.result || 'UNKNOWN'}`.trim();
+      // Subject == generated filename without the .pdf extension so they can never drift.
+      const subject = filename.replace(/\.pdf$/i, '');
       const bodyText = buildEmailBody(rec);
       await sendSiteReadinessEmail(env, token, { recipients, subject, bodyText, pdfBytes, filename });
     } catch (e) {

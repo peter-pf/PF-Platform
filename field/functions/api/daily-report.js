@@ -480,7 +480,8 @@ export async function onRequestPost(context) {
     //    Run both; require BOTH to succeed before flipping the record to 'sent'.
     let uploaded;
     try {
-      const subject = `PF Daily Report - ${rec.projectName || rec.projectId || 'Project'} - ${rec.date || ''}`.trim();
+      // Subject == generated filename without the .pdf extension so they can never drift.
+      const subject = filename.replace(/\.pdf$/i, '');
       const bodyText = buildEmailBody(rec);
       await sendReportEmail(env, token, { recipients, subject, bodyText, pdfBytes, filename });
     } catch (e) {

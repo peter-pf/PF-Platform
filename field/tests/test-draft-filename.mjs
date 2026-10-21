@@ -274,6 +274,42 @@ test('SR sample PDF generates without error', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 8. Email subject == filename minus .pdf (both forms must not drift)
+//    Mirrors the logic in daily-report.js and site-readiness.js:
+//      const subject = filename.replace(/\.pdf$/i, '');
+// ---------------------------------------------------------------------------
+test('DFR email subject equals pdfFilename without .pdf extension', () => {
+  const fn  = drFilename(drRec);
+  const sub = fn.replace(/\.pdf$/i, '');
+  assert.ok(fn.endsWith('.pdf'),           `filename should end in .pdf: ${fn}`);
+  assert.ok(!sub.endsWith('.pdf'),         `subject should NOT end in .pdf: ${sub}`);
+  assert.equal(sub, '26-1021-DFS Grain Bins Mid-States-Daily Report');
+  // Ensure subject contains the key info (date part, project, form type)
+  assert.ok(sub.startsWith('26-1021'),     `subject should start with date part: ${sub}`);
+  assert.ok(sub.includes('DFS Grain Bins Mid-States'), `subject should include project name: ${sub}`);
+  assert.ok(sub.includes('Daily Report'),  `subject should include form type: ${sub}`);
+});
+
+test('SR email subject equals pdfFilename without .pdf extension', () => {
+  const fn  = srFilename(srRec);
+  const sub = fn.replace(/\.pdf$/i, '');
+  assert.ok(fn.endsWith('.pdf'),           `filename should end in .pdf: ${fn}`);
+  assert.ok(!sub.endsWith('.pdf'),         `subject should NOT end in .pdf: ${sub}`);
+  assert.equal(sub, '26-1021-DFS Grain Bins Mid-States-Site Readiness');
+  assert.ok(sub.startsWith('26-1021'),     `subject should start with date part: ${sub}`);
+  assert.ok(sub.includes('DFS Grain Bins Mid-States'), `subject should include project name: ${sub}`);
+  assert.ok(sub.includes('Site Readiness'), `subject should include form type: ${sub}`);
+});
+
+test('DFR and SR subjects differ (no cross-contamination)', () => {
+  const drSub = drFilename(drRec).replace(/\.pdf$/i, '');
+  const srSub = srFilename(srRec).replace(/\.pdf$/i, '');
+  assert.notEqual(drSub, srSub);
+  assert.ok(!drSub.includes('Site Readiness'), `DFR subject must not contain Site Readiness: ${drSub}`);
+  assert.ok(!srSub.includes('Daily Report'),   `SR subject must not contain Daily Report: ${srSub}`);
+});
+
+// ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);
