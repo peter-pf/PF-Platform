@@ -119,3 +119,83 @@ The following are improvements worth a future sprint — held back because they 
 **Offline-capable draft saving:** Raken's core competitive advantage is offline-first. Field sites have poor cellular coverage. Service worker + IndexedDB draft caching would allow the crew to fill out reports and submit when they regain signal. Architecture change, not just presentation.
 
 **Sticky submit button:** On daily-report and site-readiness forms, the submit button is at the bottom of a long scrollable form. Procore pins the primary action button at the bottom of the viewport. On mobile this means the user never has to scroll to submit.
+
+---
+
+## Round 4 Study — Tally, Typeform, Raken
+**Commissioned by:** Derek (10/21 15:52Z) — "Build our daily report like Tally, give it Typeform-level typography and polish, but organize the actual information like Raken."
+
+---
+
+### Tally — Document-style form feel
+
+Tally positions itself as "a form builder that works like a text document." The core visual idea is that filling in a form should feel as natural as editing a Notion page or a Word document. Key observations:
+
+**Whitespace as structure.** Tally uses vertical rhythm heavily. Each question block gets roughly 24–32px above and below it. There are no harsh divider lines between questions — breathing room alone creates the visual break. The form feels airy, not cramped.
+
+**No card borders.** Most form builders wrap each section in a visible box. Tally does not. The background is a single uniform white. Sections are visually distinct only through spacing and optional light-gray fill on the question block itself. The result is a form that looks like a document page, not a database entry screen.
+
+**Clean label typography.** Labels sit directly above their inputs (no hanging labels, no floating placeholders replacing labels). Label text is 12–13px, medium weight, dark gray — readable but subordinate. The input value text is larger (15–16px) and full-weight, so what the user types is visually dominant over the prompt.
+
+**Focus is a quiet signal.** In Tally, the focused field shows a 2–3px left accent bar or a subtle blue border. No aggressive shadow rings. The effect says "you are here" without shouting it.
+
+**Takeaway for PF:** Remove section card borders. Use generous padding (20–24px vertical) to separate form sections. Let whitespace do the work. Labels stay small and uppercase-tracked above each field.
+
+---
+
+### Typeform — Typographic polish and smooth interaction
+
+Typeform's signature is conversational form design — one question at a time with a smooth transition. We cannot adopt the one-at-a-time model for a daily report (field crew needs to scan the whole form), but the typographic and interaction principles apply directly.
+
+**Type scale is decisive.** Section headers are 16–18px, weight 700 or 800. Field labels are 11–13px, weight 600, uppercase, letter-spaced. The contrast between section heading and field label creates an immediate hierarchy so the user's eye knows exactly where they are in the form.
+
+**Progress is visible and honest.** Typeform shows a thin (3–4px) progress bar at the top of the viewport. It fills based on how many questions have been answered. The bar gives users a sense of how much work remains — critical for a long daily report that a crew member needs to complete at end of day when they are tired.
+
+**Buttons feel real.** Typeform's primary buttons have a filled background, rounded corners, and a subtle scale/shadow on hover. There is never ambiguity about what to click. Secondary actions are ghost/outline. The visual hierarchy of the button row matches the hierarchy of importance.
+
+**Transitions are short and purposeful.** Input border-color transitions at ~150ms. Button background transitions at ~150ms. Focus ring appears in ~100ms. Nothing is animated for decoration — every transition confirms that the UI responded to the user.
+
+**Takeaway for PF:** Add a slim 3px progress bar above the form. Use Inter 700 at 16px for section headings with a numbered badge. Use 11px uppercase tracked labels. Add 150ms transitions on all inputs and buttons.
+
+---
+
+### Raken — Section organization built for the field
+
+Raken is the most-used daily reporting app in US construction. Its section order is the industry standard and maps directly to how contractors think through their day. Every experienced foreman recognizes this structure without being taught it.
+
+**Standard Raken section order:**
+1. Overview / Header (project, date, weather, temperature, superintendent/foreman)
+2. Production numbers (units installed, linear feet, quantities)
+3. Work performed (narrative of what actually happened)
+4. Crew and timecards (who was on site, hours, cost codes)
+5. Equipment (owned machines, rentals, operating hours)
+6. Delays and issues (weather, material, subcontractor, owner)
+7. Safety observations and incidents
+8. Photos, files, attachments
+9. Signature / superintendent sign-off
+
+**Why this order works:** It follows the mental sequence a foreman uses to close out their day. They start with "where was I and what was the weather" (context), move to "what did we produce" (the boss's first question), then "who was here and what did they do" (timesheets), then "what went wrong" (delays), and finally "sign and submit." Reading bottom-to-top is the exception, not the norm; this order matches natural recall.
+
+**Section breaks are visual anchors.** Raken uses a card-per-section on mobile — each section is a self-contained block with a bold header, add-row controls at the bottom, and a clear divider before the next section. Desktop shows the same layout with more columns.
+
+**Crew rows are the heart of the report.** Raken's crew timecard UI is prominent — larger than the notes sections — because payroll depends on it. Errors in crew hours cost money. The rows are spacious, with large touch targets for the time inputs.
+
+**Takeaway for PF:** Adopt the Raken section order exactly. Move "Columns / LF installed today" and "Work completed" up to follow Overview directly (Production & Work section). Crew comes third. Equipment fourth. Delays and safety fifth and sixth. Files last. This matches what a PF foreman actually thinks about in sequence.
+
+---
+
+### Synthesis — What we built in Round 4
+
+The three platforms each solve a different problem. Raken solves organization (the right sections in the right order). Tally solves visual feel (document-style, no card clutter). Typeform solves polish and feedback (type scale, progress, transitions).
+
+**Applied to PF daily-report.html:**
+
+- **Section structure:** 7 named sections following the Raken sequence, each with a numbered badge, bold header, collapsible body (desktop only, open by default), and a clear border-bottom separator.
+- **Progress indicator:** 3px bar above the form, filled based on how many sections have content. Gives the field crew a visible "almost done" signal.
+- **Jump list:** Desktop-only horizontal link row above the sections. Each link anchors to its section. The active section is highlighted as the user scrolls.
+- **Typeform typography:** Section headings at 16px/700. Field labels at 11px/700 uppercase with 0.5px letter-spacing. Input font-size unchanged (15px). All transitions set to 150ms.
+- **Tally whitespace:** Removed the wrapping `.dr-card` border from the form. Each section uses `padding: 20px 0 24px` with a 1px `border-bottom`. The form breathes.
+- **Focus states:** `box-shadow: 0 0 0 3px rgba(0,109,176,.15)` on focus (Typeform-style, slightly wider than the old 2px ring).
+- **Section-done badge:** When a section has content, its numbered badge fills to solid accent blue — a quiet Typeform-style completion signal.
+- **Collapsible sections on desktop:** Each section header has a chevron toggle button (visible only ≥900px). All sections open by default. This lets a desktop user collapse filled sections and focus on what remains.
+- **Applied lightly to site-readiness.html and home tiles:** Same CSS tokens, same label style, same input focus — no logic changes.
