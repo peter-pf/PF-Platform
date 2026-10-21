@@ -249,16 +249,21 @@ body {
   max-width: 680px; margin: 0 auto;
 }
 @media (min-width: 900px) {
-  /* Center the content column within the sidebar-excluded space.
-     Formula: left = (viewport + sidebar - content) / 2
-     At ≤900px it falls back to margin-left = sidebar-w (just clears the sidebar).
-     Pages that need a different max-width set --content-col on #main and
-     override max-width to match; the formula stays self-consistent. */
+  /* Full-width column to the right of the sidebar.
+     Inner .pf-col wrapper centers the content column within this area.
+     Each page sets --content-col on #main (or :root) for its preferred width;
+     the default 860px from :root applies when no override is present. */
   #main {
-    max-width: var(--content-col);
+    max-width: none;
     padding: 28px 32px;
-    margin-left: max(var(--sidebar-w), calc((100vw + var(--sidebar-w) - var(--content-col)) / 2));
+    margin-left: var(--sidebar-w);
     margin-right: 0;
+  }
+  /* Content column: centered within the padded #main. */
+  .pf-col {
+    max-width: var(--content-col);
+    margin: 0 auto;
+    width: 100%;
   }
 }
 

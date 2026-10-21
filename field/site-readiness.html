@@ -27,8 +27,9 @@
   .btn-sm{padding:4px 12px;background:var(--surface-3);color:var(--text-2);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;font-weight:500;cursor:pointer;transition:border-color .15s,color .15s;}
   .btn-sm:hover{border-color:var(--accent);color:var(--accent);}
   /* ---- layout overrides ---- */
+  :root{--content-col:1000px;}
   #main{padding:14px;padding-bottom:max(24px,env(safe-area-inset-bottom));max-width:720px;margin:0 auto;}
-  @media(min-width:900px){#main{max-width:860px;margin-right:0;padding:18px 24px;}}
+  @media(min-width:900px){#main{max-width:none;margin-left:var(--sidebar-w);margin-right:0;padding:18px 32px;}}
   /* ---- searchable picker ---- */
   .pf-picker{position:relative;}
   .pf-picker-input{background:var(--surface-3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 10px;width:100%;}
@@ -41,9 +42,10 @@
   [data-theme="dark"] .pf-picker-list li:hover,[data-theme="dark"] .pf-picker-list li[aria-selected="true"]{background:rgba(0,109,176,.2);color:#a8d4f5;}
   .pf-picker-list li.pf-empty{color:var(--text-3);cursor:default;font-style:italic;}
   /* ---- sticky submit bar ---- */
-  #srStickyBar{position:fixed;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom));left:0;right:0;z-index:70;background:var(--surface-2);border-top:1px solid var(--border);padding:10px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;box-shadow:0 -2px 8px rgba(0,0,0,.07);}
+  #srStickyBar{position:fixed;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom));left:0;right:0;z-index:70;background:var(--surface-2);border-top:1px solid var(--border);padding:0 16px;display:flex;align-items:stretch;box-shadow:0 -2px 8px rgba(0,0,0,.07);}
   [data-theme="dark"] #srStickyBar{box-shadow:none;}
-  @media(min-width:900px){#srStickyBar{bottom:0;left:var(--sidebar-w);}}
+  #srStickyBar .pf-col{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 0;width:100%;}
+  @media(min-width:900px){#srStickyBar{bottom:0;left:var(--sidebar-w);padding:0 32px;}}
   /* ---- offline draft banner ---- */
   #srOfflineBanner{background:rgba(210,153,34,.09);border:1px solid rgba(210,153,34,.3);border-radius:6px;padding:8px 12px;margin-bottom:8px;font-size:13px;display:flex;align-items:center;flex-wrap:wrap;gap:8px;}
   #srOfflineBanner.hidden{display:none;}
@@ -165,9 +167,11 @@
 
 <!-- sticky submit/draft bar -->
 <div id="srStickyBar" style="display:none">
-  <button type="button" class="btn" id="srSaveDraft">Save draft</button>
-  <button type="button" class="btn" id="srSubmit">Submit &amp; send form</button>
-  <button type="button" class="btn btn-sm" id="srNewForm" style="display:none">Start new form</button>
+  <div class="pf-col">
+    <button type="button" class="btn" id="srSaveDraft">Save draft</button>
+    <button type="button" class="btn" id="srSubmit">Submit &amp; send form</button>
+    <button type="button" class="btn btn-sm" id="srNewForm" style="display:none">Start new form</button>
+  </div>
 </div>
 
 <div id="loading">Loading...</div>
@@ -176,6 +180,7 @@
 </div>
 
 <div id="main" style="display:none">
+<div class="pf-col">
   <div id="mod-sr">
     <div id="srNoData" class="sr-muted" style="display:none">Site readiness forms not available for your role.</div>
     <div id="srWrap">
@@ -251,7 +256,8 @@
       <div id="srList"></div>
     </div>
   </div>
-</div>
+</div><!-- /.pf-col -->
+</div><!-- end #main -->
 
 <script src="/js/pf-shared.js"></script>
 <script>
