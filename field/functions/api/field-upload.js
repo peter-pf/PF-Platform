@@ -57,16 +57,23 @@ const ALLOWED_EXT = new Set(['.guh', '.jpg', '.jpeg', '.png', '.heic', '.pdf', '
 // handlogs + guhma go under the QAQC dated path (DFR area).
 // grade_photo + proof_roll are used by the Site Readiness Form (2026-10-20) and
 // go under <projectFolder>/Site Readiness/<YYYY-MM-DD>/ (not the QAQC tree).
+// photos: site photos from either form -> <projectFolder>/05 - Field/02 - Project Photos/<date>/
 const BUCKETS = {
   handlogs:    'Hand Logs',
   guhma:       'GUHMA Data',
   grade_photo: 'Grade Photo',
   proof_roll:  'Proof Roll Letter',
+  photos:      'Site Photos',
 };
 
 // Buckets that belong under the Site Readiness folder tree instead of QAQC.
 const SR_BUCKETS = new Set(['grade_photo', 'proof_roll']);
 const SR_SUBFOLDER = 'Site Readiness';
+
+// Buckets that go into the real project photos folder under 05 - Field.
+// Verified 2026-10-21: both active projects (26-022 DFS Grain, 25-026 Granary)
+// use "05 - Field / 02 - Project Photos" for site photos.
+const PHOTO_BUCKETS = new Set(['photos']);
 
 const JSON_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' };
 function json(body, status = 200) {
@@ -245,12 +252,24 @@ async function ensureChildFolder(env, token, parentId, name) {
 //
 // Site Readiness path (grade_photo, proof_roll):
 //   <projectFolder>/Site Readiness/<reportDate>/<bucket folder>
+//
+// Site Photos path (photos):
+//   <projectFolder>/05 - Field/02 - Project Photos/<reportDate>/
+//   Verified 2026-10-21: both active projects use this exact subfolder structure.
+//   Files go directly into the dated subfolder — no extra sub-bucket level.
 async function ensureDestination(env, token, projectFolderId, reportDate, bucketKey, bucketFolder) {
   if (SR_BUCKETS.has(bucketKey)) {
     const sr = await ensureChildFolder(env, token, projectFolderId, SR_SUBFOLDER);
     const dated = await ensureChildFolder(env, token, sr, reportDate);
     const bucket = await ensureChildFolder(env, token, dated, bucketFolder);
     return bucket;
+  }
+  if (PHOTO_BUCKETS.has(bucketKey)) {
+    // Photos go into the project's real site-photos folder, not the QAQC tree.
+    const field05 = await ensureChildFolder(env, token, projectFolderId, '05 - Field');
+    const photos = await ensureChildFolder(env, token, field05, '02 - Project Photos');
+    const dated = await ensureChildFolder(env, token, photos, reportDate);
+    return dated; // files land directly in the dated folder (no sub-bucket level)
   }
   // Default: QAQC tree (DFR buckets).
   const eng = await ensureChildFolder(env, token, projectFolderId, '03 - Engineering & Design');

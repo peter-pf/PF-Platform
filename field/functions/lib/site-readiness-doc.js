@@ -143,14 +143,33 @@ function fmtDate(s) {
   return `${m[2]}/${m[3]}/${m[1]}`;
 }
 
-// PDF filename: "YYYY-MM-DD - <job#> - Site Readiness - <READY|NOT READY>.pdf"
+// PDF filename: "YY-MMDD-<Project Name>-Site Readiness.pdf"
+//   Matches Derek's Daily Report convention so all field PDFs sort together by date.
+//   YY-MMDD from the inspection DATE.  Project name keeps spaces/hyphens, strips
+//   SharePoint-illegal chars.  conflictBehavior 'rename' on upload handles duplicates.
 export function pdfFilename(rec) {
   const iso = /^\d{4}-\d{2}-\d{2}/.test(String(rec.date || ''))
     ? String(rec.date).slice(0, 10)
     : new Date().toISOString().slice(0, 10);
-  const jobNum = safeComp(rec.projectId || 'Project');
-  const result = rec.result === 'READY' ? 'READY' : 'NOT READY';
-  return `${iso} - ${jobNum} - Site Readiness - ${result}.pdf`;
+  const [yyyy, mm, dd] = iso.split('-');
+  const datePart = `${yyyy.slice(2)}-${mm}${dd}`;
+  const name = safeProjectName(rec.projectName || rec.projectId || 'Project');
+  return `${datePart}-${name}-Site Readiness.pdf`;
+}
+
+// Sanitize a project NAME for a SharePoint filename — same rules as daily-report-doc:
+// strip SharePoint-illegal chars, keep spaces/hyphens, collapse whitespace, trim dots.
+function safeProjectName(v) {
+  let s = String(v == null ? '' : v)
+    .replace(/[\\/:*?"<>|]/g, '')
+    .replace(/[\x00-\x1f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^\.+/, '').replace(/\.+$/, '')
+    .trim()
+    .slice(0, 80)
+    .trim();
+  return s || 'Project';
 }
 
 function safeComp(v) {

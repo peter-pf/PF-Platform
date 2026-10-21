@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>PF Past Reports</title>
+<meta name="theme-color" content="#006DB0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="PF Field">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --accent:#006DB0;--accent-dark:#005A91;--accent-light:#E0F0FF;
+    --surface:#131820;--surface-2:#1b212c;--surface-3:#222830;
+    --border:#2a2f3a;--text:#e2e8f0;--text-2:#aab1c0;--text-3:#8a93a6;
+    --amber:#d29922;--green:#3fb950;--red:#e5534b;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;line-height:1.5;color:var(--text);background:var(--surface);}
+  a{color:var(--accent-light);text-decoration:none;}
+  a:hover{text-decoration:underline;}
+  input,select,button{font-family:inherit;font-size:inherit;}
+  input,select{background:var(--surface-2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 10px;width:100%;}
+  input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,109,176,.25);}
+
+  /* ---- top bar ---- */
+  #topbar{
+    position:sticky;top:0;z-index:100;
+    background:var(--surface-2);border-bottom:1px solid var(--border);
+    display:flex;align-items:center;justify-content:space-between;
+    padding:10px 16px;gap:10px;
+  }
+  #topbar .left{display:flex;align-items:center;gap:10px;}
+  #topbar .logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;color:var(--text);}
+  #topbar .logo .mark{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:7px;background:var(--accent);color:#fff;font-weight:700;font-size:13px;}
+  #topbar .home-btn{
+    display:inline-flex;align-items:center;gap:5px;
+    font-size:12px;font-weight:600;color:var(--text-3);
+    background:var(--surface-3);border:1px solid var(--border);
+    border-radius:6px;padding:5px 11px;text-decoration:none;
+    transition:border-color .15s,color .15s;
+  }
+  #topbar .home-btn:hover{border-color:var(--accent);color:var(--accent-light);}
+  #topbar .right{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-3);}
+  #topbar .right #userLabel{max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #topbar .right a{color:var(--text-3);}
+  #topbar .right a:hover{color:var(--text);}
+
+  /* ---- layout ---- */
+  #main{padding:14px;max-width:720px;margin:0 auto;}
+  #loading{display:flex;align-items:center;justify-content:center;min-height:60vh;color:var(--text-3);font-size:14px;}
+  #authError{display:none;padding:32px 16px;text-align:center;color:var(--text-3);}
+
+  /* ---- filter bar ---- */
+  #filterBar{
+    display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+    background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
+    padding:10px 12px;margin-bottom:12px;
+  }
+  #filterBar input#filterText{flex:1 1 160px;min-width:120px;}
+  #filterBar select#filterType{flex:0 1 160px;min-width:120px;}
+  #filterBar input#filterFrom,#filterBar input#filterTo{flex:0 1 130px;min-width:110px;}
+  #filterBar label{font-size:12px;color:var(--text-3);white-space:nowrap;}
+  #filterCount{font-size:12px;color:var(--text-3);padding-top:2px;}
+
+  /* ---- report list ---- */
+  .pr-item{
+    border:1px solid var(--border);border-radius:8px;
+    padding:12px 14px;margin-bottom:8px;
+    display:flex;flex-direction:column;gap:4px;
+  }
+  .pr-item:hover{border-color:var(--accent);}
+  .pr-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;}
+  .pr-date{font-weight:700;font-size:14px;}
+  .pr-project{font-size:14px;color:var(--text-2);}
+  .pr-badge{
+    font-size:11px;padding:2px 9px;border-radius:10px;
+    background:var(--surface-3);color:var(--text-3);
+    font-weight:600;white-space:nowrap;flex:0 0 auto;
+  }
+  .pr-badge.daily{background:rgba(0,109,176,.18);color:#5bc8ff;}
+  .pr-badge.sr{background:rgba(63,185,80,.15);color:var(--green);}
+  .pr-badge.status-ready{background:rgba(63,185,80,.15);color:var(--green);}
+  .pr-badge.status-not-ready{background:rgba(210,153,34,.15);color:var(--amber);}
+  .pr-badge.status-sent{background:rgba(0,109,176,.18);color:#5bc8ff;}
+  .pr-badge.status-draft{background:var(--surface-3);color:var(--text-3);}
+  .pr-pdf-link{font-size:12px;}
+  .pr-empty{color:var(--text-3);font-size:14px;padding:24px 0;text-align:center;}
+  .pr-err{color:var(--red);font-size:13px;padding:12px 0;}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div class="left">
+    <a href="/index.html" class="home-btn" aria-label="Home">&#8592; Home</a>
+    <div class="logo"><div class="mark">PF</div> Past Reports</div>
+  </div>
+  <div class="right">
+    <span id="userLabel"></span>
+    <a href="/api/logout">Sign out</a>
+  </div>
+</div>
+
+<div id="loading">Loading...</div>
+<div id="authError">
+  <p>Session expired. <a href="/login.html">Sign in again</a></p>
+</div>
+
+<div id="main" style="display:none">
+  <div id="filterBar">
+    <input type="text" id="filterText" placeholder="Search project or type..." autocomplete="off" aria-label="Search">
+    <select id="filterType" aria-label="Form type">
+      <option value="">All types</option>
+      <option value="daily-report">Daily Report</option>
+      <option value="site-readiness">Site Readiness</option>
+    </select>
+    <label>From <input type="date" id="filterFrom" aria-label="From date"></label>
+    <label>To <input type="date" id="filterTo" aria-label="To date"></label>
+    <span id="filterCount"></span>
+  </div>
+  <div id="reportList"></div>
+</div>
+
+<script>
+"use strict";
+window.esc = (function(){
+  var m={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'};
+  return function(s){return s==null?'':String(s).replace(/[&<>"']/g,function(c){return m[c];});};
+})();
+window.pfFmtDate = function(s){
+  if(!s)return'';
+  var m=String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(!m)return String(s);
+  return m[2]+'/'+m[3]+'/'+m[1];
+};
+
+(function(){
+  var loadEl=document.getElementById('loading');
+  var mainEl=document.getElementById('main');
+  var errEl=document.getElementById('authError');
+  var userLbl=document.getElementById('userLabel');
+
+  fetch('/api/me',{credentials:'same-origin'})
+    .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+    .then(function(r){
+      if(r.ok&&r.d&&r.d.status==='ok'){
+        if(userLbl)userLbl.textContent=r.d.name||r.d.role||'';
+        if(loadEl)loadEl.style.display='none';
+        if(mainEl)mainEl.style.display='';
+        loadReports();
+      } else if(r.d&&r.d.status==='must_reset'){
+        window.location.href='/reset-password.html';
+      } else {
+        window.location.href='/login.html?next='+encodeURIComponent(window.location.pathname);
+      }
+    })
+    .catch(function(){
+      if(loadEl)loadEl.style.display='none';
+      if(errEl)errEl.style.display='';
+    });
+})();
+
+var ALL_REPORTS = [];
+var E = window.esc;
+
+function loadReports(){
+  var listEl=document.getElementById('reportList');
+  if(listEl)listEl.innerHTML='<div class="pr-empty">Loading reports...</div>';
+  fetch('/api/past-reports',{credentials:'same-origin'})
+    .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+    .then(function(r){
+      if(!r.ok||!r.d||!r.d.ok){
+        if(listEl)listEl.innerHTML='<div class="pr-err">Could not load reports. '+(r.d&&r.d.message?E(r.d.message):'')+'</div>';
+        return;
+      }
+      ALL_REPORTS=(Array.isArray(r.d.reports)?r.d.reports:[]);
+      wireFilters();
+      renderList();
+    })
+    .catch(function(){
+      if(listEl)listEl.innerHTML='<div class="pr-err">Network error loading reports.</div>';
+    });
+}
+
+function wireFilters(){
+  ['filterText','filterType','filterFrom','filterTo'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el&&!el.dataset.wired){el.dataset.wired='1';el.addEventListener('input',renderList);el.addEventListener('change',renderList);}
+  });
+}
+
+function renderList(){
+  var textQ=(document.getElementById('filterText')||{}).value||'';
+  var typeQ=(document.getElementById('filterType')||{}).value||'';
+  var fromQ=(document.getElementById('filterFrom')||{}).value||'';
+  var toQ=(document.getElementById('filterTo')||{}).value||'';
+  var q=textQ.toLowerCase().trim();
+
+  var filtered=ALL_REPORTS.filter(function(r){
+    if(typeQ&&r.type!==typeQ)return false;
+    if(q){
+      var hay=(String(r.projectName||'')+' '+String(r.projectId||'')+' '+String(r.type||'')).toLowerCase();
+      if(hay.indexOf(q)<0)return false;
+    }
+    if(fromQ&&String(r.date||'')<fromQ)return false;
+    if(toQ&&String(r.date||'')>toQ)return false;
+    return true;
+  });
+
+  var cntEl=document.getElementById('filterCount');
+  if(cntEl)cntEl.textContent=filtered.length+' of '+ALL_REPORTS.length+' reports';
+
+  var listEl=document.getElementById('reportList');
+  if(!listEl)return;
+  if(!filtered.length){listEl.innerHTML='<div class="pr-empty">No reports match your filters.</div>';return;}
+
+  listEl.innerHTML=filtered.map(function(r){
+    var typeLabel=r.type==='daily-report'?'Daily Report':'Site Readiness';
+    var typeCls=r.type==='daily-report'?'daily':'sr';
+    var statusCls='status-'+(r.status==='sent'?'sent':(r.result==='READY'?'ready':(r.result==='NOT READY'?'not-ready':'draft')));
+    var statusLabel=r.result||r.status||'draft';
+    var pdfHtml='';
+    if(r.pdfWebUrl&&/^https:\/\//i.test(r.pdfWebUrl)){
+      pdfHtml='<a href="'+E(r.pdfWebUrl)+'" target="_blank" rel="noopener" class="pr-pdf-link">View PDF</a>';
+    } else if(r.pdfName){
+      pdfHtml='<span class="pr-badge">'+E(r.pdfName)+'</span>';
+    }
+    return '<div class="pr-item">'
+      +'<div class="pr-row">'
+      +'<span class="pr-date">'+E(window.pfFmtDate(r.date)||r.date||'—')+'</span>'
+      +'<span class="pr-project">'+E(r.projectName||r.projectId||'—')+'</span>'
+      +'<span class="pr-badge '+typeCls+'">'+E(typeLabel)+'</span>'
+      +'<span class="pr-badge '+statusCls+'">'+E(statusLabel)+'</span>'
+      +(pdfHtml?pdfHtml:'')
+      +'</div>'
+      +(r.submittedAt?'<div style="font-size:11px;color:var(--text-3)">Submitted '+E(window.pfFmtDate((r.submittedAt||'').slice(0,10)))+'</div>':'')
+      +'</div>';
+  }).join('');
+}
+</script>
+</body>
+</html>

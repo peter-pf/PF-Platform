@@ -161,9 +161,10 @@ export function safeProjectName(v, fallback) {
   return s || (fallback || 'Project');
 }
 
-// Derek's filename convention: "YY-MMDD-[project name].pdf".
-//   YY-MMDD is derived from the report DATE (e.g. 2026-07-17 -> 26-0717).
-//   [project name] is the readable, SharePoint-safe project name.
+// Derek's filename convention: "YY-MMDD-<Project Name>-Daily Report.pdf".
+//   YY-MMDD is derived from the report DATE (e.g. 2026-10-21 -> 26-1021).
+//   <Project Name> is the readable, SharePoint-safe project name (spaces/hyphens kept).
+//   "-Daily Report" suffix distinguishes from Site Readiness PDFs in the same folder.
 // conflictBehavior 'rename' on upload gives same-day duplicates a numeric suffix.
 export function pdfFilename(rec) {
   const iso = /^\d{4}-\d{2}-\d{2}/.test(String(rec.date || ''))
@@ -172,7 +173,7 @@ export function pdfFilename(rec) {
   const [yyyy, mm, dd] = iso.split('-');
   const datePart = `${yyyy.slice(2)}-${mm}${dd}`;               // YY-MMDD
   const name = safeProjectName(rec.projectName || rec.projectId, 'Project');
-  return `${datePart}-${name}.pdf`;
+  return `${datePart}-${name}-Daily Report.pdf`;
 }
 
 // ---------------------------------------------------------------------------

@@ -75,16 +75,18 @@ console.log('\n--- pdfFilename ---');
 
 test('READY filename uses job# and READY', () => {
   const fn = pdfFilename(readyRec);
-  assert.match(fn, /2026-10-20/, 'date missing');
-  assert.match(fn, /26-001/, 'job# missing');
-  assert.match(fn, /READY/, 'READY keyword missing');
-  assert(!fn.includes('NOT READY'), 'should not contain NOT READY');
+  // New format: YY-MMDD-<projectName>-Site Readiness.pdf (per Derek round 2 spec)
+  assert.match(fn, /26-1020/, 'date part YY-MMDD missing');
+  assert.match(fn, /Hanley Data Center/, 'project name missing');
+  assert.match(fn, /Site Readiness/, 'Site Readiness suffix missing');
   console.log('    filename:', fn);
 });
 
-test('NOT READY filename uses NOT READY', () => {
+test('NOT READY filename uses Site Readiness suffix', () => {
   const fn = pdfFilename(notReadyRec);
-  assert.match(fn, /NOT READY/, 'NOT READY keyword missing');
+  // New format: YY-MMDD-<projectName>-Site Readiness.pdf (result not in filename)
+  assert.match(fn, /Site Readiness/, 'Site Readiness suffix missing');
+  assert.match(fn, /26-1020/, 'date part missing');
   console.log('    filename:', fn);
 });
 

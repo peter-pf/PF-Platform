@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>PF Daily Field Report</title>
+<meta name="theme-color" content="#006DB0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="PF Field">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --accent:#006DB0;--accent-dark:#005A91;--accent-light:#E0F0FF;
+    --surface:#131820;--surface-2:#1b212c;--surface-3:#222830;
+    --border:#2a2f3a;--text:#e2e8f0;--text-2:#aab1c0;--text-3:#8a93a6;
+    --amber:#d29922;--green:#3fb950;--red:#e5534b;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;line-height:1.5;color:var(--text);background:var(--surface);}
+  a{color:var(--accent-light);text-decoration:none;}
+  a:hover{text-decoration:underline;}
+  input,select,textarea,button{font-family:inherit;font-size:inherit;}
+  input,select,textarea{background:var(--surface-2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 10px;width:100%;}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,109,176,.25);}
+  button{cursor:pointer;}
+  .btn{display:inline-block;padding:10px 20px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-weight:600;font-size:14px;cursor:pointer;transition:background .15s;}
+  .btn:hover{background:var(--accent-dark);}
+  .btn:disabled{opacity:.55;cursor:default;}
+  .btn-sm{padding:5px 13px;background:var(--surface-3);color:var(--text-2);border:1px solid var(--border);border-radius:5px;font-size:12px;font-weight:500;cursor:pointer;transition:border-color .15s,color .15s;}
+  .btn-sm:hover{border-color:var(--accent);color:var(--accent-light);}
+
+  /* ---- top bar ---- */
+  #topbar{
+    position:sticky;top:0;z-index:100;
+    background:var(--surface-2);border-bottom:1px solid var(--border);
+    display:flex;align-items:center;justify-content:space-between;
+    padding:10px 16px;gap:10px;
+  }
+  #topbar .left{display:flex;align-items:center;gap:10px;}
+  #topbar .logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;color:var(--text);}
+  #topbar .logo .mark{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:7px;background:var(--accent);color:#fff;font-weight:700;font-size:13px;}
+  #topbar .home-btn{
+    display:inline-flex;align-items:center;gap:5px;
+    font-size:12px;font-weight:600;color:var(--text-3);
+    background:var(--surface-3);border:1px solid var(--border);
+    border-radius:6px;padding:5px 11px;text-decoration:none;
+    transition:border-color .15s,color .15s;
+  }
+  #topbar .home-btn:hover{border-color:var(--accent);color:var(--accent-light);}
+  #topbar .right{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-3);}
+  #topbar .right #userLabel{max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #topbar .right a{color:var(--text-3);font-size:13px;}
+  #topbar .right a:hover{color:var(--text);}
+
+  /* ---- layout ---- */
+  #main{padding:14px;max-width:720px;margin:0 auto;}
+  #loading{display:flex;align-items:center;justify-content:center;min-height:60vh;color:var(--text-3);font-size:14px;}
+  #authError{display:none;padding:32px 16px;text-align:center;color:var(--text-3);}
+
+  /* ---- draft status banner ---- */
+  #draftStatus{
+    font-size:11px;color:var(--text-3);
+    padding:6px 12px;
+    background:var(--surface-2);border:1px solid var(--border);
+    border-radius:6px;margin-bottom:10px;
+    display:flex;align-items:center;flex-wrap:wrap;gap:4px;
+  }
+  #draftStatus .ds-name{font-weight:600;color:var(--text-2);}
+  #draftStatus .ds-sep{color:var(--border);margin:0 2px;}
+  #draftStatus .ds-saved{color:var(--green);}
+  #draftStatus .ds-unsaved{color:var(--text-3);}
+
+  /* ---- daily-reports module styles ---- */
+  #mod-daily-reports .dr-card{border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:12px;}
+  #mod-daily-reports label{display:block;font-size:12px;color:var(--text-3);margin:8px 0 3px;}
+  #mod-daily-reports input,#mod-daily-reports select,#mod-daily-reports textarea{width:100%;padding:7px 10px;box-sizing:border-box;}
+  #mod-daily-reports textarea{min-height:54px;font-family:inherit;}
+  #mod-daily-reports .dr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:4px 16px;}
+  #mod-daily-reports .dr-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;align-items:center;}
+  #mod-daily-reports .dr-row select.nm,#mod-daily-reports .dr-row select.eq{flex:2 1 160px;min-width:140px;}
+  #mod-daily-reports .dr-row input.tm{flex:0 0 115px;min-width:100px;}
+  #mod-daily-reports .dr-row input.hr{flex:0 0 105px;}
+  #mod-daily-reports .dr-row .dr-regot{flex:0 0 auto;font-size:12px;color:var(--text-3);white-space:nowrap;padding:0 2px;}
+  #mod-daily-reports .dr-row .dr-regot strong{color:var(--text-2);font-weight:600;}
+  #mod-daily-reports .dr-row .dr-regot .dr-ot{color:var(--amber);}
+  #mod-daily-reports .dr-row input.cc{flex:1 1 120px;min-width:110px;}
+  #mod-daily-reports .dr-row input.item{flex:2 1 auto;}
+  #mod-daily-reports .dr-row input.desc{flex:2 1 auto;}
+  #mod-daily-reports .dr-row .dr-cat{flex:0 0 140px;font-size:12px;color:var(--text-2);}
+  #mod-daily-reports .dr-row select.ty{flex:0 0 120px;}
+  #mod-daily-reports .dr-row select.sc{flex:1 1 auto;}
+  #mod-daily-reports .dr-mt-cat{margin:10px 0 4px;}
+  #mod-daily-reports .dr-mt-cat-h{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:4px;}
+  #mod-daily-reports .dr-section-h{font-size:13px;font-weight:600;margin:12px 0 4px;}
+  #mod-daily-reports .dr-muted{color:var(--text-3);}
+  #mod-daily-reports .dr-err{color:var(--red);font-size:13px;}
+  #mod-daily-reports .dr-ok{color:var(--green);font-size:13px;}
+  #mod-daily-reports .dr-flag{font-size:11px;color:var(--text-3);}
+  #mod-daily-reports .dr-item{border-top:1px solid var(--border);padding:8px 0;}
+  #mod-daily-reports .dr-status{font-size:11px;padding:1px 8px;border-radius:10px;}
+  #mod-daily-reports .dr-status.draft{background:var(--surface-2);color:var(--text-3);}
+  #mod-daily-reports .dr-status.submitted{background:rgba(210,153,34,.18);color:var(--amber);}
+  #mod-daily-reports .dr-status.approved{background:rgba(63,185,80,.15);color:var(--green);}
+  #mod-daily-reports .dr-status.sentToHR{background:rgba(47,109,246,.15);color:#5b8cff;}
+  #mod-daily-reports .btn-sm{font-size:12px;padding:3px 10px;}
+  #mod-daily-reports .dr-rm{flex:0 0 auto;font-size:12px;line-height:1;padding:5px 9px;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--text-3);cursor:pointer;}
+  #mod-daily-reports .dr-rm:hover{border-color:var(--amber);color:var(--amber);}
+  #mod-daily-reports .dr-upload{border:1px dashed var(--border);border-radius:8px;padding:10px 12px;}
+  #mod-daily-reports .dr-up-hint{font-size:12px;color:var(--text-3);margin-top:6px;}
+  #mod-daily-reports .dr-up-list{margin-top:8px;}
+  #mod-daily-reports .dr-up-row{display:flex;align-items:center;gap:8px;font-size:12px;padding:3px 0;}
+  #mod-daily-reports .dr-up-row .dr-up-name{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #mod-daily-reports .dr-up-row .dr-up-stat{flex:0 0 auto;color:var(--text-3);}
+  #mod-daily-reports .dr-up-row a{color:#5b8cff;text-decoration:none;}
+  #mod-daily-reports .dr-up-row a:hover{text-decoration:underline;}
+  #mod-daily-reports .dr-up-row.done .dr-up-stat{color:var(--green);}
+  #mod-daily-reports .dr-up-row.err .dr-up-stat{color:var(--red);}
+  #mod-daily-reports .dr-up-msg{font-size:12px;margin-top:6px;}
+  #mod-daily-reports input[type=file]:disabled{opacity:.55;cursor:not-allowed;}
+  #mod-daily-reports .dr-msg{font-size:13px;margin-top:8px;}
+  @media(max-width:480px){
+    #mod-daily-reports .dr-grid{grid-template-columns:1fr;}
+    #mod-daily-reports .dr-row input.tm{flex:0 0 100px;}
+    #mod-daily-reports .dr-row input.hr{flex:0 0 90px;}
+  }
+</style>
+</head>
+<body>
+
+<!-- top navigation bar -->
+<div id="topbar">
+  <div class="left">
+    <a href="/index.html" class="home-btn" aria-label="Home">&#8592; Home</a>
+    <div class="logo"><div class="mark">PF</div> Daily Report</div>
+  </div>
+  <div class="right">
+    <span id="userLabel"></span>
+    <a href="/api/logout" id="logoutLink">Sign out</a>
+  </div>
+</div>
+
+<div id="loading">Loading...</div>
+<div id="authError">
+  <p>Session expired. <a href="/login.html">Sign in again</a></p>
+</div>
+
+<div id="main" style="display:none">
+
+  <!-- draft status banner -->
+  <div id="draftStatus">
+    <span class="ds-name" id="dsFilename">—</span>
+    <span class="ds-sep">|</span>
+    <span id="dsState" class="ds-unsaved">Not saved</span>
+  </div>
+
+  <!-- DAILY REPORTS MODULE -->
+  <div id="mod-daily-reports">
+    <div id="drNoData" class="dr-muted" style="display:none">Daily reports not available for your role.</div>
+    <div id="drWrap">
+      <div class="dr-card dr-muted" style="font-size:13px">
+        Daily reports capture field work for the day. Hours entered here feed the timesheets.
+        Record crew hours, production counts, weather, equipment, delays and safety.
+        No financial data is collected or displayed here.
+      </div>
+      <div class="dr-card">
+        <h3 style="margin:0 0 8px">New daily report</h3>
+        <div id="drEditBanner" style="display:none;background:rgba(210,153,34,.14);border:1px solid rgba(210,153,34,.4);border-radius:6px;padding:8px 10px;margin:0 0 10px;font-size:13px;color:#d29922">
+          Editing an existing report (id <code data-edit-id></code>). Saving replaces it in place and re-sends the PDF. Use <strong>Start new report</strong> to cancel.
+        </div>
+        <div class="dr-grid">
+          <div><label>Date</label><input type="date" id="drDate"></div>
+          <div>
+            <label>Project</label>
+            <select id="drProject"><option value="">Select project</option></select>
+            <input type="hidden" id="drProjectId">
+          </div>
+          <div><label>Foreman</label><select id="drForeman"><option value="">Select foreman</option></select></div>
+          <div><label>Weather</label>
+            <select id="drPrecip">
+              <option value="">Select</option>
+              <option value="Clear">Clear</option>
+              <option value="Cloudy">Cloudy</option>
+              <option value="Rain">Rain</option>
+              <option value="Fog">Fog</option>
+              <option value="Snow">Snow</option>
+            </select>
+          </div>
+          <div><label>Temp</label><input type="text" id="drTemp" placeholder="72 F"></div>
+          <div><label>Columns installed today</label><input type="text" id="drCols" placeholder="0" inputmode="numeric"></div>
+          <div><label>LF installed today</label><input type="text" id="drLf" placeholder="0" inputmode="numeric"></div>
+        </div>
+
+        <div class="dr-section-h">Crew <span class="dr-flag">(hours worked, no pay)</span></div>
+        <div id="drCrew"></div>
+
+        <div class="dr-section-h">Work completed</div>
+        <textarea id="drWork" placeholder="Narrative of the day's work"></textarea>
+
+        <div class="dr-section-h">Equipment on site - owned <span class="dr-flag">(operating hours for maintenance)</span></div>
+        <div id="drOwned"></div>
+        <button type="button" class="btn btn-sm" id="drAddOwned">+ Add machine</button>
+
+        <div class="dr-section-h">Equipment on site - rental <span class="dr-flag">(operating hours)</span></div>
+        <div id="drRental"></div>
+        <button type="button" class="btn btn-sm" id="drAddRental">+ Add rental</button>
+
+        <div class="dr-section-h">Equipment failures &amp; maintenance</div>
+        <div id="drMaint"></div>
+
+        <div class="dr-section-h">Future Maintenance Items <span class="dr-flag">(adds to maintenance work list)</span></div>
+        <div id="drFuture"></div>
+        <button type="button" class="btn btn-sm" id="drAddFuture">+ Add issue</button>
+
+        <div class="dr-section-h">Delays / issues</div>
+        <textarea id="drDelays"></textarea>
+        <div class="dr-section-h">Safety observations / incidents</div>
+        <textarea id="drSafety"></textarea>
+
+        <div class="dr-section-h">Site Photos <span class="dr-flag">(photos go to the job's 05&nbsp;Field / 02&nbsp;Project Photos folder)</span></div>
+        <div class="dr-upload" id="drUpPhotos">
+          <input type="file" id="drFilePhotos" multiple accept="image/*,.heic" disabled>
+          <div class="dr-up-hint" data-up-hint>Select a project first to enable photo uploads.</div>
+          <div class="dr-up-list" data-up-list></div>
+          <div class="dr-up-msg" data-up-msg></div>
+        </div>
+
+        <div class="dr-section-h">Upload Hand Logs <span class="dr-flag">(paper QA/QC logs, photos, PDFs)</span></div>
+        <div class="dr-upload" id="drUpHandlogs">
+          <input type="file" id="drFileHandlogs" multiple disabled>
+          <div class="dr-up-hint" data-up-hint>Select a project first to enable uploads.</div>
+          <div class="dr-up-list" data-up-list></div>
+          <div class="dr-up-msg" data-up-msg></div>
+        </div>
+
+        <div class="dr-section-h">Upload GUHM Data <span class="dr-flag">(raw .guh column logger export)</span></div>
+        <div class="dr-upload" id="drUpGuhma">
+          <input type="file" id="drFileGuhma" multiple disabled>
+          <div class="dr-up-hint" data-up-hint>Select a project first to enable uploads.</div>
+          <div class="dr-up-list" data-up-list></div>
+          <div class="dr-up-msg" data-up-msg></div>
+        </div>
+
+        <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+          <button type="button" class="btn" id="drSaveDraft">Save draft</button>
+          <button type="button" class="btn" id="drSubmit">Submit &amp; send report</button>
+          <button type="button" class="btn btn-sm" id="drNewReport" style="display:none">Start new report</button>
+        </div>
+        <div class="dr-msg" data-msg style="margin-top:8px"></div>
+      </div>
+      <h3 style="margin:14px 0 6px">Recent daily reports</h3>
+      <div id="drList"></div>
+    </div>
+  </div>
+
+</div><!-- end #main -->
+
+<script>
+// ============================================================
+// GLOBAL UTILITIES
+// ============================================================
+window.esc = (function(){
+  var m={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'};
+  return function(s){return s==null?'':String(s).replace(/[&<>"']/g,function(c){return m[c];});};
+})();
+
+window.pfFmtDate = function(s){
+  if(!s) return '';
+  var m=String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(!m) return String(s);
+  return m[2]+'/'+m[3]+'/'+m[1];
+};
+
+// Client-side filename preview — mirrors server pdfFilename() in daily-report-doc.js.
+// YY-MMDD-<safeProjectName>-Daily Report.pdf
+window.drComputeFilename = function(date, projectName){
+  if(!date||!projectName) return null;
+  var mt=date.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(!mt) return null;
+  var dp=mt[1].slice(2)+'-'+mt[2]+mt[3];
+  var nm=String(projectName)
+    .replace(/[\\/:*?"<>|]/g,'').replace(/[\x00-\x1f]/g,'')
+    .replace(/\s+/g,' ').trim().replace(/^\.+/,'').replace(/\.+$/,'').trim().slice(0,80).trim()||'Project';
+  return dp+'-'+nm+'-Daily Report.pdf';
+};
+
+window.showModule = function(){};
+
+// ============================================================
+// AUTH CHECK
+// ============================================================
+(function(){
+  var loadEl  = document.getElementById('loading');
+  var mainEl  = document.getElementById('main');
+  var errEl   = document.getElementById('authError');
+  var userLbl = document.getElementById('userLabel');
+
+  fetch('/api/me',{credentials:'same-origin'})
+    .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+    .then(function(r){
+      if(r.ok && r.d && r.d.status==='ok'){
+        window.PF_ME={name:r.d.name||'',role:r.d.role||'field_ops'};
+        if(userLbl) userLbl.textContent=r.d.name||r.d.role||'';
+        if(loadEl) loadEl.style.display='none';
+        if(mainEl) mainEl.style.display='';
+        if(typeof window.showModule==='function') window.showModule('daily-reports');
+      } else if(r.d && r.d.status==='must_reset'){
+        window.location.href='/reset-password.html';
+      } else {
+        window.location.href='/login.html?next='+encodeURIComponent(window.location.pathname);
+      }
+    })
+    .catch(function(){
+      if(loadEl) loadEl.style.display='none';
+      if(errEl) errEl.style.display='';
+    });
+})();
+</script>
+
+<script>
+// ============================================================
+// MODULE: daily-reports
+// ============================================================
+try {
+(function(){
+  'use strict';
+  var E = window.esc || function(s){return s==null?'':String(s);};
+
+  var state = {
+    reports: [], priv: false,
+    editingId: null,
+    draftId: null,         // id of the current unsaved/saved draft record
+    draftSavedAt: null,    // ISO timestamp of last successful draft save
+    lists: { ownedEquipment:[], personnel:[], foremen:[], rentalCategories:[], maintenanceCategories:[], maintenanceSubcategories:{} },
+    projects: [],
+    crew: [{name:'',start:'',end:'',hours:'',costCode:'',auto:true},{name:'',start:'',end:'',hours:'',costCode:'',auto:false},{name:'',start:'',end:'',hours:'',costCode:'',auto:false}],
+    owned: [{machine:'',hours:''},{machine:'',hours:''}],
+    rental: [{category:'',hours:''},{category:'',hours:''}],
+    maintenance: [],
+    future: [{equipment:'',description:''}],
+    attachments: { handlogs:[], guhma:[], photos:[] },
+  };
+
+  var UP_BUCKETS = {
+    photos:   { input:'drFilePhotos',   wrap:'drUpPhotos',   label:'Site Photos' },
+    handlogs: { input:'drFileHandlogs', wrap:'drUpHandlogs', label:'Hand Logs' },
+    guhma:    { input:'drFileGuhma',    wrap:'drUpGuhma',    label:'GUHM Data' },
+  };
+
+  // ---- draft status banner -----------------------------------------------
+  function updateDraftBanner(savedAt){
+    var nm = window.drComputeFilename(
+      (document.getElementById('drDate')||{}).value,
+      selectedProjectName()
+    );
+    var nameEl  = document.getElementById('dsFilename');
+    var stateEl = document.getElementById('dsState');
+    if(nameEl) nameEl.textContent = nm || '—';
+    if(stateEl){
+      if(savedAt){
+        var d = new Date(savedAt);
+        var h=d.getHours(), mn=d.getMinutes();
+        var ampm=h>=12?'PM':'AM';
+        h=h%12||12;
+        var ts=h+':'+(mn<10?'0':'')+mn+' '+ampm;
+        stateEl.textContent='Draft saved '+ts;
+        stateEl.className='ds-saved';
+      } else {
+        stateEl.textContent='Not saved';
+        stateEl.className='ds-unsaved';
+      }
+    }
+  }
+
+  function api(path, opts){
+    return fetch(path, Object.assign({credentials:'same-origin',headers:{'Content-Type':'application/json'}},opts||{}))
+      .then(function(r){return r.json().then(function(j){return{ok:r.ok,status:r.status,body:j};});});
+  }
+
+  function loadProjects(){
+    return api('/api/field-projects').then(function(r){
+      var out=[];
+      if(r.ok && r.body && Array.isArray(r.body.projects)){
+        r.body.projects.forEach(function(p){
+          var number=p.number!=null?String(p.number):'';
+          var name=p.name!=null?String(p.name):'';
+          if(!number&&!name) return;
+          out.push({id:number||name,name:name,label:(number?number+' - ':'')+name});
+        });
+      }
+      out.sort(function(a,b){return a.label.localeCompare(b.label);});
+      state.projects=out;
+    }).catch(function(){state.projects=[];});
+  }
+
+  function emptyMaintRow(cat){return{category:cat,type:'',subcategory:'',item:'',hourAtFailure:''};}
+
+  function buildMaintenanceRows(){
+    var cats=state.lists.maintenanceCategories||[];
+    state.maintenance=cats.map(function(c){return emptyMaintRow(c);});
+  }
+
+  function load(){
+    var noData=document.getElementById('drNoData');
+    var wrap=document.getElementById('drWrap');
+    var me=window.PF_ME||{};
+    state.priv=(me.role==='admin'||me.role==='partner');
+    Promise.all([api('/api/field-lists'),api('/api/daily-report'),loadProjects()]).then(function(rs){
+      var lr=rs[0],dr=rs[1];
+      if(dr.status===403){if(noData)noData.style.display='';if(wrap)wrap.style.display='none';return;}
+      if(noData)noData.style.display='none';
+      if(wrap)wrap.style.display='';
+      if(lr.ok&&lr.body){
+        state.lists={
+          ownedEquipment:lr.body.ownedEquipment||[],
+          personnel:lr.body.personnel||[],
+          foremen:lr.body.foremen||[],
+          rentalCategories:lr.body.rentalCategories||[],
+          maintenanceCategories:lr.body.maintenanceCategories||[],
+          maintenanceSubcategories:lr.body.maintenanceSubcategories||{},
+        };
+      }
+      buildMaintenanceRows();
+      state.reports=(dr.ok&&dr.body&&Array.isArray(dr.body.reports))?dr.body.reports:[];
+      wireForm();renderProject();renderForeman();renderCrew();renderOwned();renderRental();renderMaint();renderFuture();renderList();
+      updateDraftBanner(null);
+    }).catch(function(){
+      if(wrap)wrap.style.display='';
+      state.reports=[];buildMaintenanceRows();
+      wireForm();renderProject();renderForeman();renderCrew();renderOwned();renderRental();renderMaint();renderFuture();renderList();
+      updateDraftBanner(null);
+    });
+  }
+
+  function opts(listVals,selected,placeholder){
+    var html='<option value="">'+E(placeholder||'Select')+'</option>';
+    var vals=(listVals||[]).slice();
+    var sel=(selected==null)?'':String(selected);
+    if(sel.trim()&&vals.map(String).indexOf(sel)<0) vals.unshift(sel);
+    vals.forEach(function(v){
+      var s=(String(v)===sel)?' selected':'';
+      html+='<option value="'+E(v)+'"'+s+'>'+E(v)+'</option>';
+    });
+    return html;
+  }
+
+  function renderForeman(){
+    var el=document.getElementById('drForeman');
+    if(!el) return;
+    var cur=el.value;
+    el.innerHTML=opts(state.lists.foremen,cur,'Select foreman');
+  }
+
+  function drDaySplit(h){
+    var n=parseFloat(String(h==null?'':h).replace(/[^0-9.\-]/g,''));
+    if(!isFinite(n)||n<0) n=0;
+    if(n>24) n=24;
+    n=Math.round(n*100)/100;
+    var reg=Math.min(n,8),ot=Math.max(n-8,0);
+    return{reg:Math.round(reg*100)/100,ot:Math.round(ot*100)/100};
+  }
+  function drNum(n){n=+n;if(!isFinite(n))return'0';return(n%1===0)?String(n):n.toFixed(2).replace(/\.?0+$/,'');}
+
+  function renderCrew(){
+    var host=document.getElementById('drCrew');
+    if(!host)return;
+    host.innerHTML=state.crew.map(function(m,i){
+      var sp=drDaySplit(m.hours);
+      return '<div class="dr-row">'
+        +'<select class="nm" data-i="'+i+'" data-f="name">'+opts(state.lists.personnel,m.name,'Crew member')+'</select>'
+        +'<input class="tm" data-i="'+i+'" data-f="start" type="time" title="Start time" aria-label="Start time" value="'+E(m.start)+'">'
+        +'<input class="tm" data-i="'+i+'" data-f="end" type="time" title="End time" aria-label="End time" value="'+E(m.end)+'">'
+        +'<input class="hr" data-i="'+i+'" data-f="hours" placeholder="Hrs worked" inputmode="decimal" value="'+E(m.hours)+'">'
+        +'<span class="dr-regot" data-regot="'+i+'" title="Daily split: Regular = first 8h, Overtime = hours over 8.">'
+        +'Reg <strong class="dr-reg">'+drNum(sp.reg)+'</strong> / OT <strong class="dr-ot">'+drNum(sp.ot)+'</strong>'
+        +'</span>'
+        +'<input class="cc" data-i="'+i+'" data-f="costCode" placeholder="Cost Code" value="'+E(m.costCode)+'">'
+        +'</div>';
+    }).join('');
+    host.querySelectorAll('[data-i]').forEach(function(el){
+      el.addEventListener('input',function(){
+        var i=+this.getAttribute('data-i'),f=this.getAttribute('data-f');
+        state.crew[i][f]=this.value;
+        if(f==='name') state.crew[i].auto=false;
+        if(f==='start'||f==='end') recalcCrewHours(i);
+        if(f==='hours'||f==='start'||f==='end') updateRegOt(i);
+      });
+    });
+  }
+
+  function updateRegOt(i){
+    var m=state.crew[i];if(!m)return;
+    var sp=drDaySplit(m.hours);
+    var host=document.querySelector('#drCrew [data-regot="'+i+'"]');
+    if(!host)return;
+    var reg=host.querySelector('.dr-reg'),ot=host.querySelector('.dr-ot');
+    if(reg)reg.textContent=drNum(sp.reg);
+    if(ot)ot.textContent=drNum(sp.ot);
+  }
+
+  function recalcCrewHours(i){
+    var m=state.crew[i];if(!m)return;
+    var start=(m.start||'').trim(),end=(m.end||'').trim();
+    if(!start||!end)return;
+    var sp=start.split(':'),ep=end.split(':');
+    if(sp.length<2||ep.length<2)return;
+    var sMin=(+sp[0])*60+(+sp[1]),eMin=(+ep[0])*60+(+ep[1]);
+    if(isNaN(sMin)||isNaN(eMin))return;
+    var diff=eMin-sMin;
+    var hrs=diff>0?Math.round((diff/60)*100)/100:0;
+    m.hours=String(hrs);
+    var el=document.querySelector('#drCrew [data-i="'+i+'"][data-f="hours"]');
+    if(el)el.value=m.hours;
+    updateRegOt(i);
+  }
+
+  function applyForemanToCrew(name){
+    var r0=state.crew[0];if(!r0)return;
+    if(r0.auto||!(r0.name||'').trim()){r0.name=name||'';r0.auto=true;renderCrew();}
+  }
+
+  function renderOwned(){
+    var host=document.getElementById('drOwned');if(!host)return;
+    var canRemove=state.owned.length>1;
+    host.innerHTML=state.owned.map(function(r,i){
+      return '<div class="dr-row">'
+        +'<select class="eq" data-i="'+i+'" data-f="machine">'+opts(state.lists.ownedEquipment,r.machine,'Machine')+'</select>'
+        +'<input class="hr" data-i="'+i+'" data-f="hours" placeholder="Machine Hours" inputmode="decimal" value="'+E(r.hours)+'">'
+        +(canRemove?'<button type="button" class="dr-rm" data-rm="'+i+'" aria-label="Remove row">Remove</button>':'')
+        +'</div>';
+    }).join('');
+    host.querySelectorAll('[data-i]').forEach(function(el){el.addEventListener('input',function(){state.owned[+this.getAttribute('data-i')][this.getAttribute('data-f')]=this.value;});});
+    host.querySelectorAll('button[data-rm]').forEach(function(b){b.addEventListener('click',function(){if(state.owned.length<=1)return;state.owned.splice(+this.getAttribute('data-rm'),1);renderOwned();});});
+  }
+
+  function renderRental(){
+    var host=document.getElementById('drRental');if(!host)return;
+    var canRemove=state.rental.length>1;
+    host.innerHTML=state.rental.map(function(r,i){
+      return '<div class="dr-row">'
+        +'<select class="eq" data-i="'+i+'" data-f="category">'+opts(state.lists.rentalCategories,r.category,'Rental equipment')+'</select>'
+        +'<input class="hr" data-i="'+i+'" data-f="hours" placeholder="Machine Hours" inputmode="decimal" value="'+E(r.hours)+'">'
+        +(canRemove?'<button type="button" class="dr-rm" data-rm="'+i+'" aria-label="Remove row">Remove</button>':'')
+        +'</div>';
+    }).join('');
+    host.querySelectorAll('[data-i]').forEach(function(el){el.addEventListener('input',function(){state.rental[+this.getAttribute('data-i')][this.getAttribute('data-f')]=this.value;});});
+    host.querySelectorAll('button[data-rm]').forEach(function(b){b.addEventListener('click',function(){if(state.rental.length<=1)return;state.rental.splice(+this.getAttribute('data-rm'),1);renderRental();});});
+  }
+
+  var MAINT_TYPES=['Failure','Maintenance'];
+
+  function renderMaint(){
+    var host=document.getElementById('drMaint');if(!host)return;
+    var cats=state.lists.maintenanceCategories||[];
+    var subs=state.lists.maintenanceSubcategories||{};
+    host.innerHTML=cats.map(function(cat){
+      var catCount=state.maintenance.filter(function(r){return r.category===cat;}).length;
+      var canRemove=catCount>1;
+      var rowsHtml=state.maintenance.map(function(r,i){
+        if(r.category!==cat)return'';
+        var subOpts=(subs&&subs[cat])?subs[cat]:[];
+        return '<div class="dr-row">'
+          +'<select class="ty" data-i="'+i+'" data-f="type">'+opts(MAINT_TYPES,r.type,'Type')+'</select>'
+          +'<select class="sc" data-i="'+i+'" data-f="subcategory">'+opts(subOpts,r.subcategory,'Subcategory')+'</select>'
+          +'<input class="item" data-i="'+i+'" data-f="item" placeholder="Detail / notes" value="'+E(r.item)+'">'
+          +'<input class="hr" data-i="'+i+'" data-f="hourAtFailure" placeholder="Machine hour at failure" inputmode="decimal" value="'+E(r.hourAtFailure)+'">'
+          +(canRemove?'<button type="button" class="dr-rm" data-mtrm="'+i+'" aria-label="Remove row">Remove</button>':'')
+          +'</div>';
+      }).join('');
+      return '<div class="dr-mt-cat">'
+        +'<div class="dr-mt-cat-h"><span>'+E(cat)+'</span>'
+        +'<button type="button" class="btn btn-sm" data-mtadd="'+E(cat)+'">+ Add row</button></div>'
+        +rowsHtml+'</div>';
+    }).join('');
+    host.querySelectorAll('[data-i]').forEach(function(el){el.addEventListener('input',function(){state.maintenance[+this.getAttribute('data-i')][this.getAttribute('data-f')]=this.value;});});
+    host.querySelectorAll('button[data-mtadd]').forEach(function(b){
+      b.addEventListener('click',function(){
+        var cat=this.getAttribute('data-mtadd');
+        var lastIdx=-1;
+        for(var i=0;i<state.maintenance.length;i++){if(state.maintenance[i].category===cat)lastIdx=i;}
+        var at=(lastIdx>=0)?lastIdx+1:state.maintenance.length;
+        state.maintenance.splice(at,0,emptyMaintRow(cat));
+        renderMaint();
+      });
+    });
+    host.querySelectorAll('button[data-mtrm]').forEach(function(b){
+      b.addEventListener('click',function(){
+        var idx=+this.getAttribute('data-mtrm');
+        var row=state.maintenance[idx];if(!row)return;
+        var catCount=state.maintenance.filter(function(r){return r.category===row.category;}).length;
+        if(catCount<=1)return;
+        state.maintenance.splice(idx,1);renderMaint();
+      });
+    });
+  }
+
+  function fleetOptions(){
+    var out=[];
+    (state.lists.ownedEquipment||[]).forEach(function(v){out.push(v);});
+    (state.lists.maintenanceCategories||[]).forEach(function(v){if(out.indexOf(v)<0)out.push(v);});
+    return out;
+  }
+
+  function renderFuture(){
+    var host=document.getElementById('drFuture');if(!host)return;
+    var fleet=fleetOptions();
+    var canRemove=state.future.length>1;
+    host.innerHTML=state.future.map(function(r,i){
+      return '<div class="dr-row">'
+        +'<select class="eq" data-i="'+i+'" data-f="equipment">'+opts(fleet,r.equipment,'Equipment')+'</select>'
+        +'<input class="desc" data-i="'+i+'" data-f="description" placeholder="Maintenance to identify" value="'+E(r.description)+'">'
+        +(canRemove?'<button type="button" class="dr-rm" data-rm="'+i+'" aria-label="Remove row">Remove</button>':'')
+        +'</div>';
+    }).join('');
+    host.querySelectorAll('[data-i]').forEach(function(el){el.addEventListener('input',function(){state.future[+this.getAttribute('data-i')][this.getAttribute('data-f')]=this.value;});});
+    host.querySelectorAll('button[data-rm]').forEach(function(b){b.addEventListener('click',function(){if(state.future.length<=1)return;state.future.splice(+this.getAttribute('data-rm'),1);renderFuture();});});
+  }
+
+  function renderProject(){
+    var sel=document.getElementById('drProject');if(!sel)return;
+    var cur=sel.value;
+    var html='<option value="">'+E('Select project')+'</option>';
+    state.projects.forEach(function(p){
+      var s=(String(p.id)===String(cur))?' selected':'';
+      html+='<option value="'+E(p.id)+'" data-name="'+E(p.name||p.label)+'"'+s+'>'+E(p.label)+'</option>';
+    });
+    sel.innerHTML=html;
+  }
+
+  function wireForm(){
+    var pi=document.getElementById('drProject');
+    if(pi&&!pi.dataset.wired){
+      pi.dataset.wired='1';
+      pi.addEventListener('change',function(){
+        var hid=document.getElementById('drProjectId');if(hid)hid.value=this.value;
+        updateUploadEnabled();
+        updateDraftBanner(state.draftSavedAt);
+      });
+    }
+    // Wire date field for banner updates
+    var dd=document.getElementById('drDate');
+    if(dd&&!dd.dataset.wired){
+      dd.dataset.wired='1';
+      dd.addEventListener('change',function(){updateDraftBanner(state.draftSavedAt);});
+    }
+    Object.keys(UP_BUCKETS).forEach(function(bk){
+      var inp=document.getElementById(UP_BUCKETS[bk].input);
+      if(inp&&!inp.dataset.wired){
+        inp.dataset.wired='1';
+        inp.addEventListener('change',function(){
+          var files=this.files?Array.prototype.slice.call(this.files):[];
+          if(files.length){uploadFiles(bk,files);}
+          this.value='';
+        });
+      }
+    });
+    updateUploadEnabled();
+    var fm=document.getElementById('drForeman');
+    if(fm&&!fm.dataset.wired){fm.dataset.wired='1';fm.addEventListener('change',function(){applyForemanToCrew(this.value);});}
+    var ao=document.getElementById('drAddOwned');
+    if(ao&&!ao.dataset.wired){ao.dataset.wired='1';ao.addEventListener('click',function(){state.owned.push({machine:'',hours:''});renderOwned();});}
+    var ar=document.getElementById('drAddRental');
+    if(ar&&!ar.dataset.wired){ar.dataset.wired='1';ar.addEventListener('click',function(){state.rental.push({category:'',hours:''});renderRental();});}
+    var af=document.getElementById('drAddFuture');
+    if(af&&!af.dataset.wired){af.dataset.wired='1';af.addEventListener('click',function(){state.future.push({equipment:'',description:''});renderFuture();});}
+    var sd=document.getElementById('drSaveDraft');
+    if(sd&&!sd.dataset.wired){sd.dataset.wired='1';sd.addEventListener('click',function(){save(false);});}
+    var sub=document.getElementById('drSubmit');
+    if(sub&&!sub.dataset.wired){sub.dataset.wired='1';sub.addEventListener('click',function(){save(true);});}
+    var nr=document.getElementById('drNewReport');
+    if(nr&&!nr.dataset.wired){nr.dataset.wired='1';nr.addEventListener('click',function(){resetForm();msg('Started a new report.',true);});}
+  }
+
+  var UP_ALLOWED=['.guh','.jpg','.jpeg','.png','.heic','.pdf','.zip','.xlsx'];
+  var UP_PHOTO_ALLOWED=['.jpg','.jpeg','.png','.heic'];
+  var UP_MAX_BYTES=50*1024*1024;
+  var UP_MAX_FILES=25;
+
+  function selectedProjectNumber(){
+    var psel=document.getElementById('drProject');
+    var v=psel?String(psel.value||'').trim():'';
+    return /^[0-9]{2}-[0-9]{2,4}$/.test(v)?v:'';
+  }
+  function selectedProjectName(){
+    var psel=document.getElementById('drProject');
+    var o=(psel&&psel.selectedIndex>=0)?psel.options[psel.selectedIndex]:null;
+    return o?(o.getAttribute('data-name')||''):'';
+  }
+  function reportDateValue(){
+    var d=document.getElementById('drDate');
+    var v=d?String(d.value||'').trim():'';
+    return /^\d{4}-\d{2}-\d{2}$/.test(v)?v:'';
+  }
+
+  function updateUploadEnabled(){
+    var num=selectedProjectNumber();
+    Object.keys(UP_BUCKETS).forEach(function(bk){
+      var inp=document.getElementById(UP_BUCKETS[bk].input);
+      var wrap=document.getElementById(UP_BUCKETS[bk].wrap);
+      if(inp)inp.disabled=!num;
+      if(wrap){
+        var hint=wrap.querySelector('[data-up-hint]');
+        if(hint){
+          if(num){
+            if(bk==='photos') hint.textContent='Photos upload to this project\'s 05 Field / 02 Project Photos folder. Allowed: .jpg .jpeg .png .heic, up to 50MB each.';
+            else hint.textContent='Files upload to this project QA/QC folder for the report date. Allowed: .guh .jpg .jpeg .png .heic .pdf .zip .xlsx, up to 50MB each.';
+          } else {
+            hint.textContent='Select a project first to enable uploads.';
+          }
+        }
+      }
+    });
+  }
+
+  function extOk(name,bk){
+    var n=String(name||'').toLowerCase();
+    var dot=n.lastIndexOf('.');
+    var ext=dot>=0?n.slice(dot):'';
+    var allowed=(bk==='photos')?UP_PHOTO_ALLOWED:UP_ALLOWED;
+    return allowed.indexOf(ext)>=0;
+  }
+
+  function upMsg(bk,text,ok){
+    var wrap=document.getElementById(UP_BUCKETS[bk].wrap);if(!wrap)return;
+    var m=wrap.querySelector('[data-up-msg]');
+    if(m){m.textContent=text||'';m.className='dr-up-msg '+(ok?'dr-ok':(ok===false?'dr-err':''));}
+  }
+
+  function safeFileLink(url,labelHtml){
+    if(url&&/^https?:\/\//i.test(url)) return '<a href="'+E(url)+'" target="_blank" rel="noopener">'+labelHtml+'</a>';
+    return labelHtml;
+  }
+
+  function renderUpList(bk,pending){
+    var wrap=document.getElementById(UP_BUCKETS[bk].wrap);if(!wrap)return;
+    var host=wrap.querySelector('[data-up-list]');if(!host)return;
+    var html='';
+    (state.attachments[bk]||[]).forEach(function(a){
+      var label=E(a.name||a.itemId||'file');
+      var link=safeFileLink(a.webUrl,label);
+      html+='<div class="dr-up-row done"><span class="dr-up-name">'+link+'</span><span class="dr-up-stat">uploaded</span></div>';
+    });
+    (pending||[]).forEach(function(p){
+      var cls=p.error?'err':'';
+      var stat=p.error?E(p.error):'uploading...';
+      html+='<div class="dr-up-row '+cls+'"><span class="dr-up-name">'+E(p.name)+'</span><span class="dr-up-stat">'+stat+'</span></div>';
+    });
+    host.innerHTML=html;
+  }
+
+  function uploadFiles(bk,files){
+    var num=selectedProjectNumber();
+    if(!num){upMsg(bk,'Select a project first.',false);return;}
+    var date=reportDateValue();
+    if(!date){upMsg(bk,'Set the report date first.',false);return;}
+    var existing=(state.attachments[bk]||[]).length;
+    if(existing+files.length>UP_MAX_FILES){upMsg(bk,'Too many files (max '+UP_MAX_FILES+' per bucket).',false);return;}
+    var pending=[];
+    var fd=new FormData();
+    fd.append('projectNumber',num);
+    fd.append('projectName',selectedProjectName());
+    fd.append('bucket',bk);
+    fd.append('reportDate',date);
+    var accepted=0;
+    files.forEach(function(f){
+      if(!extOk(f.name,bk)){pending.push({name:f.name,error:'type not allowed'});return;}
+      if(f.size>UP_MAX_BYTES){pending.push({name:f.name,error:'over 50MB'});return;}
+      fd.append('file',f,f.name);
+      pending.push({name:f.name});
+      accepted++;
+    });
+    renderUpList(bk,pending);
+    if(!accepted){upMsg(bk,'No valid files to upload.',false);return;}
+    upMsg(bk,'Uploading '+accepted+' file'+(accepted===1?'':'s')+'...',null);
+    var xhr=new XMLHttpRequest();
+    xhr.open('POST','/api/field-upload',true);
+    xhr.withCredentials=true;
+    if(xhr.upload){
+      xhr.upload.onprogress=function(ev){
+        if(ev.lengthComputable){
+          var pct=Math.round((ev.loaded/ev.total)*100);
+          upMsg(bk,'Uploading '+accepted+' file'+(accepted===1?'':'s')+'... '+pct+'%',null);
+        }
+      };
+    }
+    xhr.onload=function(){
+      var body=null;
+      try{body=JSON.parse(xhr.responseText);}catch(e){body=null;}
+      var errs=(body&&Array.isArray(body.errors))?body.errors:[];
+      function errSummary(){return errs.map(function(e){return E(e.name||'file')+' ('+E(e.error||'failed')+')';}).join(', ');}
+      if(xhr.status>=200&&xhr.status<300&&body&&body.ok&&Array.isArray(body.refs)){
+        body.refs.forEach(function(r){state.attachments[bk].push(r);});
+        renderUpList(bk,errs);
+        if(errs.length){upMsg(bk,body.refs.length+' uploaded, '+errs.length+' failed: '+errSummary(),false);}
+        else{upMsg(bk,body.refs.length+' uploaded.',true);}
+      } else {
+        renderUpList(bk,errs);
+        if(errs.length){upMsg(bk,'Upload failed: '+errSummary(),false);}
+        else{upMsg(bk,(body&&body.message)||'Upload failed.',false);}
+      }
+    };
+    xhr.onerror=function(){renderUpList(bk,[]);upMsg(bk,'Network error during upload.',false);};
+    xhr.send(fd);
+  }
+
+  function collectBody(){
+    var psel=document.getElementById('drProject');
+    var pid=psel?psel.value:'';
+    var pOpt=(psel&&psel.selectedIndex>=0)?psel.options[psel.selectedIndex]:null;
+    var pname=pOpt?(pOpt.getAttribute('data-name')||''):'';
+    return{
+      date:document.getElementById('drDate').value,
+      projectName:pname,
+      projectId:pid,
+      foreman:document.getElementById('drForeman').value,
+      precipitation:document.getElementById('drPrecip').value,
+      temp:document.getElementById('drTemp').value,
+      columnsInstalled:document.getElementById('drCols').value,
+      lfInstalled:document.getElementById('drLf').value,
+      crew:state.crew.filter(function(m){return(m.name||'').trim();}).map(function(m){return{name:m.name,start:m.start,end:m.end,hours:m.hours,costCode:m.costCode};}),
+      workCompleted:document.getElementById('drWork').value,
+      equipmentOwned:state.owned.filter(function(r){return(r.machine||'').trim()||(r.hours||'').toString().trim();}),
+      equipmentRental:state.rental.filter(function(r){return(r.category||'').trim()||(r.hours||'').toString().trim();}),
+      maintenance:state.maintenance.filter(function(r){return(r.type||'').trim()||(r.subcategory||'').trim()||(r.item||'').trim()||(r.hourAtFailure||'').toString().trim();}),
+      futureIssues:state.future.filter(function(r){return(r.equipment||'').trim()||(r.description||'').trim();}),
+      delays:document.getElementById('drDelays').value,
+      safety:document.getElementById('drSafety').value,
+      attachments:(state.attachments.photos||[]).concat(state.attachments.handlogs||[]).concat(state.attachments.guhma||[]),
+    };
+  }
+
+  function msg(t,ok){var m=document.querySelector('#mod-daily-reports [data-msg]');if(m){m.textContent=t;m.className='dr-msg '+(ok?'dr-ok':'dr-err');}}
+
+  function updateEditBanner(){
+    var b=document.getElementById('drEditBanner');
+    if(b){
+      if(state.editingId){b.style.display='';b.querySelector('[data-edit-id]')&&(b.querySelector('[data-edit-id]').textContent=state.editingId);}
+      else{b.style.display='none';}
+    }
+    var sub=document.getElementById('drSubmit');if(sub)sub.textContent=state.editingId?'Update & re-send report':'Submit & send report';
+    var nr=document.getElementById('drNewReport');if(nr)nr.style.display=state.editingId?'':'none';
+  }
+
+  function maintenanceFromRecord(saved){
+    var cats=state.lists.maintenanceCategories||[];
+    var rows=Array.isArray(saved)?saved.slice():[];
+    var out=[],used={};
+    cats.forEach(function(cat){
+      var mine=rows.filter(function(r){return r&&r.category===cat;});
+      if(mine.length){
+        mine.forEach(function(r){used[rows.indexOf(r)]=1;out.push({category:cat,type:r.type||'',subcategory:r.subcategory||'',item:r.item||'',hourAtFailure:(r.hourAtFailure!=null?r.hourAtFailure:'')});});
+      } else {
+        out.push(emptyMaintRow(cat));
+      }
+    });
+    rows.forEach(function(r,i){
+      if(used[i])return;
+      if(!r||cats.indexOf(r.category)>=0)return;
+      out.push({category:r.category||'',type:r.type||'',subcategory:r.subcategory||'',item:r.item||'',hourAtFailure:(r.hourAtFailure!=null?r.hourAtFailure:'')});
+    });
+    return out;
+  }
+
+  function loadReportIntoForm(id){
+    var r=null;
+    for(var i=0;i<state.reports.length;i++){if(state.reports[i].id===id){r=state.reports[i];break;}}
+    if(!r){msg('That report could not be found to edit.',false);return;}
+    state.editingId=r.id;
+    function setVal(elId,v){var el=document.getElementById(elId);if(el)el.value=(v==null?'':String(v));}
+    setVal('drDate',r.date);setVal('drForeman',r.foreman);
+    setVal('drPrecip',r.precipitation);setVal('drTemp',r.temp||(r.precipitation?'':r.weather));
+    setVal('drCols',r.columnsInstalled);setVal('drLf',r.lfInstalled);
+    setVal('drWork',r.workCompleted);setVal('drDelays',r.delays);setVal('drSafety',r.safety);
+    var psel=document.getElementById('drProject');
+    if(psel){
+      var pid=(r.projectId!=null&&String(r.projectId).trim())?String(r.projectId):(r.projectName||'');
+      var present=false;
+      for(var k=0;k<state.projects.length;k++){if(String(state.projects[k].id)===pid){present=true;break;}}
+      if(!present&&pid){state.projects.unshift({id:pid,name:r.projectName||pid,label:(r.projectId?r.projectId+' - ':''+(r.projectName||pid))});}
+      psel.value=pid;
+      var hid=document.getElementById('drProjectId');if(hid)hid.value=pid;
+    }
+    var crew=(Array.isArray(r.crew)?r.crew:[]).map(function(m){return{name:m.name||'',start:m.start||'',end:m.end||'',hours:(m.hours!=null?m.hours:''),costCode:m.costCode||'',auto:false};});
+    while(crew.length<3) crew.push({name:'',start:'',end:'',hours:'',costCode:'',auto:false});
+    state.crew=crew;
+    var owned=(Array.isArray(r.equipmentOwned)?r.equipmentOwned:[]).map(function(e){return{machine:e.machine||'',hours:(e.hours!=null?e.hours:'')};});
+    while(owned.length<1)owned.push({machine:'',hours:''});state.owned=owned;
+    var rental=(Array.isArray(r.equipmentRental)?r.equipmentRental:[]).map(function(e){return{category:e.category||'',hours:(e.hours!=null?e.hours:'')};});
+    while(rental.length<1)rental.push({category:'',hours:''});state.rental=rental;
+    state.maintenance=maintenanceFromRecord(r.maintenance);
+    var future=(Array.isArray(r.futureIssues)?r.futureIssues:[]).map(function(f){return{equipment:f.equipment||'',description:f.description||''};});
+    while(future.length<1)future.push({equipment:'',description:''});state.future=future;
+    var att={handlogs:[],guhma:[],photos:[]};
+    (Array.isArray(r.attachments)?r.attachments:[]).forEach(function(a){
+      var bk=a.bucket==='guhma'?'guhma':(a.bucket==='photos'?'photos':'handlogs');
+      att[bk].push({name:a.name||'',itemId:a.itemId||'',webUrl:a.webUrl||'',bucket:bk});
+    });
+    state.attachments=att;
+    renderProject();renderForeman();renderCrew();renderOwned();renderRental();renderMaint();renderFuture();
+    renderUpList('photos',[]);renderUpList('handlogs',[]);renderUpList('guhma',[]);
+    upMsg('photos','',null);upMsg('handlogs','',null);upMsg('guhma','',null);
+    updateUploadEnabled();updateEditBanner();
+    updateDraftBanner(r.updatedAt||r.createdAt||null);
+    msg('Editing report '+(window.pfFmtDate(r.date)||'')+' - '+(r.projectName||r.projectId||'')+'. Update the fields and re-send, or start a new report to cancel.',true);
+    var wrap=document.getElementById('drWrap')||document.getElementById('mod-daily-reports');
+    if(wrap&&wrap.scrollIntoView)wrap.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+
+  function upsertReport(rec){
+    if(!rec||!rec.id)return;
+    var idx=-1;
+    for(var i=0;i<state.reports.length;i++){if(state.reports[i].id===rec.id){idx=i;break;}}
+    if(idx>=0)state.reports[idx]=rec;else state.reports.push(rec);
+  }
+
+  function save(submit){
+    var body=collectBody();
+    if(!body.projectName||!body.projectName.trim()){msg('A project is required.',false);return;}
+    var editing=!!state.editingId;
+    var first=editing
+      ?Object.assign({action:'update',id:state.editingId},body)
+      :Object.assign({action:'create'},body);
+    api('/api/daily-report',{method:'POST',body:JSON.stringify(first)}).then(function(res){
+      if(!res.ok||!res.body||!res.body.saved){msg((res.body&&res.body.message)||'Save failed.',false);return;}
+      var rec=res.body.record;
+      // After create/update, track the draft id and update the banner
+      if(!submit){
+        state.draftId=rec.id;
+        state.draftSavedAt=rec.updatedAt||new Date().toISOString();
+        updateDraftBanner(state.draftSavedAt);
+      }
+      if(submit){
+        api('/api/daily-report',{method:'POST',body:JSON.stringify({action:'submit',id:rec.id})}).then(function(r2){
+          if(r2.ok&&r2.body&&r2.body.saved){
+            upsertReport(r2.body.record);
+            var to=(r2.body.distribution&&r2.body.distribution.emailedTo)||[];
+            msg((editing?'Report updated and re-sent':'Report sent')+': emailed'+(to.length?' to '+to.length+' recipient(s)':'')+' and saved to SharePoint.',true);
+            resetForm();renderList();
+          } else {
+            upsertReport(rec);
+            msg((r2.body&&r2.body.message)||'Changes saved but the report could not be sent. Please retry.',false);
+            renderList();
+          }
+        });
+      } else {
+        upsertReport(rec);msg(editing?'Changes saved.':'Draft saved.',true);resetForm();renderList();
+      }
+    }).catch(function(){msg('Network error.',false);});
+  }
+
+  function resetForm(){
+    state.editingId=null;state.draftId=null;state.draftSavedAt=null;
+    updateEditBanner();
+    ['drDate','drProject','drProjectId','drForeman','drPrecip','drTemp','drCols','drLf','drWork','drDelays','drSafety'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+    state.crew=[{name:'',start:'',end:'',hours:'',costCode:'',auto:true},{name:'',start:'',end:'',hours:'',costCode:'',auto:false},{name:'',start:'',end:'',hours:'',costCode:'',auto:false}];
+    state.owned=[{machine:'',hours:''},{machine:'',hours:''}];
+    state.rental=[{category:'',hours:''},{category:'',hours:''}];
+    state.future=[{equipment:'',description:''}];
+    state.attachments={handlogs:[],guhma:[],photos:[]};
+    buildMaintenanceRows();
+    renderProject();renderForeman();renderCrew();renderOwned();renderRental();renderMaint();renderFuture();
+    renderUpList('photos',[]);renderUpList('handlogs',[]);renderUpList('guhma',[]);
+    upMsg('photos','',null);upMsg('handlogs','',null);upMsg('guhma','',null);
+    updateUploadEnabled();
+    updateDraftBanner(null);
+  }
+
+  function statusChip(st){
+    var cls=st==='sent'?'approved':(st==='sent-to-HR'?'sentToHR':st);
+    var label=st==='sent'?'sent':st;
+    return '<span class="dr-status '+cls+'">'+E(label)+'</span>';
+  }
+
+  function renderList(){
+    var host=document.getElementById('drList');if(!host)return;
+    var rs=state.reports.slice().sort(function(a,b){return String(b.createdAt||'').localeCompare(String(a.createdAt||''));});
+    if(!rs.length){host.innerHTML='<div class="dr-muted">No daily reports yet.</div>';return;}
+    host.innerHTML=rs.map(function(r){
+      var crewH=(r.crew||[]).map(function(c){return E(c.name)+(c.hours!=null?' ('+E(c.hours)+'h)':'');}).join(', ');
+      var prod=[];
+      if(r.columnsInstalled!=null)prod.push(r.columnsInstalled+' cols');
+      if(r.lfInstalled!=null)prod.push(r.lfInstalled+' LF');
+      var actions='';
+      actions+='<button type="button" class="btn btn-sm" data-edit="'+E(r.id)+'">Edit</button> ';
+      if(r.status==='sent'&&r.pdfWebUrl){actions+=safeFileLink(r.pdfWebUrl,'View PDF')+' ';}
+      var weatherH=[];
+      if(r.precipitation)weatherH.push(E(r.precipitation));
+      if(r.temp)weatherH.push(E(r.temp));
+      if(!weatherH.length&&r.weather)weatherH.push(E(r.weather));
+      var attachH=(r.attachments||[]).map(function(a){
+        var nm=E(a.name||a.itemId||'file');
+        var b=a.bucket?(' ['+(a.bucket==='guhma'?'GUHM':(a.bucket==='photos'?'Photo':'Hand Log'))+']'):'';
+        return safeFileLink(a.webUrl,nm)+b;
+      }).join(', ');
+      return '<div class="dr-item">'
+        +'<div><strong>'+E(window.pfFmtDate(r.date)||'')+' - '+E(r.projectName||r.projectId||'')+'</strong> '+statusChip(r.status)+'</div>'
+        +'<div class="dr-muted" style="font-size:12px">Foreman '+E(r.foreman||'-')+(crewH?' - crew '+crewH:'')+(prod.length?' - '+prod.join(', '):'')+(weatherH.length?' - '+weatherH.join(' '):'')+'</div>'
+        +(r.workCompleted?'<div style="font-size:13px">'+E(r.workCompleted)+'</div>':'')
+        +(attachH?'<div class="dr-muted" style="font-size:12px">Files: '+attachH+'</div>':'')
+        +'<div class="dr-muted" style="font-size:11px">'
+        +(r.submittedBy?'submitted by '+E(r.submittedBy)+' '+E((r.submittedAt||'').slice(0,10)):'')
+        +(r.editedBy?' - edited by '+E(r.editedBy)+' '+E((r.editedAt||'').slice(0,10)):'')
+        +'</div>'
+        +(actions?'<div style="margin-top:6px">'+actions+'</div>':'')
+        +'</div>';
+    }).join('');
+    host.querySelectorAll('button[data-edit]').forEach(function(b){
+      b.addEventListener('click',function(){loadReportIntoForm(this.getAttribute('data-edit'));});
+    });
+  }
+
+  var prev=window.showModule;
+  window.showModule=function(id){if(typeof prev==='function')prev(id);if(id==='daily-reports'){load();}};
+})();
+} catch(e){
+  console.error('Module daily-reports failed to load:',e);
+}
+</script>
+
+</body>
+</html>
