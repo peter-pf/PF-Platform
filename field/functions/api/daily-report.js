@@ -75,14 +75,20 @@ import {
 const TEST_RECIPIENTS = ['pfpeter@agentmail.to'];
 const PROD_RECIPIENTS = [
   'dfranke@pierfoundations.com',
-  'jreinking@pierfoundations.com',
+  'jwillis@pierfoundations.com',
   'breinking@pierfoundations.com',
+  'jreinking@pierfoundations.com',
+  'swillis@pierfoundations.com',
+  'rvanamburg@pierfoundations.com',
+  'jlemay@pierfoundations.com',
+  'cboutte@pierfoundations.com',
 ];
 // >>> FLIP HERE <<< : ACTIVE_RECIPIENTS = TEST_RECIPIENTS (test) or PROD_RECIPIENTS (go-live).
 // PF FIELD PORTAL (pf-field project): defaults to TEST_RECIPIENTS so the new
 // project does not email the 3 partners before Derek approves this portal for
 // production. When Derek signs off, flip to PROD_RECIPIENTS (or set env var
 // DAILY_REPORT_RECIPIENTS to the 3 partner addresses without a code deploy).
+// Per Derek 10/21/2026. Flip ACTIVE_RECIPIENTS to PROD_RECIPIENTS on his go-live.
 const ACTIVE_RECIPIENTS = TEST_RECIPIENTS;
 
 // Resolve the recipient list: an env override wins (easiest ops flip, no deploy),

@@ -47,13 +47,14 @@ import {
 // ACTIVE_RECIPIENTS = PROD_RECIPIENTS (or set env var SITE_READINESS_RECIPIENTS).
 const TEST_RECIPIENTS = ['pfpeter@agentmail.to'];
 const PROD_RECIPIENTS = [
-  // TODO: Derek to supply final mailing list before go-live.
-  // Placeholder copies the DFR prod recipients as a starting point.
   'dfranke@pierfoundations.com',
-  'jreinking@pierfoundations.com',
+  'jwillis@pierfoundations.com',
   'breinking@pierfoundations.com',
+  'swillis@pierfoundations.com',
+  'jreinking@pierfoundations.com',
 ];
 // >>> FLIP HERE <<< : ACTIVE_RECIPIENTS = TEST_RECIPIENTS until Derek approves.
+// Per Derek 10/21/2026. Flip ACTIVE_RECIPIENTS to PROD_RECIPIENTS on his go-live.
 const ACTIVE_RECIPIENTS = TEST_RECIPIENTS;
 
 function resolveRecipients(env) {
