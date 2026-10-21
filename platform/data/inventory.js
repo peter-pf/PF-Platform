@@ -101,6 +101,7 @@ window.PF_INVENTORY = {
     { id: 'drill-4', category: 'Drilling', description: 'Auger Teeth (Box of 25)', manufacturer: 'ProDig / Jeffrey Machine', mfrPart: '', reqTrailer: 10, reqHome: 20, altSources: 'TBD', actualOnHand: null, notes: 'Quantities are in BOXES (25/box).' },
     { id: 'drill-5', category: 'Drilling', description: 'Pilot Bit', manufacturer: 'ProDig', mfrPart: '', reqTrailer: 4, reqHome: 10, altSources: 'Jeffrey Machine', actualOnHand: null, notes: 'Auger tips are stocked here (Derek 2026-08-20).' },
     { id: 'drill-6', category: 'Drilling', description: 'Weldable Wear Plate (Box of 25)', manufacturer: '', mfrPart: '', reqTrailer: 2, reqHome: 10, altSources: '', actualOnHand: null, notes: '' },
+    { id: 'drill-7', category: 'Drilling', description: 'Size 42 Corks for Hollow Stem', manufacturer: 'JAR CORKS', mfrPart: '6-R42-AGG-CS', reqTrailer: null, reqHome: null, altSources: '', actualOnHand: null, notes: 'Top dia 3 in, bottom dia 2-3/4 in, length 1-1/4 in. Widgetco pricing (2026-10-21): 1-9=$3.35/ea, 10-24=$2.85/ea, 25-99=$2.60/ea, 100-249=$2.40/ea, 250-999=$2.20/ea, 1000+=$2.00/ea.', purchaseLink: 'https://www.widgetco.com/products/size-42-agglomerated-jar-corks?variant=36844403032225' },
 
     // ---- Mast Components ----
     { id: 'mast-1', category: 'Mast Components', description: 'Sheave', manufacturer: 'ProDig', mfrPart: '', reqTrailer: 1, reqHome: 1, altSources: '', actualOnHand: null, notes: '' },
