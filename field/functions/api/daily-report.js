@@ -425,7 +425,13 @@ export async function onRequestPost(context) {
     // admin (it has been emailed and filed; admins may still re-send via 'submit').
     {
       const isAdmin = session && session.role === 'admin';
-      const isOwner = rec.createdBy && rec.createdBy === who;
+      // Legacy records were written with createdBy = session.name (display name).
+      // New records are written with createdBy = session.uid (stable id).
+      // Accept either so existing reports remain editable by their creator.
+      const isOwner = rec.createdBy && (
+        rec.createdBy === who ||
+        (session && session.name && rec.createdBy === session.name)
+      );
       if (!isAdmin && !isOwner) {
         return json({ status: 'forbidden', message: 'You may only edit your own reports.' }, 403);
       }

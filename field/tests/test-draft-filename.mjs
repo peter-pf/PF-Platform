@@ -356,16 +356,19 @@ test('areaForPath /api/pricing-data.js not general (default-deny)', () => {
 // ---------------------------------------------------------------------------
 // 10. Ownership guard logic — mirrors daily-report.js and site-readiness.js
 // ---------------------------------------------------------------------------
-// Replicate the ownership check exactly as written in the handlers:
-//   const isAdmin = session && session.role === 'admin';
-//   const isOwner = rec.createdBy && rec.createdBy === who;
-//   if (!isAdmin && !isOwner) -> 403
-//   if (action === 'update' && !isAdmin && rec.status === 'sent') -> 403
+// Replicate the exact check from both handlers (including legacy-name fallback):
+//   const isOwner = rec.createdBy && (
+//     rec.createdBy === who ||
+//     (session && session.name && rec.createdBy === session.name)
+//   );
 
 function ownershipCheck(session, rec, action) {
   const who = (session && (session.uid || session.name)) ? String(session.uid || session.name) : 'unknown';
   const isAdmin = session && session.role === 'admin';
-  const isOwner = rec.createdBy && rec.createdBy === who;
+  const isOwner = rec.createdBy && (
+    rec.createdBy === who ||
+    (session && session.name && rec.createdBy === session.name)
+  );
   if (!isAdmin && !isOwner) return { ok: false, status: 403, msg: 'not owner' };
   if (action === 'update' && !isAdmin && rec.status === 'sent') return { ok: false, status: 403, msg: 'sent locked' };
   return { ok: true };
@@ -421,12 +424,14 @@ test('uid takes priority over name for ownership comparison', () => {
 // 11. past-reports draft visibility — mirrors the draftVisible() filter
 // ---------------------------------------------------------------------------
 function draftVisible(r, session) {
-  const callerUid = session && (session.uid || session.name || '');
-  const isAdmin   = session && session.role === 'admin';
-  const status    = String(r.status || '');
+  const callerUid  = session && (session.uid  || '');
+  const callerName = session && (session.name || '');
+  const isAdmin    = session && session.role === 'admin';
+  const status     = String(r.status || '');
   if (status === 'sent') return true;
   if (isAdmin) return true;
-  return String(r.createdBy || '') === callerUid;
+  const cb = String(r.createdBy || '');
+  return (callerUid && cb === callerUid) || (callerName && cb === callerName);
 }
 
 const reports = [
@@ -456,6 +461,56 @@ test('full filter: user-A sees sent + own draft, not other draft', () => {
   assert.ok(ids.includes('r2'), 'Should include own draft r2');
   assert.ok(!ids.includes('r3'), 'Should NOT include user-B draft r3');
   assert.equal(visible.length, 2);
+});
+
+// ---------------------------------------------------------------------------
+// 12. Legacy-name compatibility (createdBy = display name, session has uid)
+// ---------------------------------------------------------------------------
+// Scenario: record was created before uid-based who was introduced.
+// The record has createdBy = 'John Willis' (display name).
+// The user now logs in with uid = 'b0dd7bac-1234-...' and name = 'John Willis'.
+const legacySession = { uid: 'b0dd7bac-1234-5678-abcd-ef0123456789', name: 'John Willis', role: 'field_ops' };
+const legacyRec     = { id: 'dr-legacy-1', createdBy: 'John Willis', status: 'draft' };
+const otherLegacyS  = { uid: 'cccc-dddd', name: 'Other Person', role: 'field_ops' };
+
+test('legacy record (createdBy=name) is editable by same user (uid+name session)', () => {
+  const r = ownershipCheck(legacySession, legacyRec, 'update');
+  assert.ok(r.ok, `Legacy record owner should be allowed: ${r.msg}`);
+});
+test('legacy record (createdBy=name) is editable by same user for submit', () => {
+  const r = ownershipCheck(legacySession, legacyRec, 'submit');
+  assert.ok(r.ok, `Legacy record owner should be allowed to submit: ${r.msg}`);
+});
+test('legacy record NOT editable by a different user with different name', () => {
+  const r = ownershipCheck(otherLegacyS, legacyRec, 'update');
+  assert.equal(r.ok, false);
+  assert.equal(r.status, 403);
+});
+test('legacy draft visible to owner (matched by name)', () => {
+  assert.ok(draftVisible(legacyRec, legacySession), 'Legacy draft should be visible to owner by name match');
+});
+test("legacy draft NOT visible to different user's session", () => {
+  assert.ok(!draftVisible(legacyRec, otherLegacyS), "Legacy draft should not be visible to a different user");
+});
+test('legacy draft visible to admin', () => {
+  assert.ok(draftVisible(legacyRec, adminSession), 'Admin always sees all drafts');
+});
+// New-style record: createdBy = uid; session has matching uid
+const newStyleRec = { id: 'dr-new-1', createdBy: 'b0dd7bac-1234-5678-abcd-ef0123456789', status: 'draft' };
+test('new-style record (createdBy=uid) is editable by same user', () => {
+  const r = ownershipCheck(legacySession, newStyleRec, 'update');
+  assert.ok(r.ok, `New-style record owner should be allowed: ${r.msg}`);
+});
+test('new-style record NOT editable by user whose uid does not match', () => {
+  const r = ownershipCheck(otherLegacyS, newStyleRec, 'update');
+  assert.equal(r.ok, false);
+  assert.equal(r.status, 403);
+});
+test('new-style draft visible to owner (matched by uid)', () => {
+  assert.ok(draftVisible(newStyleRec, legacySession), 'New-style draft visible to uid-matched owner');
+});
+test("new-style draft NOT visible to user with different uid", () => {
+  assert.ok(!draftVisible(newStyleRec, otherLegacyS), "New-style draft not visible to wrong uid");
 });
 
 // ---------------------------------------------------------------------------

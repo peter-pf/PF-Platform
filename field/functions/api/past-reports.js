@@ -39,8 +39,11 @@ export async function onRequestGet(context) {
   if (denied) return denied;
 
   // Caller identity for draft scoping. Prefer uid (stable) over name.
-  const callerUid = session && (session.uid || session.name || '');
-  const isAdmin   = session && session.role === 'admin';
+  // Keep callerName separately so legacy records (createdBy = display name)
+  // are still visible to their creator after the uid migration.
+  const callerUid  = session && (session.uid  || '') ;
+  const callerName = session && (session.name || '');
+  const isAdmin    = session && session.role === 'admin';
 
   try {
     if (!env.PF_SCHEDULE && !env.DB) {
@@ -61,7 +64,9 @@ export async function onRequestGet(context) {
     function draftVisible(r) {
       if (s(r.status) === 'sent') return true;
       if (isAdmin) return true;
-      return s(r.createdBy) === callerUid;
+      const cb = s(r.createdBy);
+      // Match uid (new records) OR display name (legacy records written before uid migration).
+      return (callerUid && cb === callerUid) || (callerName && cb === callerName);
     }
 
     const drReports = (drResult && Array.isArray(drResult.reports) ? drResult.reports : [])
