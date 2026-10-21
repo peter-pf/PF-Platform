@@ -40,10 +40,11 @@
   --radius-lg: 10px;
 
   /* Chrome layout */
-  --topbar-h:  52px;
-  --nav-h:     58px;
-  --sidebar-w: 192px;
-  --sticky-h:  0px;   /* pages with sticky submit bars override this */
+  --topbar-h:    52px;
+  --nav-h:       58px;
+  --sidebar-w:   192px;
+  --sticky-h:    0px;    /* pages with sticky submit bars override this */
+  --content-col: 860px;  /* max content column width; pages override on #main for centering */
 
   /* Topbar tokens */
   --topbar-bg:     #ffffff;
@@ -228,7 +229,7 @@ body {
     color: #5BC8FF;
     box-shadow: inset 2px 0 0 #5BC8FF;
   }
-  #loading, #authError, #main { margin-left: var(--sidebar-w); }
+  #loading, #authError { margin-left: var(--sidebar-w); }
 }
 
 /* ---- Loading / auth error ---- */
@@ -248,7 +249,17 @@ body {
   max-width: 680px; margin: 0 auto;
 }
 @media (min-width: 900px) {
-  #main { max-width: 860px; padding: 28px 32px; }
+  /* Center the content column within the sidebar-excluded space.
+     Formula: left = (viewport + sidebar - content) / 2
+     At ≤900px it falls back to margin-left = sidebar-w (just clears the sidebar).
+     Pages that need a different max-width set --content-col on #main and
+     override max-width to match; the formula stays self-consistent. */
+  #main {
+    max-width: var(--content-col);
+    padding: 28px 32px;
+    margin-left: max(var(--sidebar-w), calc((100vw + var(--sidebar-w) - var(--content-col)) / 2));
+    margin-right: 0;
+  }
 }
 
 /* ---- Typography hierarchy ---- */
