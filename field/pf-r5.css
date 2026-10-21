@@ -1,0 +1,314 @@
+/* PF Field Portal — Round 5 Design System
+   Stripe-inspired: quiet borders, strong typography, restrained blue.
+   All authenticated pages link this file. Page-specific styles follow
+   as inline <style> blocks that override where needed.
+   ------------------------------------------------------------------ */
+
+/* ---- Tokens (light) ---- */
+:root {
+  /* Blue — reserved for actions/selection only */
+  --accent:       #006DB0;
+  --accent-dark:  #005A91;
+  --accent-light: #EBF4FB;
+
+  /* Surfaces */
+  --bg:    #ffffff;
+  --bg-2:  #F7F8FA;
+  --card:  #ffffff;
+
+  /* Borders */
+  --border:       #E6E8EB;
+  --border-light: #E6E8EB;
+
+  /* Typography */
+  --text-0: #0D1117;
+  --text-1: #1A2233;
+  --text-2: #4A5568;
+  --text-3: #8A9BAD;
+
+  /* Semantic */
+  --green:       #16a34a;
+  --green-light: #dcfce7;
+  --amber:       #d97706;
+  --amber-light: #fef3c7;
+  --red:         #dc2626;
+  --red-light:   #fee2e2;
+
+  /* Geometry */
+  --radius:    7px;
+  --radius-sm: 5px;
+  --radius-lg: 10px;
+
+  /* Chrome layout */
+  --topbar-h:  52px;
+  --nav-h:     58px;
+  --sidebar-w: 192px;
+  --sticky-h:  0px;   /* pages with sticky submit bars override this */
+
+  /* Topbar tokens */
+  --topbar-bg:     #ffffff;
+  --topbar-border: #E6E8EB;
+  --topbar-title:  #0D1117;
+  --topbar-muted:  #8A9BAD;
+
+  /* Backward-compat aliases used by page-specific styles */
+  --surface:   #ffffff;
+  --surface-2: #ffffff;
+  --surface-3: #F7F8FA;
+  --text:      #0D1117;
+  --link:      #006DB0;
+}
+
+/* ---- Tokens (dark) ---- */
+[data-theme="dark"] {
+  --bg:    #0F1117;
+  --bg-2:  #161B24;
+  --card:  #1B2130;
+  --border:       #252D3D;
+  --border-light: #1E2738;
+  --text-0: #E8ECF2;
+  --text-1: #C0CAD8;
+  --text-2: #7A8A9B;
+  --text-3: #4A5A6A;
+  --green:       #3fb950;
+  --green-light: rgba(63,185,80,.12);
+  --amber:       #d29922;
+  --amber-light: rgba(210,153,34,.12);
+  --red:         #f87171;
+  --red-light:   rgba(248,113,113,.12);
+  --accent-light: rgba(0,109,176,.15);
+  --topbar-bg:     #161B24;
+  --topbar-border: #252D3D;
+  --topbar-title:  #E8ECF2;
+  --topbar-muted:  #7A8A9B;
+  /* Backward-compat aliases */
+  --surface:   #0F1117;
+  --surface-2: #1B2130;
+  --surface-3: #161B24;
+  --text:      #E8ECF2;
+  --link:      #5BC8FF;
+}
+
+/* ---- Base reset ---- */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 15px; line-height: 1.55;
+  color: var(--text-1); background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ---- Topbar ---- */
+#topbar {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--topbar-bg);
+  border-bottom: 1px solid var(--topbar-border);
+  display: flex; align-items: center; gap: 8px;
+  height: var(--topbar-h);
+  padding: 0 16px;
+  padding-top: env(safe-area-inset-top);
+}
+.tb-brand {
+  display: flex; align-items: center; gap: 9px;
+  text-decoration: none; flex: 1 1 auto; min-width: 0;
+}
+.tb-brand:hover { text-decoration: none; }
+.tb-mark {
+  width: 28px; height: 28px; border-radius: 6px; flex: 0 0 auto;
+  background: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 11px; letter-spacing: .3px; color: #fff;
+}
+.tb-title {
+  font-weight: 600; font-size: 14px;
+  color: var(--topbar-title);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ---- Account menu (details/summary) ---- */
+.acct-menu { position: relative; flex: 0 0 auto; }
+.acct-menu > summary { list-style: none; }
+.acct-menu > summary::-webkit-details-marker { display: none; }
+.acct-btn {
+  display: flex; align-items: center; gap: 6px;
+  cursor: pointer; padding: 6px 10px;
+  border: 1px solid transparent; border-radius: var(--radius);
+  background: none; font-family: inherit; font-size: 13px;
+  color: var(--topbar-muted);
+  transition: background .12s, border-color .12s, color .12s;
+  white-space: nowrap; max-width: 190px; overflow: hidden;
+  user-select: none;
+}
+.acct-btn:hover,
+.acct-menu[open] .acct-btn {
+  background: var(--bg-2); border-color: var(--border); color: var(--topbar-title);
+}
+.acct-name {
+  overflow: hidden; text-overflow: ellipsis; max-width: 110px;
+  white-space: nowrap;
+}
+.acct-chevron {
+  width: 13px; height: 13px; flex: 0 0 auto;
+  transition: transform .15s; color: var(--text-3);
+}
+.acct-menu[open] .acct-chevron { transform: rotate(180deg); }
+.acct-dropdown {
+  position: absolute; right: 0; top: calc(100% + 4px);
+  min-width: 168px; z-index: 200;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 18px rgba(0,0,0,.09);
+  overflow: hidden; padding: 4px 0;
+}
+.acct-item {
+  display: flex; align-items: center; gap: 9px;
+  width: 100%; padding: 9px 14px;
+  font-size: 13px; font-family: inherit;
+  color: var(--text-1); background: none; border: none;
+  cursor: pointer; text-decoration: none;
+  transition: background .1s; text-align: left; white-space: nowrap;
+}
+.acct-item:hover { background: var(--bg-2); text-decoration: none; color: var(--text-0); }
+.acct-item svg { width: 15px; height: 15px; flex: 0 0 auto; color: var(--text-3); }
+.acct-divider { height: 1px; background: var(--border); margin: 3px 0; }
+
+/* ---- Nav — phone bottom tabs ---- */
+#pfNav {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 80;
+  display: flex; align-items: stretch;
+  height: var(--nav-h); padding-bottom: env(safe-area-inset-bottom);
+  background: var(--topbar-bg); border-top: 1px solid var(--border);
+}
+.pf-nav-item {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 3px;
+  text-decoration: none; color: var(--text-3);
+  font-size: 9px; font-weight: 600; letter-spacing: .35px; text-transform: uppercase;
+  padding: 5px 2px; transition: color .12s;
+  min-height: 44px; -webkit-tap-highlight-color: transparent;
+}
+.pf-nav-item svg { width: 22px; height: 22px; flex: 0 0 auto; }
+.pf-nav-item:hover { color: var(--accent); text-decoration: none; }
+.pf-nav-item[aria-current="page"] { color: var(--accent); }
+[data-theme="dark"] .pf-nav-item[aria-current="page"] { color: #5BC8FF; }
+
+/* Account for both nav and optional sticky bar */
+body {
+  padding-bottom: calc(var(--nav-h) + var(--sticky-h) + env(safe-area-inset-bottom));
+}
+
+/* ---- Nav — desktop sidebar ---- */
+@media (min-width: 900px) {
+  body { padding-bottom: var(--sticky-h); }
+  #pfNav {
+    position: fixed; top: var(--topbar-h); left: 0; right: auto; bottom: 0;
+    width: var(--sidebar-w); height: auto;
+    flex-direction: column; align-items: stretch;
+    border-top: none; border-right: 1px solid var(--border);
+    padding: 8px 0; overflow-y: auto;
+  }
+  .pf-nav-item {
+    flex: none; flex-direction: row; gap: 10px;
+    padding: 9px 16px; font-size: 13px;
+    letter-spacing: 0; text-transform: none; justify-content: flex-start;
+  }
+  /* Subtle active: gray bg + blue text + left accent bar */
+  .pf-nav-item[aria-current="page"] {
+    background: var(--bg-2); color: var(--accent);
+    box-shadow: inset 2px 0 0 var(--accent);
+    font-weight: 600;
+  }
+  [data-theme="dark"] .pf-nav-item[aria-current="page"] {
+    background: rgba(0,109,176,.08);
+    color: #5BC8FF;
+    box-shadow: inset 2px 0 0 #5BC8FF;
+  }
+  #loading, #authError, #main { margin-left: var(--sidebar-w); }
+}
+
+/* ---- Loading / auth error ---- */
+#loading {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 60vh; color: var(--text-3); font-size: 14px;
+}
+#authError {
+  display: none; padding: 32px 16px; text-align: center; color: var(--text-2);
+}
+
+/* ---- Content wrapper ---- */
+#main {
+  display: none;
+  padding: 24px 20px;
+  padding-bottom: max(40px, env(safe-area-inset-bottom));
+  max-width: 680px; margin: 0 auto;
+}
+@media (min-width: 900px) {
+  #main { max-width: 860px; padding: 28px 32px; }
+}
+
+/* ---- Typography hierarchy ---- */
+.page-title {
+  font-size: 1.2rem; font-weight: 700;
+  color: var(--text-0); letter-spacing: -.2px; margin: 0 0 3px;
+  line-height: 1.3;
+}
+.page-sub {
+  font-size: .875rem; color: var(--text-2); margin: 0 0 22px;
+}
+.section-label {
+  font-size: .7rem; font-weight: 700;
+  letter-spacing: .55px; text-transform: uppercase;
+  color: var(--text-3); margin: 22px 0 8px;
+}
+
+/* ---- Action list (replaces tile grid) ---- */
+.action-list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: 24px;
+  background: var(--card);
+}
+.action-item {
+  display: flex; align-items: center; gap: 14px;
+  padding: 13px 16px;
+  background: var(--card);
+  text-decoration: none; color: inherit;
+  border-bottom: 1px solid var(--border);
+  transition: background .1s;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+}
+.action-item:last-child { border-bottom: none; }
+.action-item:hover { background: var(--bg-2); text-decoration: none; color: inherit; }
+.action-icon {
+  width: 34px; height: 34px; border-radius: var(--radius);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg-2); color: var(--text-2); flex: 0 0 auto;
+}
+.action-item.primary .action-icon {
+  background: var(--accent-light); color: var(--accent);
+}
+.action-text { flex: 1 1 auto; min-width: 0; }
+.action-title {
+  font-size: .9375rem; font-weight: 600;
+  color: var(--text-0); line-height: 1.25;
+}
+.action-item.primary .action-title { color: var(--accent); }
+.action-sub {
+  font-size: .8125rem; color: var(--text-2);
+  margin-top: 1px; line-height: 1.4;
+}
+.action-chevron { width: 16px; height: 16px; color: var(--text-3); flex: 0 0 auto; }
+
+/* ---- Utility ---- */
+.pf-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.pf-separator { height: 1px; background: var(--border); margin: 20px 0; }

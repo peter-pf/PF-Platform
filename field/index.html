@@ -11,236 +11,10 @@
 <meta name="apple-mobile-web-app-title" content="PF Field">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<style>
-  /* ---- PF brand tokens ---- */
-  :root{
-    /* Brand (constant across themes) */
-    --accent:#006DB0;
-    --accent-light:#E0F0FF;
-    --accent-dark:#005A91;
-    /* Light theme surfaces */
-    --bg:#F9FAFD;
-    --bg-2:#F3F5F8;
-    --card:#ffffff;
-    --border:#C8D5DC;
-    --border-light:#E2EAF0;
-    /* Light theme text */
-    --text-0:#0B1722;
-    --text-1:#2B2F36;
-    --text-2:#5A6370;
-    --text-3:#8A9AAB;
-    /* Semantic */
-    --green:#16a34a;
-    --green-light:#dcfce7;
-    --amber:#d97706;
-    --amber-light:#fef3c7;
-    /* Elevation */
-    --radius:12px;
-    --shadow-sm:0 1px 2px rgba(0,0,0,.05);
-    --shadow-md:0 4px 10px -2px rgba(0,40,80,.10);
-    --shadow-lg:0 14px 40px rgba(0,40,80,.12);
-    /* Topbar (light) */
-    --topbar-bg:#FFFFFF;
-    --topbar-border:#E2EAF0;
-    --topbar-title:#0B1722;
-    --topbar-muted:#8A9AAB;
-    /* Greet (light) */
-    --greet-bg:var(--accent);
-    --greet-color:#ffffff;
-    --greet-label-color:rgba(255,255,255,.78);
-    --greet-sub-color:rgba(255,255,255,.88);
-  }
-  [data-theme="dark"]{
-    --bg:#0F1219;
-    --bg-2:#161C25;
-    --card:#1b212c;
-    --border:#2a2f3a;
-    --border-light:#222830;
-    --text-0:#E8EDF2;
-    --text-1:#C4CDD8;
-    --text-2:#8A9AAB;
-    --text-3:#5A6A7A;
-    --green:#3fb950;
-    --green-light:rgba(63,185,80,.15);
-    --amber:#d29922;
-    --amber-light:rgba(210,153,34,.15);
-    --topbar-bg:#1E2A38;
-    --topbar-border:transparent;
-    --topbar-title:#ffffff;
-    --topbar-muted:#9FB3C4;
-    --greet-bg:linear-gradient(135deg,#10324F 0%,#1E2A38 100%);
-    --greet-color:#ffffff;
-    --greet-label-color:#9FB3C4;
-    --greet-sub-color:#C7D6E2;
-  }
-  *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
-  body{
-    font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
-    font-size:15px;line-height:1.5;
-    color:var(--text-1);background:var(--bg);
-    -webkit-font-smoothing:antialiased;
-    min-height:100vh;
-  }
-  #main{padding:18px 16px;padding-bottom:max(40px,env(safe-area-inset-bottom));max-width:680px;margin:0 auto;}
-  a{color:var(--accent);text-decoration:none;}
-  a:hover{text-decoration:underline;}
-
-  /* ---- top bar ---- */
-  #topbar{
-    position:sticky;top:0;z-index:100;
-    background:var(--topbar-bg);
-    border-bottom:1px solid var(--topbar-border);
-    box-shadow:0 1px 4px rgba(0,0,0,.06);
-    display:flex;align-items:center;gap:10px;
-    padding:11px 16px;
-    padding-top:max(11px, env(safe-area-inset-top));
-  }
-  [data-theme="dark"] #topbar{box-shadow:none;}
-  #topbar .tb-brand{
-    display:flex;align-items:center;gap:10px;
-    text-decoration:none;flex:1 1 auto;
-  }
-  #topbar .tb-brand:hover{text-decoration:none;}
-  #topbar .tb-mark{
-    width:32px;height:32px;border-radius:8px;flex:0 0 auto;
-    background:var(--accent);display:flex;align-items:center;justify-content:center;
-    font-weight:800;font-size:13px;letter-spacing:.3px;color:#fff;
-  }
-  #topbar .tb-title{font-weight:700;font-size:15px;color:var(--topbar-title);flex:1 1 auto;}
-  #topbar .tb-right{display:flex;align-items:center;gap:4px;font-size:13px;}
-  #topbar .tb-user{color:var(--topbar-muted);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  #topbar .tb-signout{
-    color:var(--topbar-muted);font-size:13px;cursor:pointer;
-    background:none;border:none;padding:6px 8px;font-family:inherit;
-  }
-  #topbar .tb-signout:hover{color:var(--topbar-title);}
-  .tb-theme{
-    display:inline-flex;align-items:center;justify-content:center;
-    width:44px;height:44px;
-    border:none;background:none;cursor:pointer;
-    color:var(--topbar-muted);border-radius:8px;
-    transition:background .15s,color .15s;
-    flex:0 0 auto;
-  }
-  .tb-theme:hover{background:var(--bg-2);color:var(--topbar-title);}
-
-  /* ---- layout ---- */
-  #loading{display:flex;align-items:center;justify-content:center;min-height:60vh;color:var(--text-3);font-size:14px;}
-  #authError{display:none;padding:32px 16px;text-align:center;color:var(--text-2);}
-  #main{display:none;}
-
-  /* ---- greeting strip ---- */
-  .greet{
-    background:var(--greet-bg);
-    border-radius:14px;padding:16px 18px;margin-bottom:18px;color:var(--greet-color);
-  }
-  .greet-label{font-size:.72rem;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--greet-label-color);margin-bottom:4px;}
-  .greet-name{font-size:1.18rem;font-weight:800;}
-  .greet-sub{font-size:.88rem;color:var(--greet-sub-color);margin-top:2px;}
-
-  /* ---- section label ---- */
-  .section-label{
-    font-size:.75rem;font-weight:700;letter-spacing:.6px;text-transform:uppercase;
-    color:var(--text-3);margin:4px 2px 10px;
-  }
-
-  /* ---- tile grid (iOS-style cards) ---- */
-  .tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;}
-  .tile{
-    background:var(--card);border:1px solid var(--border-light);
-    border-radius:var(--radius);padding:16px 14px 14px;
-    box-shadow:var(--shadow-sm);
-    display:flex;flex-direction:column;gap:8px;
-    cursor:pointer;text-decoration:none;color:inherit;
-    transition:box-shadow .15s, border-color .15s, transform .08s;
-    -webkit-tap-highlight-color:transparent;
-    min-height:110px;
-  }
-  .tile:hover{box-shadow:var(--shadow-md);border-color:var(--border);}
-  .tile:active{transform:scale(.97);}
-  .tile.accent{background:var(--accent);border-color:var(--accent-dark);}
-  .tile.accent .tile-icon,.tile.accent .tile-title,.tile.accent .tile-sub{color:#fff;}
-  .tile-icon{
-    width:42px;height:42px;border-radius:11px;flex:0 0 auto;
-    display:flex;align-items:center;justify-content:center;
-    font-size:1.4rem;background:var(--accent-light);color:var(--accent-dark);
-  }
-  .tile.accent .tile-icon{background:rgba(255,255,255,.2);}
-  .tile-text{flex:1 1 auto;}
-  .tile-title{font-size:.97rem;font-weight:700;color:var(--text-0);line-height:1.2;}
-  .tile-sub{font-size:.8rem;color:var(--text-2);margin-top:3px;line-height:1.35;}
-
-  /* ---- wide tile (spans 2 cols) ---- */
-  .tile.wide{grid-column:1/-1;flex-direction:row;align-items:center;gap:14px;min-height:auto;padding:14px 16px;}
-  .tile.wide .tile-icon{width:46px;height:46px;}
-  .tile.wide .tile-arrow{flex:0 0 auto;color:var(--text-3);font-size:1.3rem;margin-left:auto;}
-
-  /* ---- foot ---- */
-  .home-foot{text-align:center;margin-top:24px;font-size:.76rem;color:var(--text-3);}
-
-  @media(max-width:380px){
-    .tiles{grid-template-columns:1fr;}
-    .tile.wide{grid-column:1/1;}
-  }
-
-  /* ---- nav (phone: tab bar  |  desktop ≥900px: left sidebar) ---- */
-  :root{--nav-h:58px;--sidebar-w:180px;--topbar-h:52px;}
-  #pfNav{
-    position:fixed;bottom:0;left:0;right:0;z-index:80;
-    display:flex;align-items:stretch;
-    height:var(--nav-h);padding-bottom:env(safe-area-inset-bottom);
-    background:var(--topbar-bg);border-top:1px solid var(--topbar-border);
-    box-shadow:0 -1px 6px rgba(0,0,0,.06);
-  }
-  [data-theme="dark"] #pfNav{box-shadow:none;}
-  .pf-nav-item{
-    flex:1;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;gap:3px;
-    text-decoration:none;color:var(--text-3);
-    font-size:9px;font-weight:600;letter-spacing:.35px;text-transform:uppercase;
-    padding:5px 2px;transition:color .12s;
-    min-height:44px;-webkit-tap-highlight-color:transparent;
-  }
-  .pf-nav-item svg{width:22px;height:22px;flex:0 0 auto;transition:transform .1s;}
-  .pf-nav-item:hover{color:var(--accent);text-decoration:none;}
-  .pf-nav-item[aria-current="page"]{color:var(--accent);}
-  [data-theme="dark"] .pf-nav-item[aria-current="page"]{color:#5bc8ff;}
-  .pf-nav-item[aria-current="page"] svg{transform:scale(1.1);}
-  body{padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom));}
-  @media(min-width:900px){
-    body{padding-bottom:0;}
-    #pfNav{
-      position:fixed;top:var(--topbar-h);left:0;right:auto;bottom:0;
-      width:var(--sidebar-w);height:auto;
-      flex-direction:column;align-items:stretch;
-      border-top:none;border-right:1px solid var(--border-light);
-      box-shadow:none;padding:12px 0;overflow-y:auto;
-    }
-    .pf-nav-item{
-      flex:none;flex-direction:row;gap:10px;
-      padding:11px 16px;font-size:13px;
-      letter-spacing:0;text-transform:none;justify-content:flex-start;
-    }
-    .pf-nav-item[aria-current="page"]{background:var(--accent-light);color:var(--accent-dark);}
-    [data-theme="dark"] .pf-nav-item[aria-current="page"]{background:rgba(0,109,176,.18);color:#a8d4f5;}
-    #loading,#authError,#main{margin-left:var(--sidebar-w);}
-    #main{max-width:840px;}
-  }
-  /* ---- Round 4: Typeform typography polish on home tiles ---- */
-  .tile-title{font-size:.97rem;font-weight:700;color:var(--text-0);line-height:1.2;letter-spacing:-.1px;}
-  .tile-sub{font-size:.78rem;color:var(--text-2);margin-top:3px;line-height:1.4;}
-  .tile{transition:box-shadow .15s,border-color .15s,transform .1s;}
-  .tile:hover{box-shadow:var(--shadow-md);border-color:var(--border);transform:translateY(-1px);}
-  .tile:active{transform:scale(.97);}
-  /* Section headings on home page (if any labels are added) */
-  .home-section-label{font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--text-2);margin:20px 0 8px;}
-</style>
-<!-- No-flash theme: reads stored pref first, then prefers-color-scheme -->
-<script>
-(function(){try{var t=localStorage.getItem('pf-theme');var dark=t==='dark'||(t==null&&window.matchMedia&&window.matchMedia('(prefers-color-scheme:dark)').matches);if(dark)document.documentElement.setAttribute('data-theme','dark');}catch(e){}}());
-</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/pf-r5.css">
+<!-- No-flash theme -->
+<script>(function(){try{var t=localStorage.getItem('pf-theme');var d=t==='dark'||(t==null&&window.matchMedia&&window.matchMedia('(prefers-color-scheme:dark)').matches);if(d)document.documentElement.setAttribute('data-theme','dark');}catch(e){}}());</script>
 </head>
 <body>
 
@@ -249,32 +23,46 @@
     <div class="tb-mark">PF</div>
     <span class="tb-title">Field Portal</span>
   </a>
-  <div class="tb-right">
-    <span class="tb-user" id="userLabel"></span>
-    <button type="button" class="tb-theme" id="themeToggle" aria-label="Switch to dark mode"></button>
-    <button type="button" class="tb-signout" id="signoutBtn" onclick="window.location.href='/api/logout'">Sign out</button>
-  </div>
+  <details class="acct-menu" id="acctMenu">
+    <summary>
+      <span class="acct-btn">
+        <span class="acct-name" id="acctName"></span>
+        <svg class="acct-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </span>
+    </summary>
+    <div class="acct-dropdown">
+      <button type="button" class="acct-item" onclick="window.pfToggleTheme()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>
+        <span id="acctThemeLabel">Dark mode</span>
+      </button>
+      <div class="acct-divider"></div>
+      <a class="acct-item" href="/api/logout">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+        Sign Out
+      </a>
+    </div>
+  </details>
 </div>
 
 <nav id="pfNav" aria-label="Main navigation">
-  <a href="/" class="pf-nav-item" data-nav="home">
-    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h4a1 1 0 001-1v-3h2v3a1 1 0 001 1h4a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
+  <a href="/" class="pf-nav-item" data-paths="/, /index.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
     <span>Home</span>
   </a>
-  <a href="/daily-report.html" class="pf-nav-item" data-nav="daily">
-    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>
+  <a href="/daily-report.html" class="pf-nav-item" data-paths="/daily-report.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><line x1="9" y1="12" x2="15" y2="12"></line><line x1="9" y1="16" x2="13" y2="16"></line></svg>
     <span>Daily Report</span>
   </a>
-  <a href="/site-readiness.html" class="pf-nav-item" data-nav="sr">
-    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+  <a href="/site-readiness.html" class="pf-nav-item" data-paths="/site-readiness.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
     <span>Site Readiness</span>
   </a>
-  <a href="/past-reports.html" class="pf-nav-item" data-nav="pr">
-    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
+  <a href="/past-reports.html" class="pf-nav-item" data-paths="/past-reports.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
     <span>Past Reports</span>
   </a>
-  <a href="/cost-codes.html" class="pf-nav-item" data-nav="cc">
-    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm2 10a1 1 0 10-2 0v1a1 1 0 102 0v-1zm2-3a1 1 0 011 1v3a1 1 0 11-2 0v-3a1 1 0 011-1zm4-1a1 1 0 10-2 0v4a1 1 0 102 0v-4z" clip-rule="evenodd"/></svg>
+  <a href="/cost-codes.html" class="pf-nav-item" data-paths="/cost-codes.html, /cost-codes">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
     <span>Cost Codes</span>
   </a>
 </nav>
@@ -284,107 +72,82 @@
 
 <div id="main">
 
-  <div class="greet">
-    <div class="greet-label">Field Portal</div>
-    <div class="greet-name" id="greetName">Pier Foundations</div>
-  </div>
+  <p class="page-title" id="greetName">Field Portal</p>
+  <p class="page-sub">Select a tool below to get started.</p>
 
   <div class="section-label">Field Tools</div>
 
-  <div class="tiles">
+  <div class="action-list">
 
-    <!-- Daily Field Report — primary action, accent tile -->
-    <a href="/daily-report.html" class="tile accent" aria-label="Daily Field Report">
-      <div class="tile-icon">&#128221;</div>
-      <div class="tile-text">
-        <div class="tile-title">Daily Field Report</div>
-        <div class="tile-sub">Log crew, production, weather &amp; equipment</div>
+    <a href="/daily-report.html" class="action-item primary">
+      <div class="action-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><line x1="9" y1="12" x2="15" y2="12"></line><line x1="9" y1="16" x2="13" y2="16"></line></svg>
       </div>
+      <div class="action-text">
+        <div class="action-title">Daily Field Report</div>
+        <div class="action-sub">Log crew, production, weather &amp; equipment</div>
+      </div>
+      <svg class="action-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
     </a>
 
-    <!-- Site Readiness -->
-    <a href="/site-readiness.html" class="tile" aria-label="Site Readiness">
-      <div class="tile-icon">&#9989;</div>
-      <div class="tile-text">
-        <div class="tile-title">Site Readiness</div>
-        <div class="tile-sub">Pre-mobilization checklist</div>
+    <a href="/site-readiness.html" class="action-item">
+      <div class="action-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
       </div>
+      <div class="action-text">
+        <div class="action-title">Site Readiness</div>
+        <div class="action-sub">Pre-mobilization checklist</div>
+      </div>
+      <svg class="action-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
     </a>
 
-    <!-- Cost Codes — reference tile -->
-    <a href="/cost-codes.html" class="tile" aria-label="Cost Codes">
-      <div class="tile-icon">&#128220;</div>
-      <div class="tile-text">
-        <div class="tile-title">Cost Codes</div>
-        <div class="tile-sub">Find the right code for receipts and expenses</div>
+    <a href="/cost-codes.html" class="action-item">
+      <div class="action-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
       </div>
+      <div class="action-text">
+        <div class="action-title">Cost Codes</div>
+        <div class="action-sub">Find the right code for receipts and expenses</div>
+      </div>
+      <svg class="action-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
     </a>
 
-    <!-- Past Reports — wide tile spanning both columns -->
-    <a href="/past-reports.html" class="tile wide" aria-label="Past Reports">
-      <div class="tile-icon">&#128196;</div>
-      <div class="tile-text">
-        <div class="tile-title">Past Reports</div>
-        <div class="tile-sub">Browse &amp; search previous daily reports and site readiness forms</div>
+    <a href="/past-reports.html" class="action-item">
+      <div class="action-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
       </div>
-      <span class="tile-arrow" aria-hidden="true">&#8250;</span>
+      <div class="action-text">
+        <div class="action-title">Past Reports</div>
+        <div class="action-sub">Browse &amp; search previous daily reports and site readiness forms</div>
+      </div>
+      <svg class="action-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
     </a>
 
   </div>
 
-
 </div><!-- #main -->
 
+<script src="/pf-shared.js"></script>
 <script>
 "use strict";
-/* ---- Theme toggle ---- */
-var PF_SUN='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
-var PF_MOON='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
-function pfUpdateThemeBtn(){
-  var btn=document.getElementById('themeToggle');if(!btn)return;
-  var dark=document.documentElement.getAttribute('data-theme')==='dark';
-  btn.innerHTML=dark?PF_SUN:PF_MOON;
-  btn.setAttribute('aria-label',dark?'Switch to light mode':'Switch to dark mode');
-}
-function pfToggleTheme(){
-  var dark=document.documentElement.getAttribute('data-theme')==='dark';
-  document.documentElement.setAttribute('data-theme',dark?'light':'dark');
-  try{localStorage.setItem('pf-theme',dark?'light':'dark');}catch(e){}
-  pfUpdateThemeBtn();
-}
-document.addEventListener('DOMContentLoaded',function(){
-  pfUpdateThemeBtn();
-  var btn=document.getElementById('themeToggle');
-  if(btn)btn.addEventListener('click',pfToggleTheme);
-  /* ---- nav active state ---- */
-  var path=window.location.pathname;
-  var navMap={'home':['/','/index.html'],'daily':['/daily-report.html'],'sr':['/site-readiness.html'],'pr':['/past-reports.html'],'cc':['/cost-codes.html','/cost-codes']};
-  document.querySelectorAll('.pf-nav-item[data-nav]').forEach(function(a){
-    var key=a.getAttribute('data-nav');
-    var paths=navMap[key]||[];
-    if(paths.indexOf(path)>=0)a.setAttribute('aria-current','page');
-  });
-});
-/* ---- XSS escaper ---- */
-window.esc = (function(){
-  var m={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'};
-  return function(s){return s==null?'':String(s).replace(/[&<>"']/g,function(c){return m[c];});};
-})();
-
+window.esc = window.esc || function(s){
+  if(s==null)return'';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+};
 (function(){
   var loadEl  = document.getElementById('loading');
   var mainEl  = document.getElementById('main');
   var errEl   = document.getElementById('authError');
-  var userLbl = document.getElementById('userLabel');
   var greetNm = document.getElementById('greetName');
+  var acctNm  = document.getElementById('acctName');
 
   fetch('/api/me', {credentials:'same-origin'})
     .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
     .then(function(r){
       if(r.ok && r.d && r.d.status==='ok'){
-        var name = r.d.name || r.d.role || '';
-        if(userLbl) userLbl.textContent = name;
-        if(greetNm && name) greetNm.textContent = name;
+        var name = window.esc(r.d.name || r.d.role || '');
+        if(greetNm) greetNm.textContent = r.d.name || 'Field Portal';
+        if(acctNm) acctNm.textContent = r.d.name || '';
         if(loadEl) loadEl.style.display='none';
         if(mainEl) mainEl.style.display='block';
       } else if(r.d && r.d.status==='must_reset'){
