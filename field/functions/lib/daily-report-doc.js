@@ -78,14 +78,14 @@ export function renderDailyReportPdf(rec) {
     doc.table(eqRows, { valueW: 110, subLabels: new Set(['Owned', 'Rental']) });
   }
 
-  // ---- maintenance (category / type / subcategory / detail / hour-at-failure) --
+  // ---- maintenance (category / type / detail / hour-at-failure; subcategory removed R7) --
   const maint = Array.isArray(rec.maintenance)
-    ? rec.maintenance.filter((m) => m && (m.type || m.subcategory || m.item || m.category))
+    ? rec.maintenance.filter((m) => m && (m.type || m.item || m.category))
     : [];
   if (maint.length) {
     doc.heading('Maintenance');
     doc.table(maint.map((m) => {
-      const bits = [m.type, m.subcategory, m.item].filter(Boolean).join(' - ');
+      const bits = [m.type, m.item].filter(Boolean).join(' - ');
       return {
         label: `${m.category || 'General'}: ${bits || '-'}`,
         value: (m.hourAtFailure != null && m.hourAtFailure !== '') ? `${m.hourAtFailure} hr` : '',
@@ -105,9 +105,31 @@ export function renderDailyReportPdf(rec) {
     }
   }
 
-  // ---- delays ----
+  // ---- delays (R7: per-entry rows with optional downtimeHours) ----
   doc.heading('Delays');
-  doc.text(rec.delays && rec.delays.trim() ? rec.delays : 'None reported.', { size: 10 });
+  // Use delayEntries (new format) if present; fall back to the old plain-text
+  // `delays` string for records saved before R7.
+  const delayEntries = Array.isArray(rec.delayEntries) && rec.delayEntries.length
+    ? rec.delayEntries
+    : (rec.delays && rec.delays.trim() ? [{ description: rec.delays.trim(), downtimeHours: null }] : []);
+  if (delayEntries.length) {
+    let totalDowntime = 0;
+    let hasDowntime = false;
+    const delayRows = delayEntries.map((d) => {
+      const dh = (d.downtimeHours != null && d.downtimeHours !== '') ? Number(d.downtimeHours) : null;
+      if (dh != null && isFinite(dh)) { totalDowntime += dh; hasDowntime = true; }
+      return {
+        label: d.description || '-',
+        value: (dh != null && isFinite(dh)) ? `${dh} hr downtime` : '',
+      };
+    });
+    if (hasDowntime) {
+      delayRows.push({ label: 'Total downtime', value: `${Math.round(totalDowntime * 10) / 10} hr` });
+    }
+    doc.table(delayRows, { valueW: 110 });
+  } else {
+    doc.text('None reported.', { size: 10 });
+  }
 
   // ---- safety ----
   doc.heading('Safety');
@@ -228,7 +250,23 @@ export function buildEmailBody(rec) {
   lines.push(`Production: ${prod.length ? prod.join(', ') : '-'}`);
   const crewN = Array.isArray(rec.crew) ? rec.crew.filter((c) => c && c.name).length : 0;
   lines.push(`Crew on site: ${crewN}`);
-  if (rec.delays && rec.delays.trim()) lines.push(`Delays: ${rec.delays.trim().slice(0, 200)}`);
+  // R7: delayEntries replaces the plain delays string; fall back to legacy field.
+  const emailDelays = Array.isArray(rec.delayEntries) && rec.delayEntries.length
+    ? rec.delayEntries
+    : (rec.delays && rec.delays.trim() ? [{ description: rec.delays.trim(), downtimeHours: null }] : []);
+  if (emailDelays.length) {
+    let totalDowntime = 0;
+    let hasDowntime = false;
+    const parts = emailDelays.map((d) => {
+      const dh = (d.downtimeHours != null && d.downtimeHours !== '') ? Number(d.downtimeHours) : null;
+      if (dh != null && isFinite(dh)) { totalDowntime += dh; hasDowntime = true; }
+      const suffix = (dh != null && isFinite(dh)) ? ` (${dh} hr downtime)` : '';
+      return (d.description || '').trim().slice(0, 200) + suffix;
+    });
+    lines.push('Delays:');
+    parts.forEach((p) => lines.push('  - ' + p));
+    if (hasDowntime) lines.push(`  Total downtime: ${Math.round(totalDowntime * 10) / 10} hr`);
+  }
   if (rec.safety && rec.safety.trim()) lines.push(`Safety: ${rec.safety.trim().slice(0, 200)}`);
   lines.push('');
   lines.push('The full report is attached as a PDF. This is an automated message from the PF Platform.');

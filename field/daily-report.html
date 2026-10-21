@@ -349,7 +349,8 @@
           </button>
         </div>
         <div class="section-body" id="sb-delays">
-          <textarea id="drDelays" placeholder="Describe any delays, site issues, or problems encountered today"></textarea>
+          <div id="drDelayList"></div>
+          <button type="button" class="btn btn-sm dr-add-row" id="drAddDelay">+ Add delay / issue</button>
         </div>
       </div>
 
@@ -521,6 +522,7 @@ try {
     owned: [{machine:'',hours:''},{machine:'',hours:''}],
     rental: [{category:'',hours:''},{category:'',hours:''}],
     maintenance: [],
+    delayEntries: [{description:'',downtimeHours:''}],
     future: [{equipment:'',description:''}],
     attachments: { handlogs:[], guhma:[], photos:[] },
   };
@@ -585,7 +587,16 @@ try {
     }
     sv('drForeman',b.foreman);sv('drPrecip',b.precipitation);sv('drTemp',b.temp);
     sv('drCols',b.columnsInstalled);sv('drLf',b.lfInstalled);
-    sv('drWork',b.workCompleted);sv('drDelays',b.delays);sv('drSafety',b.safety);
+    sv('drWork',b.workCompleted);sv('drSafety',b.safety);
+    // R7: restore delayEntries; fall back to old delays string for old offline drafts
+    if(Array.isArray(b.delayEntries)&&b.delayEntries.length){
+      state.delayEntries=b.delayEntries.map(function(d){return{description:d.description||'',downtimeHours:(d.downtimeHours!=null?d.downtimeHours:'')};});
+    } else if(b.delays&&String(b.delays).trim()){
+      state.delayEntries=[{description:String(b.delays).trim(),downtimeHours:''}];
+    } else {
+      state.delayEntries=[{description:'',downtimeHours:''}];
+    }
+    renderDelays();
     if(Array.isArray(b.crew)&&b.crew.length){
       var crew=b.crew.map(function(m){return{name:m.name||'',start:m.start||'',end:m.end||'',hours:(m.hours!=null?m.hours:''),costCode:m.costCode||'',auto:false};});
       while(crew.length<3)crew.push({name:'',start:'',end:'',hours:'',costCode:'',auto:false});
@@ -689,7 +700,8 @@ try {
     var rental=(Array.isArray(prev.equipmentRental)?prev.equipmentRental:[]).map(function(e){return{category:e.category||'',hours:''};});
     if(!rental.length)rental=[{category:'',hours:''}];
     state.rental=rental;
-    ['drCols','drLf','drWork','drDelays','drSafety'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+    ['drCols','drLf','drWork','drSafety'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+    state.delayEntries=[{description:'',downtimeHours:''}];renderDelays();
     renderCrew();renderOwned();renderRental();
     updateDraftBanner(state.draftSavedAt);
     msg('Crew and equipment copied from '+(window.pfFmtDate(prev.date)||prev.date||'')+'. Fill in today\'s production details.',true);
@@ -741,7 +753,7 @@ try {
     }).catch(function(){state.projects=[];});
   }
 
-  function emptyMaintRow(cat){return{category:cat,type:'',subcategory:'',item:'',hourAtFailure:''};}
+  function emptyMaintRow(cat){return{category:cat,type:'',item:'',hourAtFailure:''};}
 
   function buildMaintenanceRows(){
     var cats=state.lists.maintenanceCategories||[];
@@ -770,7 +782,7 @@ try {
       }
       buildMaintenanceRows();
       state.reports=(dr.ok&&dr.body&&Array.isArray(dr.body.reports))?dr.body.reports:[];
-      wireForm();renderProject();renderForeman();renderCrew();renderOwned();renderRental();renderMaint();renderFuture();renderList();
+      wireForm();renderProject();renderForeman();renderCrew();renderOwned();renderRental();renderMaint();renderDelays();renderFuture();renderList();
       updateDraftBanner(null);
       // Auto-fill today's date (if no editing state)
       if(!state.editingId){var dd=document.getElementById('drDate');if(dd&&!dd.value)dd.value=todayIso();}
@@ -787,7 +799,7 @@ try {
     }).catch(function(){
       if(wrap)wrap.style.display='block';
       state.reports=[];buildMaintenanceRows();
-      wireForm();renderProject();renderForeman();renderCrew();renderOwned();renderRental();renderMaint();renderFuture();renderList();
+      wireForm();renderProject();renderForeman();renderCrew();renderOwned();renderRental();renderMaint();renderDelays();renderFuture();renderList();
       updateDraftBanner(null);
       if(!state.editingId){var dd2=document.getElementById('drDate');if(dd2&&!dd2.value)dd2.value=todayIso();}
       checkOfflineDraft();
@@ -914,18 +926,15 @@ try {
   function renderMaint(){
     var host=document.getElementById('drMaint');if(!host)return;
     var cats=state.lists.maintenanceCategories||[];
-    var subs=state.lists.maintenanceSubcategories||{};
     host.innerHTML=cats.map(function(cat){
       var catCount=state.maintenance.filter(function(r){return r.category===cat;}).length;
       var canRemove=catCount>1;
       var rowsHtml=state.maintenance.map(function(r,i){
         if(r.category!==cat)return'';
-        var subOpts=(subs&&subs[cat])?subs[cat]:[];
         return '<div class="dr-row">'
           +'<select class="ty" data-i="'+i+'" data-f="type">'+opts(MAINT_TYPES,r.type,'Type')+'</select>'
-          +'<select class="sc" data-i="'+i+'" data-f="subcategory">'+opts(subOpts,r.subcategory,'Subcategory')+'</select>'
           +'<input class="item" data-i="'+i+'" data-f="item" placeholder="Detail / notes" value="'+E(r.item)+'">'
-          +'<input class="hr" data-i="'+i+'" data-f="hourAtFailure" placeholder="Machine hour at failure" inputmode="decimal" value="'+E(r.hourAtFailure)+'">'
+          +'<input class="hr" data-i="'+i+'" data-f="hourAtFailure" placeholder="hours" inputmode="decimal" value="'+E(r.hourAtFailure)+'">'
           +(canRemove?'<button type="button" class="dr-rm" data-mtrm="'+i+'" aria-label="Remove row">Remove</button>':'')
           +'</div>';
       }).join('');
@@ -978,6 +987,20 @@ try {
     host.querySelectorAll('button[data-rm]').forEach(function(b){b.addEventListener('click',function(){if(state.future.length<=1)return;state.future.splice(+this.getAttribute('data-rm'),1);renderFuture();});});
   }
 
+  function renderDelays(){
+    var host=document.getElementById('drDelayList');if(!host)return;
+    var canRemove=state.delayEntries.length>1;
+    host.innerHTML=state.delayEntries.map(function(r,i){
+      return '<div class="dr-row">'
+        +'<input class="desc" data-i="'+i+'" data-f="description" placeholder="Describe delay or issue" value="'+E(r.description)+'">'
+        +'<input class="hr" data-i="'+i+'" data-f="downtimeHours" placeholder="Downtime hrs" inputmode="decimal" step="0.25" value="'+E(r.downtimeHours)+'">'
+        +(canRemove?'<button type="button" class="dr-rm" data-rm="'+i+'" aria-label="Remove row">Remove</button>':'')
+        +'</div>';
+    }).join('');
+    host.querySelectorAll('[data-i]').forEach(function(el){el.addEventListener('input',function(){state.delayEntries[+this.getAttribute('data-i')][this.getAttribute('data-f')]=this.value;});});
+    host.querySelectorAll('button[data-rm]').forEach(function(b){b.addEventListener('click',function(){if(state.delayEntries.length<=1)return;state.delayEntries.splice(+this.getAttribute('data-rm'),1);renderDelays();});});
+  }
+
   function renderProject(){
     // Refresh picker display text when state.projects updates
     var hid=document.getElementById('drProject');
@@ -991,7 +1014,7 @@ try {
     var cols=(document.getElementById('drCols')||{}).value||'';
     var lf=(document.getElementById('drLf')||{}).value||'';
     var work=(document.getElementById('drWork')||{}).value||'';
-    var delays=(document.getElementById('drDelays')||{}).value||'';
+    var delays=state.delayEntries.some(function(d){return(d.description||'').trim();});
     var safety=(document.getElementById('drSafety')||{}).value||'';
     var hasCrew=state.crew.some(function(m){return (m.name||'').trim();});
     var hasEquip=state.owned.some(function(r){return (r.machine||'').trim();})
@@ -1039,6 +1062,8 @@ try {
     if(ar&&!ar.dataset.wired){ar.dataset.wired='1';ar.addEventListener('click',function(){state.rental.push({category:'',hours:''});renderRental();});}
     var af=document.getElementById('drAddFuture');
     if(af&&!af.dataset.wired){af.dataset.wired='1';af.addEventListener('click',function(){state.future.push({equipment:'',description:''});renderFuture();});}
+    var ad=document.getElementById('drAddDelay');
+    if(ad&&!ad.dataset.wired){ad.dataset.wired='1';ad.addEventListener('click',function(){state.delayEntries.push({description:'',downtimeHours:''});renderDelays();});}
     var sd=document.getElementById('drSaveDraft');
     if(sd&&!sd.dataset.wired){sd.dataset.wired='1';sd.addEventListener('click',function(){save(false);});}
     var sub=document.getElementById('drSubmit');
@@ -1253,9 +1278,9 @@ try {
       workCompleted:document.getElementById('drWork').value,
       equipmentOwned:state.owned.filter(function(r){return(r.machine||'').trim()||(r.hours||'').toString().trim();}),
       equipmentRental:state.rental.filter(function(r){return(r.category||'').trim()||(r.hours||'').toString().trim();}),
-      maintenance:state.maintenance.filter(function(r){return(r.type||'').trim()||(r.subcategory||'').trim()||(r.item||'').trim()||(r.hourAtFailure||'').toString().trim();}),
+      maintenance:state.maintenance.filter(function(r){return(r.type||'').trim()||(r.item||'').trim()||(r.hourAtFailure||'').toString().trim();}),
       futureIssues:state.future.filter(function(r){return(r.equipment||'').trim()||(r.description||'').trim();}),
-      delays:document.getElementById('drDelays').value,
+      delayEntries:state.delayEntries.filter(function(d){return(d.description||'').trim()||(d.downtimeHours||'').toString().trim();}),
       safety:document.getElementById('drSafety').value,
       attachments:(state.attachments.photos||[]).concat(state.attachments.handlogs||[]).concat(state.attachments.guhma||[]),
     };
@@ -1280,7 +1305,7 @@ try {
     cats.forEach(function(cat){
       var mine=rows.filter(function(r){return r&&r.category===cat;});
       if(mine.length){
-        mine.forEach(function(r){used[rows.indexOf(r)]=1;out.push({category:cat,type:r.type||'',subcategory:r.subcategory||'',item:r.item||'',hourAtFailure:(r.hourAtFailure!=null?r.hourAtFailure:'')});});
+        mine.forEach(function(r){used[rows.indexOf(r)]=1;out.push({category:cat,type:r.type||'',item:r.item||'',hourAtFailure:(r.hourAtFailure!=null?r.hourAtFailure:'')});});
       } else {
         out.push(emptyMaintRow(cat));
       }
@@ -1288,7 +1313,7 @@ try {
     rows.forEach(function(r,i){
       if(used[i])return;
       if(!r||cats.indexOf(r.category)>=0)return;
-      out.push({category:r.category||'',type:r.type||'',subcategory:r.subcategory||'',item:r.item||'',hourAtFailure:(r.hourAtFailure!=null?r.hourAtFailure:'')});
+      out.push({category:r.category||'',type:r.type||'',item:r.item||'',hourAtFailure:(r.hourAtFailure!=null?r.hourAtFailure:'')});
     });
     return out;
   }
@@ -1302,7 +1327,16 @@ try {
     setVal('drDate',r.date);setVal('drForeman',r.foreman);
     setVal('drPrecip',r.precipitation);setVal('drTemp',r.temp||(r.precipitation?'':r.weather));
     setVal('drCols',r.columnsInstalled);setVal('drLf',r.lfInstalled);
-    setVal('drWork',r.workCompleted);setVal('drDelays',r.delays);setVal('drSafety',r.safety);
+    setVal('drWork',r.workCompleted);setVal('drSafety',r.safety);
+    // R7: delayEntries replaces the old drDelays textarea. Load delayEntries if
+    // present; fall back to the old `delays` string as a single entry.
+    if(Array.isArray(r.delayEntries)&&r.delayEntries.length){
+      state.delayEntries=r.delayEntries.map(function(d){return{description:d.description||'',downtimeHours:(d.downtimeHours!=null?d.downtimeHours:'')};});
+    } else if(r.delays&&String(r.delays).trim()){
+      state.delayEntries=[{description:String(r.delays).trim(),downtimeHours:''}];
+    } else {
+      state.delayEntries=[{description:'',downtimeHours:''}];
+    }
     var pid=(r.projectId!=null&&String(r.projectId).trim())?String(r.projectId):(r.projectName||'');
     var present=false;
     for(var k=0;k<state.projects.length;k++){if(String(state.projects[k].id)===pid){present=true;break;}}
@@ -1325,7 +1359,7 @@ try {
       att[bk].push({name:a.name||'',itemId:a.itemId||'',webUrl:a.webUrl||'',bucket:bk});
     });
     state.attachments=att;
-    renderProject();renderForeman();renderCrew();renderOwned();renderRental();renderMaint();renderFuture();
+    renderProject();renderForeman();renderCrew();renderOwned();renderRental();renderMaint();renderDelays();renderFuture();
     renderUpList('photos',[]);renderUpList('handlogs',[]);renderUpList('guhma',[]);
     upMsg('photos','',null);upMsg('handlogs','',null);upMsg('guhma','',null);
     updateUploadEnabled();updateEditBanner();updateCopyPrevBtn();
@@ -1384,7 +1418,7 @@ try {
   function resetForm(){
     state.editingId=null;state.draftId=null;state.draftSavedAt=null;
     updateEditBanner();
-    ['drProject','drProjectId','drForeman','drPrecip','drTemp','drCols','drLf','drWork','drDelays','drSafety'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+    ['drProject','drProjectId','drForeman','drPrecip','drTemp','drCols','drLf','drWork','drSafety'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
     // Clear picker display
     var srch=document.getElementById('drProjectSearch');if(srch)srch.value='';
     // Auto-fill today's date
@@ -1393,9 +1427,10 @@ try {
     state.owned=[{machine:'',hours:''},{machine:'',hours:''}];
     state.rental=[{category:'',hours:''},{category:'',hours:''}];
     state.future=[{equipment:'',description:''}];
+    state.delayEntries=[{description:'',downtimeHours:''}];
     state.attachments={handlogs:[],guhma:[],photos:[]};
     buildMaintenanceRows();
-    renderProject();renderForeman();renderCrew();renderOwned();renderRental();renderMaint();renderFuture();
+    renderProject();renderForeman();renderCrew();renderOwned();renderRental();renderMaint();renderDelays();renderFuture();
     renderUpList('photos',[]);renderUpList('handlogs',[]);renderUpList('guhma',[]);
     upMsg('photos','',null);upMsg('handlogs','',null);upMsg('guhma','',null);
     updateUploadEnabled();

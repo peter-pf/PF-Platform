@@ -119,6 +119,7 @@ const MAX_EQUIP_ROWS = 50;   // owned / rental equipment rows cap
 const MAX_MAINT_ROWS = 60;   // maintenance rows cap (5 categories, each can add rows)
 const MAX_FUTURE_ROWS = 50;  // future-issue rows cap
 const MAX_ATTACH_ROWS = 50;  // attachment refs cap (SharePoint drive-item refs)
+const MAX_DELAY_ROWS = 50;   // delay-entry rows cap
 
 // Approval actions ('approve','send-to-hr') are REMOVED. The remaining actions
 // are create/update (draft persistence) and submit (the 3-step PDF+email+SP flow).
@@ -228,15 +229,14 @@ function cleanEquipmentRental(input) {
   return out;
 }
 
-// Rebuild a clean MAINTENANCE array:
-//   [{category, type, subcategory, item, hourAtFailure}].
+// Rebuild a clean MAINTENANCE array: [{category, type, item, hourAtFailure}].
 // The UI sends one or more rows per FIXED maintenance category (each category is
 // a header that can hold several rows). `type` = 'Failure'|'Maintenance' (a
-// label), `subcategory` = a per-category label chosen from the owner-curated
-// maintenanceSubcategories list, `item` = free-text detail, `hourAtFailure` = the
-// machine hour-meter reading (NOT capped at 24), NOT money. BACKWARD COMPATIBLE:
-// old rows are {category, item, hourAtFailure} (no type/subcategory) and still
-// read fine (type/subcategory become '').
+// label), `item` = free-text detail, `hourAtFailure` = the machine hour-meter
+// reading (NOT capped at 24), NOT money.
+// BACKWARD COMPATIBLE: old rows with `subcategory` are accepted in input but
+// subcategory is NOT persisted (R7: Derek removed the subcategory field).
+// Old rows without type are fine (type becomes '').
 function cleanMaintenance(input) {
   if (!Array.isArray(input)) return [];
   const out = [];
@@ -244,11 +244,32 @@ function cleanMaintenance(input) {
     if (!r || typeof r !== 'object') continue;
     const category = s(r.category, MAX_SHORT);
     const type = s(r.type, MAX_SHORT);
-    const subcategory = s(r.subcategory, MAX_SHORT);
+    // subcategory is intentionally NOT read (R7 removal). Accepted in input for
+    // backward compat (old offline drafts) but never stored or emitted.
     const it = s(r.item, MAX_STR);
     const h = meterHours(r.hourAtFailure);
-    if (!category && !type && !subcategory && !it && h == null) continue;
-    out.push({ category, type, subcategory, item: it, hourAtFailure: h });
+    if (!category && !type && !it && h == null) continue;
+    out.push({ category, type, item: it, hourAtFailure: h });
+  }
+  return out;
+}
+
+// Rebuild a clean DELAY-ENTRIES array: [{description, downtimeHours}].
+// R7: the old single `delays` text field is replaced by per-entry rows. Each
+// entry has a free-text description and an optional numeric downtime hours value.
+// `downtimeHours` uses meterHours() semantics (non-negative, no 24h cap, one
+// decimal -- a delay can span multiple shifts).
+// BACKWARD COMPAT: callers that pass the old `delays` string in the top-level
+// body map it to a single entry with blank downtimeHours (done in buildBody).
+function cleanDelayEntries(input) {
+  if (!Array.isArray(input)) return [];
+  const out = [];
+  for (const r of input.slice(0, MAX_DELAY_ROWS)) {
+    if (!r || typeof r !== 'object') continue;
+    const description = s(r.description, MAX_STR);
+    const dh = meterHours(r.downtimeHours);
+    if (!description && dh == null) continue;
+    out.push({ description, downtimeHours: dh });
   }
   return out;
 }
@@ -365,7 +386,21 @@ export async function onRequestPost(context) {
         columnsInstalled: (src.columnsInstalled != null) ? count(src.columnsInstalled) : (base.columnsInstalled != null ? base.columnsInstalled : null),
         lfInstalled: (src.lfInstalled != null) ? count(src.lfInstalled) : (base.lfInstalled != null ? base.lfInstalled : null),
         equipment: s(src.equipment != null ? src.equipment : base.equipment, MAX_STR),
+        // R7: new per-entry delays. If the client sends delayEntries, clean it.
+        // If the client sends the old `delays` string (or we're reading a base
+        // record that only has delays), convert to a single delayEntries entry
+        // so the output is always the new format. We ALSO preserve the legacy
+        // `delays` string on the record so old code that reads it still works.
         delays: s(src.delays != null ? src.delays : base.delays, MAX_STR),
+        delayEntries: (() => {
+          if (src.delayEntries != null) return cleanDelayEntries(src.delayEntries);
+          if (base.delayEntries != null) return cleanDelayEntries(base.delayEntries);
+          // Backward compat: old record has only `delays` string -- surface it as
+          // a single entry so the PDF/email renderers have a unified array.
+          const legacyStr = s(src.delays != null ? src.delays : base.delays, MAX_STR);
+          if (legacyStr.trim()) return [{ description: legacyStr, downtimeHours: null }];
+          return [];
+        })(),
         safety: s(src.safety != null ? src.safety : base.safety, MAX_STR),
         // ---- structured fleet/maintenance fields (HOURS = operating hours, NO $) ----
         equipmentOwned: (src.equipmentOwned != null) ? cleanEquipmentOwned(src.equipmentOwned) : (base.equipmentOwned || []),
