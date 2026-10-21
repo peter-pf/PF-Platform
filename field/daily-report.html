@@ -234,7 +234,6 @@
 
   /* ---- offline draft banner ---- */
   #drOfflineBanner{
-    display:none;
     background:rgba(210,153,34,.09);border:1px solid rgba(210,153,34,.3);
     border-radius:6px;padding:8px 12px;margin-bottom:8px;font-size:13px;
     display:flex;align-items:center;flex-wrap:wrap;gap:8px;
@@ -446,6 +445,25 @@ document.addEventListener('DOMContentLoaded',function(){
     var paths=navMap[key]||[];
     if(paths.indexOf(path)>=0)a.setAttribute('aria-current','page');
   });
+  /* shared-device hygiene: wipe offline draft keys on sign-out */
+  var logoutLink=document.getElementById('logoutLink');
+  if(logoutLink){
+    logoutLink.addEventListener('click',function(e){
+      e.preventDefault();
+      try{
+        var uid=(window.PF_ME&&(window.PF_ME.uid||window.PF_ME.name))||'';
+        if(uid){
+          localStorage.removeItem('pf-oldr-dr-'+uid);
+          localStorage.removeItem('pf-oldr-sr-'+uid);
+        } else {
+          var keys=[];
+          for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('pf-oldr-')===0)keys.push(k);}
+          keys.forEach(function(k){localStorage.removeItem(k);});
+        }
+      }catch(ex){}
+      window.location.href='/api/logout';
+    });
+  }
 });
 // ============================================================
 // GLOBAL UTILITIES
@@ -491,6 +509,7 @@ window.showModule = function(){};
     .then(function(r){
       if(r.ok && r.d && r.d.status==='ok'){
         window.PF_ME={uid:r.d.uid||r.d.name||'',name:r.d.name||'',role:r.d.role||'field_ops'};
+        try{if(window.PF_ME.uid)localStorage.setItem('pf-last-uid',window.PF_ME.uid);}catch(e){}
         if(userLbl) userLbl.textContent=r.d.name||r.d.role||'';
         if(loadEl) loadEl.style.display='none';
         if(mainEl) mainEl.style.display='block';
@@ -547,7 +566,8 @@ try {
   /* ---- offline draft ---- */
   var _offlineTimer=null;
   function offlineDraftKey(){
-    var uid=(window.PF_ME&&(window.PF_ME.uid||window.PF_ME.name))||'anon';
+    var uid=(window.PF_ME&&(window.PF_ME.uid||window.PF_ME.name))||'';
+    if(!uid){try{uid=localStorage.getItem('pf-last-uid')||'anon';}catch(e){uid='anon';}}
     return 'pf-oldr-dr-'+uid;
   }
   function scheduleOfflineSave(){
@@ -796,6 +816,7 @@ try {
       wireForm();renderProject();renderForeman();renderCrew();renderOwned();renderRental();renderMaint();renderFuture();renderList();
       updateDraftBanner(null);
       if(!state.editingId){var dd2=document.getElementById('drDate');if(dd2&&!dd2.value)dd2.value=todayIso();}
+      checkOfflineDraft();
     });
   }
 
@@ -1351,8 +1372,8 @@ try {
     host.innerHTML=rs.map(function(r){
       var crewH=(r.crew||[]).map(function(c){return E(c.name)+(c.hours!=null?' ('+E(c.hours)+'h)':'');}).join(', ');
       var prod=[];
-      if(r.columnsInstalled!=null)prod.push(r.columnsInstalled+' cols');
-      if(r.lfInstalled!=null)prod.push(r.lfInstalled+' LF');
+      if(r.columnsInstalled!=null)prod.push(E(r.columnsInstalled)+' cols');
+      if(r.lfInstalled!=null)prod.push(E(r.lfInstalled)+' LF');
       var actions='';
       actions+='<button type="button" class="btn btn-sm" data-edit="'+E(r.id)+'">Edit</button> ';
       if(r.status==='sent'&&r.pdfWebUrl){actions+=safeFileLink(r.pdfWebUrl,'View PDF')+' ';}
