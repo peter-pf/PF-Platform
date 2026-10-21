@@ -478,6 +478,14 @@ const FIELD_PAGES = {
   // the crew and office can both access it. Operational data only, no financials.
   '/site-readiness.html':    'field_ops',
   '/site-readiness':         'field_ops',           // CF Pages clean-URL form
+  // Daily Report standalone form (field portal round 2 — split from index.html).
+  // field_ops area = admin/partner/business_dev/field_ops. Operational data only.
+  '/daily-report.html':      'field_ops',
+  '/daily-report':           'field_ops',           // CF Pages clean-URL form
+  // Past Reports browse page (field portal round 2). Combined DFR + SR listing.
+  // field_ops area — ZERO financials (date/projectName/status/PDF link only).
+  '/past-reports.html':      'field_ops',
+  '/past-reports':           'field_ops',           // CF Pages clean-URL form
 };
 
 // Filename keywords that mark a page as financial/contract/precon even if it is
@@ -551,6 +559,11 @@ export function areaForPath(pathname) {
     // endpoint also calls requireArea(session, 'field_ops'). ZERO financials
     // (checklist answers, notes, and attachment refs only).
     if (pathname.startsWith('/api/site-readiness')) return 'field_ops';
+    // Past Reports combined listing (DFR + SR). field_ops area = admin/partner/
+    // business_dev/field_ops. Drafts are scoped to the requesting user in the
+    // handler. ZERO financials. Without this line the path falls to default-deny
+    // (admin-only), blocking every field crew member.
+    if (pathname.startsWith('/api/past-reports'))  return 'field_ops';
     // Equipment Log (EDITABLE per-rig digital logbook: machine info, HOURS,
     // dated service history). CARRIES DOLLARS (dailyRate per rig, cost per
     // service entry) -> OFFICE-ONLY. financials area = admin/partner/business_dev;

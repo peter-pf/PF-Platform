@@ -34,8 +34,13 @@ function s(v, cap = 300) {
 
 export async function onRequestGet(context) {
   const { env } = context;
-  const denied = requireArea(context.data && context.data.session, 'field_ops');
+  const session = context.data && context.data.session;
+  const denied = requireArea(session, 'field_ops');
   if (denied) return denied;
+
+  // Caller identity for draft scoping. Prefer uid (stable) over name.
+  const callerUid = session && (session.uid || session.name || '');
+  const isAdmin   = session && session.role === 'admin';
 
   try {
     if (!env.PF_SCHEDULE && !env.DB) {
@@ -48,7 +53,19 @@ export async function onRequestGet(context) {
       listRecords(env, {}),
     ]);
 
+    // Visibility rule:
+    //   SENT records  -> visible to ALL field_ops (including field crew).
+    //   DRAFT records -> visible ONLY to their creator (createdBy === callerUid)
+    //                    OR to admins (who see everything).
+    // This prevents crew members from enumerating each other's in-progress drafts.
+    function draftVisible(r) {
+      if (s(r.status) === 'sent') return true;
+      if (isAdmin) return true;
+      return s(r.createdBy) === callerUid;
+    }
+
     const drReports = (drResult && Array.isArray(drResult.reports) ? drResult.reports : [])
+      .filter(draftVisible)
       .map((r) => ({
         id:          s(r.id),
         type:        'daily-report',
@@ -63,6 +80,7 @@ export async function onRequestGet(context) {
       }));
 
     const srReports = (srResult && Array.isArray(srResult.records) ? srResult.records : [])
+      .filter(draftVisible)
       .map((r) => ({
         id:          s(r.id),
         type:        'site-readiness',

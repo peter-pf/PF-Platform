@@ -122,7 +122,10 @@ export function renderDailyReportPdf(rec) {
   if (attach.length) {
     doc.heading('Attachments (in SharePoint)');
     for (const a of attach) {
-      const bkt = a.bucket === 'guhma' ? 'GUHMA Data' : (a.bucket === 'handlogs' ? 'Hand Logs' : '');
+      const bkt = a.bucket === 'guhma' ? 'GUHMA Data'
+                : a.bucket === 'handlogs' ? 'Hand Logs'
+                : a.bucket === 'photos'   ? 'Site Photo'
+                : '';
       doc.text('- ' + (a.name || a.itemId) + (bkt ? `  [${bkt}]` : ''), { size: 10 });
     }
   }

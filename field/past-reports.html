@@ -222,8 +222,11 @@ function renderList(){
 
   listEl.innerHTML=filtered.map(function(r){
     var typeLabel=r.type==='daily-report'?'Daily Report':'Site Readiness';
-    var typeCls=r.type==='daily-report'?'daily':'sr';
-    var statusCls='status-'+(r.status==='sent'?'sent':(r.result==='READY'?'ready':(r.result==='NOT READY'?'not-ready':'draft')));
+    // typeCls and statusCls are derived from whitelisted values — use E() as
+    // defense-in-depth so server data never reaches an unescaped class attribute.
+    var typeCls=E(r.type==='daily-report'?'daily':'sr');
+    var statusKey=r.status==='sent'?'sent':(r.result==='READY'?'ready':(r.result==='NOT READY'?'not-ready':'draft'));
+    var statusCls='status-'+E(statusKey);
     var statusLabel=r.result||r.status||'draft';
     var pdfHtml='';
     if(r.pdfWebUrl&&/^https:\/\//i.test(r.pdfWebUrl)){

@@ -279,7 +279,7 @@ function cleanFutureIssues(input) {
 // already live in SharePoint; we store only the refs here). NO $ -- file metadata
 // only. bucket is constrained to the known upload buckets. Same angle-bracket
 // strip + length caps as every other field; webUrl is bounded to MAX_STR.
-const VALID_ATTACH_BUCKETS = { handlogs: 1, guhma: 1 };
+const VALID_ATTACH_BUCKETS = { handlogs: 1, guhma: 1, photos: 1 };
 function cleanAttachments(input) {
   if (!Array.isArray(input)) return [];
   const out = [];
@@ -349,7 +349,9 @@ export async function onRequestPost(context) {
         message: 'Persistence unavailable: neither KV (PF_SCHEDULE) nor D1 (DB) is configured on this deployment.' }, 503);
     }
 
-    const who = (session && (session.name || session.uid)) ? s(session.name || session.uid) : 'unknown';
+    // Prefer uid (stable, set at account creation) over display name for
+    // ownership comparisons. Display names can be edited; uid cannot.
+    const who = (session && (session.uid || session.name)) ? s(session.uid || session.name) : 'unknown';
     const nowIso = new Date().toISOString();
 
     // ---- build a clean report body from the (operational, non-financial) input
@@ -416,6 +418,21 @@ export async function onRequestPost(context) {
     const id = s(parsed.id, MAX_SHORT);
     const rec = await loadReportById(env, id);
     if (!rec) return json({ status: 'error', message: 'Daily report not found.' }, 404);
+
+    // ---- OWNERSHIP CHECK (update + submit) ----------------------------------
+    // Only the record's creator or an admin may modify it.
+    // A record with status 'sent' may NOT be edited via 'update' by anyone except
+    // admin (it has been emailed and filed; admins may still re-send via 'submit').
+    {
+      const isAdmin = session && session.role === 'admin';
+      const isOwner = rec.createdBy && rec.createdBy === who;
+      if (!isAdmin && !isOwner) {
+        return json({ status: 'forbidden', message: 'You may only edit your own reports.' }, 403);
+      }
+      if (action === 'update' && !isAdmin && rec.status === 'sent') {
+        return json({ status: 'forbidden', message: 'A submitted report cannot be edited. Only admins may update sent records.' }, 403);
+      }
+    }
 
     if (action === 'update') {
       Object.assign(rec, buildBody(parsed, rec));

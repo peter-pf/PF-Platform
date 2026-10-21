@@ -133,7 +133,7 @@ function cleanItems(input) {
 function cleanAttachments(input) {
   if (!Array.isArray(input)) return [];
   const out = [];
-  const VALID_BUCKETS = { grade_photo: 1, proof_roll: 1 };
+  const VALID_BUCKETS = { grade_photo: 1, proof_roll: 1, photos: 1 };
   for (const a of input.slice(0, MAX_ATTACH)) {
     if (!a || typeof a !== 'object') continue;
     const name   = s(a.name, MAX_SHORT);
@@ -222,7 +222,8 @@ export async function onRequestPost(context) {
         message: 'Persistence unavailable: neither KV (PF_SCHEDULE) nor D1 (DB) is configured.' }, 503);
     }
 
-    const who = (session && (session.name || session.uid)) ? s(session.name || session.uid) : 'unknown';
+    // Prefer uid (stable) over display name for ownership comparisons.
+    const who = (session && (session.uid || session.name)) ? s(session.uid || session.name) : 'unknown';
     const nowIso = new Date().toISOString();
 
     if (action === 'create') {
@@ -251,6 +252,18 @@ export async function onRequestPost(context) {
     const id = s(parsed.id, MAX_SHORT);
     const rec = await loadRecordById(env, id);
     if (!rec) return json({ status: 'error', message: 'Site readiness record not found.' }, 404);
+
+    // ---- OWNERSHIP CHECK (update + submit) ----------------------------------
+    {
+      const isAdmin = session && session.role === 'admin';
+      const isOwner = rec.createdBy && rec.createdBy === who;
+      if (!isAdmin && !isOwner) {
+        return json({ status: 'forbidden', message: 'You may only edit your own site readiness forms.' }, 403);
+      }
+      if (action === 'update' && !isAdmin && rec.status === 'sent') {
+        return json({ status: 'forbidden', message: 'A submitted form cannot be edited. Only admins may update sent records.' }, 403);
+      }
+    }
 
     if (action === 'update') {
       Object.assign(rec, buildBody(parsed, rec));

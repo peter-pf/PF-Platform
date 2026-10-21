@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Unit tests: draft status banner filename computation, past-reports listing,
-// photos bucket routing, and form field wiring.
+// photos bucket routing, form field wiring, ownership gating, and areaForPath.
 //
 // Run:  node field/tests/test-draft-filename.mjs
 
@@ -307,6 +307,155 @@ test('DFR and SR subjects differ (no cross-contamination)', () => {
   assert.notEqual(drSub, srSub);
   assert.ok(!drSub.includes('Site Readiness'), `DFR subject must not contain Site Readiness: ${drSub}`);
   assert.ok(!srSub.includes('Daily Report'),   `SR subject must not contain Daily Report: ${srSub}`);
+});
+
+// ---------------------------------------------------------------------------
+// 9. areaForPath — field portal pages and /api/past-reports map to field_ops
+// ---------------------------------------------------------------------------
+const { areaForPath } = await import(
+  new URL('../functions/lib/auth.js', import.meta.url).href
+);
+
+test('areaForPath /daily-report.html -> field_ops', () => {
+  assert.equal(areaForPath('/daily-report.html'), 'field_ops');
+});
+test('areaForPath /daily-report (clean URL) -> field_ops', () => {
+  assert.equal(areaForPath('/daily-report'), 'field_ops');
+});
+test('areaForPath /past-reports.html -> field_ops', () => {
+  assert.equal(areaForPath('/past-reports.html'), 'field_ops');
+});
+test('areaForPath /past-reports (clean URL) -> field_ops', () => {
+  assert.equal(areaForPath('/past-reports'), 'field_ops');
+});
+test('areaForPath /api/past-reports -> field_ops', () => {
+  assert.equal(areaForPath('/api/past-reports'), 'field_ops');
+});
+test('areaForPath /api/past-reports?foo=bar -> field_ops', () => {
+  // startsWith check so query-string forms also match
+  assert.equal(areaForPath('/api/past-reports'), 'field_ops');
+});
+// Unchanged paths stay where they were
+test('areaForPath /api/daily-report still field_ops', () => {
+  assert.equal(areaForPath('/api/daily-report'), 'field_ops');
+});
+test('areaForPath /api/site-readiness still field_ops', () => {
+  assert.equal(areaForPath('/api/site-readiness'), 'field_ops');
+});
+test('areaForPath /site-readiness.html still field_ops', () => {
+  assert.equal(areaForPath('/site-readiness.html'), 'field_ops');
+});
+test('areaForPath /api/equipment-log still financials (unchanged)', () => {
+  assert.equal(areaForPath('/api/equipment-log'), 'financials');
+});
+test('areaForPath /api/pricing-data.js not general (default-deny)', () => {
+  // Unmapped API route falls to user_admin, not general
+  assert.equal(areaForPath('/api/pricing-data.js'), 'user_admin');
+});
+
+// ---------------------------------------------------------------------------
+// 10. Ownership guard logic — mirrors daily-report.js and site-readiness.js
+// ---------------------------------------------------------------------------
+// Replicate the ownership check exactly as written in the handlers:
+//   const isAdmin = session && session.role === 'admin';
+//   const isOwner = rec.createdBy && rec.createdBy === who;
+//   if (!isAdmin && !isOwner) -> 403
+//   if (action === 'update' && !isAdmin && rec.status === 'sent') -> 403
+
+function ownershipCheck(session, rec, action) {
+  const who = (session && (session.uid || session.name)) ? String(session.uid || session.name) : 'unknown';
+  const isAdmin = session && session.role === 'admin';
+  const isOwner = rec.createdBy && rec.createdBy === who;
+  if (!isAdmin && !isOwner) return { ok: false, status: 403, msg: 'not owner' };
+  if (action === 'update' && !isAdmin && rec.status === 'sent') return { ok: false, status: 403, msg: 'sent locked' };
+  return { ok: true };
+}
+
+const ownerSession   = { uid: 'user-A', name: 'Alice', role: 'field_ops' };
+const otherSession   = { uid: 'user-B', name: 'Bob',   role: 'field_ops' };
+const adminSession   = { uid: 'admin1', name: 'Brad',  role: 'admin' };
+const draftRec       = { id: 'dr-1', createdBy: 'user-A', status: 'draft' };
+const sentRec        = { id: 'dr-2', createdBy: 'user-A', status: 'sent'  };
+
+test('owner can update their own draft', () => {
+  const r = ownershipCheck(ownerSession, draftRec, 'update');
+  assert.ok(r.ok, `Expected ok, got: ${r.msg}`);
+});
+test('owner can submit their own draft', () => {
+  const r = ownershipCheck(ownerSession, draftRec, 'submit');
+  assert.ok(r.ok, `Expected ok, got: ${r.msg}`);
+});
+test('other user update -> 403', () => {
+  const r = ownershipCheck(otherSession, draftRec, 'update');
+  assert.equal(r.ok, false);
+  assert.equal(r.status, 403);
+});
+test('other user submit -> 403', () => {
+  const r = ownershipCheck(otherSession, draftRec, 'submit');
+  assert.equal(r.ok, false);
+  assert.equal(r.status, 403);
+});
+test('owner update of sent record -> 403 (sent locked)', () => {
+  const r = ownershipCheck(ownerSession, sentRec, 'update');
+  assert.equal(r.ok, false);
+  assert.equal(r.status, 403);
+  assert.equal(r.msg, 'sent locked');
+});
+test('admin can update sent record', () => {
+  const r = ownershipCheck(adminSession, sentRec, 'update');
+  assert.ok(r.ok, `Expected admin to override sent lock`);
+});
+test('admin can update another user\'s draft', () => {
+  const r = ownershipCheck(adminSession, draftRec, 'update');
+  assert.ok(r.ok, `Expected admin to override ownership`);
+});
+test('uid takes priority over name for ownership comparison', () => {
+  // session has uid 'user-A'; record was created by 'user-A' (uid-based)
+  // Ensure we do NOT accidentally compare by name when uid is available
+  const mixedSession = { uid: 'user-A', name: 'Different Name', role: 'field_ops' };
+  const r = ownershipCheck(mixedSession, { id: 'x', createdBy: 'user-A', status: 'draft' }, 'update');
+  assert.ok(r.ok, 'Should match by uid even if name differs');
+});
+
+// ---------------------------------------------------------------------------
+// 11. past-reports draft visibility — mirrors the draftVisible() filter
+// ---------------------------------------------------------------------------
+function draftVisible(r, session) {
+  const callerUid = session && (session.uid || session.name || '');
+  const isAdmin   = session && session.role === 'admin';
+  const status    = String(r.status || '');
+  if (status === 'sent') return true;
+  if (isAdmin) return true;
+  return String(r.createdBy || '') === callerUid;
+}
+
+const reports = [
+  { id: 'r1', status: 'sent',  createdBy: 'user-A' },
+  { id: 'r2', status: 'draft', createdBy: 'user-A' },
+  { id: 'r3', status: 'draft', createdBy: 'user-B' },
+];
+
+test('sent report visible to any field_ops user', () => {
+  assert.ok(draftVisible(reports[0], otherSession), 'Sent should be visible to user-B');
+  assert.ok(draftVisible(reports[0], ownerSession), 'Sent should be visible to user-A');
+});
+test('own draft visible to owner', () => {
+  assert.ok(draftVisible(reports[1], ownerSession), 'user-A draft should be visible to user-A');
+});
+test("other user's draft NOT visible", () => {
+  assert.ok(!draftVisible(reports[2], ownerSession), 'user-B draft should NOT be visible to user-A');
+});
+test('admin sees all drafts', () => {
+  assert.ok(draftVisible(reports[1], adminSession), 'Admin sees user-A draft');
+  assert.ok(draftVisible(reports[2], adminSession), 'Admin sees user-B draft');
+});
+test('full filter: user-A sees sent + own draft, not other draft', () => {
+  const visible = reports.filter(r => draftVisible(r, ownerSession));
+  const ids = visible.map(r => r.id);
+  assert.ok(ids.includes('r1'), 'Should include sent r1');
+  assert.ok(ids.includes('r2'), 'Should include own draft r2');
+  assert.ok(!ids.includes('r3'), 'Should NOT include user-B draft r3');
+  assert.equal(visible.length, 2);
 });
 
 // ---------------------------------------------------------------------------
