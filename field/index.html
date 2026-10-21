@@ -13,28 +13,66 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  /* ---- PF brand tokens (light, matched to field-sample.html) ---- */
+  /* ---- PF brand tokens ---- */
   :root{
+    /* Brand (constant across themes) */
+    --accent:#006DB0;
+    --accent-light:#E0F0FF;
+    --accent-dark:#005A91;
+    /* Light theme surfaces */
     --bg:#F9FAFD;
     --bg-2:#F3F5F8;
     --card:#ffffff;
     --border:#C8D5DC;
     --border-light:#E2EAF0;
+    /* Light theme text */
     --text-0:#0B1722;
     --text-1:#2B2F36;
     --text-2:#5A6370;
     --text-3:#8A9AAB;
-    --accent:#006DB0;
-    --accent-light:#E0F0FF;
-    --accent-dark:#005A91;
+    /* Semantic */
     --green:#16a34a;
     --green-light:#dcfce7;
     --amber:#d97706;
     --amber-light:#fef3c7;
+    /* Elevation */
     --radius:12px;
     --shadow-sm:0 1px 2px rgba(0,0,0,.05);
     --shadow-md:0 4px 10px -2px rgba(0,40,80,.10);
     --shadow-lg:0 14px 40px rgba(0,40,80,.12);
+    /* Topbar (light) */
+    --topbar-bg:#FFFFFF;
+    --topbar-border:#E2EAF0;
+    --topbar-title:#0B1722;
+    --topbar-muted:#8A9AAB;
+    /* Greet (light) */
+    --greet-bg:var(--accent);
+    --greet-color:#ffffff;
+    --greet-label-color:rgba(255,255,255,.78);
+    --greet-sub-color:rgba(255,255,255,.88);
+  }
+  [data-theme="dark"]{
+    --bg:#0F1219;
+    --bg-2:#161C25;
+    --card:#1b212c;
+    --border:#2a2f3a;
+    --border-light:#222830;
+    --text-0:#E8EDF2;
+    --text-1:#C4CDD8;
+    --text-2:#8A9AAB;
+    --text-3:#5A6A7A;
+    --green:#3fb950;
+    --green-light:rgba(63,185,80,.15);
+    --amber:#d29922;
+    --amber-light:rgba(210,153,34,.15);
+    --topbar-bg:#1E2A38;
+    --topbar-border:transparent;
+    --topbar-title:#ffffff;
+    --topbar-muted:#9FB3C4;
+    --greet-bg:linear-gradient(135deg,#10324F 0%,#1E2A38 100%);
+    --greet-color:#ffffff;
+    --greet-label-color:#9FB3C4;
+    --greet-sub-color:#C7D6E2;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -45,44 +83,62 @@
     -webkit-font-smoothing:antialiased;
     min-height:100vh;
   }
+  #main{padding:18px 16px;padding-bottom:max(40px,env(safe-area-inset-bottom));max-width:680px;margin:0 auto;}
   a{color:var(--accent);text-decoration:none;}
   a:hover{text-decoration:underline;}
 
   /* ---- top bar ---- */
   #topbar{
     position:sticky;top:0;z-index:100;
-    background:#1E2A38;
+    background:var(--topbar-bg);
+    border-bottom:1px solid var(--topbar-border);
+    box-shadow:0 1px 4px rgba(0,0,0,.06);
     display:flex;align-items:center;gap:10px;
     padding:11px 16px;
     padding-top:max(11px, env(safe-area-inset-top));
   }
+  [data-theme="dark"] #topbar{box-shadow:none;}
+  #topbar .tb-brand{
+    display:flex;align-items:center;gap:10px;
+    text-decoration:none;flex:1 1 auto;
+  }
+  #topbar .tb-brand:hover{text-decoration:none;}
   #topbar .tb-mark{
     width:32px;height:32px;border-radius:8px;flex:0 0 auto;
     background:var(--accent);display:flex;align-items:center;justify-content:center;
     font-weight:800;font-size:13px;letter-spacing:.3px;color:#fff;
   }
-  #topbar .tb-title{font-weight:700;font-size:15px;color:#fff;flex:1 1 auto;}
-  #topbar .tb-right{display:flex;align-items:center;gap:10px;font-size:13px;}
-  #topbar .tb-user{color:#9FB3C4;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #topbar .tb-title{font-weight:700;font-size:15px;color:var(--topbar-title);flex:1 1 auto;}
+  #topbar .tb-right{display:flex;align-items:center;gap:4px;font-size:13px;}
+  #topbar .tb-user{color:var(--topbar-muted);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   #topbar .tb-signout{
-    color:#9FB3C4;font-size:13px;cursor:pointer;
-    background:none;border:none;padding:0;font-family:inherit;
+    color:var(--topbar-muted);font-size:13px;cursor:pointer;
+    background:none;border:none;padding:6px 8px;font-family:inherit;
   }
-  #topbar .tb-signout:hover{color:#fff;}
+  #topbar .tb-signout:hover{color:var(--topbar-title);}
+  .tb-theme{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:44px;height:44px;
+    border:none;background:none;cursor:pointer;
+    color:var(--topbar-muted);border-radius:8px;
+    transition:background .15s,color .15s;
+    flex:0 0 auto;
+  }
+  .tb-theme:hover{background:var(--bg-2);color:var(--topbar-title);}
 
   /* ---- layout ---- */
   #loading{display:flex;align-items:center;justify-content:center;min-height:60vh;color:var(--text-3);font-size:14px;}
   #authError{display:none;padding:32px 16px;text-align:center;color:var(--text-2);}
-  #main{display:none;padding:18px 16px 40px;max-width:680px;margin:0 auto;}
+  #main{display:none;}
 
   /* ---- greeting strip ---- */
   .greet{
-    background:linear-gradient(135deg,#10324F 0%,#1E2A38 100%);
-    border-radius:14px;padding:16px 18px;margin-bottom:18px;color:#fff;
+    background:var(--greet-bg);
+    border-radius:14px;padding:16px 18px;margin-bottom:18px;color:var(--greet-color);
   }
-  .greet-label{font-size:.72rem;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#9FB3C4;margin-bottom:4px;}
+  .greet-label{font-size:.72rem;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--greet-label-color);margin-bottom:4px;}
   .greet-name{font-size:1.18rem;font-weight:800;}
-  .greet-sub{font-size:.88rem;color:#C7D6E2;margin-top:2px;}
+  .greet-sub{font-size:.88rem;color:var(--greet-sub-color);margin-top:2px;}
 
   /* ---- section label ---- */
   .section-label{
@@ -129,14 +185,21 @@
     .tile.wide{grid-column:1/1;}
   }
 </style>
+<!-- No-flash theme: runs before body renders -->
+<script>
+(function(){try{if(localStorage.getItem('pf-theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}}());
+</script>
 </head>
 <body>
 
 <div id="topbar">
-  <div class="tb-mark">PF</div>
-  <div class="tb-title">Field Portal</div>
+  <a href="/" class="tb-brand" aria-label="PF Field Portal">
+    <div class="tb-mark">PF</div>
+    <span class="tb-title">Field Portal</span>
+  </a>
   <div class="tb-right">
     <span class="tb-user" id="userLabel"></span>
+    <button type="button" class="tb-theme" id="themeToggle" aria-label="Switch to dark mode"></button>
     <button type="button" class="tb-signout" id="signoutBtn" onclick="window.location.href='/api/logout'">Sign out</button>
   </div>
 </div>
@@ -149,7 +212,6 @@
   <div class="greet">
     <div class="greet-label">Field Portal</div>
     <div class="greet-name" id="greetName">Pier Foundations</div>
-    <div class="greet-sub">Operational tools — no financial data here.</div>
   </div>
 
   <div class="section-label">Field Tools</div>
@@ -186,12 +248,32 @@
 
   </div>
 
-  <p class="home-foot">Field view — operational data only. No financial information is shown here.</p>
 
 </div><!-- #main -->
 
 <script>
 "use strict";
+/* ---- Theme toggle ---- */
+var PF_SUN='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+var PF_MOON='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+function pfUpdateThemeBtn(){
+  var btn=document.getElementById('themeToggle');if(!btn)return;
+  var dark=document.documentElement.getAttribute('data-theme')==='dark';
+  btn.innerHTML=dark?PF_SUN:PF_MOON;
+  btn.setAttribute('aria-label',dark?'Switch to light mode':'Switch to dark mode');
+}
+function pfToggleTheme(){
+  var dark=document.documentElement.getAttribute('data-theme')==='dark';
+  document.documentElement.setAttribute('data-theme',dark?'light':'dark');
+  try{localStorage.setItem('pf-theme',dark?'light':'dark');}catch(e){}
+  pfUpdateThemeBtn();
+}
+document.addEventListener('DOMContentLoaded',function(){
+  pfUpdateThemeBtn();
+  var btn=document.getElementById('themeToggle');
+  if(btn)btn.addEventListener('click',pfToggleTheme);
+});
+/* ---- XSS escaper ---- */
 window.esc = (function(){
   var m={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'};
   return function(s){return s==null?'':String(s).replace(/[&<>"']/g,function(c){return m[c];});};

@@ -21,15 +21,27 @@
     --text-soft:#5A6472;
     --border:#D9DEE6;
     --bg:#F2F5F9;
+    --bg-grad:linear-gradient(135deg,#E9F1F8 0%,#F2F5F9 60%,#FFFFFF 100%);
     --card:#FFFFFF;
     --error:#B4232A;
+    --input-bg:#FBFCFE;
+  }
+  [data-theme="dark"]{
+    --text:#E2E8F0;
+    --text-soft:#8A9AAB;
+    --border:#2A2F3A;
+    --bg:#131820;
+    --bg-grad:linear-gradient(135deg,#0F1823 0%,#131820 60%,#1b212c 100%);
+    --card:#1b212c;
+    --error:#F87171;
+    --input-bg:#222830;
   }
   *{box-sizing:border-box;}
   body{
     margin:0;
     font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
     color:var(--text);
-    background:linear-gradient(135deg,#E9F1F8 0%,#F2F5F9 60%,#FFFFFF 100%);
+    background:var(--bg-grad);
     min-height:100vh;
     display:flex;align-items:center;justify-content:center;
     padding:24px;
@@ -41,6 +53,7 @@
     border-radius:14px;
     box-shadow:0 12px 40px rgba(0,40,80,0.10);
     padding:36px 32px 30px;
+    color:var(--text);
   }
   .brand{
     text-align:center;margin-bottom:22px;
@@ -66,7 +79,7 @@
     width:100%;padding:11px 13px;
     border:1px solid var(--border);border-radius:8px;
     font-size:0.95rem;font-family:inherit;color:var(--text);
-    background:#FBFCFE;transition:border-color .15s, box-shadow .15s;
+    background:var(--input-bg);transition:border-color .15s, box-shadow .15s;
   }
   input:focus{
     outline:none;border-color:var(--accent);
@@ -82,7 +95,7 @@
   button:disabled{opacity:0.6;cursor:default;}
   .error{
     display:none;margin-top:16px;padding:10px 12px;
-    background:#FCEBEC;border:1px solid #F2C4C7;border-radius:8px;
+    background:rgba(180,35,42,.08);border:1px solid rgba(180,35,42,.25);border-radius:8px;
     color:var(--error);font-size:0.86rem;
   }
   .error.show{display:block;}
@@ -91,6 +104,10 @@
     font-size:0.76rem;color:var(--text-soft);line-height:1.5;
   }
 </style>
+<!-- No-flash theme: runs before body renders -->
+<script>
+(function(){try{if(localStorage.getItem('pf-theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}}());
+</script>
 </head>
 <body>
   <form class="login-box" id="loginForm" autocomplete="on">

@@ -15,44 +15,56 @@
 <style>
   :root{
     --accent:#006DB0;--accent-dark:#005A91;--accent-light:#E0F0FF;
+    --surface:#F8FAFC;--surface-2:#FFFFFF;--surface-3:#F3F5F8;
+    --border:#D8E2EA;
+    --text:#0B1722;--text-2:#4A5568;--text-3:#8A9AAB;
+    --amber:#B45309;--green:#16A34A;--red:#B91C1C;
+    --topbar-bg:#FFFFFF;--topbar-border:#D8E2EA;
+    --topbar-title:#0B1722;--topbar-muted:#8A9AAB;
+    --link:#006DB0;
+  }
+  [data-theme="dark"]{
     --surface:#131820;--surface-2:#1b212c;--surface-3:#222830;
-    --border:#2a2f3a;--text:#e2e8f0;--text-2:#aab1c0;--text-3:#8a93a6;
+    --border:#2a2f3a;
+    --text:#e2e8f0;--text-2:#aab1c0;--text-3:#8a93a6;
     --amber:#d29922;--green:#3fb950;--red:#e5534b;
+    --topbar-bg:#1b212c;--topbar-border:#2a2f3a;
+    --topbar-title:#e2e8f0;--topbar-muted:#8a93a6;
+    --link:#5bc8ff;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;height:100%;}
   body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;line-height:1.5;color:var(--text);background:var(--surface);}
-  a{color:var(--accent-light);text-decoration:none;}
+  a{color:var(--link);text-decoration:none;}
   a:hover{text-decoration:underline;}
   input,select,button{font-family:inherit;font-size:inherit;}
-  input,select{background:var(--surface-2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 10px;width:100%;}
+  input,select{background:var(--surface-3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 10px;width:100%;}
+  [data-theme="dark"] input,[data-theme="dark"] select{background:var(--surface-2);}
   input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,109,176,.25);}
 
   /* ---- top bar ---- */
   #topbar{
     position:sticky;top:0;z-index:100;
-    background:var(--surface-2);border-bottom:1px solid var(--border);
+    background:var(--topbar-bg);border-bottom:1px solid var(--topbar-border);
+    box-shadow:0 1px 4px rgba(0,0,0,.06);
     display:flex;align-items:center;justify-content:space-between;
     padding:10px 16px;gap:10px;
   }
-  #topbar .left{display:flex;align-items:center;gap:10px;}
-  #topbar .logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;color:var(--text);}
-  #topbar .logo .mark{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:7px;background:var(--accent);color:#fff;font-weight:700;font-size:13px;}
-  #topbar .home-btn{
-    display:inline-flex;align-items:center;gap:5px;
-    font-size:12px;font-weight:600;color:var(--text-3);
-    background:var(--surface-3);border:1px solid var(--border);
-    border-radius:6px;padding:5px 11px;text-decoration:none;
-    transition:border-color .15s,color .15s;
-  }
-  #topbar .home-btn:hover{border-color:var(--accent);color:var(--accent-light);}
-  #topbar .right{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-3);}
+  [data-theme="dark"] #topbar{box-shadow:none;}
+  #topbar .left{display:flex;align-items:center;gap:8px;}
+  #topbar .tb-back{display:inline-flex;align-items:center;font-size:16px;font-weight:500;color:var(--accent);text-decoration:none;min-height:44px;padding:0 6px 0 2px;}
+  #topbar .tb-back:hover{color:var(--accent-dark);text-decoration:none;}
+  #topbar .tb-divider{color:var(--topbar-border);font-size:14px;user-select:none;}
+  #topbar .tb-page-title{font-weight:700;font-size:15px;color:var(--topbar-title);}
+  #topbar .right{display:flex;align-items:center;gap:4px;font-size:13px;color:var(--topbar-muted);}
   #topbar .right #userLabel{max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  #topbar .right a{color:var(--text-3);}
-  #topbar .right a:hover{color:var(--text);}
+  #topbar .right a{color:var(--topbar-muted);padding:6px 8px;}
+  #topbar .right a:hover{color:var(--topbar-title);}
+  .tb-theme{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border:none;background:none;cursor:pointer;color:var(--topbar-muted);border-radius:8px;transition:background .15s,color .15s;flex:0 0 auto;}
+  .tb-theme:hover{background:var(--surface-3);color:var(--topbar-title);}
 
   /* ---- layout ---- */
-  #main{padding:14px;max-width:720px;margin:0 auto;}
+  #main{padding:14px;padding-bottom:max(24px,env(safe-area-inset-bottom));max-width:720px;margin:0 auto;}
   #loading{display:flex;align-items:center;justify-content:center;min-height:60vh;color:var(--text-3);font-size:14px;}
   #authError{display:none;padding:32px 16px;text-align:center;color:var(--text-3);}
 
@@ -62,6 +74,8 @@
     background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
     padding:10px 12px;margin-bottom:12px;
   }
+  #filterBar input,#filterBar select{background:var(--surface-3);}
+  [data-theme="dark"] #filterBar input,[data-theme="dark"] #filterBar select{background:var(--surface-2);}
   #filterBar input#filterText{flex:1 1 160px;min-width:120px;}
   #filterBar select#filterType{flex:0 1 160px;min-width:120px;}
   #filterBar input#filterFrom,#filterBar input#filterTo{flex:0 1 130px;min-width:110px;}
@@ -83,26 +97,34 @@
     background:var(--surface-3);color:var(--text-3);
     font-weight:600;white-space:nowrap;flex:0 0 auto;
   }
-  .pr-badge.daily{background:rgba(0,109,176,.18);color:#5bc8ff;}
+  .pr-badge.daily{background:rgba(0,109,176,.14);color:var(--accent-dark);}
   .pr-badge.sr{background:rgba(63,185,80,.15);color:var(--green);}
   .pr-badge.status-ready{background:rgba(63,185,80,.15);color:var(--green);}
   .pr-badge.status-not-ready{background:rgba(210,153,34,.15);color:var(--amber);}
-  .pr-badge.status-sent{background:rgba(0,109,176,.18);color:#5bc8ff;}
+  .pr-badge.status-sent{background:rgba(0,109,176,.14);color:var(--accent-dark);}
   .pr-badge.status-draft{background:var(--surface-3);color:var(--text-3);}
+  [data-theme="dark"] .pr-badge.daily{color:#5bc8ff;}
+  [data-theme="dark"] .pr-badge.status-sent{color:#5bc8ff;}
   .pr-pdf-link{font-size:12px;}
   .pr-empty{color:var(--text-3);font-size:14px;padding:24px 0;text-align:center;}
   .pr-err{color:var(--red);font-size:13px;padding:12px 0;}
 </style>
+<!-- No-flash theme: runs before body renders -->
+<script>
+(function(){try{if(localStorage.getItem('pf-theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}}());
+</script>
 </head>
 <body>
 
 <div id="topbar">
   <div class="left">
-    <a href="/index.html" class="home-btn" aria-label="Home">&#8592; Home</a>
-    <div class="logo"><div class="mark">PF</div> Past Reports</div>
+    <a href="/" class="tb-back" aria-label="Back to Home">&#8249; Home</a>
+    <span class="tb-divider" aria-hidden="true">|</span>
+    <span class="tb-page-title">Past Reports</span>
   </div>
   <div class="right">
     <span id="userLabel"></span>
+    <button type="button" class="tb-theme" id="themeToggle" aria-label="Switch to dark mode"></button>
     <a href="/api/logout">Sign out</a>
   </div>
 </div>
@@ -129,6 +151,27 @@
 
 <script>
 "use strict";
+/* ---- Theme toggle ---- */
+var PF_SUN='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+var PF_MOON='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+function pfUpdateThemeBtn(){
+  var btn=document.getElementById('themeToggle');if(!btn)return;
+  var dark=document.documentElement.getAttribute('data-theme')==='dark';
+  btn.innerHTML=dark?PF_SUN:PF_MOON;
+  btn.setAttribute('aria-label',dark?'Switch to light mode':'Switch to dark mode');
+}
+function pfToggleTheme(){
+  var dark=document.documentElement.getAttribute('data-theme')==='dark';
+  document.documentElement.setAttribute('data-theme',dark?'light':'dark');
+  try{localStorage.setItem('pf-theme',dark?'light':'dark');}catch(e){}
+  pfUpdateThemeBtn();
+}
+document.addEventListener('DOMContentLoaded',function(){
+  pfUpdateThemeBtn();
+  var btn=document.getElementById('themeToggle');
+  if(btn)btn.addEventListener('click',pfToggleTheme);
+});
+/* ---- XSS escaper ---- */
 window.esc = (function(){
   var m={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'};
   return function(s){return s==null?'':String(s).replace(/[&<>"']/g,function(c){return m[c];});};
@@ -152,7 +195,7 @@ window.pfFmtDate = function(s){
       if(r.ok&&r.d&&r.d.status==='ok'){
         if(userLbl)userLbl.textContent=r.d.name||r.d.role||'';
         if(loadEl)loadEl.style.display='none';
-        if(mainEl)mainEl.style.display='';
+        if(mainEl)mainEl.style.display='block';
         loadReports();
       } else if(r.d&&r.d.status==='must_reset'){
         window.location.href='/reset-password.html';
