@@ -486,6 +486,14 @@ const FIELD_PAGES = {
   // field_ops area — ZERO financials (date/projectName/status/PDF link only).
   '/past-reports.html':      'field_ops',
   '/past-reports':           'field_ops',           // CF Pages clean-URL form
+  // Cost Codes reference (field portal round 5 — Derek 2026-10-21).
+  // Explicitly classified field_ops so it is NOT caught by the SENSITIVE_NAME_RE
+  // heuristic (which matches "cost" and would elevate it to financials_global,
+  // blocking every field crew member). The page is a code-lookup tool with ZERO
+  // dollar amounts; restricted financial codes are filtered server-side in the
+  // /api/cost-codes handler and never appear in the field_ops session's page.
+  '/cost-codes.html':        'field_ops',
+  '/cost-codes':             'field_ops',           // CF Pages clean-URL form
 };
 
 // Filename keywords that mark a page as financial/contract/precon even if it is
@@ -564,6 +572,14 @@ export function areaForPath(pathname) {
     // handler. ZERO financials. Without this line the path falls to default-deny
     // (admin-only), blocking every field crew member.
     if (pathname.startsWith('/api/past-reports'))  return 'field_ops';
+    // Cost Codes reference (QuickBooks chart of accounts). field_ops area so the
+    // crew and office can both look up codes. The handler SERVER-SIDE filters
+    // restricted rows (balance sheet / income / management / insurance / interest)
+    // for non-privileged callers — restricted data is NEVER serialised for
+    // field_ops. ZERO dollar amounts in the output; only code numbers and names.
+    // Without this entry the path falls to default-deny (admin-only) because
+    // the heuristic SENSITIVE_NAME_RE matches "cost" in "/api/cost-codes".
+    if (pathname.startsWith('/api/cost-codes'))    return 'field_ops';
     // Equipment Log (EDITABLE per-rig digital logbook: machine info, HOURS,
     // dated service history). CARRIES DOLLARS (dailyRate per rig, cost per
     // service entry) -> OFFICE-ONLY. financials area = admin/partner/business_dev;
