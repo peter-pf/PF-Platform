@@ -120,25 +120,98 @@
     #mod-sr .sr-grid{grid-template-columns:1fr;}
     #mod-sr .sr-item-row select.sr-ans{flex:0 0 80px;}
   }
+
+  /* ---- nav (phone: tab bar  |  desktop ≥900px: left sidebar) ---- */
+  :root{--nav-h:58px;--sidebar-w:180px;--topbar-h:52px;--sticky-h:62px;}
+  #pfNav{position:fixed;bottom:0;left:0;right:0;z-index:80;display:flex;align-items:stretch;height:var(--nav-h);padding-bottom:env(safe-area-inset-bottom);background:var(--topbar-bg);border-top:1px solid var(--topbar-border);box-shadow:0 -1px 6px rgba(0,0,0,.06);}
+  [data-theme="dark"] #pfNav{box-shadow:none;}
+  .pf-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-decoration:none;color:var(--text-3);font-size:9px;font-weight:600;letter-spacing:.35px;text-transform:uppercase;padding:5px 2px;transition:color .12s;min-height:44px;-webkit-tap-highlight-color:transparent;}
+  .pf-nav-item svg{width:22px;height:22px;flex:0 0 auto;transition:transform .1s;}
+  .pf-nav-item:hover{color:var(--accent);text-decoration:none;}
+  .pf-nav-item[aria-current="page"]{color:var(--accent);}
+  [data-theme="dark"] .pf-nav-item[aria-current="page"]{color:#5bc8ff;}
+  .pf-nav-item[aria-current="page"] svg{transform:scale(1.1);}
+  body{padding-bottom:calc(var(--nav-h) + var(--sticky-h) + env(safe-area-inset-bottom));}
+  @media(min-width:900px){
+    body{padding-bottom:var(--sticky-h);}
+    #pfNav{position:fixed;top:var(--topbar-h);left:0;right:auto;bottom:0;width:var(--sidebar-w);height:auto;flex-direction:column;align-items:stretch;border-top:none;border-right:1px solid var(--border);box-shadow:none;padding:12px 0;overflow-y:auto;}
+    .pf-nav-item{flex:none;flex-direction:row;gap:10px;padding:11px 16px;font-size:13px;letter-spacing:0;text-transform:none;justify-content:flex-start;}
+    .pf-nav-item[aria-current="page"]{background:var(--accent-light);color:var(--accent-dark);}
+    [data-theme="dark"] .pf-nav-item[aria-current="page"]{background:rgba(0,109,176,.18);color:#a8d4f5;}
+    #loading,#authError,#main{margin-left:var(--sidebar-w);}
+    #main{max-width:860px;margin-right:0;}
+  }
+  /* topbar brand on sub-pages */
+  #topbar .tb-brand{display:flex;align-items:center;gap:8px;text-decoration:none;flex:1 1 auto;}
+  #topbar .tb-brand:hover{text-decoration:none;}
+  #topbar .tb-mark{width:30px;height:30px;border-radius:7px;flex:0 0 auto;background:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;letter-spacing:.3px;color:#fff;}
+  #topbar .tb-page-title{font-weight:700;font-size:15px;color:var(--topbar-title);}
+  #topbar .right{display:flex;align-items:center;gap:4px;font-size:13px;color:var(--topbar-muted);}
+  #topbar .right #userLabel{max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #topbar .right a{color:var(--topbar-muted);font-size:13px;padding:6px 8px;}
+  #topbar .right a:hover{color:var(--topbar-title);text-decoration:none;}
+  /* searchable picker */
+  .pf-picker{position:relative;}
+  .pf-picker-input{background:var(--surface-3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 10px;width:100%;}
+  [data-theme="dark"] .pf-picker-input{background:var(--surface-2);}
+  .pf-picker-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,109,176,.25);}
+  .pf-picker-list{position:absolute;left:0;right:0;top:calc(100% + 3px);z-index:200;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.13);max-height:220px;overflow-y:auto;margin:0;padding:0;list-style:none;}
+  .pf-picker-list li{padding:9px 12px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--border);}
+  .pf-picker-list li:last-child{border-bottom:none;}
+  .pf-picker-list li:hover,.pf-picker-list li[aria-selected="true"]{background:var(--accent-light);color:var(--accent-dark);}
+  [data-theme="dark"] .pf-picker-list li:hover,[data-theme="dark"] .pf-picker-list li[aria-selected="true"]{background:rgba(0,109,176,.2);color:#a8d4f5;}
+  .pf-picker-list li.pf-empty{color:var(--text-3);cursor:default;font-style:italic;}
+  /* sticky submit bar */
+  #srStickyBar{position:fixed;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom));left:0;right:0;z-index:70;background:var(--surface-2);border-top:1px solid var(--border);padding:10px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;box-shadow:0 -2px 8px rgba(0,0,0,.07);}
+  [data-theme="dark"] #srStickyBar{box-shadow:none;}
+  @media(min-width:900px){#srStickyBar{bottom:0;left:var(--sidebar-w);}}
+  /* offline draft banner */
+  #srOfflineBanner{display:none;background:rgba(210,153,34,.09);border:1px solid rgba(210,153,34,.3);border-radius:6px;padding:8px 12px;margin-bottom:8px;font-size:13px;display:flex;align-items:center;flex-wrap:wrap;gap:8px;}
+  #srOfflineBanner.hidden{display:none;}
 </style>
-<!-- No-flash theme: runs before body renders -->
+<!-- No-flash theme: reads stored pref first, then prefers-color-scheme -->
 <script>
-(function(){try{if(localStorage.getItem('pf-theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}}());
+(function(){try{var t=localStorage.getItem('pf-theme');var dark=t==='dark'||(t==null&&window.matchMedia&&window.matchMedia('(prefers-color-scheme:dark)').matches);if(dark)document.documentElement.setAttribute('data-theme','dark');}catch(e){}}());
 </script>
 </head>
 <body>
 
 <div id="topbar">
-  <div class="left">
-    <a href="/" class="tb-back" aria-label="Back to Home">&#8249; Home</a>
-    <span class="tb-divider" aria-hidden="true">|</span>
+  <a href="/" class="tb-brand" aria-label="PF Field Portal">
+    <div class="tb-mark">PF</div>
     <span class="tb-page-title">Site Readiness</span>
-  </div>
+  </a>
   <div class="right">
     <span id="userLabel"></span>
     <button type="button" class="tb-theme" id="themeToggle" aria-label="Switch to dark mode"></button>
     <a href="/api/logout" id="logoutLink">Sign out</a>
   </div>
+</div>
+
+<nav id="pfNav" aria-label="Main navigation">
+  <a href="/" class="pf-nav-item" data-nav="home">
+    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h4a1 1 0 001-1v-3h2v3a1 1 0 001 1h4a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
+    <span>Home</span>
+  </a>
+  <a href="/daily-report.html" class="pf-nav-item" data-nav="daily">
+    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>
+    <span>Daily Report</span>
+  </a>
+  <a href="/site-readiness.html" class="pf-nav-item" data-nav="sr">
+    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+    <span>Site Readiness</span>
+  </a>
+  <a href="/past-reports.html" class="pf-nav-item" data-nav="pr">
+    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
+    <span>Past Reports</span>
+  </a>
+</nav>
+
+<!-- sticky submit/draft bar -->
+<div id="srStickyBar" style="display:none">
+  <button type="button" class="btn" id="srSaveDraft">Save draft</button>
+  <button type="button" class="btn" id="srSubmit">Submit &amp; send form</button>
+  <button type="button" class="btn btn-sm" id="srNewForm" style="display:none">Start new form</button>
 </div>
 
 <div id="loading">Loading...</div>
@@ -163,6 +236,13 @@
           <span id="srDsState" class="ds-unsaved">Not saved</span>
         </div>
 
+        <!-- offline draft restore banner -->
+        <div id="srOfflineBanner" class="hidden">
+          Unsaved draft found from <strong id="srOfflineTime"></strong>.
+          <button type="button" id="srOfflineRestore" class="btn btn-sm">Restore</button>
+          <button type="button" id="srOfflineDismiss" class="btn btn-sm">Dismiss</button>
+        </div>
+
         <div id="srEditBanner" style="display:none;background:rgba(210,153,34,.14);border:1px solid rgba(210,153,34,.4);border-radius:6px;padding:8px 10px;margin:0 0 10px;font-size:13px;color:#d29922">
           Editing an existing form (id <code data-edit-id></code>). Use <strong>Start new form</strong> to cancel.
         </div>
@@ -171,7 +251,15 @@
         <div class="sr-grid">
           <div>
             <label>Project</label>
-            <select id="srProject"><option value="">Select project</option></select>
+            <div class="pf-picker" id="srProjectPicker">
+              <input type="text" class="pf-picker-input" id="srProjectSearch"
+                placeholder="Search job number or name"
+                autocomplete="off" role="combobox"
+                aria-expanded="false" aria-haspopup="listbox"
+                aria-autocomplete="list" aria-controls="srProjectList">
+              <input type="hidden" id="srProject">
+              <ul class="pf-picker-list" id="srProjectList" role="listbox" aria-label="Projects" style="display:none"></ul>
+            </div>
             <input type="hidden" id="srProjectId">
           </div>
           <div><label>Date</label><input type="date" id="srDate"></div>
@@ -202,11 +290,7 @@
           <div><label>Sign-off date</label><input type="date" id="srSigDate"></div>
         </div>
 
-        <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
-          <button type="button" class="btn" id="srSaveDraft">Save draft</button>
-          <button type="button" class="btn" id="srSubmit">Submit &amp; send form</button>
-          <button type="button" class="btn btn-sm" id="srNewForm" style="display:none">Start new form</button>
-        </div>
+        <div style="height:8px"></div><!-- spacing; buttons are in sticky bar -->
         <div class="sr-msg" id="srMsg" style="margin-top:6px"></div>
       </div>
 
@@ -238,6 +322,9 @@ document.addEventListener('DOMContentLoaded',function(){
   pfUpdateThemeBtn();
   var btn=document.getElementById('themeToggle');
   if(btn)btn.addEventListener('click',pfToggleTheme);
+  var path=window.location.pathname;
+  var navMap={'home':['/','/index.html'],'daily':['/daily-report.html'],'sr':['/site-readiness.html'],'pr':['/past-reports.html']};
+  document.querySelectorAll('.pf-nav-item[data-nav]').forEach(function(a){var key=a.getAttribute('data-nav');var paths=navMap[key]||[];if(paths.indexOf(path)>=0)a.setAttribute('aria-current','page');});
 });
 // XSS-safe escape for all data-to-DOM insertions.
 window.esc = (function () {
@@ -279,7 +366,7 @@ window.showModule = function () {};
     .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
     .then(function (r) {
       if (r.ok && r.d && r.d.status === 'ok') {
-        window.PF_ME = { name: r.d.name || '', role: r.d.role || 'field_ops' };
+        window.PF_ME = { uid: r.d.uid || r.d.name || '', name: r.d.name || '', role: r.d.role || 'field_ops' };
         if (userLabel) userLabel.textContent = r.d.name || r.d.role || '';
         if (loadingEl) loadingEl.style.display = 'none';
         if (mainEl) mainEl.style.display = 'block';
@@ -335,6 +422,84 @@ try {
     { key: '4c', section: '4', secLabel: '4. PF General Operations',
       label: 'Field Ops Manager jobsite visit completed prior to mob' },
   ];
+
+  /* ---- offline draft ---- */
+  function srOfflineDraftKey(){var uid=(window.PF_ME&&(window.PF_ME.uid||window.PF_ME.name))||'anon';return 'pf-oldr-sr-'+uid;}
+  var _srOfflineTimer=null;
+  function srScheduleOfflineSave(){
+    clearTimeout(_srOfflineTimer);
+    _srOfflineTimer=setTimeout(function(){try{localStorage.setItem(srOfflineDraftKey(),JSON.stringify({savedAt:new Date().toISOString(),body:collectBody(),editingId:state.editingId}));}catch(e){}},2500);
+  }
+  function srClearOfflineDraft(){try{localStorage.removeItem(srOfflineDraftKey());}catch(e){}}
+  function srCheckOfflineDraft(){
+    try{
+      var raw=localStorage.getItem(srOfflineDraftKey());if(!raw)return;
+      var local=JSON.parse(raw);if(!local||!local.savedAt||!local.body)return;
+      var banner=document.getElementById('srOfflineBanner');if(!banner)return;
+      var timeEl=document.getElementById('srOfflineTime');
+      if(timeEl){var d=new Date(local.savedAt);var h=d.getHours()%12||12,mn=d.getMinutes(),ap=d.getHours()>=12?'PM':'AM';timeEl.textContent=window.pfFmtDate(d.toISOString().slice(0,10))+' '+h+':'+(mn<10?'0':'')+mn+' '+ap;}
+      banner.classList.remove('hidden');banner._localDraft=local;
+    }catch(e){}
+  }
+  function srRestoreOfflineDraft(local){
+    if(!local||!local.body)return;
+    var b=local.body;
+    function sv(id,v){var el=document.getElementById(id);if(el)el.value=(v==null?'':String(v));}
+    if(b.projectId){srPickerSetValue(b.projectId,b.projectName||b.projectId);var hid2=document.getElementById('srProjectId');if(hid2)hid2.value=b.projectId;}
+    sv('srDate',b.date);sv('srGcContact',b.gcContact);sv('srSiteAddress',b.siteAddress);sv('srSigName',b.sigName);sv('srSigDate',b.sigDate);
+    if(Array.isArray(b.items)){
+      b.items.forEach(function(bi){var it=state.items.find(function(x){return x.key===bi.key;});if(it){it.answer=bi.answer||'';it.note=bi.note||'';}});
+    }
+    updatePhotosEnabled();updateUploadEnabled();updateDraftBanner(null);renderChecklist();
+    var m=document.getElementById('srMsg');if(m){m.textContent='Draft restored from device.';m.className='sr-msg ok';}
+  }
+
+  /* ---- project picker ---- */
+  function srPickerSetValue(pid,fallbackLabel){
+    var hid=document.getElementById('srProject');if(hid)hid.value=pid||'';
+    var srch=document.getElementById('srProjectSearch');
+    if(srch){if(!pid){srch.value='';return;}
+      var label=fallbackLabel||pid;
+      for(var i=0;i<state.projects.length;i++){if(String(state.projects[i].id)===String(pid)){label=state.projects[i].label||pid;break;}}
+      srch.value=label;
+    }
+  }
+  function initSrProjectPicker(){
+    var search=document.getElementById('srProjectSearch');
+    var hidden=document.getElementById('srProject');
+    var list=document.getElementById('srProjectList');
+    if(!search||!hidden||!list||search.dataset.pickerInit)return;
+    search.dataset.pickerInit='1';
+    var activeIdx=-1;
+    function getItems(){return Array.prototype.slice.call(list.querySelectorAll('li:not(.pf-empty)'));}
+    function buildList(query){
+      var q=(query||'').trim().toLowerCase();
+      var items=q?state.projects.filter(function(p){return p.label.toLowerCase().indexOf(q)>=0||String(p.id).toLowerCase().indexOf(q)>=0;}):state.projects;
+      list.innerHTML='';activeIdx=-1;
+      if(!items.length){var li=document.createElement('li');li.className='pf-empty';li.textContent='No matching projects';list.appendChild(li);return;}
+      items.forEach(function(p){var li=document.createElement('li');li.textContent=p.label;li.setAttribute('role','option');li.setAttribute('data-pid',p.id);li.setAttribute('data-name',p.name||p.label);if(String(p.id)===String(hidden.value)){li.setAttribute('aria-selected','true');}li.addEventListener('mousedown',function(e){e.preventDefault();selectPick(p.id,p.name||p.label,p.label);});list.appendChild(li);});
+    }
+    function openList(){buildList(search.value);list.style.display='block';search.setAttribute('aria-expanded','true');}
+    function closeList(){list.style.display='none';search.setAttribute('aria-expanded','false');}
+    function selectPick(id,name,label){
+      hidden.value=id||'';search.value=id?label:'';closeList();
+      try{if(id)localStorage.setItem('pf-last-job',id);}catch(e){}
+      var hid2=document.getElementById('srProjectId');if(hid2)hid2.value=id||'';
+      updateUploadEnabled();updatePhotosEnabled();updateDraftBanner(null);srScheduleOfflineSave();
+    }
+    search.addEventListener('focus',openList);
+    search.addEventListener('input',function(){buildList(this.value);list.style.display='block';search.setAttribute('aria-expanded','true');});
+    search.addEventListener('blur',function(){setTimeout(closeList,160);});
+    search.addEventListener('keydown',function(e){
+      var its=getItems();if(!its.length)return;
+      if(e.key==='ArrowDown'){e.preventDefault();openList();activeIdx=Math.min(activeIdx+1,its.length-1);its.forEach(function(li,i){li.setAttribute('aria-selected',i===activeIdx?'true':'false');});if(its[activeIdx])its[activeIdx].scrollIntoView({block:'nearest'});}
+      else if(e.key==='ArrowUp'){e.preventDefault();activeIdx=Math.max(activeIdx-1,0);its.forEach(function(li,i){li.setAttribute('aria-selected',i===activeIdx?'true':'false');});if(its[activeIdx])its[activeIdx].scrollIntoView({block:'nearest'});}
+      else if(e.key==='Enter'){if(activeIdx>=0&&its[activeIdx]){selectPick(its[activeIdx].getAttribute('data-pid'),its[activeIdx].getAttribute('data-name'),its[activeIdx].textContent);}e.preventDefault();}
+      else if(e.key==='Escape'){closeList();}
+    });
+    document.addEventListener('click',function(e){if(e.target&&e.target.closest&&!e.target.closest('#srProjectPicker'))closeList();});
+    if(hidden.value)srPickerSetValue(hidden.value);
+  }
 
   // Allowed file types for site readiness uploads.
   var UP_ALLOWED = ['.jpg', '.jpeg', '.png', '.heic', '.pdf'];
@@ -408,26 +573,19 @@ try {
   }
 
   function renderProject() {
-    var sel = document.getElementById('srProject');
-    if (!sel) return;
-    var cur = sel.value;
-    var html = '<option value="">Select project</option>';
-    state.projects.forEach(function (p) {
-      var s2 = (String(p.id) === String(cur)) ? ' selected' : '';
-      html += '<option value="' + E(p.id) + '" data-name="' + E(p.name || p.label) + '"' + s2 + '>' + E(p.label) + '</option>';
-    });
-    sel.innerHTML = html;
+    var hid = document.getElementById('srProject');
+    if (hid && hid.value) srPickerSetValue(hid.value);
   }
 
   function selectedProjectNumber() {
-    var psel = document.getElementById('srProject');
-    var v = psel ? String(psel.value || '').trim() : '';
+    var v = String((document.getElementById('srProject') || {}).value || '').trim();
     return /^[0-9]{2}-[0-9]{2,4}$/.test(v) ? v : '';
   }
   function selectedProjectName() {
-    var psel = document.getElementById('srProject');
-    var o = (psel && psel.selectedIndex >= 0) ? psel.options[psel.selectedIndex] : null;
-    return o ? (o.getAttribute('data-name') || '') : '';
+    var v = (document.getElementById('srProject') || {}).value || '';
+    if (!v) return '';
+    for (var i = 0; i < state.projects.length; i++) { if (String(state.projects[i].id) === String(v)) return state.projects[i].name || state.projects[i].label || v; }
+    return v;
   }
 
   // ---- Checklist render -------------------------------------------------------
@@ -620,9 +778,7 @@ try {
 
   // ---- draft status banner ---------------------------------------------------
   function updateDraftBanner(savedAt) {
-    var psel = document.getElementById('srProject');
-    var pOpt = (psel && psel.selectedIndex >= 0) ? psel.options[psel.selectedIndex] : null;
-    var pname = pOpt ? (pOpt.getAttribute('data-name') || '') : '';
+    var pname = selectedProjectName();
     var dateEl = document.getElementById('srDate');
     var nm = window.srComputeFilename(dateEl ? dateEl.value : '', pname);
     var nameEl  = document.getElementById('srDsFilename');
@@ -728,22 +884,13 @@ try {
     // init photo attachments state
     if (!state.photoAttachments) state.photoAttachments = [];
 
-    var pi = document.getElementById('srProject');
-    if (pi && !pi.dataset.wired) {
-      pi.dataset.wired = '1';
-      pi.addEventListener('change', function () {
-        var hid = document.getElementById('srProjectId');
-        if (hid) hid.value = this.value;
-        updateUploadEnabled();
-        updatePhotosEnabled();
-        updateDraftBanner(null);
-      });
-    }
+    // Project picker (hidden #srProject does not fire change; picker handles updates)
+    initSrProjectPicker();
     // Wire date field for banner updates
     var dd = document.getElementById('srDate');
     if (dd && !dd.dataset.wired) {
       dd.dataset.wired = '1';
-      dd.addEventListener('change', function () { updateDraftBanner(null); });
+      dd.addEventListener('change', function () { updateDraftBanner(null); srScheduleOfflineSave(); });
     }
     // Wire photos file input
     var ph = document.getElementById('srFilePhotos');
@@ -763,13 +910,21 @@ try {
     if (sub && !sub.dataset.wired) { sub.dataset.wired = '1'; sub.addEventListener('click', function () { save(true); }); }
     var nf = document.getElementById('srNewForm');
     if (nf && !nf.dataset.wired) { nf.dataset.wired = '1'; nf.addEventListener('click', function () { resetForm(); msg('Started a new form.', true); }); }
+    // Offline restore/dismiss
+    var ro = document.getElementById('srOfflineRestore');
+    if (ro && !ro.dataset.wired) { ro.dataset.wired = '1'; ro.addEventListener('click', function () { var b = document.getElementById('srOfflineBanner'); if (b && b._localDraft) srRestoreOfflineDraft(b._localDraft); if (b) b.classList.add('hidden'); }); }
+    var di = document.getElementById('srOfflineDismiss');
+    if (di && !di.dataset.wired) { di.dataset.wired = '1'; di.addEventListener('click', function () { var b = document.getElementById('srOfflineBanner'); if (b) b.classList.add('hidden'); srClearOfflineDraft(); }); }
+    // Show sticky bar
+    var sb = document.getElementById('srStickyBar'); if (sb) sb.style.display = 'flex';
+    // Offline auto-save on checklist changes
+    var wrap = document.getElementById('srWrap');
+    if (wrap && !wrap.dataset.offlineWired) { wrap.dataset.offlineWired = '1'; wrap.addEventListener('input', srScheduleOfflineSave); wrap.addEventListener('change', srScheduleOfflineSave); }
   }
 
   function collectBody() {
-    var psel = document.getElementById('srProject');
-    var pid  = psel ? psel.value : '';
-    var pOpt = (psel && psel.selectedIndex >= 0) ? psel.options[psel.selectedIndex] : null;
-    var pname = pOpt ? (pOpt.getAttribute('data-name') || '') : '';
+    var pid = (document.getElementById('srProject') || {}).value || '';
+    var pname = selectedProjectName();
     var inspected = document.getElementById('srInspectedBy');
     var sigName   = document.getElementById('srSigName');
     var sigDate   = document.getElementById('srSigDate');
@@ -834,7 +989,7 @@ try {
               var to = (r2.body.distribution && r2.body.distribution.emailedTo) || [];
               msg((editing ? 'Form updated and re-sent' : 'Form sent') +
                 ': emailed' + (to.length ? ' to ' + to.length + ' recipient(s)' : '') + ' and saved to SharePoint.', true);
-              resetForm(); renderList();
+              srClearOfflineDraft(); resetForm(); renderList();
             } else {
               upsertRecord(rec);
               msg((r2.body && r2.body.message) || 'Changes saved but the form could not be sent. Please retry.', false);
@@ -844,10 +999,13 @@ try {
       } else {
         upsertRecord(rec);
         updateDraftBanner(rec.updatedAt || new Date().toISOString());
-        msg(editing ? 'Changes saved.' : 'Draft saved.', true);
+        srClearOfflineDraft(); msg(editing ? 'Changes saved.' : 'Draft saved.', true);
         resetForm(); renderList();
       }
-    }).catch(function () { msg('Network error.', false); });
+    }).catch(function () {
+      try{localStorage.setItem(srOfflineDraftKey(),JSON.stringify({savedAt:new Date().toISOString(),body:collectBody(),editingId:state.editingId}));}catch(e2){}
+      msg('Network error. Draft saved on this device.', false);
+    });
   }
 
   function resetForm() {
@@ -859,6 +1017,13 @@ try {
     ['srProject', 'srProjectId', 'srDate', 'srGcContact', 'srSiteAddress', 'srSigName', 'srSigDate'].forEach(function (id) {
       var el = document.getElementById(id); if (el) el.value = '';
     });
+    // Clear picker display
+    var srch = document.getElementById('srProjectSearch'); if (srch) srch.value = '';
+    // Auto-fill today's date
+    var dd = document.getElementById('srDate');
+    if (dd) { var today=new Date(); dd.value=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0'); }
+    // Restore last job
+    try { var lastJob=localStorage.getItem('pf-last-job'); if(lastJob){srPickerSetValue(lastJob);var hid2=document.getElementById('srProjectId');if(hid2)hid2.value=lastJob;} } catch(e) {}
     // inspectedBy is auto-filled from session — re-apply.
     var ib = document.getElementById('srInspectedBy');
     if (ib && window.PF_ME) ib.value = window.PF_ME.name || '';
@@ -890,8 +1055,8 @@ try {
       state.projects.unshift({ id: pid, name: r.projectName || pid,
         label: (r.projectId ? r.projectId + ' - ' : '') + (r.projectName || pid) });
     }
-    var psel = document.getElementById('srProject');
-    if (psel) { psel.value = pid; var hid = document.getElementById('srProjectId'); if (hid) hid.value = pid; }
+    srPickerSetValue(pid, r.projectName || pid);
+    var hid = document.getElementById('srProjectId'); if (hid) hid.value = pid;
 
     state.items = ITEMS.map(function (def) {
       var saved = (Array.isArray(r.items) ? r.items : []).find(function (it) { return it.key === def.key; });
@@ -982,6 +1147,14 @@ try {
       renderProject();
       renderChecklist();
       renderList();
+      // Restore last used project if no editing state
+      if (!state.editingId) {
+        try {
+          var lastJob = localStorage.getItem('pf-last-job');
+          if (lastJob) { var hid = document.getElementById('srProject'); if (hid && !hid.value) { srPickerSetValue(lastJob); var hid2 = document.getElementById('srProjectId'); if (hid2) hid2.value = lastJob; updateUploadEnabled(); updatePhotosEnabled(); } }
+        } catch(e) {}
+      }
+      srCheckOfflineDraft();
     }).catch(function () {
       if (wrap) wrap.style.display = 'block';
       wireForm(); renderProject(); renderChecklist(); renderList();

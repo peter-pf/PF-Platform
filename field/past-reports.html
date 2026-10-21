@@ -108,26 +108,74 @@
   .pr-pdf-link{font-size:12px;}
   .pr-empty{color:var(--text-3);font-size:14px;padding:24px 0;text-align:center;}
   .pr-err{color:var(--red);font-size:13px;padding:12px 0;}
+
+  /* ---- nav (phone: tab bar  |  desktop ≥900px: left sidebar) ---- */
+  :root{--nav-h:58px;--sidebar-w:180px;--topbar-h:52px;}
+  #pfNav{position:fixed;bottom:0;left:0;right:0;z-index:80;display:flex;align-items:stretch;height:var(--nav-h);padding-bottom:env(safe-area-inset-bottom);background:var(--topbar-bg);border-top:1px solid var(--topbar-border);box-shadow:0 -1px 6px rgba(0,0,0,.06);}
+  [data-theme="dark"] #pfNav{box-shadow:none;}
+  .pf-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-decoration:none;color:var(--text-3);font-size:9px;font-weight:600;letter-spacing:.35px;text-transform:uppercase;padding:5px 2px;transition:color .12s;min-height:44px;-webkit-tap-highlight-color:transparent;}
+  .pf-nav-item svg{width:22px;height:22px;flex:0 0 auto;transition:transform .1s;}
+  .pf-nav-item:hover{color:var(--accent);text-decoration:none;}
+  .pf-nav-item[aria-current="page"]{color:var(--accent);}
+  [data-theme="dark"] .pf-nav-item[aria-current="page"]{color:#5bc8ff;}
+  .pf-nav-item[aria-current="page"] svg{transform:scale(1.1);}
+  body{padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom));}
+  @media(min-width:900px){
+    body{padding-bottom:0;}
+    #pfNav{position:fixed;top:var(--topbar-h);left:0;right:auto;bottom:0;width:var(--sidebar-w);height:auto;flex-direction:column;align-items:stretch;border-top:none;border-right:1px solid var(--border);box-shadow:none;padding:12px 0;overflow-y:auto;}
+    .pf-nav-item{flex:none;flex-direction:row;gap:10px;padding:11px 16px;font-size:13px;letter-spacing:0;text-transform:none;justify-content:flex-start;}
+    .pf-nav-item[aria-current="page"]{background:var(--accent-light);color:var(--accent-dark);}
+    [data-theme="dark"] .pf-nav-item[aria-current="page"]{background:rgba(0,109,176,.18);color:#a8d4f5;}
+    #loading,#authError,#main{margin-left:var(--sidebar-w);}
+    #main{max-width:1100px;margin-right:0;}
+  }
+  /* topbar brand */
+  #topbar .tb-brand{display:flex;align-items:center;gap:8px;text-decoration:none;flex:1 1 auto;}
+  #topbar .tb-brand:hover{text-decoration:none;}
+  #topbar .tb-mark{width:30px;height:30px;border-radius:7px;flex:0 0 auto;background:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;letter-spacing:.3px;color:#fff;}
+  #topbar .tb-page-title{font-weight:700;font-size:15px;color:var(--topbar-title);}
+  #topbar .right{display:flex;align-items:center;gap:4px;font-size:13px;color:var(--topbar-muted);}
+  #topbar .right #userLabel{max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #topbar .right a{color:var(--topbar-muted);font-size:13px;padding:6px 8px;}
+  #topbar .right a:hover{color:var(--topbar-title);text-decoration:none;}
 </style>
-<!-- No-flash theme: runs before body renders -->
+<!-- No-flash theme: reads stored pref first, then prefers-color-scheme -->
 <script>
-(function(){try{if(localStorage.getItem('pf-theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}}());
+(function(){try{var t=localStorage.getItem('pf-theme');var dark=t==='dark'||(t==null&&window.matchMedia&&window.matchMedia('(prefers-color-scheme:dark)').matches);if(dark)document.documentElement.setAttribute('data-theme','dark');}catch(e){}}());
 </script>
 </head>
 <body>
 
 <div id="topbar">
-  <div class="left">
-    <a href="/" class="tb-back" aria-label="Back to Home">&#8249; Home</a>
-    <span class="tb-divider" aria-hidden="true">|</span>
+  <a href="/" class="tb-brand" aria-label="PF Field Portal">
+    <div class="tb-mark">PF</div>
     <span class="tb-page-title">Past Reports</span>
-  </div>
+  </a>
   <div class="right">
     <span id="userLabel"></span>
     <button type="button" class="tb-theme" id="themeToggle" aria-label="Switch to dark mode"></button>
     <a href="/api/logout">Sign out</a>
   </div>
 </div>
+
+<nav id="pfNav" aria-label="Main navigation">
+  <a href="/" class="pf-nav-item" data-nav="home">
+    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h4a1 1 0 001-1v-3h2v3a1 1 0 001 1h4a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
+    <span>Home</span>
+  </a>
+  <a href="/daily-report.html" class="pf-nav-item" data-nav="daily">
+    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>
+    <span>Daily Report</span>
+  </a>
+  <a href="/site-readiness.html" class="pf-nav-item" data-nav="sr">
+    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+    <span>Site Readiness</span>
+  </a>
+  <a href="/past-reports.html" class="pf-nav-item" data-nav="pr">
+    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
+    <span>Past Reports</span>
+  </a>
+</nav>
 
 <div id="loading">Loading...</div>
 <div id="authError">
@@ -170,6 +218,9 @@ document.addEventListener('DOMContentLoaded',function(){
   pfUpdateThemeBtn();
   var btn=document.getElementById('themeToggle');
   if(btn)btn.addEventListener('click',pfToggleTheme);
+  var path=window.location.pathname;
+  var navMap={'home':['/','/index.html'],'daily':['/daily-report.html'],'sr':['/site-readiness.html'],'pr':['/past-reports.html']};
+  document.querySelectorAll('.pf-nav-item[data-nav]').forEach(function(a){var key=a.getAttribute('data-nav');var paths=navMap[key]||[];if(paths.indexOf(path)>=0)a.setAttribute('aria-current','page');});
 });
 /* ---- XSS escaper ---- */
 window.esc = (function(){

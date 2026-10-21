@@ -32,6 +32,7 @@ export async function onRequestGet(context) {
 
   return new Response(JSON.stringify({
     status: 'ok',
+    uid: session.uid || session.name || '',
     name: session.name || '',
     role: session.role,
   }), { status: 200, headers });
