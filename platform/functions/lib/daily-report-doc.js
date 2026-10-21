@@ -12,6 +12,16 @@
 import { PdfDoc, bytesToBase64, PF } from './pdf.js';
 import { GRAPH } from './graph.js';
 
+// Convert an ISO date string (YYYY-MM-DD) to the MM/DD/YYYY display format
+// required by the PF portal date rule. Storage values and filenames are
+// untouched — only displayed dates (PDF header, email narrative) use this.
+function fmtDate(s) {
+  if (!s) return '';
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return String(s);
+  return `${m[2]}/${m[3]}/${m[1]}`;
+}
+
 // ---------------------------------------------------------------------------
 // 1) RENDER: record -> PDF bytes  (PF-branded: azure header band, azure section
 //    chips, Eurostile display font, PF text palette. Layout/aesthetics only --
@@ -26,7 +36,7 @@ export function renderDailyReportPdf(rec) {
   // Project/Date/Foreman/Weather list that used to sit in the body.
   doc.brandHeader('Daily Field Report', [
     { label: 'Project',    value: rec.projectName || '-' },
-    { label: 'Date',       value: rec.date || '-' },
+    { label: 'Date',       value: fmtDate(rec.date) || '-' },
     { label: 'Foreman',    value: rec.foreman || '-' },
     { label: 'Weather',    value: weather || rec.weather || '-' },
     { label: 'Project No', value: rec.projectId || '-' },
@@ -235,7 +245,7 @@ export async function sendReportEmail(env, token, { recipients, subject, bodyTex
 // A short plain-text email body summarizing the report (NO $).
 export function buildEmailBody(rec) {
   const lines = [];
-  lines.push(`Daily field report for ${rec.projectName || rec.projectId || 'project'} on ${rec.date || ''}.`);
+  lines.push(`Daily field report for ${rec.projectName || rec.projectId || 'project'} on ${fmtDate(rec.date) || rec.date || ''}.`);
   lines.push('');
   lines.push(`Foreman: ${rec.foreman || '-'}`);
   const weather = [rec.precipitation, rec.temp].filter(Boolean).join('  ') || rec.weather || '-';
