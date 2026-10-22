@@ -188,12 +188,18 @@ export async function verifySession(token, secret) {
 // KV key: `revoked:<uid>` = epoch seconds (string), TTL 12h (matches session TTL).
 // Sessions without `iat` are treated as iat=0 (before any revocation → revoked).
 
+// Returns true on success, false on KV failure (best-effort; caller may also log).
 export async function revokeOldSessions(uid, kv) {
-  if (!kv || !uid) return;
+  if (!kv || !uid) return true; // nothing to do — not a failure
   try {
     const now = Math.floor(Date.now() / 1000);
     await kv.put(`revoked:${uid}`, String(now), { expirationTtl: 12 * 3600 });
-  } catch { /* best-effort: KV unavailable → old sessions expire naturally */ }
+    return true;
+  } catch (e) {
+    // Log error class only — no uid, no email, no token in log output.
+    console.error('session_revoke_failed', e?.constructor?.name || 'Error');
+    return false; // caller should also log if it checks the return value
+  }
 }
 
 // Check whether `session` has been revoked. Returns true (revoked) or false

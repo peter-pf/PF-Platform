@@ -113,7 +113,9 @@ export async function onRequestPost(context) {
 
     // Revoke outstanding sessions before minting the new one. Any session the
     // user had before this reset (e.g. another browser tab) is invalidated.
-    await revokeOldSessions(row.id, env.PF_SCHEDULE || null);
+    if (!await revokeOldSessions(row.id, env.PF_SCHEDULE || null)) {
+      console.error('session_revoke_failed', 'KVUnavailable');
+    }
 
     // Mint a FRESH NORMAL session (mustReset cleared) and send the user home.
     const newToken = await mintSession(

@@ -201,7 +201,9 @@ export async function onRequestPost(context) {
   // Any session the user had before this reset is invalidated. The middleware
   // checks the revocation marker and rejects sessions with iat < revEpoch.
   // Best-effort: KV unavailable → old sessions expire naturally (see auth.js).
-  await revokeOldSessions(user.id, env.PF_SCHEDULE || null);
+  if (!await revokeOldSessions(user.id, env.PF_SCHEDULE || null)) {
+    console.error('session_revoke_failed', 'KVUnavailable');
+  }
 
   // ── Audit (best-effort) ────────────────────────────────────────────────────
   try {
