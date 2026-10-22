@@ -2,66 +2,135 @@
 """
 geocode-job-coords.py — pre-compute lat/lon for PF field job sites.
 
-Reads site addresses from a JSON config (job-addresses.json in this directory)
-or from fo-projects-data.js if you've added addresses there, then geocodes each
-one via Nominatim (OpenStreetMap). Writes output to:
-
-    field/functions/lib/job-coords.js
+Strategy:
+  1. Try the full site address first (from fo-projects-data.js).
+  2. If the address is null OR Nominatim returns no result, fall back to
+     "City, ST" (city_state field).  Record which level was used.
+  3. Write output to field/functions/lib/job-coords.js.
 
 Run from the repo root:
     python3 field/scripts/geocode-job-coords.py
 
 WHY this runs on this box, not in the Worker:
-  The US Census Geocoder rejects requests from cloud hosting IPs. Nominatim also
-  has a 1-req/sec policy and is not suitable for real-time Worker calls.
-  Precomputing coords and bundling them at deploy time is the correct pattern:
-  fast at request time, deterministic, no external dependency in the Worker path.
+  Nominatim has a 1-req/sec policy and is not suitable for real-time
+  Worker calls.  The US Census Geocoder rejects Cloudflare IPs entirely.
+  Precomputing coords and bundling them at deploy time is the correct
+  pattern: fast at request time, deterministic, no external dependency.
 
 REFRESH CADENCE:
-  Run this script whenever new projects are added to fo-projects-data.js.
-  It is intentionally a manual step (same cadence as updating fo-projects-data.js
-  itself, which currently requires a manual update and redeploy).
-  A natural hook: the existing build-fo-projects-field.py script can call this
-  script after writing the updated project list, so both stay in sync in one pass.
+  Run this script (or build-fo-projects-field.py, which calls it) whenever
+  new projects are added to fo-projects-data.js / fo-projects-field.js.
 """
 
-import json, time, sys, os, re
+import json, time, sys, os
 from urllib.request import urlopen, Request
 from urllib.parse import urlencode
 from datetime import date
 
-NOMINATIM_UA = "PF-Field-Portal/1.0 (peter@pierfoundations.com)"
+NOMINATIM_UA  = "PF-Field-Portal/1.0 (peter@pierfoundations.com)"
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
-RATE_DELAY = 1.1  # Nominatim policy: max 1 req/sec
+RATE_DELAY    = 1.1  # Nominatim policy: max 1 req/sec
 
-# ── address table ──────────────────────────────────────────────────────────
-# Maintain addresses here. null → will appear as {coords: null} in the output
-# (Worker shows "No site location on file for this job").
-# Format: "job_number": "full street address, city, state zip"
-# Nominatim accepts common address formats; include as much detail as you have.
+# ── Master job data ────────────────────────────────────────────────────────
+# Sync with fo-projects-data.js and fo-projects-field.js when new jobs are added.
+# address: full street address or None
+# city_state: always present — used as fallback when address is None or not found
+#
+# Source for addresses: platform/data/project-master.json
+# Source for city_state: platform/data/fo-projects-field.js
 
-JOB_ADDRESSES = {
-    "25-026":  "2801 Bowser Ave, Fort Wayne, IN 46803",           # The Granary
-    "26-001":  "Wright Patterson AFB Ohio",                          # WPAFB
-    "26-002":  "1630 Shetrone Road Shelbyville Indiana",           # POET Bioprocessing
-    "26-007":  None,  # Madison Lifestyle District Parking Garage
-    "26-008":  "927 S 13th St, Terre Haute, IN 47807",           # INAW WTF
-    "26-009":  "4350 N Meridian St, Indianapolis, IN 46208",     # International School
-    "26-010":  None,  # Founders Park Ph II
-    "26-011":  None,  # Indianapolis Housing Hub
-    "26-012":  None,  # Warrick Place
-    "26-013":  None,  # Park & Poplar
-    "26-014":  "5050 Troy Pike, Dayton, OH 45417",               # TPS Dayton
-    "26-015":  None,  # Schaaf CPA HQ
-    "26-016":  None,  # Filager Campus Ph II
-    "26-017":  None,  # Molto Canal Pointe
-    "25-2001": None,  # Greenways Trail ITP Extension
-    "25-2002": None,  # Herrick Village
+JOB_DATA = {
+    "25-026":  {
+        "name":       "The Granary",
+        "address":    "S 8th St & Walnut St, Noblesville, IN 46060",
+        "city_state": "Noblesville, IN",
+    },
+    "26-001":  {
+        "name":       "WPAFB Housing Project",
+        "address":    "Talbott Rd and Locust Street, Wright Patterson AFB, OH 45433",
+        "city_state": "Wright Patterson AFB, OH",
+    },
+    "26-002":  {
+        "name":       "POET Bioprocessing - Shelbyville",
+        "address":    "2373 W 300 N, Shelbyville, IN 46176",
+        "city_state": "Shelbyville, IN",
+    },
+    "26-007":  {
+        "name":       "Madison Lifestyle District Parking Garage",
+        "address":    "416 Dr Martin Luther King Jr Blvd, South Bend, IN 46601",
+        "city_state": "South Bend, IN",
+    },
+    "26-008":  {
+        "name":       "INAW Terre Haute WTF GAC Addition",
+        "address":    "51 Locust St, Terre Haute, IN 47807",
+        "city_state": "Terre Haute, IN",
+    },
+    "26-009":  {
+        "name":       "International School of IN - New International Plaza",
+        "address":    "4330 N Michigan Rd, Indianapolis, IN 46208",
+        "city_state": "Indianapolis, IN",
+    },
+    "26-010":  {
+        "name":       "Founders Park Ph II",
+        "address":    "550 Riverfront Lane, Columbus, OH 43201",
+        "city_state": "Columbus, OH",
+    },
+    "26-011":  {
+        "name":       "Indianapolis Housing Hub",
+        "address":    "1010 E Georgia St, Indianapolis, IN 46202",
+        "city_state": "Indianapolis, IN",
+    },
+    "26-012":  {
+        "name":       "Warrick Place",
+        "address":    "3838 E Washington St, Indianapolis, IN 46204",
+        "city_state": "Indianapolis, IN",
+    },
+    "26-013":  {
+        "name":       "Park & Poplar",
+        "address":    "Westfield Boulevard & Park Street, Westfield, IN 46074",
+        "city_state": "Westfield, IN",
+    },
+    "26-014":  {
+        "name":       "TPS Dayton",
+        "address":    "125 Sears Street, Dayton, OH 45402",
+        "city_state": "Dayton, OH",
+    },
+    "26-015":  {
+        "name":       "Schaaf CPA HQ Building",
+        "address":    "250 North Union Street, Westfield, IN 46074",
+        "city_state": "Westfield, IN",
+    },
+    "26-016":  {
+        "name":       "Filager Campus Improvement Phase II",
+        "address":    "4011 Filager Road, Batavia, OH 45103",
+        "city_state": "Batavia, OH",
+    },
+    "26-017":  {
+        "name":       "Molto Canal Pointe",
+        "address":    None,  # street address incomplete in PM — use city fallback
+        "city_state": "Canal Winchester, OH",
+    },
+    "26-022":  {
+        "name":       "DFS Grain Bins",
+        "address":    "2905 S 33rd St, Oskaloosa, IA 52577",
+        "city_state": "Oskaloosa, IA",
+    },
+    "25-2001": {
+        "name":       "Greenways Trail ITP Extension",
+        "address":    None,
+        "city_state": "Plymouth, IN",
+    },
+    "25-2002": {
+        "name":       "Herrick Village",
+        "address":    None,
+        "city_state": "Racine, WI",
+    },
 }
 
-def geocode(address):
-    """Geocode address via Nominatim. Returns (lat, lon) floats or None."""
-    params = urlencode({"q": address, "format": "json", "limit": "1"})
+
+def geocode(query):
+    """Geocode a query string via Nominatim. Returns (lat, lon) floats or None."""
+    params = urlencode({"q": query, "format": "json", "limit": "1"})
     req = Request(
         f"{NOMINATIM_URL}?{params}",
         headers={"User-Agent": NOMINATIM_UA},
@@ -75,48 +144,75 @@ def geocode(address):
         print(f"  geocode error: {e}", file=sys.stderr)
     return None
 
+
 def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    repo_root  = os.path.dirname(os.path.dirname(script_dir))
-    out_path   = os.path.join(script_dir, "..", "functions", "lib", "job-coords.js")
-    out_path   = os.path.normpath(out_path)
+    out_path   = os.path.normpath(
+        os.path.join(script_dir, "..", "functions", "lib", "job-coords.js")
+    )
 
     coords = {}
     today  = date.today().isoformat()
 
-    print(f"Geocoding {len(JOB_ADDRESSES)} jobs via Nominatim...")
+    print(f"Geocoding {len(JOB_DATA)} jobs via Nominatim (address-first, city fallback)...")
+    print()
 
-    for job_num, address in JOB_ADDRESSES.items():
-        if address is None:
-            print(f"  {job_num}: no address — skipping")
-            coords[job_num] = None
-            continue
+    for job_num, info in JOB_DATA.items():
+        name       = info["name"]
+        address    = info["address"]
+        city_state = info["city_state"]
 
-        print(f"  {job_num}: {address!r} ...", end=" ", flush=True)
-        result = geocode(address)
+        result = None
+        level  = None
+
+        # Step 1: try full address
+        if address:
+            print(f"  {job_num} [{name[:35]}] address: {address!r} ...", end=" ", flush=True)
+            result = geocode(address)
+            if result:
+                level = "address"
+                lat, lon = result
+                print(f"OK  lat={lat:.5f}, lon={lon:.5f}")
+            else:
+                print("NOT FOUND — trying city fallback")
+            time.sleep(RATE_DELAY)
+
+        # Step 2: city_state fallback
+        if result is None and city_state:
+            print(f"  {job_num} [{name[:35]}] city:    {city_state!r} ...", end=" ", flush=True)
+            result = geocode(city_state)
+            if result:
+                level = "city"
+                lat, lon = result
+                print(f"OK  lat={lat:.5f}, lon={lon:.5f}")
+            else:
+                print("NOT FOUND")
+            time.sleep(RATE_DELAY)
+
         if result:
-            lat, lon = result
-            coords[job_num] = {"lat": round(lat, 5), "lon": round(lon, 5),
-                               "source": "nominatim", "date": today}
-            print(f"lat={lat:.5f}, lon={lon:.5f}")
+            coords[job_num] = {
+                "lat":    round(lat, 5),
+                "lon":    round(lon, 5),
+                "level":  level,
+                "source": "nominatim",
+                "date":   today,
+            }
         else:
             coords[job_num] = None
-            print("NOT FOUND")
-
-        time.sleep(RATE_DELAY)
+            print(f"  {job_num}: no address and city lookup failed — null")
 
     # Build the JS output
     lines = [
         "// AUTO-GENERATED by field/scripts/geocode-job-coords.py",
-        "// DO NOT EDIT BY HAND. Re-run the script when job addresses change.",
+        "// DO NOT EDIT BY HAND. Re-run the script (or build-fo-projects-field.py)",
+        "// when job addresses change.",
         "//",
-        "// Each entry: { lat, lon, source, date } or null (no address on file).",
-        "// Used by /api/weather to skip the geocode step at request time.",
+        "// Each entry: { lat, lon, level, source, date } or null (no location on file).",
+        "//   level: 'address' = geocoded from full street address",
+        "//          'city'    = geocoded from city/state only (address unavailable or not found)",
+        "//   null entry → Worker shows 'No site location on file for this job'",
         "//",
-        "// REFRESH: run `python3 field/scripts/geocode-job-coords.py` from repo root",
-        "// whenever fo-projects-data.js is updated with new/changed addresses.",
-        "// Natural hook: build-fo-projects-field.py can call this script at the end",
-        "// of its run so both files stay in sync in a single build step.",
+        "// Used by /api/weather to skip geocoding at request time.",
         f"// Last generated: {today}",
         "",
         "export const JOB_COORDS = {",
@@ -128,7 +224,9 @@ def main():
             lines.append(
                 f"  {json.dumps(job_num)}: "
                 f"{{ lat: {entry['lat']}, lon: {entry['lon']}, "
-                f"source: {json.dumps(entry['source'])!s}, date: {json.dumps(entry['date'])!s} }},"
+                f"level: {json.dumps(entry['level'])}, "
+                f"source: {json.dumps(entry['source'])}, "
+                f"date: {json.dumps(entry['date'])} }},"
             )
     lines += ["};", ""]
 
@@ -136,8 +234,13 @@ def main():
         f.write("\n".join(lines))
 
     non_null = sum(1 for v in coords.values() if v is not None)
-    print(f"\nWrote {out_path}")
-    print(f"Jobs with coords: {non_null}/{len(coords)}")
+    addr_lvl = sum(1 for v in coords.values() if v and v.get("level") == "address")
+    city_lvl = sum(1 for v in coords.values() if v and v.get("level") == "city")
+    print()
+    print(f"Wrote {out_path}")
+    print(f"Coverage: {non_null}/{len(coords)} jobs have coords "
+          f"({addr_lvl} address-level, {city_lvl} city-level)")
+
 
 if __name__ == "__main__":
     main()

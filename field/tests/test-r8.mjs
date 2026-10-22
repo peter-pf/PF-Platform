@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // R8 tests:
 //   Weather (mocked upstream):
-//     1. Success: geocode + NWS both succeed → returns 3-day forecast
-//     2. No address → status:'no_address' message
-//     3. Upstream geocode fail → status:'unavailable'
+//     1. Success: precomputed coords + NWS → returns 3-day forecast
+//     2. Coverage: 26-007 now has address-level coords (previously null) → returns forecast
+//     3. NWS /points fails → status:'unavailable'
 //     4. NWS points fail → status:'unavailable'
 //     5. Unknown job number → 400 error
 //     6. Auth gate: no session → 403 from requireArea
@@ -236,19 +236,43 @@ await test('1. success: precomputed coords + NWS → 3-day forecast', async () =
   assert.ok(data.asOf, 'should have asOf timestamp');
 });
 
-await test('2. no precomputed coords → status:no_location', async () => {
+await test('2. coverage improvement: 26-007 now has address-level coords → returns forecast', async () => {
+  // Before R8 coverage fix, 26-007 had null coords and returned no_location.
+  // After fix, it has address-level coords (South Bend, IN).
+  // This test verifies the improvement by confirming NWS is called and forecast returned.
+  // (no_location path is exercised when a new job is added before running geocode-job-coords.py)
+  mockFetch([
+    ['api.weather.gov/points', () => mockJsonResponse({
+      properties: { forecast: 'https://api.weather.gov/gridpoints/IWX/55,63/forecast' }
+    })],
+    ['api.weather.gov/gridpoints', () => mockJsonResponse({
+      properties: {
+        periods: [
+          { isDaytime: true,  name: 'Today',   temperature: 60, temperatureUnit: 'F', shortForecast: 'Cloudy', probabilityOfPrecipitation: { value: 20 } },
+          { isDaytime: false, name: 'Tonight', temperature: 45, temperatureUnit: 'F', shortForecast: 'Cloudy', probabilityOfPrecipitation: { value: 10 } },
+          { isDaytime: true,  name: 'Tomorrow',temperature: 64, temperatureUnit: 'F', shortForecast: 'Sunny',  probabilityOfPrecipitation: { value: 5 } },
+          { isDaytime: false, name: 'Tomorrow Night', temperature: 48, temperatureUnit: 'F', shortForecast: 'Clear', probabilityOfPrecipitation: { value: 0 } },
+          { isDaytime: true,  name: 'Friday',  temperature: 58, temperatureUnit: 'F', shortForecast: 'Rain',   probabilityOfPrecipitation: { value: 70 } },
+          { isDaytime: false, name: 'Friday Night', temperature: 40, temperatureUnit: 'F', shortForecast: 'Rain', probabilityOfPrecipitation: { value: 50 } },
+        ],
+      }
+    })],
+  ]);
+
   const ctx = makeCtx({
     method: 'GET',
     session: { uid: 'u1', role: 'field_ops', name: 'Test' },
     env: { PF_SCHEDULE: makeKV() },
   });
-  // 26-007 has null coords in job-coords.js (no address known)
   ctx.request = new Request('https://field.pierfoundations.com/api/weather?job=26-007', { method: 'GET' });
 
   const resp = await wxOnRequest(ctx);
+  restoreFetch();
   const data = await resp.json();
-  assert.equal(data.status, 'no_location');
-  assert.ok(data.message.includes('No site location'));
+  assert.equal(data.status, 'ok', 'should return ok (has coords after coverage fix)');
+  assert.ok(Array.isArray(data.forecast), 'forecast is array');
+  assert.equal(data.forecast.length, 3, '3 days returned');
+  assert.equal(data.job, '26-007');
 });
 
 await test('3. NWS /points fails → status:unavailable', async () => {

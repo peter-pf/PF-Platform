@@ -117,6 +117,13 @@ window.PF_FO_PROJECTS = {
       "city_state": "Racine, WI",
       "discipline": "Helical Pilings",
       "record": null
+    },
+    {
+      "number": "26-022",
+      "name": "DFS Grain Bins",
+      "city_state": "Oskaloosa, IA",
+      "discipline": "Aggregate Piers",
+      "record": null
     }
   ],
   "poet_scope": {
