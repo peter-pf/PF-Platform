@@ -174,7 +174,8 @@ function makeD1() {
 const wxUrl = new URL('../functions/api/weather.js', import.meta.url);
 const { onRequest: wxOnRequest } = await import(wxUrl.href);
 
-// Mock the Census geocoder and NWS using global fetch override
+// Mock NWS using global fetch override.
+// No Census geocoder mock needed — coordinates are precomputed in job-coords.js.
 const _origFetch = globalThis.fetch;
 function mockFetch(handlers) {
   globalThis.fetch = async function(url, opts) {
@@ -194,13 +195,11 @@ function mockJsonResponse(data, status = 200) {
 // Tests 1-6: Weather
 console.log('\nWeather tile tests:');
 
-await test('1. success: geocode + NWS → 3-day forecast', async () => {
+await test('1. success: precomputed coords + NWS → 3-day forecast', async () => {
+  // 26-001 (WPAFB) has coords precomputed in job-coords.js
   mockFetch([
-    ['geocoding.geo.census.gov', () => mockJsonResponse({
-      result: { addressMatches: [{ coordinates: { x: -84.05, y: 39.83 } }] }
-    })],
     ['api.weather.gov/points', () => mockJsonResponse({
-      properties: { forecast: 'https://api.weather.gov/gridpoints/ILN/73,64/forecast' }
+      properties: { forecast: 'https://api.weather.gov/gridpoints/ILN/49,72/forecast' }
     })],
     ['api.weather.gov/gridpoints', () => mockJsonResponse({
       properties: {
@@ -217,7 +216,6 @@ await test('1. success: geocode + NWS → 3-day forecast', async () => {
   ]);
 
   const kv = makeKV();
-  // WPAFB has address set in fo-projects-data.js
   const ctx = makeCtx({
     method: 'GET',
     session: { uid: 'u1', role: 'field_ops', name: 'Test' },
@@ -238,24 +236,24 @@ await test('1. success: geocode + NWS → 3-day forecast', async () => {
   assert.ok(data.asOf, 'should have asOf timestamp');
 });
 
-await test('2. no address → status:no_address', async () => {
+await test('2. no precomputed coords → status:no_location', async () => {
   const ctx = makeCtx({
     method: 'GET',
     session: { uid: 'u1', role: 'field_ops', name: 'Test' },
     env: { PF_SCHEDULE: makeKV() },
   });
-  // 25-026 has no address
-  ctx.request = new Request('https://field.pierfoundations.com/api/weather?job=25-026', { method: 'GET' });
+  // 26-007 has null coords in job-coords.js (no address known)
+  ctx.request = new Request('https://field.pierfoundations.com/api/weather?job=26-007', { method: 'GET' });
 
   const resp = await wxOnRequest(ctx);
   const data = await resp.json();
-  assert.equal(data.status, 'no_address');
-  assert.ok(data.message.includes('No site address'));
+  assert.equal(data.status, 'no_location');
+  assert.ok(data.message.includes('No site location'));
 });
 
-await test('3. geocode fails → status:unavailable', async () => {
+await test('3. NWS /points fails → status:unavailable', async () => {
   mockFetch([
-    ['geocoding.geo.census.gov', () => mockJsonResponse({ result: { addressMatches: [] } })],
+    ['api.weather.gov/points', () => ({ ok: false, status: 503, json: async () => ({}) })],
   ]);
 
   const ctx = makeCtx({
@@ -272,12 +270,12 @@ await test('3. geocode fails → status:unavailable', async () => {
   assert.ok(data.message.includes('unavailable'));
 });
 
-await test('4. NWS points fail → status:unavailable', async () => {
+await test('4. NWS forecast endpoint fails → status:unavailable', async () => {
   mockFetch([
-    ['geocoding.geo.census.gov', () => mockJsonResponse({
-      result: { addressMatches: [{ coordinates: { x: -84.05, y: 39.83 } }] }
+    ['api.weather.gov/points', () => mockJsonResponse({
+      properties: { forecast: 'https://api.weather.gov/gridpoints/ILN/49,72/forecast' }
     })],
-    ['api.weather.gov/points', () => ({ ok: false, status: 503, json: async () => ({}) })],
+    ['api.weather.gov/gridpoints', () => ({ ok: false, status: 503, json: async () => ({}) })],
   ]);
 
   const ctx = makeCtx({

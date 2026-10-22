@@ -2,15 +2,21 @@
 // 3-day NWS forecast for a PF job site.
 //
 // FLOW:
-//   1. Client POSTs {job: "26-001"} (or GET ?job=26-001).
-//   2. Server looks up the site address in fo-projects-data.js.
-//      No address → 200 {status:'no_address', message:'No site address on file for this job.'}.
-//   3. Geocode address → (lat, lon) via US Census Geocoder (no key).
-//      Geocode fail → 200 {status:'unavailable', message:'Weather unavailable right now.'}.
-//   4. NWS /points/{lat},{lon} → get forecastUrl.
+//   1. Client sends GET ?job=26-001 (or POST {job: "26-001"}).
+//   2. Server looks up precomputed lat/lon from job-coords.js.
+//      No coords → 200 {status:'no_location', message:'No site location on file for this job.'}.
+//   3. Calls NWS /points/{lat},{lon} → gets forecastUrl → 3-day forecast
+//      (high/low, short text, precip chance).
 //      NWS fail → 200 {status:'unavailable', message:'Weather unavailable right now.'}.
-//   5. GET forecastUrl → parse first 3 daytime periods (high/low, short text, precip).
-//   6. Cache result in KV under "weather:v1:{jobNumber}" for ~60 minutes.
+//   4. Caches result in KV under "weather:v1:{jobNumber}" for ~60 minutes.
+//   5. Returns {status:'ok', forecast:[...], asOf, job, name, cached}.
+//
+// WHY precomputed coords (not runtime geocoding):
+//   The US Census Geocoder and Nominatim both block or rate-limit Cloudflare IPs.
+//   Coordinates are precomputed offline (field/scripts/geocode-job-coords.py) and
+//   bundled at deploy time. To add/refresh coords for new jobs, re-run that script
+//   and redeploy. Hook: build-fo-projects-field.py can call the script at the end
+//   of its run so both files stay in sync.
 //
 // SECURITY:
 //   - Auth: field_ops area (set in areaForPath + verified in handler).
@@ -21,6 +27,7 @@
 
 import { requireArea } from '../lib/auth.js';
 import { FO_PROJECTS } from '../lib/fo-projects-data.js';
+import { JOB_COORDS } from '../lib/job-coords.js';
 
 const JSON_HEADERS = {
   'Content-Type': 'application/json',
@@ -35,34 +42,7 @@ const NWS_UA = 'PF-Field-Portal/1.0 (peter@pierfoundations.com)';
 const KV_TTL_SECONDS = 3600; // ~60 minutes
 const KV_PREFIX = 'weather:v1:';
 
-// Geocode a one-line address via the US Census Geocoder.
-// Returns {lat, lon} or null on failure.
-async function geocodeAddress(address) {
-  const url = 'https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?' +
-    new URLSearchParams({
-      address,
-      benchmark: 'Public_AR_Current',
-      format: 'json',
-    }).toString();
-  try {
-    const resp = await fetch(url, {
-      headers: { 'User-Agent': NWS_UA },
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!resp.ok) return null;
-    const data = await resp.json();
-    const matches = data?.result?.addressMatches;
-    if (!matches || matches.length === 0) return null;
-    const coords = matches[0].coordinates;
-    if (!coords || typeof coords.x !== 'number' || typeof coords.y !== 'number') return null;
-    // Census returns {x: lon, y: lat}
-    return { lat: coords.y, lon: coords.x };
-  } catch {
-    return null;
-  }
-}
-
-// Parse forecast periods into 3-day summary {date, high, low, shortForecast, precipChance}.
+// Parse forecast periods into 3-day summary {name, high, low, unit, shortForecast, precipChance}.
 // NWS periods alternate daytime/nighttime. We take up to 3 daytime periods.
 function parseForecast(periods) {
   const days = [];
@@ -70,10 +50,10 @@ function parseForecast(periods) {
     if (!period.isDaytime) continue;
     const precip = period.probabilityOfPrecipitation?.value ?? null;
     days.push({
-      name: period.name,            // "Today", "Monday", etc.
-      high: period.temperature,     // daytime = high
-      low: null,                    // will fill from next period
-      unit: period.temperatureUnit, // F or C
+      name: period.name,
+      high: period.temperature,
+      low: null, // filled below from the next nighttime period
+      unit: period.temperatureUnit,
       shortForecast: period.shortForecast,
       precipChance: precip !== null ? Math.round(precip) : null,
     });
@@ -81,7 +61,6 @@ function parseForecast(periods) {
   }
   // Fill lows from the following nighttime period
   for (let i = 0; i < days.length; i++) {
-    // Find the matching nighttime period right after this daytime
     const dayIdx = periods.findIndex(p => p.isDaytime && p.name === days[i].name);
     if (dayIdx >= 0 && dayIdx + 1 < periods.length && !periods[dayIdx + 1].isDaytime) {
       days[i].low = periods[dayIdx + 1].temperature;
@@ -90,7 +69,7 @@ function parseForecast(periods) {
   return days;
 }
 
-// Fetch NWS 3-day forecast for lat/lon. Returns {forecast, asOf} or null.
+// Fetch NWS 3-day forecast for precomputed lat/lon. Returns {forecast, asOf} or null.
 async function fetchNwsForecast(lat, lon) {
   const pointsUrl = `https://api.weather.gov/points/${lat.toFixed(4)},${lon.toFixed(4)}`;
   try {
@@ -127,10 +106,6 @@ export async function onRequest(context) {
   const authErr = requireArea(context.data?.session, 'field_ops');
   if (authErr) return authErr;
 
-  if (!env.PF_SCHEDULE) {
-    return json({ status: 'unavailable', message: 'Weather unavailable right now.' });
-  }
-
   // Parse job number from GET query or POST body
   let jobNumber = null;
   if (request.method === 'GET') {
@@ -152,7 +127,6 @@ export async function onRequest(context) {
   // Validate job number against known projects
   jobNumber = String(jobNumber || '').trim();
   if (!jobNumber) {
-    // Default to first project if none supplied
     jobNumber = FO_PROJECTS[0]?.number || '';
   }
   const project = FO_PROJECTS.find(p => p.number === jobNumber);
@@ -160,36 +134,46 @@ export async function onRequest(context) {
     return json({ status: 'error', message: 'Unknown job number.' }, 400);
   }
 
-  if (!project.address) {
-    return json({ status: 'no_address', message: 'No site address on file for this job.', job: project.number, name: project.name });
-  }
-
-  // Check KV cache
-  const cacheKey = KV_PREFIX + jobNumber;
-  try {
-    const cached = await env.PF_SCHEDULE.get(cacheKey, { type: 'json' });
-    if (cached) {
-      return json({ status: 'ok', ...cached, job: project.number, name: project.name, cached: true });
-    }
-  } catch { /* ignore cache read errors */ }
-
-  // Geocode
-  const coords = await geocodeAddress(project.address);
+  // Look up precomputed coordinates
+  const coords = JOB_COORDS[jobNumber] || null;
   if (!coords) {
-    return json({ status: 'unavailable', message: 'Weather unavailable right now.', job: project.number, name: project.name });
+    return json({
+      status: 'no_location',
+      message: 'No site location on file for this job.',
+      job: project.number,
+      name: project.name,
+    });
   }
 
-  // NWS forecast
+  // Check KV cache (skip gracefully if KV not bound)
+  const cacheKey = KV_PREFIX + jobNumber;
+  if (env.PF_SCHEDULE) {
+    try {
+      const cached = await env.PF_SCHEDULE.get(cacheKey, { type: 'json' });
+      if (cached) {
+        return json({ status: 'ok', ...cached, job: project.number, name: project.name, cached: true });
+      }
+    } catch { /* ignore cache read errors */ }
+  }
+
+  // NWS forecast (no geocoding — coords are precomputed)
   const result = await fetchNwsForecast(coords.lat, coords.lon);
   if (!result) {
-    return json({ status: 'unavailable', message: 'Weather unavailable right now.', job: project.number, name: project.name });
+    return json({
+      status: 'unavailable',
+      message: 'Weather unavailable right now.',
+      job: project.number,
+      name: project.name,
+    });
   }
 
   // Cache in KV
   const payload = { forecast: result.forecast, asOf: result.asOf };
-  try {
-    await env.PF_SCHEDULE.put(cacheKey, JSON.stringify(payload), { expirationTtl: KV_TTL_SECONDS });
-  } catch { /* ignore cache write errors */ }
+  if (env.PF_SCHEDULE) {
+    try {
+      await env.PF_SCHEDULE.put(cacheKey, JSON.stringify(payload), { expirationTtl: KV_TTL_SECONDS });
+    } catch { /* ignore cache write errors */ }
+  }
 
   return json({ status: 'ok', ...payload, job: project.number, name: project.name, cached: false });
 }
