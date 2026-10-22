@@ -12,8 +12,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="PF Field">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --accent:#006DB0;
@@ -39,7 +37,7 @@
   *{box-sizing:border-box;}
   body{
     margin:0;
-    font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
     color:var(--text);
     background:var(--bg);
     min-height:100vh;
@@ -148,9 +146,22 @@
 
 <script>
 (function () {
-  // Extract token from URL query param. Never log or expose it.
-  var params = new URLSearchParams(window.location.search);
-  var token = params.get('token') || '';
+  // Extract token from URL fragment (#token=...). The fragment is never sent
+  // to the server and never appears in the HTTP Referrer header, even if the
+  // user navigates away from this page. After reading, we strip the fragment
+  // from the browser's address bar so the token cannot be captured in the
+  // browser history or accidentally shared from the URL bar.
+  var hash = window.location.hash.slice(1); // strip leading '#'
+  var token = '';
+  try {
+    var fragParams = new URLSearchParams(hash);
+    token = fragParams.get('token') || '';
+  } catch (e) { token = ''; }
+
+  // Strip the fragment from the address bar immediately after reading.
+  if (window.history && typeof window.history.replaceState === 'function') {
+    window.history.replaceState(null, '', window.location.pathname + (window.location.search || ''));
+  }
 
   var formEl = document.getElementById('resetForm');
   var invalidEl = document.getElementById('invalidState');
@@ -158,7 +169,7 @@
   var errBox = document.getElementById('errorBox');
 
   if (!token || token.length < 10) {
-    // No token — show invalid state immediately (no network call needed)
+    // No token (or too short) — show invalid state immediately
     invalidEl.style.display = '';
     return;
   }

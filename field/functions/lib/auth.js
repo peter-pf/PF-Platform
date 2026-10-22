@@ -114,10 +114,13 @@ async function hmac(payloadB64, secret) {
   return b64urlEncode(new Uint8Array(sig));
 }
 
-// Mint a per-user session token: base64url(JSON{uid,role,name,mr,exp}).signature
+// Mint a per-user session token: base64url(JSON{uid,role,name,iat,mr,exp}).signature
 // `mustReset` (mr) marks a RESTRICTED session: the user authenticated correctly
 // but must change a temporary password. A restricted session may ONLY reach the
 // password-reset endpoint/page (enforced in the middleware), never the portal.
+// `iat` (issued-at, epoch seconds) supports session revocation after a password
+// reset: sessions issued before the revocation time are invalidated by the
+// middleware's checkSessionRevoked() check.
 export async function mintSession(
   { uid, role, name, mustReset }, secret, ttlMs = SESSION_TTL_MS
 ) {
@@ -125,6 +128,7 @@ export async function mintSession(
     uid,
     role,
     name: name || '',
+    iat: Math.floor(Date.now() / 1000), // issued-at (for revocation check)
     exp: Date.now() + ttlMs,
   };
   if (mustReset) claims.mr = 1; // restricted: reset-only
@@ -166,6 +170,49 @@ export async function verifySession(token, secret) {
 }
 
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Session revocation (password-reset invalidation)
+// ---------------------------------------------------------------------------
+//
+// When a user resets their password (either via forgot-password flow or the
+// must_reset forced-reset flow), call `revokeOldSessions(uid, kv)` to write
+// a KV key recording the revocation epoch. The middleware reads this key and
+// rejects sessions whose `iat` is before the revocation epoch.
+//
+// DESIGN CHOICE: the revocation check fails OPEN on KV error. If PF_SCHEDULE
+// is unavailable, outstanding sessions retain their natural 12h expiry rather
+// than locking out all users. The risk of a stale session surviving a KV
+// outage is accepted as less harmful than a portal-wide outage. This choice is
+// intentional and documented — do not change it without owner review.
+//
+// KV key: `revoked:<uid>` = epoch seconds (string), TTL 12h (matches session TTL).
+// Sessions without `iat` are treated as iat=0 (before any revocation → revoked).
+
+export async function revokeOldSessions(uid, kv) {
+  if (!kv || !uid) return;
+  try {
+    const now = Math.floor(Date.now() / 1000);
+    await kv.put(`revoked:${uid}`, String(now), { expirationTtl: 12 * 3600 });
+  } catch { /* best-effort: KV unavailable → old sessions expire naturally */ }
+}
+
+// Check whether `session` has been revoked. Returns true (revoked) or false
+// (valid, check not possible, or KV error).
+export async function checkSessionRevoked(session, kv) {
+  if (!kv || !session || !session.uid) return false;
+  try {
+    const raw = await kv.get(`revoked:${session.uid}`);
+    if (!raw) return false;
+    const revEpoch = parseInt(raw, 10);
+    if (!Number.isFinite(revEpoch)) return false;
+    // iat missing → treat as epoch 0 (before any revocation → revoked)
+    const iat = typeof session.iat === 'number' ? session.iat : 0;
+    return iat < revEpoch;
+  } catch {
+    return false; // KV error → fail open (see DESIGN CHOICE above)
+  }
+}
+
 // Cookie helpers
 // ---------------------------------------------------------------------------
 export function getCookie(cookieString, name) {

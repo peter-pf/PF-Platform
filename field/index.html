@@ -314,26 +314,12 @@ window.esc = window.esc || function(s){
 })();
 
 // ---- Weather tile (R8) ----
+// Project list is fetched from /api/field-projects (same source as Daily Report
+// and Site Readiness pickers) so new jobs appear automatically without a code
+// change. The hard-coded project array was removed in R8 security hardening.
 (function(){
-  var WX_PROJECTS = [
-    {number:'25-026', name:'The Granary'},
-    {number:'26-001', name:'WPAFB Housing'},
-    {number:'26-002', name:'POET Bioprocessing'},
-    {number:'26-007', name:'Madison Lifestyle Parking'},
-    {number:'26-008', name:'INAW Terre Haute'},
-    {number:'26-009', name:'International School'},
-    {number:'26-010', name:'Founders Park Ph II'},
-    {number:'26-011', name:'Indianapolis Housing Hub'},
-    {number:'26-012', name:'Warrick Place'},
-    {number:'26-013', name:'Park & Poplar'},
-    {number:'26-014', name:'TPS Dayton'},
-    {number:'26-015', name:'Schaaf CPA HQ'},
-    {number:'26-016', name:'Filager Campus Ph II'},
-    {number:'26-017', name:'Molto Canal Pointe'},
-    {number:'25-2001', name:'Greenways Trail'},
-    {number:'25-2002', name:'Herrick Village'},
-  ];
-  var LAST_JOB_KEY = 'pf-wx-job';
+  // Shared last-job key — same as Daily Report and Site Readiness pickers.
+  var LAST_JOB_KEY = 'pf-last-job';
   var wxBody = document.getElementById('wxBody');
 
   function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -343,11 +329,11 @@ window.esc = window.esc || function(s){
     catch(e){return '';}
   }
 
-  function renderForecast(data, jobSel){
+  function renderForecast(data, jobSel, projects){
     var html = '<div class="wx-job-row">' +
       '<span class="wx-job-label">Job:</span>' +
       '<select class="wx-job-sel" id="wxJobSel" aria-label="Select job for weather">';
-    WX_PROJECTS.forEach(function(p){
+    (projects||[]).forEach(function(p){
       html += '<option value="'+esc(p.number)+'"'+(p.number===jobSel?' selected':'')+'>'+esc(p.name)+'</option>';
     });
     html += '</select></div>';
@@ -380,34 +366,48 @@ window.esc = window.esc || function(s){
       selEl.addEventListener('change', function(){
         var job = this.value;
         try{localStorage.setItem(LAST_JOB_KEY, job);}catch(e){}
-        loadWeather(job);
+        loadWeather(job, projects);
       });
     }
   }
 
-  function loadWeather(job){
+  function loadWeather(job, projects){
     wxBody.innerHTML = '<div class="wx-loading">Loading forecast...</div>';
     fetch('/api/weather?job='+encodeURIComponent(job), {credentials:'same-origin'})
       .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
       .then(function(r){
         if(r.ok){
-          renderForecast(r.d, job);
+          renderForecast(r.d, job, projects);
         } else {
-          renderForecast({status:'unavailable'}, job);
+          renderForecast({status:'unavailable'}, job, projects);
         }
       })
       .catch(function(){
-        renderForecast({status:'unavailable'}, job);
+        renderForecast({status:'unavailable'}, job, projects);
       });
   }
 
-  // Default job: last used or first in list
-  var defaultJob;
-  try{defaultJob = localStorage.getItem(LAST_JOB_KEY);}catch(e){}
-  if(!defaultJob || !WX_PROJECTS.find(function(p){return p.number===defaultJob;})){
-    defaultJob = WX_PROJECTS[0].number;
-  }
-  loadWeather(defaultJob);
+  // Fetch project list from the API, then load weather for the default job.
+  // Default job: pf-last-job (shared with Daily Report / Site Readiness)
+  // falling back to the first project returned by the API.
+  fetch('/api/field-projects', {credentials:'same-origin'})
+    .then(function(r){return r.ok ? r.json() : [];})
+    .then(function(projects){
+      if(!projects || !projects.length){
+        wxBody.innerHTML = '<div class="wx-error">No active jobs on file.</div>';
+        return;
+      }
+      var defaultJob;
+      try{defaultJob = localStorage.getItem(LAST_JOB_KEY);}catch(e){}
+      // If the stored job is not in the current list, fall back to the first job.
+      if(!defaultJob || !projects.find(function(p){return p.number===defaultJob;})){
+        defaultJob = projects[0].number;
+      }
+      loadWeather(defaultJob, projects);
+    })
+    .catch(function(){
+      wxBody.innerHTML = '<div class="wx-error">Weather unavailable right now.</div>';
+    });
 })();
 </script>
 </body>

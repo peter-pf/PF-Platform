@@ -21,7 +21,7 @@
 
 import {
   verifySession, getCookie, hashPassword, mintSession, sessionCookie,
-  isRestrictedSession, SESSION_COOKIE,
+  isRestrictedSession, SESSION_COOKIE, revokeOldSessions,
 } from '../lib/auth.js';
 
 const JSON_HEADERS = {
@@ -110,6 +110,10 @@ export async function onRequestPost(context) {
         .bind(row.id, 'password_reset', `role=${row.role}`, new Date().toISOString())
         .run();
     } catch { /* best-effort */ }
+
+    // Revoke outstanding sessions before minting the new one. Any session the
+    // user had before this reset (e.g. another browser tab) is invalidated.
+    await revokeOldSessions(row.id, env.PF_SCHEDULE || null);
 
     // Mint a FRESH NORMAL session (mustReset cleared) and send the user home.
     const newToken = await mintSession(

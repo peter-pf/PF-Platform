@@ -14,13 +14,21 @@
 //     9. Known email → raw token NOT equal to stored hash
 //    10. Expired token → INVALID_RESPONSE from reset-by-token
 //    11. Used token → INVALID_RESPONSE from reset-by-token
-//    12. Valid token → password updated; old password rejected at /api/login pattern
+//    12. Valid token → password updated; audit written
 //    13. Rate limit by email: 4th request returns generic response without DB write
 //    14. Middleware: /forgot-password.html in PUBLIC_PATHS
 //    15. Middleware: /reset.html in PUBLIC_PATHS
-//    16. Middleware: /api/forgot-password in AUTH_ENDPOINTS
-//    17. Middleware: /api/reset-by-token in AUTH_ENDPOINTS
+//    16. Middleware: /api/forgot-password in AUTH_ENDPOINTS (exact match)
+//    17. Middleware: /api/reset-by-token in AUTH_ENDPOINTS (exact match)
 //    18. auth.js: /api/weather mapped to field_ops area
+//
+//   Security hardening (R8 audit):
+//    19. Timing: both paths (known + unknown) return before background tasks run
+//    20. Atomic single-use: two concurrent consumes → exactly one succeeds
+//    21. Session revocation: old session rejected after reset; new session passes
+//    22. CT + cross-site guards: form-encoded and cross-site requests rejected, no DB write
+//    23. Fragment token: email link uses #token= not ?token=
+//    24. WX_PROJECTS removed: index.html has no hard-coded list; dropdown built from /api/field-projects
 //
 // Run: node field/tests/test-r8.mjs
 
@@ -58,8 +66,11 @@ import { readFileSync } from 'fs';
 const mwText = readFileSync(fileURLToPath(mwUrl), 'utf8');
 
 // ---- Helper: build a minimal CF Pages Function context ----
-// Used to exercise the endpoint handlers without a real CF runtime.
+// Provides a waitUntil() method that captures background tasks so tests can:
+//   1. Verify the response arrives before background work runs (timing invariant).
+//   2. Explicitly await ctx._bgTasks before asserting DB side-effects.
 function makeCtx({ method = 'POST', body = null, session = null, env = {} } = {}) {
+  const bgTasks = [];
   const req = new Request('https://field.pierfoundations.com/api/test', {
     method,
     headers: { 'Content-Type': 'application/json' },
@@ -73,6 +84,8 @@ function makeCtx({ method = 'POST', body = null, session = null, env = {} } = {}
       ...env,
     },
     data: session ? { session } : {},
+    waitUntil(p) { bgTasks.push(p); },
+    _bgTasks: bgTasks,
   };
 }
 
@@ -95,6 +108,8 @@ function makeKV() {
 }
 
 // ---- Mock D1 (in-memory) ----
+// run() returns { meta: { changes: n } } for UPDATE statements that modify rows,
+// which is what reset-by-token checks to enforce single-use token consumption.
 function makeD1() {
   const tables = {
     users: [],
@@ -135,20 +150,46 @@ function makeD1() {
           const sql = this._sql.toLowerCase();
           const binds = this._binds;
           if (sql.includes('update password_resets set used_at') && sql.includes('where user_email')) {
+            // Invalidate old tokens for same email (non-atomic, bulk invalidation)
             const email = binds[0];
+            const excludeId = binds[1];
             tables.password_resets.forEach(r => {
-              if (r.user_email === email && !r.used_at) r.used_at = new Date().toISOString();
+              if (r.user_email === email && !r.used_at && r.id !== excludeId) {
+                r.used_at = new Date().toISOString();
+              }
             });
+            return { meta: { changes: 0 } };
           } else if (sql.includes('insert into password_resets')) {
             tables.password_resets.push({
               id: binds[0], user_email: binds[1], token_hash: binds[2],
               expires_at: binds[3], used_at: null,
               created_at: new Date().toISOString(), request_ip: binds[4] || '',
             });
+            return { meta: { changes: 1 } };
+          } else if (
+            sql.includes('update password_resets set used_at') &&
+            sql.includes('where id') &&
+            sql.includes('and used_at is null')
+          ) {
+            // ATOMIC single-use consume:
+            //   UPDATE ... SET used_at=datetime('now') WHERE id=? AND used_at IS NULL AND expires_at>?
+            // Returns meta.changes=1 only if the row was actually consumed.
+            const id = binds[0];
+            const expiresCheck = binds[1];
+            const row = tables.password_resets.find(r =>
+              r.id === id && !r.used_at && r.expires_at > expiresCheck
+            );
+            if (row) {
+              row.used_at = new Date().toISOString();
+              return { meta: { changes: 1 } };
+            }
+            return { meta: { changes: 0 } };
           } else if (sql.includes('update password_resets set used_at') && sql.includes('where id')) {
+            // Simple mark-used (on email send failure, etc.)
             const id = binds[0];
             const row = tables.password_resets.find(r => r.id === id);
             if (row) row.used_at = new Date().toISOString();
+            return { meta: { changes: row ? 1 : 0 } };
           } else if (sql.includes('update users set password_hash')) {
             const [hash, salt, iterations, ts, id] = binds;
             const user = tables.users.find(u => u.id === id);
@@ -156,10 +197,12 @@ function makeD1() {
               user.password_hash = hash; user.salt = salt;
               user.iterations = iterations; user.must_reset = 0;
             }
+            return { meta: { changes: user ? 1 : 0 } };
           } else if (sql.includes('insert into audit_log')) {
             tables.audit_log.push({ user_id: binds[0], action: binds[1], detail: binds[2] });
+            return { meta: { changes: 1 } };
           }
-          return { success: true };
+          return { meta: { changes: 0 } };
         },
         async all() { return { results: [] }; },
       };
@@ -240,7 +283,6 @@ await test('2. coverage improvement: 26-007 now has address-level coords → ret
   // Before R8 coverage fix, 26-007 had null coords and returned no_location.
   // After fix, it has address-level coords (South Bend, IN).
   // This test verifies the improvement by confirming NWS is called and forecast returned.
-  // (no_location path is exercised when a new job is added before running geocode-job-coords.py)
   mockFetch([
     ['api.weather.gov/points', () => mockJsonResponse({
       properties: { forecast: 'https://api.weather.gov/gridpoints/IWX/55,63/forecast' }
@@ -348,12 +390,13 @@ const { onRequest: rbtOnRequest } = await import(rbtUrl.href);
 
 console.log('\nForgot password / reset-by-token tests:');
 
-await test('7. unknown email → generic response, no error', async () => {
+await test('7. unknown email → generic response, no error, no DB write', async () => {
   const db = makeD1();  // no users
   const ctx = makeCtx({ body: { email: 'nobody@example.com' }, env: { DB: db, PF_SCHEDULE: makeKV() } });
 
-  // Graph configured = false (no AZURE_ vars) → falls back but still generic
   const resp = await fpOnRequest(ctx);
+  // Await background tasks (no user found → exits early with no writes)
+  await Promise.all(ctx._bgTasks);
   const data = await resp.json();
   assert.equal(resp.status, 200, 'always 200');
   assert.equal(data.status, 'ok');
@@ -385,6 +428,8 @@ await test('8. known email → token_hash stored in DB', async () => {
   });
 
   const resp = await fpOnRequest(ctx);
+  // Must await background tasks before asserting DB state
+  await Promise.all(ctx._bgTasks);
   restoreFetch();
   const data = await resp.json();
   assert.equal(resp.status, 200);
@@ -423,6 +468,8 @@ await test('9. raw token is NOT the stored hash', async () => {
   });
 
   await fpOnRequest(ctx);
+  // Await background tasks so email is sent and capturedBody is set
+  await Promise.all(ctx._bgTasks);
   restoreFetch();
 
   const row = db._tables.password_resets[0];
@@ -446,11 +493,9 @@ await test('10. expired token → INVALID_RESPONSE', async () => {
   db._addUser({ id: 'u1', name: 'Test User', email: 'peter@pierfoundations.com', active: 1 });
 
   // Insert an already-expired token manually
-  // We need to know a hash that matches a raw token. Generate one.
   const { b64urlEncode } = await import(authUrl.href);
   const tokenBytes = new Uint8Array(32);
   crypto.getRandomValues(tokenBytes);
-  // Encode raw token same way as forgot-password.js does
   const rawToken = b64urlEncode(tokenBytes);
   const digest = await crypto.subtle.digest('SHA-256', tokenBytes);
   const tokenHash = b64urlEncode(new Uint8Array(digest));
@@ -541,7 +586,7 @@ await test('12. valid token → password updated, audit written', async () => {
   assert.equal(db._tables.audit_log[0].action, 'password_reset_by_token');
 });
 
-await test('13. rate limit: 4th email request returns generic, no new DB row', async () => {
+await test('13. rate limit: 4th email request returns generic, email sent at most 3 times', async () => {
   const db = makeD1();
   db._addUser({ id: 'u1', name: 'Test User', email: 'ratelimit@pierfoundations.com', active: 1 });
 
@@ -562,23 +607,22 @@ await test('13. rate limit: 4th email request returns generic, no new DB row', a
     SP_DRIVE_ID: 'did',
   };
 
-  // First 3 requests — should succeed
+  // First 3 requests — should succeed; await background so email sends are counted
   for (let i = 0; i < 3; i++) {
     const ctx = makeCtx({ body: { email: 'ratelimit@pierfoundations.com' }, env });
     await fpOnRequest(ctx);
+    await Promise.all(ctx._bgTasks);
   }
-  const countAfter3 = db._tables.password_resets.filter(r => r.user_email === 'ratelimit@pierfoundations.com' && !r.used_at);
-  // After 3 requests, at least one active token (previous are invalidated by each request)
-  assert.ok(countAfter3.length >= 0, 'some tokens after 3 requests');
 
-  // 4th request — should be rate-limited
+  // 4th request — should be rate-limited (no background queued, no email sent)
   const ctx4 = makeCtx({ body: { email: 'ratelimit@pierfoundations.com' }, env });
   const resp4 = await fpOnRequest(ctx4);
+  await Promise.all(ctx4._bgTasks); // empty — rate limited before waitUntil
   restoreFetch();
   const data4 = await resp4.json();
   assert.equal(resp4.status, 200, '4th request still returns 200');
   assert.equal(data4.status, 'ok', 'still generic response');
-  // sendCount should be at most 3 (4th was rate-limited)
+  // sendCount should be exactly 3 (4th was rate-limited)
   assert.ok(sendCount <= 3, `email sent at most 3 times (got ${sendCount})`);
 });
 
@@ -604,6 +648,248 @@ await test('17. /api/reset-by-token in AUTH_ENDPOINTS', () => {
 await test('18. /api/weather mapped to field_ops in areaForPath', () => {
   assert.equal(areaForPath('/api/weather'), 'field_ops');
   assert.equal(areaForPath('/api/weather?job=26-001'), 'field_ops');  // query string shouldn't matter for startsWith
+});
+
+// ---- Security hardening tests (R8 audit) ----
+console.log('\nSecurity hardening tests:');
+
+await test('19. timing: both paths (known + unknown) return before background tasks run', async () => {
+  // Known-email path: response should arrive before background task executes
+  const db1 = makeD1();
+  db1._addUser({ id: 'u1', name: 'Test User', email: 'peter@pierfoundations.com', active: 1 });
+  mockFetch([
+    ['login.microsoftonline.com', () => mockJsonResponse({ access_token: 'tok', expires_in: 3600 })],
+    ['graph.microsoft.com', () => ({ ok: true, status: 202, json: async () => ({}) })],
+  ]);
+  const ctx1 = makeCtx({
+    body: { email: 'peter@pierfoundations.com' },
+    env: {
+      DB: db1,
+      PF_SCHEDULE: makeKV(),
+      AZURE_CLIENT_ID: 'cid', AZURE_CLIENT_SECRET: 'csec',
+      AZURE_TENANT_ID: 'tid', SP_DRIVE_ID: 'did',
+    },
+  });
+  const resp1 = await fpOnRequest(ctx1);
+  // Response arrived. Background tasks are queued but NOT yet run (waitUntil captured them).
+  assert.equal(db1._tables.password_resets.length, 0,
+    'known-email: no DB write before background runs (timing invariant)');
+  // Now run the background — DB write should happen
+  await Promise.all(ctx1._bgTasks);
+  restoreFetch();
+  assert.equal(db1._tables.password_resets.length, 1,
+    'known-email: DB write happens after background runs');
+  assert.equal(resp1.status, 200);
+
+  // Unknown-email path: response arrives immediately, background runs but finds no user
+  const db2 = makeD1();  // no users
+  const ctx2 = makeCtx({
+    body: { email: 'nobody@example.com' },
+    env: { DB: db2, PF_SCHEDULE: makeKV() },
+  });
+  const resp2 = await fpOnRequest(ctx2);
+  assert.equal(db2._tables.password_resets.length, 0,
+    'unknown-email: no DB write before background runs');
+  await Promise.all(ctx2._bgTasks);
+  assert.equal(db2._tables.password_resets.length, 0,
+    'unknown-email: still no DB write after background runs (user not found)');
+  assert.equal(resp2.status, 200);
+});
+
+await test('20. atomic single-use: two concurrent consumes → exactly one succeeds', async () => {
+  const db = makeD1();
+  db._addUser({ id: 'u1', name: 'Test User', email: 'peter@pierfoundations.com', active: 1, role: 'field_ops' });
+
+  const { b64urlEncode } = await import(authUrl.href);
+  const tokenBytes = new Uint8Array(32);
+  crypto.getRandomValues(tokenBytes);
+  const rawToken = b64urlEncode(tokenBytes);
+  const digest = await crypto.subtle.digest('SHA-256', tokenBytes);
+  const tokenHash = b64urlEncode(new Uint8Array(digest));
+
+  db._tables.password_resets.push({
+    id: 'r1', user_email: 'peter@pierfoundations.com', token_hash: tokenHash,
+    expires_at: Math.floor(Date.now() / 1000) + 1800,
+    used_at: null, created_at: new Date().toISOString(), request_ip: '',
+  });
+
+  // Fire two concurrent requests with the same valid token
+  const makeReq = () => makeCtx({
+    body: { token: rawToken, password: 'Concurrent123!', confirm: 'Concurrent123!' },
+    env: { DB: db },
+  });
+
+  const [resp1, resp2] = await Promise.all([
+    rbtOnRequest(makeReq()),
+    rbtOnRequest(makeReq()),
+  ]);
+  const [d1, d2] = await Promise.all([resp1.json(), resp2.json()]);
+
+  const successes = [d1, d2].filter(d => d.status === 'ok').length;
+  const invalids  = [d1, d2].filter(d => d.status === 'invalid').length;
+  assert.equal(successes, 1, 'exactly one concurrent request succeeds');
+  assert.equal(invalids,  1, 'exactly one concurrent request gets INVALID_RESPONSE');
+});
+
+await test('21. session revocation: old session rejected after reset; new session passes', async () => {
+  const { checkSessionRevoked, revokeOldSessions } = await import(authUrl.href);
+  const kv = makeKV();
+  const db = makeD1();
+  db._addUser({ id: 'u1', name: 'Test User', email: 'peter@pierfoundations.com', active: 1, role: 'field_ops' });
+
+  // Simulate a session issued 60 seconds before the reset
+  const oldIat = Math.floor(Date.now() / 1000) - 60;
+  const oldSession = { uid: 'u1', role: 'field_ops', iat: oldIat };
+
+  // Before any reset, old session should be valid (not revoked)
+  const notRevoked = await checkSessionRevoked(oldSession, kv);
+  assert.equal(notRevoked, false, 'old session not yet revoked before reset');
+
+  // Perform a successful password reset via reset-by-token
+  const { b64urlEncode } = await import(authUrl.href);
+  const tokenBytes = new Uint8Array(32);
+  crypto.getRandomValues(tokenBytes);
+  const rawToken = b64urlEncode(tokenBytes);
+  const digest = await crypto.subtle.digest('SHA-256', tokenBytes);
+  const tokenHash = b64urlEncode(new Uint8Array(digest));
+
+  db._tables.password_resets.push({
+    id: 'r1', user_email: 'peter@pierfoundations.com', token_hash: tokenHash,
+    expires_at: Math.floor(Date.now() / 1000) + 1800,
+    used_at: null, created_at: new Date().toISOString(), request_ip: '',
+  });
+
+  const ctx = makeCtx({
+    body: { token: rawToken, password: 'PostReset123!', confirm: 'PostReset123!' },
+    env: { DB: db, PF_SCHEDULE: kv },
+  });
+
+  const resp = await rbtOnRequest(ctx);
+  const data = await resp.json();
+  assert.equal(data.status, 'ok', 'reset succeeded');
+
+  // Old session (iat < revocation epoch) should now be rejected
+  const isRevoked = await checkSessionRevoked(oldSession, kv);
+  assert.equal(isRevoked, true, 'old session is revoked after password reset');
+
+  // A session with iat after the revocation epoch should pass
+  const newIat = Math.floor(Date.now() / 1000) + 2; // 2 seconds after now
+  const newSession = { uid: 'u1', role: 'field_ops', iat: newIat };
+  const newRevoked = await checkSessionRevoked(newSession, kv);
+  assert.equal(newRevoked, false, 'session issued after reset is not revoked');
+
+  // A session without iat should be treated as iat=0 (revoked)
+  const noIatSession = { uid: 'u1', role: 'field_ops' };
+  const noIatRevoked = await checkSessionRevoked(noIatSession, kv);
+  assert.equal(noIatRevoked, true, 'session without iat (treated as iat=0) is revoked');
+});
+
+await test('22. CT + cross-site guards: form-encoded and cross-site requests rejected, no DB write', async () => {
+  const db = makeD1();
+  db._addUser({ id: 'u1', name: 'Test User', email: 'peter@pierfoundations.com', active: 1 });
+
+  // Form-encoded → rejected with generic response, no DB write
+  const formReq = new Request('https://field.pierfoundations.com/api/forgot-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'email=peter%40pierfoundations.com',
+  });
+  const ctx1 = { request: formReq, env: { DB: db, PF_SCHEDULE: makeKV() }, data: {}, waitUntil() {} };
+  const resp1 = await fpOnRequest(ctx1);
+  const d1 = await resp1.json();
+  assert.equal(resp1.status, 200, 'form-encoded: 200');
+  assert.equal(d1.status, 'ok', 'form-encoded: generic response');
+  assert.equal(db._tables.password_resets.length, 0, 'form-encoded: no DB write');
+
+  // Sec-Fetch-Site: cross-site → rejected
+  const xsiteReq = new Request('https://field.pierfoundations.com/api/forgot-password', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Sec-Fetch-Site': 'cross-site',
+      'Origin': 'https://evil.example.com',
+    },
+    body: JSON.stringify({ email: 'peter@pierfoundations.com' }),
+  });
+  const ctx2 = { request: xsiteReq, env: { DB: db, PF_SCHEDULE: makeKV() }, data: {}, waitUntil() {} };
+  const resp2 = await fpOnRequest(ctx2);
+  const d2 = await resp2.json();
+  assert.equal(resp2.status, 200, 'cross-site: 200');
+  assert.equal(d2.status, 'ok', 'cross-site: generic response');
+  assert.equal(db._tables.password_resets.length, 0, 'cross-site: no DB write');
+
+  // Wrong Origin (non-matching, even without cross-site header) → rejected
+  const wrongOriginReq = new Request('https://field.pierfoundations.com/api/forgot-password', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Sec-Fetch-Site': 'same-origin',
+      'Origin': 'https://evil.example.com',
+    },
+    body: JSON.stringify({ email: 'peter@pierfoundations.com' }),
+  });
+  const ctx3 = { request: wrongOriginReq, env: { DB: db, PF_SCHEDULE: makeKV() }, data: {}, waitUntil() {} };
+  const resp3 = await fpOnRequest(ctx3);
+  const d3 = await resp3.json();
+  assert.equal(resp3.status, 200, 'wrong-origin: 200');
+  assert.equal(d3.status, 'ok', 'wrong-origin: generic response');
+  assert.equal(db._tables.password_resets.length, 0, 'wrong-origin: no DB write');
+});
+
+await test('23. email reset link uses URL fragment (#token=) not query param (?token=)', async () => {
+  const db = makeD1();
+  db._addUser({ id: 'u1', name: 'Test User', email: 'peter@pierfoundations.com', active: 1 });
+
+  let capturedBody = null;
+  mockFetch([
+    ['login.microsoftonline.com', () => mockJsonResponse({ access_token: 'tok', expires_in: 3600 })],
+    ['graph.microsoft.com', (url, opts) => {
+      capturedBody = JSON.parse(opts.body);
+      return { ok: true, status: 202, json: async () => ({}) };
+    }],
+  ]);
+
+  const ctx = makeCtx({
+    body: { email: 'peter@pierfoundations.com' },
+    env: {
+      DB: db,
+      PF_SCHEDULE: makeKV(),
+      AZURE_CLIENT_ID: 'cid', AZURE_CLIENT_SECRET: 'csec',
+      AZURE_TENANT_ID: 'tid', SP_DRIVE_ID: 'did',
+    },
+  });
+
+  await fpOnRequest(ctx);
+  // Must await background tasks for the email to be sent
+  await Promise.all(ctx._bgTasks);
+  restoreFetch();
+
+  assert.ok(capturedBody, 'email was sent');
+  const emailText = capturedBody.message.body.content;
+  // Must use fragment form: reset.html#token=<value>
+  assert.ok(emailText.includes('#token='), 'link uses URL fragment (#token=)');
+  // Must NOT use query param form
+  assert.ok(!emailText.includes('?token='), 'link does NOT use query param (?token=)');
+  // Full link should contain reset.html#token=
+  assert.ok(emailText.includes('reset.html#token='), 'full fragment link present');
+});
+
+await test('24. index.html: WX_PROJECTS removed; dropdown built from /api/field-projects; uses pf-last-job key', () => {
+  const indexHtml = readFileSync(
+    fileURLToPath(new URL('../index.html', import.meta.url)), 'utf8'
+  );
+  // Hard-coded project array must be gone
+  assert.ok(!indexHtml.includes('WX_PROJECTS'),
+    'WX_PROJECTS hard-coded array is removed');
+  // Must fetch from the live API endpoint (same source as Daily Report / Site Readiness)
+  assert.ok(indexHtml.includes('/api/field-projects'),
+    'fetches project list from /api/field-projects');
+  // Must use the shared last-job key (not the old pf-wx-job key)
+  assert.ok(indexHtml.includes('pf-last-job'),
+    'uses shared pf-last-job localStorage key');
+  // Must NOT use the old per-tile key
+  assert.ok(!indexHtml.includes('pf-wx-job'),
+    'old pf-wx-job key is removed');
 });
 
 // ---- Summary ----

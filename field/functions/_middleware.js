@@ -25,6 +25,7 @@
 
 import {
   verifySession, getCookie, areaForPath, roleCanAccess, isRestrictedSession,
+  checkSessionRevoked,
 } from './lib/auth.js';
 
 // Paths that don't require auth at all.
@@ -118,7 +119,9 @@ export async function onRequest(context) {
   // Genuinely public paths (login page, favicon).
   if (PUBLIC_PATHS.some(p => path === p)) return context.next();
   // The auth endpoints validate themselves; don't gate them here.
-  if (AUTH_ENDPOINTS.some(p => path === p || path.startsWith(p))) return context.next();
+  // Exact match only — prevents a crafted sub-path (e.g. /api/login/extra)
+  // from bypassing auth by matching a prefix.
+  if (AUTH_ENDPOINTS.includes(path)) return context.next();
 
   const cookie = request.headers.get('Cookie') || '';
 
@@ -127,6 +130,25 @@ export async function onRequest(context) {
   if (sessionToken) {
     const session = await verifySession(sessionToken, SECRET);
     if (session) {
+      // ---- Session revocation check ----------------------------------------
+      // After a password reset, revokeOldSessions() writes a KV marker at
+      // `revoked:<uid>`. A session whose iat (issued-at) predates the revocation
+      // epoch is invalid — force re-login. The check fails OPEN on KV error:
+      // KV unavailable → treat as no revocation (see auth.js for the choice).
+      if (await checkSessionRevoked(session, env.PF_SCHEDULE || null)) {
+        // Send HTML navs to login; return 401 for API/fetch requests.
+        if (isHtmlNav(request)) {
+          return new Response(null, {
+            status: 302,
+            headers: { 'Location': '/login.html', 'Cache-Control': 'private, no-store' },
+          });
+        }
+        return new Response('Authentication required', {
+          status: 401,
+          headers: { 'Content-Type': 'text/plain', 'Cache-Control': 'private, no-store' },
+        });
+      }
+
       // Inject identity + role for downstream Functions (server-side RBAC).
       context.data = context.data || {};
       context.data.session = session;
