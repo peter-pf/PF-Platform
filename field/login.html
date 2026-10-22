@@ -101,6 +101,15 @@
     text-align:center;margin-top:20px;
     font-size:0.76rem;color:var(--text-soft);line-height:1.5;
   }
+  .foot a{color:var(--accent);text-decoration:none;}
+  .foot a:hover{text-decoration:underline;}
+  .success{
+    display:none;margin-top:16px;padding:10px 12px;
+    background:rgba(22,163,74,.08);border:1px solid rgba(22,163,74,.25);border-radius:8px;
+    color:#16a34a;font-size:0.86rem;
+  }
+  [data-theme="dark"] .success{color:#3fb950;}
+  .success.show{display:block;}
 </style>
 <!-- No-flash theme: runs before body renders -->
 <script>
@@ -125,11 +134,13 @@
 
     <button type="submit" id="submitBtn">Sign in</button>
 
+    <div class="success" id="successBox" role="status"></div>
     <div class="error" id="errorBox" role="alert"></div>
 
     <div class="foot">
       Field access - authorized users only.<br>
-      Trouble signing in? Contact Brad.
+      Trouble signing in? Contact Brad.<br>
+      <a href="/forgot-password.html">Forgot password?</a>
     </div>
   </form>
 
@@ -138,6 +149,13 @@
   var form = document.getElementById('loginForm');
   var btn = document.getElementById('submitBtn');
   var errBox = document.getElementById('errorBox');
+  var okBox = document.getElementById('successBox');
+
+  // Show success banner if arriving after a password reset
+  if (new URLSearchParams(window.location.search).get('reset') === '1') {
+    okBox.textContent = 'Password updated. Please sign in with your new password.';
+    okBox.classList.add('show');
+  }
 
   function showError(msg) {
     errBox.textContent = msg;

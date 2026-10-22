@@ -567,6 +567,13 @@ export function areaForPath(pathname) {
     // endpoint also calls requireArea(session, 'field_ops'). ZERO financials
     // (checklist answers, notes, and attachment refs only).
     if (pathname.startsWith('/api/site-readiness')) return 'field_ops';
+    // 3-day NWS weather forecast for the crew's active job site. Geocodes the
+    // site address server-side (US Census geocoder) then calls NWS. field_ops
+    // area = admin/partner/business_dev/field_ops so the crew can see the
+    // forecast. ZERO financials (weather data only). KV-cached ~60 min.
+    // Without this line it falls to default-deny (admin-only) via the sensitive-
+    // name heuristic matching "weather". The handler ALSO calls requireArea.
+    if (pathname.startsWith('/api/weather'))        return 'field_ops';
     // Past Reports combined listing (DFR + SR). field_ops area = admin/partner/
     // business_dev/field_ops. Drafts are scoped to the requesting user in the
     // handler. ZERO financials. Without this line the path falls to default-deny

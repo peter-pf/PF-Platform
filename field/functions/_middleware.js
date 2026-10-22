@@ -31,11 +31,19 @@ import {
 // NOTE: Cloudflare Pages serves "foo.html" at the clean URL "/foo" (308), so we
 // allow-list BOTH forms for the non-sensitive auth/denied pages. /denied is here
 // (not sensitive) so a denied-area redirect can't loop for an authenticated user.
+// forgot-password and reset are public — no session is available for users who
+// have forgotten their password. Both are allow-listed here AND their API
+// endpoints are added to AUTH_ENDPOINTS so no session gate fires on them.
 const PUBLIC_PATHS = ['/favicon.ico', '/robots.txt',
-  '/login.html', '/login', '/denied.html', '/denied'];
+  '/login.html', '/login', '/denied.html', '/denied',
+  '/forgot-password.html', '/forgot-password',
+  '/reset.html', '/reset'];
 
 // Paths that bypass the SESSION gate (they ARE the auth surface).
-const AUTH_ENDPOINTS = ['/api/login', '/api/logout'];
+// /api/forgot-password and /api/reset-by-token are public (no session required —
+// users have forgotten their password). They validate themselves internally.
+const AUTH_ENDPOINTS = ['/api/login', '/api/logout',
+  '/api/forgot-password', '/api/reset-by-token'];
 
 // The reset page + endpoint a RESTRICTED (must_reset) session is allowed to use.
 const RESET_PAGE = '/reset-password.html';

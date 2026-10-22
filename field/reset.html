@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<!-- Referrer-Policy: no-referrer prevents the token in the URL from leaking
+     via the Referer header if the user clicks an external link on this page. -->
+<meta name="referrer" content="no-referrer">
+<title>Set New Password - PF Field Portal</title>
+<meta name="theme-color" content="#1F6FB2">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="PF Field">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --accent:#006DB0;
+    --accent-dark:#005A91;
+    --accent-light:#EBF4FB;
+    --text:#1A2233;
+    --text-soft:#4A5568;
+    --border:#E6E8EB;
+    --bg:#ffffff;
+    --card:#ffffff;
+    --error:#dc2626;
+    --input-bg:#F7F8FA;
+  }
+  [data-theme="dark"]{
+    --text:#E8ECF2;
+    --text-soft:#7A8A9B;
+    --border:#252D3D;
+    --bg:#0F1117;
+    --card:#1B2130;
+    --error:#f87171;
+    --input-bg:#252D3D;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+    color:var(--text);
+    background:var(--bg);
+    min-height:100vh;
+    display:flex;align-items:center;justify-content:center;
+    padding:24px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .login-box{
+    width:100%;max-width:380px;
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:36px 32px 30px;
+    color:var(--text);
+  }
+  .brand{
+    text-align:center;margin-bottom:22px;
+  }
+  .brand .mark{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:56px;height:56px;border-radius:14px;
+    background:var(--accent);color:#fff;
+    font-weight:700;font-size:1.4rem;letter-spacing:0.5px;
+    margin-bottom:12px;
+  }
+  .brand h1{
+    font-size:1.18rem;font-weight:700;margin:0;color:var(--text);
+  }
+  .brand p{
+    font-size:0.86rem;color:var(--text-soft);margin:4px 0 0;
+  }
+  label{
+    display:block;font-size:0.8rem;font-weight:600;color:var(--text-soft);
+    margin:14px 0 5px;
+  }
+  input[type=password]{
+    width:100%;padding:11px 13px;
+    border:1px solid var(--border);border-radius:8px;
+    font-size:0.95rem;font-family:inherit;color:var(--text);
+    background:var(--input-bg);transition:border-color .15s, box-shadow .15s;
+  }
+  input:focus{
+    outline:none;border-color:var(--accent);
+    box-shadow:0 0 0 3px var(--accent-light);
+  }
+  button{
+    width:100%;margin-top:22px;padding:12px;
+    background:var(--accent);color:#fff;border:none;border-radius:8px;
+    font-size:0.98rem;font-weight:600;font-family:inherit;cursor:pointer;
+    transition:background .15s;
+  }
+  button:hover{background:var(--accent-dark);}
+  button:disabled{opacity:0.6;cursor:default;}
+  .msg{
+    display:none;margin-top:16px;padding:10px 12px;border-radius:8px;
+    font-size:0.86rem;
+  }
+  .msg.error{
+    background:rgba(180,35,42,.08);border:1px solid rgba(180,35,42,.25);
+    color:var(--error);
+  }
+  .msg.show{display:block;}
+  .foot{
+    text-align:center;margin-top:20px;
+    font-size:0.76rem;color:var(--text-soft);line-height:1.5;
+  }
+  .foot a{color:var(--accent);text-decoration:none;}
+  .foot a:hover{text-decoration:underline;}
+  .invalid-state{text-align:center;padding:12px 0;}
+  .invalid-state p{font-size:0.9rem;color:var(--text-soft);margin:0 0 16px;}
+</style>
+<!-- No-flash theme -->
+<script>(function(){try{var t=localStorage.getItem('pf-theme');var d=t==='dark'||(t==null&&window.matchMedia&&window.matchMedia('(prefers-color-scheme:dark)').matches);if(d)document.documentElement.setAttribute('data-theme','dark');}catch(e){}}());</script>
+</head>
+<body>
+  <div class="login-box">
+    <div class="brand">
+      <div class="mark">PF</div>
+      <h1>Set New Password</h1>
+      <p id="subhead">Create a new password for your account</p>
+    </div>
+
+    <form id="resetForm" autocomplete="off" style="display:none;">
+      <label for="password">New password</label>
+      <input type="password" id="password" name="password"
+             autocomplete="new-password" required placeholder="At least 12 characters">
+
+      <label for="confirm">Confirm password</label>
+      <input type="password" id="confirm" name="confirm"
+             autocomplete="new-password" required placeholder="Repeat password">
+
+      <button type="submit" id="submitBtn">Set password</button>
+
+      <div class="msg error" id="errorBox" role="alert"></div>
+    </form>
+
+    <div id="invalidState" class="invalid-state" style="display:none;">
+      <p>This link is invalid or has expired.</p>
+      <a href="/forgot-password.html" style="color:var(--accent);text-decoration:none;font-size:0.9rem;font-weight:600;">Request a new reset link</a>
+    </div>
+
+    <div class="foot">
+      <a href="/login.html">Back to sign in</a>
+    </div>
+  </div>
+
+<script>
+(function () {
+  // Extract token from URL query param. Never log or expose it.
+  var params = new URLSearchParams(window.location.search);
+  var token = params.get('token') || '';
+
+  var formEl = document.getElementById('resetForm');
+  var invalidEl = document.getElementById('invalidState');
+  var btn = document.getElementById('submitBtn');
+  var errBox = document.getElementById('errorBox');
+
+  if (!token || token.length < 10) {
+    // No token — show invalid state immediately (no network call needed)
+    invalidEl.style.display = '';
+    return;
+  }
+
+  // Token is present — show the form
+  formEl.style.display = '';
+
+  function showError(msg) {
+    errBox.textContent = msg;
+    errBox.classList.add('show');
+  }
+  function clearError() {
+    errBox.textContent = '';
+    errBox.classList.remove('show');
+  }
+
+  formEl.addEventListener('submit', function (e) {
+    e.preventDefault();
+    clearError();
+
+    var password = document.getElementById('password').value;
+    var confirm  = document.getElementById('confirm').value;
+
+    if (password.length < 12) {
+      showError('Password must be at least 12 characters.');
+      return;
+    }
+    if (password !== confirm) {
+      showError('Passwords do not match.');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Setting password...';
+
+    fetch('/api/reset-by-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: token, password: password, confirm: confirm })
+    })
+    .then(function (res) {
+      return res.json().then(function (data) { return { ok: res.ok, status: res.status, data: data }; });
+    })
+    .then(function (r) {
+      if (r.data && r.data.status === 'ok') {
+        // Redirect to login with a success indicator
+        window.location.href = r.data.redirect || '/login.html?reset=1';
+      } else if (r.data && r.data.status === 'invalid') {
+        // Show invalid state, hide form
+        formEl.style.display = 'none';
+        invalidEl.style.display = '';
+        document.getElementById('subhead').textContent = '';
+      } else {
+        showError((r.data && r.data.message) || 'An error occurred. Please try again.');
+        btn.disabled = false;
+        btn.textContent = 'Set password';
+      }
+    })
+    .catch(function () {
+      showError('Could not reach the server. Please try again.');
+      btn.disabled = false;
+      btn.textContent = 'Set password';
+    });
+  });
+})();
+</script>
+</body>
+</html>
