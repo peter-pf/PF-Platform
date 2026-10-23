@@ -661,10 +661,13 @@ try {
   // Build the resolved upload-path display string.
   // bucket: 'safety_cert' -> <root>/06 - Safety/<date>
   // others (photos, markup) -> <root>/05 - Field/02 - Project Photos/<date>
-  // spFolder is the actual SP folder name; falls back to projectNum when null.
+  // spFolder: real SP folder name resolved from Graph; null until resolved or if not yet created.
+  // null fallback: "Project <num> folder (created on first upload) / ..." — never a guessed name.
   function buildUploadPath(projectNum, spFolder, date, bucket) {
-    var root = (spFolder && spFolder.length) ? spFolder : projectNum;
-    if (!root || !date) return '';
+    if (!projectNum || !date) return '';
+    var root = (spFolder && spFolder.length)
+      ? spFolder
+      : 'Project ' + projectNum + ' folder (created on first upload)';
     if (bucket === 'safety_cert') {
       return root + ' / 06 - Safety / ' + date;
     }

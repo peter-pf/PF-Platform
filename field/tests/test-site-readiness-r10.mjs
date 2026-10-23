@@ -311,8 +311,10 @@ import { CHECKLIST_ITEMS, uploadBucketForItem, computeResult } from '../function
 {
   // Simulate client buildUploadPath(projectNum, spFolder, date, bucket).
   function buildUploadPath(projectNum, spFolder, date, bucket) {
-    const root = (spFolder && spFolder.length) ? spFolder : projectNum;
-    if (!root || !date) return '';
+    if (!projectNum || !date) return '';
+    const root = (spFolder && spFolder.length)
+      ? spFolder
+      : 'Project ' + projectNum + ' folder (created on first upload)';
     if (bucket === 'safety_cert') return root + ' / 06 - Safety / ' + date;
     return root + ' / 05 - Field / 02 - Project Photos / ' + date;
   }
@@ -321,17 +323,17 @@ import { CHECKLIST_ITEMS, uploadBucketForItem, computeResult } from '../function
   const p1 = buildUploadPath('25-026', '25-026 - The Granary - FlCo', '2026-10-23', 'photos');
   assert.equal(p1, '25-026 - The Granary - FlCo / 05 - Field / 02 - Project Photos / 2026-10-23', 'K1: photos path with spFolder');
 
-  // K2: No spFolder (null) — falls back to project number.
+  // K2: No spFolder (null) — safe fallback, never a guessed name.
   const p2 = buildUploadPath('26-012', null, '2026-10-23', 'photos');
-  assert.equal(p2, '26-012 / 05 - Field / 02 - Project Photos / 2026-10-23', 'K2: photos path without spFolder uses number');
+  assert.equal(p2, 'Project 26-012 folder (created on first upload) / 05 - Field / 02 - Project Photos / 2026-10-23', 'K2: null spFolder shows safe fallback text');
 
   // K3: Safety cert bucket routes to 06 - Safety.
   const p3 = buildUploadPath('26-012', null, '2026-10-23', 'safety_cert');
-  assert.equal(p3, '26-012 / 06 - Safety / 2026-10-23', 'K3: safety_cert path uses 06 - Safety');
+  assert.equal(p3, 'Project 26-012 folder (created on first upload) / 06 - Safety / 2026-10-23', 'K3: safety_cert path uses 06 - Safety with fallback root');
 
   // K4: Empty project or date returns empty string.
   assert.equal(buildUploadPath('', null, '2026-10-23', 'photos'), '', 'K4: empty projectNum -> empty path');
-  assert.equal(buildUploadPath('26-012', null, '', 'photos'),     '', 'K5: empty date -> empty path');
+  assert.equal(buildUploadPath('26-012', null, '', 'photos'),     '', 'K4b: empty date -> empty path');
 
   // K5: Path changes when date changes (dynamic update test).
   const p5a = buildUploadPath('26-012', null, '2026-10-23', 'photos');

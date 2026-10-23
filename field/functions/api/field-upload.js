@@ -35,6 +35,14 @@
 
 import { requireArea } from '../lib/auth.js';
 import { GRAPH, graphConfigured, getGraphToken } from '../lib/graph.js';
+import {
+  PROJECTS_PATH as _PROJECTS_PATH,
+  COMPLETED_FOLDER_NAME as _COMPLETED_FOLDER_NAME,
+  nameMatchesProject,
+  listFolderChildrenByPath,
+  listFolderChildrenById,
+  resolveProjectFolder,
+} from '../lib/sp-project-folders.js';
 
 // ---- limits / allow-list ---------------------------------------------------
 const MAX_FILE_BYTES = 50 * 1024 * 1024;   // 50MB per file
@@ -158,98 +166,10 @@ function extOf(name) {
   return dot >= 0 ? name.slice(dot).toLowerCase() : '';
 }
 
-// The fixed SharePoint Projects folder (the parent of every project root).
-const PROJECTS_PATH = '04 - Project Management/02 - Projects';
-const COMPLETED_FOLDER_NAME = '001 - Completed Projects';
-
-// Does this folder name belong to the requested project number?
-//   name === "26-002"  OR  "26-002 - ..."  OR  "26-002-..."
-function nameMatchesProject(name, projectNumber) {
-  if (typeof name !== 'string') return false;
-  return name === projectNumber
-    || name.startsWith(projectNumber + ' ')
-    || name.startsWith(projectNumber + '-');
-}
-
-// Encode a Graph path: encode each SEGMENT (so spaces/& inside a folder name are
-// escaped) but keep the "/" separators LITERAL. encodeURIComponent on the whole
-// string would turn "/" into %2F and break path addressing.
-function encGraphPath(path) {
-  return String(path).split('/').map(encodeURIComponent).join('/');
-}
-
-// List the FOLDER children of a drive item by PATH. Graph path addressing is
-// /drives/{id}/root:/<path>:/children -- each path SEGMENT is URL-encoded, the
-// "/" separators and the wrapping colons are literal. Follows @odata.nextLink.
-// Returns an array of {id, name, folder} (folders only).
-async function listFolderChildrenByPath(env, token, path) {
-  const driveId = encodeURIComponent(env.SP_DRIVE_ID);
-  const encPath = encGraphPath(path); // per-segment encode, literal "/" separators
-  let url = `${GRAPH}/drives/${driveId}/root:/${encPath}:/children?$select=name,id,folder&$top=200`;
-  const out = [];
-  while (url) {
-    const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-    if (resp.status === 404) return out;     // missing folder -> no children
-    if (!resp.ok) throw new Error('list children failed ' + resp.status);
-    const data = await resp.json();
-    (Array.isArray(data && data.value) ? data.value : []).forEach((it) => {
-      if (it && it.folder) out.push({ id: it.id, name: it.name, folder: it.folder });
-    });
-    url = data['@odata.nextLink'] || null;
-  }
-  return out;
-}
-
-// List the FOLDER children of a drive item by its ITEM ID (used to walk into the
-// year folders under Completed Projects). Follows @odata.nextLink.
-async function listFolderChildrenById(env, token, itemId) {
-  const driveId = encodeURIComponent(env.SP_DRIVE_ID);
-  let url = `${GRAPH}/drives/${driveId}/items/${encodeURIComponent(itemId)}/children?$select=name,id,folder&$top=200`;
-  const out = [];
-  while (url) {
-    const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-    if (resp.status === 404) return out;
-    if (!resp.ok) throw new Error('list children failed ' + resp.status);
-    const data = await resp.json();
-    (Array.isArray(data && data.value) ? data.value : []).forEach((it) => {
-      if (it && it.folder) out.push({ id: it.id, name: it.name, folder: it.folder });
-    });
-    url = data['@odata.nextLink'] || null;
-  }
-  return out;
-}
-
-// Resolve the project folder drive-item id by DETERMINISTIC PATH LISTING.
-//
-// Graph's root/search(q=...) is fuzzy full-text and was verified NOT to reliably
-// surface the exact project folder (it returned loosely-related items and dropped
-// the real one; parentReference.path also came back empty). So instead we LIST
-// the fixed Projects folder and prefix-match the project number directly:
-//   1. ACTIVE: list children of "04 - Project Management/02 - Projects" and match.
-//      The active project roots ("26-002 - POET Projects - POET", ...) live here
-//      directly, alongside a "001 - Completed Projects" child folder.
-//   2. COMPLETED fallback: list "02 - Projects/001 - Completed Projects" (YEAR
-//      folders, e.g. "2026"), then list each year folder and match inside it.
-//   3. Nothing -> null (caller 404s with the clear message).
-// Active wins by construction (step 1 before step 2). Returns { id, name } or null.
-async function resolveProjectFolder(env, token, projectNumber) {
-  // ---- 1. ACTIVE project tree ----
-  const active = await listFolderChildrenByPath(env, token, PROJECTS_PATH);
-  const activeMatch = active.find((f) => nameMatchesProject(f.name, projectNumber));
-  if (activeMatch) return { id: activeMatch.id, name: activeMatch.name };
-
-  // ---- 2. COMPLETED projects fallback (year folders -> project folders) ----
-  const completedPath = `${PROJECTS_PATH}/${COMPLETED_FOLDER_NAME}`;
-  const yearFolders = await listFolderChildrenByPath(env, token, completedPath);
-  for (const year of yearFolders) {
-    const inYear = await listFolderChildrenById(env, token, year.id);
-    const match = inYear.find((f) => nameMatchesProject(f.name, projectNumber));
-    if (match) return { id: match.id, name: match.name };
-  }
-
-  // ---- 3. not found ----
-  return null;
-}
+// Project-folder resolution imported from shared lib (functions/lib/sp-project-folders.js).
+// Both field-upload.js and field-projects.js use the same resolver to keep logic in sync.
+const PROJECTS_PATH       = _PROJECTS_PATH;
+const COMPLETED_FOLDER_NAME = _COMPLETED_FOLDER_NAME;
 
 // Find an existing child FOLDER with this exact name under `parentId`, or null.
 async function findChildFolder(env, token, parentId, name) {
