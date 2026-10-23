@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Time Off — PF Field Portal</title>
+<meta name="theme-color" content="#006DB0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/pf-r5.css">
+<style>
+  #main { max-width: 860px; margin: 0 auto; padding: 16px 14px 40px; }
+  .alloc-bar { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:20px; }
+  .alloc-stat { background:var(--card); border:1px solid var(--border);
+    border-radius:var(--radius); padding:12px 16px; flex:1; min-width:120px; }
+  .alloc-stat-label { font-size:.72rem; font-weight:600; text-transform:uppercase;
+    letter-spacing:.4px; color:var(--text-3); margin-bottom:4px; }
+  .alloc-stat-val { font-size:1.5rem; font-weight:700; color:var(--text-0); }
+  .alloc-stat-val.not-set { font-size:.9rem; color:var(--text-2); font-weight:400; }
+  .card { background:var(--card); border:1px solid var(--border);
+    border-radius:var(--radius); padding:18px 20px; margin-bottom:18px; }
+  .card-title { font-size:1rem; font-weight:700; color:var(--text-0);
+    margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+  .form-row { margin-bottom:13px; }
+  .form-row label { display:block; font-size:.8rem; font-weight:600;
+    color:var(--text-2); margin-bottom:4px; }
+  .form-row input, .form-row select, .form-row textarea {
+    width:100%; padding:8px 10px; border:1px solid var(--border);
+    border-radius:var(--radius-sm); font-size:.9rem; font-family:inherit;
+    color:var(--text-1); background:var(--bg-2);
+    transition:border-color .12s; box-sizing:border-box; }
+  .form-row input:focus, .form-row select:focus, .form-row textarea:focus {
+    outline:none; border-color:var(--accent); }
+  .form-row textarea { resize:vertical; min-height:72px; }
+  .form-row-inline { display:flex; gap:12px; }
+  .form-row-inline .form-row { flex:1; }
+  .check-row { display:flex; align-items:center; gap:8px; margin-bottom:13px; }
+  .check-row input[type=checkbox] { width:16px; height:16px; cursor:pointer; }
+  .check-row label { font-size:.9rem; color:var(--text-1); cursor:pointer; }
+  .btn { display:inline-flex; align-items:center; justify-content:center;
+    gap:6px; padding:9px 18px; border-radius:var(--radius-sm); font-size:.875rem;
+    font-weight:600; font-family:inherit; cursor:pointer;
+    border:1px solid transparent; transition:background .12s, border-color .12s; }
+  .btn-primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .btn-primary:hover { background:var(--accent-dark); border-color:var(--accent-dark); }
+  .btn-secondary { background:var(--bg-2); color:var(--text-1); border-color:var(--border); }
+  .btn-secondary:hover { background:var(--border); }
+  .btn-sm { padding:5px 12px; font-size:.8rem; }
+  .btn-danger { background:var(--red-light); color:var(--red); border-color:var(--red); }
+  .btn-danger:hover { background:var(--red); color:#fff; }
+  .btn-success { background:var(--green-light); color:var(--green); border-color:var(--green); }
+  .btn-success:hover { background:var(--green); color:#fff; }
+  .msg { padding:10px 14px; border-radius:var(--radius-sm); font-size:.875rem; margin-bottom:14px; }
+  .msg.ok  { background:var(--green-light); color:var(--green); border:1px solid var(--green); }
+  .msg.err { background:var(--red-light);   color:var(--red);   border:1px solid var(--red); }
+  .msg.info { background:var(--accent-light); color:var(--accent); border:1px solid var(--accent); }
+  .table { width:100%; border-collapse:collapse; font-size:.85rem; }
+  .table th { text-align:left; font-size:.72rem; font-weight:700; text-transform:uppercase;
+    letter-spacing:.3px; color:var(--text-3); padding:6px 8px;
+    border-bottom:1px solid var(--border); }
+  .table td { padding:8px 8px; border-bottom:1px solid var(--border-light);
+    vertical-align:middle; color:var(--text-1); }
+  .table tr:last-child td { border-bottom:none; }
+  .badge { display:inline-block; padding:2px 9px; border-radius:8px;
+    font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.3px; }
+  .badge-pending  { background:var(--amber-light); color:var(--amber); }
+  .badge-approved { background:var(--green-light);  color:var(--green); }
+  .badge-denied   { background:var(--red-light);    color:var(--red); }
+  .badge-cancelled{ background:var(--bg-2); color:var(--text-3); border:1px solid var(--border); }
+  .section-label { font-size:.75rem; font-weight:700; text-transform:uppercase;
+    letter-spacing:.5px; color:var(--text-3); margin:20px 0 8px; }
+  .owner-section { border-top:2px solid var(--accent-light); margin-top:30px; padding-top:24px; }
+  .owner-badge { display:inline-block; padding:2px 9px; border-radius:8px;
+    font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.3px;
+    background:var(--accent-light); color:var(--accent); margin-bottom:4px; }
+  .empty-note { text-align:center; padding:20px 0; color:var(--text-3); font-size:.875rem; }
+  .alloc-form-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:6px 0; }
+  .alloc-form-row .emp-name { flex:1; min-width:120px; font-size:.875rem; color:var(--text-1); }
+  .alloc-form-row input[type=number] { width:80px; padding:5px 8px; border:1px solid var(--border);
+    border-radius:var(--radius-sm); font-size:.85rem; background:var(--bg-2);
+    color:var(--text-1); font-family:inherit; }
+  .deny-reason { margin-top:6px; }
+  .deny-reason input { padding:5px 8px; font-size:.85rem; width:100%; border:1px solid var(--border);
+    border-radius:var(--radius-sm); background:var(--bg-2); color:var(--text-1);
+    font-family:inherit; box-sizing:border-box; }
+</style>
+<script>(function(){try{var t=localStorage.getItem('pf-theme');var d=t==='dark'||(t==null&&window.matchMedia&&window.matchMedia('(prefers-color-scheme:dark)').matches);if(d)document.documentElement.setAttribute('data-theme','dark');}catch(e){}}());</script>
+</head>
+<body>
+
+<div id="topbar">
+  <a href="/" class="tb-brand" aria-label="PF Field Portal">
+    <div class="tb-mark">PF</div>
+    <span class="tb-title">Field Portal</span>
+  </a>
+  <details class="acct-menu" id="acctMenu">
+    <summary>
+      <span class="acct-btn">
+        <span class="acct-name" id="acctName"></span>
+        <svg class="acct-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </span>
+    </summary>
+    <div class="acct-dropdown">
+      <button type="button" class="acct-item" onclick="window.pfToggleTheme()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>
+        <span id="acctThemeLabel">Dark mode</span>
+      </button>
+      <div class="acct-divider"></div>
+      <a class="acct-item" href="/api/logout">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+        Sign Out
+      </a>
+    </div>
+  </details>
+</div>
+
+<nav id="pfNav" aria-label="Main navigation">
+  <a href="/" class="pf-nav-item" data-paths="/, /index.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+    <span>Home</span>
+  </a>
+  <a href="/daily-report.html" class="pf-nav-item" data-paths="/daily-report.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+    <span>Daily Report</span>
+  </a>
+  <a href="/time-off.html" class="pf-nav-item" data-paths="/time-off.html, /time-off">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><path d="M8 14l2 2 4-4"></path></svg>
+    <span>Time Off</span>
+  </a>
+  <a href="/schedule.html" class="pf-nav-item" data-paths="/schedule.html, /schedule">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+    <span>Schedule</span>
+  </a>
+  <a href="/past-reports.html" class="pf-nav-item" data-paths="/past-reports.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+    <span>Past Reports</span>
+  </a>
+</nav>
+
+<div id="loading">Loading...</div>
+<div id="authError"><p>Session expired. <a href="/login.html">Sign in again</a></p></div>
+
+<div id="main" style="display:none">
+  <p class="page-title">Time Off</p>
+
+  <!-- Allocation summary bar -->
+  <div class="alloc-bar" id="allocBar">
+    <div class="alloc-stat">
+      <div class="alloc-stat-label">Allocated</div>
+      <div class="alloc-stat-val not-set" id="statAllocated">—</div>
+    </div>
+    <div class="alloc-stat">
+      <div class="alloc-stat-label">Used</div>
+      <div class="alloc-stat-val" id="statUsed">0</div>
+    </div>
+    <div class="alloc-stat">
+      <div class="alloc-stat-label">Pending</div>
+      <div class="alloc-stat-val" id="statPending">0</div>
+    </div>
+    <div class="alloc-stat">
+      <div class="alloc-stat-label">Remaining</div>
+      <div class="alloc-stat-val not-set" id="statRemaining">—</div>
+    </div>
+  </div>
+
+  <!-- Request form -->
+  <div class="card">
+    <div class="card-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+      Request Time Off
+    </div>
+    <div id="formMsg"></div>
+    <form id="toForm" autocomplete="off">
+      <div class="form-row-inline">
+        <div class="form-row">
+          <label for="startDate">Start Date</label>
+          <input type="date" id="startDate" name="start_date" required>
+        </div>
+        <div class="form-row">
+          <label for="endDate">End Date</label>
+          <input type="date" id="endDate" name="end_date" required>
+        </div>
+      </div>
+      <div class="form-row">
+        <label for="typeSelect">Type</label>
+        <select id="typeSelect" name="type">
+          <option value="Vacation">Vacation</option>
+          <option value="Sick">Sick</option>
+          <option value="Personal">Personal</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="check-row">
+        <input type="checkbox" id="halfDay" name="half_day">
+        <label for="halfDay">Half day (single day, 0.5 days)</label>
+      </div>
+      <div class="form-row">
+        <label for="noteField">Note (optional)</label>
+        <textarea id="noteField" name="note" placeholder="Optional — leave blank if none." maxlength="500"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary" id="submitBtn">Submit Request</button>
+    </form>
+  </div>
+
+  <!-- My request history -->
+  <div class="section-label">My Requests</div>
+  <div class="card" id="myRequestsCard">
+    <div id="myRequestsBody">
+      <div class="empty-note">Loading...</div>
+    </div>
+  </div>
+
+  <!-- Owner section (shown only to admin/partner) -->
+  <div class="owner-section" id="ownerSection" style="display:none">
+    <div class="owner-badge">Owner View</div>
+    <div class="section-label" style="margin-top:12px;">Pending Requests</div>
+    <div class="card" id="pendingCard">
+      <div id="pendingBody">
+        <div class="empty-note">Loading...</div>
+      </div>
+    </div>
+
+    <div class="section-label">Employee Allocations — <span id="allocYear"></span></div>
+    <div class="card" id="allocCard">
+      <p style="font-size:.82rem;color:var(--text-2);margin-bottom:12px;">
+        Set how many days each employee is allocated per year. Leave at 0 if not yet assigned.
+        Field crew members see "Allocation not set, ask an owner" until a value is saved.
+      </p>
+      <div id="allocBody">
+        <div class="empty-note">Loading...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/pf-shared.js"></script>
+<script>
+"use strict";
+window.esc = window.esc || function(s){
+  if(s==null)return'';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+};
+
+var _myUid = '';
+var _myRole = '';
+var _allData = null;
+
+function fmtDateDisp(iso) {
+  if (!iso) return '';
+  var m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return iso;
+  return m[2]+'/'+m[3]+'/'+m[1];
+}
+
+function badgeHtml(status) {
+  var map = {pending:'badge-pending',approved:'badge-approved',denied:'badge-denied',cancelled:'badge-cancelled'};
+  return '<span class="badge '+(map[status]||'badge-cancelled')+'">'+window.esc(status)+'</span>';
+}
+
+function showMsg(el, text, type) {
+  if (!el) return;
+  el.innerHTML = '<div class="msg '+type+'">'+window.esc(text)+'</div>';
+}
+
+// ---- Allocation summary ----
+function renderAllocBar(alloc) {
+  var elA = document.getElementById('statAllocated');
+  var elU = document.getElementById('statUsed');
+  var elP = document.getElementById('statPending');
+  var elR = document.getElementById('statRemaining');
+  if (!alloc) return;
+  if (alloc.allocatedDays === null) {
+    elA.textContent = 'Not set';
+    elA.classList.add('not-set');
+    elR.textContent = '—';
+    elR.classList.add('not-set');
+  } else {
+    elA.textContent = alloc.allocatedDays;
+    elA.classList.remove('not-set');
+    elR.textContent = alloc.remaining !== null ? alloc.remaining : '—';
+    if (alloc.remaining !== null) elR.classList.remove('not-set');
+  }
+  elU.textContent = alloc.usedDays || 0;
+  elP.textContent = alloc.pendingDays || 0;
+}
+
+// ---- My requests table ----
+function renderMyRequests(requests) {
+  var el = document.getElementById('myRequestsBody');
+  if (!el) return;
+  if (!requests || !requests.length) {
+    el.innerHTML = '<div class="empty-note">No requests yet.</div>';
+    return;
+  }
+  var rows = requests.map(function(r) {
+    var dates = r.start_date === r.end_date
+      ? fmtDateDisp(r.start_date) + (r.half_day ? ' (half)' : '')
+      : fmtDateDisp(r.start_date) + ' – ' + fmtDateDisp(r.end_date);
+    var cancelBtn = r.status === 'pending'
+      ? '<button class="btn btn-sm btn-danger" onclick="cancelRequest(\''+window.esc(r.id)+'\')">Cancel</button>'
+      : '';
+    var denialNote = r.status === 'denied' && r.denial_reason
+      ? '<br><span style="font-size:.78rem;color:var(--text-3);">Reason: '+window.esc(r.denial_reason)+'</span>'
+      : '';
+    return '<tr>'+
+      '<td>'+window.esc(dates)+'</td>'+
+      '<td>'+window.esc(r.type)+'</td>'+
+      '<td>'+window.esc(String(r.day_count))+'d</td>'+
+      '<td>'+badgeHtml(r.status)+denialNote+'</td>'+
+      '<td>'+cancelBtn+'</td>'+
+      '</tr>';
+  }).join('');
+  el.innerHTML = '<table class="table"><thead><tr>'+
+    '<th>Dates</th><th>Type</th><th>Days</th><th>Status</th><th></th>'+
+    '</tr></thead><tbody>'+rows+'</tbody></table>';
+}
+
+// ---- Owner: pending requests ----
+function renderPending(requests) {
+  var el = document.getElementById('pendingBody');
+  if (!el) return;
+  if (!requests || !requests.length) {
+    el.innerHTML = '<div class="empty-note">No pending requests.</div>';
+    return;
+  }
+  var rows = requests.map(function(r) {
+    var dates = r.start_date === r.end_date
+      ? fmtDateDisp(r.start_date) + (r.half_day ? ' (half)' : '')
+      : fmtDateDisp(r.start_date) + ' – ' + fmtDateDisp(r.end_date);
+    var noteHtml = r.note ? '<br><span style="font-size:.78rem;color:var(--text-2);">'+window.esc(r.note)+'</span>' : '';
+    return '<tr id="prow-'+window.esc(r.id)+'">'+
+      '<td>'+window.esc(r.name||r.uid)+'</td>'+
+      '<td>'+window.esc(dates)+noteHtml+'</td>'+
+      '<td>'+window.esc(r.type)+'</td>'+
+      '<td>'+window.esc(String(r.day_count))+'d</td>'+
+      '<td>'+
+        '<div style="display:flex;flex-direction:column;gap:6px;">'+
+          '<button class="btn btn-sm btn-success" onclick="approveRequest(\''+window.esc(r.id)+'\')">Approve</button>'+
+          '<div class="deny-reason"><input type="text" id="reason-'+window.esc(r.id)+'" placeholder="Reason (optional)" maxlength="300" style="width:100%;margin-bottom:4px;"></div>'+
+          '<button class="btn btn-sm btn-danger" onclick="denyRequest(\''+window.esc(r.id)+'\')">Deny</button>'+
+        '</div>'+
+      '</td>'+
+      '</tr>';
+  }).join('');
+  el.innerHTML = '<table class="table"><thead><tr>'+
+    '<th>Employee</th><th>Dates</th><th>Type</th><th>Days</th><th>Action</th>'+
+    '</tr></thead><tbody>'+rows+'</tbody></table>';
+}
+
+// ---- Owner: allocations ----
+function renderAllocations(allocations) {
+  var el = document.getElementById('allocBody');
+  if (!el) return;
+  var yr = new Date().getFullYear();
+  document.getElementById('allocYear') && (document.getElementById('allocYear').textContent = yr);
+  // Build map: uid -> allocated_days for this year
+  var allocMap = {};
+  (allocations||[]).forEach(function(a){ if(a.year === yr) allocMap[a.uid] = a.allocated_days; });
+  // Need list of employees — gather from _allData.pendingAll + ownRequests
+  // Plus any uid already in allocations
+  var uids = {};
+  (_allData && _allData.pendingAll || []).forEach(function(r){ uids[r.uid] = r.name || r.uid; });
+  (_allData && _allData.ownRequests || []).forEach(function(r){ uids[r.uid] = r.name || r.uid; });
+  (allocations||[]).forEach(function(a){ if (!uids[a.uid]) uids[a.uid] = a.uid; });
+  var keys = Object.keys(uids);
+  if (!keys.length) {
+    el.innerHTML = '<div class="empty-note">No employees with requests yet. Allocations can be set once employees submit requests, or add them by uid directly.</div>';
+    return;
+  }
+  var rows = keys.map(function(uid) {
+    var cur = (uid in allocMap) ? allocMap[uid] : '';
+    return '<div class="alloc-form-row">'+
+      '<span class="emp-name">'+window.esc(uids[uid])+'</span>'+
+      '<input type="number" id="alloc-inp-'+window.esc(uid)+'" min="0" max="365" step="0.5" value="'+window.esc(String(cur))+'" placeholder="Days">'+
+      '<button class="btn btn-sm btn-secondary" onclick="saveAllocation(\''+window.esc(uid)+'\','+yr+')">Save</button>'+
+      '</div>';
+  }).join('');
+  el.innerHTML = rows + '<div id="allocMsg" style="margin-top:8px;"></div>';
+}
+
+// ---- API calls ----
+function loadData() {
+  fetch('/api/time-off', {credentials:'same-origin'})
+    .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+    .then(function(res) {
+      if (!res.ok || !res.d.ok) { return; }
+      _allData = res.d;
+      renderAllocBar(res.d.allocation);
+      renderMyRequests(res.d.ownRequests);
+      if (res.d.isOwner) {
+        var ownerSec = document.getElementById('ownerSection');
+        if (ownerSec) ownerSec.style.display = 'block';
+        renderPending(res.d.pendingAll);
+        renderAllocations(res.d.allocations);
+      }
+    })
+    .catch(function(){ /* silent */ });
+}
+
+window.cancelRequest = function(id) {
+  if (!confirm('Cancel this time off request?')) return;
+  fetch('/api/time-off', {
+    method:'POST', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({action:'cancel', id:id})
+  }).then(function(r){ return r.json(); })
+    .then(function(d) {
+      if (d.ok) { loadData(); }
+      else { alert('Error: ' + (d.error || 'unknown')); }
+    }).catch(function(){ alert('Network error'); });
+};
+
+window.approveRequest = function(id) {
+  fetch('/api/time-off-admin', {
+    method:'POST', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({action:'approve', id:id})
+  }).then(function(r){ return r.json(); })
+    .then(function(d) {
+      if (d.ok) { loadData(); }
+      else { alert('Error: ' + (d.error || 'unknown')); }
+    }).catch(function(){ alert('Network error'); });
+};
+
+window.denyRequest = function(id) {
+  var reasonEl = document.getElementById('reason-' + id);
+  var reason = reasonEl ? reasonEl.value.trim() : '';
+  fetch('/api/time-off-admin', {
+    method:'POST', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({action:'deny', id:id, denial_reason:reason})
+  }).then(function(r){ return r.json(); })
+    .then(function(d) {
+      if (d.ok) { loadData(); }
+      else { alert('Error: ' + (d.error || 'unknown')); }
+    }).catch(function(){ alert('Network error'); });
+};
+
+window.saveAllocation = function(uid, year) {
+  var inp = document.getElementById('alloc-inp-' + uid);
+  if (!inp) return;
+  var days = parseFloat(inp.value);
+  if (isNaN(days) || days < 0 || days > 365) {
+    alert('Enter a valid number of days (0–365).'); return;
+  }
+  fetch('/api/time-off-admin', {
+    method:'POST', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({action:'set-allocation', uid:uid, year:year, allocated_days:days})
+  }).then(function(r){ return r.json(); })
+    .then(function(d) {
+      var msgEl = document.getElementById('allocMsg');
+      if (d.ok) {
+        if (msgEl) msgEl.innerHTML = '<div class="msg ok">Saved.</div>';
+        setTimeout(function(){ if(msgEl) msgEl.innerHTML=''; }, 2500);
+        loadData();
+      } else {
+        if (msgEl) msgEl.innerHTML = '<div class="msg err">'+ window.esc(d.error||'Error') +'</div>';
+      }
+    }).catch(function(e){ alert('Network error'); });
+};
+
+// ---- Form half-day enforcement ----
+document.getElementById('halfDay').addEventListener('change', function() {
+  var ed = document.getElementById('endDate');
+  var sd = document.getElementById('startDate');
+  if (this.checked) { ed.value = sd.value; ed.disabled = true; }
+  else { ed.disabled = false; }
+});
+document.getElementById('startDate').addEventListener('change', function() {
+  if (document.getElementById('halfDay').checked) {
+    document.getElementById('endDate').value = this.value;
+  }
+});
+
+// ---- Form submit ----
+document.getElementById('toForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  var btn = document.getElementById('submitBtn');
+  var msgEl = document.getElementById('formMsg');
+  var startDate = document.getElementById('startDate').value;
+  var endDate   = document.getElementById('endDate').value;
+  var halfDay   = document.getElementById('halfDay').checked;
+  var type      = document.getElementById('typeSelect').value;
+  var note      = document.getElementById('noteField').value.trim();
+
+  if (!startDate || !endDate) { showMsg(msgEl,'Start and end dates are required.','err'); return; }
+  if (endDate < startDate)    { showMsg(msgEl,'End date must be on or after start date.','err'); return; }
+  if (halfDay && startDate !== endDate) { showMsg(msgEl,'Half-day requests must be a single day.','err'); return; }
+
+  btn.disabled = true; btn.textContent = 'Submitting...';
+  msgEl.innerHTML = '';
+
+  fetch('/api/time-off', {
+    method:'POST', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({action:'submit', start_date:startDate, end_date:endDate,
+                          half_day:halfDay, type:type, note:note})
+  }).then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+    .then(function(res) {
+      btn.disabled = false; btn.textContent = 'Submit Request';
+      if (res.ok && res.d.ok) {
+        showMsg(msgEl, 'Request submitted. The owners will be notified.', 'ok');
+        document.getElementById('toForm').reset();
+        document.getElementById('endDate').disabled = false;
+        loadData();
+      } else {
+        showMsg(msgEl, res.d.error || 'Error submitting request.', 'err');
+      }
+    }).catch(function() {
+      btn.disabled = false; btn.textContent = 'Submit Request';
+      showMsg(msgEl, 'Network error. Please try again.', 'err');
+    });
+});
+
+// ---- Boot ----
+(function() {
+  var loadEl  = document.getElementById('loading');
+  var mainEl  = document.getElementById('main');
+  var errEl   = document.getElementById('authError');
+  var acctNm  = document.getElementById('acctName');
+
+  fetch('/api/me', {credentials:'same-origin'})
+    .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+    .then(function(res) {
+      if (res.ok && res.d && res.d.status === 'ok') {
+        _myUid  = res.d.uid  || '';
+        _myRole = res.d.role || '';
+        if (acctNm) acctNm.textContent = res.d.name || '';
+        if (loadEl) loadEl.style.display = 'none';
+        if (mainEl) mainEl.style.display = 'block';
+        loadData();
+      } else if (res.d && res.d.status === 'must_reset') {
+        window.location.href = '/reset-password.html';
+      } else {
+        window.location.href = '/login.html?next=' + encodeURIComponent(window.location.pathname);
+      }
+    }).catch(function() {
+      if (loadEl) loadEl.style.display = 'none';
+      if (errEl)  errEl.style.display  = 'block';
+    });
+})();
+</script>
+</body>
+</html>

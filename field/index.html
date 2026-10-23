@@ -34,6 +34,32 @@
   .dash-title{font-size:.875rem;font-weight:600;color:var(--text-0);flex:1;line-height:1.3;}
   .dash-tag{font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--text-3);background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:2px 7px;white-space:nowrap;}
   .dash-desc{font-size:.75rem;color:var(--text-2);margin:4px 0 12px;line-height:1.45;}
+  /* ---- Schedule tile (full-width) ---- */
+  .dash-card-full{grid-column:1/-1;}
+  .sched-tile-inner{cursor:pointer;}
+  .sched-tile-inner:hover .dash-title{color:var(--accent);}
+  /* 2-week grid: rows = team members, cols = dates */
+  .sched-grid{overflow-x:auto;margin-top:8px;}
+  .sched-table{border-collapse:collapse;min-width:400px;width:100%;}
+  .sched-table th{font-size:.65rem;font-weight:700;text-transform:uppercase;
+    letter-spacing:.3px;color:var(--text-3);padding:4px 6px;
+    border-bottom:1px solid var(--border);text-align:center;white-space:nowrap;}
+  .sched-table th.name-col{text-align:left;min-width:90px;}
+  .sched-table td{padding:3px 4px;border-bottom:1px solid var(--border-light);
+    font-size:.75rem;vertical-align:middle;}
+  .sched-table td.name-col{color:var(--text-1);white-space:nowrap;padding-left:0;}
+  .sched-table td.day-col{text-align:center;}
+  .sched-table tr:last-child td{border-bottom:none;}
+  .sched-absent{display:block;background:var(--accent-light);color:var(--accent);
+    border:1px solid var(--accent);border-radius:3px;font-size:.65rem;font-weight:600;
+    text-align:center;padding:1px 0;margin:0 2px;}
+  .sched-absent-half{background:var(--amber-light);color:var(--amber);border-color:var(--amber);}
+  .sched-day-head{font-size:.7rem;color:var(--text-3);}
+  .sched-day-head.today{color:var(--accent);font-weight:700;}
+  .sched-empty{font-size:.8rem;color:var(--text-3);padding:10px 0;text-align:center;}
+  .view-sched-link{display:inline-flex;align-items:center;gap:4px;font-size:.78rem;
+    color:var(--accent);font-weight:600;margin-top:10px;text-decoration:none;}
+  .view-sched-link:hover{text-decoration:underline;}
   /* ---- Skeleton bars ---- */
   .skel{background:var(--border);border-radius:3px;}
   .skel-row{display:flex;gap:8px;margin-bottom:7px;align-items:center;}
@@ -122,6 +148,10 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
     <span>Cost Codes</span>
   </a>
+  <a href="/time-off.html" class="pf-nav-item" data-paths="/time-off.html, /time-off">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><path d="M8 14l2 2 4-4"></path></svg>
+    <span>Time Off</span>
+  </a>
 </nav>
 
 <div id="loading">Loading...</div>
@@ -150,25 +180,35 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
       Past Reports
     </a>
+    <a href="/time-off.html" class="qa-btn secondary">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><path d="M8 14l2 2 4-4"></path></svg>
+      Time Off
+    </a>
   </div>
 
   <div class="section-label" style="margin-top:8px;margin-bottom:10px;">Dashboard</div>
 
   <div class="dash-grid">
 
-    <!-- This Week's Schedule -->
-    <div class="dash-card">
-      <div class="dash-card-head">
-        <div class="dash-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+    <!-- 2-Week Schedule (full-width tile) -->
+    <div class="dash-card dash-card-full" id="schedCard">
+      <div class="sched-tile-inner" onclick="window.location.href='/schedule.html'" role="button" tabindex="0" aria-label="View full schedule" style="outline:none;">
+        <div class="dash-card-head">
+          <div class="dash-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          </div>
+          <span class="dash-title">2-Week Schedule</span>
+          <span class="dash-tag" id="schedTileTag">Loading</span>
         </div>
-        <span class="dash-title">This Week's Schedule</span>
-        <span class="dash-tag">Coming soon</span>
+        <p class="dash-desc" style="margin-bottom:6px;">Team absences — next 14 days. Click to open full schedule.</p>
+        <div class="sched-grid" id="schedGrid">
+          <div class="sched-empty">Loading...</div>
+        </div>
+        <a href="/schedule.html" class="view-sched-link" onclick="event.stopPropagation()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          View full schedule
+        </a>
       </div>
-      <p class="dash-desc">Crew, job assignment, and mobilization dates for the current week.</p>
-      <div class="skel-row"><div class="skel" style="height:10px;width:72%;"></div></div>
-      <div class="skel-row"><div class="skel" style="height:10px;width:50%;"></div></div>
-      <div class="skel-row"><div class="skel" style="height:10px;width:64%;"></div></div>
     </div>
 
     <!-- Today's Job -->
@@ -310,6 +350,93 @@ window.esc = window.esc || function(s){
     .catch(function(){
       if(loadEl) loadEl.style.display='none';
       if(errEl) errEl.style.display='block';
+    });
+})();
+
+// ---- Schedule tile: 2-week approved absences ----
+(function(){
+  function padZ(n){ return n < 10 ? '0'+n : String(n); }
+  function todayIso(){
+    var d = new Date();
+    return d.getFullYear()+'-'+padZ(d.getMonth()+1)+'-'+padZ(d.getDate());
+  }
+  function addDays(iso, n){
+    var d = new Date(iso+'T12:00:00Z');
+    d.setUTCDate(d.getUTCDate()+n);
+    return d.toISOString().slice(0,10);
+  }
+  function shortDate(iso){
+    // Returns "M/D" e.g. "10/23"
+    var p = iso.split('-');
+    return p[1].replace(/^0/,'')+'/'+p[2].replace(/^0/,'');
+  }
+  function dowShort(iso){
+    var DAYS=['Su','Mo','Tu','We','Th','Fr','Sa'];
+    return DAYS[new Date(iso+'T12:00:00Z').getUTCDay()];
+  }
+
+  var tagEl  = document.getElementById('schedTileTag');
+  var gridEl = document.getElementById('schedGrid');
+
+  var today = todayIso();
+  var to    = addDays(today, 13);
+  var url   = '/api/schedule-absences?from='+encodeURIComponent(today)+'&to='+encodeURIComponent(to);
+
+  fetch(url, {credentials:'same-origin'})
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var absences = data.absences || [];
+      if(tagEl) tagEl.textContent = absences.length ? absences.length+' absence'+(absences.length!==1?'s':'') : 'No absences';
+
+      // Build 14-day columns
+      var days = [];
+      for(var i=0;i<14;i++) days.push(addDays(today,i));
+
+      // Map uid -> name + per-day set
+      var empMap = {}; // uid -> {name, days: Set}
+      absences.forEach(function(a){
+        if(!empMap[a.uid]) empMap[a.uid] = {name:a.name||a.uid, halfDays:{}};
+        var s = new Date(a.start_date+'T12:00:00Z');
+        var e = new Date(a.end_date+'T12:00:00Z');
+        var cur = new Date(s);
+        while(cur<=e){
+          var iso = cur.toISOString().slice(0,10);
+          empMap[a.uid].halfDays[iso] = a.half_day ? 1 : 0;
+          cur.setUTCDate(cur.getUTCDate()+1);
+        }
+      });
+      var empKeys = Object.keys(empMap);
+
+      if(!empKeys.length){
+        gridEl.innerHTML = '<div class="sched-empty">No approved absences in the next 14 days.</div>';
+        return;
+      }
+
+      // Table
+      var headCells = days.map(function(d){
+        var isToday = d===today;
+        return '<th class="day-col"><div class="sched-day-head'+(isToday?' today':'')+'">'+dowShort(d)+'<br>'+shortDate(d)+'</div></th>';
+      }).join('');
+
+      var rows = empKeys.map(function(uid){
+        var emp = empMap[uid];
+        var cells = days.map(function(d){
+          if(typeof emp.halfDays[d] !== 'undefined'){
+            var half = emp.halfDays[d]===1;
+            return '<td class="day-col"><span class="sched-absent'+(half?' sched-absent-half':'')+'">'+(half?'½':'OFF')+'</span></td>';
+          }
+          return '<td class="day-col"></td>';
+        }).join('');
+        return '<tr><td class="name-col">'+window.esc(emp.name)+'</td>'+cells+'</tr>';
+      }).join('');
+
+      gridEl.innerHTML = '<table class="sched-table"><thead><tr>'+
+        '<th class="name-col">Employee</th>'+headCells+
+        '</tr></thead><tbody>'+rows+'</tbody></table>';
+    })
+    .catch(function(){
+      if(tagEl) tagEl.textContent = 'Unavailable';
+      if(gridEl) gridEl.innerHTML = '<div class="sched-empty">Schedule unavailable.</div>';
     });
 })();
 
