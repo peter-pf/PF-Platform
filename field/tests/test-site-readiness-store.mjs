@@ -87,7 +87,8 @@ function makeMockKV() {
 // ---- Dynamic import of store -----------------------------------------------
 const storeUrl = new URL('../functions/lib/site-readiness-store.js', import.meta.url);
 const {
-  upsertRecord, loadRecordById, listRecords, countRecords, computeResult, CHECKLIST_ITEMS
+  upsertRecord, loadRecordById, listRecords, countRecords, computeResult, CHECKLIST_ITEMS,
+  uploadBucketForItem
 } = await import(storeUrl.href);
 
 // ---- Helpers ---------------------------------------------------------------
@@ -272,15 +273,17 @@ await testAsync('loadRecordById falls back to KV', async () => {
 // ============================================================
 console.log('\n--- CHECKLIST_ITEMS ---');
 
-test('CHECKLIST_ITEMS has exactly 12 items', () => {
-  assert.equal((CHECKLIST_ITEMS || []).length, 12,
-    `expected 12, got ${(CHECKLIST_ITEMS || []).length}`);
+test('CHECKLIST_ITEMS has exactly 14 items (R9: added 3e, 4d)', () => {
+  assert.equal((CHECKLIST_ITEMS || []).length, 14,
+    `expected 14, got ${(CHECKLIST_ITEMS || []).length}`);
 });
 
-test('items 3a and 3d have hasUpload=true', () => {
+test('items 3a, 3d, 3e, 4d have hasUpload=true', () => {
   const by = Object.fromEntries((CHECKLIST_ITEMS || []).map(d => [d.key, d]));
   assert.equal(by['3a'] && by['3a'].hasUpload, true, '3a missing hasUpload');
   assert.equal(by['3d'] && by['3d'].hasUpload, true, '3d missing hasUpload');
+  assert.equal(by['3e'] && by['3e'].hasUpload, true, '3e missing hasUpload');
+  assert.equal(by['4d'] && by['4d'].hasUpload, true, '4d missing hasUpload');
 });
 
 test('items without upload do not have hasUpload', () => {
@@ -289,6 +292,31 @@ test('items without upload do not have hasUpload', () => {
   withoutUp.forEach(k => {
     assert(!by[k].hasUpload, k + ' should not have hasUpload');
   });
+});
+
+test('2c label is the R9 updated description', () => {
+  const by = Object.fromEntries((CHECKLIST_ITEMS || []).map(d => [d.key, d]));
+  assert(by['2c'].label.includes('underground utilities'), '2c label should include "underground utilities"');
+  assert(by['2c'].label.includes('building pad'), '2c label should include "building pad"');
+});
+
+test('uploadBucketForItem maps 3e->staking_photo and 4d->safety_cert', () => {
+  assert.equal(uploadBucketForItem('3a'), 'grade_photo',   '3a->grade_photo');
+  assert.equal(uploadBucketForItem('3d'), 'proof_roll',    '3d->proof_roll');
+  assert.equal(uploadBucketForItem('3e'), 'staking_photo', '3e->staking_photo');
+  assert.equal(uploadBucketForItem('4d'), 'safety_cert',   '4d->safety_cert');
+  assert.equal(uploadBucketForItem('1a'), null,            '1a->null');
+});
+
+test('new items 3e and 4d appear in correct sections', () => {
+  const by = Object.fromEntries((CHECKLIST_ITEMS || []).map(d => [d.key, d]));
+  assert.equal(by['3e'].section, '3', '3e should be in section 3');
+  assert.equal(by['4d'].section, '4', '4d should be in section 4');
+});
+
+test('4b label updated to include GC discussion', () => {
+  const by = Object.fromEntries((CHECKLIST_ITEMS || []).map(d => [d.key, d]));
+  assert(by['4b'].label.toLowerCase().includes('gc') || by['4b'].label.toLowerCase().includes('discussed'), '4b label should reference GC discussion');
 });
 
 // ============================================================
