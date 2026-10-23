@@ -111,10 +111,20 @@ const BUCKETS = {
   safety_cert:   'Safety Certs',
   sr_markup:     'Site Plan Markup',
   sr_signature:  'Signatures',
+  // R11: Section 1 and 4 photo buckets (Site Readiness; go under SR_SUBFOLDER)
+  photo_1a:      'Site Prep Photos',
+  photo_1b:      'Site Conditions Photos',
+  photo_1c:      'Site Concerns Photos',
+  photo_4b:      'Trucking Load Photos',
+  photo_4c:      'Trucking Overhead Photos',
 };
 
 // Buckets that belong under the Site Readiness folder tree instead of QAQC.
-const SR_BUCKETS = new Set(['grade_photo', 'proof_roll', 'staking_photo', 'sr_markup', 'sr_signature']);
+const SR_BUCKETS = new Set([
+  'grade_photo', 'proof_roll', 'staking_photo', 'sr_markup', 'sr_signature',
+  // R11: section 1 and 4 photo buckets (stored under Site Readiness folder tree)
+  'photo_1a', 'photo_1b', 'photo_1c', 'photo_4b', 'photo_4c',
+]);
 const SR_SUBFOLDER = 'Site Readiness';
 
 // Buckets that go into the project safety folder (06 - Safety).

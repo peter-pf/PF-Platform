@@ -318,8 +318,13 @@ test('areaForPath: /api/time-off -> field_ops', () => {
   assert.equal(areaForPath('/api/time-off'), 'field_ops');
 });
 
-test('areaForPath: /api/time-off-admin -> schedule_admin', () => {
-  assert.equal(areaForPath('/api/time-off-admin'), 'schedule_admin');
+// R11: time-off-admin route removed; no schedule_admin entry. The path now
+// falls to default-deny (admin-only heuristic) — no file exists so CF returns 404.
+test('areaForPath: /api/time-off-admin no longer returns schedule_admin (R11)', () => {
+  // After R11 removal, the path is not explicitly mapped. It must NOT return
+  // 'field_ops' (crew access) — it should be admin or unknown (default-deny).
+  const area = areaForPath('/api/time-off-admin');
+  assert.notEqual(area, 'field_ops', '/api/time-off-admin must not be accessible to field_ops');
 });
 
 test('areaForPath: /api/schedule-absences -> schedule', () => {
@@ -337,20 +342,22 @@ test('roleCanAccess: field_ops can access field_ops area', () => {
   assert.equal(roleCanAccess('field_ops', 'field_ops'), true);
 });
 
-test('roleCanAccess: field_ops BLOCKED from schedule_admin', () => {
-  assert.equal(roleCanAccess('field_ops', 'schedule_admin'), false);
+// R11: schedule_admin area removed (time-off-admin endpoint deleted).
+// Test that crew roles still cannot access admin-only areas.
+test('roleCanAccess: field_ops BLOCKED from user_admin area (R11)', () => {
+  assert.equal(roleCanAccess('field_ops', 'user_admin'), false);
 });
 
-test('roleCanAccess: admin can access schedule_admin', () => {
-  assert.equal(roleCanAccess('admin', 'schedule_admin'), true);
+test('roleCanAccess: admin can access user_admin area', () => {
+  assert.equal(roleCanAccess('admin', 'user_admin'), true);
 });
 
-test('roleCanAccess: partner can access schedule_admin', () => {
-  assert.equal(roleCanAccess('partner', 'schedule_admin'), true);
+test('roleCanAccess: partner BLOCKED from user_admin area', () => {
+  assert.equal(roleCanAccess('partner', 'user_admin'), false);
 });
 
-test('roleCanAccess: business_dev BLOCKED from schedule_admin', () => {
-  assert.equal(roleCanAccess('business_dev', 'schedule_admin'), false);
+test('roleCanAccess: business_dev can access business_dev area', () => {
+  assert.equal(roleCanAccess('business_dev', 'business_dev'), true);
 });
 
 // ---------------------------------------------------------------------------
@@ -397,14 +404,13 @@ test('IDOR: user A can cancel their own request', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 33: admin-endpoint 403 — non-owners cannot reach schedule_admin
+// 33: R11 — time-off-admin endpoint removed, crew cannot access admin areas
 // ---------------------------------------------------------------------------
-test('admin-endpoint 403: field_ops and business_dev cannot access schedule_admin', () => {
-  assert.equal(roleCanAccess('field_ops',     'schedule_admin'), false);
-  assert.equal(roleCanAccess('business_dev',  'schedule_admin'), false);
-  assert.equal(roleCanAccess('field_ops',     'schedule'),       true); // schedule page OK
-  assert.equal(roleCanAccess('admin',         'schedule_admin'), true);
-  assert.equal(roleCanAccess('partner',       'schedule_admin'), true);
+test('R11: field_ops blocked from user_admin; schedule page OK', () => {
+  assert.equal(roleCanAccess('field_ops',    'user_admin'),   false);
+  assert.equal(roleCanAccess('field_ops',    'schedule'),     true); // schedule page OK
+  assert.equal(roleCanAccess('admin',        'user_admin'),   true);
+  assert.equal(roleCanAccess('partner',      'user_admin'),   false);
 });
 
 // ---------------------------------------------------------------------------

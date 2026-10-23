@@ -67,9 +67,16 @@ export function renderSiteReadinessPdf(rec) {
   ], { valueW: 260 });
 
   // ---- Checklist sections --------------------------------------------------
-  // Group items by sectionLabel.
+  // R11 backward compat: pre-R11 records (schemaVersion unset) stored key '1b'
+  // as "Spoil pile locations identified off the building pad". R11+ records store
+  // '1b' = "General conditions". Skip '1b' in the main loop for old records and
+  // render it separately under a legacy label after the checklist sections.
+  const isPreR11 = !rec.schemaVersion || rec.schemaVersion < 11;
+
+  // Group items by sectionLabel (skipping pre-R11 1b so it renders under legacy label).
   const sections = [];
   for (const def of CHECKLIST_ITEMS) {
+    if (isPreR11 && def.key === '1b') continue;
     let sec = sections.find((s) => s.label === def.sectionLabel);
     if (!sec) { sec = { label: def.sectionLabel, items: [] }; sections.push(sec); }
     sec.items.push(def);
@@ -95,6 +102,21 @@ export function renderSiteReadinessPdf(rec) {
 
   // Gather all attachment refs up front (used in 4b/ops sections and the summary).
   const allAttach = Array.isArray(rec.attachments) ? rec.attachments : [];
+
+  // ---- R11 legacy: old 1b "Spoil pile" (pre-R11 records only) ---------------
+  // Pre-R11 records stored key '1b' = "Spoil pile locations identified off the
+  // building pad." Show under a legacy heading so historical data is unambiguous.
+  if (isPreR11) {
+    const legacyItem1b = (rec.items || []).find((it) => it && it.key === '1b');
+    if (legacyItem1b && legacyItem1b.answer) {
+      doc.heading('Site Prep (pre-R11 legacy items)');
+      const legRows = [{ label: '1b. Spoil pile locations identified off the building pad (legacy)', value: legacyItem1b.answer }];
+      if (legacyItem1b.note && String(legacyItem1b.note).trim()) {
+        legRows.push({ label: '     Note: ' + String(legacyItem1b.note).trim(), value: '' });
+      }
+      doc.table(legRows, { valueW: 60 });
+    }
+  }
 
   // ---- 4b Detail sub-items (R9 back-compat: render if present in old records) --
   const d4b = rec.item4bDetail;
@@ -213,13 +235,19 @@ export function renderSiteReadinessPdf(rec) {
 }
 
 function bucketLabel(bucket) {
-  if (bucket === 'grade_photo')  return 'Grade Photo';
-  if (bucket === 'proof_roll')   return 'Proof Roll Letter';
-  if (bucket === 'staking_photo') return 'Staking Photo';
-  if (bucket === 'safety_cert')  return 'Safety Cert';
-  if (bucket === 'sr_markup')    return 'Site Plan Markup';
-  if (bucket === 'sr_signature') return 'Signature';
-  if (bucket === 'photos')       return 'Site Photo';
+  if (bucket === 'grade_photo')    return 'Grade Photo';
+  if (bucket === 'proof_roll')     return 'Proof Roll Letter';
+  if (bucket === 'staking_photo')  return 'Staking Photo';
+  if (bucket === 'safety_cert')    return 'Safety Cert';
+  if (bucket === 'sr_markup')      return 'Site Plan Markup';
+  if (bucket === 'sr_signature')   return 'Signature';
+  if (bucket === 'photos')         return 'Site Photo';
+  // R11: section 1 and 4 photo buckets
+  if (bucket === 'photo_1a')       return 'Site Prep Photo';
+  if (bucket === 'photo_1b')       return 'Site Conditions Photo';
+  if (bucket === 'photo_1c')       return 'Site Concerns Photo';
+  if (bucket === 'photo_4b')       return 'Trucking Load Photo';
+  if (bucket === 'photo_4c')       return 'Trucking Overhead Photo';
   return bucket || '';
 }
 

@@ -41,7 +41,8 @@ function resolveRecipients(env) {
 }
 
 const MAIL_FROM    = 'peter@pierfoundations.com';
-const PORTAL_URL   = 'https://field.pierfoundations.com/time-off.html';
+// Platform Time Off Review tab — owners approve/deny requests here.
+const PLATFORM_TIME_OFF_REVIEW_URL = 'https://portal.pierfoundations.com/#time-off-review';
 const FIELD_ORIGIN = 'https://field.pierfoundations.com';
 
 const JSON_HEADERS = {
@@ -213,8 +214,8 @@ async function sendRequestEmail(env, { requesterName, type, startDate, endDate, 
     `Dates: ${datesStr}  (${countStr})`,
     noteLine,
     '',
-    'Log in to approve or deny this request:',
-    PORTAL_URL,
+    'Log in to review this request:',
+    PLATFORM_TIME_OFF_REVIEW_URL,
   ].filter(l => l !== undefined).join('\n');
 
   const recipients = resolveRecipients(env);

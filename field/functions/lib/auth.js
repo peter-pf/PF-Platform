@@ -295,11 +295,6 @@ const AREA_ROLES = {
   // off, performance, and compliance are HR-confidential. Default-deny: any
   // role not listed here is blocked from the /hr/ area by direct URL too.
   hr:               ['admin', 'hr'],
-  // Time Off + crew schedule administration: approve/deny requests, set
-  // allocations. The 3 owners (Brad, Jonathan, Derek) only.
-  // admin = Brad (role:'admin'), Jonathan + Derek (role:'partner').
-  // business_dev and field_ops are BLOCKED from admin operations by direct URL.
-  schedule_admin:   ['admin', 'partner'],
   // CRM module (future) — admin + partner + business_dev. Agreed target scope
   // for the upcoming CRM area. Harmless to pre-declare: no /crm/ path is mapped
   // yet, so this only takes effect once the CRM module is wired. Default-deny
@@ -553,10 +548,9 @@ const FIELD_PAGES = {
   // /api/cost-codes handler and never appear in the field_ops session's page.
   '/cost-codes.html':        'field_ops',
   '/cost-codes':             'field_ops',           // CF Pages clean-URL form
-  // Time Off page — request form, own history, owner approval panel (field_ops area
-  // = admin/partner/business_dev/field_ops so the crew can reach the form; the
-  // owner-only panels inside are conditionally shown client-side and enforced
-  // server-side by the /api/time-off-admin endpoint). ZERO financials.
+  // Time Off page — request form and own request history (field_ops area =
+  // admin/partner/business_dev/field_ops so the crew can reach the form).
+  // ZERO financials.
   '/time-off.html':          'field_ops',
   '/time-off':               'field_ops',           // CF Pages clean-URL form
   // Full schedule page — month-scrollable view of approved team absences.
@@ -651,15 +645,12 @@ export function areaForPath(pathname) {
     // handler. ZERO financials. Without this line the path falls to default-deny
     // (admin-only), blocking every field crew member.
     if (pathname.startsWith('/api/past-reports'))  return 'field_ops';
-    // Time Off admin (approve/deny/set-allocation). Owner-only: admin + partner.
-    // MUST be checked BEFORE the /api/time-off prefix so the more-specific path
-    // wins. schedule_admin area = admin + partner ONLY; field_ops BLOCKED.
-    if (pathname.startsWith('/api/time-off-admin')) return 'schedule_admin';
     // Time Off request submission + own request history. field_ops area =
     // admin/partner/business_dev/field_ops so the crew can submit and view their
-    // own requests. Owner sub-actions live in /api/time-off-admin (above).
-    // ZERO financials. Without this line path falls to default-deny (admin-only).
-    if (pathname.startsWith('/api/time-off'))       return 'field_ops';
+    // own requests. ZERO financials. Without this line path falls to default-deny
+    // (admin-only). Exact match only: /api/time-off with optional trailing slash
+    // or query; never matches sub-paths like a future /api/time-off-admin variant.
+    if (pathname === '/api/time-off' || pathname.startsWith('/api/time-off/')) return 'field_ops';
     // Cost Codes reference (QuickBooks chart of accounts). field_ops area so the
     // crew and office can both look up codes. The handler SERVER-SIDE filters
     // restricted rows (balance sheet / income / management / insurance / interest)

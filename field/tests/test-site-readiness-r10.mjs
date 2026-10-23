@@ -13,8 +13,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // ---- A: New R10 structure ---------------------------------------------------
 {
-  // A1: 19 items total.
-  assert.equal(CHECKLIST_ITEMS.length, 19, 'A1: should have 19 checklist items');
+  // A1: 20 items total (R11: old 1b removed, new 1b + 1c added = +1 net).
+  assert.equal(CHECKLIST_ITEMS.length, 20, 'A1: should have 20 checklist items (R11)');
 
   // A2: Sections present.
   const sections = [...new Set(CHECKLIST_ITEMS.map(d => d.section))];
@@ -54,7 +54,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
   // R9 bucket gone from 4d.
   assert.equal(uploadBucketForItem('4d'), null, 'B6: 4d -> null (R10: no safety bucket on 4d)');
   assert.equal(uploadBucketForItem('4a'), null, 'B7: 4a -> null');
-  assert.equal(uploadBucketForItem('1a'), null, 'B8: 1a -> null');
+  assert.equal(uploadBucketForItem('1a'), 'photo_1a', 'B8: 1a -> photo_1a (R11)');
 
   console.log('B (uploadBucketForItem): PASS');
 }

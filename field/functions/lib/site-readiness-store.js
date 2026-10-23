@@ -174,14 +174,27 @@ export async function countRecords(env) {
 // READY requires every item to be 'Yes' or 'N/A'.
 // NOT READY if any item is 'No' or blank.
 // R10 (Derek 2026-10-23): 7-section checklist structure.
+// R11 (Derek 2026-10-23): Section 1 renamed "Site Prep and Conditions"; old 1b
+//   (Spoil pile) removed (covered by 5b); 1a gets photo upload; new 1b/1c added.
+//   Photo uploads added to 4b and 4c. Old 1b backward compat: pre-R11 records
+//   stored key '1b' = Spoil pile. Records created by R11+ have schemaVersion: 11.
+//   PDF uses schemaVersion to render the old 1b under a legacy label.
 // Section 4 renamed Trucking Plan; new sections 5 Stone & Spoils Plan, 6 Safety.
 // Section 7 Site Photos is not a checklist item — it is the photos upload widget.
 export const CHECKLIST_ITEMS = [
-  // Section 1: Site Prep
-  { key: '1a', section: '1', sectionLabel: 'Site Prep',
-    label: 'Temp construction stone drive from street to pad (each truck entry)' },
-  { key: '1b', section: '1', sectionLabel: 'Site Prep',
-    label: 'Spoil pile locations identified off the building pad' },
+  // Section 1: Site Prep and Conditions (R11: renamed; 1a photo added; old 1b removed; new 1b+1c added)
+  { key: '1a', section: '1', sectionLabel: 'Site Prep and Conditions',
+    label: 'Temp construction stone drive from street to pad (each truck entry)',
+    hasUpload: true, uploadLabel: 'Photo of temp construction stone drive' },
+  // NOTE: old 1b 'Spoil pile locations identified off the building pad' removed in R11.
+  // Pre-R11 records hold key '1b' with the spoil-pile meaning; PDF uses schemaVersion
+  // to detect and label it correctly as legacy. New 1b = general conditions.
+  { key: '1b', section: '1', sectionLabel: 'Site Prep and Conditions',
+    label: 'General conditions, soil type, etc.',
+    hasUpload: true, uploadLabel: 'General conditions photo' },
+  { key: '1c', section: '1', sectionLabel: 'Site Prep and Conditions',
+    label: 'Areas of concern',
+    hasUpload: true, uploadLabel: 'Areas of concern photo' },
   // Section 2: Utilities
   { key: '2a', section: '2', sectionLabel: 'Utilities',
     label: 'Private utilities located and marked by GC' },
@@ -207,9 +220,11 @@ export const CHECKLIST_ITEMS = [
   { key: '4a', section: '4', sectionLabel: 'Trucking Plan',
     label: 'Trucking access discussed with GC' },
   { key: '4b', section: '4', sectionLabel: 'Trucking Plan',
-    label: 'Unload / load location? On street or on site? Additional materials required if on street?' },
+    label: 'Unload / load location? On street or on site? Additional materials required if on street?',
+    hasUpload: true, uploadLabel: 'Unload / load location photo' },
   { key: '4c', section: '4', sectionLabel: 'Trucking Plan',
-    label: 'Overhead utilities in the way?' },
+    label: 'Overhead utilities in the way?',
+    hasUpload: true, uploadLabel: 'Overhead utilities photo' },
   { key: '4d', section: '4', sectionLabel: 'Trucking Plan',
     label: 'Special notes about directions in and out of the job site' },
   // Section 5: Stone & Spoils Plan (R10: new)
@@ -231,9 +246,18 @@ export const CHECKLIST_ITEMS = [
 
 // Derive the upload bucket key from an item key.
 export function uploadBucketForItem(itemKey) {
+  // Section 1 photo buckets (R11)
+  if (itemKey === '1a') return 'photo_1a';
+  if (itemKey === '1b') return 'photo_1b';
+  if (itemKey === '1c') return 'photo_1c';
+  // Section 3 uploads (existing)
   if (itemKey === '3a') return 'grade_photo';
   if (itemKey === '3d') return 'proof_roll';
   if (itemKey === '3e') return 'staking_photo';
+  // Section 4 photo buckets (R11)
+  if (itemKey === '4b') return 'photo_4b';
+  if (itemKey === '4c') return 'photo_4c';
+  // Section 5/6 uploads (existing)
   if (itemKey === '5d') return 'sr_markup';
   if (itemKey === '6a') return 'safety_cert';
   return null;

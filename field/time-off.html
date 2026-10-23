@@ -70,20 +70,7 @@
   .badge-cancelled{ background:var(--bg-2); color:var(--text-3); border:1px solid var(--border); }
   .section-label { font-size:.75rem; font-weight:700; text-transform:uppercase;
     letter-spacing:.5px; color:var(--text-3); margin:20px 0 8px; }
-  .owner-section { border-top:2px solid var(--accent-light); margin-top:30px; padding-top:24px; }
-  .owner-badge { display:inline-block; padding:2px 9px; border-radius:8px;
-    font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.3px;
-    background:var(--accent-light); color:var(--accent); margin-bottom:4px; }
   .empty-note { text-align:center; padding:20px 0; color:var(--text-3); font-size:.875rem; }
-  .alloc-form-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:6px 0; }
-  .alloc-form-row .emp-name { flex:1; min-width:120px; font-size:.875rem; color:var(--text-1); }
-  .alloc-form-row input[type=number] { width:80px; padding:5px 8px; border:1px solid var(--border);
-    border-radius:var(--radius-sm); font-size:.85rem; background:var(--bg-2);
-    color:var(--text-1); font-family:inherit; }
-  .deny-reason { margin-top:6px; }
-  .deny-reason input { padding:5px 8px; font-size:.85rem; width:100%; border:1px solid var(--border);
-    border-radius:var(--radius-sm); background:var(--bg-2); color:var(--text-1);
-    font-family:inherit; box-sizing:border-box; }
 </style>
 <script>(function(){try{var t=localStorage.getItem('pf-theme');var d=t==='dark'||(t==null&&window.matchMedia&&window.matchMedia('(prefers-color-scheme:dark)').matches);if(d)document.documentElement.setAttribute('data-theme','dark');}catch(e){}}());</script>
 </head>
@@ -215,27 +202,6 @@
     </div>
   </div>
 
-  <!-- Owner section (shown only to admin/partner) -->
-  <div class="owner-section" id="ownerSection" style="display:none">
-    <div class="owner-badge">Owner View</div>
-    <div class="section-label" style="margin-top:12px;">Pending Requests</div>
-    <div class="card" id="pendingCard">
-      <div id="pendingBody">
-        <div class="empty-note">Loading...</div>
-      </div>
-    </div>
-
-    <div class="section-label">Employee Allocations — <span id="allocYear"></span></div>
-    <div class="card" id="allocCard">
-      <p style="font-size:.82rem;color:var(--text-2);margin-bottom:12px;">
-        Set how many days each employee is allocated per year. Leave at 0 if not yet assigned.
-        Field crew members see "Allocation not set, ask an owner" until a value is saved.
-      </p>
-      <div id="allocBody">
-        <div class="empty-note">Loading...</div>
-      </div>
-    </div>
-  </div>
 </div>
 
 <script src="/js/pf-shared.js"></script>
@@ -247,7 +213,6 @@ window.esc = window.esc || function(s){
 };
 
 var _myUid = '';
-var _myRole = '';
 var _allData = null;
 
 function fmtDateDisp(iso) {
@@ -315,69 +280,6 @@ function renderMyRequests(requests) {
     '</tr></thead><tbody>'+rows+'</tbody></table>';
 }
 
-// ---- Owner: pending requests ----
-function renderPending(requests) {
-  var el = document.getElementById('pendingBody');
-  if (!el) return;
-  if (!requests || !requests.length) {
-    el.innerHTML = '<div class="empty-note">No pending requests.</div>';
-    return;
-  }
-  var rows = requests.map(function(r) {
-    var dates = r.start_date === r.end_date
-      ? fmtDateDisp(r.start_date) + (r.half_day ? ' (half)' : '')
-      : fmtDateDisp(r.start_date) + ' – ' + fmtDateDisp(r.end_date);
-    var noteHtml = r.note ? '<br><span style="font-size:.78rem;color:var(--text-2);">'+window.esc(r.note)+'</span>' : '';
-    return '<tr id="prow-'+window.esc(r.id)+'">'+
-      '<td>'+window.esc(r.name||r.uid)+'</td>'+
-      '<td>'+window.esc(dates)+noteHtml+'</td>'+
-      '<td>'+window.esc(r.type)+'</td>'+
-      '<td>'+window.esc(String(r.day_count))+'d <span style="font-size:.72rem;color:var(--text-3);">'+(r.type==='Home Day'?'wknd days':'wkdays')+'</span></td>'+
-      '<td>'+
-        '<div style="display:flex;flex-direction:column;gap:6px;">'+
-          '<button class="btn btn-sm btn-success" data-approve-id="'+window.esc(r.id)+'">Approve</button>'+
-          '<div class="deny-reason"><input type="text" id="reason-'+window.esc(r.id)+'" placeholder="Reason (optional)" maxlength="300" style="width:100%;margin-bottom:4px;"></div>'+
-          '<button class="btn btn-sm btn-danger" data-deny-id="'+window.esc(r.id)+'">Deny</button>'+
-        '</div>'+
-      '</td>'+
-      '</tr>';
-  }).join('');
-  el.innerHTML = '<table class="table"><thead><tr>'+
-    '<th>Employee</th><th>Dates</th><th>Type</th><th>Days</th><th>Action</th>'+
-    '</tr></thead><tbody>'+rows+'</tbody></table>';
-}
-
-// ---- Owner: allocations ----
-function renderAllocations(allocations) {
-  var el = document.getElementById('allocBody');
-  if (!el) return;
-  var yr = new Date().getFullYear();
-  document.getElementById('allocYear') && (document.getElementById('allocYear').textContent = yr);
-  // Build map: uid -> allocated_days for this year
-  var allocMap = {};
-  (allocations||[]).forEach(function(a){ if(a.year === yr) allocMap[a.uid] = a.allocated_days; });
-  // Need list of employees — gather from _allData.pendingAll + ownRequests
-  // Plus any uid already in allocations
-  var uids = {};
-  (_allData && _allData.pendingAll || []).forEach(function(r){ uids[r.uid] = r.name || r.uid; });
-  (_allData && _allData.ownRequests || []).forEach(function(r){ uids[r.uid] = r.name || r.uid; });
-  (allocations||[]).forEach(function(a){ if (!uids[a.uid]) uids[a.uid] = a.uid; });
-  var keys = Object.keys(uids);
-  if (!keys.length) {
-    el.innerHTML = '<div class="empty-note">No employees with requests yet. Allocations can be set once employees submit requests, or add them by uid directly.</div>';
-    return;
-  }
-  var rows = keys.map(function(uid) {
-    var cur = (uid in allocMap) ? allocMap[uid] : '';
-    return '<div class="alloc-form-row">'+
-      '<span class="emp-name">'+window.esc(uids[uid])+'</span>'+
-      '<input type="number" id="alloc-inp-'+window.esc(uid)+'" min="0" max="365" step="0.5" value="'+window.esc(String(cur))+'" placeholder="Days">'+
-      '<button class="btn btn-sm btn-secondary" data-save-uid="'+window.esc(uid)+'" data-save-year="'+yr+'">Save</button>'+
-      '</div>';
-  }).join('');
-  el.innerHTML = rows + '<div id="allocMsg" style="margin-top:8px;"></div>';
-}
-
 // ---- API calls ----
 function loadData() {
   fetch('/api/time-off', {credentials:'same-origin'})
@@ -387,12 +289,6 @@ function loadData() {
       _allData = res.d;
       renderAllocBar(res.d.allocation);
       renderMyRequests(res.d.ownRequests);
-      if (res.d.isOwner) {
-        var ownerSec = document.getElementById('ownerSection');
-        if (ownerSec) ownerSec.style.display = 'block';
-        renderPending(res.d.pendingAll);
-        renderAllocations(res.d.allocations);
-      }
     })
     .catch(function(){ /* silent */ });
 }
@@ -410,64 +306,11 @@ window.cancelRequest = function(id) {
     }).catch(function(){ alert('Network error'); });
 };
 
-window.approveRequest = function(id) {
-  fetch('/api/time-off-admin', {
-    method:'POST', credentials:'same-origin',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({action:'approve', id:id})
-  }).then(function(r){ return r.json(); })
-    .then(function(d) {
-      if (d.ok) { loadData(); }
-      else { alert('Error: ' + (d.error || 'unknown')); }
-    }).catch(function(){ alert('Network error'); });
-};
-
-window.denyRequest = function(id) {
-  var reasonEl = document.getElementById('reason-' + id);
-  var reason = reasonEl ? reasonEl.value.trim() : '';
-  fetch('/api/time-off-admin', {
-    method:'POST', credentials:'same-origin',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({action:'deny', id:id, denial_reason:reason})
-  }).then(function(r){ return r.json(); })
-    .then(function(d) {
-      if (d.ok) { loadData(); }
-      else { alert('Error: ' + (d.error || 'unknown')); }
-    }).catch(function(){ alert('Network error'); });
-};
-
-window.saveAllocation = function(uid, year) {
-  var inp = document.getElementById('alloc-inp-' + uid);
-  if (!inp) return;
-  var days = parseFloat(inp.value);
-  if (isNaN(days) || days < 0 || days > 365) {
-    alert('Enter a valid number of days (0–365).'); return;
-  }
-  fetch('/api/time-off-admin', {
-    method:'POST', credentials:'same-origin',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({action:'set-allocation', uid:uid, year:year, allocated_days:days})
-  }).then(function(r){ return r.json(); })
-    .then(function(d) {
-      var msgEl = document.getElementById('allocMsg');
-      if (d.ok) {
-        if (msgEl) msgEl.innerHTML = '<div class="msg ok">Saved.</div>';
-        setTimeout(function(){ if(msgEl) msgEl.innerHTML=''; }, 2500);
-        loadData();
-      } else {
-        if (msgEl) msgEl.innerHTML = '<div class="msg err">'+ window.esc(d.error||'Error') +'</div>';
-      }
-    }).catch(function(e){ alert('Network error'); });
-};
-
-// ---- Event delegation for dynamically-rendered buttons (item 9 fix) ----
+// ---- Event delegation for dynamically-rendered buttons ----
 document.addEventListener('click', function(e) {
   var btn = e.target && e.target.closest ? e.target.closest('button') : null;
   if (!btn) return;
-  if (btn.dataset.cancelId)       { window.cancelRequest(btn.dataset.cancelId); }
-  else if (btn.dataset.approveId) { window.approveRequest(btn.dataset.approveId); }
-  else if (btn.dataset.denyId)    { window.denyRequest(btn.dataset.denyId); }
-  else if (btn.dataset.saveUid)   { window.saveAllocation(btn.dataset.saveUid, parseInt(btn.dataset.saveYear, 10)); }
+  if (btn.dataset.cancelId) { window.cancelRequest(btn.dataset.cancelId); }
 });
 
 // ---- Inline vacation-balance warning ----
@@ -584,7 +427,6 @@ document.getElementById('toForm').addEventListener('submit', function(e) {
     .then(function(res) {
       if (res.ok && res.d && res.d.status === 'ok') {
         _myUid  = res.d.uid  || '';
-        _myRole = res.d.role || '';
         if (acctNm) acctNm.textContent = res.d.name || '';
         if (loadEl) loadEl.style.display = 'none';
         if (mainEl) mainEl.style.display = 'block';

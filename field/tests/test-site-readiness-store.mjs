@@ -273,24 +273,32 @@ await testAsync('loadRecordById falls back to KV', async () => {
 // ============================================================
 console.log('\n--- CHECKLIST_ITEMS ---');
 
-// R10: updated expectations for 19-item structure.
-test('CHECKLIST_ITEMS has exactly 19 items (R10: sections 1-6)', () => {
-  assert.equal((CHECKLIST_ITEMS || []).length, 19,
-    `expected 19, got ${(CHECKLIST_ITEMS || []).length}`);
+// R11: updated expectations for 20-item structure (old 1b removed; new 1b, 1c added; 4b/4c photo uploads).
+test('CHECKLIST_ITEMS has exactly 20 items (R11: sections 1-6)', () => {
+  assert.equal((CHECKLIST_ITEMS || []).length, 20,
+    `expected 20, got ${(CHECKLIST_ITEMS || []).length}`);
 });
 
-test('R10: items with hasUpload=true are 3a, 3d, 3e, 5d, 6a', () => {
+test('R11: items with hasUpload=true are 1a, 1b, 1c, 3a, 3d, 3e, 4b, 4c, 5d, 6a', () => {
   const by = Object.fromEntries((CHECKLIST_ITEMS || []).map(d => [d.key, d]));
+  // R11 new
+  assert.equal(by['1a'] && by['1a'].hasUpload, true, '1a missing hasUpload (R11)');
+  assert.equal(by['1b'] && by['1b'].hasUpload, true, '1b missing hasUpload (R11 new General conditions)');
+  assert.equal(by['1c'] && by['1c'].hasUpload, true, '1c missing hasUpload (R11)');
+  assert.equal(by['4b'] && by['4b'].hasUpload, true, '4b missing hasUpload (R11)');
+  assert.equal(by['4c'] && by['4c'].hasUpload, true, '4c missing hasUpload (R11)');
+  // Existing
   assert.equal(by['3a'] && by['3a'].hasUpload, true, '3a missing hasUpload');
   assert.equal(by['3d'] && by['3d'].hasUpload, true, '3d missing hasUpload');
   assert.equal(by['3e'] && by['3e'].hasUpload, true, '3e missing hasUpload');
   assert.equal(by['5d'] && by['5d'].hasUpload, true, '5d missing hasUpload (R10)');
   assert.equal(by['6a'] && by['6a'].hasUpload, true, '6a missing hasUpload (R10)');
-  assert(!by['4d'].hasUpload, '4d should NOT have hasUpload in R10');
+  assert(!by['4d'].hasUpload, '4d should NOT have hasUpload');
 });
 
 test('items without upload do not have hasUpload', () => {
-  const withoutUp = ['1a', '1b', '2a', '2b', '2c', '3b', '3c', '4a', '4b', '4c', '4d', '5a', '5b', '5c'];
+  // R11: 1a/1b/1c/4b/4c now have uploads; removed from this list
+  const withoutUp = ['2a', '2b', '2c', '3b', '3c', '4a', '4d', '5a', '5b', '5c'];
   const by = Object.fromEntries((CHECKLIST_ITEMS || []).map(d => [d.key, d]));
   withoutUp.forEach(k => {
     assert(!by[k].hasUpload, k + ' should not have hasUpload');
@@ -303,28 +311,62 @@ test('2c label is the R9 updated description', () => {
   assert(by['2c'].label.includes('building pad'), '2c label should include "building pad"');
 });
 
-test('R10: uploadBucketForItem maps 5d->sr_markup and 6a->safety_cert (4d->null)', () => {
+test('R11: uploadBucketForItem maps all upload items correctly', () => {
+  // R11 new section 1 and 4 photo buckets
+  assert.equal(uploadBucketForItem('1a'), 'photo_1a',      '1a->photo_1a (R11)');
+  assert.equal(uploadBucketForItem('1b'), 'photo_1b',      '1b->photo_1b (R11)');
+  assert.equal(uploadBucketForItem('1c'), 'photo_1c',      '1c->photo_1c (R11)');
+  assert.equal(uploadBucketForItem('4b'), 'photo_4b',      '4b->photo_4b (R11)');
+  assert.equal(uploadBucketForItem('4c'), 'photo_4c',      '4c->photo_4c (R11)');
+  // Existing
   assert.equal(uploadBucketForItem('3a'), 'grade_photo',   '3a->grade_photo');
   assert.equal(uploadBucketForItem('3d'), 'proof_roll',    '3d->proof_roll');
   assert.equal(uploadBucketForItem('3e'), 'staking_photo', '3e->staking_photo');
   assert.equal(uploadBucketForItem('5d'), 'sr_markup',     '5d->sr_markup (R10)');
   assert.equal(uploadBucketForItem('6a'), 'safety_cert',   '6a->safety_cert (R10)');
-  assert.equal(uploadBucketForItem('4d'), null,            '4d->null (R10: no upload on 4d)');
-  assert.equal(uploadBucketForItem('1a'), null,            '1a->null');
+  // Items without upload
+  assert.equal(uploadBucketForItem('4d'), null,            '4d->null (no upload)');
+  assert.equal(uploadBucketForItem('4a'), null,            '4a->null (no upload)');
 });
 
-test('R10: new items in correct sections', () => {
+test('R11: items in correct sections', () => {
   const by = Object.fromEntries((CHECKLIST_ITEMS || []).map(d => [d.key, d]));
+  // R11 section 1
+  assert.equal(by['1a'].section, '1', '1a should be in section 1');
+  assert.equal(by['1b'].section, '1', '1b should be in section 1');
+  assert.equal(by['1c'].section, '1', '1c should be in section 1');
+  assert.equal(by['1a'].sectionLabel, 'Site Prep and Conditions', '1a section label R11');
+  assert.equal(by['1b'].sectionLabel, 'Site Prep and Conditions', '1b section label R11');
+  assert.equal(by['1c'].sectionLabel, 'Site Prep and Conditions', '1c section label R11');
+  // Existing
   assert.equal(by['3e'].section, '3', '3e should be in section 3');
   assert.equal(by['4a'].sectionLabel, 'Trucking Plan', '4a section is Trucking Plan');
+  assert.equal(by['4b'].sectionLabel, 'Trucking Plan', '4b section is Trucking Plan');
+  assert.equal(by['4c'].sectionLabel, 'Trucking Plan', '4c section is Trucking Plan');
   assert.equal(by['5d'].section, '5', '5d should be in section 5');
   assert.equal(by['6a'].section, '6', '6a should be in section 6');
 });
 
-test('R10: 4b label is Trucking Plan item', () => {
+test('R11: 4b label is Trucking Plan item with upload', () => {
   const by = Object.fromEntries((CHECKLIST_ITEMS || []).map(d => [d.key, d]));
   assert(by['4b'].label.toLowerCase().includes('unload') || by['4b'].label.toLowerCase().includes('street'),
     '4b label should reference unload/street (R10 trucking item)');
+});
+
+test('R11: section 1 old 1b (Spoil pile) is NOT in CHECKLIST_ITEMS', () => {
+  // Old 1b "Spoil pile locations" was removed. New 1b = "General conditions".
+  const by = Object.fromEntries((CHECKLIST_ITEMS || []).map(d => [d.key, d]));
+  assert(by['1b'], '1b key must exist (new General conditions item)');
+  assert(!by['1b'].label.toLowerCase().includes('spoil'), 'new 1b must not mention spoil pile');
+  assert(by['1b'].label.toLowerCase().includes('general') || by['1b'].label.toLowerCase().includes('condition'),
+    'new 1b should mention general conditions');
+});
+
+test('R11: new 1c (Areas of concern) exists in CHECKLIST_ITEMS', () => {
+  const by = Object.fromEntries((CHECKLIST_ITEMS || []).map(d => [d.key, d]));
+  assert(by['1c'], '1c must exist in CHECKLIST_ITEMS');
+  assert(by['1c'].label.toLowerCase().includes('concern'), '1c label should mention concern');
+  assert(by['1c'].hasUpload, '1c should have hasUpload');
 });
 
 // ============================================================
