@@ -49,8 +49,9 @@ function isCrossSite(request) {
 
 // KV rate-limit: max `limit` writes per `windowMs` for a given key.
 // Returns true if the caller is over limit, false if allowed.
+// Precondition: kv MUST be non-null; check env.PF_SCHEDULE before calling.
 async function isRateLimited(kv, key, limit, windowMs) {
-  if (!kv) return false; // no KV → allow but log a warning
+  if (!kv) return false; // guard (should not reach here; caller checks kv first)
   const now = Date.now();
   const raw = await kv.get(key);
   const state = raw ? JSON.parse(raw) : { ts: now, count: 0 };
@@ -141,7 +142,16 @@ export async function onRequestPost(context) {
     const id = s(body.id, 36);
     if (!id) return json({ ok: false, error: 'id required.' }, 400);
 
+    // Self-review block: owners may not approve their own requests.
+    const reqRow = await env.DB
+      .prepare('SELECT uid FROM absence_requests WHERE id=?').bind(id).first();
+    if (reqRow && reqRow.uid === session.uid) {
+      return json({ ok: false, error: 'Another owner must review your own request.' }, 403);
+    }
+
     // Rate-limit: max 60 approve/deny decisions per uid per hour.
+    // Fail-closed: PF_SCHEDULE missing → 503 (do not allow unlimited writes).
+    if (!env.PF_SCHEDULE) return json({ ok: false, error: 'KV binding unavailable.' }, 503);
     if (await isRateLimited(env.PF_SCHEDULE, `tor_action:${session.uid}`, 60, 3600_000)) {
       return json({ ok: false, error: 'Rate limit exceeded. Try again later.' }, 429);
     }
@@ -150,8 +160,8 @@ export async function onRequestPost(context) {
       .prepare(`UPDATE absence_requests
                 SET status='approved', updated_at=?,
                     approved_by=?, approved_by_name=?, approved_at=?
-                WHERE id=? AND status='pending'`)
-      .bind(now, session.uid, s(session.name || '', 200), now, id)
+                WHERE id=? AND status='pending' AND uid != ?`)
+      .bind(now, session.uid, s(session.name || '', 200), now, id, session.uid)
       .run();
 
     if (!result.meta || result.meta.changes !== 1) {
@@ -168,6 +178,14 @@ export async function onRequestPost(context) {
     if (!id) return json({ ok: false, error: 'id required.' }, 400);
     const reason = s(body.denial_reason || '', 300);
 
+    // Self-review block: owners may not deny their own requests.
+    const reqRow = await env.DB
+      .prepare('SELECT uid FROM absence_requests WHERE id=?').bind(id).first();
+    if (reqRow && reqRow.uid === session.uid) {
+      return json({ ok: false, error: 'Another owner must review your own request.' }, 403);
+    }
+
+    if (!env.PF_SCHEDULE) return json({ ok: false, error: 'KV binding unavailable.' }, 503);
     if (await isRateLimited(env.PF_SCHEDULE, `tor_action:${session.uid}`, 60, 3600_000)) {
       return json({ ok: false, error: 'Rate limit exceeded. Try again later.' }, 429);
     }
@@ -177,8 +195,8 @@ export async function onRequestPost(context) {
                 SET status='denied', updated_at=?,
                     denied_by=?, denied_by_name=?, denied_at=?,
                     denial_reason=?
-                WHERE id=? AND status='pending'`)
-      .bind(now, session.uid, s(session.name || '', 200), now, reason, id)
+                WHERE id=? AND status='pending' AND uid != ?`)
+      .bind(now, session.uid, s(session.name || '', 200), now, reason, id, session.uid)
       .run();
 
     if (!result.meta || result.meta.changes !== 1) {

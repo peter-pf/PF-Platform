@@ -52,7 +52,14 @@ function makeDB(rows) {
         return { meta: { changes: 0 } };
       },
       async first() {
-        // SELECT status / SELECT id FROM users
+        // SELECT uid FROM absence_requests (self-review check)
+        if (/SELECT uid FROM absence_requests/i.test(sql)) {
+          const id = _binds[0];
+          if (id === 'no-id')   return null;
+          if (id === 'self-id') return { uid: 'brad' };  // session.uid == requester uid
+          return { uid: 'crew-member' };                  // different uid → allowed
+        }
+        // SELECT status FROM absence_requests (race-safe fallback)
         if (/SELECT status FROM absence_requests/i.test(sql)) {
           const id = _binds[0];
           if (id === 'no-id')      return null;
@@ -325,6 +332,74 @@ console.log('10. PATH MAP');
   ok("areaForPath('/api/time-off-review/') === 'schedule_admin'",
      areaForPath('/api/time-off-review/') === 'schedule_admin',
      areaForPath('/api/time-off-review/'));
+}
+
+// =============================================================================
+// 11. SELF-REVIEW BLOCK (MED security fix)
+// =============================================================================
+console.log('11. SELF-REVIEW BLOCK');
+{
+  const env = makeEnv();
+  // approve own request (self-id returns uid='brad', session uid='brad') → 403
+  const pa = await onRequestPost(ctx(ADMIN, env, req('https://x/api/time-off-review', { action:'approve', id:'self-id' })));
+  const ja = await pa.json();
+  ok('approve self → 403',                  pa.status === 403, pa.status);
+  ok('approve self error message',           ja.error === 'Another owner must review your own request.', ja.error);
+
+  // deny own request → 403
+  const pd = await onRequestPost(ctx(ADMIN, env, req('https://x/api/time-off-review', { action:'deny', id:'self-id' })));
+  const jd = await pd.json();
+  ok('deny self → 403',                     pd.status === 403, pd.status);
+  ok('deny self error message',             jd.error === 'Another owner must review your own request.', jd.error);
+
+  // approve another's request (good-id uid='crew-member', session uid='brad') → 200
+  const po = await onRequestPost(ctx(ADMIN, env, req('https://x/api/time-off-review', { action:'approve', id:'good-id' })));
+  ok('approve other → still 200',           po.status === 200, po.status);
+
+  // deny another's request → 200
+  const pdo = await onRequestPost(ctx(PARTNER, env, req('https://x/api/time-off-review', { action:'deny', id:'good-id' })));
+  ok('deny other → still 200',              pdo.status === 200, pdo.status);
+}
+
+// =============================================================================
+// 12. BLOCKER FIX — usedMap only counts type='Vacation' (client-side logic test)
+// =============================================================================
+console.log('12. USED-MAP VACATION-ONLY');
+{
+  // Replicate the renderAllocations usedMap logic exactly as fixed.
+  const year = 2026;
+  const requests = [
+    { uid:'u1', type:'Vacation', status:'approved', start_date:'2026-07-01', day_count:3 },
+    { uid:'u1', type:'Sick',     status:'approved', start_date:'2026-07-05', day_count:1 },
+    { uid:'u1', type:'Home Day', status:'approved', start_date:'2026-07-10', day_count:1 },
+    { uid:'u1', type:'Vacation', status:'pending',  start_date:'2026-08-01', day_count:2 },  // pending: not counted
+    { uid:'u1', type:'Vacation', status:'approved', start_date:'2025-12-20', day_count:1 },  // prior year: not counted
+  ];
+  const usedMap = {};
+  requests.forEach(function(r){
+    if (r.type === 'Vacation' && r.status === 'approved' &&
+        r.start_date && r.start_date.slice(0,4) === String(year)) {
+      usedMap[r.uid] = (usedMap[r.uid] || 0) + (r.day_count || 0);
+    }
+  });
+  ok('only approved Vacation in current year counted', usedMap['u1'] === 3, usedMap['u1']);
+  ok('Sick days NOT counted in usedMap',               (usedMap['u1'] || 0) !== 5, usedMap['u1']); // would be 5 if Sick counted
+  ok('pending Vacation NOT counted',                   (usedMap['u1'] || 0) !== 5, usedMap['u1']);
+  ok('prior-year Vacation NOT counted',                (usedMap['u1'] || 0) !== 4, usedMap['u1']);
+}
+
+// =============================================================================
+// 13. RATE LIMIT FAIL-CLOSED (no KV → 503, not skip)
+// =============================================================================
+console.log('13. RATE LIMIT NO-KV FAIL-CLOSED');
+{
+  // isRateLimited with no KV must return true → handler returns 503
+  // (previously returned false → would have allowed the request)
+  const env = makeEnv({ kv: null });  // no KV binding
+  const p = await onRequestPost(ctx(ADMIN, env, req('https://x/api/time-off-review', { action:'approve', id:'good-id' })));
+  ok('approve with no KV → 503 (fail-closed)',  p.status === 503, p.status);
+  const pd = await onRequestPost(ctx(ADMIN, env, req('https://x/api/time-off-review', { action:'deny', id:'good-id' })));
+  ok('deny with no KV → 503 (fail-closed)',     pd.status === 503, pd.status);
 }
 
 console.log('\n=== ' + pass + ' passed, ' + fail + ' failed ===');

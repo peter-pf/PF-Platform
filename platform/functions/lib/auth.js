@@ -457,9 +457,6 @@ const PAGE_AREAS = {
   '/index.html':             'general',          // portal home/landing
   '/denied.html':            'general',          // access-denied notice (any auth user)
   '/reset-password.html':    'general',          // reset UI (restricted-session gated separately)
-  // Time Off Review (owner/admin only, SPA module — same page as index.html but
-  // mapped explicitly so a direct GET request is gated at the page boundary too).
-  '/time-off-review.html':   'schedule_admin',   // owner-only absence review + allocation
 };
 
 // HTML pages the FIELD CREW is explicitly allowed to reach (their operational

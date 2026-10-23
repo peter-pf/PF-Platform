@@ -4589,7 +4589,7 @@ th.pf-hl-rownum { color: var(--text-3, #6b7280); }
     if (xhr.status === 200) {
       var me = JSON.parse(xhr.responseText);   // throws on preview (SPA HTML fallback)
       if (me && me.role) { role = me.role; gotValidRole = true; }
-      window.PF_ME = { name: (me && me.name) || '', role: role };
+      window.PF_ME = { uid: (me && me.uid) || '', name: (me && me.name) || '', role: role };
     }
   } catch (e) { /* fail closed: role stays field_ops */ }
 
@@ -44477,8 +44477,13 @@ try {
         html += '</td>';
         html += '<td>';
         if (isPending) {
-          html += '<button class="tor-btn tor-btn-approve" data-tor-approve="' + esc(r.id) + '">Approve</button>';
-          html += '<button class="tor-btn tor-btn-deny"    data-tor-deny="' + esc(r.id) + '">Deny</button>';
+          var isSelf = (window.PF_ME && window.PF_ME.uid && window.PF_ME.uid === r.uid);
+          if (isSelf) {
+            html += '<span style="font-size:11px;color:#6B7280;font-style:italic">Another owner must review</span>';
+          } else {
+            html += '<button class="tor-btn tor-btn-approve" data-tor-approve="' + esc(r.id) + '">Approve</button>';
+            html += '<button class="tor-btn tor-btn-deny"    data-tor-deny="' + esc(r.id) + '">Deny</button>';
+          }
         }
         html += '</td>';
         html += '</tr>';
@@ -44493,10 +44498,12 @@ try {
     var year = new Date().getFullYear();
     var allocMap = {};
     state.allocations.forEach(function(a){ if (a.year === year) allocMap[a.uid] = a.allocated_days; });
-    // compute used (approved days this year)
+    // compute used: ONLY Vacation type + approved + start_date in current year.
+    // Mirrors field's getAllocationSummary: strftime('%Y',start_date)=year AND type='Vacation'.
     var usedMap = {};
     state.requests.forEach(function(r){
-      if (r.status === 'approved' && r.start_date && r.start_date.slice(0,4) === String(year)) {
+      if (r.type === 'Vacation' && r.status === 'approved' &&
+          r.start_date && r.start_date.slice(0,4) === String(year)) {
         usedMap[r.uid] = (usedMap[r.uid] || 0) + (r.day_count || 0);
       }
     });
@@ -44537,13 +44544,15 @@ try {
       d.setDate(monday.getDate() + i);
       days.push(d);
     }
-    // Build a map iso → [{name, status, type}]
+    // Build a map iso → [{name, status, type}].
+    // Cap at 366 days per request to prevent unbounded loops on malformed data.
     var calMap = {};
     state.requests.forEach(function(r){
       if (r.status !== 'approved' && r.status !== 'pending') return;
       var s = new Date(r.start_date + 'T12:00:00Z');
       var e = new Date(r.end_date   + 'T12:00:00Z');
-      for (var t = new Date(s); t <= e; t.setDate(t.getDate()+1)) {
+      var dayCount = 0;
+      for (var t = new Date(s); t <= e && dayCount < 366; t.setDate(t.getDate()+1), dayCount++) {
         var iso = t.toISOString().slice(0,10);
         if (!calMap[iso]) calMap[iso] = [];
         calMap[iso].push({ name: r.name||r.uid, status: r.status, type: r.type||'' });
@@ -44659,7 +44668,8 @@ try {
       btn.addEventListener('click', function(){
         var uid  = btn.getAttribute('data-tor-save-alloc');
         var year = parseInt(btn.getAttribute('data-tor-alloc-year'), 10);
-        var input = el.querySelector('[data-tor-alloc-uid="' + uid + '"]');
+        var safeUid = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(uid) : uid.replace(/[^\w-]/g, '\\$&');
+        var input = el.querySelector('[data-tor-alloc-uid="' + safeUid + '"]');
         var days = input ? parseFloat(input.value) : NaN;
         if (!Number.isFinite(days) || days < 0 || days > 365) {
           alert('Enter a valid number of days (0–365).'); return;
