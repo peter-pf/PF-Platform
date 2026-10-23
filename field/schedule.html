@@ -184,19 +184,19 @@ function renderCalendar(year, month, absences) {
   var today = todayIso();
   var numDays = daysInMonth(year, month);
 
-  // Use uid for grouping (returned by API for this purpose).
-  // Fall back to name if uid is missing (defensive).
+  // Use personKey (opaque, server-assigned) for grouping. uid is not returned
+  // by the API (security). Fall back to name/id for defensive coding only.
   var empMap = {}; // key -> name
   absences.forEach(function(a) {
-    var key = a.uid || a.name || a.id;
-    if (!empMap[key]) empMap[key] = a.name || a.uid || key;
+    var key = a.personKey || a.name || a.id;
+    if (!empMap[key]) empMap[key] = a.name || key;
   });
   var empKeys = Object.keys(empMap);
 
   // Build a day->key map: which employees are absent on each date, with label
   var dayAbsMap = {}; // iso -> { key -> { half, label } }
   absences.forEach(function(a) {
-    var key = a.uid || a.name || a.id;
+    var key = a.personKey || a.name || a.id;
     var s = new Date(a.start_date + 'T12:00:00Z');
     var e = new Date(a.end_date   + 'T12:00:00Z');
     var cur = new Date(s);

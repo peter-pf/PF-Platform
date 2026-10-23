@@ -462,14 +462,37 @@ test('overlap: approved request also blocks (same logic)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 40-46: R9 additions — Home Day, default allocation, schedule labels
+// 40-51: R9 additions — Home Day weekend-only, allocation, schedule labels
 // ---------------------------------------------------------------------------
 
-// calendarDays counts every calendar day (including weekends)
-function calendarDaysForTest(startIso, endIso) {
-  const s = new Date(startIso + 'T12:00:00Z');
-  const e = new Date(endIso   + 'T12:00:00Z');
-  return Math.round((e - s) / 86400000) + 1;
+// countWeekendDays mirrors server (Sat=6, Sun=0)
+function countWeekendDays(startIso, endIso) {
+  try {
+    const start = new Date(startIso + 'T12:00:00Z');
+    const end   = new Date(endIso   + 'T12:00:00Z');
+    if (isNaN(start) || isNaN(end) || end < start) return 0;
+    let count = 0;
+    const cur = new Date(start);
+    while (cur <= end) {
+      const dow = cur.getUTCDay();
+      if (dow === 0 || dow === 6) count++;
+      cur.setUTCDate(cur.getUTCDate() + 1);
+    }
+    return count;
+  } catch { return 0; }
+}
+
+// Home Day server submit logic mirror (weekend-only, Derek 10/23 follow-up)
+function validateHomeDay(startIso, endIso) {
+  // Reject if any weekday in span
+  if (countWeekdays(startIso, endIso) > 0) {
+    return { ok: false, error: 'Home Days are for weekends. Use Vacation for weekdays.' };
+  }
+  const dayCount = countWeekendDays(startIso, endIso);
+  if (dayCount <= 0) {
+    return { ok: false, error: 'Home Day request must include at least one Saturday or Sunday.' };
+  }
+  return { ok: true, dayCount };
 }
 
 // getAllocationSummary logic mirror (default = 10, only Vacation deducts)
@@ -490,27 +513,51 @@ function typeToLabel(type) {
   return 'Out';
 }
 
-test('R9: Home Day on Saturday accepted (calendarDays >= 1)', () => {
-  // 2026-10-24 is Saturday — calendarDays should be 1
-  const days = calendarDaysForTest('2026-10-24', '2026-10-24');
-  assert.equal(days, 1); // valid: calendar day counts weekend
+// R9 follow-up (Derek 10/23): Home Day is weekend-only
+test('R9b: Home Day on Saturday accepted (weekend day = 1)', () => {
+  // 2026-10-24 is Saturday
+  const r = validateHomeDay('2026-10-24', '2026-10-24');
+  assert.equal(r.ok, true);
+  assert.equal(r.dayCount, 1);
 });
 
-test('R9: Home Day spans full weekend = 2 calendar days', () => {
-  // Sat-Sun span
-  const days = calendarDaysForTest('2026-10-24', '2026-10-25');
-  assert.equal(days, 2);
+test('R9b: Home Day Sat-Sun accepted (2 weekend days)', () => {
+  // 2026-10-24 Sat – 2026-10-25 Sun
+  const r = validateHomeDay('2026-10-24', '2026-10-25');
+  assert.equal(r.ok, true);
+  assert.equal(r.dayCount, 2);
+});
+
+test('R9b: Home Day on Monday rejected (weekday in span)', () => {
+  // 2026-10-26 is Monday
+  const r = validateHomeDay('2026-10-26', '2026-10-26');
+  assert.equal(r.ok, false);
+  assert.match(r.error, /weekends/i);
+  assert.match(r.error, /Vacation/);
+});
+
+test('R9b: Home Day Fri-Sun rejected (contains Friday)', () => {
+  // 2026-10-23 Fri – 2026-10-25 Sun: Friday is a weekday → reject
+  const r = validateHomeDay('2026-10-23', '2026-10-25');
+  assert.equal(r.ok, false);
+  assert.match(r.error, /weekends/i);
+});
+
+test('R9b: Home Day Mon-Sun rejected (contains weekdays)', () => {
+  const r = validateHomeDay('2026-10-19', '2026-10-25');
+  assert.equal(r.ok, false);
+  assert.match(r.error, /weekends/i);
 });
 
 test('R9: Home Day does NOT deduct from vacation allocation', () => {
   const summary = getAllocationSummary({
     allocDaysFromDb: 10,
     absences: [
-      { type: 'Home Day', status: 'approved', days: 3 },
+      { type: 'Home Day', status: 'approved', days: 2 },
       { type: 'Vacation', status: 'approved', days: 2 },
     ],
   });
-  // 3 Home Days should not eat into vacation; only 2 Vacation days deducted
+  // 2 Home Days should not eat into vacation; only 2 Vacation days deducted
   assert.equal(summary.usedDays,  2);
   assert.equal(summary.remaining, 8);
 });

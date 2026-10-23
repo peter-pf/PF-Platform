@@ -394,11 +394,11 @@ window.esc = window.esc || function(s){
       var days = [];
       for(var i=0;i<14;i++) days.push(addDays(today,i));
 
-      // Map uid (or fallback name) -> per-day info incl. label
+      // Map personKey (opaque, server-assigned; uid never returned) -> per-day info
       var empMap = {}; // key -> {name, dayInfo: {iso: {half, label}}}
       absences.forEach(function(a){
-        var key = a.uid || a.name || a.id;
-        if(!empMap[key]) empMap[key] = {name:a.name||a.uid||key, dayInfo:{}};
+        var key = a.personKey || a.name || a.id;
+        if(!empMap[key]) empMap[key] = {name:a.name||key, dayInfo:{}};
         var s = new Date(a.start_date+'T12:00:00Z');
         var e = new Date(a.end_date+'T12:00:00Z');
         var cur = new Date(s);

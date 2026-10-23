@@ -116,8 +116,26 @@ function newId() {
   return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
 }
 
-// Home Day: crew works on road, requests to be home on specific day(s).
-// Allowed any day of week; counts calendar days; does NOT deduct from vacation.
+// Count WEEKEND days (Sat + Sun) between two ISO dates (inclusive).
+function countWeekendDays(startIso, endIso) {
+  try {
+    const start = new Date(startIso + 'T12:00:00Z');
+    const end   = new Date(endIso   + 'T12:00:00Z');
+    if (isNaN(start) || isNaN(end) || end < start) return 0;
+    let count = 0;
+    const cur = new Date(start);
+    while (cur <= end) {
+      const dow = cur.getUTCDay(); // 0=Sun, 6=Sat
+      if (dow === 0 || dow === 6) count++;
+      cur.setUTCDate(cur.getUTCDate() + 1);
+    }
+    return count;
+  } catch { return 0; }
+}
+
+// Home Day: crew works on road, requests to be home on a WEEKEND.
+// Allowed ONLY on Sat/Sun; any weekday in the span is rejected.
+// Counts weekend days; does NOT deduct from vacation.
 // Personal folds into Other (kept here for backward compat with old records).
 const VALID_TYPES = ['Vacation', 'Home Day', 'Sick', 'Personal', 'Other'];
 
@@ -175,9 +193,9 @@ async function sendRequestEmail(env, { requesterName, type, startDate, endDate, 
   const datesStr = startDate === endDate
     ? fmtDate(startDate) + (halfDay ? ' (half day)' : '')
     : `${fmtDate(startDate)} - ${fmtDate(endDate)}`;
-  // Home Day counts calendar days; everything else counts weekdays.
+  // Home Day counts weekend days; everything else counts weekdays.
   const countStr = halfDay ? '0.5 days'
-    : type === 'Home Day' ? `${dayCount} calendar day${dayCount === 1 ? '' : 's'}`
+    : type === 'Home Day' ? `${dayCount} weekend day${dayCount === 1 ? '' : 's'}`
     : `${dayCount} weekday${dayCount === 1 ? '' : 's'}`;
   const cleanNote = sanitiseNote(note);
   const noteLine  = cleanNote ? `Employee note: ${cleanNote}` : '';
@@ -371,14 +389,21 @@ export async function onRequestPost(context) {
       return json({ ok: false, error: 'A single request may not span more than 60 days.' }, 400);
     }
 
-    // Home Day: counts calendar days, allowed any day of week including weekends.
-    // Vacation: must contain at least one weekday (weekdays-only policy).
+    // Home Day: WEEKENDS ONLY (Sat/Sun). Reject if the span contains any weekday.
+    // Day count = number of weekend days in the span.
+    // Vacation: weekdays only; must contain at least one.
     // Sick / Other / Personal: count weekdays; reject all-weekend spans.
     let dayCount;
     if (halfDay) {
       dayCount = 0.5;
     } else if (type === 'Home Day') {
-      dayCount = calendarDays(startDate, endDate); // always >= 1
+      if (countWeekdays(startDate, endDate) > 0) {
+        return json({ ok: false, error: 'Home Days are for weekends. Use Vacation for weekdays.' }, 400);
+      }
+      dayCount = countWeekendDays(startDate, endDate);
+      if (dayCount <= 0) {
+        return json({ ok: false, error: 'Home Day request must include at least one Saturday or Sunday.' }, 400);
+      }
     } else {
       dayCount = countWeekdays(startDate, endDate);
       if (dayCount <= 0) {

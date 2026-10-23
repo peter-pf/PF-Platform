@@ -78,7 +78,12 @@ export async function onRequestGet(context) {
 
     ({ from, to } = clampRange(from, to));
 
-    // uid is returned for client-side employee grouping.
+    // uid is selected server-side for grouping only; it is NEVER returned to
+    // the client (security fix: uid must not be exposed to the whole crew —
+    // see gate fix-round hardening item #6). Instead, each distinct uid is
+    // mapped to an opaque response-local key ('p1', 'p2', ...) that clients
+    // use for grouping without knowing the underlying uid.
+    //
     // type is NOT returned raw (privacy); instead a display label is derived:
     //   Vacation  → 'Vacation'  (crew can plan around named vacation)
     //   Home Day  → 'Home'      (crew can plan around home days)
@@ -92,11 +97,21 @@ export async function onRequestGet(context) {
                 ORDER BY start_date ASC, name ASC`)
       .bind(to, from).all();
 
-    const absences = (results || []).map(({ type: t, ...r }) => {
+    // Build opaque per-person key map: uid never leaves the server.
+    const uidToKey = new Map();
+    let personCounter = 0;
+
+    const absences = (results || []).map(({ uid: rowUid, type: t, ...r }) => {
+      if (!uidToKey.has(rowUid)) {
+        personCounter++;
+        uidToKey.set(rowUid, `p${personCounter}`);
+      }
+      const personKey = uidToKey.get(rowUid);
       const label = t === 'Vacation' ? 'Vacation'
                   : t === 'Home Day'  ? 'Home'
                   : 'Out';
-      return { ...r, label };
+      // uid is intentionally NOT spread into the response (destructured out above)
+      return { ...r, personKey, label };
     });
 
     return json({ ok: true, from, to, absences, jobs: [] });
