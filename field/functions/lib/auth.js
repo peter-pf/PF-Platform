@@ -518,6 +518,7 @@ const PAGE_AREAS = {
 const FIELD_PAGES = {
   '/daily-production.html':  'field_ops',         // daily logs / production
   '/schedule.html':          'schedule',          // crew schedule (operational)
+  '/schedule':               'schedule',          // CF Pages clean-URL form (308 from .html)
   // Field Companion (AI field-search) standalone page. field_ops area =
   // admin/partner/business_dev/field_ops so crew, BD, partners AND admins can
   // deep-link straight to the tool. WITHOUT this it fell to the default
