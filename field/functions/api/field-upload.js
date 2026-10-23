@@ -55,20 +55,29 @@ const ALLOWED_EXT = new Set(['.guh', '.jpg', '.jpeg', '.png', '.heic', '.pdf', '
 
 // bucket key -> the human folder name created under the dated upload folder.
 // handlogs + guhma go under the QAQC dated path (DFR area).
-// grade_photo + proof_roll are used by the Site Readiness Form (2026-10-20) and
-// go under <projectFolder>/Site Readiness/<YYYY-MM-DD>/ (not the QAQC tree).
-// photos: site photos from either form -> <projectFolder>/05 - Field/02 - Project Photos/<date>/
+// grade_photo + proof_roll + staking_photo + sr_markup + sr_signature are used
+// by the Site Readiness Form and go under <projectFolder>/Site Readiness/<YYYY-MM-DD>/.
+// safety_cert goes under <projectFolder>/06 - Safety/<YYYY-MM-DD>/.
+// photos: site photos -> <projectFolder>/05 - Field/02 - Project Photos/<date>/.
 const BUCKETS = {
-  handlogs:    'Hand Logs',
-  guhma:       'GUHMA Data',
-  grade_photo: 'Grade Photo',
-  proof_roll:  'Proof Roll Letter',
-  photos:      'Site Photos',
+  handlogs:     'Hand Logs',
+  guhma:        'GUHMA Data',
+  grade_photo:  'Grade Photo',
+  proof_roll:   'Proof Roll Letter',
+  photos:       'Site Photos',
+  staking_photo: 'Staking Photos',
+  safety_cert:  'Safety Certs',
+  sr_markup:    'Site Plan Markup',
+  sr_signature: 'Signatures',
 };
 
 // Buckets that belong under the Site Readiness folder tree instead of QAQC.
-const SR_BUCKETS = new Set(['grade_photo', 'proof_roll']);
+const SR_BUCKETS = new Set(['grade_photo', 'proof_roll', 'staking_photo', 'sr_markup', 'sr_signature']);
 const SR_SUBFOLDER = 'Site Readiness';
+
+// Buckets that go into the project safety folder (06 - Safety).
+// Created additively if missing; files never overwritten (conflictBehavior=rename).
+const SAFETY_BUCKETS = new Set(['safety_cert']);
 
 // Buckets that go into the real project photos folder under 05 - Field.
 // Verified 2026-10-21: both active projects (26-022 DFS Grain, 25-026 Granary)
@@ -250,8 +259,12 @@ async function ensureChildFolder(env, token, parentId, name) {
 // QAQC path (handlogs, guhma):
 //   <projectFolder>/03 - Engineering & Design/QAQC/<reportDate>/<bucket folder>
 //
-// Site Readiness path (grade_photo, proof_roll):
+// Site Readiness path (grade_photo, proof_roll, staking_photo, sr_markup, sr_signature):
 //   <projectFolder>/Site Readiness/<reportDate>/<bucket folder>
+//
+// Safety path (safety_cert):
+//   <projectFolder>/06 - Safety/<reportDate>/<bucket folder>
+//   The 06 - Safety folder is created additively if missing; files never overwritten.
 //
 // Site Photos path (photos):
 //   <projectFolder>/05 - Field/02 - Project Photos/<reportDate>/
@@ -261,6 +274,15 @@ async function ensureDestination(env, token, projectFolderId, reportDate, bucket
   if (SR_BUCKETS.has(bucketKey)) {
     const sr = await ensureChildFolder(env, token, projectFolderId, SR_SUBFOLDER);
     const dated = await ensureChildFolder(env, token, sr, reportDate);
+    const bucket = await ensureChildFolder(env, token, dated, bucketFolder);
+    return bucket;
+  }
+  if (SAFETY_BUCKETS.has(bucketKey)) {
+    // Safety certs go into <projectFolder>/06 - Safety/<date>/<bucket folder>.
+    // The safety folder is created additively (ensureChildFolder uses conflictBehavior=fail
+    // for folder creation, so concurrent creates collapse and existing folders are reused).
+    const safety = await ensureChildFolder(env, token, projectFolderId, '06 - Safety');
+    const dated = await ensureChildFolder(env, token, safety, reportDate);
     const bucket = await ensureChildFolder(env, token, dated, bucketFolder);
     return bucket;
   }

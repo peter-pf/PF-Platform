@@ -67,12 +67,12 @@ function resolveRecipients(env) {
 }
 
 // ---------------------------------------------------------------------------
-const MAX_BODY_BYTES = 32 * 1024;
+const MAX_BODY_BYTES = 64 * 1024;  // bumped 32->64 to accommodate new fields + extra refs
 const MAX_RECORDS   = 20000;
 const MAX_STR       = 2000;   // note / address / contact cap
 const MAX_SHORT     = 300;    // name / project / date cap
-const MAX_ITEMS     = 20;     // more than enough for 11 items
-const MAX_ATTACH    = 30;     // attachment refs cap
+const MAX_ITEMS     = 20;     // more than enough for current 14 items
+const MAX_ATTACH    = 60;     // bumped 30->60 for new bucket types (markup, sigs, safety)
 
 const VALID_ANSWERS = { 'Yes': 1, 'No': 1, 'N/A': 1 };
 const VALID_ITEM_KEYS = new Set(CHECKLIST_ITEMS.map((d) => d.key));
@@ -129,11 +129,46 @@ function cleanItems(input) {
   return out;
 }
 
+// Rebuild a clean 4b-detail sub-items object from client input.
+// { unloadStreet, overheadUtils, specialNotes } — free text, no XSS via s().
+function cleanItem4bDetail(input) {
+  if (!input || typeof input !== 'object') return { unloadStreet: '', overheadUtils: '', specialNotes: '' };
+  return {
+    unloadStreet:  s(input.unloadStreet,  MAX_STR),
+    overheadUtils: s(input.overheadUtils, MAX_STR),
+    specialNotes:  s(input.specialNotes,  MAX_STR),
+  };
+}
+
+// Rebuild a clean ops sign-off record for stone/spoils placement.
+function cleanOpsSignoffItem(input) {
+  if (!input || typeof input !== 'object') return { desc: '', superName: '', pfMgrName: '' };
+  return {
+    desc:      s(input.desc,      MAX_STR),
+    superName: s(input.superName, MAX_SHORT),
+    pfMgrName: s(input.pfMgrName, MAX_SHORT),
+  };
+}
+
+// Rebuild clean ops sign-offs for stone + spoils placement.
+function cleanOpsSignoffs(input) {
+  if (!input || typeof input !== 'object') {
+    return { stonePlacement: cleanOpsSignoffItem(null), spoilsPlacement: cleanOpsSignoffItem(null) };
+  }
+  return {
+    stonePlacement:  cleanOpsSignoffItem(input.stonePlacement),
+    spoilsPlacement: cleanOpsSignoffItem(input.spoilsPlacement),
+  };
+}
+
 // Rebuild a clean attachments array from client input (SP refs only).
 function cleanAttachments(input) {
   if (!Array.isArray(input)) return [];
   const out = [];
-  const VALID_BUCKETS = { grade_photo: 1, proof_roll: 1, photos: 1 };
+  const VALID_BUCKETS = {
+    grade_photo: 1, proof_roll: 1, photos: 1,
+    staking_photo: 1, safety_cert: 1, sr_markup: 1, sr_signature: 1,
+  };
   for (const a of input.slice(0, MAX_ATTACH)) {
     if (!a || typeof a !== 'object') continue;
     const name   = s(a.name, MAX_SHORT);
@@ -166,6 +201,10 @@ function buildBody(src, base) {
     attachments: src.attachments != null ? cleanAttachments(src.attachments) : (base.attachments || []),
     sigName:     s(src.sigName != null ? src.sigName : base.sigName, MAX_SHORT),
     sigDate:     isoDateOrToday(src.sigDate != null ? src.sigDate : base.sigDate),
+    // 4b sub-items (unload/load questions). Falls back to empty on legacy records.
+    item4bDetail: cleanItem4bDetail(src.item4bDetail != null ? src.item4bDetail : (base.item4bDetail || null)),
+    // Stone/spoils placement sign-offs. Falls back to empty on legacy records.
+    opsSignoffs: cleanOpsSignoffs(src.opsSignoffs != null ? src.opsSignoffs : (base.opsSignoffs || null)),
     // Computed from items (server-set, never trusted from client).
     result,
     openItems,

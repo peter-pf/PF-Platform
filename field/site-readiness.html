@@ -103,6 +103,17 @@
   #srDraftStatus .ds-sep{color:var(--border);margin:0 2px;}
   #srDraftStatus .ds-saved{color:var(--green);}
   #srDraftStatus .ds-unsaved{color:var(--text-3);}
+  /* ---- 4b detail sub-items ---- */
+  #mod-sr .sr-4b-detail{margin:8px 0 4px 0;padding:8px 10px;background:rgba(0,109,176,.05);border-left:3px solid var(--accent);border-radius:0 4px 4px 0;}
+  #mod-sr .sr-4b-detail-h{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-3);margin-bottom:6px;}
+  #mod-sr .sr-4b-row{margin-bottom:6px;}
+  #mod-sr .sr-4b-row label{font-size:12px;color:var(--text-2);margin-bottom:3px;display:block;}
+  #mod-sr .sr-4b-inp{width:100%;}
+  /* ---- Photo count warning ---- */
+  #srPhotoCount.warn{color:var(--amber);font-weight:600;}
+  #srPhotoCount.ok{color:var(--green);}
+  /* ---- Markup tools ---- */
+  .sr-markup-tools{display:flex;}
   /* ---- Responsive ---- */
   @media(max-width:460px){
     #mod-sr .sr-grid{grid-template-columns:1fr;}
@@ -224,7 +235,12 @@
           <div><label>Date</label><input type="date" id="srDate"></div>
           <div><label>GC / Site Contact</label><input type="text" id="srGcContact" placeholder="Name or company"></div>
           <div><label>Site Address</label><input type="text" id="srSiteAddress" placeholder="Project site address"></div>
-          <div><label>Inspected By</label><input type="text" id="srInspectedBy" placeholder="Auto-filled from login" readonly></div>
+          <div>
+            <label>Inspected By</label>
+            <input type="text" id="srInspectedBy" list="srInspectedByList"
+              placeholder="Your name (editable)" autocomplete="off">
+            <datalist id="srInspectedByList"></datalist>
+          </div>
         </div>
 
         <!-- Live result banner -->
@@ -235,11 +251,112 @@
 
         <!-- Site Photos -->
         <div class="sr-section-h">Site Photos <span style="font-size:11px;color:var(--text-3);font-weight:400">(upload to 05&nbsp;Field / 02&nbsp;Project Photos)</span></div>
+        <div style="font-size:12px;color:var(--text-3);margin-bottom:6px">
+          Minimum 10 pictures of the site and building pad, including (2) from each corner of the building.
+          Tag corner photos by including "corner" in the filename.
+        </div>
         <div id="srUpPhotos">
           <div class="sr-up-hint" id="srPhotoHint">Select a project first to enable photo uploads. Allowed: .jpg .jpeg .png .heic, up to 50MB each.</div>
+          <div id="srPhotoCount" style="font-size:12px;margin:4px 0;display:none"></div>
           <input type="file" id="srFilePhotos" multiple accept=".jpg,.jpeg,.png,.heic" disabled>
           <div class="sr-up-list" id="srPhotoList"></div>
           <div class="sr-up-msg" id="srPhotoMsg"></div>
+        </div>
+
+        <!-- Stone & Spoils Placement Sign-offs -->
+        <div class="sr-section-h">Stone &amp; Spoils Placement Sign-offs</div>
+        <div style="font-size:12px;color:var(--text-3);margin-bottom:8px">
+          Discuss stone and spoils locations with the site superintendent, mark the site plan, and capture signatures.
+          Upload a photo or screenshot of the site plan, then draw on it with the markup tool.
+          Signatures are saved as PNGs to the project's Site Readiness SharePoint folder.
+        </div>
+
+        <div class="sr-card" style="margin-bottom:10px">
+          <div style="font-weight:700;font-size:13px;margin-bottom:8px">i. Stone Placement Location</div>
+          <label>Location description</label>
+          <textarea id="srStoneDesc" rows="2" placeholder="Describe agreed stone placement location..."></textarea>
+          <div style="margin-top:8px">
+            <label>Site plan markup — upload an image/screenshot of the site plan, then draw on it</label>
+            <input type="file" id="srMarkupStoneImg" accept=".jpg,.jpeg,.png,.heic" style="margin-bottom:6px">
+            <div id="srMarkupStoneWrap" style="display:none;position:relative;border:1px solid var(--border);border-radius:6px;overflow:hidden;touch-action:none;user-select:none;">
+              <canvas id="srMarkupStoneCanvas" style="display:block;width:100%;cursor:crosshair;touch-action:none"></canvas>
+            </div>
+            <div class="sr-markup-tools" id="srMarkupStoneTools" style="display:none;gap:6px;flex-wrap:wrap;margin-top:6px">
+              <button type="button" class="btn btn-sm" onclick="window.srMarkupUndo('stone')">Undo</button>
+              <button type="button" class="btn btn-sm" onclick="window.srMarkupClear('stone')">Clear</button>
+              <button type="button" class="btn btn-sm" data-color="rgba(255,230,0,0.65)" onclick="window.srMarkupColor('stone',this)">Yellow</button>
+              <button type="button" class="btn btn-sm" data-color="rgba(0,109,176,0.75)" onclick="window.srMarkupColor('stone',this)">Blue</button>
+              <button type="button" class="btn btn-sm" data-color="rgba(229,83,75,0.75)" onclick="window.srMarkupColor('stone',this)">Red</button>
+              <button type="button" class="btn btn-sm" onclick="window.srMarkupSave('stone')">Save markup</button>
+            </div>
+            <div id="srMarkupStoneMsg" class="sr-up-msg"></div>
+          </div>
+          <div style="margin-top:10px">
+            <label>Site Superintendent signature</label>
+            <div><input type="text" id="srStoneSuperName" placeholder="Printed name of superintendent" style="margin-bottom:6px"></div>
+            <canvas id="srSigStoneSuper" width="400" height="120"
+              style="border:1px solid var(--border);border-radius:6px;touch-action:none;cursor:crosshair;display:block;width:100%;max-width:400px;background:var(--surface-3)"></canvas>
+            <div style="display:flex;gap:6px;margin-top:4px">
+              <button type="button" class="btn btn-sm" onclick="window.srSigClear('stone_super')">Clear sig</button>
+              <button type="button" class="btn btn-sm" onclick="window.srSigSave('stone_super','stone')">Save signature</button>
+            </div>
+            <div id="srSigStoneSuperMsg" class="sr-up-msg"></div>
+          </div>
+          <div style="margin-top:10px">
+            <label>PF Field Ops Mgr signature</label>
+            <div><input type="text" id="srStoneMgrName" placeholder="PF Field Ops Mgr printed name" style="margin-bottom:6px"></div>
+            <canvas id="srSigStoneMgr" width="400" height="120"
+              style="border:1px solid var(--border);border-radius:6px;touch-action:none;cursor:crosshair;display:block;width:100%;max-width:400px;background:var(--surface-3)"></canvas>
+            <div style="display:flex;gap:6px;margin-top:4px">
+              <button type="button" class="btn btn-sm" onclick="window.srSigClear('stone_mgr')">Clear sig</button>
+              <button type="button" class="btn btn-sm" onclick="window.srSigSave('stone_mgr','stone')">Save signature</button>
+            </div>
+            <div id="srSigStoneMgrMsg" class="sr-up-msg"></div>
+          </div>
+        </div>
+
+        <div class="sr-card" style="margin-bottom:10px">
+          <div style="font-weight:700;font-size:13px;margin-bottom:8px">ii. Spoils Placement Location(s)</div>
+          <label>Location description</label>
+          <textarea id="srSpoilsDesc" rows="2" placeholder="Describe agreed spoils placement location(s)..."></textarea>
+          <div style="margin-top:8px">
+            <label>Site plan markup</label>
+            <input type="file" id="srMarkupSpoilsImg" accept=".jpg,.jpeg,.png,.heic" style="margin-bottom:6px">
+            <div id="srMarkupSpoilsWrap" style="display:none;position:relative;border:1px solid var(--border);border-radius:6px;overflow:hidden;touch-action:none;user-select:none;">
+              <canvas id="srMarkupSpoilsCanvas" style="display:block;width:100%;cursor:crosshair;touch-action:none"></canvas>
+            </div>
+            <div class="sr-markup-tools" id="srMarkupSpoilsTools" style="display:none;gap:6px;flex-wrap:wrap;margin-top:6px">
+              <button type="button" class="btn btn-sm" onclick="window.srMarkupUndo('spoils')">Undo</button>
+              <button type="button" class="btn btn-sm" onclick="window.srMarkupClear('spoils')">Clear</button>
+              <button type="button" class="btn btn-sm" data-color="rgba(255,230,0,0.65)" onclick="window.srMarkupColor('spoils',this)">Yellow</button>
+              <button type="button" class="btn btn-sm" data-color="rgba(0,109,176,0.75)" onclick="window.srMarkupColor('spoils',this)">Blue</button>
+              <button type="button" class="btn btn-sm" data-color="rgba(229,83,75,0.75)" onclick="window.srMarkupColor('spoils',this)">Red</button>
+              <button type="button" class="btn btn-sm" onclick="window.srMarkupSave('spoils')">Save markup</button>
+            </div>
+            <div id="srMarkupSpoilsMsg" class="sr-up-msg"></div>
+          </div>
+          <div style="margin-top:10px">
+            <label>Site Superintendent signature</label>
+            <div><input type="text" id="srSpoilsSuperName" placeholder="Printed name of superintendent" style="margin-bottom:6px"></div>
+            <canvas id="srSigSpoilsSuper" width="400" height="120"
+              style="border:1px solid var(--border);border-radius:6px;touch-action:none;cursor:crosshair;display:block;width:100%;max-width:400px;background:var(--surface-3)"></canvas>
+            <div style="display:flex;gap:6px;margin-top:4px">
+              <button type="button" class="btn btn-sm" onclick="window.srSigClear('spoils_super')">Clear sig</button>
+              <button type="button" class="btn btn-sm" onclick="window.srSigSave('spoils_super','spoils')">Save signature</button>
+            </div>
+            <div id="srSigSpoilsSuperMsg" class="sr-up-msg"></div>
+          </div>
+          <div style="margin-top:10px">
+            <label>PF Field Ops Mgr signature</label>
+            <div><input type="text" id="srSpoilsMgrName" placeholder="PF Field Ops Mgr printed name" style="margin-bottom:6px"></div>
+            <canvas id="srSigSpoilsMgr" width="400" height="120"
+              style="border:1px solid var(--border);border-radius:6px;touch-action:none;cursor:crosshair;display:block;width:100%;max-width:400px;background:var(--surface-3)"></canvas>
+            <div style="display:flex;gap:6px;margin-top:4px">
+              <button type="button" class="btn btn-sm" onclick="window.srSigClear('spoils_mgr')">Clear sig</button>
+              <button type="button" class="btn btn-sm" onclick="window.srSigSave('spoils_mgr','spoils')">Save signature</button>
+            </div>
+            <div id="srSigSpoilsMgrMsg" class="sr-up-msg"></div>
+          </div>
         </div>
 
         <!-- Sign-off -->
@@ -366,7 +483,7 @@ try {
     { key: '2b', section: '2', secLabel: '2. Utilities',
       label: 'Public utilities located and marked (PF)' },
     { key: '2c', section: '2', secLabel: '2. Utilities',
-      label: "No new utilities within 10' of pad until PF scope complete" },
+      label: "No new underground utilities installed within 10' of building pad until PF scope complete" },
     { key: '3a', section: '3', secLabel: '3. Building Pad',
       label: 'At working grade elevation per GC (variance >3" may be change order)',
       uploadBucket: 'grade_photo', uploadLabel: 'Grade stake / elevation photo' },
@@ -377,12 +494,19 @@ try {
     { key: '3d', section: '3', secLabel: '3. Building Pad',
       label: 'Proof rolled and inspected by 3rd party testing agency',
       uploadBucket: 'proof_roll', uploadLabel: 'Passing proof-roll letter from 3rd party' },
+    { key: '3e', section: '3', secLabel: '3. Building Pad',
+      label: 'Staking & Layout: building pad has been staked',
+      uploadBucket: 'staking_photo', uploadLabel: 'Staking & layout photos' },
     { key: '4a', section: '4', secLabel: '4. PF General Operations',
       label: "Stone delivery plan: 200-300 TN/day, dumped within ~50' of work" },
     { key: '4b', section: '4', secLabel: '4. PF General Operations',
-      label: 'Lowboy access for mob/demob confirmed (or GC notified of constraints)' },
+      label: 'Lowboy access for mob/demob: plan to unload/load equipment discussed with GC',
+      has4bDetail: true },
     { key: '4c', section: '4', secLabel: '4. PF General Operations',
       label: 'Field Ops Manager jobsite visit completed prior to mob' },
+    { key: '4d', section: '4', secLabel: '4. PF General Operations',
+      label: 'Safety training / videos completed by crew before starting work onsite',
+      uploadBucket: 'safety_cert', uploadLabel: 'Safety certs or completion docs' },
   ];
 
   /* ---- offline draft ---- */
@@ -466,6 +590,8 @@ try {
   // Allowed file types for site readiness uploads.
   var UP_ALLOWED = ['.jpg', '.jpeg', '.png', '.heic', '.pdf'];
   var UP_MAX_BYTES = 50 * 1024 * 1024;
+  // Allowed for safety certs only (includes zip/xlsx for cert packages).
+  var UP_SAFETY_ALLOWED = ['.jpg', '.jpeg', '.png', '.heic', '.pdf', '.zip', '.xlsx'];
 
   var state = {
     records: [],
@@ -475,8 +601,15 @@ try {
     items: ITEMS.map(function (d) { return { key: d.key, answer: '', note: '' }; }),
     // attachments: [{key, name, itemId, webUrl, bucket}] — refs from /api/field-upload
     attachments: [],
-    // pending uploads per bucket key: { grade_photo: [{name, error?}], proof_roll: [...] }
+    // pending uploads per bucket key
     pendingUploads: {},
+    // 4b sub-items
+    item4bDetail: { unloadStreet: '', overheadUtils: '', specialNotes: '' },
+    // stone/spoils placement sign-offs
+    opsSignoffs: {
+      stonePlacement:  { desc: '', superName: '', pfMgrName: '' },
+      spoilsPlacement: { desc: '', superName: '', pfMgrName: '' },
+    },
   };
 
   function api(path, opts) {
@@ -587,7 +720,22 @@ try {
           var bk = def.uploadBucket;
           var bkAttach = state.attachments.filter(function (a) { return a.bucket === bk; });
           var bkPending = state.pendingUploads[bk] || [];
-          html += renderUploadWidget(def.key, bk, def.uploadLabel, bkAttach, bkPending);
+          var bkAllowed = (bk === 'safety_cert') ? UP_SAFETY_ALLOWED : UP_ALLOWED;
+          html += renderUploadWidget(def.key, bk, def.uploadLabel, bkAttach, bkPending, bkAllowed);
+        }
+
+        // 4b detail sub-items.
+        if (def.has4bDetail) {
+          var d4b = state.item4bDetail || {};
+          html += '<div class="sr-4b-detail">';
+          html += '<div class="sr-4b-detail-h">Items to discuss with GC:</div>';
+          html += '<div class="sr-4b-row"><label>Unload on street? Plates / curbs needed?</label>';
+          html += '<input type="text" class="sr-4b-inp" data-4b-field="unloadStreet" value="' + E(d4b.unloadStreet||'') + '" placeholder="Notes..."></div>';
+          html += '<div class="sr-4b-row"><label>Any overhead utilities in the way?</label>';
+          html += '<input type="text" class="sr-4b-inp" data-4b-field="overheadUtils" value="' + E(d4b.overheadUtils||'') + '" placeholder="Notes..."></div>';
+          html += '<div class="sr-4b-row"><label>Special notes about getting in and out of the jobsite</label>';
+          html += '<input type="text" class="sr-4b-inp" data-4b-field="specialNotes" value="' + E(d4b.specialNotes||'') + '" placeholder="Notes..."></div>';
+          html += '</div>';
         }
 
         html += '</div>'; // .sr-item
@@ -635,15 +783,26 @@ try {
         });
       }
     });
+    // Wire 4b detail text inputs.
+    host.querySelectorAll('input.sr-4b-inp').forEach(function (el) {
+      if (!el.dataset.wired) {
+        el.dataset.wired = '1';
+        el.addEventListener('input', function () {
+          var f = this.getAttribute('data-4b-field');
+          if (f && state.item4bDetail) state.item4bDetail[f] = this.value;
+        });
+      }
+    });
     updateUploadEnabled();
     updateResultBanner();
   }
 
-  function renderUploadWidget(itemKey, bucket, uploadLabel, attached, pending) {
+  function renderUploadWidget(itemKey, bucket, uploadLabel, attached, pending, allowedTypes) {
+    var ext = (allowedTypes || UP_ALLOWED).join(',');
     var inputId = 'srFile_' + bucket;
     var html = '<div class="sr-upload">';
     html += '<div class="sr-up-hint">' + E(uploadLabel) + '</div>';
-    html += '<input type="file" id="' + E(inputId) + '" data-bucket="' + E(bucket) + '" data-item-key="' + E(itemKey) + '" accept="' + E(UP_ALLOWED.join(',')) + '" disabled>';
+    html += '<input type="file" id="' + E(inputId) + '" data-bucket="' + E(bucket) + '" data-item-key="' + E(itemKey) + '" accept="' + E(ext) + '"' + (bucket === 'safety_cert' ? ' multiple' : '') + ' disabled>';
     // Saved refs.
     var listHtml = '';
     attached.forEach(function (a) {
@@ -693,6 +852,7 @@ try {
     var date = dateEl ? String(dateEl.value || '').trim() : '';
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) { upMsg(bucket, 'Set the date first.', false); return; }
 
+    var allowedExt = (bucket === 'safety_cert') ? UP_SAFETY_ALLOWED : UP_ALLOWED;
     var accepted = 0;
     var pending = [];
     var fd = new FormData();
@@ -705,7 +865,7 @@ try {
       var n = String(f.name || '').toLowerCase();
       var dot = n.lastIndexOf('.');
       var ext = dot >= 0 ? n.slice(dot) : '';
-      if (UP_ALLOWED.indexOf(ext) < 0) { pending.push({ name: f.name, error: 'type not allowed' }); return; }
+      if (allowedExt.indexOf(ext) < 0) { pending.push({ name: f.name, error: 'type not allowed' }); return; }
       if (f.size > UP_MAX_BYTES) { pending.push({ name: f.name, error: 'over 50MB' }); return; }
       fd.append('file', f, f.name);
       pending.push({ name: f.name });
@@ -775,6 +935,26 @@ try {
     }
   }
 
+  function isCornerPhoto(name) {
+    return /corner/i.test(String(name || ''));
+  }
+
+  function renderPhotoCount() {
+    var cnt = (state.photoAttachments || []).length;
+    var corners = (state.photoAttachments || []).filter(function(a){ return isCornerPhoto(a.name); }).length;
+    var cntEl = document.getElementById('srPhotoCount');
+    if (!cntEl) return;
+    if (cnt === 0) { cntEl.style.display = 'none'; return; }
+    cntEl.style.display = 'block';
+    var ok = cnt >= 10 && corners >= 8;
+    cntEl.className = ok ? 'ok' : 'warn';
+    var msg = cnt + ' photo' + (cnt === 1 ? '' : 's') + ' uploaded';
+    if (corners > 0) msg += ' (' + corners + ' corner)';
+    if (cnt < 10) msg += ' — need at least 10 total';
+    if (corners < 8) msg += '; at least 8 corner shots recommended';
+    cntEl.textContent = msg;
+  }
+
   function renderPhotoList(pending) {
     var host = document.getElementById('srPhotoList');
     if (!host) return;
@@ -783,7 +963,8 @@ try {
       var nm = E(a.name || a.itemId || 'file');
       var link = (a.webUrl && /^https?:\/\//i.test(a.webUrl))
         ? '<a href="' + E(a.webUrl) + '" target="_blank" rel="noopener">' + nm + '</a>' : nm;
-      html += '<div class="sr-up-row done"><span class="sr-up-name">' + link + '</span><span class="sr-up-stat">uploaded</span></div>';
+      var corner = isCornerPhoto(a.name) ? ' <span style="font-size:10px;color:var(--accent)">[corner]</span>' : '';
+      html += '<div class="sr-up-row done"><span class="sr-up-name">' + link + corner + '</span><span class="sr-up-stat">uploaded</span></div>';
     });
     (pending || []).forEach(function (p) {
       var cls = p.error ? 'err' : '';
@@ -791,6 +972,7 @@ try {
       html += '<div class="sr-up-row ' + cls + '"><span class="sr-up-name">' + E(p.name) + '</span><span class="sr-up-stat">' + stat + '</span></div>';
     });
     host.innerHTML = html;
+    renderPhotoCount();
   }
 
   function photoMsg(text, ok) {
@@ -832,7 +1014,15 @@ try {
         body.refs.forEach(function (r) {
           (state.photoAttachments || (state.photoAttachments = [])).push({ name: r.name, itemId: r.itemId, webUrl: r.webUrl, bucket: 'photos' });
         });
-        renderPhotoList([]); photoMsg(body.refs.length + ' uploaded.', true);
+        renderPhotoList([]);
+        var cnt = (state.photoAttachments || []).length;
+        var corners = (state.photoAttachments || []).filter(function(a){ return isCornerPhoto(a.name); }).length;
+        var warnParts = [];
+        if (cnt < 10) warnParts.push(cnt + ' uploaded (min 10 required)');
+        else photoMsg(body.refs.length + ' uploaded.', true);
+        if (corners < 8) warnParts.push(corners + ' corner shots (min 8 recommended — include "corner" in filename)');
+        if (warnParts.length) photoMsg(warnParts.join('; '), null);
+        else if (cnt >= 10) photoMsg(body.refs.length + ' uploaded. ✓ Meets minimum.', true);
       } else {
         renderPhotoList([]); photoMsg((body && body.message) || 'Upload failed.', false);
       }
@@ -890,6 +1080,7 @@ try {
     var inspected = document.getElementById('srInspectedBy');
     var sigName   = document.getElementById('srSigName');
     var sigDate   = document.getElementById('srSigDate');
+    function gv(id){ var el=document.getElementById(id); return el ? el.value : ''; }
     return {
       projectId:   pid,
       projectName: pname,
@@ -901,6 +1092,19 @@ try {
       attachments: state.attachments.slice().concat(state.photoAttachments || []),
       sigName:     (sigName || {}).value || '',
       sigDate:     (sigDate || {}).value || '',
+      item4bDetail: Object.assign({}, state.item4bDetail),
+      opsSignoffs: {
+        stonePlacement: {
+          desc:      gv('srStoneDesc'),
+          superName: gv('srStoneSuperName'),
+          pfMgrName: gv('srStoneMgrName'),
+        },
+        spoilsPlacement: {
+          desc:      gv('srSpoilsDesc'),
+          superName: gv('srSpoilsSuperName'),
+          pfMgrName: gv('srSpoilsMgrName'),
+        },
+      },
     };
   }
 
@@ -976,7 +1180,11 @@ try {
     state.pendingUploads = {};
     state.photoAttachments = [];
     state.items = ITEMS.map(function (d) { return { key: d.key, answer: '', note: '' }; });
-    ['srProject', 'srProjectId', 'srDate', 'srGcContact', 'srSiteAddress', 'srSigName', 'srSigDate'].forEach(function (id) {
+    state.item4bDetail = { unloadStreet: '', overheadUtils: '', specialNotes: '' };
+    state.opsSignoffs = { stonePlacement: { desc:'', superName:'', pfMgrName:'' }, spoilsPlacement: { desc:'', superName:'', pfMgrName:'' } };
+    ['srProject', 'srProjectId', 'srDate', 'srGcContact', 'srSiteAddress', 'srSigName', 'srSigDate',
+     'srStoneDesc', 'srStoneSuperName', 'srStoneMgrName',
+     'srSpoilsDesc', 'srSpoilsSuperName', 'srSpoilsMgrName'].forEach(function (id) {
       var el = document.getElementById(id); if (el) el.value = '';
     });
     // Clear picker display
@@ -986,10 +1194,13 @@ try {
     if (dd) { var today=new Date(); dd.value=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0'); }
     // Restore last job
     try { var lastJob=localStorage.getItem('pf-last-job'); if(lastJob){srPickerSetValue(lastJob);var hid2=document.getElementById('srProjectId');if(hid2)hid2.value=lastJob;} } catch(e) {}
-    // inspectedBy is auto-filled from session — re-apply.
+    // inspectedBy defaults to signed-in user; editable.
     var ib = document.getElementById('srInspectedBy');
     if (ib && window.PF_ME) ib.value = window.PF_ME.name || '';
+    // Clear canvas markup/sig
+    srMarkupResetAll();
     renderPhotoList([]);
+    renderPhotoCount();
     photoMsg('', null);
     updatePhotosEnabled();
     updateDraftBanner(null);
@@ -1030,7 +1241,30 @@ try {
     state.photoAttachments = allAtt.filter(function (a) { return a.bucket === 'photos'; });
     state.pendingUploads = {};
 
+    // Restore 4b detail.
+    var d4b = r.item4bDetail || {};
+    state.item4bDetail = { unloadStreet: d4b.unloadStreet||'', overheadUtils: d4b.overheadUtils||'', specialNotes: d4b.specialNotes||'' };
+
+    // Restore ops sign-offs text fields.
+    var ops = r.opsSignoffs || {};
+    var stn = ops.stonePlacement  || {};
+    var spl = ops.spoilsPlacement || {};
+    state.opsSignoffs = {
+      stonePlacement:  { desc: stn.desc||'', superName: stn.superName||'', pfMgrName: stn.pfMgrName||'' },
+      spoilsPlacement: { desc: spl.desc||'', superName: spl.superName||'', pfMgrName: spl.pfMgrName||'' },
+    };
+    function sv2(id, v) { var el=document.getElementById(id); if(el) el.value=v||''; }
+    sv2('srStoneDesc',      stn.desc);
+    sv2('srStoneSuperName', stn.superName);
+    sv2('srStoneMgrName',   stn.pfMgrName);
+    sv2('srSpoilsDesc',      spl.desc);
+    sv2('srSpoilsSuperName', spl.superName);
+    sv2('srSpoilsMgrName',   spl.pfMgrName);
+
+    srMarkupResetAll(); // canvas state cannot be restored from PNG; user re-draws if needed
+
     renderPhotoList([]);
+    renderPhotoCount();
     photoMsg('', null);
     updatePhotosEnabled();
     updateDraftBanner(r.updatedAt || r.createdAt || null);
@@ -1083,6 +1317,180 @@ try {
     });
   }
 
+  // ---- Markup / Signature canvas tools ------------------------------------
+  var _markupState = {
+    stone:  { ctx: null, strokes: [], color: 'rgba(255,230,0,0.65)', lineWidth: 12, baseImg: null },
+    spoils: { ctx: null, strokes: [], color: 'rgba(255,230,0,0.65)', lineWidth: 12, baseImg: null },
+  };
+  var _sigState = {
+    stone_super:  { ctx: null, drawing: false },
+    stone_mgr:    { ctx: null, drawing: false },
+    spoils_super: { ctx: null, drawing: false },
+    spoils_mgr:   { ctx: null, drawing: false },
+  };
+
+  function _capFirst(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+  function _capAll(key) { return key.split('_').map(_capFirst).join(''); }
+
+  function srMarkupResetAll() {
+    ['stone','spoils'].forEach(function(k) {
+      var st = _markupState[k]; if(!st) return;
+      st.strokes = []; st.baseImg = null; st.ctx = null;
+      var id1 = 'srMarkup' + _capFirst(k) + 'Wrap';
+      var id2 = 'srMarkup' + _capFirst(k) + 'Tools';
+      var w = document.getElementById(id1); if(w) w.style.display = 'none';
+      var t = document.getElementById(id2); if(t) t.style.display = 'none';
+    });
+    ['stone_super','stone_mgr','spoils_super','spoils_mgr'].forEach(function(k) {
+      var cv = document.getElementById('srSig' + _capAll(k));
+      if(cv) { var ctx=cv.getContext('2d'); ctx.clearRect(0,0,cv.width,cv.height); }
+    });
+  }
+
+  function srMarkupInitCanvas(which, img) {
+    var cv   = document.getElementById('srMarkup' + _capFirst(which) + 'Canvas');
+    var wrap = document.getElementById('srMarkup' + _capFirst(which) + 'Wrap');
+    var tools= document.getElementById('srMarkup' + _capFirst(which) + 'Tools');
+    if (!cv || !wrap) return;
+    cv.width  = img.naturalWidth;
+    cv.height = img.naturalHeight;
+    var maxW = (cv.closest('.sr-card') || document.body).offsetWidth - 30;
+    cv.style.width = Math.min(maxW, img.naturalWidth) + 'px';
+    var ctx = cv.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    _markupState[which].ctx = ctx;
+    _markupState[which].strokes = [];
+    _markupState[which].baseImg = img;
+    wrap.style.display = 'block';
+    if(tools) tools.style.display = 'flex';
+    srMarkupWireCanvas(which, cv, ctx);
+  }
+
+  function srMarkupWireCanvas(which, cv, ctx) {
+    if (cv.dataset.markupWired) return;
+    cv.dataset.markupWired = '1';
+    var st = _markupState[which];
+    var drawing = false; var cur = [];
+    function pos(e) {
+      var r = cv.getBoundingClientRect();
+      var sx = cv.width/r.width, sy = cv.height/r.height;
+      var src = e.touches ? e.touches[0] : e;
+      return { x: (src.clientX-r.left)*sx, y: (src.clientY-r.top)*sy };
+    }
+    function start(e) { e.preventDefault(); drawing=true; cur=[pos(e)]; ctx.beginPath(); ctx.moveTo(cur[0].x,cur[0].y); }
+    function move(e)  { if(!drawing) return; e.preventDefault(); var p=pos(e); cur.push(p); ctx.lineTo(p.x,p.y); ctx.strokeStyle=st.color; ctx.lineWidth=st.lineWidth; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.stroke(); }
+    function end(e)   { if(!drawing) return; e.preventDefault(); drawing=false; if(cur.length) st.strokes.push({pts:cur.slice(),color:st.color,lw:st.lineWidth}); cur=[]; }
+    cv.addEventListener('mousedown',start); cv.addEventListener('mousemove',move); cv.addEventListener('mouseup',end); cv.addEventListener('mouseleave',end);
+    cv.addEventListener('touchstart',start,{passive:false}); cv.addEventListener('touchmove',move,{passive:false}); cv.addEventListener('touchend',end,{passive:false});
+  }
+
+  window.srMarkupUndo = function(which) {
+    var st=_markupState[which]; if(!st||!st.ctx) return;
+    if(!st.strokes.length) return; st.strokes.pop();
+    var cv=document.getElementById('srMarkup'+_capFirst(which)+'Canvas'); if(!cv) return;
+    st.ctx.clearRect(0,0,cv.width,cv.height);
+    if(st.baseImg) st.ctx.drawImage(st.baseImg,0,0);
+    st.strokes.forEach(function(s){
+      st.ctx.beginPath(); s.pts.forEach(function(p,i){ if(i===0) st.ctx.moveTo(p.x,p.y); else st.ctx.lineTo(p.x,p.y); });
+      st.ctx.strokeStyle=s.color; st.ctx.lineWidth=s.lw; st.ctx.lineCap='round'; st.ctx.lineJoin='round'; st.ctx.stroke();
+    });
+  };
+  window.srMarkupClear = function(which) {
+    var st=_markupState[which]; if(!st||!st.ctx) return; st.strokes=[];
+    var cv=document.getElementById('srMarkup'+_capFirst(which)+'Canvas'); if(!cv) return;
+    st.ctx.clearRect(0,0,cv.width,cv.height); if(st.baseImg) st.ctx.drawImage(st.baseImg,0,0);
+  };
+  window.srMarkupColor = function(which, btn) { var st=_markupState[which]; if(!st) return; var c=btn.getAttribute('data-color'); if(c) st.color=c; };
+  window.srMarkupSave  = function(which) {
+    var msgId='srMarkup'+_capFirst(which)+'Msg'; var msgEl=document.getElementById(msgId);
+    function mkMsg(t,ok){ if(msgEl){ msgEl.textContent=t; msgEl.className='sr-up-msg '+(ok===true?'ok':(ok===false?'err':'')); } }
+    var num=selectedProjectNumber(); if(!num){ mkMsg('Select a project first.',false); return; }
+    var dateEl=document.getElementById('srDate'); var date=dateEl?dateEl.value:''; if(!date){ mkMsg('Set the date first.',false); return; }
+    var cv=document.getElementById('srMarkup'+_capFirst(which)+'Canvas'); if(!cv){ mkMsg('No canvas.',false); return; }
+    mkMsg('Saving...',null);
+    cv.toBlob(function(blob){
+      if(!blob){ mkMsg('Export failed.',false); return; }
+      var fd=new FormData();
+      fd.append('projectNumber',num); fd.append('projectName',selectedProjectName()); fd.append('bucket','sr_markup'); fd.append('reportDate',date);
+      fd.append('file',blob,'site-plan-markup-'+which+'-'+date+'.png');
+      var xhr=new XMLHttpRequest(); xhr.open('POST','/api/field-upload',true); xhr.withCredentials=true;
+      xhr.onload=function(){ var body=null; try{body=JSON.parse(xhr.responseText);}catch(e){}
+        if(xhr.status>=200&&xhr.status<300&&body&&body.ok&&Array.isArray(body.refs)&&body.refs.length){
+          var r=body.refs[0]; state.attachments.push({key:which+'_markup',name:r.name,itemId:r.itemId,webUrl:r.webUrl,bucket:'sr_markup'}); mkMsg('Markup saved.',true);
+        } else { mkMsg((body&&body.message)||'Save failed.',false); }
+      };
+      xhr.onerror=function(){ mkMsg('Network error.',false); }; xhr.send(fd);
+    },'image/png');
+  };
+
+  function srMarkupWireImageInput(which) {
+    var inp=document.getElementById('srMarkup'+_capFirst(which)+'Img'); if(!inp||inp.dataset.wired) return;
+    inp.dataset.wired='1';
+    inp.addEventListener('change',function(){
+      var file=this.files&&this.files[0]; if(!file) return;
+      var url=URL.createObjectURL(file); var img=new Image();
+      img.onload=function(){ srMarkupInitCanvas(which,img); URL.revokeObjectURL(url); };
+      img.src=url; this.value='';
+    });
+  }
+
+  function srSigInitCanvas(sigKey) {
+    var cv=document.getElementById('srSig'+_capAll(sigKey)); if(!cv||cv.dataset.sigWired) return;
+    cv.dataset.sigWired='1';
+    var ctx=cv.getContext('2d'); _sigState[sigKey].ctx=ctx;
+    var drawing=false;
+    function pos(e){ var r=cv.getBoundingClientRect(); var sx=cv.width/r.width,sy=cv.height/r.height; var src=e.touches?e.touches[0]:e; return{x:(src.clientX-r.left)*sx,y:(src.clientY-r.top)*sy}; }
+    function start(e){ e.preventDefault(); drawing=true; var p=pos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); }
+    function move(e){ if(!drawing) return; e.preventDefault(); var p=pos(e); ctx.lineTo(p.x,p.y); ctx.strokeStyle='#222'; ctx.lineWidth=2.5; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.stroke(); }
+    function end(e){ drawing=false; }
+    cv.addEventListener('mousedown',start); cv.addEventListener('mousemove',move); cv.addEventListener('mouseup',end); cv.addEventListener('mouseleave',end);
+    cv.addEventListener('touchstart',start,{passive:false}); cv.addEventListener('touchmove',move,{passive:false}); cv.addEventListener('touchend',end,{passive:false});
+  }
+  window.srSigClear = function(sigKey) {
+    var cv=document.getElementById('srSig'+_capAll(sigKey)); if(!cv) return;
+    cv.getContext('2d').clearRect(0,0,cv.width,cv.height);
+  };
+  window.srSigSave = function(sigKey, which) {
+    var cv=document.getElementById('srSig'+_capAll(sigKey));
+    var msgEl=document.getElementById('srSig'+_capAll(sigKey)+'Msg');
+    function mkMsg(t,ok){ if(msgEl){ msgEl.textContent=t; msgEl.className='sr-up-msg '+(ok===true?'ok':(ok===false?'err':'')); } }
+    if(!cv){ mkMsg('Canvas not found.',false); return; }
+    var num=selectedProjectNumber(); if(!num){ mkMsg('Select a project first.',false); return; }
+    var dateEl=document.getElementById('srDate'); var date=dateEl?dateEl.value:''; if(!date){ mkMsg('Set the date first.',false); return; }
+    mkMsg('Saving...',null);
+    cv.toBlob(function(blob){
+      if(!blob){ mkMsg('Export failed.',false); return; }
+      if(blob.size>2*1024*1024){ mkMsg('Signature too large (>2MB). Clear and re-sign.',false); return; }
+      var fd=new FormData();
+      fd.append('projectNumber',num); fd.append('projectName',selectedProjectName()); fd.append('bucket','sr_signature'); fd.append('reportDate',date);
+      var parts=sigKey.split('_');
+      fd.append('file',blob,'sig-'+sigKey+'-'+date+'.png');
+      var xhr=new XMLHttpRequest(); xhr.open('POST','/api/field-upload',true); xhr.withCredentials=true;
+      xhr.onload=function(){ var body=null; try{body=JSON.parse(xhr.responseText);}catch(e){}
+        if(xhr.status>=200&&xhr.status<300&&body&&body.ok&&Array.isArray(body.refs)&&body.refs.length){
+          var r=body.refs[0]; state.attachments.push({key:which+'_sig_'+parts[1],name:r.name,itemId:r.itemId,webUrl:r.webUrl,bucket:'sr_signature'}); mkMsg('Signature saved.',true);
+        } else { mkMsg((body&&body.message)||'Save failed.',false); }
+      };
+      xhr.onerror=function(){ mkMsg('Network error.',false); }; xhr.send(fd);
+    },'image/png');
+  };
+
+  function srWireSignaturesAndMarkup() {
+    Object.keys(_sigState).forEach(srSigInitCanvas);
+    ['stone','spoils'].forEach(srMarkupWireImageInput);
+  }
+
+  // ---- Load personnel names for inspectedBy datalist ----------------------
+  function loadPersonnelList() {
+    api('/api/field-lists').then(function(r) {
+      if (!r.ok || !r.body) return;
+      var names = (r.body.personnel || []);
+      var dl = document.getElementById('srInspectedByList');
+      if (!dl || !names.length) return;
+      dl.innerHTML = names.map(function(n){ return '<option value="' + E(n) + '">'; }).join('');
+    }).catch(function(){});
+  }
+
   // ---- Load everything -------------------------------------------------------
   function load() {
     var noData = document.getElementById('srNoData');
@@ -1106,9 +1514,11 @@ try {
         dateEl.value = today.getFullYear() + '-' + mm + '-' + dd;
       }
       wireForm();
+      srWireSignaturesAndMarkup();
       renderProject();
       renderChecklist();
       renderList();
+      loadPersonnelList();
       // Restore last used project if no editing state
       if (!state.editingId) {
         try {
@@ -1119,7 +1529,8 @@ try {
       srCheckOfflineDraft();
     }).catch(function () {
       if (wrap) wrap.style.display = 'block';
-      wireForm(); renderProject(); renderChecklist(); renderList();
+      wireForm(); srWireSignaturesAndMarkup(); renderProject(); renderChecklist(); renderList();
+      loadPersonnelList();
       srCheckOfflineDraft();
     });
   }

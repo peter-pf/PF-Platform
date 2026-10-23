@@ -93,10 +93,53 @@ export function renderSiteReadinessPdf(rec) {
     doc.table(rows, { valueW: 60 });
   }
 
+  // Gather all attachment refs up front (used in 4b/ops sections and the summary).
+  const allAttach = Array.isArray(rec.attachments) ? rec.attachments : [];
+
+  // ---- 4b Detail sub-items --------------------------------------------------
+  const d4b = rec.item4bDetail;
+  if (d4b && (d4b.unloadStreet || d4b.overheadUtils || d4b.specialNotes)) {
+    doc.heading('4b. Equipment Loading/Unloading Detail');
+    const rows4b = [];
+    if (d4b.unloadStreet) rows4b.push({ label: 'Unload on street / plates / curbs', value: d4b.unloadStreet });
+    if (d4b.overheadUtils) rows4b.push({ label: 'Overhead utilities', value: d4b.overheadUtils });
+    if (d4b.specialNotes) rows4b.push({ label: 'Special site access notes', value: d4b.specialNotes });
+    doc.table(rows4b, { valueW: 280 });
+  }
+
+  // ---- Ops sign-offs (stone / spoils placement) ---------------------------
+  const ops = rec.opsSignoffs;
+  if (ops && (ops.stonePlacement || ops.spoilsPlacement)) {
+    doc.heading('Stone & Spoils Placement Sign-offs');
+    const sections4 = [
+      { label: 'Stone Placement Location', item: ops.stonePlacement },
+      { label: 'Spoils Placement Location(s)', item: ops.spoilsPlacement },
+    ];
+    for (const sec of sections4) {
+      if (!sec.item) continue;
+      const rows = [];
+      if (sec.item.desc) rows.push({ label: 'Location description', value: sec.item.desc });
+      if (sec.item.superName) rows.push({ label: 'Site Superintendent', value: sec.item.superName });
+      if (sec.item.pfMgrName) rows.push({ label: 'PF Field Ops Mgr', value: sec.item.pfMgrName });
+      if (rows.length) {
+        doc.text(sec.label, { size: 11, bold: true });
+        doc.table(rows, { valueW: 280 });
+        // Signature / markup refs for this section.
+        const sigRefs = allAttach.filter((a) => a && a.bucket === 'sr_signature' && a.key && a.key.includes(sec.label === 'Stone Placement Location' ? 'stone' : 'spoils'));
+        const mkRefs = allAttach.filter((a) => a && a.bucket === 'sr_markup' && a.key && a.key.includes(sec.label === 'Stone Placement Location' ? 'stone' : 'spoils'));
+        for (const a of [...sigRefs, ...mkRefs]) {
+          const hasUrl = a.webUrl && /^https:\/\//i.test(String(a.webUrl).trim());
+          const urlPart = hasUrl ? `  ${String(a.webUrl).trim()}` : '';
+          doc.text(`  - ${a.name}  [${bucketLabel(a.bucket)}]${urlPart}`, { size: 10 });
+        }
+        doc.spacer(4);
+      }
+    }
+  }
+
   // ---- Attachments (refs only; bytes live in SharePoint) -------------------
   // cleanAttachments: keep only https:// webUrls so no bare item IDs or
   // non-https references reach the PDF.
-  const allAttach = Array.isArray(rec.attachments) ? rec.attachments : [];
   const attach = allAttach.filter((a) => a && a.name && String(a.name).trim());
   if (attach.length) {
     doc.heading('Attachments (filed in SharePoint)');
@@ -130,8 +173,13 @@ export function renderSiteReadinessPdf(rec) {
 }
 
 function bucketLabel(bucket) {
-  if (bucket === 'grade_photo') return 'Grade Photo';
-  if (bucket === 'proof_roll') return 'Proof Roll Letter';
+  if (bucket === 'grade_photo')  return 'Grade Photo';
+  if (bucket === 'proof_roll')   return 'Proof Roll Letter';
+  if (bucket === 'staking_photo') return 'Staking Photo';
+  if (bucket === 'safety_cert')  return 'Safety Cert';
+  if (bucket === 'sr_markup')    return 'Site Plan Markup';
+  if (bucket === 'sr_signature') return 'Signature';
+  if (bucket === 'photos')       return 'Site Photo';
   return bucket || '';
 }
 

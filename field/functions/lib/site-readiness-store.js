@@ -185,7 +185,7 @@ export const CHECKLIST_ITEMS = [
   { key: '2b', section: '2', sectionLabel: 'Utilities',
     label: 'Public utilities located and marked (PF)' },
   { key: '2c', section: '2', sectionLabel: 'Utilities',
-    label: 'No new utilities within 10\' of pad until PF scope complete' },
+    label: "No new underground utilities installed within 10' of building pad until PF scope complete" },
   // Section 3: Building Pad
   { key: '3a', section: '3', sectionLabel: 'Building Pad',
     label: 'At working grade elevation per GC (variance >3" may be change order)',
@@ -197,22 +197,30 @@ export const CHECKLIST_ITEMS = [
   { key: '3d', section: '3', sectionLabel: 'Building Pad',
     label: 'Proof rolled and inspected by 3rd party testing agency',
     hasUpload: true, uploadLabel: 'Passing proof-roll letter from 3rd party' },
+  { key: '3e', section: '3', sectionLabel: 'Building Pad',
+    label: 'Staking & Layout: building pad has been staked',
+    hasUpload: true, uploadLabel: 'Staking & layout photos' },
   // Section 4: PF General Ops
   { key: '4a', section: '4', sectionLabel: 'PF General Operations',
     label: 'Stone delivery plan: 200-300 TN/day, dumped within ~50\' of work' },
   { key: '4b', section: '4', sectionLabel: 'PF General Operations',
-    label: 'Lowboy access for mob/demob confirmed (or GC notified of constraints)' },
+    label: 'Lowboy access for mob/demob: plan to unload/load equipment discussed with GC' },
   // From Mob Prep > Building Pad Prep > Field Ops Manager Jobsite Visit (platform/index.html ~21137):
   // pre-mob site walk by PF Field Ops Manager to verify site conditions in person.
   { key: '4c', section: '4', sectionLabel: 'PF General Operations',
     label: 'Field Ops Manager jobsite visit completed prior to mob' },
+  { key: '4d', section: '4', sectionLabel: 'PF General Operations',
+    label: 'Safety training / videos completed by crew before starting work onsite',
+    hasUpload: true, uploadLabel: 'Safety certs or completion docs' },
 ];
 
 // Derive the upload bucket key from an item key.
-// '3a' -> 'grade_photo', '3d' -> 'proof_roll'.
+// '3a' -> 'grade_photo', '3d' -> 'proof_roll', '3e' -> 'staking_photo', '4d' -> 'safety_cert'.
 export function uploadBucketForItem(itemKey) {
   if (itemKey === '3a') return 'grade_photo';
   if (itemKey === '3d') return 'proof_roll';
+  if (itemKey === '3e') return 'staking_photo';
+  if (itemKey === '4d') return 'safety_cert';
   return null;
 }
 
