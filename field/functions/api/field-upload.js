@@ -53,6 +53,38 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // Allowed file extensions (lower-case, with dot). Reject anything else.
 const ALLOWED_EXT = new Set(['.guh', '.jpg', '.jpeg', '.png', '.heic', '.pdf', '.zip', '.xlsx']);
 
+// Per-bucket extension allow-lists (verifier fix-round 2026-10-23).
+const BUCKET_EXT = new Map([
+  ['sr_markup',    new Set(['.png'])],
+  ['sr_signature', new Set(['.png'])],
+  ['staking_photo', new Set(['.jpg', '.jpeg', '.png', '.heic'])],
+  ['photos',        new Set(['.jpg', '.jpeg', '.png', '.heic'])],
+  ['safety_cert',   new Set(['.pdf', '.jpg', '.jpeg', '.png', '.heic'])],
+]);
+const BUCKET_MAX_BYTES = new Map([
+  ['sr_markup',    1 * 1024 * 1024],
+  ['sr_signature', 1 * 1024 * 1024],
+]);
+const PNG_SIG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+function isPng(buf) {
+  if (buf.length < 8) return false;
+  for (let i = 0; i < 8; i++) { if (buf[i] !== PNG_SIG[i]) return false; }
+  return true;
+}
+const PNG_MAGIC_BUCKETS = new Set(['sr_markup', 'sr_signature']);
+
+// Cross-site request guard (Origin, multipart POST — mirrors time-off.js).
+const FIELD_ORIGIN = 'https://field.pierfoundations.com';
+function isCrossSite(request) {
+  const origin = request.headers.get('Origin') || '';
+  if (!origin) return false;
+  const host = request.headers.get('Host') || '';
+  const isPreview = /\.pf-field\.pages\.dev$/i.test(host);
+  const allowed = [FIELD_ORIGIN];
+  if (isPreview) allowed.push(`https://${host}`);
+  return !allowed.includes(origin);
+}
+
 // bucket key -> the human folder name created under the dated upload folder.
 // handlogs + guhma go under the QAQC dated path (DFR area).
 // grade_photo + proof_roll + staking_photo + sr_markup + sr_signature are used
@@ -356,6 +388,11 @@ export async function onRequestPost(context) {
   const denied = requireArea(session, 'field_ops');
   if (denied) return denied;
 
+  // [SEC] Cross-site origin check (multipart POST — Origin header only).
+  if (isCrossSite(request)) {
+    return json({ status: 'error', message: 'Cross-site request rejected.' }, 403);
+  }
+
   // [fail closed] Graph creds + fixed drive id must all be present.
   if (!graphConfigured(env)) {
     return json({ status: 'error', message: 'Upload is unavailable: the server is not configured.' }, 503);
@@ -424,11 +461,23 @@ export async function onRequestPost(context) {
       const safeName = safeBaseName(part.name);
       if (!safeName) { errors.push({ name: String(part.name || ''), error: 'Unsafe or empty filename.' }); continue; }
       const ext = extOf(safeName);
+      const bucketExts = BUCKET_EXT.has(bucketKey) ? BUCKET_EXT.get(bucketKey) : ALLOWED_EXT;
+      if (!bucketExts.has(ext)) { errors.push({ name: safeName, error: 'File type not allowed for this bucket.' }); continue; }
       if (!ALLOWED_EXT.has(ext)) { errors.push({ name: safeName, error: 'File type not allowed.' }); continue; }
 
       const buf = new Uint8Array(await part.arrayBuffer());
       if (buf.length === 0) { errors.push({ name: safeName, error: 'Empty file.' }); continue; }
+      const bucketMax = BUCKET_MAX_BYTES.has(bucketKey) ? BUCKET_MAX_BYTES.get(bucketKey) : MAX_FILE_BYTES;
+      if (buf.length > bucketMax) {
+        const capMB = (bucketMax / (1024 * 1024)).toFixed(0);
+        errors.push({ name: safeName, error: `File exceeds ${capMB}MB limit for this bucket.` });
+        continue;
+      }
       if (buf.length > MAX_FILE_BYTES) { errors.push({ name: safeName, error: 'File exceeds 50MB.' }); continue; }
+      if (PNG_MAGIC_BUCKETS.has(bucketKey) && !isPng(buf)) {
+        errors.push({ name: safeName, error: 'File must be a valid PNG.' });
+        continue;
+      }
 
       try {
         const item = await uploadViaSession(env, token, destFolderId, safeName, buf);

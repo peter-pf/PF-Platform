@@ -79,6 +79,26 @@ const VALID_ITEM_KEYS = new Set(CHECKLIST_ITEMS.map((d) => d.key));
 
 const VALID_ACTIONS = { create: 1, update: 1, submit: 1 };
 
+// [SEC fix-round 2026-10-23]
+const SP_HOST_PREFIX = 'https://pierfoundations.sharepoint.com/';
+const GRAPH_ID_RE = /^[A-Za-z0-9!._\-]{1,300}$/;
+const OPS_SECTION_KEYS = new Set(['stone', 'spoils']);
+
+const FIELD_ORIGIN = 'https://field.pierfoundations.com';
+function isCrossSite(request) {
+  const sfs = request.headers.get('Sec-Fetch-Site') || '';
+  if (sfs === 'cross-site') return true;
+  const origin = request.headers.get('Origin') || '';
+  if (origin) {
+    const host = request.headers.get('Host') || '';
+    const isPreview = /\.pf-field\.pages\.dev$/i.test(host);
+    const allowed = [FIELD_ORIGIN];
+    if (isPreview) allowed.push(`https://${host}`);
+    if (!allowed.includes(origin)) return true;
+  }
+  return false;
+}
+
 const JSON_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' };
 
 function json(body, status = 200) {
@@ -141,52 +161,64 @@ function cleanItem4bDetail(input) {
 }
 
 // Rebuild a clean ops sign-off record for stone/spoils placement.
-function cleanOpsSignoffItem(input) {
+// [SEC fix-round 2026-10-23]: server stamps signedAt + capturedBy from session.
+function cleanOpsSignoffItem(input, session, nowIso) {
   if (!input || typeof input !== 'object') return { desc: '', superName: '', pfMgrName: '' };
-  return {
+  const base = {
     desc:      s(input.desc,      MAX_STR),
     superName: s(input.superName, MAX_SHORT),
     pfMgrName: s(input.pfMgrName, MAX_SHORT),
   };
+  if (session && nowIso) {
+    base.signedAt       = nowIso;
+    base.capturedByUid  = s((session.uid  || ''), MAX_SHORT);
+    base.capturedByName = s((session.name || ''), MAX_SHORT);
+  }
+  return base;
 }
 
 // Rebuild clean ops sign-offs for stone + spoils placement.
-function cleanOpsSignoffs(input) {
+function cleanOpsSignoffs(input, session, nowIso) {
   if (!input || typeof input !== 'object') {
-    return { stonePlacement: cleanOpsSignoffItem(null), spoilsPlacement: cleanOpsSignoffItem(null) };
+    return { stonePlacement: cleanOpsSignoffItem(null, session, nowIso), spoilsPlacement: cleanOpsSignoffItem(null, session, nowIso) };
   }
   return {
-    stonePlacement:  cleanOpsSignoffItem(input.stonePlacement),
-    spoilsPlacement: cleanOpsSignoffItem(input.spoilsPlacement),
+    stonePlacement:  cleanOpsSignoffItem(input.stonePlacement,  session, nowIso),
+    spoilsPlacement: cleanOpsSignoffItem(input.spoilsPlacement, session, nowIso),
   };
 }
 
 // Rebuild a clean attachments array from client input (SP refs only).
+// [SEC fix-round 2026-10-23]: webUrl must be on SP host; itemId must match GRAPH_ID_RE;
+// OPS_SECTION_KEYS ('stone','spoils') preserved for PDF section routing.
 function cleanAttachments(input) {
   if (!Array.isArray(input)) return [];
   const out = [];
-  const VALID_BUCKETS = {
-    grade_photo: 1, proof_roll: 1, photos: 1,
-    staking_photo: 1, safety_cert: 1, sr_markup: 1, sr_signature: 1,
-  };
+  const VALID_BUCKETS = new Set([
+    'grade_photo', 'proof_roll', 'photos',
+    'staking_photo', 'safety_cert', 'sr_markup', 'sr_signature',
+  ]);
   for (const a of input.slice(0, MAX_ATTACH)) {
     if (!a || typeof a !== 'object') continue;
-    const name   = s(a.name, MAX_SHORT);
-    const itemId = s(a.itemId, MAX_SHORT);
+    const name     = s(a.name, MAX_SHORT);
+    const rawId    = s(a.itemId, MAX_SHORT);
+    const itemId   = GRAPH_ID_RE.test(rawId) ? rawId : '';
     if (!name && !itemId) continue;
     const bucketRaw = s(a.bucket, MAX_SHORT);
-    const bucket = VALID_BUCKETS[bucketRaw] ? bucketRaw : '';
-    const wu = s(a.webUrl, MAX_STR);
-    const webUrl = /^https:\/\//i.test(wu) ? wu : '';
-    // itemKey ties this attachment to a checklist item (optional, for display).
-    const key = s(a.key, 10);
-    out.push({ key: VALID_ITEM_KEYS.has(key) ? key : '', name, itemId, webUrl, bucket });
+    const bucket    = VALID_BUCKETS.has(bucketRaw) ? bucketRaw : '';
+    const wu        = s(a.webUrl, MAX_STR);
+    const webUrl    = wu.startsWith(SP_HOST_PREFIX) ? wu : '';
+    const rawKey    = s(a.key, 20);
+    const key       = OPS_SECTION_KEYS.has(rawKey)
+      ? rawKey
+      : (VALID_ITEM_KEYS.has(rawKey) ? rawKey : '');
+    out.push({ key, name, itemId, webUrl, bucket });
   }
   return out;
 }
 
-// Build a clean record body from a parsed POST body and an optional base record.
-function buildBody(src, base) {
+// session + nowIso passed in on write paths so cleanOpsSignoffs can stamp server-side metadata.
+function buildBody(src, base, session, nowIso) {
   base = base || {};
   const items = src.items != null ? cleanItems(src.items) : (base.items || cleanItems(null));
   const { result, openItems } = computeResult(items);
@@ -201,11 +233,11 @@ function buildBody(src, base) {
     attachments: src.attachments != null ? cleanAttachments(src.attachments) : (base.attachments || []),
     sigName:     s(src.sigName != null ? src.sigName : base.sigName, MAX_SHORT),
     sigDate:     isoDateOrToday(src.sigDate != null ? src.sigDate : base.sigDate),
-    // 4b sub-items (unload/load questions). Falls back to empty on legacy records.
     item4bDetail: cleanItem4bDetail(src.item4bDetail != null ? src.item4bDetail : (base.item4bDetail || null)),
-    // Stone/spoils placement sign-offs. Falls back to empty on legacy records.
-    opsSignoffs: cleanOpsSignoffs(src.opsSignoffs != null ? src.opsSignoffs : (base.opsSignoffs || null)),
-    // Computed from items (server-set, never trusted from client).
+    opsSignoffs: cleanOpsSignoffs(
+      src.opsSignoffs != null ? src.opsSignoffs : (base.opsSignoffs || null),
+      session, nowIso,
+    ),
     result,
     openItems,
   };
@@ -241,6 +273,15 @@ export async function onRequestPost(context) {
   const session = context.data && context.data.session;
   const denied = requireArea(session, 'field_ops');
   if (denied) return denied;
+
+  if (isCrossSite(request)) {
+    return json({ status: 'error', message: 'Cross-site request rejected.' }, 403);
+  }
+  const ctHeader = (request.headers.get('Content-Type') || '').toLowerCase();
+  if (!ctHeader.includes('application/json')) {
+    return json({ status: 'error', message: 'Content-Type must be application/json.' }, 415);
+  }
+
   try {
     const len = Number(request.headers.get('Content-Length') || '0');
     if (len > MAX_BODY_BYTES) return json({ status: 'error', message: 'Payload too large.' }, 413);
@@ -270,7 +311,7 @@ export async function onRequestPost(context) {
       if (total >= MAX_RECORDS) {
         return json({ status: 'error', message: 'Site readiness record storage is full.' }, 413);
       }
-      const body = buildBody(parsed, {});
+      const body = buildBody(parsed, {}, session, nowIso);
       if (!body.projectId && !body.projectName) {
         return json({ status: 'error', message: 'A project is required.' }, 400);
       }
@@ -311,7 +352,7 @@ export async function onRequestPost(context) {
     }
 
     if (action === 'update') {
-      Object.assign(rec, buildBody(parsed, rec));
+      Object.assign(rec, buildBody(parsed, rec, session, nowIso));
       rec.updatedAt = nowIso;
       const stamp = await upsertRecord(env, rec);
       return json({ ok: true, saved: true, action, record: rec, meta: { updated: stamp } });
@@ -340,7 +381,7 @@ export async function onRequestPost(context) {
     }
 
     // Re-compute result at submit time (ensures it reflects the final saved answers).
-    Object.assign(rec, buildBody(parsed, rec));
+    Object.assign(rec, buildBody(parsed, rec, session, nowIso));
     rec.updatedAt = nowIso;
 
     let token;

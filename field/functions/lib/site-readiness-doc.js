@@ -108,27 +108,35 @@ export function renderSiteReadinessPdf(rec) {
   }
 
   // ---- Ops sign-offs (stone / spoils placement) ---------------------------
+  // Attachments are routed via key='stone' or key='spoils' (OPS_SECTION_KEYS).
   const ops = rec.opsSignoffs;
   if (ops && (ops.stonePlacement || ops.spoilsPlacement)) {
     doc.heading('Stone & Spoils Placement Sign-offs');
     const sections4 = [
-      { label: 'Stone Placement Location', item: ops.stonePlacement },
-      { label: 'Spoils Placement Location(s)', item: ops.spoilsPlacement },
+      { label: 'Stone Placement Location',    item: ops.stonePlacement,  sectionKey: 'stone' },
+      { label: 'Spoils Placement Location(s)', item: ops.spoilsPlacement, sectionKey: 'spoils' },
     ];
     for (const sec of sections4) {
       if (!sec.item) continue;
       const rows = [];
-      if (sec.item.desc) rows.push({ label: 'Location description', value: sec.item.desc });
-      if (sec.item.superName) rows.push({ label: 'Site Superintendent', value: sec.item.superName });
-      if (sec.item.pfMgrName) rows.push({ label: 'PF Field Ops Mgr', value: sec.item.pfMgrName });
+      if (sec.item.desc)      rows.push({ label: 'Location description', value: sec.item.desc });
+      if (sec.item.superName) rows.push({ label: 'Site Superintendent',  value: sec.item.superName });
+      if (sec.item.pfMgrName) rows.push({ label: 'PF Field Ops Mgr',     value: sec.item.pfMgrName });
+      if (sec.item.capturedByName || sec.item.signedAt) {
+        const by   = sec.item.capturedByName || '—';
+        const when = sec.item.signedAt
+          ? fmtDate(sec.item.signedAt.slice(0, 10)) + ' ' + (sec.item.signedAt.slice(11, 16) || '') + ' UTC'
+          : '—';
+        rows.push({ label: 'Signature captured by', value: `${by} on ${when}` });
+      }
       if (rows.length) {
         doc.text(sec.label, { size: 11, bold: true });
         doc.table(rows, { valueW: 280 });
-        // Signature / markup refs for this section.
-        const sigRefs = allAttach.filter((a) => a && a.bucket === 'sr_signature' && a.key && a.key.includes(sec.label === 'Stone Placement Location' ? 'stone' : 'spoils'));
-        const mkRefs = allAttach.filter((a) => a && a.bucket === 'sr_markup' && a.key && a.key.includes(sec.label === 'Stone Placement Location' ? 'stone' : 'spoils'));
+        // Exact key match (OPS_SECTION_KEYS = 'stone' | 'spoils'), not substring.
+        const sigRefs = allAttach.filter((a) => a && a.bucket === 'sr_signature' && a.key === sec.sectionKey);
+        const mkRefs  = allAttach.filter((a) => a && a.bucket === 'sr_markup'    && a.key === sec.sectionKey);
         for (const a of [...sigRefs, ...mkRefs]) {
-          const hasUrl = a.webUrl && /^https:\/\//i.test(String(a.webUrl).trim());
+          const hasUrl = a.webUrl && a.webUrl.startsWith('https://pierfoundations.sharepoint.com/');
           const urlPart = hasUrl ? `  ${String(a.webUrl).trim()}` : '';
           doc.text(`  - ${a.name}  [${bucketLabel(a.bucket)}]${urlPart}`, { size: 10 });
         }

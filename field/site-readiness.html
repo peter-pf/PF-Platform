@@ -716,12 +716,15 @@ try {
         html += '</div>';
 
         // File upload for items with hasUpload.
+        // Show only when answered Yes, or refs/pending already exist (preserve visibility).
         if (def.uploadBucket) {
           var bk = def.uploadBucket;
           var bkAttach = state.attachments.filter(function (a) { return a.bucket === bk; });
           var bkPending = state.pendingUploads[bk] || [];
-          var bkAllowed = (bk === 'safety_cert') ? UP_SAFETY_ALLOWED : UP_ALLOWED;
-          html += renderUploadWidget(def.key, bk, def.uploadLabel, bkAttach, bkPending, bkAllowed);
+          if (stateItem.answer === 'Yes' || bkAttach.length > 0 || bkPending.length > 0) {
+            var bkAllowed = (bk === 'safety_cert') ? UP_SAFETY_ALLOWED : UP_ALLOWED;
+            html += renderUploadWidget(def.key, bk, def.uploadLabel, bkAttach, bkPending, bkAllowed);
+          }
         }
 
         // 4b detail sub-items.
