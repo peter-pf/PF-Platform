@@ -183,6 +183,7 @@ export async function countRecords(env) {
 // Section 7 Site Photos is not a checklist item — it is the photos upload widget.
 export const CHECKLIST_ITEMS = [
   // Section 1: Site Prep and Conditions (R11: renamed; 1a photo added; old 1b removed; new 1b+1c added)
+  //                                       (R12: added 1d-1h; no photo uploads; schemaVersion guard required)
   { key: '1a', section: '1', sectionLabel: 'Site Prep and Conditions',
     label: 'Temp construction stone drive from street to pad (each truck entry)',
     hasUpload: true, uploadLabel: 'Photo of temp construction stone drive' },
@@ -195,6 +196,18 @@ export const CHECKLIST_ITEMS = [
   { key: '1c', section: '1', sectionLabel: 'Site Prep and Conditions',
     label: 'Areas of concern',
     hasUpload: true, uploadLabel: 'Areas of concern photo' },
+  // R12: 1d-1h — standard dropdown+notes, no photo upload
+  // schemaVersion guard: scored/rendered only for records with schemaVersion >= 12.
+  { key: '1d', section: '1', sectionLabel: 'Site Prep and Conditions',
+    label: 'Pad firm enough for the rig to track and set up (no soft spots or ruts)' },
+  { key: '1e', section: '1', sectionLabel: 'Site Prep and Conditions',
+    label: 'Standing water or drainage issues on the pad' },
+  { key: '1f', section: '1', sectionLabel: 'Site Prep and Conditions',
+    label: 'Adjacent structures or neighbors close enough to be sensitive to vibration' },
+  { key: '1g', section: '1', sectionLabel: 'Site Prep and Conditions',
+    label: 'Crew parking and equipment laydown area identified' },
+  { key: '1h', section: '1', sectionLabel: 'Site Prep and Conditions',
+    label: 'Site hours or noise restrictions from the GC or city' },
   // Section 2: Utilities
   { key: '2a', section: '2', sectionLabel: 'Utilities',
     label: 'Private utilities located and marked by GC' },
@@ -263,12 +276,22 @@ export function uploadBucketForItem(itemKey) {
   return null;
 }
 
+// Keys introduced in R12. Only scored when schemaVersion >= 12.
+// Pre-R12 records (R11, legacy) must not show these as open items.
+export const R12_KEYS = new Set(['1d', '1e', '1f', '1g', '1h']);
+
 // Compute the overall result from an items array.
 // Each item: { key, answer } where answer is 'Yes' | 'No' | 'N/A' | ''.
+// schemaVersion: the record's stored schemaVersion (number or undefined).
+//   R12 items (1d-1h) are only included in scoring when schemaVersion >= 12.
+//   Pre-R12 records (v11, legacy) are non-breaking: 1d-1h are skipped entirely.
 // Returns { result: 'READY'|'NOT READY', openItems: [key, ...] }.
-export function computeResult(items) {
+export function computeResult(items, schemaVersion) {
+  const isR12 = typeof schemaVersion === 'number' && schemaVersion >= 12;
   const openItems = [];
   for (const def of CHECKLIST_ITEMS) {
+    // Skip R12-only keys for pre-R12 records so they never count as open.
+    if (R12_KEYS.has(def.key) && !isR12) continue;
     const item = (items || []).find((it) => it && it.key === def.key);
     const answer = (item && item.answer) ? String(item.answer).trim() : '';
     if (answer !== 'Yes' && answer !== 'N/A') {

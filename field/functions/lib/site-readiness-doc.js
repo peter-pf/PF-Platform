@@ -9,7 +9,7 @@
 
 import { PdfDoc, bytesToBase64, PF } from './pdf.js';
 import { GRAPH } from './graph.js';
-import { CHECKLIST_ITEMS } from './site-readiness-store.js';
+import { CHECKLIST_ITEMS, R12_KEYS } from './site-readiness-store.js';
 
 // ---------------------------------------------------------------------------
 // 1) RENDER: record -> PDF bytes  (PF-branded, same palette as DFR)
@@ -72,11 +72,15 @@ export function renderSiteReadinessPdf(rec) {
   // '1b' = "General conditions". Skip '1b' in the main loop for old records and
   // render it separately under a legacy label after the checklist sections.
   const isPreR11 = !rec.schemaVersion || rec.schemaVersion < 11;
+  // R12 backward compat: 1d-1h were added in R12. Pre-R12 records have no answers
+  // for those keys — skip them entirely in the PDF so they don't render as '-'.
+  const isPreR12 = !rec.schemaVersion || rec.schemaVersion < 12;
 
-  // Group items by sectionLabel (skipping pre-R11 1b so it renders under legacy label).
+  // Group items by sectionLabel (skipping pre-R11 1b and pre-R12 1d-1h).
   const sections = [];
   for (const def of CHECKLIST_ITEMS) {
     if (isPreR11 && def.key === '1b') continue;
+    if (isPreR12 && R12_KEYS.has(def.key)) continue;
     let sec = sections.find((s) => s.label === def.sectionLabel);
     if (!sec) { sec = { label: def.sectionLabel, items: [] }; sections.push(sec); }
     sec.items.push(def);

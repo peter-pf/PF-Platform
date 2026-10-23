@@ -13,8 +13,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // ---- A: New R10 structure ---------------------------------------------------
 {
-  // A1: 20 items total (R11: old 1b removed, new 1b + 1c added = +1 net).
-  assert.equal(CHECKLIST_ITEMS.length, 20, 'A1: should have 20 checklist items (R11)');
+  // A1: 25 items total (R12: +1d+1e+1f+1g+1h).
+  assert.equal(CHECKLIST_ITEMS.length, 25, 'A1: should have 25 checklist items (R12)');
 
   // A2: Sections present.
   const sections = [...new Set(CHECKLIST_ITEMS.map(d => d.section))];

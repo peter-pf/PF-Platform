@@ -63,7 +63,8 @@ const ALLOWED_EXT = new Set(['.guh', '.jpg', '.jpeg', '.png', '.heic', '.pdf', '
 
 // Per-bucket extension allow-lists (verifier fix-round 2026-10-23; predrill added integration 2026-10-23).
 // [MEDIUM-4 R11 2026-10-23]: R11 photo_* buckets (section 1 and 4) are image-only.
-// Magic-byte check applied via PNG_MAGIC_BUCKETS (PNG) or IMAGE_MAGIC_BUCKETS (below) where relevant.
+// PNG_MAGIC_BUCKETS (defined below) enforces a magic-byte check for buckets that require PNG.
+// photo_* buckets use extension-only enforcement (jpg/jpeg/png/heic) — same as photos/staking_photo.
 const IMAGE_ONLY_EXT = new Set(['.jpg', '.jpeg', '.png', '.heic']);
 const BUCKET_EXT = new Map([
   ['sr_markup',    new Set(['.png'])],

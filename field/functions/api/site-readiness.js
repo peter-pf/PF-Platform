@@ -36,7 +36,7 @@ import {
 } from '../lib/site-readiness-doc.js';
 import {
   upsertRecord, loadRecordById, listRecords, countRecords,
-  CHECKLIST_ITEMS, computeResult,
+  CHECKLIST_ITEMS, computeResult, R12_KEYS,
 } from '../lib/site-readiness-store.js';
 
 // ===========================================================================
@@ -71,7 +71,7 @@ const MAX_BODY_BYTES = 64 * 1024;  // bumped 32->64 to accommodate new fields + 
 const MAX_RECORDS   = 20000;
 const MAX_STR       = 2000;   // note / address / contact cap
 const MAX_SHORT     = 300;    // name / project / date cap
-const MAX_ITEMS     = 20;     // more than enough for current 14 items
+const MAX_ITEMS     = 30;     // more than enough for current 25 items (R12 added 1d-1h)
 const MAX_ATTACH    = 60;     // bumped 30->60 for new bucket types (markup, sigs, safety)
 
 const VALID_ANSWERS = { 'Yes': 1, 'No': 1, 'N/A': 1 };
@@ -251,11 +251,36 @@ function cleanAttachments(input) {
   return out;
 }
 
+// Keys that must never be stored under a legacy record (schemaVersion absent).
+// These keys have new meanings in R11/R12; on a legacy record '1b' still means
+// "Spoil pile". Allowing the client to write 1b-1h on a legacy update would
+// overwrite the spoil-pile answer or print "General conditions" under the legacy
+// label in the PDF. Strip them from incoming src.items for legacy updates.
+// [LOW R12 2026-10-23]
+const SCHEMA_GUARDED_KEYS = new Set(['1b', '1c', '1d', '1e', '1f', '1g', '1h']);
+
 // session + nowIso passed in on write paths so cleanOpsSignoffs can stamp server-side metadata.
 function buildBody(src, base, session, nowIso) {
   base = base || {};
-  const items = src.items != null ? cleanItems(src.items) : (base.items || cleanItems(null));
-  const { result, openItems } = computeResult(items);
+
+  // [SEC HIGH-2 R11 / R12 2026-10-23]: Server stamps schemaVersion on every NEW create.
+  // R12 bumps from 11 to 12. Updates preserve the stored base.schemaVersion so legacy
+  // records (stored without schemaVersion) remain legacy after re-save.
+  // Client-supplied schemaVersion is NEVER trusted.
+  const isCreate = Object.keys(base).length === 0;
+  const schemaVersion = isCreate ? 12 : base.schemaVersion;
+  const isLegacyUpdate = !isCreate && (schemaVersion == null || schemaVersion < 11);
+
+  // [LOW R12 2026-10-23]: On a legacy update, strip schema-guarded keys from incoming
+  // items before passing to cleanItems. The old 1b answer (spoil pile) must come ONLY
+  // from the stored base.items — a client on the new form cannot overwrite it.
+  let srcItems = src.items;
+  if (isLegacyUpdate && Array.isArray(srcItems)) {
+    srcItems = srcItems.filter((it) => !it || !SCHEMA_GUARDED_KEYS.has(String(it.key || '')));
+  }
+
+  const items = srcItems != null ? cleanItems(srcItems) : (base.items || cleanItems(null));
+  const { result, openItems } = computeResult(items, schemaVersion);
 
   // [SEC fix-round 2026-10-23 R2]: pass srcOps and baseOps separately to cleanOpsSignoffs.
   // Legacy keys (stonePlacement/spoilsPlacement) must come ONLY from the stored record (base).
@@ -267,15 +292,6 @@ function buildBody(src, base, session, nowIso) {
   const raw4bSrc = src.item4bDetail != null ? src.item4bDetail : null;
   const raw4bBase = base.item4bDetail || null;
   const raw4b = raw4bSrc != null ? raw4bSrc : raw4bBase;
-
-  // [SEC HIGH-2 R11 2026-10-23]: Server stamps schemaVersion=11 on every NEW create
-  // (base is empty {}). Updates preserve the stored base.schemaVersion so legacy
-  // records (stored without schemaVersion) remain legacy after re-save and the PDF
-  // renderer's isPreR11 check continues to route old 1b data to the legacy label
-  // ("Spoil pile") rather than the new R11 label ("General conditions").
-  // Client-supplied schemaVersion is NEVER trusted — buildBody ignores src.schemaVersion.
-  const isCreate = Object.keys(base).length === 0;
-  const schemaVersion = isCreate ? 11 : base.schemaVersion;
 
   const body = {
     date:        isoDateOrToday(src.date != null ? src.date : base.date),

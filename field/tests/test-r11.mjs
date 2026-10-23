@@ -86,9 +86,9 @@ test('A4: /time-off.html still maps to field_ops (self-service page preserved)',
 
 const byKey = Object.fromEntries((CHECKLIST_ITEMS || []).map(d => [d.key, d]));
 
-test('B1: total CHECKLIST_ITEMS count is 20 (R11)', () => {
-  assert.equal(CHECKLIST_ITEMS.length, 20,
-    `expected 20, got ${CHECKLIST_ITEMS.length}. R11: -old_1b +new_1b +1c = 20`);
+test('B1: total CHECKLIST_ITEMS count is 25 (R12)', () => {
+  assert.equal(CHECKLIST_ITEMS.length, 25,
+    `expected 25, got ${CHECKLIST_ITEMS.length}. R12: +1d+1e+1f+1g+1h = 25`);
 });
 
 test('B2: section 1 label is "Site Prep and Conditions" (R11 rename)', () => {

@@ -274,9 +274,9 @@ await testAsync('loadRecordById falls back to KV', async () => {
 console.log('\n--- CHECKLIST_ITEMS ---');
 
 // R11: updated expectations for 20-item structure (old 1b removed; new 1b, 1c added; 4b/4c photo uploads).
-test('CHECKLIST_ITEMS has exactly 20 items (R11: sections 1-6)', () => {
-  assert.equal((CHECKLIST_ITEMS || []).length, 20,
-    `expected 20, got ${(CHECKLIST_ITEMS || []).length}`);
+test('CHECKLIST_ITEMS has exactly 25 items (R12: sections 1-6)', () => {
+  assert.equal((CHECKLIST_ITEMS || []).length, 25,
+    `expected 25, got ${(CHECKLIST_ITEMS || []).length}`);
 });
 
 test('R11: items with hasUpload=true are 1a, 1b, 1c, 3a, 3d, 3e, 4b, 4c, 5d, 6a', () => {
