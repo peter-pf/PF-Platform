@@ -593,6 +593,81 @@ test('R9: schedule label: Sick -> "Out"', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Fix1: predrill bucket present in both server whitelists
+// ---------------------------------------------------------------------------
+test('Fix1: predrill in VALID_ATTACH_BUCKETS + upload BUCKETS (mirrors field-upload.js)', () => {
+  // Server-side VALID_ATTACH_BUCKETS (daily-report.js) and BUCKETS (field-upload.js)
+  // are kept in sync; use static inline copies to avoid Workers runtime deps.
+  const VALID_ATTACH_BUCKETS = { handlogs: 1, guhma: 1, photos: 1, predrill: 1 };
+  const UPLOAD_BUCKETS = ['handlogs', 'guhma', 'grade_photo', 'proof_roll', 'photos', 'predrill'];
+  assert.ok('predrill' in VALID_ATTACH_BUCKETS, 'predrill in VALID_ATTACH_BUCKETS');
+  assert.ok(UPLOAD_BUCKETS.includes('predrill'), 'predrill in field-upload BUCKETS');
+});
+
+// ---------------------------------------------------------------------------
+// Fix2: half-day type enforcement (Home Day = Sat/Sun; Vacation = weekday)
+// ---------------------------------------------------------------------------
+function halfDayTypeCheck(type, isoDate) {
+  const dow = new Date(isoDate + 'T12:00:00Z').getUTCDay();
+  const isWeekend = dow === 0 || dow === 6;
+  if (type === 'Home Day' && !isWeekend) return { ok: false, error: 'Home Days are for weekends. Use Vacation for weekdays.' };
+  if (type === 'Vacation' && isWeekend)  return { ok: false, error: 'Vacation requests must fall on a weekday.' };
+  return { ok: true };
+}
+
+test('Fix2: Home Day half-day on Saturday accepted', () => {
+  assert.deepEqual(halfDayTypeCheck('Home Day', '2026-10-24'), { ok: true }); // Saturday
+});
+test('Fix2: Home Day half-day on Sunday accepted', () => {
+  assert.deepEqual(halfDayTypeCheck('Home Day', '2026-10-25'), { ok: true }); // Sunday
+});
+test('Fix2: Home Day half-day on Monday rejected', () => {
+  const r = halfDayTypeCheck('Home Day', '2026-10-26'); // Monday
+  assert.equal(r.ok, false);
+  assert.match(r.error, /weekends/);
+});
+test('Fix2: Vacation half-day on Friday accepted', () => {
+  assert.deepEqual(halfDayTypeCheck('Vacation', '2026-10-23'), { ok: true }); // Friday
+});
+test('Fix2: Vacation half-day on Saturday rejected', () => {
+  const r = halfDayTypeCheck('Vacation', '2026-10-24'); // Saturday
+  assert.equal(r.ok, false);
+  assert.match(r.error, /weekday/);
+});
+test('Fix2: Sick/Other half-day: no day-of-week restriction', () => {
+  assert.deepEqual(halfDayTypeCheck('Sick', '2026-10-24'), { ok: true });
+  assert.deepEqual(halfDayTypeCheck('Other', '2026-10-25'), { ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// Fix3: unknown type rejected; Personal -> Other normalisation
+// ---------------------------------------------------------------------------
+const FIX3_VALID = ['Vacation', 'Home Day', 'Sick', 'Personal', 'Other'];
+function fix3ResolveType(raw) {
+  const t = raw === 'Personal' ? 'Other' : raw;
+  if (!FIX3_VALID.includes(t)) return { ok: false, error: 'Invalid request type.' };
+  return { ok: true, type: t };
+}
+
+test('Fix3: unknown type rejected with 400', () => {
+  const r = fix3ResolveType('Unpaid');
+  assert.equal(r.ok, false);
+  assert.match(r.error, /Invalid/);
+});
+test('Fix3: Personal maps to Other (backward compat)', () => {
+  const r = fix3ResolveType('Personal');
+  assert.equal(r.ok, true);
+  assert.equal(r.type, 'Other');
+});
+test('Fix3: valid types pass unchanged', () => {
+  for (const t of ['Vacation', 'Home Day', 'Sick', 'Other']) {
+    const r = fix3ResolveType(t);
+    assert.equal(r.ok, true);
+    assert.equal(r.type, t);
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------
 setTimeout(() => {

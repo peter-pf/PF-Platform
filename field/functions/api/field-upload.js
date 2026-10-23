@@ -64,6 +64,7 @@ const BUCKETS = {
   grade_photo: 'Grade Photo',
   proof_roll:  'Proof Roll Letter',
   photos:      'Site Photos',
+  predrill:    'Predrill Markup',
 };
 
 // Buckets that belong under the Site Readiness folder tree instead of QAQC.
@@ -74,6 +75,9 @@ const SR_SUBFOLDER = 'Site Readiness';
 // Verified 2026-10-21: both active projects (26-022 DFS Grain, 25-026 Granary)
 // use "05 - Field / 02 - Project Photos" for site photos.
 const PHOTO_BUCKETS = new Set(['photos']);
+
+// Predrill Markup: 05 - Field/Predrill Markup/<date>/
+const PREDRILL_BUCKETS = new Set(['predrill']);
 
 const JSON_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' };
 function json(body, status = 200) {
@@ -270,6 +274,13 @@ async function ensureDestination(env, token, projectFolderId, reportDate, bucket
     const photos = await ensureChildFolder(env, token, field05, '02 - Project Photos');
     const dated = await ensureChildFolder(env, token, photos, reportDate);
     return dated; // files land directly in the dated folder (no sub-bucket level)
+  }
+  if (PREDRILL_BUCKETS.has(bucketKey)) {
+    // Predrill Markup goes under 05 - Field/Predrill Markup/<date>/ (not QAQC).
+    const field05 = await ensureChildFolder(env, token, projectFolderId, '05 - Field');
+    const predrill = await ensureChildFolder(env, token, field05, 'Predrill Markup');
+    const dated = await ensureChildFolder(env, token, predrill, reportDate);
+    return dated;
   }
   // Default: QAQC tree (DFR buckets).
   const eng = await ensureChildFolder(env, token, projectFolderId, '03 - Engineering & Design');

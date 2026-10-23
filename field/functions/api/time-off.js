@@ -139,6 +139,12 @@ function countWeekendDays(startIso, endIso) {
 // Personal folds into Other (kept here for backward compat with old records).
 const VALID_TYPES = ['Vacation', 'Home Day', 'Sick', 'Personal', 'Other'];
 
+// Normalize legacy 'Personal' -> 'Other' for display of stored rows.
+function normalizeType(row) {
+  if (row && row.type === 'Personal') return { ...row, type: 'Other' };
+  return row;
+}
+
 // ---------------------------------------------------------------------------
 // Origin / Sec-Fetch-Site guard (POST only)
 // ---------------------------------------------------------------------------
@@ -326,8 +332,8 @@ export async function onRequestGet(context) {
       allocations = allocRows || [];
     }
 
-    return json({ ok: true, ownRequests: ownRows || [], allocation: alloc,
-                  isOwner, pendingAll: isOwner ? pendingAll : undefined,
+    return json({ ok: true, ownRequests: (ownRows || []).map(normalizeType), allocation: alloc,
+                  isOwner, pendingAll: isOwner ? pendingAll.map(normalizeType) : undefined,
                   allocations: isOwner ? allocations : undefined });
   } catch (e) {
     console.error('time_off_get_error', e?.message);
@@ -372,7 +378,12 @@ export async function onRequestPost(context) {
     const endDate   = s(body.end_date,   10);
     // half_day must be strictly boolean true or numeric 1
     const halfDay   = body.half_day === true || body.half_day === 1 ? 1 : 0;
-    const type      = VALID_TYPES.includes(s(body.type, 20)) ? s(body.type, 20) : 'Vacation';
+    // Normalize legacy 'Personal' -> 'Other'; reject any other unknown type.
+    const rawType = s(body.type, 20);
+    const type    = rawType === 'Personal' ? 'Other' : rawType;
+    if (!VALID_TYPES.includes(type)) {
+      return json({ ok: false, error: 'Invalid request type.' }, 400);
+    }
     const note      = sanitiseNote(body.note);
 
     // Date validation
@@ -396,6 +407,15 @@ export async function onRequestPost(context) {
     let dayCount;
     if (halfDay) {
       dayCount = 0.5;
+      // Half-day must obey the same day-of-week rules as full-day requests.
+      const hdDow = new Date(startDate + 'T12:00:00Z').getUTCDay();
+      const hdWeekend = hdDow === 0 || hdDow === 6;
+      if (type === 'Home Day' && !hdWeekend) {
+        return json({ ok: false, error: 'Home Days are for weekends. Use Vacation for weekdays.' }, 400);
+      }
+      if (type === 'Vacation' && hdWeekend) {
+        return json({ ok: false, error: 'Vacation requests must fall on a weekday.' }, 400);
+      }
     } else if (type === 'Home Day') {
       if (countWeekdays(startDate, endDate) > 0) {
         return json({ ok: false, error: 'Home Days are for weekends. Use Vacation for weekdays.' }, 400);
