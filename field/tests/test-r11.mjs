@@ -271,40 +271,20 @@ test('A7: GET handler return statement does not include pendingAll or allocation
 });
 
 // ---------------------------------------------------------------------------
-// C (HIGH-2): site-readiness.js buildBody stamps schemaVersion=11 server-side
+// C (HIGH-2): schemaVersion stamping — covered by R12-15/16/17 in test-r12.mjs
+// with the correct current stamp value (12, not 11). The old inline stub hard-coded
+// 11 so it always passed regardless of server code changes; tests moved to test-r12.mjs.
 // ---------------------------------------------------------------------------
 
-// Inline the schemaVersion stamping logic from site-readiness.js buildBody for testing.
-// (buildBody is not exported; we test the logic in isolation to verify correctness.)
-function serverSchemaVersion(base) {
-  const isCreate = Object.keys(base).length === 0;
-  return isCreate ? 11 : base.schemaVersion;
-}
-
-test('C1: new record (empty base) gets schemaVersion=11 stamped by server', () => {
-  const sv = serverSchemaVersion({});
-  assert.equal(sv, 11, 'create must stamp schemaVersion=11');
-});
-
-test('C2: legacy update (base with no schemaVersion) preserves undefined — stays legacy', () => {
-  const legacyBase = { date: '2026-01-01', items: [{ key: '1b', answer: 'Yes' }] };
-  const sv = serverSchemaVersion(legacyBase);
-  assert.equal(sv, undefined,
-    'legacy re-save must NOT stamp schemaVersion=11 — record stays legacy so PDF shows Spoil pile');
-});
-
-test('C3: R11 update (base.schemaVersion=11) preserves 11', () => {
-  const r11Base = { date: '2026-10-23', schemaVersion: 11, items: [] };
-  const sv = serverSchemaVersion(r11Base);
-  assert.equal(sv, 11, 'R11 re-save must preserve schemaVersion=11');
-});
+// C1-C3 removed: stale inline stub returned 11 unconditionally and did not exercise
+// the real buildBody logic. See test-r12.mjs tests R12-15, R12-16, R12-17.
 
 test('C4: legacy re-save: isPreR11 check still passes (no collision on 1b)', () => {
-  // After a legacy re-save schemaVersion is undefined → PDF still routes 1b as spoil pile.
+  // After a legacy re-save schemaVersion stays undefined (server preserves base.schemaVersion).
+  // buildBody: isCreate=false, base.schemaVersion=undefined → schemaVersion=undefined stored.
+  // Covered by R12-17 for the stamp value; here we verify the PDF routing.
   const legacyReSavedRec = { date: '2026-01-01', items: [{ key: '1b', answer: 'Marked' }] };
-  // schemaVersion stays undefined (see C2 above)
-  const sv = serverSchemaVersion({ date: legacyReSavedRec.date, items: legacyReSavedRec.items });
-  assert.equal(sv, undefined);
+  const sv = undefined; // server preserves undefined for legacy updates
   // With undefined schemaVersion, isPreR11 is true → PDF shows legacy label
   const pre = isPreR11({ ...legacyReSavedRec, schemaVersion: sv });
   assert.equal(pre, true, 'legacy re-saved record must still be treated as pre-R11 in PDF');

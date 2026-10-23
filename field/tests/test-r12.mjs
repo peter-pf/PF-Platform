@@ -408,6 +408,89 @@ test('R12-30: HTML computeResult guards R12 keys by loadedSchemaVersion', () => 
 });
 
 // ---------------------------------------------------------------------------
+// 8. Client/server scoring agreement + legacy sentinel
+// ---------------------------------------------------------------------------
+
+// Inline client computeResult logic (mirrors site-readiness.html)
+const CLIENT_R12_KEYS_TEST = { '1d':1,'1e':1,'1f':1,'1g':1,'1h':1 };
+function clientComputeResult(items, loadedSchemaVersion) {
+  const sv = loadedSchemaVersion;
+  const isR12 = (sv === null) || (typeof sv === 'number' && sv >= 12);
+  const open = [];
+  items.forEach(it => {
+    if (!isR12 && CLIENT_R12_KEYS_TEST[it.key]) return;
+    if (it.answer !== 'Yes' && it.answer !== 'N/A') open.push(it.key);
+  });
+  return { result: open.length === 0 ? 'READY' : 'NOT READY', openItems: open };
+}
+// All items answered helper
+const allAnswered = CHECKLIST_ITEMS.map(d => ({ key: d.key, answer: 'Yes', note: '' }));
+const allAnsweredNoR12 = allAnswered.map(it => CLIENT_R12_KEYS_TEST[it.key] ? { ...it, answer: '' } : it);
+
+test('R12-31: client and server agree: legacy record (sv=0/undefined) all-pre-R12 answered = READY', () => {
+  // Client uses 0 for legacy; server uses undefined
+  const clientR = clientComputeResult(allAnsweredNoR12, 0).result;
+  const serverR = computeResult(allAnsweredNoR12, undefined).result;
+  assert.equal(clientR, 'READY', 'client: legacy record with all pre-R12 items answered = READY');
+  assert.equal(serverR, 'READY', 'server: legacy record with all pre-R12 items answered = READY');
+});
+
+test('R12-32: client and server agree: v11 record all-pre-R12 answered = READY', () => {
+  const clientR = clientComputeResult(allAnsweredNoR12, 11).result;
+  const serverR = computeResult(allAnsweredNoR12, 11).result;
+  assert.equal(clientR, 'READY');
+  assert.equal(serverR, 'READY');
+});
+
+test('R12-33: client and server agree: v12 record all answered = READY', () => {
+  const clientR = clientComputeResult(allAnswered, 12).result;
+  const serverR = computeResult(allAnswered, 12).result;
+  assert.equal(clientR, 'READY');
+  assert.equal(serverR, 'READY');
+});
+
+test('R12-34: client and server agree: v12 record with unanswered 1d = NOT READY', () => {
+  const items12 = allAnswered.map(it => it.key === '1d' ? { ...it, answer: '' } : it);
+  const clientR = clientComputeResult(items12, 12);
+  const serverR = computeResult(items12, 12);
+  assert.equal(clientR.result, 'NOT READY');
+  assert.equal(serverR.result, 'NOT READY');
+  assert.ok(clientR.openItems.includes('1d'), 'client must list 1d as open');
+  assert.ok(serverR.openItems.includes('1d'), 'server must list 1d as open');
+});
+
+test('R12-35: new form (sv=null) is R12-scored on client', () => {
+  const r = clientComputeResult(allAnswered, null);
+  assert.equal(r.result, 'READY', 'new form with all items answered must be READY');
+});
+
+test('R12-36: HTML uses 0 sentinel for legacy records (not null)', () => {
+  assert.ok(htmlSrc.includes('loadedSchemaVersion : 0') || htmlSrc.includes('loadedSchemaVersion = 0') || htmlSrc.includes(': 0;') && htmlSrc.includes('loadedSchemaVersion'),
+    'HTML must assign 0 (not null) for loaded records missing schemaVersion');
+  // Specifically the assignment at load time
+  assert.ok(htmlSrc.includes('? r.schemaVersion : 0'),
+    'HTML load path must fall back to 0 for legacy records');
+});
+
+test('R12-37: HTML isLegacyRecord function exists and checks sv===0', () => {
+  assert.ok(htmlSrc.includes('isLegacyRecord'),
+    'HTML must define isLegacyRecord() helper');
+  assert.ok(htmlSrc.includes('loadedSchemaVersion === 0'),
+    'isLegacyRecord must check for sentinel 0');
+});
+
+test('R12-38: HTML CLIENT_GUARDED_KEYS covers 1b/1c/1d-1h', () => {
+  for (const k of ['1b','1c','1d','1e','1f','1g','1h']) {
+    assert.ok(htmlSrc.includes(`'${k}': 1`), `CLIENT_GUARDED_KEYS must include '${k}'`);
+  }
+});
+
+test('R12-39: HTML disabled note text present for legacy inputs', () => {
+  assert.ok(htmlSrc.includes('older version of the form'),
+    'HTML must show older-version note for disabled guarded inputs on legacy records');
+});
+
+// ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------
 setTimeout(() => {

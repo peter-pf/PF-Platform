@@ -591,6 +591,10 @@ try {
 
   // R12 keys: only scored/open on schemaVersion >= 12 records (mirrors server R12_KEYS).
   var CLIENT_R12_KEYS = { '1d': 1, '1e': 1, '1f': 1, '1g': 1, '1h': 1 };
+  // Guarded keys: server strips these on legacy updates (schemaVersion absent).
+  // Inputs are disabled for legacy records so crew can't answer questions the server ignores.
+  // Mirrors server SCHEMA_GUARDED_KEYS = {1b, 1c, 1d, 1e, 1f, 1g, 1h}.
+  var CLIENT_GUARDED_KEYS = { '1b': 1, '1c': 1, '1d': 1, '1e': 1, '1f': 1, '1g': 1, '1h': 1 };
 
   var state = {
     records: [],
@@ -636,12 +640,15 @@ try {
   }
 
   // Compute READY / NOT READY from current state.items (mirrors server computeResult).
-  // R12: 1d-1h are only counted as open for R12 records (schemaVersion >= 12).
-  // When loading a pre-R12 draft, state.loadedSchemaVersion is set to the record's value;
-  // new forms use null which is treated as R12 (crew is filling a fresh form).
+  // R12: 1d-1h are only scored for R12 records (schemaVersion >= 12).
+  // loadedSchemaVersion encoding:
+  //   null  = new form, never saved      → treat as R12 (crew filling fresh form)
+  //   0     = existing legacy record     → schemaVersion absent in stored data
+  //   11    = existing R11 record        → 1d-1h unscored, other items scored, inputs editable
+  //   12    = existing R12 record        → all items scored
   function computeResult() {
     var sv = state.loadedSchemaVersion;
-    // null = new form (not yet saved); treat as R12 so new forms score all items.
+    // null = new form; treat as R12. 0 = legacy; sv=11 = R11 — both pre-R12.
     var isR12 = (sv === null) || (typeof sv === 'number' && sv >= 12);
     var open = [];
     state.items.forEach(function (it) {
@@ -649,6 +656,12 @@ try {
       if (it.answer !== 'Yes' && it.answer !== 'N/A') open.push(it.key);
     });
     return { result: open.length === 0 ? 'READY' : 'NOT READY', openItems: open };
+  }
+
+  // True when the loaded record is a legacy record (existing, no stored schemaVersion).
+  // Server strips guarded keys (1b/1c/1d-1h) on legacy updates so those inputs are locked.
+  function isLegacyRecord() {
+    return state.loadedSchemaVersion === 0;
   }
 
   // Update the live result banner above the checklist.
@@ -737,19 +750,31 @@ try {
       html += '<div class="sr-section-items">';
       sec.defs.forEach(function (def) {
         var stateItem = state.items.find(function (it) { return it.key === def.key; }) || { key: def.key, answer: '', note: '' };
+        // Legacy record: disable guarded keys (server ignores them on update).
+        var legacy = isLegacyRecord();
+        var guardedDisabled = legacy && CLIENT_GUARDED_KEYS[def.key];
         // Note when the item is answered No (highlight).
         var noClass = stateItem.answer === 'No' ? ' style="background:rgba(229,83,75,.07)"' : '';
         html += '<div class="sr-item" data-item-key="' + E(def.key) + '"' + noClass + '>';
         html += '<div class="sr-item-label"><strong>' + E(def.key) + '.</strong> ' + E(def.label) + '</div>';
-        html += '<div class="sr-item-row">';
-        html += '<select class="sr-ans" data-key="' + E(def.key) + '" aria-label="Answer for ' + E(def.key) + '">';
-        html += '<option value="">Select</option>';
-        ['Yes', 'No', 'N/A'].forEach(function (a) {
-          html += '<option value="' + a + '"' + (stateItem.answer === a ? ' selected' : '') + '>' + a + '</option>';
-        });
-        html += '</select>';
-        html += '<input type="text" class="sr-note" data-key="' + E(def.key) + '" placeholder="Note (optional)" value="' + E(stateItem.note) + '" aria-label="Note for ' + E(def.key) + '">';
-        html += '</div>';
+        if (guardedDisabled) {
+          // Show stored value read-only + a note explaining why inputs are locked.
+          var dispVal = stateItem.answer || '—';
+          html += '<div class="sr-item-row">';
+          html += '<span class="sr-item-flag" style="color:var(--text-3);font-style:italic">' + E(dispVal) + (stateItem.note ? ' — ' + E(stateItem.note) : '') + '</span>';
+          html += '</div>';
+          html += '<div class="sr-item-flag" style="margin-top:3px">This draft was started on an older version of the form. Start a new Site Readiness report to answer these questions.</div>';
+        } else {
+          html += '<div class="sr-item-row">';
+          html += '<select class="sr-ans" data-key="' + E(def.key) + '" aria-label="Answer for ' + E(def.key) + '">';
+          html += '<option value="">Select</option>';
+          ['Yes', 'No', 'N/A'].forEach(function (a) {
+            html += '<option value="' + a + '"' + (stateItem.answer === a ? ' selected' : '') + '>' + a + '</option>';
+          });
+          html += '</select>';
+          html += '<input type="text" class="sr-note" data-key="' + E(def.key) + '" placeholder="Note (optional)" value="' + E(stateItem.note) + '" aria-label="Note for ' + E(def.key) + '">';
+          html += '</div>';
+        }
 
         // File upload for items with hasUpload.
         // Show only when answered Yes, or refs/pending already exist (preserve visibility).
@@ -1269,7 +1294,9 @@ try {
     var hid = document.getElementById('srProjectId'); if (hid) hid.value = pid;
 
     // R12: track the loaded record's schemaVersion so computeResult can skip 1d-1h for pre-R12 records.
-    state.loadedSchemaVersion = (typeof r.schemaVersion === 'number') ? r.schemaVersion : null;
+    // Use 0 as sentinel for legacy records (existing record with no stored schemaVersion).
+    // null is reserved for "new form, never loaded" so computeResult can tell new from legacy.
+    state.loadedSchemaVersion = (typeof r.schemaVersion === 'number') ? r.schemaVersion : 0;
 
     state.items = ITEMS.map(function (def) {
       var saved = (Array.isArray(r.items) ? r.items : []).find(function (it) { return it.key === def.key; });
