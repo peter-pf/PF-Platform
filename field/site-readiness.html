@@ -777,12 +777,16 @@ try {
         }
 
         // File upload for items with hasUpload.
-        // Show only when answered Yes, or refs/pending already exist (preserve visibility).
+        // R13: always render upload widgets for photo buckets — a photo matters whatever the answer.
+        // EXCEPTION: safety_cert (6a) stays conditional on Yes (per R10 Derek spec).
         if (def.uploadBucket) {
           var bk = def.uploadBucket;
           var bkAttach = state.attachments.filter(function (a) { return a.bucket === bk; });
           var bkPending = state.pendingUploads[bk] || [];
-          if (stateItem.answer === 'Yes' || bkAttach.length > 0 || bkPending.length > 0) {
+          var showUpload = (bk === 'safety_cert')
+            ? (stateItem.answer === 'Yes' || bkAttach.length > 0 || bkPending.length > 0)
+            : true; // all other upload buckets always visible
+          if (showUpload) {
             var bkAllowed = (bk === 'safety_cert') ? UP_SAFETY_ALLOWED : UP_ALLOWED;
             html += renderUploadWidget(def.key, bk, def.uploadLabel, bkAttach, bkPending, bkAllowed);
           }
