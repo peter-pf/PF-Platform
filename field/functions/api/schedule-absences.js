@@ -78,9 +78,13 @@ export async function onRequestGet(context) {
 
     ({ from, to } = clampRange(from, to));
 
-    // Only return name, start_date, end_date, half_day — no uid, no type (privacy)
+    // uid is returned for client-side employee grouping.
+    // type is NOT returned raw (privacy); instead a display label is derived:
+    //   Vacation  → 'Vacation'  (crew can plan around named vacation)
+    //   Home Day  → 'Home'      (crew can plan around home days)
+    //   Sick / Other / Personal → 'Out'  (private; crew only sees "out")
     const { results } = await env.DB
-      .prepare(`SELECT id, name, start_date, end_date, half_day
+      .prepare(`SELECT id, uid, name, start_date, end_date, half_day, type
                 FROM absence_requests
                 WHERE status='approved'
                   AND start_date <= ?
@@ -88,8 +92,12 @@ export async function onRequestGet(context) {
                 ORDER BY start_date ASC, name ASC`)
       .bind(to, from).all();
 
-    // Add a fixed label so the client can identify these rows
-    const absences = (results || []).map(r => ({ ...r, label: 'Out' }));
+    const absences = (results || []).map(({ type: t, ...r }) => {
+      const label = t === 'Vacation' ? 'Vacation'
+                  : t === 'Home Day'  ? 'Home'
+                  : 'Out';
+      return { ...r, label };
+    });
 
     return json({ ok: true, from, to, absences, jobs: [] });
   } catch (e) {

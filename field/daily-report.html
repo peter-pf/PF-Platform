@@ -311,6 +311,7 @@
         <div class="section-body" id="sb-crew">
           <div class="form-sublabel">Timecards <span class="dr-flag">(hours worked — no pay rates)</span></div>
           <div id="drCrew"></div>
+          <button type="button" class="btn btn-sm" id="drAddCrew" style="margin-top:6px">+ Add crew member</button>
         </div>
       </div>
 
@@ -393,6 +394,13 @@
           <div class="form-sublabel">GUHM data <span class="dr-flag">(raw .guh column logger export)</span></div>
           <div class="dr-upload" id="drUpGuhma">
             <input type="file" id="drFileGuhma" multiple disabled>
+            <div class="dr-up-hint" data-up-hint>Select a project first to enable uploads.</div>
+            <div class="dr-up-list" data-up-list></div>
+            <div class="dr-up-msg" data-up-msg></div>
+          </div>
+          <div class="form-sublabel">Predrill highlighted markup <span class="dr-flag">(annotated predrill drawing)</span></div>
+          <div class="dr-upload" id="drUpPredrill">
+            <input type="file" id="drFilePredrill" multiple disabled>
             <div class="dr-up-hint" data-up-hint>Select a project first to enable uploads.</div>
             <div class="dr-up-list" data-up-list></div>
             <div class="dr-up-msg" data-up-msg></div>
@@ -524,13 +532,14 @@ try {
     maintenance: [],
     delayEntries: [{description:'',downtimeHours:''}],
     future: [{equipment:'',description:''}],
-    attachments: { handlogs:[], guhma:[], photos:[] },
+    attachments: { handlogs:[], guhma:[], photos:[], predrill:[] },
   };
 
   var UP_BUCKETS = {
     photos:   { input:'drFilePhotos',   wrap:'drUpPhotos',   label:'Site Photos' },
     handlogs: { input:'drFileHandlogs', wrap:'drUpHandlogs', label:'Hand Logs' },
     guhma:    { input:'drFileGuhma',    wrap:'drUpGuhma',    label:'GUHM Data' },
+    predrill: { input:'drFilePredrill', wrap:'drUpPredrill', label:'Predrill Markup' },
   };
 
   /* ---- helpers ---- */
@@ -599,7 +608,7 @@ try {
     renderDelays();
     if(Array.isArray(b.crew)&&b.crew.length){
       var crew=b.crew.map(function(m){return{name:m.name||'',start:m.start||'',end:m.end||'',hours:(m.hours!=null?m.hours:''),costCode:m.costCode||'',auto:false};});
-      while(crew.length<3)crew.push({name:'',start:'',end:'',hours:'',costCode:'',auto:false});
+      while(crew.length<1)crew.push({name:'',start:'',end:'',hours:'',costCode:'',auto:false});
       state.crew=crew;
     }
     if(Array.isArray(b.equipmentOwned)&&b.equipmentOwned.length){
@@ -689,8 +698,9 @@ try {
     var pid=(document.getElementById('drProject')||{}).value||'';
     var prev=findPrevSentReport(pid);
     if(!prev){msg('No previous sent reports found for this project.',false);return;}
+    // Copy crew names (clear hours) from previous report; pad to at least 1 row.
     var crew=(Array.isArray(prev.crew)?prev.crew:[]).map(function(m){return{name:m.name||'',start:'',end:'',hours:'',costCode:m.costCode||'',auto:false};});
-    while(crew.length<3)crew.push({name:'',start:'',end:'',hours:'',costCode:'',auto:false});
+    while(crew.length<1)crew.push({name:'',start:'',end:'',hours:'',costCode:'',auto:false});
     state.crew=crew;
     var fm=document.getElementById('drForeman');if(fm&&prev.foreman)fm.value=prev.foreman;
     applyForemanToCrew(prev.foreman||'');
@@ -838,6 +848,7 @@ try {
   function renderCrew(){
     var host=document.getElementById('drCrew');
     if(!host)return;
+    var canRemove=state.crew.length>1;
     host.innerHTML=state.crew.map(function(m,i){
       var sp=drDaySplit(m.hours);
       return '<div class="dr-row">'
@@ -849,6 +860,7 @@ try {
         +'Reg <strong class="dr-reg">'+drNum(sp.reg)+'</strong> / OT <strong class="dr-ot">'+drNum(sp.ot)+'</strong>'
         +'</span>'
         +'<input class="cc" data-i="'+i+'" data-f="costCode" placeholder="Cost Code" value="'+E(m.costCode)+'">'
+        +(canRemove?'<button type="button" class="dr-rm" data-crm="'+i+'" aria-label="Remove crew member">Remove</button>':'')
         +'</div>';
     }).join('');
     host.querySelectorAll('[data-i]').forEach(function(el){
@@ -858,6 +870,13 @@ try {
         if(f==='name') state.crew[i].auto=false;
         if(f==='start'||f==='end') recalcCrewHours(i);
         if(f==='hours'||f==='start'||f==='end') updateRegOt(i);
+      });
+    });
+    host.querySelectorAll('button[data-crm]').forEach(function(b){
+      b.addEventListener('click',function(){
+        if(state.crew.length<=1)return;
+        state.crew.splice(+this.getAttribute('data-crm'),1);
+        renderCrew();
       });
     });
   }
@@ -1019,7 +1038,7 @@ try {
     var hasCrew=state.crew.some(function(m){return (m.name||'').trim();});
     var hasEquip=state.owned.some(function(r){return (r.machine||'').trim();})
       ||state.rental.some(function(r){return (r.category||'').trim();});
-    var hasFiles=state.attachments.photos.length||state.attachments.handlogs.length||state.attachments.guhma.length;
+    var hasFiles=state.attachments.photos.length||state.attachments.handlogs.length||state.attachments.guhma.length||state.attachments.predrill.length;
     var s1=!!(pid&&date);var s2=!!(cols||lf||work);var s3=hasCrew;var s4=hasEquip;
     var s5=!!delays;var s6=!!safety;var s7=!!hasFiles;
     var score=+s1+ +s2+ +s3+ +s4+ +s5+ +s6+ +s7;
@@ -1056,6 +1075,8 @@ try {
     updateUploadEnabled();
     var fm=document.getElementById('drForeman');
     if(fm&&!fm.dataset.wired){fm.dataset.wired='1';fm.addEventListener('change',function(){applyForemanToCrew(this.value);scheduleOfflineSave();});}
+    var ac=document.getElementById('drAddCrew');
+    if(ac&&!ac.dataset.wired){ac.dataset.wired='1';ac.addEventListener('click',function(){state.crew.push({name:'',start:'',end:'',hours:'',costCode:'',auto:false});renderCrew();});}
     var ao=document.getElementById('drAddOwned');
     if(ao&&!ao.dataset.wired){ao.dataset.wired='1';ao.addEventListener('click',function(){state.owned.push({machine:'',hours:''});renderOwned();});}
     var ar=document.getElementById('drAddRental');
@@ -1282,7 +1303,7 @@ try {
       futureIssues:state.future.filter(function(r){return(r.equipment||'').trim()||(r.description||'').trim();}),
       delayEntries:state.delayEntries.filter(function(d){return(d.description||'').trim()||(d.downtimeHours||'').toString().trim();}),
       safety:document.getElementById('drSafety').value,
-      attachments:(state.attachments.photos||[]).concat(state.attachments.handlogs||[]).concat(state.attachments.guhma||[]),
+      attachments:(state.attachments.photos||[]).concat(state.attachments.handlogs||[]).concat(state.attachments.guhma||[]).concat(state.attachments.predrill||[]),
     };
   }
 
@@ -1343,8 +1364,10 @@ try {
     if(!present&&pid){state.projects.unshift({id:pid,name:r.projectName||pid,label:(r.projectId?r.projectId+' - '+r.projectName:r.projectName||pid)});}
     drPickerSetValue(pid,r.projectName||pid);
     var hid=document.getElementById('drProjectId');if(hid)hid.value=pid;
+    // Preserve whatever number of crew rows the record has (>3 possible in R9).
+    // Minimum 1 row so the form never shows a blank crew section.
     var crew=(Array.isArray(r.crew)?r.crew:[]).map(function(m){return{name:m.name||'',start:m.start||'',end:m.end||'',hours:(m.hours!=null?m.hours:''),costCode:m.costCode||'',auto:false};});
-    while(crew.length<3) crew.push({name:'',start:'',end:'',hours:'',costCode:'',auto:false});
+    while(crew.length<1) crew.push({name:'',start:'',end:'',hours:'',costCode:'',auto:false});
     state.crew=crew;
     var owned=(Array.isArray(r.equipmentOwned)?r.equipmentOwned:[]).map(function(e){return{machine:e.machine||'',hours:(e.hours!=null?e.hours:'')};});
     while(owned.length<1)owned.push({machine:'',hours:''});state.owned=owned;
@@ -1353,15 +1376,15 @@ try {
     state.maintenance=maintenanceFromRecord(r.maintenance);
     var future=(Array.isArray(r.futureIssues)?r.futureIssues:[]).map(function(f){return{equipment:f.equipment||'',description:f.description||''};});
     while(future.length<1)future.push({equipment:'',description:''});state.future=future;
-    var att={handlogs:[],guhma:[],photos:[]};
+    var att={handlogs:[],guhma:[],photos:[],predrill:[]};
     (Array.isArray(r.attachments)?r.attachments:[]).forEach(function(a){
-      var bk=a.bucket==='guhma'?'guhma':(a.bucket==='photos'?'photos':'handlogs');
+      var bk=a.bucket==='guhma'?'guhma':(a.bucket==='photos'?'photos':(a.bucket==='predrill'?'predrill':'handlogs'));
       att[bk].push({name:a.name||'',itemId:a.itemId||'',webUrl:a.webUrl||'',bucket:bk});
     });
     state.attachments=att;
     renderProject();renderForeman();renderCrew();renderOwned();renderRental();renderMaint();renderDelays();renderFuture();
-    renderUpList('photos',[]);renderUpList('handlogs',[]);renderUpList('guhma',[]);
-    upMsg('photos','',null);upMsg('handlogs','',null);upMsg('guhma','',null);
+    renderUpList('photos',[]);renderUpList('handlogs',[]);renderUpList('guhma',[]);renderUpList('predrill',[]);
+    upMsg('photos','',null);upMsg('handlogs','',null);upMsg('guhma','',null);upMsg('predrill','',null);
     updateUploadEnabled();updateEditBanner();updateCopyPrevBtn();
     updateDraftBanner(r.updatedAt||r.createdAt||null);
     msg('Editing report '+(window.pfFmtDate(r.date)||'')+' - '+(r.projectName||r.projectId||'')+'. Update the fields and re-send, or start a new report to cancel.',true);
@@ -1428,11 +1451,11 @@ try {
     state.rental=[{category:'',hours:''},{category:'',hours:''}];
     state.future=[{equipment:'',description:''}];
     state.delayEntries=[{description:'',downtimeHours:''}];
-    state.attachments={handlogs:[],guhma:[],photos:[]};
+    state.attachments={handlogs:[],guhma:[],photos:[],predrill:[]};
     buildMaintenanceRows();
     renderProject();renderForeman();renderCrew();renderOwned();renderRental();renderMaint();renderDelays();renderFuture();
-    renderUpList('photos',[]);renderUpList('handlogs',[]);renderUpList('guhma',[]);
-    upMsg('photos','',null);upMsg('handlogs','',null);upMsg('guhma','',null);
+    renderUpList('photos',[]);renderUpList('handlogs',[]);renderUpList('guhma',[]);renderUpList('predrill',[]);
+    upMsg('photos','',null);upMsg('handlogs','',null);upMsg('guhma','',null);upMsg('predrill','',null);
     updateUploadEnabled();
     updateDraftBanner(null);
     updateProgress();
@@ -1462,7 +1485,8 @@ try {
       if(!weatherH.length&&r.weather)weatherH.push(E(r.weather));
       var attachH=(r.attachments||[]).map(function(a){
         var nm=E(a.name||a.itemId||'file');
-        var b=a.bucket?(' ['+(a.bucket==='guhma'?'GUHM':(a.bucket==='photos'?'Photo':'Hand Log'))+']'):'';
+        var bLabel=a.bucket==='guhma'?'GUHM':(a.bucket==='photos'?'Photo':(a.bucket==='predrill'?'Predrill':'Hand Log'));
+        var b=a.bucket?(' ['+bLabel+']'):'';
         return safeFileLink(a.webUrl,nm)+b;
       }).join(', ');
       return '<div class="dr-item">'

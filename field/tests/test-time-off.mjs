@@ -87,7 +87,7 @@ function s(v, cap = 500) {
   return String(v).replace(/[<>]/g, '').slice(0, cap);
 }
 
-const VALID_TYPES = ['Vacation', 'Sick', 'Personal', 'Other'];
+const VALID_TYPES = ['Vacation', 'Home Day', 'Sick', 'Personal', 'Other'];
 
 function newId() {
   // Polyfill for test env (Node has crypto.randomUUID since v14.17)
@@ -243,8 +243,8 @@ test('s(): strips < and > angle brackets (XSS defense)', () => {
 // ---------------------------------------------------------------------------
 // 10-11: VALID_TYPES
 // ---------------------------------------------------------------------------
-test('VALID_TYPES: Vacation/Sick/Personal/Other accepted', () => {
-  ['Vacation', 'Sick', 'Personal', 'Other'].forEach(t => {
+test('VALID_TYPES: Vacation/Home Day/Sick/Personal/Other accepted', () => {
+  ['Vacation', 'Home Day', 'Sick', 'Personal', 'Other'].forEach(t => {
     assert.equal(VALID_TYPES.includes(t), true, `${t} should be valid`);
   });
 });
@@ -459,6 +459,90 @@ test('overlap: approved request also blocks (same logic)', () => {
     assert.equal(statuses.includes(r.status), true); // both block new requests
     assert.equal(overlaps(r.start, r.end, '2026-11-03', '2026-11-07'), true);
   }
+});
+
+// ---------------------------------------------------------------------------
+// 40-46: R9 additions — Home Day, default allocation, schedule labels
+// ---------------------------------------------------------------------------
+
+// calendarDays counts every calendar day (including weekends)
+function calendarDaysForTest(startIso, endIso) {
+  const s = new Date(startIso + 'T12:00:00Z');
+  const e = new Date(endIso   + 'T12:00:00Z');
+  return Math.round((e - s) / 86400000) + 1;
+}
+
+// getAllocationSummary logic mirror (default = 10, only Vacation deducts)
+function getAllocationSummary({ allocDaysFromDb, absences }) {
+  const allocDays = (allocDaysFromDb != null && Number.isFinite(allocDaysFromDb))
+    ? allocDaysFromDb : 10;
+  const usedDays    = absences.filter(a => a.type === 'Vacation' && a.status === 'approved')
+                              .reduce((t, a) => t + a.days, 0);
+  const pendingDays = absences.filter(a => a.type === 'Vacation' && a.status === 'pending')
+                              .reduce((t, a) => t + a.days, 0);
+  return { allocDays, usedDays, pendingDays, remaining: allocDays - usedDays - pendingDays };
+}
+
+// schedule-absences label mapping mirror
+function typeToLabel(type) {
+  if (type === 'Vacation') return 'Vacation';
+  if (type === 'Home Day') return 'Home';
+  return 'Out';
+}
+
+test('R9: Home Day on Saturday accepted (calendarDays >= 1)', () => {
+  // 2026-10-24 is Saturday — calendarDays should be 1
+  const days = calendarDaysForTest('2026-10-24', '2026-10-24');
+  assert.equal(days, 1); // valid: calendar day counts weekend
+});
+
+test('R9: Home Day spans full weekend = 2 calendar days', () => {
+  // Sat-Sun span
+  const days = calendarDaysForTest('2026-10-24', '2026-10-25');
+  assert.equal(days, 2);
+});
+
+test('R9: Home Day does NOT deduct from vacation allocation', () => {
+  const summary = getAllocationSummary({
+    allocDaysFromDb: 10,
+    absences: [
+      { type: 'Home Day', status: 'approved', days: 3 },
+      { type: 'Vacation', status: 'approved', days: 2 },
+    ],
+  });
+  // 3 Home Days should not eat into vacation; only 2 Vacation days deducted
+  assert.equal(summary.usedDays,  2);
+  assert.equal(summary.remaining, 8);
+});
+
+test('R9: default allocation = 10 when no DB row exists', () => {
+  const summary = getAllocationSummary({ allocDaysFromDb: null, absences: [] });
+  assert.equal(summary.allocDays, 10);
+  assert.equal(summary.remaining, 10);
+});
+
+test('R9: Vacation type uses configured allocation (override)', () => {
+  const summary = getAllocationSummary({
+    allocDaysFromDb: 15,
+    absences: [{ type: 'Vacation', status: 'approved', days: 5 }],
+  });
+  assert.equal(summary.allocDays, 15);
+  assert.equal(summary.usedDays,  5);
+  assert.equal(summary.remaining, 10);
+});
+
+test('R9: schedule label: Vacation -> "Vacation"', () => {
+  assert.equal(typeToLabel('Vacation'), 'Vacation');
+});
+
+test('R9: schedule label: Home Day -> "Home"', () => {
+  assert.equal(typeToLabel('Home Day'), 'Home');
+});
+
+test('R9: schedule label: Sick -> "Out"', () => {
+  assert.equal(typeToLabel('Sick'), 'Out');
+  assert.equal(typeToLabel('Other'), 'Out');
+  assert.equal(typeToLabel('Personal'), 'Out');
 });
 
 // ---------------------------------------------------------------------------

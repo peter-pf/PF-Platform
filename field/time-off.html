@@ -186,10 +186,14 @@
         <label for="typeSelect">Type</label>
         <select id="typeSelect" name="type">
           <option value="Vacation">Vacation</option>
+          <option value="Home Day">Home Day</option>
           <option value="Sick">Sick</option>
-          <option value="Personal">Personal</option>
           <option value="Other">Other</option>
         </select>
+        <p style="font-size:.78rem;color:var(--text-2);margin:5px 0 0;">
+          <strong>Vacation:</strong> weekdays only, counts against your 10 days.&nbsp;
+          <strong>Home Day:</strong> any day home off the road, does not count against vacation.
+        </p>
       </div>
       <div class="check-row">
         <input type="checkbox" id="halfDay" name="half_day">
@@ -270,19 +274,13 @@ function renderAllocBar(alloc) {
   var elP = document.getElementById('statPending');
   var elR = document.getElementById('statRemaining');
   if (!alloc) return;
-  if (alloc.allocatedDays === null) {
-    elA.textContent = 'Not set';
-    elA.classList.add('not-set');
-    elR.textContent = '—';
-    elR.classList.add('not-set');
-  } else {
-    elA.textContent = alloc.allocatedDays;
-    elA.classList.remove('not-set');
-    elR.textContent = alloc.remaining !== null ? alloc.remaining : '—';
-    if (alloc.remaining !== null) elR.classList.remove('not-set');
-  }
+  // Server now defaults allocatedDays to 10 when no explicit row exists.
+  elA.textContent = (alloc.allocatedDays != null) ? alloc.allocatedDays : 10;
+  elA.classList.remove('not-set');
   elU.textContent = alloc.usedDays || 0;
   elP.textContent = alloc.pendingDays || 0;
+  elR.textContent = (alloc.remaining != null) ? alloc.remaining : '—';
+  if (alloc.remaining != null) elR.classList.remove('not-set');
 }
 
 // ---- My requests table ----
@@ -303,10 +301,11 @@ function renderMyRequests(requests) {
     var denialNote = r.status === 'denied' && r.denial_reason
       ? '<br><span style="font-size:.78rem;color:var(--text-3);">Reason: '+window.esc(r.denial_reason)+'</span>'
       : '';
+    var dayLabel = r.type === 'Home Day' ? 'cal days' : 'wkdays';
     return '<tr>'+
       '<td>'+window.esc(dates)+'</td>'+
       '<td>'+window.esc(r.type)+'</td>'+
-      '<td>'+window.esc(String(r.day_count))+'d <span style="font-size:.72rem;color:var(--text-3);">wkdays</span></td>'+
+      '<td>'+window.esc(String(r.day_count))+'d <span style="font-size:.72rem;color:var(--text-3);">'+dayLabel+'</span></td>'+
       '<td>'+badgeHtml(r.status)+denialNote+'</td>'+
       '<td>'+cancelBtn+'</td>'+
       '</tr>';
@@ -333,7 +332,7 @@ function renderPending(requests) {
       '<td>'+window.esc(r.name||r.uid)+'</td>'+
       '<td>'+window.esc(dates)+noteHtml+'</td>'+
       '<td>'+window.esc(r.type)+'</td>'+
-      '<td>'+window.esc(String(r.day_count))+'d <span style="font-size:.72rem;color:var(--text-3);">wkdays</span></td>'+
+      '<td>'+window.esc(String(r.day_count))+'d <span style="font-size:.72rem;color:var(--text-3);">'+(r.type==='Home Day'?'cal days':'wkdays')+'</span></td>'+
       '<td>'+
         '<div style="display:flex;flex-direction:column;gap:6px;">'+
           '<button class="btn btn-sm btn-success" data-approve-id="'+window.esc(r.id)+'">Approve</button>'+
@@ -471,6 +470,47 @@ document.addEventListener('click', function(e) {
   else if (btn.dataset.saveUid)   { window.saveAllocation(btn.dataset.saveUid, parseInt(btn.dataset.saveYear, 10)); }
 });
 
+// ---- Inline vacation-balance warning ----
+// Runs client-side when user picks dates / type so they see the warning before
+// they hit Submit (the server repeats it on the response; this is UX sugar).
+function checkVacationBalance() {
+  var type  = document.getElementById('typeSelect').value;
+  var msgEl = document.getElementById('formMsg');
+  if (type !== 'Vacation' || !_allData || !_allData.allocation) { return; }
+  var alloc    = _allData.allocation;
+  var sd = document.getElementById('startDate').value;
+  var ed = document.getElementById('endDate').value;
+  var hd = document.getElementById('halfDay').checked;
+  if (!sd || !ed) return;
+  var days = hd ? 0.5 : countWeekdaysClient(sd, ed);
+  var rem  = alloc.remaining;
+  if (rem != null && days > rem) {
+    showMsg(msgEl, 'Warning: this request (' + days + ' weekday' + (days===1?'':'s') + ') would exceed your remaining vacation balance (' + rem + ' day' + (rem===1?'':'s') + '). You can still submit and the owner will review.', 'info');
+  } else {
+    // Clear any previous balance warning (but not errors)
+    var cur = msgEl.querySelector('.msg.info');
+    if (cur) msgEl.removeChild(cur);
+  }
+}
+function countWeekdaysClient(startIso, endIso) {
+  try {
+    var s = new Date(startIso + 'T12:00:00Z');
+    var e = new Date(endIso   + 'T12:00:00Z');
+    if (isNaN(s) || isNaN(e) || e < s) return 0;
+    var count = 0;
+    var cur = new Date(s);
+    while (cur <= e) {
+      var dow = cur.getUTCDay();
+      if (dow !== 0 && dow !== 6) count++;
+      cur.setUTCDate(cur.getUTCDate() + 1);
+    }
+    return count;
+  } catch(e2) { return 0; }
+}
+document.getElementById('typeSelect').addEventListener('change', checkVacationBalance);
+document.getElementById('startDate').addEventListener('change', checkVacationBalance);
+document.getElementById('endDate').addEventListener('change', checkVacationBalance);
+
 // ---- Form half-day enforcement ----
 document.getElementById('halfDay').addEventListener('change', function() {
   var ed = document.getElementById('endDate');
@@ -511,7 +551,15 @@ document.getElementById('toForm').addEventListener('submit', function(e) {
     .then(function(res) {
       btn.disabled = false; btn.textContent = 'Submit Request';
       if (res.ok && res.d.ok) {
-        showMsg(msgEl, 'Request submitted. The owners will be notified.', 'ok');
+        var successMsg = 'Request submitted. The owners will be notified.';
+        showMsg(msgEl, successMsg, 'ok');
+        if (res.d.vacation_warning) {
+          // Append warning below the success message (non-blocking)
+          var warnDiv = document.createElement('div');
+          warnDiv.className = 'msg info';
+          warnDiv.textContent = res.d.vacation_warning;
+          msgEl.appendChild(warnDiv);
+        }
         document.getElementById('toForm').reset();
         document.getElementById('endDate').disabled = false;
         loadData();

@@ -53,6 +53,8 @@
   .sched-absent{display:block;background:var(--accent-light);color:var(--accent);
     border:1px solid var(--accent);border-radius:3px;font-size:.65rem;font-weight:600;
     text-align:center;padding:1px 0;margin:0 2px;}
+  .sched-absent-vacation{background:var(--green-light);color:var(--green);border-color:var(--green);}
+  .sched-absent-home{background:var(--amber-light);color:var(--amber);border-color:var(--amber);}
   .sched-absent-half{background:var(--amber-light);color:var(--amber);border-color:var(--amber);}
   .sched-day-head{font-size:.7rem;color:var(--text-3);}
   .sched-day-head.today{color:var(--accent);font-weight:700;}
@@ -392,16 +394,17 @@ window.esc = window.esc || function(s){
       var days = [];
       for(var i=0;i<14;i++) days.push(addDays(today,i));
 
-      // Map uid -> name + per-day set
-      var empMap = {}; // uid -> {name, days: Set}
+      // Map uid (or fallback name) -> per-day info incl. label
+      var empMap = {}; // key -> {name, dayInfo: {iso: {half, label}}}
       absences.forEach(function(a){
-        if(!empMap[a.uid]) empMap[a.uid] = {name:a.name||a.uid, halfDays:{}};
+        var key = a.uid || a.name || a.id;
+        if(!empMap[key]) empMap[key] = {name:a.name||a.uid||key, dayInfo:{}};
         var s = new Date(a.start_date+'T12:00:00Z');
         var e = new Date(a.end_date+'T12:00:00Z');
         var cur = new Date(s);
         while(cur<=e){
           var iso = cur.toISOString().slice(0,10);
-          empMap[a.uid].halfDays[iso] = a.half_day ? 1 : 0;
+          empMap[key].dayInfo[iso] = { half: a.half_day ? 1 : 0, label: a.label || 'Out' };
           cur.setUTCDate(cur.getUTCDate()+1);
         }
       });
@@ -418,12 +421,19 @@ window.esc = window.esc || function(s){
         return '<th class="day-col"><div class="sched-day-head'+(isToday?' today':'')+'">'+dowShort(d)+'<br>'+shortDate(d)+'</div></th>';
       }).join('');
 
-      var rows = empKeys.map(function(uid){
-        var emp = empMap[uid];
+      var rows = empKeys.map(function(key){
+        var emp = empMap[key];
         var cells = days.map(function(d){
-          if(typeof emp.halfDays[d] !== 'undefined'){
-            var half = emp.halfDays[d]===1;
-            return '<td class="day-col"><span class="sched-absent'+(half?' sched-absent-half':'')+'">'+(half?'½':'OFF')+'</span></td>';
+          var info = emp.dayInfo[d];
+          if(info){
+            var half  = info.half === 1;
+            var lbl   = info.label || 'Out';
+            var extra = half            ? ' sched-absent-half'
+                      : lbl==='Vacation'? ' sched-absent-vacation'
+                      : lbl==='Home'    ? ' sched-absent-home'
+                      : '';
+            var text  = half ? '½' : lbl;
+            return '<td class="day-col"><span class="sched-absent'+extra+'">'+window.esc(text)+'</span></td>';
           }
           return '<td class="day-col"></td>';
         }).join('');

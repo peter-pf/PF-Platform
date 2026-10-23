@@ -116,7 +116,10 @@ function newId() {
   return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
 }
 
-const VALID_TYPES = ['Vacation', 'Sick', 'Personal', 'Other'];
+// Home Day: crew works on road, requests to be home on specific day(s).
+// Allowed any day of week; counts calendar days; does NOT deduct from vacation.
+// Personal folds into Other (kept here for backward compat with old records).
+const VALID_TYPES = ['Vacation', 'Home Day', 'Sick', 'Personal', 'Other'];
 
 // ---------------------------------------------------------------------------
 // Origin / Sec-Fetch-Site guard (POST only)
@@ -157,6 +160,11 @@ async function checkRateLimit(kv, key, max, ttl) {
 // ---------------------------------------------------------------------------
 // sendMail — plain-text, checks for 202 and logs failures
 // ---------------------------------------------------------------------------
+// Count calendar days between two ISO dates (inclusive). >= 1 when start <= end.
+function countCalendarDays(startIso, endIso) {
+  return calendarDays(startIso, endIso); // reuses existing helper
+}
+
 async function sendRequestEmail(env, { requesterName, type, startDate, endDate, halfDay, dayCount, note }) {
   if (!graphConfigured(env)) return;
   let token;
@@ -167,7 +175,10 @@ async function sendRequestEmail(env, { requesterName, type, startDate, endDate, 
   const datesStr = startDate === endDate
     ? fmtDate(startDate) + (halfDay ? ' (half day)' : '')
     : `${fmtDate(startDate)} - ${fmtDate(endDate)}`;
-  const countStr = halfDay ? '0.5 days' : `${dayCount} weekday${dayCount === 1 ? '' : 's'}`;
+  // Home Day counts calendar days; everything else counts weekdays.
+  const countStr = halfDay ? '0.5 days'
+    : type === 'Home Day' ? `${dayCount} calendar day${dayCount === 1 ? '' : 's'}`
+    : `${dayCount} weekday${dayCount === 1 ? '' : 's'}`;
   const cleanNote = sanitiseNote(note);
   const noteLine  = cleanNote ? `Employee note: ${cleanNote}` : '';
 
@@ -183,7 +194,8 @@ async function sendRequestEmail(env, { requesterName, type, startDate, endDate, 
   ].filter(l => l !== undefined).join('\n');
 
   const recipients = resolveRecipients(env);
-  const subject    = `Time Off Request — ${requesterName}: ${datesStr}`;
+  // Subject includes type so owners can see Vacation vs Home Day at a glance.
+  const subject    = `Time Off Request (${type}) — ${requesterName}: ${datesStr}`;
   const message    = {
     subject,
     body: { contentType: 'Text', content: bodyText },
@@ -217,22 +229,31 @@ function fmtDate(iso) {
 // ---------------------------------------------------------------------------
 // Allocation summary
 // ---------------------------------------------------------------------------
+// Default allocation when no explicit row exists. Matches the employee-facing
+// "10 vacation days per year" policy. Owners can still override per person.
+const DEFAULT_VACATION_DAYS = 10;
+
 async function getAllocationSummary(db, uid, year) {
   const alloc = await db
     .prepare('SELECT allocated_days FROM employee_allocations WHERE uid = ? AND year = ?')
     .bind(uid, year).first();
-  const allocDays = alloc ? alloc.allocated_days : null;
+  // Default to 10 when no explicit row; keeps "not set" message from appearing
+  // for every employee before owners have configured individual values.
+  const allocDays = alloc ? alloc.allocated_days : DEFAULT_VACATION_DAYS;
 
+  // usedDays counts ONLY Vacation requests (not Home Day / Sick / Other).
+  // Home Day and Sick do not deduct from the vacation allocation.
   const usedResult = await db
     .prepare(`SELECT COALESCE(SUM(day_count),0) AS total
-              FROM absence_requests WHERE uid=? AND status='approved'
+              FROM absence_requests WHERE uid=? AND type='Vacation' AND status='approved'
               AND strftime('%Y',start_date)=?`)
     .bind(uid, String(year)).first();
   const usedDays = usedResult ? (usedResult.total || 0) : 0;
 
+  // pendingDays: pending Vacation requests (not Home Day / Sick / Other).
   const pendResult = await db
     .prepare(`SELECT COALESCE(SUM(day_count),0) AS total
-              FROM absence_requests WHERE uid=? AND status='pending'
+              FROM absence_requests WHERE uid=? AND type='Vacation' AND status='pending'
               AND strftime('%Y',start_date)=?`)
     .bind(uid, String(year)).first();
   const pendingDays = pendResult ? (pendResult.total || 0) : 0;
@@ -242,7 +263,7 @@ async function getAllocationSummary(db, uid, year) {
     allocatedDays: allocDays,
     usedDays,
     pendingDays,
-    remaining: allocDays !== null ? Math.max(0, allocDays - usedDays) : null,
+    remaining: Math.max(0, allocDays - usedDays),
   };
 }
 
@@ -350,8 +371,23 @@ export async function onRequestPost(context) {
       return json({ ok: false, error: 'A single request may not span more than 60 days.' }, 400);
     }
 
-    const dayCount = halfDay ? 0.5 : countWeekdays(startDate, endDate);
-    if (dayCount <= 0) return json({ ok: false, error: 'Date range contains no weekdays.' }, 400);
+    // Home Day: counts calendar days, allowed any day of week including weekends.
+    // Vacation: must contain at least one weekday (weekdays-only policy).
+    // Sick / Other / Personal: count weekdays; reject all-weekend spans.
+    let dayCount;
+    if (halfDay) {
+      dayCount = 0.5;
+    } else if (type === 'Home Day') {
+      dayCount = calendarDays(startDate, endDate); // always >= 1
+    } else {
+      dayCount = countWeekdays(startDate, endDate);
+      if (dayCount <= 0) {
+        const msg = type === 'Vacation'
+          ? 'Vacation requests must contain at least one weekday.'
+          : 'Date range contains no weekdays.';
+        return json({ ok: false, error: msg }, 400);
+      }
+    }
 
     // uid and name from session — NEVER from client
     const uid  = session.uid;
@@ -406,7 +442,20 @@ export async function onRequestPost(context) {
       halfDay: !!halfDay, dayCount, note,
     }));
 
-    return json({ ok: true, id, status: 'pending', day_count: dayCount });
+    // Soft warning (not a block) if a Vacation request would exceed the remaining
+    // balance. The request is still accepted; the owner can deny it if needed.
+    let vacationWarning = null;
+    if (type === 'Vacation' && !halfDay) {
+      try {
+        const allocCheck = await getAllocationSummary(env.DB, uid, new Date().getUTCFullYear());
+        if (allocCheck.remaining !== null && dayCount > allocCheck.remaining) {
+          vacationWarning = `This request (${dayCount} weekday${dayCount === 1 ? '' : 's'}) exceeds your remaining vacation balance (${allocCheck.remaining} day${allocCheck.remaining === 1 ? '' : 's'}).`;
+        }
+      } catch { /* non-fatal — warning is best-effort */ }
+    }
+
+    return json({ ok: true, id, status: 'pending', day_count: dayCount,
+                  ...(vacationWarning ? { vacation_warning: vacationWarning } : {}) });
   }
 
   // ---- Cancel own pending request (race-safe) ----------------------------

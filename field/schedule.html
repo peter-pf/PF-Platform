@@ -39,6 +39,10 @@
   .absent-block { display:block; background:var(--accent-light); color:var(--accent);
     border:1px solid var(--accent); border-radius:4px; font-size:.7rem; font-weight:600;
     text-align:center; padding:2px 0; margin:1px 2px; }
+  .absent-vacation { background:var(--green-light); color:var(--green);
+    border-color:var(--green); }
+  .absent-home { background:var(--amber-light); color:var(--amber);
+    border-color:var(--amber); }
   .absent-half { background:var(--amber-light); color:var(--amber);
     border-color:var(--amber); }
   .month-empty { text-align:center; padding:30px 0; color:var(--text-3); font-size:.875rem; }
@@ -46,8 +50,10 @@
     color:var(--text-2); align-items:center; }
   .legend-dot { display:inline-block; width:12px; height:12px; border-radius:2px;
     margin-right:4px; vertical-align:middle; }
-  .legend-full { background:var(--accent-light); border:1px solid var(--accent); }
-  .legend-half { background:var(--amber-light); border:1px solid var(--amber); }
+  .legend-out      { background:var(--accent-light);  border:1px solid var(--accent); }
+  .legend-vacation { background:var(--green-light);   border:1px solid var(--green); }
+  .legend-home     { background:var(--amber-light);   border:1px solid var(--amber); }
+  .legend-half     { background:var(--amber-light);   border:1px solid var(--amber); }
   .note-row { font-size:.78rem; color:var(--text-3); margin-bottom:10px; }
 </style>
 <script>(function(){try{var t=localStorage.getItem('pf-theme');var d=t==='dark'||(t==null&&window.matchMedia&&window.matchMedia('(prefers-color-scheme:dark)').matches);if(d)document.documentElement.setAttribute('data-theme','dark');}catch(e){}}());</script>
@@ -118,8 +124,10 @@
   </div>
   <div class="note-row">Showing approved time off. Job schedule coming soon.</div>
   <div class="legend">
-    <span><span class="legend-dot legend-full"></span>Full day off</span>
-    <span><span class="legend-dot legend-half"></span>Half day off</span>
+    <span><span class="legend-dot legend-vacation"></span>Vacation</span>
+    <span><span class="legend-dot legend-home"></span>Home day</span>
+    <span><span class="legend-dot legend-out"></span>Out (sick / other)</span>
+    <span><span class="legend-dot legend-half"></span>Half day</span>
   </div>
   <div class="cal-wrap" id="calWrap">
     <div class="month-empty">Loading...</div>
@@ -176,23 +184,26 @@ function renderCalendar(year, month, absences) {
   var today = todayIso();
   var numDays = daysInMonth(year, month);
 
-  // Gather unique employees who have absences this month
-  var empMap = {}; // uid -> name
+  // Use uid for grouping (returned by API for this purpose).
+  // Fall back to name if uid is missing (defensive).
+  var empMap = {}; // key -> name
   absences.forEach(function(a) {
-    if (!empMap[a.uid]) empMap[a.uid] = a.name || a.uid;
+    var key = a.uid || a.name || a.id;
+    if (!empMap[key]) empMap[key] = a.name || a.uid || key;
   });
   var empKeys = Object.keys(empMap);
 
-  // Build a day->uid set map: which uids are absent on each date
-  var dayAbsMap = {}; // iso -> { uid -> half_day }
+  // Build a day->key map: which employees are absent on each date, with label
+  var dayAbsMap = {}; // iso -> { key -> { half, label } }
   absences.forEach(function(a) {
+    var key = a.uid || a.name || a.id;
     var s = new Date(a.start_date + 'T12:00:00Z');
     var e = new Date(a.end_date   + 'T12:00:00Z');
     var cur = new Date(s);
     while (cur <= e) {
       var iso = cur.toISOString().slice(0,10);
       if (!dayAbsMap[iso]) dayAbsMap[iso] = {};
-      dayAbsMap[iso][a.uid] = a.half_day ? 1 : 0;
+      dayAbsMap[iso][key] = { half: a.half_day ? 1 : 0, label: a.label || 'Out' };
       cur.setUTCDate(cur.getUTCDate() + 1);
     }
   });
@@ -220,18 +231,20 @@ function renderCalendar(year, month, absences) {
   if (!empKeys.length) {
     html += '<tr><td colspan="'+(numDays+1)+'" class="month-empty">No approved absences this month.</td></tr>';
   } else {
-    empKeys.forEach(function(uid) {
-      var row = '<tr><td class="name-cell">'+window.esc(empMap[uid])+'</td>';
+    empKeys.forEach(function(key) {
+      var row = '<tr><td class="name-cell">'+window.esc(empMap[key])+'</td>';
       days.forEach(function(day) {
         var cell = '';
-        if (dayAbsMap[day.iso] && day.iso >= today.slice(0,7)+'-01' /* always render */) {
-          if (typeof dayAbsMap[day.iso][uid] !== 'undefined') {
-            var isHalf = dayAbsMap[day.iso][uid] === 1;
-            cell = '<span class="absent-block'+(isHalf?' absent-half':'')+'">'+(isHalf?'½':'OFF')+'</span>';
-          }
-        } else if (dayAbsMap[day.iso] && typeof dayAbsMap[day.iso][uid] !== 'undefined') {
-          var isHalf = dayAbsMap[day.iso][uid] === 1;
-          cell = '<span class="absent-block'+(isHalf?' absent-half':'')+'">'+(isHalf?'½':'OFF')+'</span>';
+        var info = dayAbsMap[day.iso] && dayAbsMap[day.iso][key];
+        if (info) {
+          var isHalf = info.half === 1;
+          var lbl    = info.label || 'Out';
+          var extra  = isHalf ? ' absent-half'
+                     : lbl === 'Vacation' ? ' absent-vacation'
+                     : lbl === 'Home'     ? ' absent-home'
+                     : '';
+          var text   = isHalf ? '½' : lbl;
+          cell = '<span class="absent-block'+extra+'">'+window.esc(text)+'</span>';
         }
         row += '<td class="day-cell">'+cell+'</td>';
       });

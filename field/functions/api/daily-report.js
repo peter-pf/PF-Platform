@@ -300,7 +300,8 @@ function cleanFutureIssues(input) {
 // already live in SharePoint; we store only the refs here). NO $ -- file metadata
 // only. bucket is constrained to the known upload buckets. Same angle-bracket
 // strip + length caps as every other field; webUrl is bounded to MAX_STR.
-const VALID_ATTACH_BUCKETS = { handlogs: 1, guhma: 1, photos: 1 };
+// predrill added R9 (Derek 10/23/2026): predrill highlighted markup photos/PDFs.
+const VALID_ATTACH_BUCKETS = { handlogs: 1, guhma: 1, photos: 1, predrill: 1 };
 function cleanAttachments(input) {
   if (!Array.isArray(input)) return [];
   const out = [];
