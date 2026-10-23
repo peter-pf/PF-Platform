@@ -130,27 +130,26 @@ import { CHECKLIST_ITEMS, uploadBucketForItem, computeResult } from '../function
   assert.ok('sitePlan' in r10Signoffs, 'E1: sitePlan key present');
   assert.ok(!('stonePlacement' in r10Signoffs), 'E1: no stonePlacement in R10 state');
 
-  // E2: R9 opsSignoffs migration — collectBody should produce sitePlan.
+  // E2: R9 opsSignoffs migration — server cleanOpsSignoffs(srcOps, baseOps, ...) shape.
+  // [Updated for SEC fix-round R2: function now takes srcOps + baseOps separately]
   const r9Signoffs = { stonePlacement: { desc: 'NW corner', superName: 'Alice', pfMgrName: 'Pete' }, spoilsPlacement: { desc: 'SE field' } };
-  // Simulate server cleanOpsSignoffs logic: if no sitePlan but has stonePlacement, migrate.
-  function simulateCleanOpsSignoffs(input) {
-    if (!input) return { sitePlan: {} };
-    const out = {};
-    if (input.sitePlan != null) {
-      out.sitePlan = input.sitePlan;
-    } else if (input.stonePlacement != null) {
-      out.sitePlan = Object.assign({}, input.stonePlacement);
-    } else {
-      out.sitePlan = {};
-    }
-    if (input.stonePlacement  != null) out.stonePlacement  = input.stonePlacement;
-    if (input.spoilsPlacement != null) out.spoilsPlacement = input.spoilsPlacement;
+  // Simulate server cleanOpsSignoffs with the R2 two-param signature.
+  function simulateCleanOpsSignoffs(srcOps, baseOps) {
+    srcOps  = srcOps  || {};
+    baseOps = baseOps || {};
+    const srcSP  = srcOps.sitePlan  != null ? srcOps.sitePlan  : (srcOps.stonePlacement  || null);
+    const baseSP = baseOps.sitePlan != null ? baseOps.sitePlan : null;
+    const spIn = srcSP || baseSP || {};
+    const out = { sitePlan: { desc: spIn.desc || '', superName: spIn.superName || '', pfMgrName: spIn.pfMgrName || '' } };
+    if (baseOps.stonePlacement  != null) out.stonePlacement  = Object.assign({}, baseOps.stonePlacement);
+    if (baseOps.spoilsPlacement != null) out.spoilsPlacement = Object.assign({}, baseOps.spoilsPlacement);
     return out;
   }
-  const cleaned = simulateCleanOpsSignoffs(r9Signoffs);
+  // Pass r9Signoffs as srcOps; no stored base yet (new record with R9 client).
+  const cleaned = simulateCleanOpsSignoffs(r9Signoffs, {});
   assert.equal(cleaned.sitePlan.desc, 'NW corner',  'E2: stonePlacement migrated to sitePlan.desc');
-  assert.ok('stonePlacement'  in cleaned, 'E2: stonePlacement preserved for back-compat');
-  assert.ok('spoilsPlacement' in cleaned, 'E2: spoilsPlacement preserved for back-compat');
+  assert.ok(!('stonePlacement'  in cleaned), 'E2: no legacy stonePlacement in output (base had none)');
+  assert.ok(!('spoilsPlacement' in cleaned), 'E2: no legacy spoilsPlacement in output (base had none)');
 
   console.log('E (single sign-off): PASS');
 }
@@ -183,6 +182,163 @@ import { CHECKLIST_ITEMS, uploadBucketForItem, computeResult } from '../function
   assert.ok(!buckets.includes(photoBucket), 'G2: photos bucket not tied to any checklist item');
 
   console.log('G (section 7 path): PASS');
+}
+
+// ---- H: SEC fix-round R2 — legacy stamp forge prevention -------------------
+{
+  // Simulate cleanOpsSignoffItemLegacy(stored): stamp preserved only from stored record.
+  function simLegacy(stored) {
+    stored = stored || {};
+    const out = { desc: stored.desc || '', superName: stored.superName || '', pfMgrName: stored.pfMgrName || '' };
+    if (stored.signedAt)       out.signedAt       = stored.signedAt;
+    if (stored.capturedByUid)  out.capturedByUid  = stored.capturedByUid;
+    if (stored.capturedByName) out.capturedByName = stored.capturedByName;
+    return out;
+  }
+  // Simulate new cleanOpsSignoffs(srcOps, baseOps): legacy keys only from baseOps.
+  function simCleanOpsSignoffs2(srcOps, baseOps) {
+    srcOps  = srcOps  || {};
+    baseOps = baseOps || {};
+    const srcSP  = srcOps.sitePlan  != null ? srcOps.sitePlan  : (srcOps.stonePlacement  || null);
+    const baseSP = baseOps.sitePlan != null ? baseOps.sitePlan : null;
+    const spIn = srcSP || baseSP || {};
+    const out = { sitePlan: { desc: spIn.desc || '', superName: spIn.superName || '', pfMgrName: spIn.pfMgrName || '' } };
+    if (baseOps.stonePlacement  != null) out.stonePlacement  = simLegacy(baseOps.stonePlacement);
+    if (baseOps.spoilsPlacement != null) out.spoilsPlacement = simLegacy(baseOps.spoilsPlacement);
+    return out;
+  }
+
+  // H1: Client sends forged stonePlacement.signedAt in src — it is ignored.
+  const baseWithLegacy = { stonePlacement: { desc: 'NW corner', signedAt: '2026-10-01T08:00:00Z', capturedByName: 'Alice' } };
+  const srcForged = { opsSignoffs: { stonePlacement: { desc: 'NW corner', signedAt: 'FORGED', capturedByName: 'HACKER' } } };
+  const result1 = simCleanOpsSignoffs2(srcForged.opsSignoffs, baseWithLegacy);
+  assert.equal(result1.stonePlacement.signedAt,       '2026-10-01T08:00:00Z', 'H1: forged signedAt ignored — stored stamp preserved');
+  assert.equal(result1.stonePlacement.capturedByName, 'Alice',                 'H1: forged capturedByName ignored');
+
+  // H2: New record — src sends legacy stone keys, base has none — legacy keys absent from output.
+  const baseEmpty = {};
+  const srcWithLegacy = { sitePlan: { desc: 'my plan' }, stonePlacement: { desc: 'injected', signedAt: 'FORGED' } };
+  const result2 = simCleanOpsSignoffs2(srcWithLegacy, baseEmpty);
+  assert.ok(!('stonePlacement' in result2), 'H2: client-injected stonePlacement dropped when base has none');
+
+  // H3: Back-compat — base has legacy keys, they survive round-trip (unchanged stamp).
+  const result3 = simCleanOpsSignoffs2({ sitePlan: { desc: 'updated desc' } }, baseWithLegacy);
+  assert.ok('stonePlacement' in result3, 'H3: base legacy key preserved in back-compat pass');
+  assert.equal(result3.stonePlacement.signedAt, '2026-10-01T08:00:00Z', 'H3: base signedAt unchanged');
+
+  console.log('H (SEC: legacy stamp forge prevention): PASS');
+}
+
+// ---- I: SEC fix-round R2 — sitePlan stamp idempotency ----------------------
+{
+  // Simulate cleanOpsSignoffItemStamped(src, base, session, nowIso).
+  function simStamped(src, base, session, nowIso) {
+    src  = (src  && typeof src  === 'object') ? src  : {};
+    base = (base && typeof base === 'object') ? base : {};
+    const cleaned = {
+      desc:      src.desc      != null ? (src.desc      || '') : (base.desc      || ''),
+      superName: src.superName != null ? (src.superName || '') : (base.superName || ''),
+      pfMgrName: src.pfMgrName != null ? (src.pfMgrName || '') : (base.pfMgrName || ''),
+    };
+    if (base.signedAt)       cleaned.signedAt       = base.signedAt;
+    if (base.capturedByUid)  cleaned.capturedByUid  = base.capturedByUid;
+    if (base.capturedByName) cleaned.capturedByName = base.capturedByName;
+    const hasContent = !!(cleaned.desc || cleaned.superName || cleaned.pfMgrName);
+    if (session && nowIso && hasContent && !base.signedAt) {
+      cleaned.signedAt       = nowIso;
+      cleaned.capturedByUid  = session.uid  || '';
+      cleaned.capturedByName = session.name || '';
+    }
+    return cleaned;
+  }
+  const sess  = { uid: 'u1', name: 'Field User' };
+  const now1  = '2026-10-23T10:00:00Z';
+  const now2  = '2026-10-24T09:00:00Z';
+
+  // I1: First capture — empty base, content in src → gets stamp.
+  const first = simStamped({ desc: 'SW corner', superName: 'Bob', pfMgrName: 'Pete' }, {}, sess, now1);
+  assert.equal(first.signedAt,       now1,         'I1: first capture stamped');
+  assert.equal(first.capturedByName, 'Field User', 'I1: capturedByName set on first capture');
+
+  // I2: Second save (same or different session) — base already has stamp → stamp preserved.
+  const second = simStamped({ desc: 'SW corner', superName: 'Bob', pfMgrName: 'Pete' }, first, sess, now2);
+  assert.equal(second.signedAt, now1, 'I2: stamp not overwritten on resave');
+
+  // I3: Admin edits desc — original signer preserved.
+  const adminSess = { uid: 'a1', name: 'Admin' };
+  const afterAdmin = simStamped({ desc: 'SW corner (revised)', superName: 'Bob', pfMgrName: 'Pete' }, first, adminSess, now2);
+  assert.equal(afterAdmin.signedAt,       now1,         'I3: admin edit preserves original signedAt');
+  assert.equal(afterAdmin.capturedByName, 'Field User', 'I3: admin edit preserves original capturedByName');
+
+  // I4: Empty sign-off (no content) → no stamp even on new record.
+  const empty = simStamped({}, {}, sess, now1);
+  assert.ok(!empty.signedAt, 'I4: empty sign-off not stamped');
+
+  console.log('I (SEC: sitePlan stamp idempotency): PASS');
+}
+
+// ---- J: PDF refs5d filter — markup + sig attachments route to sign-off section
+{
+  // Simulate the PDF allAttach filter used in site-readiness-doc.js.
+  function refsFor5d(allAttach) {
+    return allAttach.filter((a) => a && a.key === '5d' &&
+      (a.bucket === 'sr_markup' || a.bucket === 'sr_signature'));
+  }
+
+  const allAttach = [
+    { key: '5d', bucket: 'sr_markup',    name: 'markup.png', itemId: 'abc', webUrl: 'https://...' },
+    { key: '5d', bucket: 'sr_signature', name: 'sig_super.png', itemId: 'def', webUrl: 'https://...' },
+    { key: '5d', bucket: 'sr_signature', name: 'sig_mgr.png',   itemId: 'ghi', webUrl: 'https://...' },
+    { key: '3a', bucket: 'grade_photo',  name: 'grade.jpg', itemId: 'jkl', webUrl: 'https://...' },
+    { key: 'stone', bucket: 'sr_markup', name: 'old.png',   itemId: 'mno', webUrl: 'https://...' }, // R9 old key
+  ];
+
+  const refs = refsFor5d(allAttach);
+  // J1: All three 5d refs found (markup + 2 sigs).
+  assert.equal(refs.length, 3, 'J1: three 5d refs found (1 markup + 2 sig)');
+  // J2: grade_photo ref not in refs5d.
+  assert.ok(!refs.some(a => a.bucket === 'grade_photo'), 'J2: grade_photo excluded from refs5d');
+  // J3: Old R9 stone key attachment excluded even though bucket matches.
+  assert.ok(!refs.some(a => a.key === 'stone'), 'J3: stone key excluded from refs5d filter');
+  // J4: Both sr_markup and sr_signature buckets included.
+  assert.ok(refs.some(a => a.bucket === 'sr_markup'),    'J4: sr_markup ref included');
+  assert.ok(refs.some(a => a.bucket === 'sr_signature'), 'J4: sr_signature ref included');
+
+  console.log('J (PDF refs5d filter): PASS');
+}
+
+// ---- K: buildUploadPath format (Req 5 — resolved path display) -------------
+{
+  // Simulate client buildUploadPath(projectNum, spFolder, date, bucket).
+  function buildUploadPath(projectNum, spFolder, date, bucket) {
+    const root = (spFolder && spFolder.length) ? spFolder : projectNum;
+    if (!root || !date) return '';
+    if (bucket === 'safety_cert') return root + ' / 06 - Safety / ' + date;
+    return root + ' / 05 - Field / 02 - Project Photos / ' + date;
+  }
+
+  // K1: Full spFolder available — photos bucket.
+  const p1 = buildUploadPath('25-026', '25-026 - The Granary - FlCo', '2026-10-23', 'photos');
+  assert.equal(p1, '25-026 - The Granary - FlCo / 05 - Field / 02 - Project Photos / 2026-10-23', 'K1: photos path with spFolder');
+
+  // K2: No spFolder (null) — falls back to project number.
+  const p2 = buildUploadPath('26-012', null, '2026-10-23', 'photos');
+  assert.equal(p2, '26-012 / 05 - Field / 02 - Project Photos / 2026-10-23', 'K2: photos path without spFolder uses number');
+
+  // K3: Safety cert bucket routes to 06 - Safety.
+  const p3 = buildUploadPath('26-012', null, '2026-10-23', 'safety_cert');
+  assert.equal(p3, '26-012 / 06 - Safety / 2026-10-23', 'K3: safety_cert path uses 06 - Safety');
+
+  // K4: Empty project or date returns empty string.
+  assert.equal(buildUploadPath('', null, '2026-10-23', 'photos'), '', 'K4: empty projectNum -> empty path');
+  assert.equal(buildUploadPath('26-012', null, '', 'photos'),     '', 'K5: empty date -> empty path');
+
+  // K5: Path changes when date changes (dynamic update test).
+  const p5a = buildUploadPath('26-012', null, '2026-10-23', 'photos');
+  const p5b = buildUploadPath('26-012', null, '2026-10-24', 'photos');
+  assert.notEqual(p5a, p5b, 'K5: path updates when date changes');
+
+  console.log('K (buildUploadPath format): PASS');
 }
 
 console.log('\nAll R10 tests PASSED.');

@@ -254,7 +254,7 @@
         <div style="font-size:12px;color:var(--text-3);margin-bottom:6px">
           Minimum 10 pictures of the site and building pad, including (2) from each corner of the building.
           Tag corner photos by including "corner" in the filename.
-          Photos are saved to: <em>&lt;project&gt; / 05 - Field / 02 - Project Photos / &lt;date&gt;</em>
+          Photos are saved to: <span id="srPhotoPathHint" style="font-style:italic">select a project and date to see the resolved folder</span>
         </div>
         <div id="srUpPhotos">
           <div class="sr-up-hint" id="srPhotoHint">Select a project first to enable photo uploads. Allowed: .jpg .jpeg .png .heic, up to 50MB each.</div>
@@ -591,10 +591,11 @@ try {
       var out = [];
       if (r.ok && r.body && Array.isArray(r.body.projects)) {
         r.body.projects.forEach(function (p) {
-          var number = p.number != null ? String(p.number) : '';
-          var name   = p.name   != null ? String(p.name)   : '';
+          var number   = p.number   != null ? String(p.number)   : '';
+          var name     = p.name     != null ? String(p.name)     : '';
+          var spFolder = p.spFolder != null ? String(p.spFolder) : null;
           if (!number && !name) return;
-          out.push({ id: number || name, name: name,
+          out.push({ id: number || name, name: name, spFolder: spFolder,
             label: (number ? number + ' - ' : '') + name });
         });
       }
@@ -649,6 +650,25 @@ try {
     if (!v) return '';
     for (var i = 0; i < state.projects.length; i++) { if (String(state.projects[i].id) === String(v)) return state.projects[i].name || state.projects[i].label || v; }
     return v;
+  }
+  // Returns the SP folder name for the selected project, or null if unknown.
+  function selectedProjectSpFolder() {
+    var v = (document.getElementById('srProject') || {}).value || '';
+    if (!v) return null;
+    for (var i = 0; i < state.projects.length; i++) { if (String(state.projects[i].id) === String(v)) return state.projects[i].spFolder || null; }
+    return null;
+  }
+  // Build the resolved upload-path display string.
+  // bucket: 'safety_cert' -> <root>/06 - Safety/<date>
+  // others (photos, markup) -> <root>/05 - Field/02 - Project Photos/<date>
+  // spFolder is the actual SP folder name; falls back to projectNum when null.
+  function buildUploadPath(projectNum, spFolder, date, bucket) {
+    var root = (spFolder && spFolder.length) ? spFolder : projectNum;
+    if (!root || !date) return '';
+    if (bucket === 'safety_cert') {
+      return root + ' / 06 - Safety / ' + date;
+    }
+    return root + ' / 05 - Field / 02 - Project Photos / ' + date;
   }
 
   // ---- Checklist render -------------------------------------------------------
@@ -773,13 +793,20 @@ try {
 
   function updateUploadEnabled() {
     var num = selectedProjectNumber();
+    var spFolder = selectedProjectSpFolder();
+    var date = (document.getElementById('srDate') || {}).value || '';
     ITEMS.forEach(function (def) {
       if (!def.uploadBucket) return;
       var inp = document.getElementById('srFile_' + def.uploadBucket);
       if (inp) {
         inp.disabled = !num;
         var hint = inp.closest('.sr-upload') ? inp.closest('.sr-upload').querySelector('.sr-up-hint') : null;
-        // hint text is fixed (the label), no need to change it; just disable/enable the input.
+        if (hint && def.uploadBucket === 'safety_cert') {
+          // Show resolved path for section 6 safety cert upload.
+          hint.textContent = num && date
+            ? 'Training material will be saved to: ' + buildUploadPath(num, spFolder, date, 'safety_cert')
+            : def.uploadLabel + (num ? ' — set a date to see the resolved folder.' : ' — select a project first.');
+        }
       }
     });
   }
@@ -871,14 +898,22 @@ try {
 
   // ---- photos upload (standalone bucket) ------------------------------------
   function updatePhotosEnabled() {
-    var num = selectedProjectNumber();
-    var inp = document.getElementById('srFilePhotos');
-    var hint = document.getElementById('srPhotoHint');
+    var num      = selectedProjectNumber();
+    var spFolder = selectedProjectSpFolder();
+    var date     = (document.getElementById('srDate') || {}).value || '';
+    var inp      = document.getElementById('srFilePhotos');
+    var hint     = document.getElementById('srPhotoHint');
+    var pathSpan = document.getElementById('srPhotoPathHint');
     if (inp) inp.disabled = !num;
     if (hint) {
       hint.textContent = num
-        ? 'Photos upload to this project\'s 05 Field / 02 Project Photos folder.'
-        : 'Select a project first to enable photo uploads.';
+        ? 'Allowed: .jpg .jpeg .png .heic, up to 50\u00a0MB each.'
+        : 'Select a project first to enable photo uploads. Allowed: .jpg .jpeg .png .heic, up to 50\u00a0MB each.';
+    }
+    if (pathSpan) {
+      var path = buildUploadPath(num, spFolder, date, 'photos');
+      pathSpan.textContent = path || 'select a project and date to see the resolved folder';
+      pathSpan.style.fontStyle = path ? 'normal' : 'italic';
     }
   }
 
@@ -989,7 +1024,7 @@ try {
     var dd = document.getElementById('srDate');
     if (dd && !dd.dataset.wired) {
       dd.dataset.wired = '1';
-      dd.addEventListener('change', function () { updateDraftBanner(null); srScheduleOfflineSave(); });
+      dd.addEventListener('change', function () { updateDraftBanner(null); srScheduleOfflineSave(); updatePhotosEnabled(); updateUploadEnabled(); });
     }
     // Wire photos file input
     var ph = document.getElementById('srFilePhotos');

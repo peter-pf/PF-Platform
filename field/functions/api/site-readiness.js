@@ -160,59 +160,63 @@ function cleanItem4bDetail(input) {
   };
 }
 
-// Rebuild a clean ops sign-off record (new or active).
-// [SEC fix-round 2026-10-23]: server stamps signedAt + capturedBy from session.
-function cleanOpsSignoffItem(input, session, nowIso) {
-  if (!input || typeof input !== 'object') return { desc: '', superName: '', pfMgrName: '' };
-  const base = {
-    desc:      s(input.desc,      MAX_STR),
-    superName: s(input.superName, MAX_SHORT),
-    pfMgrName: s(input.pfMgrName, MAX_SHORT),
+// Rebuild a clean ops sign-off record with idempotent server stamp.
+// [SEC fix-round 2026-10-23 R2]: stamps ONLY on first capture (base.signedAt absent).
+// Admin edits never overwrite the original signer: base.signedAt is always preserved.
+function cleanOpsSignoffItemStamped(src, base, session, nowIso) {
+  src  = (src  && typeof src  === 'object') ? src  : {};
+  base = (base && typeof base === 'object') ? base : {};
+  const cleaned = {
+    desc:      s(src.desc      != null ? src.desc      : (base.desc      || ''), MAX_STR),
+    superName: s(src.superName != null ? src.superName : (base.superName || ''), MAX_SHORT),
+    pfMgrName: s(src.pfMgrName != null ? src.pfMgrName : (base.pfMgrName || ''), MAX_SHORT),
   };
-  if (session && nowIso) {
-    base.signedAt       = nowIso;
-    base.capturedByUid  = s((session.uid  || ''), MAX_SHORT);
-    base.capturedByName = s((session.name || ''), MAX_SHORT);
+  // Always preserve the existing server stamp from the stored record.
+  // Client-supplied stamp fields are never accepted (prevented upstream by separate srcOps/baseOps).
+  if (base.signedAt)       cleaned.signedAt       = s(String(base.signedAt),       MAX_SHORT);
+  if (base.capturedByUid)  cleaned.capturedByUid  = s(String(base.capturedByUid),  MAX_SHORT);
+  if (base.capturedByName) cleaned.capturedByName = s(String(base.capturedByName), MAX_SHORT);
+  // Stamp on first capture only: sign-off has content AND stored record has no stamp yet.
+  const hasContent = !!(cleaned.desc || cleaned.superName || cleaned.pfMgrName);
+  if (session && nowIso && hasContent && !base.signedAt) {
+    cleaned.signedAt       = nowIso;
+    cleaned.capturedByUid  = s(String(session.uid  || ''), MAX_SHORT);
+    cleaned.capturedByName = s(String(session.name || ''), MAX_SHORT);
   }
-  return base;
+  return cleaned;
 }
 
-// Preserve a legacy ops sign-off item (R9 stone/spoils) without re-stamping server fields.
-function cleanOpsSignoffItemLegacy(input) {
-  if (!input || typeof input !== 'object') return { desc: '', superName: '', pfMgrName: '' };
-  const base = {
-    desc:      s(input.desc,      MAX_STR),
-    superName: s(input.superName, MAX_SHORT),
-    pfMgrName: s(input.pfMgrName, MAX_SHORT),
+// Preserve a legacy ops sign-off item (R9 stone/spoils) from the STORED RECORD only.
+// [SEC fix-round 2026-10-23 R2]: caller must pass base.opsSignoffs[key], never the merged src.
+function cleanOpsSignoffItemLegacy(stored) {
+  if (!stored || typeof stored !== 'object') return { desc: '', superName: '', pfMgrName: '' };
+  const out = {
+    desc:      s(stored.desc,      MAX_STR),
+    superName: s(stored.superName, MAX_SHORT),
+    pfMgrName: s(stored.pfMgrName, MAX_SHORT),
   };
-  // Preserve original server-stamped fields without re-issuing them.
-  if (input.signedAt)       base.signedAt       = s(String(input.signedAt),       MAX_SHORT);
-  if (input.capturedByUid)  base.capturedByUid  = s(String(input.capturedByUid),  MAX_SHORT);
-  if (input.capturedByName) base.capturedByName = s(String(input.capturedByName), MAX_SHORT);
-  return base;
+  // Preserve original server-stamped fields from the stored record.
+  if (stored.signedAt)       out.signedAt       = s(String(stored.signedAt),       MAX_SHORT);
+  if (stored.capturedByUid)  out.capturedByUid  = s(String(stored.capturedByUid),  MAX_SHORT);
+  if (stored.capturedByName) out.capturedByName = s(String(stored.capturedByName), MAX_SHORT);
+  return out;
 }
 
 // Rebuild clean ops sign-offs.
-// R10: primary key is sitePlan (single sign-off for stone+spoils plan).
-// Back-compat: preserve legacy R9 stonePlacement/spoilsPlacement keys if present (never drop refs).
-// Migration: if input has stonePlacement but no sitePlan, populate sitePlan from stonePlacement.
-function cleanOpsSignoffs(input, session, nowIso) {
-  if (!input || typeof input !== 'object') {
-    return { sitePlan: cleanOpsSignoffItem(null, session, nowIso) };
-  }
-  const out = {};
-  // R10 primary.
-  if (input.sitePlan != null) {
-    out.sitePlan = cleanOpsSignoffItem(input.sitePlan, session, nowIso);
-  } else if (input.stonePlacement != null) {
-    // Migrate R9 stonePlacement -> sitePlan (take stonePlacement as the canonical one).
-    out.sitePlan = cleanOpsSignoffItem(input.stonePlacement, session, nowIso);
-  } else {
-    out.sitePlan = cleanOpsSignoffItem(null, session, nowIso);
-  }
-  // Back-compat: preserve R9 keys without re-stamping.
-  if (input.stonePlacement  != null) out.stonePlacement  = cleanOpsSignoffItemLegacy(input.stonePlacement);
-  if (input.spoilsPlacement != null) out.spoilsPlacement = cleanOpsSignoffItemLegacy(input.spoilsPlacement);
+// [SEC fix-round 2026-10-23 R2]: takes srcOps (client) and baseOps (stored record) separately.
+// Legacy stone/spoils keys come ONLY from baseOps — client can never forge or inject them.
+// R10 primary: sitePlan stamped once on first capture.
+// Migration: R9 stonePlacement -> sitePlan if srcOps has no explicit sitePlan.
+function cleanOpsSignoffs(srcOps, baseOps, session, nowIso) {
+  srcOps  = (srcOps  && typeof srcOps  === 'object') ? srcOps  : {};
+  baseOps = (baseOps && typeof baseOps === 'object') ? baseOps : {};
+  // R10 primary: sitePlan. Migrate R9 stonePlacement if no sitePlan in src.
+  const srcSP  = srcOps.sitePlan  != null ? srcOps.sitePlan  : (srcOps.stonePlacement  || null);
+  const baseSP = baseOps.sitePlan != null ? baseOps.sitePlan : null;
+  const out = { sitePlan: cleanOpsSignoffItemStamped(srcSP, baseSP, session, nowIso) };
+  // Back-compat: legacy keys ONLY from stored record. Client src.opsSignoffs.stonePlacement is ignored.
+  if (baseOps.stonePlacement  != null) out.stonePlacement  = cleanOpsSignoffItemLegacy(baseOps.stonePlacement);
+  if (baseOps.spoilsPlacement != null) out.spoilsPlacement = cleanOpsSignoffItemLegacy(baseOps.spoilsPlacement);
   return out;
 }
 
@@ -251,14 +255,11 @@ function buildBody(src, base, session, nowIso) {
   const items = src.items != null ? cleanItems(src.items) : (base.items || cleanItems(null));
   const { result, openItems } = computeResult(items);
 
-  // R10 back-compat: merge base.opsSignoffs (legacy keys) with src.opsSignoffs (new keys)
-  // so old stonePlacement/spoilsPlacement refs survive a round-trip through an R10 client.
-  let rawOps;
-  if (src.opsSignoffs != null) {
-    rawOps = Object.assign({}, (base.opsSignoffs || {}), src.opsSignoffs);
-  } else {
-    rawOps = base.opsSignoffs || null;
-  }
+  // [SEC fix-round 2026-10-23 R2]: pass srcOps and baseOps separately to cleanOpsSignoffs.
+  // Legacy keys (stonePlacement/spoilsPlacement) must come ONLY from the stored record (base).
+  // Object.assign merge removed — it allowed client to inject forged legacy stamp fields.
+  const srcOps  = src.opsSignoffs  || null;
+  const baseOps = base.opsSignoffs || null;
 
   // item4bDetail: back-compat field (R9). Preserve if present; never create for new records.
   const raw4bSrc = src.item4bDetail != null ? src.item4bDetail : null;
@@ -276,7 +277,7 @@ function buildBody(src, base, session, nowIso) {
     attachments: src.attachments != null ? cleanAttachments(src.attachments) : (base.attachments || []),
     sigName:     s(src.sigName != null ? src.sigName : base.sigName, MAX_SHORT),
     sigDate:     isoDateOrToday(src.sigDate != null ? src.sigDate : base.sigDate),
-    opsSignoffs: cleanOpsSignoffs(rawOps, session, nowIso),
+    opsSignoffs: cleanOpsSignoffs(srcOps, baseOps, session, nowIso),
     result,
     openItems,
   };

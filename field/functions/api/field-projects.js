@@ -36,8 +36,9 @@ const JSON_HEADERS = {
 export async function onRequestGet(context) {
   const denied = requireArea(context.data && context.data.session, 'field_ops');
   if (denied) return denied;
-  // Return only {number, name} — confirm no financial keys.
-  const projects = FO_PROJECTS.map((p) => ({ number: p.number, name: p.name }));
+  // Return {number, name, spFolder} — confirm no financial keys.
+  // spFolder: actual SP folder name for resolved-path display in the field form (null when unknown).
+  const projects = FO_PROJECTS.map((p) => ({ number: p.number, name: p.name, spFolder: p.spFolder || null }));
   return new Response(JSON.stringify({ ok: true, projects }), {
     status: 200,
     headers: JSON_HEADERS,
