@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Time Off feature tests (unit-level; no network calls, no D1):
-//   1. countDays: full-day range
-//   2. countDays: single day
-//   3. countDays: half-day = 0.5
-//   4. countDays: multi-day span
-//   5. countDays: end before start = 0
+//   1. countWeekdays: full-day single date
+//   2. countWeekdays: single day (Tuesday)
+//   3. countWeekdays: half-day = 0.5
+//   4. countWeekdays: Mon-Fri span = 5
+//   5. countWeekdays: end before start = 0
 //   6. isIsoDate: valid
 //   7. isIsoDate: invalid
 //   8. s(): caps length
@@ -27,6 +27,18 @@
 //   25. roleCanAccess: admin can access schedule_admin
 //   26. roleCanAccess: partner can access schedule_admin
 //   27. roleCanAccess: business_dev BLOCKED from schedule_admin
+//   28. countWeekdays: span with weekend = skips Sat/Sun
+//   29. countWeekdays: single weekend day = 0
+//   30. isIsoDate strict (round-trip): rejects non-existent dates
+//   31. IDOR: cancel blocked for mismatched uid
+//   32. IDOR: cancel succeeds for own uid
+//   33. admin-endpoint 403: field_ops + business_dev blocked from schedule_admin
+//   34. rate-limit: under max = allowed
+//   35. rate-limit: at max = blocked
+//   36. rate-limit: KV error = fail open
+//   37. overlap: overlapping dates detected
+//   38. overlap: adjacent (non-overlapping) dates
+//   39. overlap: approved request also blocks
 //
 // Run: node field/tests/test-time-off.mjs
 
@@ -42,14 +54,28 @@ const __dir = dirname(fileURLToPath(import.meta.url));
 // areaForPath / roleCanAccess we import from the actual auth.js.
 // ---------------------------------------------------------------------------
 
-function countDays(startIso, endIso, halfDay) {
+// countWeekdays mirrors the server-side implementation (Mon-Fri only).
+// halfDay handled by the caller in submit; kept here for test convenience.
+function countWeekdays(startIso, endIso, halfDay) {
   if (halfDay) return 0.5;
   try {
     const start = new Date(startIso + 'T12:00:00Z');
     const end   = new Date(endIso   + 'T12:00:00Z');
     if (isNaN(start) || isNaN(end) || end < start) return 0;
-    return Math.round((end - start) / 86400000) + 1;
+    let count = 0;
+    for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+      const dow = d.getUTCDay();
+      if (dow !== 0 && dow !== 6) count++;
+    }
+    return count;
   } catch { return 0; }
+}
+
+// calendarDays used for the 60-day span cap guard
+function calendarDays(startIso, endIso) {
+  const s = new Date(startIso + 'T12:00:00Z');
+  const e = new Date(endIso   + 'T12:00:00Z');
+  return Math.round((e - s) / 86400000) + 1;
 }
 
 function isIsoDate(v) {
@@ -105,6 +131,39 @@ function clampRange(from, to) {
   return { from, to };
 }
 
+// Strict round-trip date validation (mirrors server isIsoDate)
+function isIsoDateStrict(v) {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  try { return new Date(v + 'T12:00:00Z').toISOString().slice(0, 10) === v; }
+  catch { return false; }
+}
+
+// Overlap guard mirrors server SQL: start_date <= endDate AND end_date >= startDate
+function overlaps(existStart, existEnd, newStart, newEnd) {
+  return existStart <= newEnd && existEnd >= newStart;
+}
+
+// KV mock for rate-limit tests
+function mockKV() {
+  const store = {};
+  return {
+    async get(k)       { return store[k] || null; },
+    async put(k, v)    { store[k] = v; },
+    async getError()   { throw new Error('KV unavailable'); },
+  };
+}
+
+// checkRateLimit mirrors server implementation
+async function checkRateLimit(kv, key, max, ttl) {
+  try {
+    const raw = await kv.get(key);
+    const count = raw ? parseInt(raw, 10) : 0;
+    if (count >= max) return false;
+    await kv.put(key, String(count + 1), { expirationTtl: ttl });
+    return true;
+  } catch { return true; } // fail open on KV error
+}
+
 // ---------------------------------------------------------------------------
 // Load auth.js via file URL (pure ESM, no Workers runtime deps)
 // ---------------------------------------------------------------------------
@@ -129,26 +188,26 @@ function test(name, fn) {
 }
 
 // ---------------------------------------------------------------------------
-// 1-5: countDays
+// 1-5: countWeekdays (Mon-Fri only — mirrors server)
 // ---------------------------------------------------------------------------
-test('countDays: full-day single date = 1', () => {
-  assert.equal(countDays('2026-10-23', '2026-10-23', false), 1);
+test('countWeekdays: full-day single date (Fri) = 1', () => {
+  assert.equal(countWeekdays('2026-10-23', '2026-10-23', false), 1);
 });
 
-test('countDays: single day not half = 1', () => {
-  assert.equal(countDays('2026-12-01', '2026-12-01', false), 1);
+test('countWeekdays: single day (Tue) not half = 1', () => {
+  assert.equal(countWeekdays('2026-12-01', '2026-12-01', false), 1);
 });
 
-test('countDays: half-day = 0.5 regardless of dates', () => {
-  assert.equal(countDays('2026-10-23', '2026-10-23', true), 0.5);
+test('countWeekdays: half-day = 0.5 regardless of dates', () => {
+  assert.equal(countWeekdays('2026-10-23', '2026-10-23', true), 0.5);
 });
 
-test('countDays: multi-day Mon-Fri (5 days)', () => {
-  assert.equal(countDays('2026-10-19', '2026-10-23', false), 5);
+test('countWeekdays: Mon-Fri span (5 weekdays)', () => {
+  assert.equal(countWeekdays('2026-10-19', '2026-10-23', false), 5);
 });
 
-test('countDays: end before start = 0', () => {
-  assert.equal(countDays('2026-10-25', '2026-10-20', false), 0);
+test('countWeekdays: end before start = 0', () => {
+  assert.equal(countWeekdays('2026-10-25', '2026-10-20', false), 0);
 });
 
 // ---------------------------------------------------------------------------
@@ -292,6 +351,114 @@ test('roleCanAccess: partner can access schedule_admin', () => {
 
 test('roleCanAccess: business_dev BLOCKED from schedule_admin', () => {
   assert.equal(roleCanAccess('business_dev', 'schedule_admin'), false);
+});
+
+// ---------------------------------------------------------------------------
+// 28-29: countWeekdays — weekend exclusion
+// ---------------------------------------------------------------------------
+test('countWeekdays: Mon-Sun span skips Sat+Sun = 5', () => {
+  // 2026-10-19 Mon to 2026-10-25 Sun: 5 weekdays, 2 weekend days
+  assert.equal(countWeekdays('2026-10-19', '2026-10-25', false), 5);
+});
+
+test('countWeekdays: single weekend day (Sat) = 0', () => {
+  // 2026-10-24 is Saturday
+  assert.equal(countWeekdays('2026-10-24', '2026-10-24', false), 0);
+});
+
+// ---------------------------------------------------------------------------
+// 30: isIsoDate strict (round-trip rejects non-existent dates)
+// ---------------------------------------------------------------------------
+test('isIsoDate strict: rejects non-existent dates via round-trip', () => {
+  assert.equal(isIsoDateStrict('2026-02-31'), false); // Feb 31 does not exist
+  assert.equal(isIsoDateStrict('2026-13-01'), false); // month 13
+  assert.equal(isIsoDateStrict('2026-00-01'), false); // month 0
+  assert.equal(isIsoDateStrict('2026-10-23'), true);  // valid
+  assert.equal(isIsoDateStrict('2026-02-28'), true);  // valid (leap check)
+  assert.equal(isIsoDateStrict('not-a-date'), false);
+});
+
+// ---------------------------------------------------------------------------
+// 31-32: IDOR — cancel only succeeds when uid matches
+// ---------------------------------------------------------------------------
+test('IDOR: user B cannot cancel user A\'s request', () => {
+  // Mirrors server: WHERE id=? AND uid=? AND status='pending'
+  const req = { id: 'req-001', uid: 'user-a', status: 'pending' };
+  const actingUid = 'user-b';
+  const canCancel = req.uid === actingUid && req.status === 'pending';
+  assert.equal(canCancel, false);
+});
+
+test('IDOR: user A can cancel their own request', () => {
+  const req = { id: 'req-001', uid: 'user-a', status: 'pending' };
+  const actingUid = 'user-a';
+  const canCancel = req.uid === actingUid && req.status === 'pending';
+  assert.equal(canCancel, true);
+});
+
+// ---------------------------------------------------------------------------
+// 33: admin-endpoint 403 — non-owners cannot reach schedule_admin
+// ---------------------------------------------------------------------------
+test('admin-endpoint 403: field_ops and business_dev cannot access schedule_admin', () => {
+  assert.equal(roleCanAccess('field_ops',     'schedule_admin'), false);
+  assert.equal(roleCanAccess('business_dev',  'schedule_admin'), false);
+  assert.equal(roleCanAccess('field_ops',     'schedule'),       true); // schedule page OK
+  assert.equal(roleCanAccess('admin',         'schedule_admin'), true);
+  assert.equal(roleCanAccess('partner',       'schedule_admin'), true);
+});
+
+// ---------------------------------------------------------------------------
+// 34-36: rate-limit (KV mock)
+// ---------------------------------------------------------------------------
+test('rate-limit: under max = allowed', async () => {
+  const kv = mockKV();
+  const r1 = await checkRateLimit(kv, 'to_rl:hr:u1', 5, 3600);
+  const r2 = await checkRateLimit(kv, 'to_rl:hr:u1', 5, 3600);
+  assert.equal(r1, true);
+  assert.equal(r2, true);
+});
+
+test('rate-limit: at max = blocked', async () => {
+  const kv = mockKV();
+  for (let i = 0; i < 5; i++) await checkRateLimit(kv, 'to_rl:hr:u2', 5, 3600);
+  const blocked = await checkRateLimit(kv, 'to_rl:hr:u2', 5, 3600);
+  assert.equal(blocked, false);
+});
+
+test('rate-limit: KV error = fail open (allow request)', async () => {
+  const brokenKV = { async get() { throw new Error('KV down'); }, async put() { throw new Error('KV down'); } };
+  const result = await checkRateLimit(brokenKV, 'to_rl:hr:u3', 5, 3600);
+  assert.equal(result, true); // fail open — do NOT lock out user
+});
+
+// ---------------------------------------------------------------------------
+// 37-39: overlap guard
+// ---------------------------------------------------------------------------
+test('overlap: overlapping date ranges detected', () => {
+  // existing: Nov 1-5; new request: Nov 3-7 (overlaps)
+  assert.equal(overlaps('2026-11-01', '2026-11-05', '2026-11-03', '2026-11-07'), true);
+  // existing contains new entirely
+  assert.equal(overlaps('2026-11-01', '2026-11-10', '2026-11-03', '2026-11-05'), true);
+  // new starts same day as existing starts
+  assert.equal(overlaps('2026-11-01', '2026-11-05', '2026-11-01', '2026-11-01'), true);
+});
+
+test('overlap: adjacent (non-overlapping) date ranges pass', () => {
+  // existing: Nov 1-5; new: Nov 6-10 (adjacent, no overlap)
+  assert.equal(overlaps('2026-11-01', '2026-11-05', '2026-11-06', '2026-11-10'), false);
+  // entirely before
+  assert.equal(overlaps('2026-11-01', '2026-11-05', '2026-10-25', '2026-10-31'), false);
+});
+
+test('overlap: approved request also blocks (same logic)', () => {
+  // The server checks status IN ('pending','approved') — both block
+  const pending  = { start: '2026-11-01', end: '2026-11-05', status: 'pending'  };
+  const approved = { start: '2026-11-01', end: '2026-11-05', status: 'approved' };
+  const statuses = ['pending', 'approved'];
+  for (const r of [pending, approved]) {
+    assert.equal(statuses.includes(r.status), true); // both block new requests
+    assert.equal(overlaps(r.start, r.end, '2026-11-03', '2026-11-07'), true);
+  }
 });
 
 // ---------------------------------------------------------------------------

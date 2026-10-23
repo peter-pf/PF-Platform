@@ -298,7 +298,7 @@ function renderMyRequests(requests) {
       ? fmtDateDisp(r.start_date) + (r.half_day ? ' (half)' : '')
       : fmtDateDisp(r.start_date) + ' – ' + fmtDateDisp(r.end_date);
     var cancelBtn = r.status === 'pending'
-      ? '<button class="btn btn-sm btn-danger" onclick="cancelRequest(\''+window.esc(r.id)+'\')">Cancel</button>'
+      ? '<button class="btn btn-sm btn-danger" data-cancel-id="'+window.esc(r.id)+'">Cancel</button>'
       : '';
     var denialNote = r.status === 'denied' && r.denial_reason
       ? '<br><span style="font-size:.78rem;color:var(--text-3);">Reason: '+window.esc(r.denial_reason)+'</span>'
@@ -306,7 +306,7 @@ function renderMyRequests(requests) {
     return '<tr>'+
       '<td>'+window.esc(dates)+'</td>'+
       '<td>'+window.esc(r.type)+'</td>'+
-      '<td>'+window.esc(String(r.day_count))+'d</td>'+
+      '<td>'+window.esc(String(r.day_count))+'d <span style="font-size:.72rem;color:var(--text-3);">wkdays</span></td>'+
       '<td>'+badgeHtml(r.status)+denialNote+'</td>'+
       '<td>'+cancelBtn+'</td>'+
       '</tr>';
@@ -333,12 +333,12 @@ function renderPending(requests) {
       '<td>'+window.esc(r.name||r.uid)+'</td>'+
       '<td>'+window.esc(dates)+noteHtml+'</td>'+
       '<td>'+window.esc(r.type)+'</td>'+
-      '<td>'+window.esc(String(r.day_count))+'d</td>'+
+      '<td>'+window.esc(String(r.day_count))+'d <span style="font-size:.72rem;color:var(--text-3);">wkdays</span></td>'+
       '<td>'+
         '<div style="display:flex;flex-direction:column;gap:6px;">'+
-          '<button class="btn btn-sm btn-success" onclick="approveRequest(\''+window.esc(r.id)+'\')">Approve</button>'+
+          '<button class="btn btn-sm btn-success" data-approve-id="'+window.esc(r.id)+'">Approve</button>'+
           '<div class="deny-reason"><input type="text" id="reason-'+window.esc(r.id)+'" placeholder="Reason (optional)" maxlength="300" style="width:100%;margin-bottom:4px;"></div>'+
-          '<button class="btn btn-sm btn-danger" onclick="denyRequest(\''+window.esc(r.id)+'\')">Deny</button>'+
+          '<button class="btn btn-sm btn-danger" data-deny-id="'+window.esc(r.id)+'">Deny</button>'+
         '</div>'+
       '</td>'+
       '</tr>';
@@ -373,7 +373,7 @@ function renderAllocations(allocations) {
     return '<div class="alloc-form-row">'+
       '<span class="emp-name">'+window.esc(uids[uid])+'</span>'+
       '<input type="number" id="alloc-inp-'+window.esc(uid)+'" min="0" max="365" step="0.5" value="'+window.esc(String(cur))+'" placeholder="Days">'+
-      '<button class="btn btn-sm btn-secondary" onclick="saveAllocation(\''+window.esc(uid)+'\','+yr+')">Save</button>'+
+      '<button class="btn btn-sm btn-secondary" data-save-uid="'+window.esc(uid)+'" data-save-year="'+yr+'">Save</button>'+
       '</div>';
   }).join('');
   el.innerHTML = rows + '<div id="allocMsg" style="margin-top:8px;"></div>';
@@ -460,6 +460,16 @@ window.saveAllocation = function(uid, year) {
       }
     }).catch(function(e){ alert('Network error'); });
 };
+
+// ---- Event delegation for dynamically-rendered buttons (item 9 fix) ----
+document.addEventListener('click', function(e) {
+  var btn = e.target && e.target.closest ? e.target.closest('button') : null;
+  if (!btn) return;
+  if (btn.dataset.cancelId)       { window.cancelRequest(btn.dataset.cancelId); }
+  else if (btn.dataset.approveId) { window.approveRequest(btn.dataset.approveId); }
+  else if (btn.dataset.denyId)    { window.denyRequest(btn.dataset.denyId); }
+  else if (btn.dataset.saveUid)   { window.saveAllocation(btn.dataset.saveUid, parseInt(btn.dataset.saveYear, 10)); }
+});
 
 // ---- Form half-day enforcement ----
 document.getElementById('halfDay').addEventListener('change', function() {
