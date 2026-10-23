@@ -247,6 +247,10 @@ const AREA_ROLES = {
   // yet, so this only takes effect once the CRM module is wired. Default-deny
   // still applies to any role not listed.
   crm:              ['admin', 'partner', 'business_dev'],
+  // Time Off Review — absence request approval + allocation management.
+  // Owner-level only: admin + partner. field_ops, business_dev, and hr BLOCKED.
+  // Carries employee PTO data (days granted, absences) — internal HR-adjacent.
+  schedule_admin:   ['admin', 'partner'],
   // Admin-only
   user_admin:       ['admin'],
   // Opportunity email-bridge (the external email daemon authenticates as admin):
@@ -453,6 +457,9 @@ const PAGE_AREAS = {
   '/index.html':             'general',          // portal home/landing
   '/denied.html':            'general',          // access-denied notice (any auth user)
   '/reset-password.html':    'general',          // reset UI (restricted-session gated separately)
+  // Time Off Review (owner/admin only, SPA module — same page as index.html but
+  // mapped explicitly so a direct GET request is gated at the page boundary too).
+  '/time-off-review.html':   'schedule_admin',   // owner-only absence review + allocation
 };
 
 // HTML pages the FIELD CREW is explicitly allowed to reach (their operational
@@ -613,6 +620,12 @@ export function areaForPath(pathname) {
     // this line it would fall through to the default 'user_admin' (admin-only) and
     // a partner (e.g. Jonathan/Derek as partner) could not read the checklist state.
     if (pathname.startsWith('/api/coo-checklist')) return 'financials_global';
+    // Time Off Review — owner-only (admin + partner) absence approval + allocation
+    // editor. schedule_admin area: BLOCKS field_ops, business_dev, and hr by direct
+    // URL too. The handler ALSO calls requireArea(session, 'schedule_admin') on GET
+    // + POST. Without this entry the path falls through to default-deny 'user_admin'
+    // (admin-only) and a partner (Jonathan/Derek) could not approve requests.
+    if (pathname.startsWith('/api/time-off-review')) return 'schedule_admin';
     // "Generate Test Sheet" (Testing section): copies the AP Modulus Test template
     // into the project's SharePoint 04 - Testing folder and populates the portal
     // cells. OFFICE / PM setup action -> financials area (admin + partner +

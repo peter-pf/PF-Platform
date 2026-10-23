@@ -5575,6 +5575,13 @@ window.progress = (function () {
       <a class="nav-item" data-module="hr" onclick="showModule('hr')" title="Human Resources (admin + HR role only)" style="color:#d64545">
         <span class="nav-icon">&#128100;</span> HR
       </a>
+      <!-- Time Off Review (owner-only: admin + partner). Lists all absence requests,
+           approve/deny controls, per-employee allocation editor, and a 2-week calendar
+           view. Server gate: schedule_admin area = admin + partner ONLY. data-fo-hide
+           keeps this invisible to field_ops (who would see a blank page + 403 anyway). -->
+      <a class="nav-item" data-fo-hide="1" data-module="time-off-review" onclick="showModule('time-off-review')" style="color:#d64545">
+        <span class="nav-icon">&#128197;</span> Time Off Review
+      </a>
       <!-- Education: training/onboarding grouped UNDER HR (Melanie 2026-07-24).
            NOTE: nav nesting is VISUAL only. The training pages keep their OWN
            server-side gating from auth.js (both are 'general' = all roles). The
@@ -5869,6 +5876,11 @@ document.addEventListener('click', function(e) {
   <!-- INVENTORY (Derek's module, v1). Read-only stock grouped by location (Farm +
        trailers); Actual Qty on Hand is the only editable field (office-gated). -->
   <div class="module-view" id="mod-inventory"><div id="inventory-app"></div></div>
+  <!-- TIME OFF REVIEW (owner-only: admin + partner). Lists absence requests with
+       approve/deny controls, per-employee allocation editor, and 2-week calendar.
+       Server gate: schedule_admin area (admin + partner ONLY). field_ops NEVER
+       reaches this module (data-fo-hide in nav + server 403). All data via window.esc. -->
+  <div class="module-view" id="mod-time-off-review"><div id="time-off-review-app"></div></div>
   <!-- EQUIPMENT -->
   <div class="module-view" id="mod-equipment"><div id="equipment-app"></div></div>
   <!-- SAFETY -->
@@ -6773,6 +6785,7 @@ const moduleTitles = {
   onboarding: 'Role Onboarding',
   hr: 'Human Resources',
   inventory: 'Inventory',
+  'time-off-review': 'Time Off Review',
   // ---- Phase 1 placeholders ----
   pfadmin: 'PF Admin',
   'bd-targets': 'Business Development - Target Accounts',
@@ -44299,6 +44312,382 @@ try {
     console.error('PF Dashboard search failed to load:', e);
   }
 })();
+</script>
+<!-- TIME OFF REVIEW MODULE (owner-only: admin + partner) -->
+<style>
+/* ---- TIME OFF REVIEW ---- */
+#mod-time-off-review { padding: 0 16px 32px; }
+#tor-header { margin-bottom: 16px; }
+#tor-title { font-size: 20px; font-weight: 600; color: var(--text-0,#000); margin-bottom: 4px; }
+#tor-sub { font-size: 12px; color: var(--text-2,#5A6370); }
+/* Filter tabs */
+.tor-tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+.tor-tab { font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 4px;
+  border: 1px solid var(--border,#D0D5DD); background: var(--surface-2,#F5F7FA);
+  color: var(--text-1,#374151); cursor: pointer; }
+.tor-tab.active { background: var(--accent,#d64545); color: #fff; border-color: var(--accent,#d64545); }
+/* Requests table */
+.tor-tbl-wrap { overflow-x: auto; margin-bottom: 20px; }
+.tor-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tor-tbl th { background: var(--surface-2,#F5F7FA); font-weight: 600; text-align: left;
+  padding: 6px 8px; border-bottom: 2px solid var(--border,#D0D5DD); white-space: nowrap; }
+.tor-tbl td { padding: 6px 8px; border-bottom: 1px solid var(--border,#E5E7EB); vertical-align: top; }
+.tor-tbl tr:last-child td { border-bottom: none; }
+.tor-status-pending  { display:inline-block; padding:2px 7px; border-radius:3px; font-size:11px; font-weight:600; background:#FEF3C7; color:#92400E; }
+.tor-status-approved { display:inline-block; padding:2px 7px; border-radius:3px; font-size:11px; font-weight:600; background:#D1FAE5; color:#065F46; }
+.tor-status-denied   { display:inline-block; padding:2px 7px; border-radius:3px; font-size:11px; font-weight:600; background:#FEE2E2; color:#991B1B; }
+.tor-btn { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 3px;
+  border: none; cursor: pointer; margin-right: 4px; }
+.tor-btn-approve { background: #D1FAE5; color: #065F46; border: 1px solid #6EE7B7; }
+.tor-btn-deny    { background: #FEE2E2; color: #991B1B; border: 1px solid #FCA5A5; }
+.tor-btn:disabled { opacity: .45; cursor: not-allowed; }
+/* Allocations table */
+#tor-alloc-section { margin-bottom: 20px; }
+#tor-alloc-title { font-size: 15px; font-weight: 600; margin-bottom: 8px; color: var(--text-0,#000); }
+.tor-alloc-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tor-alloc-tbl th { background: var(--surface-2,#F5F7FA); font-weight: 600; text-align: left;
+  padding: 5px 8px; border-bottom: 2px solid var(--border,#D0D5DD); }
+.tor-alloc-tbl td { padding: 5px 8px; border-bottom: 1px solid var(--border,#E5E7EB); }
+.tor-alloc-input { width: 60px; text-align: right; border: 1px solid var(--border,#D0D5DD);
+  border-radius: 3px; padding: 2px 5px; font-size: 13px; }
+/* Calendar */
+#tor-cal-section { margin-bottom: 8px; }
+#tor-cal-title { font-size: 15px; font-weight: 600; margin-bottom: 8px; color: var(--text-0,#000); }
+#tor-cal-nav { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; }
+#tor-cal-nav button { padding: 3px 10px; border-radius: 3px; border: 1px solid var(--border,#D0D5DD);
+  background: var(--surface-2,#F5F7FA); cursor: pointer; font-size: 12px; }
+.tor-cal-grid { display: grid; grid-template-columns: repeat(14, 1fr); gap: 2px; }
+.tor-cal-head { font-size: 10px; font-weight: 600; text-align: center; padding: 2px 0;
+  color: var(--text-2,#5A6370); }
+.tor-cal-cell { min-height: 56px; border: 1px solid var(--border,#E5E7EB); border-radius: 2px;
+  padding: 2px 3px; font-size: 10px; background: var(--surface-2,#F5F7FA); }
+.tor-cal-cell.today { border-color: var(--accent,#d64545); background: #fff5f5; }
+.tor-cal-cell .tor-cal-date { font-weight: 600; font-size: 11px; margin-bottom: 2px; color: var(--text-1,#374151); }
+.tor-cal-chip { display: block; padding: 1px 3px; border-radius: 2px; margin-bottom: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tor-cal-chip.pending  { background: #FEF3C7; color: #92400E; }
+.tor-cal-chip.approved { background: #D1FAE5; color: #065F46; }
+/* Empty state */
+.tor-empty { color: var(--text-2,#5A6370); font-size: 13px; padding: 16px 0; }
+/* Error */
+.tor-err { color: #991B1B; background: #FEE2E2; border-radius: 4px; padding: 10px 14px;
+  font-size: 13px; margin-bottom: 12px; }
+</style>
+<script>
+try {
+(function () {
+  'use strict';
+
+  var esc = window.esc || function (v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function(c){ return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]); }); };
+  var pfFmtDate = window.pfFmtDate || function(v){ return String(v||'').slice(0,10); };
+
+  var state = {
+    loaded: false, loading: false, error: null,
+    requests: [], allocations: [], users: [],
+    filter: 'pending',  // pending | approved | denied | all
+    calOffset: 0,       // 0 = current 2-week window, -1 = prev, +1 = next
+  };
+
+  function canManage() {
+    var r = (window.PF_ME && window.PF_ME.role) || '';
+    return r === 'admin' || r === 'partner';
+  }
+
+  function host() {
+    return document.getElementById('time-off-review-app');
+  }
+
+  // ---------- render ----------
+
+  function render() {
+    var el = host();
+    if (!el) return;
+    if (!canManage()) {
+      el.innerHTML = '<div class="tor-err">Access restricted to owners (admin / partner).</div>';
+      return;
+    }
+    if (state.loading) {
+      el.innerHTML = '<div class="tor-empty">Loading...</div>';
+      return;
+    }
+    if (state.error) {
+      el.innerHTML = '<div class="tor-err">' + esc(state.error) + ' <button onclick="window._torReload()">Retry</button></div>';
+      return;
+    }
+    var html = '';
+    html += '<div id="tor-header">';
+    html += '<div id="tor-title">Time Off Review</div>';
+    html += '<div id="tor-sub">Review, approve and deny absence requests. Manage per-employee allocations.</div>';
+    html += '</div>';
+    // Filter tabs
+    html += renderTabs();
+    // Requests table
+    html += renderRequests();
+    // Allocation editor
+    html += renderAllocations();
+    // Calendar
+    html += renderCalendar();
+    el.innerHTML = html;
+    attachHandlers();
+  }
+
+  function renderTabs() {
+    var tabs = [['pending','Pending'],['approved','Approved'],['denied','Denied'],['all','All']];
+    var counts = { pending:0, approved:0, denied:0, all: state.requests.length };
+    state.requests.forEach(function(r){ if (counts[r.status] != null) counts[r.status]++; });
+    var html = '<div class="tor-tabs">';
+    tabs.forEach(function(t){
+      var id = t[0], label = t[1];
+      var cnt = counts[id];
+      html += '<button class="tor-tab' + (state.filter===id?' active':'') + '" data-tor-tab="' + id + '">'
+        + esc(label) + (cnt !== undefined ? ' <span style="opacity:.7">(' + cnt + ')</span>' : '')
+        + '</button>';
+    });
+    html += '</div>';
+    return html;
+  }
+
+  function renderRequests() {
+    var rows = state.filter === 'all' ? state.requests : state.requests.filter(function(r){ return r.status === state.filter; });
+    var html = '<div class="tor-tbl-wrap">';
+    if (!rows.length) {
+      html += '<div class="tor-empty">No ' + esc(state.filter) + ' requests.</div>';
+    } else {
+      html += '<table class="tor-tbl"><thead><tr>'
+        + '<th>Employee</th><th>Type</th><th>Start</th><th>End</th><th>Days</th><th>Note</th><th>Status</th><th>Action</th>'
+        + '</tr></thead><tbody>';
+      rows.forEach(function(r){
+        var isPending = r.status === 'pending';
+        var statusCls = 'tor-status-' + esc(r.status);
+        var start = pfFmtDate(r.start_date);
+        var end   = pfFmtDate(r.end_date);
+        var typeLabel = esc(r.type || '');
+        var halfLabel = r.half_day ? ' (half)' : '';
+        html += '<tr>';
+        html += '<td>' + esc(r.name || r.uid) + '</td>';
+        html += '<td>' + typeLabel + halfLabel + '</td>';
+        html += '<td style="white-space:nowrap">' + esc(start) + '</td>';
+        html += '<td style="white-space:nowrap">' + esc(end) + '</td>';
+        html += '<td>' + esc(r.day_count != null ? r.day_count : '') + '</td>';
+        html += '<td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(r.note||'') + '">' + esc(r.note || '') + '</td>';
+        html += '<td><span class="' + statusCls + '">' + esc(r.status) + '</span>';
+        if (r.status === 'denied' && r.denial_reason) {
+          html += '<br><span style="font-size:10px;color:#6B7280">' + esc(r.denial_reason) + '</span>';
+        }
+        html += '</td>';
+        html += '<td>';
+        if (isPending) {
+          html += '<button class="tor-btn tor-btn-approve" data-tor-approve="' + esc(r.id) + '">Approve</button>';
+          html += '<button class="tor-btn tor-btn-deny"    data-tor-deny="' + esc(r.id) + '">Deny</button>';
+        }
+        html += '</td>';
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function renderAllocations() {
+    var year = new Date().getFullYear();
+    var allocMap = {};
+    state.allocations.forEach(function(a){ if (a.year === year) allocMap[a.uid] = a.allocated_days; });
+    // compute used (approved days this year)
+    var usedMap = {};
+    state.requests.forEach(function(r){
+      if (r.status === 'approved' && r.start_date && r.start_date.slice(0,4) === String(year)) {
+        usedMap[r.uid] = (usedMap[r.uid] || 0) + (r.day_count || 0);
+      }
+    });
+    var html = '<div id="tor-alloc-section">';
+    html += '<div id="tor-alloc-title">Employee Allocations — ' + year + '</div>';
+    html += '<table class="tor-alloc-tbl"><thead><tr>';
+    html += '<th>Employee</th><th>Allocated Days</th><th>Used</th><th>Remaining</th><th></th>';
+    html += '</tr></thead><tbody>';
+    state.users.forEach(function(u){
+      var alloc = allocMap[u.uid] != null ? allocMap[u.uid] : '';
+      var used  = usedMap[u.uid] || 0;
+      var rem   = alloc !== '' ? (parseFloat(alloc) - used).toFixed(1) : '';
+      html += '<tr>';
+      html += '<td>' + esc(u.name) + '</td>';
+      html += '<td><input class="tor-alloc-input" type="number" min="0" max="365" step="0.5"'
+        + ' data-tor-alloc-uid="' + esc(u.uid) + '"'
+        + ' value="' + esc(String(alloc)) + '" placeholder="—"></td>';
+      html += '<td>' + (used > 0 ? used.toFixed(1) : '—') + '</td>';
+      html += '<td>' + (rem !== '' ? rem : '—') + '</td>';
+      html += '<td><button class="tor-btn" style="background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE"'
+        + ' data-tor-save-alloc="' + esc(u.uid) + '" data-tor-alloc-year="' + year + '">Save</button></td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+    return html;
+  }
+
+  function renderCalendar() {
+    // 2-week window starting from Monday of current week + calOffset*14 days.
+    var today = new Date();
+    var dow = (today.getDay() + 6) % 7; // Mon=0
+    var monday = new Date(today);
+    monday.setDate(today.getDate() - dow + state.calOffset * 14);
+    monday.setHours(0,0,0,0);
+    var days = [];
+    for (var i = 0; i < 14; i++) {
+      var d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      days.push(d);
+    }
+    // Build a map iso → [{name, status, type}]
+    var calMap = {};
+    state.requests.forEach(function(r){
+      if (r.status !== 'approved' && r.status !== 'pending') return;
+      var s = new Date(r.start_date + 'T12:00:00Z');
+      var e = new Date(r.end_date   + 'T12:00:00Z');
+      for (var t = new Date(s); t <= e; t.setDate(t.getDate()+1)) {
+        var iso = t.toISOString().slice(0,10);
+        if (!calMap[iso]) calMap[iso] = [];
+        calMap[iso].push({ name: r.name||r.uid, status: r.status, type: r.type||'' });
+      }
+    });
+    var DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    var todayIso = today.toISOString().slice(0,10);
+    var startLabel = pfFmtDate(days[0].toISOString().slice(0,10));
+    var endLabel   = pfFmtDate(days[13].toISOString().slice(0,10));
+    var html = '<div id="tor-cal-section">';
+    html += '<div id="tor-cal-title">Calendar — ' + esc(startLabel) + ' to ' + esc(endLabel) + '</div>';
+    html += '<div id="tor-cal-nav">';
+    html += '<button id="tor-cal-prev">&#9664; Prev</button>';
+    html += '<button id="tor-cal-next">Next &#9654;</button>';
+    html += '</div>';
+    html += '<div class="tor-cal-grid">';
+    DAY_NAMES.forEach(function(n){ html += '<div class="tor-cal-head">' + n + '</div>'; });
+    days.forEach(function(d){
+      var iso = d.toISOString().slice(0,10);
+      var isToday = iso === todayIso;
+      html += '<div class="tor-cal-cell' + (isToday?' today':'') + '">';
+      html += '<div class="tor-cal-date">' + d.getDate() + '</div>';
+      (calMap[iso]||[]).forEach(function(entry){
+        html += '<span class="tor-cal-chip ' + esc(entry.status) + '" title="' + esc(entry.name + ' — ' + entry.type) + '">' + esc(entry.name.split(' ')[0]) + '</span>';
+      });
+      html += '</div>';
+    });
+    html += '</div></div>';
+    return html;
+  }
+
+  // ---------- data ----------
+
+  function load() {
+    if (state.loading) return;
+    state.loading = true;
+    state.error = null;
+    render();
+    fetch('/api/time-off-review', { credentials: 'same-origin' })
+      .then(function(r){
+        if (r.status === 403) throw new Error('Access denied (403). Owner role required.');
+        if (!r.ok) throw new Error('Server error ' + r.status);
+        return r.json();
+      })
+      .then(function(d){
+        state.loading = false;
+        if (!d.ok) { state.error = d.error || 'Unknown error'; render(); return; }
+        state.requests    = d.requests    || [];
+        state.allocations = d.allocations || [];
+        state.users       = d.users       || [];
+        state.loaded = true;
+        render();
+      })
+      .catch(function(e){
+        state.loading = false;
+        state.error = e.message || 'Failed to load data.';
+        render();
+      });
+  }
+
+  window._torReload = function(){ state.loaded=false; load(); };
+
+  function postAction(body, onDone) {
+    fetch('/api/time-off-review', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok) { state.loaded = false; load(); }
+      else { alert(d.error || 'Action failed.'); if (onDone) onDone(); }
+    })
+    .catch(function(e){ alert('Network error: ' + e.message); if (onDone) onDone(); });
+  }
+
+  // ---------- event handlers ----------
+
+  function attachHandlers() {
+    var el = host();
+    if (!el) return;
+
+    // Filter tabs
+    el.querySelectorAll('[data-tor-tab]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        state.filter = btn.getAttribute('data-tor-tab');
+        render();
+      });
+    });
+
+    // Approve buttons
+    el.querySelectorAll('[data-tor-approve]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var id = btn.getAttribute('data-tor-approve');
+        btn.disabled = true;
+        postAction({ action: 'approve', id: id }, function(){ btn.disabled = false; });
+      });
+    });
+
+    // Deny buttons (prompt for optional reason)
+    el.querySelectorAll('[data-tor-deny]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var id = btn.getAttribute('data-tor-deny');
+        var reason = prompt('Denial reason (optional):') || '';
+        btn.disabled = true;
+        postAction({ action: 'deny', id: id, denial_reason: reason }, function(){ btn.disabled = false; });
+      });
+    });
+
+    // Allocation save buttons
+    el.querySelectorAll('[data-tor-save-alloc]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var uid  = btn.getAttribute('data-tor-save-alloc');
+        var year = parseInt(btn.getAttribute('data-tor-alloc-year'), 10);
+        var input = el.querySelector('[data-tor-alloc-uid="' + uid + '"]');
+        var days = input ? parseFloat(input.value) : NaN;
+        if (!Number.isFinite(days) || days < 0 || days > 365) {
+          alert('Enter a valid number of days (0–365).'); return;
+        }
+        btn.disabled = true;
+        postAction({ action: 'set-allocation', uid: uid, year: year, allocated_days: days },
+          function(){ btn.disabled = false; });
+      });
+    });
+
+    // Calendar nav
+    var prev = document.getElementById('tor-cal-prev');
+    var next = document.getElementById('tor-cal-next');
+    if (prev) prev.addEventListener('click', function(){ state.calOffset--; render(); });
+    if (next) next.addEventListener('click', function(){ state.calOffset++; render(); });
+  }
+
+  // ---------- showModule hook ----------
+
+  var _showPrev = window.showModule;
+  window.showModule = function(id) {
+    if (typeof _showPrev === 'function') _showPrev(id);
+    if (id === 'time-off-review' && !state.loaded && !state.loading) load();
+  };
+})();
+} catch (e) {
+  console.error('Module time-off-review failed to load:', e);
+}
 </script>
 </body>
 </html>
