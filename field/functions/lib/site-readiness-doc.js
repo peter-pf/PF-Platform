@@ -96,51 +96,83 @@ export function renderSiteReadinessPdf(rec) {
   // Gather all attachment refs up front (used in 4b/ops sections and the summary).
   const allAttach = Array.isArray(rec.attachments) ? rec.attachments : [];
 
-  // ---- 4b Detail sub-items --------------------------------------------------
+  // ---- 4b Detail sub-items (R9 back-compat: render if present in old records) --
   const d4b = rec.item4bDetail;
   if (d4b && (d4b.unloadStreet || d4b.overheadUtils || d4b.specialNotes)) {
-    doc.heading('4b. Equipment Loading/Unloading Detail');
+    doc.heading('4b. Equipment Loading/Unloading Detail (legacy)');
     const rows4b = [];
-    if (d4b.unloadStreet) rows4b.push({ label: 'Unload on street / plates / curbs', value: d4b.unloadStreet });
+    if (d4b.unloadStreet)  rows4b.push({ label: 'Unload on street / plates / curbs', value: d4b.unloadStreet });
     if (d4b.overheadUtils) rows4b.push({ label: 'Overhead utilities', value: d4b.overheadUtils });
-    if (d4b.specialNotes) rows4b.push({ label: 'Special site access notes', value: d4b.specialNotes });
+    if (d4b.specialNotes)  rows4b.push({ label: 'Special site access notes', value: d4b.specialNotes });
     doc.table(rows4b, { valueW: 280 });
   }
 
-  // ---- Ops sign-offs (stone / spoils placement) ---------------------------
-  // Attachments are routed via key='stone' or key='spoils' (OPS_SECTION_KEYS).
+  // ---- Stone & Spoils Plan sign-off (R10+) ------------------------------------
+  // R10: single sitePlan sign-off. Markup/sig attachments use item key '5d'.
+  // Back-compat: R9 records have stonePlacement/spoilsPlacement — render them too.
   const ops = rec.opsSignoffs;
-  if (ops && (ops.stonePlacement || ops.spoilsPlacement)) {
-    doc.heading('Stone & Spoils Placement Sign-offs');
-    const sections4 = [
-      { label: 'Stone Placement Location',    item: ops.stonePlacement,  sectionKey: 'stone' },
-      { label: 'Spoils Placement Location(s)', item: ops.spoilsPlacement, sectionKey: 'spoils' },
-    ];
-    for (const sec of sections4) {
-      if (!sec.item) continue;
+  if (ops) {
+    // R10 single sign-off.
+    if (ops.sitePlan && (ops.sitePlan.desc || ops.sitePlan.superName || ops.sitePlan.pfMgrName)) {
+      doc.heading('Stone & Spoils Plan Sign-off');
+      const sp = ops.sitePlan;
       const rows = [];
-      if (sec.item.desc)      rows.push({ label: 'Location description', value: sec.item.desc });
-      if (sec.item.superName) rows.push({ label: 'Site Superintendent',  value: sec.item.superName });
-      if (sec.item.pfMgrName) rows.push({ label: 'PF Field Ops Mgr',     value: sec.item.pfMgrName });
-      if (sec.item.capturedByName || sec.item.signedAt) {
-        const by   = sec.item.capturedByName || '—';
-        const when = sec.item.signedAt
-          ? fmtDate(sec.item.signedAt.slice(0, 10)) + ' ' + (sec.item.signedAt.slice(11, 16) || '') + ' UTC'
+      if (sp.desc)      rows.push({ label: 'Location description', value: sp.desc });
+      if (sp.superName) rows.push({ label: 'Site Superintendent',  value: sp.superName });
+      if (sp.pfMgrName) rows.push({ label: 'PF Field Ops Mgr',     value: sp.pfMgrName });
+      if (sp.capturedByName || sp.signedAt) {
+        const by   = sp.capturedByName || '—';
+        const when = sp.signedAt
+          ? fmtDate(sp.signedAt.slice(0, 10)) + ' ' + (sp.signedAt.slice(11, 16) || '') + ' UTC'
           : '—';
         rows.push({ label: 'Signature captured by', value: `${by} on ${when}` });
       }
       if (rows.length) {
-        doc.text(sec.label, { size: 11, bold: true });
         doc.table(rows, { valueW: 280 });
-        // Exact key match (OPS_SECTION_KEYS = 'stone' | 'spoils'), not substring.
-        const sigRefs = allAttach.filter((a) => a && a.bucket === 'sr_signature' && a.key === sec.sectionKey);
-        const mkRefs  = allAttach.filter((a) => a && a.bucket === 'sr_markup'    && a.key === sec.sectionKey);
-        for (const a of [...sigRefs, ...mkRefs]) {
+        // Attachments keyed to item '5d' (site plan markup item).
+        const refs5d = allAttach.filter((a) => a && a.key === '5d' &&
+          (a.bucket === 'sr_markup' || a.bucket === 'sr_signature'));
+        for (const a of refs5d) {
           const hasUrl = a.webUrl && a.webUrl.startsWith('https://pierfoundations.sharepoint.com/');
           const urlPart = hasUrl ? `  ${String(a.webUrl).trim()}` : '';
           doc.text(`  - ${a.name}  [${bucketLabel(a.bucket)}]${urlPart}`, { size: 10 });
         }
         doc.spacer(4);
+      }
+    }
+
+    // R9 back-compat: render stone/spoils separately if present.
+    if (ops.stonePlacement || ops.spoilsPlacement) {
+      doc.heading('Stone & Spoils Placement Sign-offs (R9 legacy)');
+      const legacySecs = [
+        { label: 'Stone Placement Location',     item: ops.stonePlacement,  sectionKey: 'stone' },
+        { label: 'Spoils Placement Location(s)', item: ops.spoilsPlacement, sectionKey: 'spoils' },
+      ];
+      for (const sec of legacySecs) {
+        if (!sec.item) continue;
+        const rows = [];
+        if (sec.item.desc)      rows.push({ label: 'Location description', value: sec.item.desc });
+        if (sec.item.superName) rows.push({ label: 'Site Superintendent',  value: sec.item.superName });
+        if (sec.item.pfMgrName) rows.push({ label: 'PF Field Ops Mgr',     value: sec.item.pfMgrName });
+        if (sec.item.capturedByName || sec.item.signedAt) {
+          const by   = sec.item.capturedByName || '—';
+          const when = sec.item.signedAt
+            ? fmtDate(sec.item.signedAt.slice(0, 10)) + ' ' + (sec.item.signedAt.slice(11, 16) || '') + ' UTC'
+            : '—';
+          rows.push({ label: 'Signature captured by', value: `${by} on ${when}` });
+        }
+        if (rows.length) {
+          doc.text(sec.label, { size: 11, bold: true });
+          doc.table(rows, { valueW: 280 });
+          const sigRefs = allAttach.filter((a) => a && a.bucket === 'sr_signature' && a.key === sec.sectionKey);
+          const mkRefs  = allAttach.filter((a) => a && a.bucket === 'sr_markup'    && a.key === sec.sectionKey);
+          for (const a of [...sigRefs, ...mkRefs]) {
+            const hasUrl = a.webUrl && a.webUrl.startsWith('https://pierfoundations.sharepoint.com/');
+            const urlPart = hasUrl ? `  ${String(a.webUrl).trim()}` : '';
+            doc.text(`  - ${a.name}  [${bucketLabel(a.bucket)}]${urlPart}`, { size: 10 });
+          }
+          doc.spacer(4);
+        }
       }
     }
   }

@@ -160,7 +160,7 @@ function cleanItem4bDetail(input) {
   };
 }
 
-// Rebuild a clean ops sign-off record for stone/spoils placement.
+// Rebuild a clean ops sign-off record (new or active).
 // [SEC fix-round 2026-10-23]: server stamps signedAt + capturedBy from session.
 function cleanOpsSignoffItem(input, session, nowIso) {
   if (!input || typeof input !== 'object') return { desc: '', superName: '', pfMgrName: '' };
@@ -177,15 +177,43 @@ function cleanOpsSignoffItem(input, session, nowIso) {
   return base;
 }
 
-// Rebuild clean ops sign-offs for stone + spoils placement.
+// Preserve a legacy ops sign-off item (R9 stone/spoils) without re-stamping server fields.
+function cleanOpsSignoffItemLegacy(input) {
+  if (!input || typeof input !== 'object') return { desc: '', superName: '', pfMgrName: '' };
+  const base = {
+    desc:      s(input.desc,      MAX_STR),
+    superName: s(input.superName, MAX_SHORT),
+    pfMgrName: s(input.pfMgrName, MAX_SHORT),
+  };
+  // Preserve original server-stamped fields without re-issuing them.
+  if (input.signedAt)       base.signedAt       = s(String(input.signedAt),       MAX_SHORT);
+  if (input.capturedByUid)  base.capturedByUid  = s(String(input.capturedByUid),  MAX_SHORT);
+  if (input.capturedByName) base.capturedByName = s(String(input.capturedByName), MAX_SHORT);
+  return base;
+}
+
+// Rebuild clean ops sign-offs.
+// R10: primary key is sitePlan (single sign-off for stone+spoils plan).
+// Back-compat: preserve legacy R9 stonePlacement/spoilsPlacement keys if present (never drop refs).
+// Migration: if input has stonePlacement but no sitePlan, populate sitePlan from stonePlacement.
 function cleanOpsSignoffs(input, session, nowIso) {
   if (!input || typeof input !== 'object') {
-    return { stonePlacement: cleanOpsSignoffItem(null, session, nowIso), spoilsPlacement: cleanOpsSignoffItem(null, session, nowIso) };
+    return { sitePlan: cleanOpsSignoffItem(null, session, nowIso) };
   }
-  return {
-    stonePlacement:  cleanOpsSignoffItem(input.stonePlacement,  session, nowIso),
-    spoilsPlacement: cleanOpsSignoffItem(input.spoilsPlacement, session, nowIso),
-  };
+  const out = {};
+  // R10 primary.
+  if (input.sitePlan != null) {
+    out.sitePlan = cleanOpsSignoffItem(input.sitePlan, session, nowIso);
+  } else if (input.stonePlacement != null) {
+    // Migrate R9 stonePlacement -> sitePlan (take stonePlacement as the canonical one).
+    out.sitePlan = cleanOpsSignoffItem(input.stonePlacement, session, nowIso);
+  } else {
+    out.sitePlan = cleanOpsSignoffItem(null, session, nowIso);
+  }
+  // Back-compat: preserve R9 keys without re-stamping.
+  if (input.stonePlacement  != null) out.stonePlacement  = cleanOpsSignoffItemLegacy(input.stonePlacement);
+  if (input.spoilsPlacement != null) out.spoilsPlacement = cleanOpsSignoffItemLegacy(input.spoilsPlacement);
+  return out;
 }
 
 // Rebuild a clean attachments array from client input (SP refs only).
@@ -222,7 +250,22 @@ function buildBody(src, base, session, nowIso) {
   base = base || {};
   const items = src.items != null ? cleanItems(src.items) : (base.items || cleanItems(null));
   const { result, openItems } = computeResult(items);
-  return {
+
+  // R10 back-compat: merge base.opsSignoffs (legacy keys) with src.opsSignoffs (new keys)
+  // so old stonePlacement/spoilsPlacement refs survive a round-trip through an R10 client.
+  let rawOps;
+  if (src.opsSignoffs != null) {
+    rawOps = Object.assign({}, (base.opsSignoffs || {}), src.opsSignoffs);
+  } else {
+    rawOps = base.opsSignoffs || null;
+  }
+
+  // item4bDetail: back-compat field (R9). Preserve if present; never create for new records.
+  const raw4bSrc = src.item4bDetail != null ? src.item4bDetail : null;
+  const raw4bBase = base.item4bDetail || null;
+  const raw4b = raw4bSrc != null ? raw4bSrc : raw4bBase;
+
+  const body = {
     date:        isoDateOrToday(src.date != null ? src.date : base.date),
     projectId:   s(src.projectId != null ? src.projectId : base.projectId, MAX_SHORT),
     projectName: s(src.projectName != null ? src.projectName : base.projectName, MAX_SHORT),
@@ -233,14 +276,13 @@ function buildBody(src, base, session, nowIso) {
     attachments: src.attachments != null ? cleanAttachments(src.attachments) : (base.attachments || []),
     sigName:     s(src.sigName != null ? src.sigName : base.sigName, MAX_SHORT),
     sigDate:     isoDateOrToday(src.sigDate != null ? src.sigDate : base.sigDate),
-    item4bDetail: cleanItem4bDetail(src.item4bDetail != null ? src.item4bDetail : (base.item4bDetail || null)),
-    opsSignoffs: cleanOpsSignoffs(
-      src.opsSignoffs != null ? src.opsSignoffs : (base.opsSignoffs || null),
-      session, nowIso,
-    ),
+    opsSignoffs: cleanOpsSignoffs(rawOps, session, nowIso),
     result,
     openItems,
   };
+  // Preserve legacy item4bDetail if it has data (never drop on update).
+  if (raw4b) body.item4bDetail = cleanItem4bDetail(raw4b);
+  return body;
 }
 
 // ---- GET: list records -------------------------------------------------------

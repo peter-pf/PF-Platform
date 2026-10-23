@@ -249,11 +249,12 @@
         <!-- Checklist sections rendered by JS -->
         <div id="srChecklist"></div>
 
-        <!-- Site Photos -->
-        <div class="sr-section-h">Site Photos <span style="font-size:11px;color:var(--text-3);font-weight:400">(upload to 05&nbsp;Field / 02&nbsp;Project Photos)</span></div>
+        <!-- Section 7: Site Photos -->
+        <div class="sr-section-h">7. Site Photos <span style="font-size:11px;color:var(--text-3);font-weight:400">(upload to 05&nbsp;Field / 02&nbsp;Project Photos)</span></div>
         <div style="font-size:12px;color:var(--text-3);margin-bottom:6px">
           Minimum 10 pictures of the site and building pad, including (2) from each corner of the building.
           Tag corner photos by including "corner" in the filename.
+          Photos are saved to: <em>&lt;project&gt; / 05 - Field / 02 - Project Photos / &lt;date&gt;</em>
         </div>
         <div id="srUpPhotos">
           <div class="sr-up-hint" id="srPhotoHint">Select a project first to enable photo uploads. Allowed: .jpg .jpeg .png .heic, up to 50MB each.</div>
@@ -263,99 +264,54 @@
           <div class="sr-up-msg" id="srPhotoMsg"></div>
         </div>
 
-        <!-- Stone & Spoils Placement Sign-offs -->
-        <div class="sr-section-h">Stone &amp; Spoils Placement Sign-offs</div>
+        <!-- 5d: Stone & Spoils Plan Sign-off (single shared) -->
+        <div class="sr-section-h">Stone &amp; Spoils Plan Sign-off</div>
         <div style="font-size:12px;color:var(--text-3);margin-bottom:8px">
-          Discuss stone and spoils locations with the site superintendent, mark the site plan, and capture signatures.
-          Upload a photo or screenshot of the site plan, then draw on it with the markup tool.
-          Signatures are saved as PNGs to the project's Site Readiness SharePoint folder.
+          Discuss stone and spoils locations with the site superintendent, mark them on the site plan,
+          and capture signatures below. Upload a photo or screenshot of the site plan, then draw on it.
+          Markup and signatures are saved to the project's Site Readiness SharePoint folder.
         </div>
 
         <div class="sr-card" style="margin-bottom:10px">
-          <div style="font-weight:700;font-size:13px;margin-bottom:8px">i. Stone Placement Location</div>
-          <label>Location description</label>
-          <textarea id="srStoneDesc" rows="2" placeholder="Describe agreed stone placement location..."></textarea>
+          <label>Location description (stone and spoils)</label>
+          <textarea id="srSitePlanDesc" rows="2" placeholder="Describe agreed stone and spoils placement locations..."></textarea>
           <div style="margin-top:8px">
             <label>Site plan markup — upload an image/screenshot of the site plan, then draw on it</label>
-            <input type="file" id="srMarkupStoneImg" accept=".jpg,.jpeg,.png,.heic" style="margin-bottom:6px">
-            <div id="srMarkupStoneWrap" style="display:none;position:relative;border:1px solid var(--border);border-radius:6px;overflow:hidden;touch-action:none;user-select:none;">
-              <canvas id="srMarkupStoneCanvas" style="display:block;width:100%;cursor:crosshair;touch-action:none"></canvas>
+            <input type="file" id="srMarkupSitePlanImg" accept=".jpg,.jpeg,.png,.heic" style="margin-bottom:6px">
+            <div id="srMarkupSitePlanWrap" style="display:none;position:relative;border:1px solid var(--border);border-radius:6px;overflow:hidden;touch-action:none;user-select:none;">
+              <canvas id="srMarkupSitePlanCanvas" style="display:block;width:100%;cursor:crosshair;touch-action:none"></canvas>
             </div>
-            <div class="sr-markup-tools" id="srMarkupStoneTools" style="display:none;gap:6px;flex-wrap:wrap;margin-top:6px">
-              <button type="button" class="btn btn-sm" onclick="window.srMarkupUndo('stone')">Undo</button>
-              <button type="button" class="btn btn-sm" onclick="window.srMarkupClear('stone')">Clear</button>
-              <button type="button" class="btn btn-sm" data-color="rgba(255,230,0,0.65)" onclick="window.srMarkupColor('stone',this)">Yellow</button>
-              <button type="button" class="btn btn-sm" data-color="rgba(0,109,176,0.75)" onclick="window.srMarkupColor('stone',this)">Blue</button>
-              <button type="button" class="btn btn-sm" data-color="rgba(229,83,75,0.75)" onclick="window.srMarkupColor('stone',this)">Red</button>
-              <button type="button" class="btn btn-sm" onclick="window.srMarkupSave('stone')">Save markup</button>
+            <div class="sr-markup-tools" id="srMarkupSitePlanTools" style="display:none;gap:6px;flex-wrap:wrap;margin-top:6px">
+              <button type="button" class="btn btn-sm" onclick="window.srMarkupUndo('sitePlan')">Undo</button>
+              <button type="button" class="btn btn-sm" onclick="window.srMarkupClear('sitePlan')">Clear</button>
+              <button type="button" class="btn btn-sm" data-color="rgba(255,230,0,0.65)" onclick="window.srMarkupColor('sitePlan',this)">Yellow</button>
+              <button type="button" class="btn btn-sm" data-color="rgba(0,109,176,0.75)" onclick="window.srMarkupColor('sitePlan',this)">Blue</button>
+              <button type="button" class="btn btn-sm" data-color="rgba(229,83,75,0.75)" onclick="window.srMarkupColor('sitePlan',this)">Red</button>
+              <button type="button" class="btn btn-sm" onclick="window.srMarkupSave('sitePlan')">Save markup</button>
             </div>
-            <div id="srMarkupStoneMsg" class="sr-up-msg"></div>
+            <div id="srMarkupSitePlanMsg" class="sr-up-msg"></div>
           </div>
           <div style="margin-top:10px">
             <label>Site Superintendent signature</label>
-            <div><input type="text" id="srStoneSuperName" placeholder="Printed name of superintendent" style="margin-bottom:6px"></div>
-            <canvas id="srSigStoneSuper" width="400" height="120"
+            <div><input type="text" id="srSitePlanSuperName" placeholder="Printed name of superintendent" style="margin-bottom:6px"></div>
+            <canvas id="srSigSiteSuperCanvas" width="400" height="120"
               style="border:1px solid var(--border);border-radius:6px;touch-action:none;cursor:crosshair;display:block;width:100%;max-width:400px;background:var(--surface-3)"></canvas>
             <div style="display:flex;gap:6px;margin-top:4px">
-              <button type="button" class="btn btn-sm" onclick="window.srSigClear('stone_super')">Clear sig</button>
-              <button type="button" class="btn btn-sm" onclick="window.srSigSave('stone_super','stone')">Save signature</button>
+              <button type="button" class="btn btn-sm" onclick="window.srSigClear('site_super')">Clear sig</button>
+              <button type="button" class="btn btn-sm" onclick="window.srSigSave('site_super','sitePlan')">Save signature</button>
             </div>
-            <div id="srSigStoneSuperMsg" class="sr-up-msg"></div>
+            <div id="srSigSiteSuperMsg" class="sr-up-msg"></div>
           </div>
           <div style="margin-top:10px">
             <label>PF Field Ops Mgr signature</label>
-            <div><input type="text" id="srStoneMgrName" placeholder="PF Field Ops Mgr printed name" style="margin-bottom:6px"></div>
-            <canvas id="srSigStoneMgr" width="400" height="120"
+            <div><input type="text" id="srSitePlanMgrName" placeholder="PF Field Ops Mgr printed name" style="margin-bottom:6px"></div>
+            <canvas id="srSigSiteMgrCanvas" width="400" height="120"
               style="border:1px solid var(--border);border-radius:6px;touch-action:none;cursor:crosshair;display:block;width:100%;max-width:400px;background:var(--surface-3)"></canvas>
             <div style="display:flex;gap:6px;margin-top:4px">
-              <button type="button" class="btn btn-sm" onclick="window.srSigClear('stone_mgr')">Clear sig</button>
-              <button type="button" class="btn btn-sm" onclick="window.srSigSave('stone_mgr','stone')">Save signature</button>
+              <button type="button" class="btn btn-sm" onclick="window.srSigClear('site_mgr')">Clear sig</button>
+              <button type="button" class="btn btn-sm" onclick="window.srSigSave('site_mgr','sitePlan')">Save signature</button>
             </div>
-            <div id="srSigStoneMgrMsg" class="sr-up-msg"></div>
-          </div>
-        </div>
-
-        <div class="sr-card" style="margin-bottom:10px">
-          <div style="font-weight:700;font-size:13px;margin-bottom:8px">ii. Spoils Placement Location(s)</div>
-          <label>Location description</label>
-          <textarea id="srSpoilsDesc" rows="2" placeholder="Describe agreed spoils placement location(s)..."></textarea>
-          <div style="margin-top:8px">
-            <label>Site plan markup</label>
-            <input type="file" id="srMarkupSpoilsImg" accept=".jpg,.jpeg,.png,.heic" style="margin-bottom:6px">
-            <div id="srMarkupSpoilsWrap" style="display:none;position:relative;border:1px solid var(--border);border-radius:6px;overflow:hidden;touch-action:none;user-select:none;">
-              <canvas id="srMarkupSpoilsCanvas" style="display:block;width:100%;cursor:crosshair;touch-action:none"></canvas>
-            </div>
-            <div class="sr-markup-tools" id="srMarkupSpoilsTools" style="display:none;gap:6px;flex-wrap:wrap;margin-top:6px">
-              <button type="button" class="btn btn-sm" onclick="window.srMarkupUndo('spoils')">Undo</button>
-              <button type="button" class="btn btn-sm" onclick="window.srMarkupClear('spoils')">Clear</button>
-              <button type="button" class="btn btn-sm" data-color="rgba(255,230,0,0.65)" onclick="window.srMarkupColor('spoils',this)">Yellow</button>
-              <button type="button" class="btn btn-sm" data-color="rgba(0,109,176,0.75)" onclick="window.srMarkupColor('spoils',this)">Blue</button>
-              <button type="button" class="btn btn-sm" data-color="rgba(229,83,75,0.75)" onclick="window.srMarkupColor('spoils',this)">Red</button>
-              <button type="button" class="btn btn-sm" onclick="window.srMarkupSave('spoils')">Save markup</button>
-            </div>
-            <div id="srMarkupSpoilsMsg" class="sr-up-msg"></div>
-          </div>
-          <div style="margin-top:10px">
-            <label>Site Superintendent signature</label>
-            <div><input type="text" id="srSpoilsSuperName" placeholder="Printed name of superintendent" style="margin-bottom:6px"></div>
-            <canvas id="srSigSpoilsSuper" width="400" height="120"
-              style="border:1px solid var(--border);border-radius:6px;touch-action:none;cursor:crosshair;display:block;width:100%;max-width:400px;background:var(--surface-3)"></canvas>
-            <div style="display:flex;gap:6px;margin-top:4px">
-              <button type="button" class="btn btn-sm" onclick="window.srSigClear('spoils_super')">Clear sig</button>
-              <button type="button" class="btn btn-sm" onclick="window.srSigSave('spoils_super','spoils')">Save signature</button>
-            </div>
-            <div id="srSigSpoilsSuperMsg" class="sr-up-msg"></div>
-          </div>
-          <div style="margin-top:10px">
-            <label>PF Field Ops Mgr signature</label>
-            <div><input type="text" id="srSpoilsMgrName" placeholder="PF Field Ops Mgr printed name" style="margin-bottom:6px"></div>
-            <canvas id="srSigSpoilsMgr" width="400" height="120"
-              style="border:1px solid var(--border);border-radius:6px;touch-action:none;cursor:crosshair;display:block;width:100%;max-width:400px;background:var(--surface-3)"></canvas>
-            <div style="display:flex;gap:6px;margin-top:4px">
-              <button type="button" class="btn btn-sm" onclick="window.srSigClear('spoils_mgr')">Clear sig</button>
-              <button type="button" class="btn btn-sm" onclick="window.srSigSave('spoils_mgr','spoils')">Save signature</button>
-            </div>
-            <div id="srSigSpoilsMgrMsg" class="sr-up-msg"></div>
+            <div id="srSigSiteMgrMsg" class="sr-up-msg"></div>
           </div>
         </div>
 
@@ -473,6 +429,7 @@ try {
   var E = window.esc || function (s) { return s == null ? '' : String(s); };
 
   // Canonical checklist definition (mirrors site-readiness-store.js CHECKLIST_ITEMS).
+  // R10 (Derek 2026-10-23): 7-section structure.
   var ITEMS = [
     { key: '1a', section: '1', secLabel: '1. Site Prep',
       label: 'Temp construction stone drive from street to pad (each truck entry)' },
@@ -496,17 +453,31 @@ try {
       uploadBucket: 'proof_roll', uploadLabel: 'Passing proof-roll letter from 3rd party' },
     { key: '3e', section: '3', secLabel: '3. Building Pad',
       label: 'Staking & Layout: building pad has been staked',
-      uploadBucket: 'staking_photo', uploadLabel: 'Staking & layout photos' },
-    { key: '4a', section: '4', secLabel: '4. PF General Operations',
-      label: "Stone delivery plan: 200-300 TN/day, dumped within ~50' of work" },
-    { key: '4b', section: '4', secLabel: '4. PF General Operations',
-      label: 'Lowboy access for mob/demob: plan to unload/load equipment discussed with GC',
-      has4bDetail: true },
-    { key: '4c', section: '4', secLabel: '4. PF General Operations',
-      label: 'Field Ops Manager jobsite visit completed prior to mob' },
-    { key: '4d', section: '4', secLabel: '4. PF General Operations',
-      label: 'Safety training / videos completed by crew before starting work onsite',
-      uploadBucket: 'safety_cert', uploadLabel: 'Safety certs or completion docs' },
+      uploadBucket: 'staking_photo', uploadLabel: 'If staking is complete, attach photos of the staking here.' },
+    // Section 4: Trucking Plan (R10: renamed from PF General Operations)
+    { key: '4a', section: '4', secLabel: '4. Trucking Plan',
+      label: 'Trucking access discussed with GC' },
+    { key: '4b', section: '4', secLabel: '4. Trucking Plan',
+      label: 'Unload / load location? On street or on site? Additional materials required if on street?' },
+    { key: '4c', section: '4', secLabel: '4. Trucking Plan',
+      label: 'Overhead utilities in the way?' },
+    { key: '4d', section: '4', secLabel: '4. Trucking Plan',
+      label: 'Special notes about directions in and out of the job site' },
+    // Section 5: Stone & Spoils Plan (R10: new)
+    { key: '5a', section: '5', secLabel: '5. Stone & Spoils Plan',
+      label: 'Stone placement location' },
+    { key: '5b', section: '5', secLabel: '5. Stone & Spoils Plan',
+      label: 'Spoils placement location' },
+    { key: '5c', section: '5', secLabel: '5. Stone & Spoils Plan',
+      label: 'Spoils removal plan: any additional PF coordination required or GC plan to remove spoils' },
+    // 5d: site plan markup upload + single sign-off rendered after checklist
+    { key: '5d', section: '5', secLabel: '5. Stone & Spoils Plan',
+      label: 'Site plan markup',
+      uploadBucket: 'sr_markup', uploadLabel: 'Site plan markup image (drawn on canvas)' },
+    // Section 6: Safety (R10: new)
+    { key: '6a', section: '6', secLabel: '6. Safety',
+      label: 'Additional safety training required for PF before on site?',
+      uploadBucket: 'safety_cert', uploadLabel: "Save training material to the project's OneDrive safety folder" },
   ];
 
   /* ---- offline draft ---- */
@@ -603,12 +574,9 @@ try {
     attachments: [],
     // pending uploads per bucket key
     pendingUploads: {},
-    // 4b sub-items
-    item4bDetail: { unloadStreet: '', overheadUtils: '', specialNotes: '' },
-    // stone/spoils placement sign-offs
+    // R10: single site plan sign-off
     opsSignoffs: {
-      stonePlacement:  { desc: '', superName: '', pfMgrName: '' },
-      spoilsPlacement: { desc: '', superName: '', pfMgrName: '' },
+      sitePlan: { desc: '', superName: '', pfMgrName: '' },
     },
   };
 
@@ -727,20 +695,6 @@ try {
           }
         }
 
-        // 4b detail sub-items.
-        if (def.has4bDetail) {
-          var d4b = state.item4bDetail || {};
-          html += '<div class="sr-4b-detail">';
-          html += '<div class="sr-4b-detail-h">Items to discuss with GC:</div>';
-          html += '<div class="sr-4b-row"><label>Unload on street? Plates / curbs needed?</label>';
-          html += '<input type="text" class="sr-4b-inp" data-4b-field="unloadStreet" value="' + E(d4b.unloadStreet||'') + '" placeholder="Notes..."></div>';
-          html += '<div class="sr-4b-row"><label>Any overhead utilities in the way?</label>';
-          html += '<input type="text" class="sr-4b-inp" data-4b-field="overheadUtils" value="' + E(d4b.overheadUtils||'') + '" placeholder="Notes..."></div>';
-          html += '<div class="sr-4b-row"><label>Special notes about getting in and out of the jobsite</label>';
-          html += '<input type="text" class="sr-4b-inp" data-4b-field="specialNotes" value="' + E(d4b.specialNotes||'') + '" placeholder="Notes..."></div>';
-          html += '</div>';
-        }
-
         html += '</div>'; // .sr-item
       });
       html += '</div>'; // .sr-section-items
@@ -783,16 +737,6 @@ try {
           var files = this.files ? Array.prototype.slice.call(this.files) : [];
           if (files.length) uploadFiles(bk, itemKey, files);
           this.value = '';
-        });
-      }
-    });
-    // Wire 4b detail text inputs.
-    host.querySelectorAll('input.sr-4b-inp').forEach(function (el) {
-      if (!el.dataset.wired) {
-        el.dataset.wired = '1';
-        el.addEventListener('input', function () {
-          var f = this.getAttribute('data-4b-field');
-          if (f && state.item4bDetail) state.item4bDetail[f] = this.value;
         });
       }
     });
@@ -1095,17 +1039,11 @@ try {
       attachments: state.attachments.slice().concat(state.photoAttachments || []),
       sigName:     (sigName || {}).value || '',
       sigDate:     (sigDate || {}).value || '',
-      item4bDetail: Object.assign({}, state.item4bDetail),
       opsSignoffs: {
-        stonePlacement: {
-          desc:      gv('srStoneDesc'),
-          superName: gv('srStoneSuperName'),
-          pfMgrName: gv('srStoneMgrName'),
-        },
-        spoilsPlacement: {
-          desc:      gv('srSpoilsDesc'),
-          superName: gv('srSpoilsSuperName'),
-          pfMgrName: gv('srSpoilsMgrName'),
+        sitePlan: {
+          desc:      gv('srSitePlanDesc'),
+          superName: gv('srSitePlanSuperName'),
+          pfMgrName: gv('srSitePlanMgrName'),
         },
       },
     };
@@ -1183,11 +1121,9 @@ try {
     state.pendingUploads = {};
     state.photoAttachments = [];
     state.items = ITEMS.map(function (d) { return { key: d.key, answer: '', note: '' }; });
-    state.item4bDetail = { unloadStreet: '', overheadUtils: '', specialNotes: '' };
-    state.opsSignoffs = { stonePlacement: { desc:'', superName:'', pfMgrName:'' }, spoilsPlacement: { desc:'', superName:'', pfMgrName:'' } };
+    state.opsSignoffs = { sitePlan: { desc: '', superName: '', pfMgrName: '' } };
     ['srProject', 'srProjectId', 'srDate', 'srGcContact', 'srSiteAddress', 'srSigName', 'srSigDate',
-     'srStoneDesc', 'srStoneSuperName', 'srStoneMgrName',
-     'srSpoilsDesc', 'srSpoilsSuperName', 'srSpoilsMgrName'].forEach(function (id) {
+     'srSitePlanDesc', 'srSitePlanSuperName', 'srSitePlanMgrName'].forEach(function (id) {
       var el = document.getElementById(id); if (el) el.value = '';
     });
     // Clear picker display
@@ -1244,25 +1180,26 @@ try {
     state.photoAttachments = allAtt.filter(function (a) { return a.bucket === 'photos'; });
     state.pendingUploads = {};
 
-    // Restore 4b detail.
-    var d4b = r.item4bDetail || {};
-    state.item4bDetail = { unloadStreet: d4b.unloadStreet||'', overheadUtils: d4b.overheadUtils||'', specialNotes: d4b.specialNotes||'' };
+    // R10 back-compat: migrate R9 item4bDetail text into section 4 item notes.
+    if (r.item4bDetail) {
+      var d4b = r.item4bDetail;
+      var it4b = state.items.find(function(x){ return x.key === '4b'; });
+      var it4c = state.items.find(function(x){ return x.key === '4c'; });
+      var it4d = state.items.find(function(x){ return x.key === '4d'; });
+      if (it4b && !it4b.note && d4b.unloadStreet)  it4b.note = d4b.unloadStreet;
+      if (it4c && !it4c.note && d4b.overheadUtils) it4c.note = d4b.overheadUtils;
+      if (it4d && !it4d.note && d4b.specialNotes)  it4d.note = d4b.specialNotes;
+    }
 
-    // Restore ops sign-offs text fields.
+    // Restore ops sign-offs.
+    // R10: use sitePlan; if missing, migrate from R9 stonePlacement.
     var ops = r.opsSignoffs || {};
-    var stn = ops.stonePlacement  || {};
-    var spl = ops.spoilsPlacement || {};
-    state.opsSignoffs = {
-      stonePlacement:  { desc: stn.desc||'', superName: stn.superName||'', pfMgrName: stn.pfMgrName||'' },
-      spoilsPlacement: { desc: spl.desc||'', superName: spl.superName||'', pfMgrName: spl.pfMgrName||'' },
-    };
+    var sp = ops.sitePlan || ops.stonePlacement || {};
+    state.opsSignoffs = { sitePlan: { desc: sp.desc||'', superName: sp.superName||'', pfMgrName: sp.pfMgrName||'' } };
     function sv2(id, v) { var el=document.getElementById(id); if(el) el.value=v||''; }
-    sv2('srStoneDesc',      stn.desc);
-    sv2('srStoneSuperName', stn.superName);
-    sv2('srStoneMgrName',   stn.pfMgrName);
-    sv2('srSpoilsDesc',      spl.desc);
-    sv2('srSpoilsSuperName', spl.superName);
-    sv2('srSpoilsMgrName',   spl.pfMgrName);
+    sv2('srSitePlanDesc',      sp.desc);
+    sv2('srSitePlanSuperName', sp.superName);
+    sv2('srSitePlanMgrName',   sp.pfMgrName);
 
     srMarkupResetAll(); // canvas state cannot be restored from PNG; user re-draws if needed
 
@@ -1322,38 +1259,34 @@ try {
 
   // ---- Markup / Signature canvas tools ------------------------------------
   var _markupState = {
-    stone:  { ctx: null, strokes: [], color: 'rgba(255,230,0,0.65)', lineWidth: 12, baseImg: null },
-    spoils: { ctx: null, strokes: [], color: 'rgba(255,230,0,0.65)', lineWidth: 12, baseImg: null },
+    sitePlan: { ctx: null, strokes: [], color: 'rgba(255,230,0,0.65)', lineWidth: 12, baseImg: null },
   };
   var _sigState = {
-    stone_super:  { ctx: null, drawing: false },
-    stone_mgr:    { ctx: null, drawing: false },
-    spoils_super: { ctx: null, drawing: false },
-    spoils_mgr:   { ctx: null, drawing: false },
+    site_super: { ctx: null, drawing: false },
+    site_mgr:   { ctx: null, drawing: false },
   };
 
   function _capFirst(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
   function _capAll(key) { return key.split('_').map(_capFirst).join(''); }
 
   function srMarkupResetAll() {
-    ['stone','spoils'].forEach(function(k) {
+    ['sitePlan'].forEach(function(k) {
       var st = _markupState[k]; if(!st) return;
       st.strokes = []; st.baseImg = null; st.ctx = null;
-      var id1 = 'srMarkup' + _capFirst(k) + 'Wrap';
-      var id2 = 'srMarkup' + _capFirst(k) + 'Tools';
-      var w = document.getElementById(id1); if(w) w.style.display = 'none';
-      var t = document.getElementById(id2); if(t) t.style.display = 'none';
+      var w = document.getElementById('srMarkupSitePlanWrap');  if(w) w.style.display = 'none';
+      var t = document.getElementById('srMarkupSitePlanTools'); if(t) t.style.display = 'none';
     });
-    ['stone_super','stone_mgr','spoils_super','spoils_mgr'].forEach(function(k) {
-      var cv = document.getElementById('srSig' + _capAll(k));
+    ['site_super','site_mgr'].forEach(function(k) {
+      var cv = document.getElementById('srSig' + _capAll(k) + 'Canvas');
       if(cv) { var ctx=cv.getContext('2d'); ctx.clearRect(0,0,cv.width,cv.height); }
     });
   }
 
   function srMarkupInitCanvas(which, img) {
-    var cv   = document.getElementById('srMarkup' + _capFirst(which) + 'Canvas');
-    var wrap = document.getElementById('srMarkup' + _capFirst(which) + 'Wrap');
-    var tools= document.getElementById('srMarkup' + _capFirst(which) + 'Tools');
+    // R10: only 'sitePlan' key supported; use fixed element ids.
+    var cv   = document.getElementById('srMarkupSitePlanCanvas');
+    var wrap = document.getElementById('srMarkupSitePlanWrap');
+    var tools= document.getElementById('srMarkupSitePlanTools');
     if (!cv || !wrap) return;
     cv.width  = img.naturalWidth;
     cv.height = img.naturalHeight;
@@ -1390,7 +1323,7 @@ try {
   window.srMarkupUndo = function(which) {
     var st=_markupState[which]; if(!st||!st.ctx) return;
     if(!st.strokes.length) return; st.strokes.pop();
-    var cv=document.getElementById('srMarkup'+_capFirst(which)+'Canvas'); if(!cv) return;
+    var cv=document.getElementById('srMarkupSitePlanCanvas'); if(!cv) return;
     st.ctx.clearRect(0,0,cv.width,cv.height);
     if(st.baseImg) st.ctx.drawImage(st.baseImg,0,0);
     st.strokes.forEach(function(s){
@@ -1400,26 +1333,28 @@ try {
   };
   window.srMarkupClear = function(which) {
     var st=_markupState[which]; if(!st||!st.ctx) return; st.strokes=[];
-    var cv=document.getElementById('srMarkup'+_capFirst(which)+'Canvas'); if(!cv) return;
+    var cv=document.getElementById('srMarkupSitePlanCanvas'); if(!cv) return;
     st.ctx.clearRect(0,0,cv.width,cv.height); if(st.baseImg) st.ctx.drawImage(st.baseImg,0,0);
   };
   window.srMarkupColor = function(which, btn) { var st=_markupState[which]; if(!st) return; var c=btn.getAttribute('data-color'); if(c) st.color=c; };
   window.srMarkupSave  = function(which) {
-    var msgId='srMarkup'+_capFirst(which)+'Msg'; var msgEl=document.getElementById(msgId);
+    // R10: only sitePlan supported; fixed element ids.
+    var msgEl=document.getElementById('srMarkupSitePlanMsg');
     function mkMsg(t,ok){ if(msgEl){ msgEl.textContent=t; msgEl.className='sr-up-msg '+(ok===true?'ok':(ok===false?'err':'')); } }
     var num=selectedProjectNumber(); if(!num){ mkMsg('Select a project first.',false); return; }
     var dateEl=document.getElementById('srDate'); var date=dateEl?dateEl.value:''; if(!date){ mkMsg('Set the date first.',false); return; }
-    var cv=document.getElementById('srMarkup'+_capFirst(which)+'Canvas'); if(!cv){ mkMsg('No canvas.',false); return; }
+    var cv=document.getElementById('srMarkupSitePlanCanvas'); if(!cv){ mkMsg('No canvas.',false); return; }
     mkMsg('Saving...',null);
     cv.toBlob(function(blob){
       if(!blob){ mkMsg('Export failed.',false); return; }
       var fd=new FormData();
       fd.append('projectNumber',num); fd.append('projectName',selectedProjectName()); fd.append('bucket','sr_markup'); fd.append('reportDate',date);
-      fd.append('file',blob,'site-plan-markup-'+which+'-'+date+'.png');
+      fd.append('file',blob,'site-plan-markup-'+date+'.png');
       var xhr=new XMLHttpRequest(); xhr.open('POST','/api/field-upload',true); xhr.withCredentials=true;
       xhr.onload=function(){ var body=null; try{body=JSON.parse(xhr.responseText);}catch(e){}
         if(xhr.status>=200&&xhr.status<300&&body&&body.ok&&Array.isArray(body.refs)&&body.refs.length){
-          var r=body.refs[0]; state.attachments.push({key:which+'_markup',name:r.name,itemId:r.itemId,webUrl:r.webUrl,bucket:'sr_markup'}); mkMsg('Markup saved.',true);
+          // Use item key '5d' so cleanAttachments accepts it and PDF can route it.
+          var r=body.refs[0]; state.attachments.push({key:'5d',name:r.name,itemId:r.itemId,webUrl:r.webUrl,bucket:'sr_markup'}); mkMsg('Markup saved.',true);
         } else { mkMsg((body&&body.message)||'Save failed.',false); }
       };
       xhr.onerror=function(){ mkMsg('Network error.',false); }; xhr.send(fd);
@@ -1427,7 +1362,8 @@ try {
   };
 
   function srMarkupWireImageInput(which) {
-    var inp=document.getElementById('srMarkup'+_capFirst(which)+'Img'); if(!inp||inp.dataset.wired) return;
+    // R10: fixed element id for the single site plan input.
+    var inp=document.getElementById('srMarkupSitePlanImg'); if(!inp||inp.dataset.wired) return;
     inp.dataset.wired='1';
     inp.addEventListener('change',function(){
       var file=this.files&&this.files[0]; if(!file) return;
@@ -1438,7 +1374,8 @@ try {
   }
 
   function srSigInitCanvas(sigKey) {
-    var cv=document.getElementById('srSig'+_capAll(sigKey)); if(!cv||cv.dataset.sigWired) return;
+    // R10: canvas ids use 'Canvas' suffix: srSigSiteSuperCanvas, srSigSiteMgrCanvas.
+    var cv=document.getElementById('srSig'+_capAll(sigKey)+'Canvas'); if(!cv||cv.dataset.sigWired) return;
     cv.dataset.sigWired='1';
     var ctx=cv.getContext('2d'); _sigState[sigKey].ctx=ctx;
     var drawing=false;
@@ -1450,11 +1387,11 @@ try {
     cv.addEventListener('touchstart',start,{passive:false}); cv.addEventListener('touchmove',move,{passive:false}); cv.addEventListener('touchend',end,{passive:false});
   }
   window.srSigClear = function(sigKey) {
-    var cv=document.getElementById('srSig'+_capAll(sigKey)); if(!cv) return;
+    var cv=document.getElementById('srSig'+_capAll(sigKey)+'Canvas'); if(!cv) return;
     cv.getContext('2d').clearRect(0,0,cv.width,cv.height);
   };
   window.srSigSave = function(sigKey, which) {
-    var cv=document.getElementById('srSig'+_capAll(sigKey));
+    var cv=document.getElementById('srSig'+_capAll(sigKey)+'Canvas');
     var msgEl=document.getElementById('srSig'+_capAll(sigKey)+'Msg');
     function mkMsg(t,ok){ if(msgEl){ msgEl.textContent=t; msgEl.className='sr-up-msg '+(ok===true?'ok':(ok===false?'err':'')); } }
     if(!cv){ mkMsg('Canvas not found.',false); return; }
@@ -1466,12 +1403,12 @@ try {
       if(blob.size>2*1024*1024){ mkMsg('Signature too large (>2MB). Clear and re-sign.',false); return; }
       var fd=new FormData();
       fd.append('projectNumber',num); fd.append('projectName',selectedProjectName()); fd.append('bucket','sr_signature'); fd.append('reportDate',date);
-      var parts=sigKey.split('_');
       fd.append('file',blob,'sig-'+sigKey+'-'+date+'.png');
       var xhr=new XMLHttpRequest(); xhr.open('POST','/api/field-upload',true); xhr.withCredentials=true;
       xhr.onload=function(){ var body=null; try{body=JSON.parse(xhr.responseText);}catch(e){}
         if(xhr.status>=200&&xhr.status<300&&body&&body.ok&&Array.isArray(body.refs)&&body.refs.length){
-          var r=body.refs[0]; state.attachments.push({key:which+'_sig_'+parts[1],name:r.name,itemId:r.itemId,webUrl:r.webUrl,bucket:'sr_signature'}); mkMsg('Signature saved.',true);
+          // Use item key '5d' so cleanAttachments accepts it and PDF can route it.
+          var r=body.refs[0]; state.attachments.push({key:'5d',name:r.name,itemId:r.itemId,webUrl:r.webUrl,bucket:'sr_signature'}); mkMsg('Signature saved.',true);
         } else { mkMsg((body&&body.message)||'Save failed.',false); }
       };
       xhr.onerror=function(){ mkMsg('Network error.',false); }; xhr.send(fd);
@@ -1480,7 +1417,7 @@ try {
 
   function srWireSignaturesAndMarkup() {
     Object.keys(_sigState).forEach(srSigInitCanvas);
-    ['stone','spoils'].forEach(srMarkupWireImageInput);
+    ['sitePlan'].forEach(srMarkupWireImageInput);
   }
 
   // ---- Load personnel names for inspectedBy datalist ----------------------

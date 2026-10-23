@@ -173,6 +173,9 @@ export async function countRecords(env) {
 // answer: 'Yes' | 'No' | 'N/A' | '' (blank = unanswered)
 // READY requires every item to be 'Yes' or 'N/A'.
 // NOT READY if any item is 'No' or blank.
+// R10 (Derek 2026-10-23): 7-section checklist structure.
+// Section 4 renamed Trucking Plan; new sections 5 Stone & Spoils Plan, 6 Safety.
+// Section 7 Site Photos is not a checklist item — it is the photos upload widget.
 export const CHECKLIST_ITEMS = [
   // Section 1: Site Prep
   { key: '1a', section: '1', sectionLabel: 'Site Prep',
@@ -191,7 +194,7 @@ export const CHECKLIST_ITEMS = [
     label: 'At working grade elevation per GC (variance >3" may be change order)',
     hasUpload: true, uploadLabel: 'Grade stake / elevation photo' },
   { key: '3b', section: '3', sectionLabel: 'Building Pad',
-    label: 'Pad overbuilt 10\' on all sides' },
+    label: "Pad overbuilt 10' on all sides" },
   { key: '3c', section: '3', sectionLabel: 'Building Pad',
     label: '4"-6" stone working platform placed' },
   { key: '3d', section: '3', sectionLabel: 'Building Pad',
@@ -199,28 +202,40 @@ export const CHECKLIST_ITEMS = [
     hasUpload: true, uploadLabel: 'Passing proof-roll letter from 3rd party' },
   { key: '3e', section: '3', sectionLabel: 'Building Pad',
     label: 'Staking & Layout: building pad has been staked',
-    hasUpload: true, uploadLabel: 'Staking & layout photos' },
-  // Section 4: PF General Ops
-  { key: '4a', section: '4', sectionLabel: 'PF General Operations',
-    label: 'Stone delivery plan: 200-300 TN/day, dumped within ~50\' of work' },
-  { key: '4b', section: '4', sectionLabel: 'PF General Operations',
-    label: 'Lowboy access for mob/demob: plan to unload/load equipment discussed with GC' },
-  // From Mob Prep > Building Pad Prep > Field Ops Manager Jobsite Visit (platform/index.html ~21137):
-  // pre-mob site walk by PF Field Ops Manager to verify site conditions in person.
-  { key: '4c', section: '4', sectionLabel: 'PF General Operations',
-    label: 'Field Ops Manager jobsite visit completed prior to mob' },
-  { key: '4d', section: '4', sectionLabel: 'PF General Operations',
-    label: 'Safety training / videos completed by crew before starting work onsite',
-    hasUpload: true, uploadLabel: 'Safety certs or completion docs' },
+    hasUpload: true, uploadLabel: 'If staking is complete, attach photos of the staking here.' },
+  // Section 4: Trucking Plan (R10: renamed from PF General Operations; items rebuilt)
+  { key: '4a', section: '4', sectionLabel: 'Trucking Plan',
+    label: 'Trucking access discussed with GC' },
+  { key: '4b', section: '4', sectionLabel: 'Trucking Plan',
+    label: 'Unload / load location? On street or on site? Additional materials required if on street?' },
+  { key: '4c', section: '4', sectionLabel: 'Trucking Plan',
+    label: 'Overhead utilities in the way?' },
+  { key: '4d', section: '4', sectionLabel: 'Trucking Plan',
+    label: 'Special notes about directions in and out of the job site' },
+  // Section 5: Stone & Spoils Plan (R10: new)
+  { key: '5a', section: '5', sectionLabel: 'Stone & Spoils Plan',
+    label: 'Stone placement location' },
+  { key: '5b', section: '5', sectionLabel: 'Stone & Spoils Plan',
+    label: 'Spoils placement location' },
+  { key: '5c', section: '5', sectionLabel: 'Stone & Spoils Plan',
+    label: 'Spoils removal plan: any additional PF coordination required or GC plan to remove spoils' },
+  // 5d = site plan markup upload + single sign-off block (canvas rendered in HTML, not a plain item)
+  { key: '5d', section: '5', sectionLabel: 'Stone & Spoils Plan',
+    label: 'Site plan markup',
+    hasUpload: true, uploadLabel: 'Site plan markup image (drawn on canvas)' },
+  // Section 6: Safety (R10: new; was 4d "Safety training")
+  { key: '6a', section: '6', sectionLabel: 'Safety',
+    label: 'Additional safety training required for PF before on site?',
+    hasUpload: true, uploadLabel: 'Save training material to the project\'s OneDrive safety folder' },
 ];
 
 // Derive the upload bucket key from an item key.
-// '3a' -> 'grade_photo', '3d' -> 'proof_roll', '3e' -> 'staking_photo', '4d' -> 'safety_cert'.
 export function uploadBucketForItem(itemKey) {
   if (itemKey === '3a') return 'grade_photo';
   if (itemKey === '3d') return 'proof_roll';
   if (itemKey === '3e') return 'staking_photo';
-  if (itemKey === '4d') return 'safety_cert';
+  if (itemKey === '5d') return 'sr_markup';
+  if (itemKey === '6a') return 'safety_cert';
   return null;
 }
 

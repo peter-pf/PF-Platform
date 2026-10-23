@@ -273,21 +273,24 @@ await testAsync('loadRecordById falls back to KV', async () => {
 // ============================================================
 console.log('\n--- CHECKLIST_ITEMS ---');
 
-test('CHECKLIST_ITEMS has exactly 14 items (R9: added 3e, 4d)', () => {
-  assert.equal((CHECKLIST_ITEMS || []).length, 14,
-    `expected 14, got ${(CHECKLIST_ITEMS || []).length}`);
+// R10: updated expectations for 19-item structure.
+test('CHECKLIST_ITEMS has exactly 19 items (R10: sections 1-6)', () => {
+  assert.equal((CHECKLIST_ITEMS || []).length, 19,
+    `expected 19, got ${(CHECKLIST_ITEMS || []).length}`);
 });
 
-test('items 3a, 3d, 3e, 4d have hasUpload=true', () => {
+test('R10: items with hasUpload=true are 3a, 3d, 3e, 5d, 6a', () => {
   const by = Object.fromEntries((CHECKLIST_ITEMS || []).map(d => [d.key, d]));
   assert.equal(by['3a'] && by['3a'].hasUpload, true, '3a missing hasUpload');
   assert.equal(by['3d'] && by['3d'].hasUpload, true, '3d missing hasUpload');
   assert.equal(by['3e'] && by['3e'].hasUpload, true, '3e missing hasUpload');
-  assert.equal(by['4d'] && by['4d'].hasUpload, true, '4d missing hasUpload');
+  assert.equal(by['5d'] && by['5d'].hasUpload, true, '5d missing hasUpload (R10)');
+  assert.equal(by['6a'] && by['6a'].hasUpload, true, '6a missing hasUpload (R10)');
+  assert(!by['4d'].hasUpload, '4d should NOT have hasUpload in R10');
 });
 
 test('items without upload do not have hasUpload', () => {
-  const withoutUp = ['1a', '1b', '2a', '2b', '2c', '3b', '3c', '4a', '4b', '4c'];
+  const withoutUp = ['1a', '1b', '2a', '2b', '2c', '3b', '3c', '4a', '4b', '4c', '4d', '5a', '5b', '5c'];
   const by = Object.fromEntries((CHECKLIST_ITEMS || []).map(d => [d.key, d]));
   withoutUp.forEach(k => {
     assert(!by[k].hasUpload, k + ' should not have hasUpload');
@@ -300,23 +303,28 @@ test('2c label is the R9 updated description', () => {
   assert(by['2c'].label.includes('building pad'), '2c label should include "building pad"');
 });
 
-test('uploadBucketForItem maps 3e->staking_photo and 4d->safety_cert', () => {
+test('R10: uploadBucketForItem maps 5d->sr_markup and 6a->safety_cert (4d->null)', () => {
   assert.equal(uploadBucketForItem('3a'), 'grade_photo',   '3a->grade_photo');
   assert.equal(uploadBucketForItem('3d'), 'proof_roll',    '3d->proof_roll');
   assert.equal(uploadBucketForItem('3e'), 'staking_photo', '3e->staking_photo');
-  assert.equal(uploadBucketForItem('4d'), 'safety_cert',   '4d->safety_cert');
+  assert.equal(uploadBucketForItem('5d'), 'sr_markup',     '5d->sr_markup (R10)');
+  assert.equal(uploadBucketForItem('6a'), 'safety_cert',   '6a->safety_cert (R10)');
+  assert.equal(uploadBucketForItem('4d'), null,            '4d->null (R10: no upload on 4d)');
   assert.equal(uploadBucketForItem('1a'), null,            '1a->null');
 });
 
-test('new items 3e and 4d appear in correct sections', () => {
+test('R10: new items in correct sections', () => {
   const by = Object.fromEntries((CHECKLIST_ITEMS || []).map(d => [d.key, d]));
   assert.equal(by['3e'].section, '3', '3e should be in section 3');
-  assert.equal(by['4d'].section, '4', '4d should be in section 4');
+  assert.equal(by['4a'].sectionLabel, 'Trucking Plan', '4a section is Trucking Plan');
+  assert.equal(by['5d'].section, '5', '5d should be in section 5');
+  assert.equal(by['6a'].section, '6', '6a should be in section 6');
 });
 
-test('4b label updated to include GC discussion', () => {
+test('R10: 4b label is Trucking Plan item', () => {
   const by = Object.fromEntries((CHECKLIST_ITEMS || []).map(d => [d.key, d]));
-  assert(by['4b'].label.toLowerCase().includes('gc') || by['4b'].label.toLowerCase().includes('discussed'), '4b label should reference GC discussion');
+  assert(by['4b'].label.toLowerCase().includes('unload') || by['4b'].label.toLowerCase().includes('street'),
+    '4b label should reference unload/street (R10 trucking item)');
 });
 
 // ============================================================
