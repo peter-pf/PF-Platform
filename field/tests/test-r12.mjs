@@ -287,6 +287,66 @@ test('R12-25: field-upload.js comment correctly references PNG_MAGIC_BUCKETS ins
 });
 
 // ---------------------------------------------------------------------------
+// 7. HTML client: 1d-1h labels present and client/server keys in sync
+// ---------------------------------------------------------------------------
+const htmlSrc = readFileSync(resolve(__dir, '../site-readiness.html'), 'utf8');
+
+const R12_LABELS = [
+  'Pad firm enough for the rig to track and set up (no soft spots or ruts)',
+  'Standing water or drainage issues on the pad',
+  'Adjacent structures or neighbors close enough to be sensitive to vibration',
+  'Crew parking and equipment laydown area identified',
+  'Site hours or noise restrictions from the GC or city',
+];
+
+test('R12-26: HTML contains all five R12 labels (1d-1h) in client ITEMS', () => {
+  let found = 0;
+  for (const label of R12_LABELS) {
+    if (htmlSrc.includes(label)) {
+      found++;
+    } else {
+      assert.fail(`HTML missing R12 label: "${label}"`);
+    }
+  }
+  assert.equal(found, 5, `expected 5 R12 labels in HTML, found ${found}`);
+});
+
+test('R12-27: client ITEMS key list matches server CHECKLIST_ITEMS key list', () => {
+  // Extract client item keys from HTML ITEMS definition
+  const clientKeysRaw = htmlSrc.match(/key:\s*'([^']+)'/g) || [];
+  // Filter to only the ITEMS var section (between var ITEMS = [ and closing ]
+  const itemsStart = htmlSrc.indexOf('var ITEMS = [');
+  const itemsEnd   = htmlSrc.indexOf('\n  ];', itemsStart);
+  const itemsSection = htmlSrc.slice(itemsStart, itemsEnd);
+  const clientKeys = (itemsSection.match(/key:\s*'([^']+)'/g) || [])
+    .map(m => m.replace(/key:\s*'/, '').replace("'", ''));
+  const serverKeys = CHECKLIST_ITEMS.map(d => d.key);
+  assert.deepEqual(clientKeys, serverKeys,
+    'client ITEMS keys must exactly match server CHECKLIST_ITEMS keys in the same order');
+});
+
+test('R12-28: HTML collectBody sends schemaVersion: 12', () => {
+  assert.ok(htmlSrc.includes('schemaVersion: 12'),
+    'collectBody must send schemaVersion: 12 (bumped from 11)');
+  assert.ok(!htmlSrc.includes('schemaVersion: 11'),
+    'old schemaVersion: 11 must no longer appear in collectBody');
+});
+
+test('R12-29: HTML CLIENT_R12_KEYS set covers all five R12 item keys', () => {
+  for (const k of ['1d','1e','1f','1g','1h']) {
+    assert.ok(htmlSrc.includes(`'${k}': 1`),
+      `CLIENT_R12_KEYS in HTML must include key '${k}'`);
+  }
+});
+
+test('R12-30: HTML computeResult guards R12 keys by loadedSchemaVersion', () => {
+  assert.ok(htmlSrc.includes('loadedSchemaVersion'),
+    'HTML must track loadedSchemaVersion for schema-version-aware scoring');
+  assert.ok(htmlSrc.includes('CLIENT_R12_KEYS'),
+    'HTML computeResult must reference CLIENT_R12_KEYS to skip 1d-1h for pre-R12 records');
+});
+
+// ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------
 setTimeout(() => {

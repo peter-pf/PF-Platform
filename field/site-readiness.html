@@ -435,6 +435,7 @@ try {
   // Canonical checklist definition (mirrors site-readiness-store.js CHECKLIST_ITEMS).
   // R10 (Derek 2026-10-23): 7-section structure.
   // R11 (Derek 2026-10-23): Section 1 renamed; 1a photo upload; old 1b removed; new 1b/1c added; 4b/4c photo uploads.
+  // R12 (Derek 2026-10-23): 1d-1h added to section 1 (dropdown+notes, no photo upload).
   var ITEMS = [
     { key: '1a', section: '1', secLabel: '1. Site Prep and Conditions',
       label: 'Temp construction stone drive from street to pad (each truck entry)',
@@ -445,6 +446,17 @@ try {
     { key: '1c', section: '1', secLabel: '1. Site Prep and Conditions',
       label: 'Areas of concern',
       uploadBucket: 'photo_1c', uploadLabel: 'Areas of concern photo' },
+    // R12: 1d-1h — dropdown + notes only; no photo upload
+    { key: '1d', section: '1', secLabel: '1. Site Prep and Conditions',
+      label: 'Pad firm enough for the rig to track and set up (no soft spots or ruts)' },
+    { key: '1e', section: '1', secLabel: '1. Site Prep and Conditions',
+      label: 'Standing water or drainage issues on the pad' },
+    { key: '1f', section: '1', secLabel: '1. Site Prep and Conditions',
+      label: 'Adjacent structures or neighbors close enough to be sensitive to vibration' },
+    { key: '1g', section: '1', secLabel: '1. Site Prep and Conditions',
+      label: 'Crew parking and equipment laydown area identified' },
+    { key: '1h', section: '1', secLabel: '1. Site Prep and Conditions',
+      label: 'Site hours or noise restrictions from the GC or city' },
     { key: '2a', section: '2', secLabel: '2. Utilities',
       label: 'Private utilities located and marked by GC' },
     { key: '2b', section: '2', secLabel: '2. Utilities',
@@ -577,6 +589,9 @@ try {
   // Allowed for safety certs only (includes zip/xlsx for cert packages).
   var UP_SAFETY_ALLOWED = ['.jpg', '.jpeg', '.png', '.heic', '.pdf', '.zip', '.xlsx'];
 
+  // R12 keys: only scored/open on schemaVersion >= 12 records (mirrors server R12_KEYS).
+  var CLIENT_R12_KEYS = { '1d': 1, '1e': 1, '1f': 1, '1g': 1, '1h': 1 };
+
   var state = {
     records: [],
     editingId: null,
@@ -591,6 +606,9 @@ try {
     opsSignoffs: {
       sitePlan: { desc: '', superName: '', pfMgrName: '' },
     },
+    // R12: schemaVersion of the loaded record (null = new form; set when loading an existing record).
+    // Used by computeResult to avoid marking 1d-1h open on pre-R12 loaded drafts.
+    loadedSchemaVersion: null,
   };
 
   function api(path, opts) {
@@ -617,10 +635,17 @@ try {
     }).catch(function () { state.projects = []; });
   }
 
-  // Compute READY / NOT READY from current state.items (mirrors server logic).
+  // Compute READY / NOT READY from current state.items (mirrors server computeResult).
+  // R12: 1d-1h are only counted as open for R12 records (schemaVersion >= 12).
+  // When loading a pre-R12 draft, state.loadedSchemaVersion is set to the record's value;
+  // new forms use null which is treated as R12 (crew is filling a fresh form).
   function computeResult() {
+    var sv = state.loadedSchemaVersion;
+    // null = new form (not yet saved); treat as R12 so new forms score all items.
+    var isR12 = (sv === null) || (typeof sv === 'number' && sv >= 12);
     var open = [];
     state.items.forEach(function (it) {
+      if (!isR12 && CLIENT_R12_KEYS[it.key]) return; // skip R12 keys for pre-R12 loaded records
       if (it.answer !== 'Yes' && it.answer !== 'N/A') open.push(it.key);
     });
     return { result: open.length === 0 ? 'READY' : 'NOT READY', openItems: open };
@@ -1100,7 +1125,7 @@ try {
     var sigDate   = document.getElementById('srSigDate');
     function gv(id){ var el=document.getElementById(id); return el ? el.value : ''; }
     return {
-      schemaVersion: 11,
+      schemaVersion: 12,
       projectId:   pid,
       projectName: pname,
       date:        (document.getElementById('srDate') || {}).value || '',
@@ -1194,6 +1219,7 @@ try {
     state.photoAttachments = [];
     state.items = ITEMS.map(function (d) { return { key: d.key, answer: '', note: '' }; });
     state.opsSignoffs = { sitePlan: { desc: '', superName: '', pfMgrName: '' } };
+    state.loadedSchemaVersion = null; // null = new form; computeResult treats as R12
     ['srProject', 'srProjectId', 'srDate', 'srGcContact', 'srSiteAddress', 'srSigName', 'srSigDate',
      'srSitePlanDesc', 'srSitePlanSuperName', 'srSitePlanMgrName'].forEach(function (id) {
       var el = document.getElementById(id); if (el) el.value = '';
@@ -1241,6 +1267,9 @@ try {
     }
     srPickerSetValue(pid, r.projectName || pid);
     var hid = document.getElementById('srProjectId'); if (hid) hid.value = pid;
+
+    // R12: track the loaded record's schemaVersion so computeResult can skip 1d-1h for pre-R12 records.
+    state.loadedSchemaVersion = (typeof r.schemaVersion === 'number') ? r.schemaVersion : null;
 
     state.items = ITEMS.map(function (def) {
       var saved = (Array.isArray(r.items) ? r.items : []).find(function (it) { return it.key === def.key; });
