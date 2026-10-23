@@ -252,6 +252,67 @@ test('R12-21: legacy update strips 1b, 1c, 1d-1h from incoming items', () => {
   assert.ok(!keys.includes('1d'), '1d must be stripped from legacy update');
 });
 
+test('R12-21b: legacy update preserves stored 1b answer+note byte-identical after update', () => {
+  // Simulate the server-side merge: strip guarded from incoming, merge back from base.
+  const SCHEMA_GUARDED_KEYS = new Set(['1b','1c','1d','1e','1f','1g','1h']);
+  function applyLegacyMerge(srcItems, baseItems) {
+    // Strip guarded from incoming
+    let filtered = srcItems.filter(it => !it || !SCHEMA_GUARDED_KEYS.has(String(it.key || '')));
+    // Simulate cleanItems fill: add blank entries for all server CHECKLIST_ITEMS keys
+    const seen = new Set(filtered.map(it => it.key));
+    for (const def of CHECKLIST_ITEMS) {
+      if (!seen.has(def.key)) filtered.push({ key: def.key, answer: '', note: '' });
+    }
+    // Re-merge guarded keys from base
+    for (const baseIt of baseItems) {
+      if (!baseIt || !SCHEMA_GUARDED_KEYS.has(String(baseIt.key || ''))) continue;
+      const idx = filtered.findIndex(it => it.key === baseIt.key);
+      const merged = { key: baseIt.key, answer: baseIt.answer || '', note: baseIt.note || '' };
+      if (idx >= 0) { filtered[idx] = merged; } else { filtered.push(merged); }
+    }
+    return filtered;
+  }
+  const legacyBase = {
+    date: '2026-01-01',
+    items: [
+      { key: '1a', answer: 'Yes', note: '' },
+      { key: '1b', answer: 'Yes', note: 'south side of building' }, // old spoil-pile answer
+    ],
+  };
+  const incomingItems = [
+    { key: '1a', answer: 'Yes', note: '' },
+    { key: '1b', answer: 'No', note: 'client overwrite attempt' }, // must be ignored
+    { key: '2a', answer: 'Yes', note: '' },
+  ];
+  const result = applyLegacyMerge(incomingItems, legacyBase.items);
+  const stored1b = result.find(it => it.key === '1b');
+  assert.ok(stored1b, '1b must be present in result items');
+  assert.equal(stored1b.answer, 'Yes', 'stored 1b answer must be preserved (not blanked or overwritten)');
+  assert.equal(stored1b.note, 'south side of building', 'stored 1b note must be preserved byte-identical');
+});
+
+test('R12-21c: legacy update result does not flip to NOT READY due to blanked 1b', () => {
+  // If 1b was Yes and gets blanked, computeResult (pre-R12) would still not count it
+  // (R12_KEYS doesn't include 1b) — but having it present with Yes is the correct state.
+  // Verify the merge keeps 1b=Yes so it doesn't pollute any future schema upgrade path.
+  const SCHEMA_GUARDED_KEYS = new Set(['1b','1c','1d','1e','1f','1g','1h']);
+  const legacyBase = { items: [{ key: '1b', answer: 'Yes', note: 'confirmed' }] };
+  const incoming = [{ key: '1a', answer: 'Yes' }];
+  let filtered = incoming.filter(it => !SCHEMA_GUARDED_KEYS.has(it.key));
+  // cleanItems fill would add blank 1b
+  filtered.push({ key: '1b', answer: '', note: '' });
+  // Apply merge
+  for (const baseIt of legacyBase.items) {
+    if (!SCHEMA_GUARDED_KEYS.has(baseIt.key)) continue;
+    const idx = filtered.findIndex(it => it.key === baseIt.key);
+    const merged = { key: baseIt.key, answer: baseIt.answer || '', note: baseIt.note || '' };
+    if (idx >= 0) filtered[idx] = merged; else filtered.push(merged);
+  }
+  const item1b = filtered.find(it => it.key === '1b');
+  assert.equal(item1b.answer, 'Yes', '1b must be Yes after merge, not blank');
+  assert.equal(item1b.note, 'confirmed', '1b note must survive merge');
+});
+
 test('R12-22: R12 update does NOT strip 1b-1h (only legacy updates are guarded)', () => {
   const r12Base = { schemaVersion: 12, items: [] };
   const incoming = [

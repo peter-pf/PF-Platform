@@ -271,15 +271,26 @@ function buildBody(src, base, session, nowIso) {
   const schemaVersion = isCreate ? 12 : base.schemaVersion;
   const isLegacyUpdate = !isCreate && (schemaVersion == null || schemaVersion < 11);
 
-  // [LOW R12 2026-10-23]: On a legacy update, strip schema-guarded keys from incoming
-  // items before passing to cleanItems. The old 1b answer (spoil pile) must come ONLY
-  // from the stored base.items — a client on the new form cannot overwrite it.
+  // [LOW R12 2026-10-23 / fix 2026-10-23]: On a legacy update, strip schema-guarded keys from
+  // incoming items before cleanItems, then re-merge them from base.items so cleanItems' fill-
+  // missing-keys loop cannot blank them. Without the merge, cleanItems inserts blank answers
+  // for any key absent from srcItems, overwriting the stored old-1b spoil-pile answer.
   let srcItems = src.items;
   if (isLegacyUpdate && Array.isArray(srcItems)) {
     srcItems = srcItems.filter((it) => !it || !SCHEMA_GUARDED_KEYS.has(String(it.key || '')));
   }
 
-  const items = srcItems != null ? cleanItems(srcItems) : (base.items || cleanItems(null));
+  let items = srcItems != null ? cleanItems(srcItems) : (base.items || cleanItems(null));
+
+  // Re-merge guarded keys from base.items for legacy updates so stored answers survive.
+  if (isLegacyUpdate && Array.isArray(base.items)) {
+    for (const baseIt of base.items) {
+      if (!baseIt || !SCHEMA_GUARDED_KEYS.has(String(baseIt.key || ''))) continue;
+      const idx = items.findIndex((it) => it.key === baseIt.key);
+      const merged = { key: baseIt.key, answer: baseIt.answer || '', note: baseIt.note || '' };
+      if (idx >= 0) { items[idx] = merged; } else { items.push(merged); }
+    }
+  }
   const { result, openItems } = computeResult(items, schemaVersion);
 
   // [SEC fix-round 2026-10-23 R2]: pass srcOps and baseOps separately to cleanOpsSignoffs.
