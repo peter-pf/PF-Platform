@@ -229,6 +229,8 @@ function cleanAttachments(input) {
   const VALID_BUCKETS = new Set([
     'grade_photo', 'proof_roll', 'photos',
     'staking_photo', 'safety_cert', 'sr_markup', 'sr_signature',
+    // R11: section 1 and 4 photo buckets (site-readiness-store.js uploadBucketForItem)
+    'photo_1a', 'photo_1b', 'photo_1c', 'photo_4b', 'photo_4c',
   ]);
   for (const a of input.slice(0, MAX_ATTACH)) {
     if (!a || typeof a !== 'object') continue;
@@ -266,6 +268,15 @@ function buildBody(src, base, session, nowIso) {
   const raw4bBase = base.item4bDetail || null;
   const raw4b = raw4bSrc != null ? raw4bSrc : raw4bBase;
 
+  // [SEC HIGH-2 R11 2026-10-23]: Server stamps schemaVersion=11 on every NEW create
+  // (base is empty {}). Updates preserve the stored base.schemaVersion so legacy
+  // records (stored without schemaVersion) remain legacy after re-save and the PDF
+  // renderer's isPreR11 check continues to route old 1b data to the legacy label
+  // ("Spoil pile") rather than the new R11 label ("General conditions").
+  // Client-supplied schemaVersion is NEVER trusted — buildBody ignores src.schemaVersion.
+  const isCreate = Object.keys(base).length === 0;
+  const schemaVersion = isCreate ? 11 : base.schemaVersion;
+
   const body = {
     date:        isoDateOrToday(src.date != null ? src.date : base.date),
     projectId:   s(src.projectId != null ? src.projectId : base.projectId, MAX_SHORT),
@@ -281,6 +292,8 @@ function buildBody(src, base, session, nowIso) {
     result,
     openItems,
   };
+  // schemaVersion: only include when defined (legacy records stored without it must stay legacy).
+  if (schemaVersion !== undefined) body.schemaVersion = schemaVersion;
   // Preserve legacy item4bDetail if it has data (never drop on update).
   if (raw4b) body.item4bDetail = cleanItem4bDetail(raw4b);
   return body;

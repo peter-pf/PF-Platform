@@ -303,10 +303,13 @@ export async function onRequestGet(context) {
   if (!env.DB) return json({ ok: false, error: 'No database available.' }, 503);
 
   try {
-    const uid     = session.uid;
-    const year    = new Date().getUTCFullYear();
-    const isOwner = session.role === 'admin' || session.role === 'partner';
+    const uid  = session.uid;
+    const year = new Date().getUTCFullYear();
 
+    // [SEC HIGH-1 R11 2026-10-23]: GET returns ONLY the caller's own requests and
+    // balance regardless of role. The previous isOwner branch leaked all employees'
+    // pending absence_requests + all employee_allocations to admin/partner sessions.
+    // That branch is removed entirely. Owner review lives in the platform portal.
     const { results: ownRows } = await env.DB
       .prepare(`SELECT id, uid, name, start_date, end_date, half_day, type, note,
                        day_count, status, created_at, updated_at,
@@ -316,26 +319,7 @@ export async function onRequestGet(context) {
 
     const alloc = await getAllocationSummary(env.DB, uid, year);
 
-    let pendingAll = [], allocations = [];
-    if (isOwner) {
-      const { results: pr } = await env.DB
-        .prepare(`SELECT id, uid, name, start_date, end_date, half_day, type, note,
-                         day_count, status, created_at,
-                         approved_by_name, approved_at, denied_by_name, denied_at, denial_reason
-                  FROM absence_requests WHERE status='pending'
-                  ORDER BY created_at ASC LIMIT 500`)
-        .all();
-      pendingAll = pr || [];
-
-      const { results: allocRows } = await env.DB
-        .prepare('SELECT uid, year, allocated_days FROM employee_allocations ORDER BY uid, year DESC')
-        .all();
-      allocations = allocRows || [];
-    }
-
-    return json({ ok: true, ownRequests: (ownRows || []).map(normalizeType), allocation: alloc,
-                  isOwner, pendingAll: isOwner ? pendingAll.map(normalizeType) : undefined,
-                  allocations: isOwner ? allocations : undefined });
+    return json({ ok: true, ownRequests: (ownRows || []).map(normalizeType), allocation: alloc });
   } catch (e) {
     console.error('time_off_get_error', e?.message);
     return json({ ok: false, error: 'Internal error.' }, 500);

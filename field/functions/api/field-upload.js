@@ -62,13 +62,22 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const ALLOWED_EXT = new Set(['.guh', '.jpg', '.jpeg', '.png', '.heic', '.pdf', '.zip', '.xlsx']);
 
 // Per-bucket extension allow-lists (verifier fix-round 2026-10-23; predrill added integration 2026-10-23).
+// [MEDIUM-4 R11 2026-10-23]: R11 photo_* buckets (section 1 and 4) are image-only.
+// Magic-byte check applied via PNG_MAGIC_BUCKETS (PNG) or IMAGE_MAGIC_BUCKETS (below) where relevant.
+const IMAGE_ONLY_EXT = new Set(['.jpg', '.jpeg', '.png', '.heic']);
 const BUCKET_EXT = new Map([
   ['sr_markup',    new Set(['.png'])],
   ['sr_signature', new Set(['.png'])],
-  ['staking_photo', new Set(['.jpg', '.jpeg', '.png', '.heic'])],
-  ['photos',        new Set(['.jpg', '.jpeg', '.png', '.heic'])],
+  ['staking_photo', IMAGE_ONLY_EXT],
+  ['photos',        IMAGE_ONLY_EXT],
   ['safety_cert',   new Set(['.pdf', '.jpg', '.jpeg', '.png', '.heic'])],
   ['predrill',      new Set(['.pdf', '.jpg', '.jpeg', '.png', '.heic'])],
+  // R11 section 1 + 4 site-readiness photo buckets — images only
+  ['photo_1a', IMAGE_ONLY_EXT],
+  ['photo_1b', IMAGE_ONLY_EXT],
+  ['photo_1c', IMAGE_ONLY_EXT],
+  ['photo_4b', IMAGE_ONLY_EXT],
+  ['photo_4c', IMAGE_ONLY_EXT],
 ]);
 const BUCKET_MAX_BYTES = new Map([
   ['sr_markup',    1 * 1024 * 1024],

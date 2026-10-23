@@ -237,6 +237,120 @@ test('B14: pre-R11 record with no 1b answer: no legacy section added', () => {
 });
 
 // ---------------------------------------------------------------------------
+// A (HIGH-1): time-off.js GET no longer leaks owner data (source checks)
+// ---------------------------------------------------------------------------
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+
+const timeOffSrc = readFileSync(resolve(__dir, '../functions/api/time-off.js'), 'utf8');
+
+test('A5: GET handler no longer contains pendingAll query (isOwner branch removed)', () => {
+  assert.ok(!timeOffSrc.includes('pendingAll'),
+    'pendingAll must be removed from GET handler — it was leaking all employees\' requests');
+});
+
+test('A6: GET handler return statement does not include isOwner key', () => {
+  // Find the json({...}) return inside the GET handler.
+  // The return statement must not include isOwner: in the response object.
+  const getHandlerIdx = timeOffSrc.indexOf('onRequestGet');
+  const postHandlerIdx = timeOffSrc.indexOf('onRequestPost');
+  const getSection = timeOffSrc.slice(getHandlerIdx, postHandlerIdx);
+  // Look for the json({...}) return — must not have isOwner: as a key
+  assert.ok(!getSection.includes('isOwner:'),
+    'GET handler return must not include isOwner: key — owner role check removed from GET');
+});
+
+test('A7: GET handler return statement does not include pendingAll or allocations keys', () => {
+  const getHandlerIdx = timeOffSrc.indexOf('onRequestGet');
+  const postHandlerIdx = timeOffSrc.indexOf('onRequestPost');
+  const getSection = timeOffSrc.slice(getHandlerIdx, postHandlerIdx);
+  assert.ok(!getSection.includes('pendingAll:'),
+    'GET handler return must not include pendingAll: key');
+  assert.ok(!getSection.includes('allocations:'),
+    'GET handler return must not include allocations: key — owner data removed from GET response');
+});
+
+// ---------------------------------------------------------------------------
+// C (HIGH-2): site-readiness.js buildBody stamps schemaVersion=11 server-side
+// ---------------------------------------------------------------------------
+
+// Inline the schemaVersion stamping logic from site-readiness.js buildBody for testing.
+// (buildBody is not exported; we test the logic in isolation to verify correctness.)
+function serverSchemaVersion(base) {
+  const isCreate = Object.keys(base).length === 0;
+  return isCreate ? 11 : base.schemaVersion;
+}
+
+test('C1: new record (empty base) gets schemaVersion=11 stamped by server', () => {
+  const sv = serverSchemaVersion({});
+  assert.equal(sv, 11, 'create must stamp schemaVersion=11');
+});
+
+test('C2: legacy update (base with no schemaVersion) preserves undefined — stays legacy', () => {
+  const legacyBase = { date: '2026-01-01', items: [{ key: '1b', answer: 'Yes' }] };
+  const sv = serverSchemaVersion(legacyBase);
+  assert.equal(sv, undefined,
+    'legacy re-save must NOT stamp schemaVersion=11 — record stays legacy so PDF shows Spoil pile');
+});
+
+test('C3: R11 update (base.schemaVersion=11) preserves 11', () => {
+  const r11Base = { date: '2026-10-23', schemaVersion: 11, items: [] };
+  const sv = serverSchemaVersion(r11Base);
+  assert.equal(sv, 11, 'R11 re-save must preserve schemaVersion=11');
+});
+
+test('C4: legacy re-save: isPreR11 check still passes (no collision on 1b)', () => {
+  // After a legacy re-save schemaVersion is undefined → PDF still routes 1b as spoil pile.
+  const legacyReSavedRec = { date: '2026-01-01', items: [{ key: '1b', answer: 'Marked' }] };
+  // schemaVersion stays undefined (see C2 above)
+  const sv = serverSchemaVersion({ date: legacyReSavedRec.date, items: legacyReSavedRec.items });
+  assert.equal(sv, undefined);
+  // With undefined schemaVersion, isPreR11 is true → PDF shows legacy label
+  const pre = isPreR11({ ...legacyReSavedRec, schemaVersion: sv });
+  assert.equal(pre, true, 'legacy re-saved record must still be treated as pre-R11 in PDF');
+  // Confirm 1b routes to legacy label, not new label
+  const rows = renderSection1ForPdf({ ...legacyReSavedRec, schemaVersion: sv });
+  const legacyRow = rows.find(r => r.key === '1b_legacy');
+  assert.ok(legacyRow, 'legacy re-saved record must still show old 1b under legacy label');
+  const newRow = rows.find(r => r.key === '1b' && r.label.toLowerCase().includes('general'));
+  assert.equal(newRow, undefined, 'legacy re-saved record must NOT show 1b under General conditions');
+});
+
+// ---------------------------------------------------------------------------
+// D (MEDIUM-3/4): site-readiness.js VALID_BUCKETS + field-upload.js BUCKET_EXT
+// ---------------------------------------------------------------------------
+const srSrc = readFileSync(resolve(__dir, '../functions/api/site-readiness.js'), 'utf8');
+const uploadSrc = readFileSync(resolve(__dir, '../functions/api/field-upload.js'), 'utf8');
+
+test('D1: cleanAttachments VALID_BUCKETS includes all 5 photo_* buckets (MEDIUM-3)', () => {
+  for (const b of ['photo_1a', 'photo_1b', 'photo_1c', 'photo_4b', 'photo_4c']) {
+    assert.ok(srSrc.includes(`'${b}'`),
+      `site-readiness.js cleanAttachments VALID_BUCKETS must include ${b}`);
+  }
+});
+
+test('D2: field-upload.js BUCKET_EXT includes all 5 photo_* buckets (MEDIUM-4)', () => {
+  for (const b of ['photo_1a', 'photo_1b', 'photo_1c', 'photo_4b', 'photo_4c']) {
+    assert.ok(uploadSrc.includes(`'${b}'`),
+      `field-upload.js BUCKET_EXT must include ${b} for image-only allowlist`);
+  }
+});
+
+test('D3: field-upload.js photo_* BUCKET_EXT uses image-only extensions', () => {
+  // IMAGE_ONLY_EXT constant must be present and used for the photo_* entries
+  assert.ok(uploadSrc.includes('IMAGE_ONLY_EXT'),
+    'IMAGE_ONLY_EXT constant must exist in field-upload.js for photo_* buckets');
+  // Verify it contains the expected image extensions
+  assert.ok(uploadSrc.includes('.heic'), 'IMAGE_ONLY_EXT must include .heic');
+  // Ensure .pdf and .guh are NOT in IMAGE_ONLY_EXT (image-only means no docs)
+  // Check the IMAGE_ONLY_EXT definition line does not include .pdf or .guh
+  const imageOnlyLine = uploadSrc.split('\n').find(l => l.includes('IMAGE_ONLY_EXT') && l.includes('new Set'));
+  assert.ok(imageOnlyLine, 'IMAGE_ONLY_EXT definition line must exist');
+  assert.ok(!imageOnlyLine.includes('.pdf'), 'IMAGE_ONLY_EXT must not include .pdf');
+  assert.ok(!imageOnlyLine.includes('.guh'), 'IMAGE_ONLY_EXT must not include .guh');
+});
+
+// ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------
 setTimeout(() => {
