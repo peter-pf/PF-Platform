@@ -264,8 +264,10 @@
           <div class="sr-up-msg" id="srPhotoMsg"></div>
         </div>
 
-        <!-- 5d: Stone & Spoils Plan Sign-off (single shared) -->
-        <div class="sr-section-h">Stone &amp; Spoils Plan Sign-off</div>
+        <!-- 5d: Stone & Spoils site plan markup and sign-off (moved into section 5 by renderChecklist) -->
+        <!-- renderChecklist() detaches this node before host.innerHTML and re-inserts it before [data-sec-start="6"] -->
+        <div id="srSection5dBlock">
+        <div style="font-weight:600;font-size:14px;margin:12px 0 4px;color:var(--text)">5d. Site plan markup and sign-off</div>
         <div style="font-size:12px;color:var(--text-3);margin-bottom:8px">
           Discuss stone and spoils locations with the site superintendent, mark them on the site plan,
           and capture signatures below. Upload a photo or screenshot of the site plan, then draw on it.
@@ -314,6 +316,7 @@
             <div id="srSigSiteMgrMsg" class="sr-up-msg"></div>
           </div>
         </div>
+        </div><!-- /#srSection5dBlock -->
 
         <!-- Sign-off -->
         <div class="sr-section-h">Sign-off</div>
@@ -470,10 +473,11 @@ try {
       label: 'Spoils placement location' },
     { key: '5c', section: '5', secLabel: '5. Stone & Spoils Plan',
       label: 'Spoils removal plan: any additional PF coordination required or GC plan to remove spoils' },
-    // 5d: site plan markup upload + single sign-off rendered after checklist
+    // 5d: checklist item only (dropdown + note). Markup upload + sign-off are in #srSection5dBlock,
+    // which renderChecklist() moves to appear right after 5c in the DOM (before section 6).
+    // uploadBucket intentionally omitted here to prevent a duplicate upload widget.
     { key: '5d', section: '5', secLabel: '5. Stone & Spoils Plan',
-      label: 'Site plan markup',
-      uploadBucket: 'sr_markup', uploadLabel: 'Site plan markup image (drawn on canvas)' },
+      label: 'Stone and spoils placement confirmed (see site plan below)' },
     // Section 6: Safety (R10: new)
     { key: '6a', section: '6', secLabel: '6. Safety',
       label: 'Additional safety training required for PF before on site?',
@@ -678,17 +682,24 @@ try {
   function renderChecklist() {
     var host = document.getElementById('srChecklist');
     if (!host) return;
-    // Group items by section.
+
+    // Detach the 5d markup/sign-off block BEFORE clearing innerHTML so canvas state and
+    // event listeners are preserved. It will be re-inserted below after section 5.
+    var block5d = document.getElementById('srSection5dBlock');
+    if (block5d && block5d.parentNode) block5d.parentNode.removeChild(block5d);
+
+    // Group items by section, capturing section number for later DOM targeting.
     var sections = [];
     ITEMS.forEach(function (def) {
       var sec = sections.find(function (s2) { return s2.secLabel === def.secLabel; });
-      if (!sec) { sec = { secLabel: def.secLabel, defs: [] }; sections.push(sec); }
+      if (!sec) { sec = { secLabel: def.secLabel, section: def.section, defs: [] }; sections.push(sec); }
       sec.defs.push(def);
     });
 
     var html = '';
     sections.forEach(function (sec) {
-      html += '<div class="sr-section-h">' + E(sec.secLabel) + '</div>';
+      // data-sec-start used by the 5d block re-insertion to find section 6's header.
+      html += '<div class="sr-section-h" data-sec-start="' + E(sec.section) + '">' + E(sec.secLabel) + '</div>';
       html += '<div class="sr-section-items">';
       sec.defs.forEach(function (def) {
         var stateItem = state.items.find(function (it) { return it.key === def.key; }) || { key: def.key, answer: '', note: '' };
@@ -765,6 +776,19 @@ try {
     });
     updateUploadEnabled();
     updateResultBanner();
+
+    // Re-insert the 5d markup/sign-off block immediately before section 6's header,
+    // so the order is: 5a/5b/5c checklist items → 5d block → section 6.
+    // Using the detached block5d captured above; canvas state and listeners are intact.
+    if (block5d) {
+      var sec6header = host.querySelector('[data-sec-start="6"]');
+      if (sec6header) {
+        host.insertBefore(block5d, sec6header);
+      } else {
+        // Fallback: append inside host if section 6 header not found.
+        host.appendChild(block5d);
+      }
+    }
   }
 
   function renderUploadWidget(itemKey, bucket, uploadLabel, attached, pending, allowedTypes) {

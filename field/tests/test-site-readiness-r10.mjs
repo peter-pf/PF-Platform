@@ -4,7 +4,12 @@
  * Tests: new 19-item checklist, legacy R9/pre-R9 back-compat, single sign-off, section 6, section 7.
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { CHECKLIST_ITEMS, uploadBucketForItem, computeResult } from '../functions/lib/site-readiness-store.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // ---- A: New R10 structure ---------------------------------------------------
 {
@@ -341,6 +346,40 @@ import { CHECKLIST_ITEMS, uploadBucketForItem, computeResult } from '../function
   assert.notEqual(p5a, p5b, 'K5: path updates when date changes');
 
   console.log('K (buildUploadPath format): PASS');
+}
+
+// ---- M: Section-5d DOM order (structure + ITEMS sequence) --------------------
+{
+  const html = readFileSync(join(__dirname, '../site-readiness.html'), 'utf8');
+
+  // M1: CHECKLIST_ITEMS order: 5c index < 5d index (5d is last in section 5).
+  const idx5c = CHECKLIST_ITEMS.findIndex(d => d.key === '5c');
+  const idx5d = CHECKLIST_ITEMS.findIndex(d => d.key === '5d');
+  const idx6a = CHECKLIST_ITEMS.findIndex(d => d.key === '6a');
+  assert.ok(idx5c < idx5d, 'M1: 5c comes before 5d in CHECKLIST_ITEMS');
+  assert.ok(idx5d < idx6a, 'M2: 5d comes before 6a in CHECKLIST_ITEMS');
+
+  // M3: HTML has #srSection5dBlock wrapper.
+  assert.ok(html.includes('id="srSection5dBlock"'), 'M3: #srSection5dBlock id present in HTML');
+
+  // M4: renderChecklist marks section 6 header with data-sec-start="6".
+  assert.ok(html.includes('data-sec-start="'), 'M4: renderChecklist emits data-sec-start attributes');
+  assert.ok(html.includes('"6"'), 'M4b: data-sec-start="6" referenced in JS');
+
+  // M5: renderChecklist re-inserts block5d before [data-sec-start="6"] (section 5d before section 6).
+  assert.ok(html.includes('data-sec-start="6"'), 'M5: querySelector targets data-sec-start="6" for block5d insertion');
+  assert.ok(html.includes('insertBefore(block5d'), 'M5b: insertBefore(block5d ...) present in renderChecklist');
+
+  // M6: block5d is detached before host.innerHTML (preserve canvas/listeners on re-render).
+  assert.ok(html.includes('removeChild(block5d)'), 'M6: block5d detached before host.innerHTML to preserve canvas state');
+
+  // M7: 5d block header is labeled as "5d." (part of section 5, not standalone section header).
+  assert.ok(html.includes('5d. Site plan markup and sign-off'), 'M7: 5d block labeled as 5d sub-item of section 5');
+
+  // M8: Section 4 in site-readiness.html ITEMS is titled "Trucking Plan".
+  assert.ok(html.includes("secLabel: '4. Trucking Plan'") || html.includes('secLabel: "4. Trucking Plan"'), 'M8: Section 4 titled Trucking Plan in client ITEMS');
+
+  console.log('M (5d DOM order + section structure): PASS');
 }
 
 console.log('\nAll R10 tests PASSED.');
