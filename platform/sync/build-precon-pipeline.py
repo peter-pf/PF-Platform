@@ -108,10 +108,10 @@ BID_LOG_WEBURL = (
 #           rows 3+ = one project per row. Read with data_only=True.
 AP_META_DRIVE = "b!ogeNU-bvwUevFyKNf9PvlnJJzsEhnrxMv1zdx5x3u8NS2DUHVpM_Q7YocCSzzqgA"  # TEST drive
 AP_META_ITEM = "016ISVH66XMEC5VHR24BD2SER5BIH2PMJL"  # TEST: PETER TEST - Bidding Metadata.xlsx
-AP_META_TAB = "Agg Pier Metadata"
+AP_META_TAB = "Project Data"
 AP_META_HEADER_ROW = 2   # row 1 = category bands (ignore); row 2 = field headers; 3+ = data
 AP_META_SOURCE = ("SharePoint/TEST - Write-Back Dev/PETER TEST - Bidding Metadata.xlsx"
-                  " [Agg Pier Metadata]")
+                  " [Project Data]")
 
 # metadata "Stage" cell -> stage bucket (the ap replacement for section_to_bucket).
 # Blank/unknown Stage -> actively_bidding (logged as a defaulted row).
