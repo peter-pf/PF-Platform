@@ -530,6 +530,8 @@ const FIELD_PAGES = {
   '/field-companion':        'field_ops',          // CF Pages clean-URL form
   // Site Readiness Form standalone page (Derek 2026-10-20). field_ops area so
   // the crew and office can both access it. Operational data only, no financials.
+  '/equipment-inspection.html': 'field_ops',
+  '/equipment-inspection':     'field_ops',          // CF Pages clean-URL form
   '/site-readiness.html':    'field_ops',
   '/site-readiness':         'field_ops',           // CF Pages clean-URL form
   // Daily Report standalone form (field portal round 2 — split from index.html).
@@ -633,6 +635,11 @@ export function areaForPath(pathname) {
     // endpoint also calls requireArea(session, 'field_ops'). ZERO financials
     // (checklist answers, notes, and attachment refs only).
     if (pathname.startsWith('/api/site-readiness')) return 'field_ops';
+    // Daily Equipment Inspection (Derek, 2026-10-25). field_ops area =
+    // admin/partner/business_dev/field_ops so the crew can submit inspections.
+    // The endpoint also calls requireArea(session, 'field_ops'). ZERO financials
+    // (checklist answers, machine info, and SP ref only).
+    if (pathname.startsWith('/api/equipment-inspection')) return 'field_ops';
     // 3-day NWS weather forecast for the crew's active job site. Geocodes the
     // site address server-side (US Census geocoder) then calls NWS. field_ops
     // area = admin/partner/business_dev/field_ops so the crew can see the
