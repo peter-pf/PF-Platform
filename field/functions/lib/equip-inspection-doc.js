@@ -1,12 +1,20 @@
 // equip-inspection-doc.js -- PDF generation + SharePoint upload for Daily Equipment Inspection.
 //
-// Mirrors site-readiness-doc.js end to end.
-//
 // SharePoint path:
 //   05 - Field Operations/Equipment Checklist/<Machine Type>/<Serial>/<filename>
 //
 // Filename format (Derek, 10/25/2026): YY-MMDD-<serial>-daily-inspection.pdf
 //   where serial is already sanitized (alphanumerics + dashes).
+//
+// PDF LAYOUT (Round 2 fixes):
+//   - brandHeader called with empty title string; two-line "Daily Equipment / Inspection"
+//     drawn manually in the band with _draw() so it never collides with the metadata block.
+//   - Checklist items use doc.row() (word-wraps left column) instead of doc.table()
+//     (which clips with ellipsis on long labels).
+//   - Notes render under each item using doc.text() with indent.
+//   - "Needs Attention" items render with red right-column text.
+//   - A Deficiencies summary section lists all "Needs Attention" items near the top,
+//     after Machine Information, before the per-section checklists.
 //
 // SOURCE NOTES (checklist items):
 //   Cat Skid Steer OMM SEBU9258-01 (262D3/272D3 series):
@@ -17,18 +25,35 @@
 //     https://www.cat.com/en_US/support/operations/service-manuals.html
 //   Generic daily walk-around reference also at:
 //     https://www.cat.com/en_US/support/maintenance.html
+//
+// NOTE: No email. Submit = save to D1 + PDF to SharePoint only (PRIMARY-8, 2026-10-25).
 
-import { PdfDoc, bytesToBase64, PF } from './pdf.js';
+import { PdfDoc, PF } from './pdf.js';
 import { GRAPH } from './graph.js';
 import { CHECKLIST_ITEMS, MACHINE_LABELS } from './equip-inspection-store.js';
+
+// ---------------------------------------------------------------------------
+// bandHeader geometry constants -- must mirror brandHeader() in pdf.js exactly.
+// ---------------------------------------------------------------------------
+const PAGE_H     = 792;
+const MARGIN     = 54;
+const BAND_H     = 104;
+const BAND_Y     = PAGE_H - BAND_H;      // = 688
+const BAND_CTR_Y = BAND_Y + BAND_H / 2;  // = 740
+
+// The logo occupies logoX=52, logoW<=190, so logoRightX<=242.
+// titleX is 18pt after the logo's right edge. Use 260 conservatively.
+const TITLE_X    = 260;
+
+// Red colour for "Needs Attention" answer text in the PDF.
+const RED = [0.75, 0.12, 0.12];
 
 // ---------------------------------------------------------------------------
 // 1. FILENAME
 // ---------------------------------------------------------------------------
 // YY-MMDD-<serial>-daily-inspection.pdf
-// serial already sanitized by the API endpoint before this is called.
 export function pdfFilename(rec) {
-  const d = rec.date || '';               // YYYY-MM-DD
+  const d = rec.date || '';
   const yy   = d.slice(2, 4);
   const mmdd = d.slice(5, 7) + d.slice(8, 10);
   const serial = sanitizeSerial(rec.serialNumber || 'unknown');
@@ -46,46 +71,74 @@ function sanitizeSerial(raw) {
 export function renderEquipInspectionPdf(rec) {
   const doc = new PdfDoc();
 
-  const typeLabel = MACHINE_LABELS[rec.machineType] || rec.machineType || '-';
-  const safeResult = rec.safeToOperate === true ? 'Safe to Operate: YES'
-    : rec.safeToOperate === false ? 'Safe to Operate: NO'
-    : 'Safe to Operate: Not answered';
+  const typeLabel   = MACHINE_LABELS[rec.machineType] || rec.machineType || '-';
   const ownedRented = rec.ownedOrRented || '-';
+  const safeStr     = rec.safeToOperate === true  ? 'Safe to Operate: YES'
+                    : rec.safeToOperate === false ? 'Safe to Operate: NO'
+                    :                               'Safe to Operate: Not answered';
 
-  doc.brandHeader('Daily Equipment Inspection', [
-    { label: 'Machine',     value: typeLabel },
-    { label: 'Job #',       value: rec.projectId || rec.jobNumber || '-' },
-    { label: 'Date',        value: fmtDate(rec.date) },
-    { label: 'Serial #',    value: rec.serialNumber || '-' },
+  // ---- Brand header: empty title string so the band renders without a title ----
+  // We draw our own two-line title into the band below, so it never overlaps
+  // the right-side metadata block regardless of string width.
+  doc.brandHeader('', [
+    { label: 'Machine',  value: typeLabel },
+    { label: 'Job #',    value: rec.projectId || rec.jobNumber || '-' },
+    { label: 'Date',     value: fmtDate(rec.date) },
+    { label: 'Serial #', value: rec.serialNumber || '-' },
   ]);
+
+  // ---- Two-line "Daily Equipment / Inspection" in the charcoal band ----
+  // _draw(text, size, kind, x, baselineY, color)
+  // BAND_CTR_Y = 740; two lines at +7 / -7 relative to centre.
+  doc._draw('Daily Equipment', 13, 'euro', TITLE_X, BAND_CTR_Y + 7, PF.white);
+  doc._draw('Inspection',      13, 'euro', TITLE_X, BAND_CTR_Y - 7, PF.white);
+
   doc.spacer(2);
 
-  // Safe-to-operate banner
-  const isOk = rec.safeToOperate === true;
+  // ---- Safe-to-operate banner ----
+  const isOk    = rec.safeToOperate === true;
   const bannerH = 22;
   if (doc.y - (bannerH + 8) < 54) doc._newPage();
   doc.y -= 8;
   const by = doc.y - bannerH;
   const bannerBg = isOk ? [0.22, 0.78, 0.38] : [0.85, 0.25, 0.25];
-  doc.fillRect(54, by, 612 - 54 * 2, bannerH, bannerBg);
-  doc._draw(safeResult, 11, 'helvb', 54 + 8, by + 7, [1, 1, 1]);
+  doc.fillRect(MARGIN, by, 612 - MARGIN * 2, bannerH, bannerBg);
+  doc._draw(safeStr, 11, 'helvb', MARGIN + 8, by + 7, [1, 1, 1]);
   doc.y = by - 4;
 
-  // Header details block
+  // ---- Machine Information ----
   doc.heading('Machine Information');
   doc.table([
-    { label: 'Machine Type',  value: typeLabel },
-    { label: 'Job Number',    value: rec.projectId || rec.jobNumber || '-' },
-    { label: 'Date',          value: fmtDate(rec.date) },
-    { label: 'Inspected By',  value: rec.inspectedBy || '-' },
+    { label: 'Machine Type',   value: typeLabel },
+    { label: 'Job Number',     value: rec.projectId || rec.jobNumber || '-' },
+    { label: 'Date',           value: fmtDate(rec.date) },
+    { label: 'Inspected By',   value: rec.inspectedBy || '-' },
     { label: 'Owned / Rented', value: ownedRented },
-    { label: 'Serial Number', value: rec.serialNumber || '-' },
-    { label: 'Machine Hours', value: rec.machineHours != null ? String(rec.machineHours) + ' hrs' : '-' },
+    { label: 'Serial Number',  value: rec.serialNumber || '-' },
+    { label: 'Machine Hours',  value: rec.machineHours != null ? String(rec.machineHours) + ' hrs' : '-' },
   ], { valueW: 260 });
 
-  // Checklist sections
-  const items = Array.isArray(rec.items) ? rec.items : [];
-  const bySection = {};
+  // ---- Deficiencies summary (Needs Attention items) near the top ----
+  const items      = Array.isArray(rec.items) ? rec.items : [];
+  const attention  = items.filter((it) => it && it.answer === 'Needs Attention');
+
+  if (attention.length) {
+    doc.heading('Deficiencies Summary');
+    for (const it of attention) {
+      const def = CHECKLIST_ITEMS.find((d) => d.key === it.key);
+      const label = def ? def.label : it.key;
+      doc.row(label, 'Needs Attention', {
+        size: 9.5, rightW: 95, rightColor: RED,
+      });
+      if (it.note) {
+        doc.text('Note: ' + it.note, { size: 8.5, color: PF.secondary, indent: 16 });
+      }
+    }
+    doc.spacer(4);
+  }
+
+  // ---- Checklist sections ----
+  const bySection   = {};
   const sectionOrder = [];
   for (const def of CHECKLIST_ITEMS) {
     if (!def.types.includes(rec.machineType)) continue;
@@ -95,7 +148,7 @@ export function renderEquipInspectionPdf(rec) {
     }
     const found = items.find((it) => it && it.key === def.key);
     bySection[def.section].push({
-      label: def.label,
+      label:  def.label,
       answer: (found && found.answer) || '',
       note:   (found && found.note)   || '',
     });
@@ -103,27 +156,36 @@ export function renderEquipInspectionPdf(rec) {
 
   for (const section of sectionOrder) {
     doc.heading(section);
-    const rows = bySection[section].flatMap(({ label, answer, note }) => {
-      const rowAnswer = answer || '—';
-      const display = note ? `${rowAnswer}   Note: ${note}` : rowAnswer;
-      return [{ label, value: display }];
-    });
-    doc.table(rows, { valueW: 280 });
+    for (const { label, answer, note } of bySection[section]) {
+      const displayAnswer = answer || '--';
+      const isAttn        = answer === 'Needs Attention';
+      doc.row(label, displayAnswer, {
+        size:       9.5,
+        rightW:     95,
+        rightColor: isAttn ? RED : (answer === 'N/A' ? PF.secondary : PF.azureDark),
+      });
+      if (note) {
+        doc.text('Note: ' + note, { size: 8.5, color: PF.secondary, indent: 16 });
+      }
+    }
+    doc.spacer(2);
   }
 
-  // Deficiencies / Notes
+  // ---- Overall deficiencies / notes free text ----
   if (rec.deficienciesNotes && String(rec.deficienciesNotes).trim()) {
-    doc.heading('Deficiencies / Notes');
+    doc.heading('Inspector Notes');
     doc.text(rec.deficienciesNotes, { size: 10 });
   }
 
-  // Footer note
+  // ---- Footer note ----
   doc.spacer(8);
-  doc.text('This checklist is a starting-point template. Contact Derek Franke to refine items for your specific machine.', {
-    size: 9, color: PF.secondary,
-  });
+  doc.text(
+    'This checklist is a starting-point template. Contact Derek Franke to refine items for your specific machine.',
+    { size: 9, color: PF.secondary }
+  );
 
-  return doc.build();
+  // BLOCKER FIX: was doc.build() which does not exist. Correct method is toBytes().
+  return doc.toBytes();
 }
 
 function fmtDate(iso) {
@@ -134,57 +196,7 @@ function fmtDate(iso) {
 }
 
 // ---------------------------------------------------------------------------
-// 3. EMAIL (Graph sendMail) -- mirrors site-readiness-doc.js
-// ---------------------------------------------------------------------------
-export async function sendEquipInspectionEmail(token, rec, pdfBytes, recipients) {
-  if (!token || !recipients || !recipients.length) return;
-  const typeLabel = MACHINE_LABELS[rec.machineType] || rec.machineType || '-';
-  const filename = pdfFilename(rec);
-  const subject = `Daily Equipment Inspection — ${typeLabel} ${rec.serialNumber || ''} — ${fmtDate(rec.date)}`;
-  const bodyText = buildEmailBody(rec);
-
-  const payload = {
-    message: {
-      subject,
-      body: { contentType: 'Text', content: bodyText },
-      toRecipients: recipients.map((a) => ({ emailAddress: { address: a } })),
-      attachments: [{
-        '@odata.type': '#microsoft.graph.fileAttachment',
-        name: filename,
-        contentType: 'application/pdf',
-        contentBytes: bytesToBase64(pdfBytes),
-      }],
-    },
-  };
-  await fetch(`${GRAPH}/users/peter@pierfoundations.com/sendMail`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-}
-
-export function buildEmailBody(rec) {
-  const typeLabel = MACHINE_LABELS[rec.machineType] || rec.machineType || '-';
-  const safeStr = rec.safeToOperate === true ? 'YES' : rec.safeToOperate === false ? 'NO' : 'Not answered';
-  const items = Array.isArray(rec.items) ? rec.items : [];
-  const attn = items.filter((i) => i && i.answer === 'Needs Attention');
-  let body = `Daily Equipment Inspection\n\nMachine: ${typeLabel}\nSerial: ${rec.serialNumber || '-'}\n`;
-  body += `Job: ${rec.projectId || rec.jobNumber || '-'}\nDate: ${fmtDate(rec.date)}\nInspected By: ${rec.inspectedBy || '-'}\n`;
-  body += `Machine Hours: ${rec.machineHours != null ? rec.machineHours + ' hrs' : '-'}\nOwned/Rented: ${rec.ownedOrRented || '-'}\n`;
-  body += `\nSafe to Operate: ${safeStr}\n`;
-  if (attn.length) {
-    body += `\nItems Needing Attention (${attn.length}):\n`;
-    for (const it of attn) {
-      const def = CHECKLIST_ITEMS.find((d) => d.key === it.key);
-      body += `  - ${def ? def.label : it.key}${it.note ? ': ' + it.note : ''}\n`;
-    }
-  }
-  if (rec.deficienciesNotes) body += `\nDeficiencies / Notes:\n${rec.deficienciesNotes}\n`;
-  return body;
-}
-
-// ---------------------------------------------------------------------------
-// 4. SHAREPOINT UPLOAD
+// 3. SHAREPOINT UPLOAD
 // ---------------------------------------------------------------------------
 // Path: 05 - Field Operations/Equipment Checklist/<Machine Type Folder>/<Serial>/<filename>
 //
@@ -193,7 +205,6 @@ export function buildEmailBody(rec) {
 
 const EQUIP_CHECKLIST_ID = '016ISVH63BW25FXFK2Y5H2UPBKEI2ZRSW2';
 
-// Folder name per machine type (safe SP names, no special chars)
 const MACHINE_TYPE_FOLDERS = {
   skid_steer:         'Skid Steer Loader',
   predrill_excavator: 'Predrill Excavator',
@@ -201,24 +212,18 @@ const MACHINE_TYPE_FOLDERS = {
 };
 
 export async function uploadEquipInspectionPdf(env, token, rec, pdfBytes) {
-  const driveId = encodeURIComponent(env.SP_DRIVE_ID);
-  const filename = pdfFilename(rec);
+  const driveId      = encodeURIComponent(env.SP_DRIVE_ID);
+  const filename     = pdfFilename(rec);
   const machineFolder = MACHINE_TYPE_FOLDERS[rec.machineType] || 'Other';
   const serialFolder  = sanitizeSerial(rec.serialNumber || 'unknown');
 
-  // Ensure Machine Type folder under Equipment Checklist
   const machineId = await ensureChildFolder(env, token, EQUIP_CHECKLIST_ID, machineFolder);
-  // Ensure Serial folder under Machine Type folder
   const serialId  = await ensureChildFolder(env, token, machineId, serialFolder);
 
-  // Upload PDF (conflictBehavior=rename so no overwrite)
   const uploadUrl = `${GRAPH}/drives/${driveId}/items/${encodeURIComponent(serialId)}:/${encodeURIComponent(filename)}:/content?@microsoft.graph.conflictBehavior=rename`;
   const uploadResp = await fetch(uploadUrl, {
     method: 'PUT',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/pdf',
-    },
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/pdf' },
     body: pdfBytes,
   });
   if (!uploadResp.ok) {

@@ -105,7 +105,7 @@
 <div id="topbar">
   <a href="/" class="tb-brand" aria-label="PF Field Portal">
     <div class="tb-mark">PF</div>
-    <span class="tb-title">Equipment Inspection</span>
+    <span class="tb-title">Daily Equipment Inspection</span>
   </a>
   <details class="acct-menu" id="acctMenu">
     <summary>
@@ -212,7 +212,7 @@
           </div>
           <div>
             <label>Inspected By</label>
-            <input type="text" id="eiInspectedBy" placeholder="Your name" list="eiInspectedByList" autocomplete="off">
+            <input type="text" id="eiInspectedBy" placeholder="Your name" list="eiInspectedByList" autocomplete="off" maxlength="80">
             <datalist id="eiInspectedByList"></datalist>
           </div>
           <div>
@@ -229,7 +229,7 @@
           </div>
           <div>
             <label>Machine Hours</label>
-            <input type="number" id="eiMachineHours" placeholder="Hours" min="0" max="999999" step="0.1">
+            <input type="number" id="eiMachineHours" placeholder="Hours" min="0" max="100000" step="0.1">
           </div>
         </div>
       </div>
@@ -544,11 +544,14 @@ function eiLoadList() {
         html += 'Job: ' + window.esc(rec.projectId || '-');
         html += '</div>';
         if (rec.status === 'draft') {
-          html += '<button type="button" class="btn btn-sm" style="margin-top:4px" onclick="eiLoadRecord(\'' + window.esc(rec.id) + '\')">Continue draft</button>';
+          html += '<button type="button" class="btn btn-sm" style="margin-top:4px" data-id="' + window.esc(rec.id) + '">Continue draft</button>';
         }
         html += '</div>';
       });
       host.innerHTML = html;
+      host.querySelectorAll('button[data-id]').forEach(function(btn) {
+        btn.addEventListener('click', function() { eiLoadRecord(btn.dataset.id); });
+      });
     })
     .catch(function(){ document.getElementById('eiList').innerHTML = '<div style="color:var(--text-3);font-size:13px">Could not load recent inspections.</div>'; });
 }
