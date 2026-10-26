@@ -183,13 +183,12 @@ export async function onRequestPost(context) {
       return json({ status: 'error', message: 'Invalid email or password.' }, 401);
     }
 
-    // Success — clear the failure counters for this IP + email.
-    await clearFails(kv, [ipKey, emailKey]);
-
-    // [PORTAL-GATE] Deny non-office roles AFTER verifying the password (so
-    // timing does not distinguish "wrong password" from "wrong portal"). A
-    // field_ops user who knows their password is told to use the field portal;
-    // no session cookie — not even a restricted one — is issued.
+    // [N-1 PORTAL-GATE] Deny non-office roles AFTER verifying the password (so
+    // timing does not distinguish "wrong password" from "wrong portal"), but
+    // BEFORE clearFails: a field_ops user trying the wrong portal does NOT earn
+    // a counter-reset. The per-IP/per-email fail counters are intentionally left
+    // as-is so a crew member hammering the office portal does not flush their
+    // throttle budget. No session cookie — not even a restricted one — is issued.
     if (!OFFICE_ROLES.includes(row.role)) {
       try {
         await env.DB
@@ -202,6 +201,9 @@ export async function onRequestPost(context) {
         message: 'This account cannot sign in to the office portal. Use field.pierfoundations.com.',
       }, 403);
     }
+
+    // Correct portal, correct password — clear the failure counters.
+    await clearFails(kv, [ipKey, emailKey]);
 
     // [SEC-06] If the account must reset its (temporary) password, mint a
     // RESTRICTED session: it authenticates the user but the middleware lets it

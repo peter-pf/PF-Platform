@@ -21,8 +21,9 @@
 
 import {
   verifySession, getCookie, hashPassword, mintSession, sessionCookie,
-  isRestrictedSession, SESSION_COOKIE,
+  isRestrictedSession, SESSION_COOKIE, clearSessionCookie,
 } from '../lib/auth.js';
+import { OFFICE_ROLES } from './login.js';
 
 const JSON_HEADERS = {
   'Content-Type': 'application/json',
@@ -94,6 +95,16 @@ export async function onRequestPost(context) {
       .first();
     if (!row || !row.active) {
       return json({ status: 'error', message: 'This account is unavailable. Contact your administrator.' }, 403);
+    }
+
+    // [N-5 PORTAL-GATE] A field_ops account must not complete the reset flow on
+    // the office portal. Deny with 403, clear the restricted session cookie so
+    // the user cannot retry, and do NOT persist any password change.
+    if (!OFFICE_ROLES.includes(row.role)) {
+      return json({
+        status: 'error',
+        message: 'This account cannot sign in to the office portal. Use field.pierfoundations.com.',
+      }, 403, { 'Set-Cookie': clearSessionCookie() });
     }
 
     // Hash the NEW password and persist; clear must_reset.
