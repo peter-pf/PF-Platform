@@ -11,10 +11,12 @@
 <link rel="stylesheet" href="/pf-r5.css">
 <style>
   #main { max-width:1100px; margin:0 auto; padding:16px 14px 40px; }
+
+  /* ---- Page header + month nav ---- */
   .page-head { display:flex; align-items:center; justify-content:space-between;
-    flex-wrap:wrap; gap:12px; margin-bottom:16px; }
+    flex-wrap:wrap; gap:12px; margin-bottom:6px; }
   .page-head h1 { font-size:1.1rem; font-weight:700; color:var(--text-0); margin:0; }
-  .month-nav { display:flex; align-items:center; gap:10px; }
+  .month-nav { display:flex; align-items:center; gap:8px; }
   .month-nav .month-label { font-size:.95rem; font-weight:600; color:var(--text-0);
     min-width:130px; text-align:center; }
   .month-nav .nav-btn { background:var(--bg-2); border:1px solid var(--border);
@@ -23,38 +25,74 @@
   .month-nav .nav-btn:hover { background:var(--border); }
   .month-nav .nav-btn.today-btn { background:var(--accent-light); color:var(--accent);
     border-color:var(--accent); }
-  .cal-wrap { overflow-x:auto; }
-  .cal-table { width:100%; border-collapse:collapse; min-width:500px; }
-  .cal-table th { font-size:.72rem; font-weight:700; text-transform:uppercase;
-    letter-spacing:.3px; color:var(--text-3); padding:6px 8px;
-    border-bottom:2px solid var(--border); text-align:left; white-space:nowrap; }
-  .cal-table th.day-col { text-align:center; min-width:34px; }
-  .cal-table td { padding:5px 8px; border-bottom:1px solid var(--border-light);
-    vertical-align:middle; font-size:.82rem; color:var(--text-1); }
-  .cal-table td.day-cell { text-align:center; vertical-align:middle; padding:4px 2px; }
-  .cal-table td.name-cell { white-space:nowrap; color:var(--text-1); font-size:.82rem; }
-  .cal-table tr:last-child td { border-bottom:none; }
-  .day-num { font-size:.72rem; color:var(--text-3); }
-  .day-num.today { color:var(--accent); font-weight:700; }
-  .absent-block { display:block; background:var(--accent-light); color:var(--accent);
-    border:1px solid var(--accent); border-radius:4px; font-size:.7rem; font-weight:600;
-    text-align:center; padding:2px 0; margin:1px 2px; }
-  .absent-vacation { background:var(--green-light); color:var(--green);
-    border-color:var(--green); }
-  .absent-home { background:var(--amber-light); color:var(--amber);
-    border-color:var(--amber); }
-  .absent-half { background:var(--amber-light); color:var(--amber);
-    border-color:var(--amber); }
-  .month-empty { text-align:center; padding:30px 0; color:var(--text-3); font-size:.875rem; }
-  .legend { display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; font-size:.78rem;
-    color:var(--text-2); align-items:center; }
-  .legend-dot { display:inline-block; width:12px; height:12px; border-radius:2px;
-    margin-right:4px; vertical-align:middle; }
-  .legend-out      { background:var(--accent-light);  border:1px solid var(--accent); }
-  .legend-vacation { background:var(--green-light);   border:1px solid var(--green); }
-  .legend-home     { background:var(--amber-light);   border:1px solid var(--amber); }
-  .legend-half     { background:var(--amber-light);   border:1px solid var(--amber); }
-  .note-row { font-size:.78rem; color:var(--text-3); margin-bottom:10px; }
+  .note-row { font-size:.78rem; color:var(--text-3); margin-bottom:12px; }
+
+  /* ---- Month grid ---- */
+  .cal-outer { background:var(--bg-card,#fff); border:1px solid var(--border-light);
+    border-radius:var(--radius,8px); overflow:hidden; }
+  .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); }
+
+  /* Day-of-week header cells */
+  .cal-dow { background:var(--bg-2); font-size:.68rem; font-weight:700;
+    text-transform:uppercase; letter-spacing:.3px; color:var(--text-3);
+    text-align:center; padding:7px 2px;
+    border-bottom:1px solid var(--border-light); }
+
+  /* Day cells */
+  .cal-cell { min-height:72px; padding:4px 3px 3px; overflow:hidden;
+    border-right:1px solid var(--border-light);
+    border-bottom:1px solid var(--border-light);
+    position:relative; }
+  .cal-cell:nth-child(7n) { border-right:none; }
+  .cal-cell.cal-outside { background:var(--bg-2); }
+  .cal-cell.cal-today { background:var(--accent-light); }
+  .cal-cell.cal-today .cal-num { color:var(--accent); font-weight:700; }
+  /* Remove bottom border on last row cells (handled via JS data-last-row attr) */
+  .cal-cell[data-last-row] { border-bottom:none; }
+
+  .cal-num { display:block; font-size:.72rem; font-weight:600; color:var(--text-2);
+    line-height:1; margin-bottom:3px; }
+
+  /* Name pills */
+  .cal-entries { display:flex; flex-direction:column; gap:2px; }
+  .cal-entry { display:block; background:var(--accent-light); color:var(--accent);
+    border-radius:3px; font-size:.66rem; font-weight:500;
+    padding:1px 4px; line-height:1.4;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+  .cal-more { display:block; font-size:.6rem; color:var(--text-3);
+    padding-left:2px; line-height:1.4; }
+
+  /* Tappable cell on mobile */
+  @media (hover:none) { .cal-cell.cal-has-entries { cursor:pointer; } }
+  .cal-cell.cal-has-entries { cursor:pointer; }
+
+  /* ---- Day detail panel (tap/click) ---- */
+  #dayDetail { display:none; margin-top:10px;
+    padding:11px 14px; background:var(--bg-card,#fff);
+    border:1px solid var(--border-light);
+    border-left:3px solid var(--accent);
+    border-radius:var(--radius,8px); font-size:.85rem; }
+  #dayDetail .det-hd { display:flex; align-items:center;
+    justify-content:space-between; margin-bottom:8px; }
+  #dayDetail .det-title { font-weight:700; font-size:.9rem; color:var(--text-0); }
+  #dayDetail .det-close { font:inherit; font-size:.78rem; background:none; border:none;
+    color:var(--text-3); cursor:pointer; padding:0 2px; }
+  #dayDetail .det-close:hover { color:var(--text-1); }
+  #dayDetail .det-row { padding:4px 0; border-bottom:1px solid var(--border-light);
+    color:var(--text-1); }
+  #dayDetail .det-row:last-child { border-bottom:none; }
+  #dayDetail .det-none { color:var(--text-3); font-style:italic; }
+
+  /* ---- Mobile: 7 cols must fit; shrink text, tighter cells ---- */
+  @media (max-width:520px) {
+    #main { padding:10px 6px 32px; }
+    .cal-cell { min-height:54px; padding:3px 2px 2px; }
+    .cal-num { font-size:.65rem; }
+    .cal-entry { font-size:.58rem; padding:1px 2px; }
+    .cal-more { font-size:.56rem; }
+    .month-nav .nav-btn { padding:5px 8px; font-size:.76rem; }
+    .month-nav .month-label { min-width:100px; }
+  }
 </style>
 <script>(function(){try{var t=localStorage.getItem('pf-theme');var d=t==='dark'||(t==null&&window.matchMedia&&window.matchMedia('(prefers-color-scheme:dark)').matches);if(d)document.documentElement.setAttribute('data-theme','dark');}catch(e){}}());</script>
 </head>
@@ -96,7 +134,6 @@
     <span>Daily Report</span>
   </a>
   <a href="/equipment-inspection.html" class="pf-nav-item" data-paths="/equipment-inspection.html">
-    <!-- Derek's VSC rig silhouette — field/img/rig-icon.png, CSS mask, follows currentColor -->
     <span class="rig-icon" aria-hidden="true"></span>
     <span>Equip. Inspect.</span>
   </a>
@@ -135,16 +172,15 @@
       <button class="nav-btn today-btn" id="todayBtn">Today</button>
     </div>
   </div>
-  <div class="note-row">Showing approved time off. Job schedule coming soon.</div>
-  <div class="legend">
-    <span><span class="legend-dot legend-vacation"></span>Vacation</span>
-    <span><span class="legend-dot legend-home"></span>Home day</span>
-    <span><span class="legend-dot legend-out"></span>Out (sick / other)</span>
-    <span><span class="legend-dot legend-half"></span>Half day</span>
+  <div class="note-row">Approved time off &mdash; job schedule not yet included.</div>
+
+  <!-- Month grid -->
+  <div class="cal-outer">
+    <div class="cal-grid" id="calGrid"></div>
   </div>
-  <div class="cal-wrap" id="calWrap">
-    <div class="month-empty">Loading...</div>
-  </div>
+
+  <!-- Day detail panel: shown when user taps/clicks a day that has entries -->
+  <div id="dayDetail"></div>
 </div>
 
 <script src="/js/pf-shared.js"></script>
@@ -159,10 +195,14 @@ var _viewYear  = new Date().getFullYear();
 var _viewMonth = new Date().getMonth(); // 0-based
 var _absences  = [];
 
-// ---- Date utilities ----
+// Currently selected cell iso for detail panel
+var _detailIso = null;
+
+// ---- Date utilities ---- (unchanged from original)
 var MONTHS = ['January','February','March','April','May','June',
               'July','August','September','October','November','December'];
-var DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+var DOW_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+var DOW_FULL  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
 function padZ(n) { return n < 10 ? '0'+n : String(n); }
 function isoDate(y,m,d) { return y+'-'+padZ(m+1)+'-'+padZ(d); }
@@ -176,98 +216,191 @@ function todayIso() {
   return d.getFullYear()+'-'+padZ(d.getMonth()+1)+'-'+padZ(d.getDate());
 }
 
-// First and last day of the current view month
 function monthRange(year, month) {
   var last = daysInMonth(year, month);
   return { from: isoDate(year, month, 1), to: isoDate(year, month, last) };
 }
 
-// ---- Load absences for a date range ----
+// ---- Build day-map: iso -> [{ name, half_day }] ----
+// Consumes only name and half_day from the API response (no type/label).
+function buildDayMap(absences) {
+  var map = {};
+  absences.forEach(function(a) {
+    if (!a.start_date || !a.end_date) return;
+    var s   = new Date(a.start_date + 'T12:00:00Z');
+    var e   = new Date(a.end_date   + 'T12:00:00Z');
+    var cur = new Date(s);
+    var lim = 0;
+    while (cur <= e && lim < 400) {
+      var iso = cur.toISOString().slice(0,10);
+      if (!map[iso]) map[iso] = [];
+      map[iso].push({ name: a.name || '', half: !!a.half_day });
+      cur.setUTCDate(cur.getUTCDate() + 1);
+      lim++;
+    }
+  });
+  return map;
+}
+
+// ---- Render month grid ----
+function renderCalendar(year, month, absences) {
+  var grid    = document.getElementById('calGrid');
+  var today   = todayIso();
+  var dayMap  = buildDayMap(absences);
+  var numDays = daysInMonth(year, month);
+
+  // Day of week the 1st falls on (0=Sun … 6=Sat)
+  var firstDow = new Date(isoDate(year, month, 1) + 'T12:00:00Z').getUTCDay();
+
+  var totalCells = firstDow + numDays;
+  var nRows      = Math.ceil(totalCells / 7);
+  var totalGrid  = nRows * 7;
+
+  // Narrow viewport: show fewer entries per cell before "+N more"
+  var narrow = window.innerWidth <= 520;
+  var maxVis = narrow ? 1 : 2;
+
+  // Clear previous grid
+  while (grid.firstChild) grid.removeChild(grid.firstChild);
+
+  // DOW header row (7 cells)
+  for (var h = 0; h < 7; h++) {
+    var hdr = document.createElement('div');
+    hdr.className = 'cal-dow';
+    hdr.textContent = DOW_SHORT[h];
+    grid.appendChild(hdr);
+  }
+
+  // Day cells
+  for (var i = 0; i < totalGrid; i++) {
+    var dayNum   = i - firstDow + 1;
+    var inMonth  = dayNum >= 1 && dayNum <= numDays;
+    var isLastRow = i >= (nRows - 1) * 7;
+    var col      = i % 7;
+
+    var cell = document.createElement('div');
+    cell.className = 'cal-cell' + (inMonth ? '' : ' cal-outside');
+    if (isLastRow) cell.setAttribute('data-last-row', '1');
+
+    if (inMonth) {
+      var iso     = isoDate(year, month, dayNum);
+      var isToday = iso === today;
+      if (isToday) cell.classList.add('cal-today');
+
+      // Day number
+      var numEl = document.createElement('span');
+      numEl.className = 'cal-num';
+      numEl.textContent = String(dayNum);
+      cell.appendChild(numEl);
+
+      var entries = dayMap[iso] || [];
+      if (entries.length > 0) {
+        cell.classList.add('cal-has-entries');
+        cell.setAttribute('data-iso', iso);
+
+        var entriesWrap = document.createElement('div');
+        entriesWrap.className = 'cal-entries';
+
+        var visible = entries.slice(0, maxVis);
+        var hidden  = entries.length - visible.length;
+
+        visible.forEach(function(entry) {
+          var pill = document.createElement('span');
+          pill.className = 'cal-entry';
+          // First name only in the cell (saves space); full details on tap
+          var firstName = entry.name.split(' ')[0];
+          pill.textContent = firstName + (entry.half ? ' ½' : '');
+          entriesWrap.appendChild(pill);
+        });
+
+        if (hidden > 0) {
+          var moreEl = document.createElement('span');
+          moreEl.className = 'cal-more';
+          moreEl.textContent = '+' + hidden + ' more';
+          entriesWrap.appendChild(moreEl);
+        }
+
+        cell.appendChild(entriesWrap);
+
+        // Tap / click: show detail panel below grid
+        (function(cellIso, cellEntries) {
+          cell.addEventListener('click', function() {
+            showDetail(cellIso, cellEntries);
+          });
+        })(iso, entries);
+      }
+    }
+
+    grid.appendChild(cell);
+  }
+
+  // Close any open detail panel when grid is re-rendered
+  closeDetail();
+}
+
+// ---- Detail panel ----
+function showDetail(iso, entries) {
+  _detailIso = iso;
+  var panel = document.getElementById('dayDetail');
+  // Clear safely
+  while (panel.firstChild) panel.removeChild(panel.firstChild);
+
+  // Format date: "Monday, October 26"
+  var d = new Date(iso + 'T12:00:00Z');
+  var label = DOW_FULL[d.getUTCDay()] + ', '
+    + MONTHS[d.getUTCMonth()] + ' '
+    + d.getUTCDate();
+
+  var hd = document.createElement('div');
+  hd.className = 'det-hd';
+
+  var titleEl = document.createElement('span');
+  titleEl.className = 'det-title';
+  titleEl.textContent = label;
+
+  var closeBtn = document.createElement('button');
+  closeBtn.className = 'det-close';
+  closeBtn.type = 'button';
+  closeBtn.textContent = 'Close';
+  closeBtn.addEventListener('click', closeDetail);
+
+  hd.appendChild(titleEl);
+  hd.appendChild(closeBtn);
+  panel.appendChild(hd);
+
+  if (!entries.length) {
+    var none = document.createElement('div');
+    none.className = 'det-none';
+    none.textContent = 'No approved time off.';
+    panel.appendChild(none);
+  } else {
+    entries.forEach(function(entry) {
+      var row = document.createElement('div');
+      row.className = 'det-row';
+      row.textContent = entry.name + (entry.half ? ' — half day' : '');
+      panel.appendChild(row);
+    });
+  }
+
+  panel.style.display = 'block';
+  // Scroll panel into view on mobile
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function closeDetail() {
+  _detailIso = null;
+  var panel = document.getElementById('dayDetail');
+  panel.style.display = 'none';
+  while (panel.firstChild) panel.removeChild(panel.firstChild);
+}
+
+// ---- Load absences for a date range (unchanged from original) ----
 function loadAbsences(from, to, callback) {
   var url = '/api/schedule-absences?from='+encodeURIComponent(from)+'&to='+encodeURIComponent(to);
   fetch(url, {credentials:'same-origin'})
     .then(function(r){ return r.json(); })
     .then(function(d) { callback(d.absences || []); })
     .catch(function() { callback([]); });
-}
-
-// ---- Render calendar grid ----
-function renderCalendar(year, month, absences) {
-  var el = document.getElementById('calWrap');
-  var today = todayIso();
-  var numDays = daysInMonth(year, month);
-
-  // Use personKey (opaque, server-assigned) for grouping. uid is not returned
-  // by the API (security). Fall back to name/id for defensive coding only.
-  var empMap = {}; // key -> name
-  absences.forEach(function(a) {
-    var key = a.personKey || a.name || a.id;
-    if (!empMap[key]) empMap[key] = a.name || key;
-  });
-  var empKeys = Object.keys(empMap);
-
-  // Build a day->key map: which employees are absent on each date, with label
-  var dayAbsMap = {}; // iso -> { key -> { half, label } }
-  absences.forEach(function(a) {
-    var key = a.personKey || a.name || a.id;
-    var s = new Date(a.start_date + 'T12:00:00Z');
-    var e = new Date(a.end_date   + 'T12:00:00Z');
-    var cur = new Date(s);
-    while (cur <= e) {
-      var iso = cur.toISOString().slice(0,10);
-      if (!dayAbsMap[iso]) dayAbsMap[iso] = {};
-      dayAbsMap[iso][key] = { half: a.half_day ? 1 : 0, label: a.label || 'Out' };
-      cur.setUTCDate(cur.getUTCDate() + 1);
-    }
-  });
-
-  // Day header row: day number + day name
-  var days = [];
-  for (var d = 1; d <= numDays; d++) {
-    var iso = isoDate(year, month, d);
-    var dow = new Date(iso + 'T12:00:00Z').getUTCDay();
-    days.push({ d:d, iso:iso, name:DAYS[dow] });
-  }
-
-  var headCells = days.map(function(day) {
-    var isToday = day.iso === today;
-    return '<th class="day-col">' +
-      '<div class="day-num'+(isToday?' today':'')+'">'+day.d+'</div>' +
-      '<div style="font-size:.65rem;color:var(--text-3)">'+day.name+'</div>' +
-      '</th>';
-  }).join('');
-
-  var html = '<table class="cal-table"><thead><tr>' +
-    '<th style="min-width:110px;">Employee</th>' + headCells +
-    '</tr></thead><tbody>';
-
-  if (!empKeys.length) {
-    html += '<tr><td colspan="'+(numDays+1)+'" class="month-empty">No approved absences this month.</td></tr>';
-  } else {
-    empKeys.forEach(function(key) {
-      var row = '<tr><td class="name-cell">'+window.esc(empMap[key])+'</td>';
-      days.forEach(function(day) {
-        var cell = '';
-        var info = dayAbsMap[day.iso] && dayAbsMap[day.iso][key];
-        if (info) {
-          var isHalf = info.half === 1;
-          var lbl    = info.label || 'Out';
-          var extra  = isHalf ? ' absent-half'
-                     : lbl === 'Vacation' ? ' absent-vacation'
-                     : lbl === 'Home'     ? ' absent-home'
-                     : '';
-          var text   = isHalf ? '½' : lbl;
-          cell = '<span class="absent-block'+extra+'">'+window.esc(text)+'</span>';
-        }
-        row += '<td class="day-cell">'+cell+'</td>';
-      });
-      row += '</tr>';
-      html += row;
-    });
-  }
-
-  html += '</tbody></table>';
-  el.innerHTML = html;
 }
 
 function updateView() {
@@ -299,7 +432,16 @@ document.getElementById('todayBtn').addEventListener('click', function() {
   updateView();
 });
 
-// ---- Boot ----
+// Re-render on resize so maxVis recomputes for narrow/wide
+var _resizeTimer;
+window.addEventListener('resize', function() {
+  clearTimeout(_resizeTimer);
+  _resizeTimer = setTimeout(function() {
+    renderCalendar(_viewYear, _viewMonth, _absences);
+  }, 200);
+});
+
+// ---- Boot (unchanged from original) ----
 (function() {
   var loadEl = document.getElementById('loading');
   var mainEl = document.getElementById('main');
