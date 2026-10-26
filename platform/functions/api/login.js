@@ -22,6 +22,20 @@ import {
   verifyPassword, mintSession, hashPassword, sessionCookie, RESET_SESSION_TTL_MS,
 } from '../lib/auth.js';
 
+// ---------------------------------------------------------------------------
+// Office portal role gate
+// ---------------------------------------------------------------------------
+// Only these roles may log in to the office portal. field_ops (the field crew)
+// must use field.pierfoundations.com instead. Any role NOT in this list is
+// denied here — before a session cookie is ever minted — so neither a normal
+// nor a must_reset restricted session is issued to a field-only account.
+//
+// Derived from ROLES/AREA_ROLES in lib/auth.js: every role that has access to
+// at least one office area (financials, preconstruction, etc.) is included.
+// field_ops is deliberately absent because its only areas (field_ops, schedule,
+// general, reset) are served by the separate field portal.
+export const OFFICE_ROLES = ['admin', 'partner', 'business_dev', 'hr'];
+
 const JSON_HEADERS = {
   'Content-Type': 'application/json',
   'Cache-Control': 'private, no-store',
@@ -171,6 +185,23 @@ export async function onRequestPost(context) {
 
     // Success — clear the failure counters for this IP + email.
     await clearFails(kv, [ipKey, emailKey]);
+
+    // [PORTAL-GATE] Deny non-office roles AFTER verifying the password (so
+    // timing does not distinguish "wrong password" from "wrong portal"). A
+    // field_ops user who knows their password is told to use the field portal;
+    // no session cookie — not even a restricted one — is issued.
+    if (!OFFICE_ROLES.includes(row.role)) {
+      try {
+        await env.DB
+          .prepare('INSERT INTO audit_log (user_id, action, detail, ts) VALUES (?, ?, ?, ?)')
+          .bind(row.id, 'login_denied_portal', `role=${row.role} ip=${ip}`, new Date().toISOString())
+          .run();
+      } catch { /* audit best-effort */ }
+      return json({
+        status: 'error',
+        message: 'This account cannot sign in to the office portal. Use field.pierfoundations.com.',
+      }, 403);
+    }
 
     // [SEC-06] If the account must reset its (temporary) password, mint a
     // RESTRICTED session: it authenticates the user but the middleware lets it

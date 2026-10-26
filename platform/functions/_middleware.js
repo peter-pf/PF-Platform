@@ -27,6 +27,17 @@ import {
   verifySession, getCookie, areaForPath, roleCanAccess, isRestrictedSession,
 } from './lib/auth.js';
 
+// Office portal role allowlist — must stay in sync with OFFICE_ROLES in
+// api/login.js. A session cookie whose role is NOT in this list is rejected
+// immediately: the cookie is cleared and the user is sent to /login.html (or
+// receives 401 for API calls). This handles stale cookies that predate the
+// portal gate, and prevents any path-level bypass.
+const OFFICE_ROLES = ['admin', 'partner', 'business_dev', 'hr'];
+
+// Clear-cookie header value (expires the pf_session cookie).
+const CLEAR_SESSION_COOKIE =
+  'pf_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0';
+
 // Paths that don't require auth at all.
 // NOTE: Cloudflare Pages serves "foo.html" at the clean URL "/foo" (308), so we
 // allow-list BOTH forms for the non-sensitive auth/denied pages. /denied is here
@@ -119,6 +130,36 @@ export async function onRequest(context) {
   if (sessionToken) {
     const session = await verifySession(sessionToken, SECRET);
     if (session) {
+      // ---- [PORTAL-GATE] Reject non-office roles immediately ----
+      // If a field_ops (or any non-office) session cookie is presented to the
+      // office portal, clear it and send the user back to login. This kills any
+      // crew session minted before this guard was deployed. The legacy shared-
+      // gate fallbacks (pf_auth_token, Basic Auth) are NOT touched here — they
+      // are a separate pending cutover decision.
+      if (!OFFICE_ROLES.includes(session.role)) {
+        if (isHtmlNav(request)) {
+          return new Response(null, {
+            status: 302,
+            headers: {
+              'Location': '/login.html',
+              'Set-Cookie': CLEAR_SESSION_COOKIE,
+              'Cache-Control': 'private, no-store',
+            },
+          });
+        }
+        return new Response(JSON.stringify({
+          status: 'error',
+          message: 'This account cannot access the office portal.',
+        }), {
+          status: 401,
+          headers: {
+            'Content-Type': 'application/json',
+            'Set-Cookie': CLEAR_SESSION_COOKIE,
+            'Cache-Control': 'private, no-store',
+          },
+        });
+      }
+
       // Inject identity + role for downstream Functions (server-side RBAC).
       context.data = context.data || {};
       context.data.session = session;
