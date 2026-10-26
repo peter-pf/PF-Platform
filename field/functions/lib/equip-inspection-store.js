@@ -1,20 +1,20 @@
-// equip-inspection-store.js -- persistence layer for Daily Equipment Inspection records.
+// equip-inspection-store.js: persistence layer for Daily Equipment Inspection records.
 //
 // STORAGE: D1 ONLY. No KV fallback. If env.DB is absent or the D1 query fails,
 // the function throws so the calling endpoint can return 503. Fail-closed is the
 // correct posture for a form that writes to SharePoint on submit.
 //
 // D1 table schema (migration 0009_equip_inspections.sql):
-//   id              TEXT PRIMARY KEY  -- server-generated crypto.randomUUID(), NEVER from client
-//   machine_type    TEXT   -- 'skid_steer' | 'predrill_excavator' | 'vibro_excavator'
+//   id              TEXT PRIMARY KEY : server-generated crypto.randomUUID(), NEVER from client
+//   machine_type    TEXT  : 'skid_steer' | 'predrill_excavator' | 'vibro_excavator'
 //   serial_number   TEXT
-//   inspection_date TEXT   -- YYYY-MM-DD
-//   status          TEXT   -- 'draft' | 'submitted'
-//   data            TEXT   -- full JSON blob
-//   created_by      TEXT   -- session uid (server-set on create)
+//   inspection_date TEXT  : YYYY-MM-DD
+//   status          TEXT  : 'draft' | 'submitted'
+//   data            TEXT  : full JSON blob
+//   created_by      TEXT  : session uid (server-set on create)
 //   created_at      TEXT
 //   updated_at      TEXT
-//   updated_by      TEXT   -- uid
+//   updated_by      TEXT  : uid
 //
 // CHECKLIST ITEMS
 // ---------------------------------------------------------------------------
@@ -59,13 +59,13 @@ export const CHECKLIST_ITEMS = [
   { key: 'fl_fuel',        section: 'Fluid Levels', label: 'Fuel level', types: ALL_TYPES },
 
   // ---- Leaks ---------------------------------------------------------------
-  { key: 'lk_engine',      section: 'Leaks', label: 'Engine area -- oil, coolant, fuel leaks', types: ALL_TYPES },
+  { key: 'lk_engine',      section: 'Leaks', label: 'Engine area: oil, coolant, fuel leaks', types: ALL_TYPES },
   { key: 'lk_hydraulic',   section: 'Leaks', label: 'Hydraulic system leaks (hoses, fittings, cylinders)', types: ALL_TYPES },
   { key: 'lk_final_drive', section: 'Leaks', label: 'Final drive / axle leaks', types: ALL_TYPES },
 
   // ---- Belts, Hoses & Air --------------------------------------------------
-  { key: 'bh_belts',       section: 'Belts, Hoses & Air Filter', label: 'Drive belts -- condition, tension, fraying', types: ALL_TYPES },
-  { key: 'bh_hoses',       section: 'Belts, Hoses & Air Filter', label: 'Hoses -- condition, chafing, kinks, clamps', types: ALL_TYPES },
+  { key: 'bh_belts',       section: 'Belts, Hoses & Air Filter', label: 'Drive belts: condition, tension, fraying', types: ALL_TYPES },
+  { key: 'bh_hoses',       section: 'Belts, Hoses & Air Filter', label: 'Hoses: condition, chafing, kinks, clamps', types: ALL_TYPES },
   { key: 'bh_air_filter',  section: 'Belts, Hoses & Air Filter', label: 'Air filter service indicator (restriction indicator)', types: ALL_TYPES },
 
   // ---- Tires / Tracks & Undercarriage (Skid Steer) -------------------------
@@ -74,42 +74,42 @@ export const CHECKLIST_ITEMS = [
   // ---- Tracks & Undercarriage (Excavators) ---------------------------------
   { key: 'uc_tracks',      section: 'Tracks & Undercarriage', label: 'Track tension and condition (shoes, links, pins)', types: EXCAVATOR_TYPES },
   { key: 'uc_rollers',     section: 'Tracks & Undercarriage', label: 'Track rollers and carrier rollers', types: EXCAVATOR_TYPES },
-  { key: 'uc_sprockets',   section: 'Tracks & Undercarriage', label: 'Sprockets -- wear, cracks, missing teeth', types: EXCAVATOR_TYPES },
-  { key: 'uc_idlers',      section: 'Tracks & Undercarriage', label: 'Front idlers -- condition, leaks', types: EXCAVATOR_TYPES },
+  { key: 'uc_sprockets',   section: 'Tracks & Undercarriage', label: 'Sprockets: wear, cracks, missing teeth', types: EXCAVATOR_TYPES },
+  { key: 'uc_idlers',      section: 'Tracks & Undercarriage', label: 'Front idlers: condition, leaks', types: EXCAVATOR_TYPES },
 
   // ---- Bucket / Attachment -------------------------------------------------
-  { key: 'bk_teeth',        section: 'Bucket / Attachment', label: 'Bucket teeth / cutting edge -- wear, cracks, secure', types: ALL_TYPES },
+  { key: 'bk_teeth',        section: 'Bucket / Attachment', label: 'Bucket teeth / cutting edge: wear, cracks, secure', types: ALL_TYPES },
   { key: 'bk_pins',         section: 'Bucket / Attachment', label: 'Bucket pins and bushings', types: ALL_TYPES },
-  { key: 'bk_quick_attach', section: 'Bucket / Attachment', label: 'Quick-attach / coupler -- pins locked, indicator engaged', types: ALL_TYPES },
+  { key: 'bk_quick_attach', section: 'Bucket / Attachment', label: 'Quick-attach / coupler: pins locked, indicator engaged', types: ALL_TYPES },
 
   // ---- Grease Points -------------------------------------------------------
   { key: 'gr_daily',       section: 'Lubrication', label: 'Daily grease points lubricated per schedule', types: ALL_TYPES },
 
   // ---- Safety & Cab --------------------------------------------------------
-  { key: 'sf_seat_belt',   section: 'Safety & Cab', label: 'Seat belt -- condition, latches properly', types: ALL_TYPES },
-  { key: 'sf_rops',        section: 'Safety & Cab', label: 'ROPS / FOPS structure -- no visible damage or cracks', types: ALL_TYPES },
-  { key: 'sf_extinguisher',section: 'Safety & Cab', label: 'Fire extinguisher -- present, charged, accessible', types: ALL_TYPES },
+  { key: 'sf_seat_belt',   section: 'Safety & Cab', label: 'Seat belt: condition, latches properly', types: ALL_TYPES },
+  { key: 'sf_rops',        section: 'Safety & Cab', label: 'ROPS / FOPS structure: no visible damage or cracks', types: ALL_TYPES },
+  { key: 'sf_extinguisher',section: 'Safety & Cab', label: 'Fire extinguisher: present, charged, accessible', types: ALL_TYPES },
   { key: 'sf_horn',        section: 'Safety & Cab', label: 'Horn functional', types: ALL_TYPES },
   { key: 'sf_backup_alarm',section: 'Safety & Cab', label: 'Backup alarm functional', types: ALL_TYPES },
   { key: 'sf_lights',      section: 'Safety & Cab', label: 'Work lights and travel lights operational', types: ALL_TYPES },
-  { key: 'sf_mirrors_cam', section: 'Safety & Cab', label: 'Mirrors / cameras -- clean, properly adjusted', types: ALL_TYPES },
-  { key: 'sf_glass',       section: 'Safety & Cab', label: 'Cab glass -- no cracks, clean, wipers functional', types: ALL_TYPES },
-  { key: 'sf_gauges',      section: 'Safety & Cab', label: 'Gauges and instrument cluster -- no active warning lights', types: ALL_TYPES },
+  { key: 'sf_mirrors_cam', section: 'Safety & Cab', label: 'Mirrors / cameras: clean, properly adjusted', types: ALL_TYPES },
+  { key: 'sf_glass',       section: 'Safety & Cab', label: 'Cab glass: no cracks, clean, wipers functional', types: ALL_TYPES },
+  { key: 'sf_gauges',      section: 'Safety & Cab', label: 'Gauges and instrument cluster: no active warning lights', types: ALL_TYPES },
 
   // ---- Predrill Excavator: Auger Attachment --------------------------------
-  { key: 'pd_auger_head',  section: 'Auger Drive Head', label: 'Auger drive head -- oil level, leaks, hose connections', types: ['predrill_excavator'] },
-  { key: 'pd_flighting',   section: 'Auger Drive Head', label: 'Auger flighting -- condition, wear, straightness', types: ['predrill_excavator'] },
-  { key: 'pd_teeth',       section: 'Auger Drive Head', label: 'Auger teeth / bits -- wear, cracks, secure', types: ['predrill_excavator'] },
-  { key: 'pd_kelly',       section: 'Auger Drive Head', label: 'Kelly bar / attachment connection -- pins locked, condition', types: ['predrill_excavator'] },
-  { key: 'pd_hyd_lines',   section: 'Auger Drive Head', label: 'Hydraulic hoses to auger drive -- condition, leaks, couplings', types: ['predrill_excavator'] },
+  { key: 'pd_auger_head',  section: 'Auger Drive Head', label: 'Auger drive head: oil level, leaks, hose connections', types: ['predrill_excavator'] },
+  { key: 'pd_flighting',   section: 'Auger Drive Head', label: 'Auger flighting: condition, wear, straightness', types: ['predrill_excavator'] },
+  { key: 'pd_teeth',       section: 'Auger Drive Head', label: 'Auger teeth / bits: wear, cracks, secure', types: ['predrill_excavator'] },
+  { key: 'pd_kelly',       section: 'Auger Drive Head', label: 'Kelly bar / attachment connection: pins locked, condition', types: ['predrill_excavator'] },
+  { key: 'pd_hyd_lines',   section: 'Auger Drive Head', label: 'Hydraulic hoses to auger drive: condition, leaks, couplings', types: ['predrill_excavator'] },
 
   // ---- Vibro Excavator: Vibro Probe Attachment -----------------------------
-  { key: 'vb_probe',       section: 'Vibrator / Probe', label: 'Vibrator / probe body -- condition, tip/fin wear', types: ['vibro_excavator'] },
-  { key: 'vb_follower',    section: 'Vibrator / Probe', label: 'Follower tubes -- condition, connections, alignment', types: ['vibro_excavator'] },
-  { key: 'vb_hopper',      section: 'Vibrator / Probe', label: 'Stone hopper / feed door -- operation, wear, seals', types: ['vibro_excavator'] },
-  { key: 'vb_air_water',   section: 'Vibrator / Probe', label: 'Compressed air or water flush lines -- connections, leaks', types: ['vibro_excavator'] },
-  { key: 'vb_hyd_hoses',   section: 'Vibrator / Probe', label: 'Hydraulic hoses to vibrator -- condition, quick-disconnects', types: ['vibro_excavator'] },
-  { key: 'vb_power_pack',  section: 'Vibrator / Probe', label: 'Power pack / generator (if applicable) -- oil, fuel, start check', types: ['vibro_excavator'] },
+  { key: 'vb_probe',       section: 'Vibrator / Probe', label: 'Vibrator / probe body: condition, tip/fin wear', types: ['vibro_excavator'] },
+  { key: 'vb_follower',    section: 'Vibrator / Probe', label: 'Follower tubes: condition, connections, alignment', types: ['vibro_excavator'] },
+  { key: 'vb_hopper',      section: 'Vibrator / Probe', label: 'Stone hopper / feed door: operation, wear, seals', types: ['vibro_excavator'] },
+  { key: 'vb_air_water',   section: 'Vibrator / Probe', label: 'Compressed air or water flush lines: connections, leaks', types: ['vibro_excavator'] },
+  { key: 'vb_hyd_hoses',   section: 'Vibrator / Probe', label: 'Hydraulic hoses to vibrator: condition, quick-disconnects', types: ['vibro_excavator'] },
+  { key: 'vb_power_pack',  section: 'Vibrator / Probe', label: 'Power pack / generator (if applicable): oil, fuel, start check', types: ['vibro_excavator'] },
 ];
 
 // Build a set of valid item keys for fast lookup.
