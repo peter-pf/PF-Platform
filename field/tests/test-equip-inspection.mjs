@@ -705,6 +705,106 @@ test('L8: API handles add_photo and del_photo actions', () => {
   assert.ok(apiSrc.includes('isJpeg'), 'API must validate JPEG magic bytes');
 });
 
+// ===========================================================================
+// M. SECURITY FIX CHECKS (HIGH/MEDIUM/LOW from security gate, 2026-10-26)
+// ===========================================================================
+
+// M1: buildBody never accepts sectionPhotos from client on update/submit
+test('M1: buildBody carries sectionPhotos only from base, never from src', () => {
+  // sectionPhotos must always come from base (stored record), not from src.
+  // The simplest check: the old "src.sectionPhotos != null ? src.sectionPhotos" pattern is gone.
+  assert.ok(!apiSrc.includes('src.sectionPhotos != null'), 'src.sectionPhotos bypass pattern must be removed');
+  assert.ok(apiSrc.includes('base.sectionPhotos'), 'sectionPhotos must be read from base');
+  // Also confirm no dead action0 code.
+  assert.ok(!apiSrc.includes('action0'), 'dead action0 variable must be removed');
+});
+
+// M2: add_photo and del_photo have a KV rate limit (ei_photo_rl:)
+test('M2: add_photo and del_photo are rate-limited (ei_photo_rl:)', () => {
+  assert.ok(apiSrc.includes('ei_photo_rl:'), 'photo rate limit key must be ei_photo_rl:{uid}');
+  assert.ok(apiSrc.includes('RL_PHOTO_MAX'), 'photo rate limit max constant must exist');
+  assert.ok(apiSrc.includes('RL_PHOTO_TTL'), 'photo rate limit TTL constant must exist');
+});
+
+// M3: parseJpegDimensions parses a real JPEG SOF correctly
+test('M3: parseJpegDimensions reads correct dimensions from JPEG SOF marker', () => {
+  // Replicate parseJpegDimensions inline (it is not exported)
+  function parseJpegDimensions(b64) {
+    try {
+      const src = b64.startsWith('data:') ? b64.slice(b64.indexOf(',') + 1) : b64;
+      const bin = atob(src);
+      const len = bin.length;
+      const SOF_SET = new Set([0xC0,0xC1,0xC2,0xC3,0xC5,0xC6,0xC7,0xC9,0xCA,0xCB,0xCD,0xCE,0xCF]);
+      let i = 2;
+      while (i + 3 < len) {
+        if (bin.charCodeAt(i) !== 0xFF) break;
+        const marker = bin.charCodeAt(i + 1);
+        if (marker === 0xD9) break;
+        if (marker >= 0xD0 && marker <= 0xD9) { i += 2; continue; }
+        if (i + 3 >= len) break;
+        const segLen = (bin.charCodeAt(i + 2) << 8) | bin.charCodeAt(i + 3);
+        if (SOF_SET.has(marker) && segLen >= 9 && i + 8 < len) {
+          const h = (bin.charCodeAt(i + 5) << 8) | bin.charCodeAt(i + 6);
+          const w = (bin.charCodeAt(i + 7) << 8) | bin.charCodeAt(i + 8);
+          return { w, h };
+        }
+        i += 2 + segLen;
+        if (segLen < 2) break;
+      }
+    } catch { /* */ }
+    return null;
+  }
+  // The verified 1x1 JPEG from L5
+  const TINY_JPEG_B64 = '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/9oACAEBAAA/APvT/9k=';
+  const dims = parseJpegDimensions(TINY_JPEG_B64);
+  assert.ok(dims !== null, 'parseJpegDimensions must return non-null for a valid JPEG');
+  assert.strictEqual(dims.w, 1, 'width must be 1');
+  assert.strictEqual(dims.h, 1, 'height must be 1');
+  assert.strictEqual(parseJpegDimensions('aGVsbG8='), null, 'must return null for non-JPEG');
+  // API source must contain the function
+  assert.ok(apiSrc.includes('parseJpegDimensions'), 'API must export parseJpegDimensions');
+  assert.ok(apiSrc.includes('MAX_PHOTO_DIM'), 'API must reject oversized dimensions');
+  assert.ok(apiSrc.includes('MAX_PHOTO_MP'),  'API must reject images over 6 MP');
+});
+
+// M4: submit rejects empty inspectedBy with 400
+test('M4: submit rejects empty inspectedBy', () => {
+  assert.ok(apiSrc.includes("Inspected By is required"),
+    'submit must reject empty inspectedBy with "Inspected By is required"');
+  // The check must happen on submit (not just on update)
+  const submitIdx = apiSrc.indexOf("action === 'submit'");
+  const inspReqIdx = apiSrc.indexOf("Inspected By is required");
+  assert.ok(inspReqIdx > submitIdx, 'inspectedBy required check must be inside the submit block');
+});
+
+// M5: doc.js handles unavailable photos without throwing
+test('M5: embedSectionPhotos handles unavailable photos gracefully', () => {
+  const docSrc2 = readFileSync(resolve(__dir, '../functions/lib/equip-inspection-doc.js'), 'utf8');
+  assert.ok(docSrc2.includes('unavailable'), 'doc must check p.unavailable flag');
+  assert.ok(docSrc2.includes('Photo unavailable'), 'doc must emit "Photo unavailable" text for missing photos');
+  // must have try/catch around addJpeg
+  assert.ok(docSrc2.includes('} catch {'), 'doc must catch errors per-photo in embedSectionPhotos');
+});
+
+// M6: size cap is 2 MB and message matches
+test('M6: photo size cap is MAX_PHOTO_BYTES (2 MB) with matching error message', () => {
+  assert.ok(apiSrc.includes('MAX_PHOTO_BYTES'), 'photo size cap constant must exist');
+  assert.ok(apiSrc.includes('max 2 MB'), 'error message must say max 2 MB');
+  assert.ok(!apiSrc.includes('max 1.5 MB'), 'old 1.5 MB message must be gone');
+});
+
+// M7: photos stored without TTL in KV (no expirationTtl in add_photo put)
+test('M7: KV put in add_photo has no expirationTtl (photos persist until submit/delete)', () => {
+  // The put call in add_photo should be: env.PF_SCHEDULE.put(kvKey, photoData)
+  // without an expirationTtl option. We check PHOTO_KV_TTL is absent from add_photo path.
+  assert.ok(!apiSrc.includes('PHOTO_KV_TTL'), 'PHOTO_KV_TTL must be removed (no TTL on photo KV put)');
+});
+
+// M8: KV photos are deleted after SP upload on submit
+test('M8: submit cleans up photo KV entries after upload (kvKeysToDelete)', () => {
+  assert.ok(apiSrc.includes('kvKeysToDelete'), 'submit must collect and delete KV keys after upload');
+});
+
 setTimeout(() => {
   console.log(`\n  ${passed} passed, ${failed} failed\n`);
   if (failed) process.exit(1);

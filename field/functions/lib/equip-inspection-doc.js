@@ -87,35 +87,53 @@ function decodePhotoEntry(p) {
   return { b64, w: p.w || 1, h: p.h || 1 };
 }
 
+// Render one row of available photo thumbnails (up to THUMBS_PER_ROW).
+// Each entry in rowSlice must already have idx and dispH set.
+function _renderPhotoRow(doc, rowItems) {
+  if (!rowItems.length) return;
+  const rowH = Math.max(...rowItems.map((r) => r.dispH));
+  doc._ensure(rowH + THUMB_GAP_Y);
+  const yBase = doc.y - rowH;
+  for (let j = 0; j < rowItems.length; j++) {
+    const { idx, dispH } = rowItems[j];
+    const x = MARGIN + j * (THUMB_W + THUMB_GAP_X);
+    doc.cur.push(
+      `q ${THUMB_W.toFixed(2)} 0 0 ${dispH.toFixed(2)} ${x.toFixed(2)} ${yBase.toFixed(2)} cm /DImg${idx} Do Q`
+    );
+  }
+  doc.y = yBase - THUMB_GAP_Y;
+}
+
 // Embed section photos in the PDF (2 per row, proportional thumbnails).
+// Photos marked unavailable (p.unavailable=true or p.data missing) are skipped
+// gracefully with a "Photo unavailable" text note; a bad JPEG is caught per-item.
 function embedSectionPhotos(doc, photos) {
   if (!photos || !photos.length) return;
   doc.spacer(6);
-  for (let i = 0; i < photos.length; i += THUMBS_PER_ROW) {
-    const rowSlice = photos.slice(i, i + THUMBS_PER_ROW);
-    // Register images and compute display dimensions.
-    const rowItems = rowSlice.map((p) => {
-      const { b64, w, h } = decodePhotoEntry(p);
-      const aspect  = h / w;
-      const dispH   = Math.min(Math.round(THUMB_W * aspect), MAX_THUMB_H);
-      const idx     = doc.addJpeg(b64, w, h);
-      return { idx, dispH };
-    });
-    const rowH = Math.max(...rowItems.map((r) => r.dispH));
-    // Ensure room for this thumbnail row; creates a new page if needed.
-    doc._ensure(rowH + THUMB_GAP_Y);
-    const yBase = doc.y - rowH;
-    for (let j = 0; j < rowItems.length; j++) {
-      const { idx, dispH } = rowItems[j];
-      const x = MARGIN + j * (THUMB_W + THUMB_GAP_X);
-      // Draw JPEG thumbnail using the raw cm + Do operator (not placeJpeg,
-      // because we want all images in the row at the same y-base).
-      doc.cur.push(
-        `q ${THUMB_W.toFixed(2)} 0 0 ${dispH.toFixed(2)} ${x.toFixed(2)} ${yBase.toFixed(2)} cm /DImg${idx} Do Q`
-      );
+  let pending = [];
+  const flushRow = () => { if (pending.length) { _renderPhotoRow(doc, pending); pending = []; } };
+
+  for (const p of photos) {
+    if (p.unavailable || !p.data) {
+      flushRow();
+      doc.text('Photo unavailable', { size: 8.5, color: PF.muted, indent: 8 });
+      continue;
     }
-    doc.y = yBase - THUMB_GAP_Y;
+    try {
+      const { b64, w, h } = decodePhotoEntry(p);
+      const safeW  = Math.max(w || 1, 1);
+      const safeH  = Math.max(h || 1, 1);
+      const aspect = safeH / safeW;
+      const dispH  = Math.min(Math.round(THUMB_W * aspect), MAX_THUMB_H) || MAX_THUMB_H;
+      const idx    = doc.addJpeg(b64, safeW, safeH);
+      pending.push({ idx, dispH });
+      if (pending.length >= THUMBS_PER_ROW) flushRow();
+    } catch {
+      flushRow();
+      doc.text('Photo unavailable', { size: 8.5, color: PF.muted, indent: 8 });
+    }
   }
+  flushRow();
   doc.spacer(2);
 }
 

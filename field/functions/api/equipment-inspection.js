@@ -40,6 +40,7 @@ import {
 // ---------------------------------------------------------------------------
 const MAX_BODY_BYTES       = 64 * 1024;
 const MAX_BODY_PHOTO_BYTES = 2.5 * 1024 * 1024; // 2.5 MB for add_photo action
+const MAX_PHOTO_BYTES      = 2 * 1024 * 1024;    // 2 MB per individual photo
 const MAX_RECORDS          = 20000;
 const MAX_STR              = 2000;
 const MAX_SHORT_BY         = 80;
@@ -47,7 +48,8 @@ const MAX_SHORT            = 300;
 const MAX_ITEMS            = 60;
 const MAX_PHOTOS_PER_SEC   = 5;
 const MAX_PHOTOS_TOTAL     = 20;
-const PHOTO_KV_TTL         = 7 * 24 * 3600; // 7 days
+const MAX_PHOTO_DIM        = 2400;   // max pixels on either side
+const MAX_PHOTO_MP         = 6e6;    // max megapixels (6 MP)
 
 const VALID_ACTIONS      = { create: 1, update: 1, submit: 1, add_photo: 1, del_photo: 1 };
 const VALID_OWNED_RENTED = { 'Owned': 1, 'Rented': 1 };
@@ -61,6 +63,38 @@ function isJpeg(b64) {
     const bin = atob(b64.startsWith('data:') ? b64.slice(b64.indexOf(',') + 1) : b64);
     return bin.charCodeAt(0) === 0xFF && bin.charCodeAt(1) === 0xD8 && bin.charCodeAt(2) === 0xFF;
   } catch { return false; }
+}
+
+// Parse real JPEG image dimensions from SOF marker.
+// Returns {w, h} or null if not found / parse error.
+function parseJpegDimensions(b64) {
+  try {
+    const src = b64.startsWith('data:') ? b64.slice(b64.indexOf(',') + 1) : b64;
+    const bin = atob(src);
+    const len = bin.length;
+    // SOF marker types that carry image height/width (non-differential frame headers).
+    const SOF_SET = new Set([
+      0xC0,0xC1,0xC2,0xC3,0xC5,0xC6,0xC7,0xC9,0xCA,0xCB,0xCD,0xCE,0xCF,
+    ]);
+    let i = 2; // skip SOI (FF D8)
+    while (i + 3 < len) {
+      if (bin.charCodeAt(i) !== 0xFF) break;
+      const marker = bin.charCodeAt(i + 1);
+      if (marker === 0xD9) break; // EOI
+      // Standalone markers (no length): RST0-RST7 (D0-D7), SOI (D8), EOI (D9).
+      if (marker >= 0xD0 && marker <= 0xD9) { i += 2; continue; }
+      if (i + 3 >= len) break;
+      const segLen = (bin.charCodeAt(i + 2) << 8) | bin.charCodeAt(i + 3);
+      if (SOF_SET.has(marker) && segLen >= 9 && i + 8 < len) {
+        const h = (bin.charCodeAt(i + 5) << 8) | bin.charCodeAt(i + 6);
+        const w = (bin.charCodeAt(i + 7) << 8) | bin.charCodeAt(i + 8);
+        return { w, h };
+      }
+      i += 2 + segLen;
+      if (segLen < 2) break; // malformed
+    }
+  } catch { /* fall through */ }
+  return null;
 }
 
 // KV key for a photo blob.
@@ -92,6 +126,9 @@ function sanitizeMachineHours(v) {
 // Submit rate limit: 10 per hour per uid.
 const RL_SUBMIT_MAX = 10;
 const RL_SUBMIT_TTL = 3600;
+// Photo add/delete rate limit: 60 per hour per uid.
+const RL_PHOTO_MAX  = 60;
+const RL_PHOTO_TTL  = 3600;
 async function checkRateLimit(kv, key, max, ttl) {
   if (!kv) return true; // KV absent: allow (fail open for rate limit only)
   try {
@@ -192,27 +229,12 @@ function buildBody(src, base, uid, newServerId) {
     return { err: `inspectedBy must be one of: ${INSPECTED_BY_OPTIONS.join(', ')}` };
   }
 
-  // sectionPhotos: metadata only (no base64 data here; that lives in KV).
-  // Accept from src or carry over from base. Strip raw photo data if present.
-  const rawSectionPhotos = src.sectionPhotos != null ? src.sectionPhotos
-    : (base && base.sectionPhotos) || {};
-  const sectionPhotos = {};
-  if (rawSectionPhotos && typeof rawSectionPhotos === 'object') {
-    for (const [sec, arr] of Object.entries(rawSectionPhotos)) {
-      if (!VALID_SECTIONS.has(sec) || !Array.isArray(arr)) continue;
-      sectionPhotos[sec] = arr.slice(0, MAX_PHOTOS_PER_SEC).map((p) => ({
-        n:    Number(p.n) || 0,
-        name: cap(p.name || '', 200),
-        w:    Number(p.w) || 0,
-        h:    Number(p.h) || 0,
-        // Preserve SP URLs from submitted records; strip data: fields.
-        ...(p.spUrl ? { spUrl: cap(p.spUrl, 500) } : {}),
-        ...(p.spId  ? { spId:  cap(p.spId,  200) } : {}),
-        // If data is present (coming from in-memory during submit reconstruction), keep it.
-        ...(p.data  ? { data:  p.data } : {}),
-      }));
-    }
-  }
+  // sectionPhotos: ALWAYS carry from the stored base record.
+  // Client-supplied sectionPhotos is NEVER trusted on update or submit.
+  // Only add_photo and del_photo may mutate photo metadata.
+  // On create, base is null so this correctly initialises to {}.
+  const sectionPhotos = (base && base.sectionPhotos && typeof base.sectionPhotos === 'object')
+    ? base.sectionPhotos : {};
 
   // id: on create = server-generated; on update/submit = from base.
   const id = newServerId || (base && base.id);
@@ -286,7 +308,6 @@ export async function onRequest(context) {
   if (!ct.includes('application/json')) return jsonErr('JSON body required', 400);
 
   // add_photo uploads can be up to 2.5 MB; all other actions stay at 64 KB.
-  const action0 = (() => { try { return JSON.parse(''); } catch { return null; } })();
   // We need to peek at the action before setting size limit, so read as text.
   const rawLen = Number(request.headers.get('Content-Length') || '0');
   // Optimistic: if Content-Length says it's > 2.5MB, reject immediately.
@@ -347,6 +368,11 @@ export async function onRequest(context) {
 
   // ---- ADD_PHOTO: validate JPEG, store in KV, update record metadata -------
   if (action === 'add_photo') {
+    // Rate limit: 60 photo add/del actions per hour per uid.
+    const phRlKey = `ei_photo_rl:${uid}`;
+    const phRlOk  = await checkRateLimit(env.PF_SCHEDULE, phRlKey, RL_PHOTO_MAX, RL_PHOTO_TTL);
+    if (!phRlOk) return jsonErr('Too many photo actions this hour. Please wait.', 429);
+
     // Requires an existing draft record.
     const phRecId = String(src.id || '');
     if (!UUID_RE.test(phRecId)) return jsonErr('Invalid id format', 400);
@@ -373,18 +399,33 @@ export async function onRequest(context) {
     // Validate JPEG data.
     const photoData = String(src.data || '');
     if (!photoData) return jsonErr('Photo data required', 400);
-    if (photoData.length > 2 * 1024 * 1024) return jsonErr('Photo too large (max 1.5 MB)', 400);
+    if (photoData.length > MAX_PHOTO_BYTES) return jsonErr('Photo too large (max 2 MB)', 400);
     if (!isJpeg(photoData)) return jsonErr('Photo must be JPEG (magic bytes FF D8 FF)', 400);
 
-    // Store raw photo data in KV (7-day TTL).
-    const photoN   = sectionArr.length;
-    const kvKey    = photoKvKey(phRecId, slug, photoN);
-    const name     = cap(String(src.name || `photo_${photoN + 1}.jpg`), 200);
-    const w        = Math.round(Number(src.w) || 0);
-    const h        = Math.round(Number(src.h) || 0);
+    // Parse real dimensions from JPEG SOF marker; reject oversized images.
+    // Client-supplied w/h are ignored.
+    const dims = parseJpegDimensions(photoData);
+    if (!dims) return jsonErr('Could not read image dimensions', 400);
+    const { w, h } = dims;
+    if (w > MAX_PHOTO_DIM || h > MAX_PHOTO_DIM) {
+      return jsonErr(`Image too large (max ${MAX_PHOTO_DIM}px on either side)`, 400);
+    }
+    if (w * h > MAX_PHOTO_MP) {
+      return jsonErr('Image too large (max 6 megapixels)', 400);
+    }
+
+    // Collision-safe photo index: max existing n + 1.
+    const photoN = sectionArr.length > 0
+      ? Math.max(...sectionArr.map((p) => Number(p.n) || 0)) + 1
+      : 0;
+    const kvKey  = photoKvKey(phRecId, slug, photoN);
+    const name   = cap(String(src.name || `photo_${photoN + 1}.jpg`), 200);
+
     if (!env.PF_SCHEDULE) return jsonErr('Storage unavailable', 503);
+    // Store without TTL: photos must not silently expire before submit.
+    // Cleanup happens on submit (after SP upload) and on del_photo.
     try {
-      await env.PF_SCHEDULE.put(kvKey, photoData, { expirationTtl: PHOTO_KV_TTL });
+      await env.PF_SCHEDULE.put(kvKey, photoData);
     } catch (e) {
       console.error('[equip-inspection] KV photo store failed:', e && e.message);
       return jsonErr('Photo storage failed', 503);
@@ -402,6 +443,11 @@ export async function onRequest(context) {
 
   // ---- DEL_PHOTO: remove from KV and record metadata ----------------------
   if (action === 'del_photo') {
+    // Share the same rate limit as add_photo (60/hr per uid).
+    const dpRlKey = `ei_photo_rl:${uid}`;
+    const dpRlOk  = await checkRateLimit(env.PF_SCHEDULE, dpRlKey, RL_PHOTO_MAX, RL_PHOTO_TTL);
+    if (!dpRlOk) return jsonErr('Too many photo actions this hour. Please wait.', 429);
+
     const dpRecId = String(src.id || '');
     if (!UUID_RE.test(dpRecId)) return jsonErr('Invalid id format', 400);
     let dpBase;
@@ -431,7 +477,8 @@ export async function onRequest(context) {
         try {
           const data = await env.PF_SCHEDULE.get(oldKey);
           if (data) {
-            await env.PF_SCHEDULE.put(newKey, data, { expirationTtl: PHOTO_KV_TTL });
+            // No TTL: photos must not expire before submit.
+            await env.PF_SCHEDULE.put(newKey, data);
             await env.PF_SCHEDULE.delete(oldKey);
           }
         } catch { /* best effort */ }
@@ -465,34 +512,47 @@ export async function onRequest(context) {
     const rlOk  = await checkRateLimit(env.PF_SCHEDULE, rlKey, RL_SUBMIT_MAX, RL_SUBMIT_TTL);
     if (!rlOk) return jsonErr('Too many submissions this hour. Please wait.', 429);
 
+    // Inspected By is required on submit.
+    if (!body.inspectedBy) return jsonErr('Inspected By is required', 400);
+
     body.status      = 'submitted';
     body.submittedBy = uid;
     body.submittedAt = new Date().toISOString();
 
-    // Generate PDF.
+    body.pdfName = pdfFilename(body);
+
+    // Load photo data from KV BEFORE rendering PDF so photos are embedded.
+    // Missing/expired photos are marked unavailable so the PDF shows a placeholder.
+    const kvKeysToDelete = [];
+    if (env.PF_SCHEDULE && body.sectionPhotos && typeof body.sectionPhotos === 'object') {
+      for (const [, arr] of Object.entries(body.sectionPhotos)) {
+        if (!Array.isArray(arr)) continue;
+        for (const p of arr) {
+          if (p.kvKey) {
+            try {
+              const data = await env.PF_SCHEDULE.get(p.kvKey);
+              if (data) {
+                p.data = data;
+                kvKeysToDelete.push(p.kvKey);
+              } else {
+                p.unavailable = true;
+                console.warn('[equip-inspection] photo KV missing:', p.kvKey);
+              }
+            } catch {
+              p.unavailable = true;
+            }
+          }
+        }
+      }
+    }
+
+    // Generate PDF with hydrated photos.
     let pdfBytes;
     try {
       pdfBytes = renderEquipInspectionPdf(body);
     } catch (e) {
       console.error('[equip-inspection] PDF render failed:', e && e.message);
       return jsonErr('PDF generation failed', 500);
-    }
-
-    body.pdfName = pdfFilename(body);
-
-    // Load photo data from KV and hydrate sectionPhotos[].data for PDF embedding.
-    if (env.PF_SCHEDULE && body.sectionPhotos && typeof body.sectionPhotos === 'object') {
-      for (const [section, arr] of Object.entries(body.sectionPhotos)) {
-        if (!Array.isArray(arr)) continue;
-        for (const p of arr) {
-          if (p.kvKey) {
-            try {
-              const data = await env.PF_SCHEDULE.get(p.kvKey);
-              if (data) p.data = data;
-            } catch { /* best effort */ }
-          }
-        }
-      }
     }
 
     // Graph: upload PDF and section photos to SharePoint.
@@ -516,10 +576,16 @@ export async function onRequest(context) {
       }
     }
 
-    // Strip raw photo data from stored record (data lives in SP / KV, not D1 blob).
+    // Delete photo KV entries now that they are embedded in the PDF and uploaded.
+    // Best-effort: don't fail submit on KV delete errors.
+    for (const kvKey of kvKeysToDelete) {
+      try { await env.PF_SCHEDULE.delete(kvKey); } catch { /* best effort */ }
+    }
+
+    // Strip raw photo data from stored record (data lives in SP, not D1).
     if (body.sectionPhotos) {
       for (const arr of Object.values(body.sectionPhotos)) {
-        if (Array.isArray(arr)) arr.forEach((p) => { delete p.data; });
+        if (Array.isArray(arr)) arr.forEach((p) => { delete p.data; delete p.unavailable; });
       }
     }
 
