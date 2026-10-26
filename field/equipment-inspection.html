@@ -24,7 +24,7 @@
     https://www.cat.com/en_US/support/operations/service-manuals.html
   Generic daily walk-around inspection guidance also referenced at:
     https://www.cat.com/en_US/support/maintenance.html
-  Attachment-specific items (auger, vibro probe) are generic starting points
+  Attachment-specific items (auger head, Flot) are generic starting points
   for Derek Franke to refine based on PF's specific equipment.
 -->
 <style>
@@ -211,9 +211,14 @@
             <input type="date" id="eiDate">
           </div>
           <div>
-            <label>Inspected By</label>
-            <input type="text" id="eiInspectedBy" placeholder="Your name" list="eiInspectedByList" autocomplete="off" maxlength="80">
-            <datalist id="eiInspectedByList"></datalist>
+            <label>Inspected By <span style="color:var(--danger,#c0392b)">*</span></label>
+            <select id="eiInspectedBy" required>
+              <option value="">-- select --</option>
+              <option value="John Willis">John Willis</option>
+              <option value="Seth Willis">Seth Willis</option>
+              <option value="Christian Boutte">Christian Boutte</option>
+              <option value="Jordan Lemay">Jordan Lemay</option>
+            </select>
           </div>
           <div>
             <label>Owned or Rented</label>
@@ -307,9 +312,10 @@ var EI_ITEMS = [
   {key:'uc_sprockets',   section:'Tracks & Undercarriage', label:'Sprockets: wear, cracks, missing teeth',               types:['predrill_excavator','vibro_excavator']},
   {key:'uc_idlers',      section:'Tracks & Undercarriage', label:'Front idlers: condition, leaks',                        types:['predrill_excavator','vibro_excavator']},
   // Bucket / Attachment
-  {key:'bk_teeth',        section:'Bucket / Attachment', label:'Bucket teeth / cutting edge: wear, cracks, secure',     types:['skid_steer','predrill_excavator','vibro_excavator']},
-  {key:'bk_pins',         section:'Bucket / Attachment', label:'Bucket pins and bushings',                                types:['skid_steer','predrill_excavator','vibro_excavator']},
-  {key:'bk_quick_attach', section:'Bucket / Attachment', label:'Quick-attach / coupler: pins locked, indicator engaged', types:['skid_steer','predrill_excavator','vibro_excavator']},
+  // Bucket / Attachment: NOT on vibro_excavator (Derek 2026-10-26)
+  {key:'bk_teeth',        section:'Bucket / Attachment', label:'Bucket teeth / cutting edge: wear, cracks, secure',     types:['skid_steer','predrill_excavator']},
+  {key:'bk_pins',         section:'Bucket / Attachment', label:'Bucket pins and bushings',                                types:['skid_steer','predrill_excavator']},
+  {key:'bk_quick_attach', section:'Bucket / Attachment', label:'Quick-attach / coupler: pins locked, indicator engaged', types:['skid_steer','predrill_excavator']},
   // Lubrication
   {key:'gr_daily',       section:'Lubrication', label:'Daily grease points lubricated per schedule',       types:['skid_steer','predrill_excavator','vibro_excavator']},
   // Safety & Cab
@@ -328,13 +334,13 @@ var EI_ITEMS = [
   {key:'pd_teeth',       section:'Auger Drive Head', label:'Auger teeth / bits: wear, cracks, secure',               types:['predrill_excavator']},
   {key:'pd_kelly',       section:'Auger Drive Head', label:'Kelly bar / attachment connection: pins locked, condition', types:['predrill_excavator']},
   {key:'pd_hyd_lines',   section:'Auger Drive Head', label:'Hydraulic hoses to auger drive: condition, leaks, couplings', types:['predrill_excavator']},
-  // Vibro: Vibrator / Probe
-  {key:'vb_probe',       section:'Vibrator / Probe', label:'Vibrator / probe body: condition, tip/fin wear',           types:['vibro_excavator']},
-  {key:'vb_follower',    section:'Vibrator / Probe', label:'Follower tubes: condition, connections, alignment',        types:['vibro_excavator']},
-  {key:'vb_hopper',      section:'Vibrator / Probe', label:'Stone hopper / feed door: operation, wear, seals',        types:['vibro_excavator']},
-  {key:'vb_air_water',   section:'Vibrator / Probe', label:'Compressed air or water flush lines: connections, leaks', types:['vibro_excavator']},
-  {key:'vb_hyd_hoses',   section:'Vibrator / Probe', label:'Hydraulic hoses to vibrator: condition, quick-disconnects', types:['vibro_excavator']},
-  {key:'vb_power_pack',  section:'Vibrator / Probe', label:'Power pack / generator (if applicable): oil, fuel, start check', types:['vibro_excavator']},
+  // Vibro: Flot (renamed from Vibrator / Probe per Derek 2026-10-26; keys unchanged)
+  {key:'vb_probe',       section:'Flot', label:'Flot body: condition, tip/fin wear',                                types:['vibro_excavator']},
+  {key:'vb_follower',    section:'Flot', label:'Follower tubes: condition, connections, alignment',                 types:['vibro_excavator']},
+  {key:'vb_hopper',      section:'Flot', label:'Stone hopper / feed door: operation, wear, seals',                 types:['vibro_excavator']},
+  {key:'vb_air_water',   section:'Flot', label:'Compressed air or water flush lines: connections, leaks',          types:['vibro_excavator']},
+  {key:'vb_hyd_hoses',   section:'Flot', label:'Hydraulic hoses to flot: condition, quick-disconnects',            types:['vibro_excavator']},
+  {key:'vb_power_pack',  section:'Flot', label:'Power pack / generator (if applicable): oil, fuel, start check',  types:['vibro_excavator']},
 ];
 var EI_ANSWERS = ['Pass', 'Needs Attention', 'N/A'];
 
@@ -346,7 +352,14 @@ var eiState = {
   safeToOperate: null,
   projects: [],
   me: null,
+  sectionPhotos: {}, // sectionName -> [{n, name, w, h, previewUrl}]
 };
+
+// --- Photo upload constants ---
+var EI_MAX_DIM = 1600;
+var EI_JPEG_Q  = 0.8;
+var EI_MAX_PHOTOS_PER_SEC = 5;
+var EI_MAX_PHOTOS_TOTAL   = 20;
 
 // ---- Render checklist for selected machine type ----
 function eiRenderChecklist() {
@@ -385,6 +398,15 @@ function eiRenderChecklist() {
       html += '<input type="text" class="ei-note" data-key="' + window.esc(d.key) + '" placeholder="Note (optional)" value="' + window.esc(noteVal) + '" maxlength="500" aria-label="' + window.esc(d.label) + ' note">';
       html += '</div></div>';
     }
+    // Photo upload area for this section.
+    html += '<div class="ei-photo-area" data-section="' + window.esc(sec) + '" style="padding:8px 0 4px 0">';
+    html += '<div class="ei-photo-list" id="eiPhotoList_' + window.esc(sectionToSlug(sec)) + '" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px"></div>';
+    html += '<label class="btn btn-sm" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px">';
+    html += '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>';
+    html += 'Add Photo';
+    html += '<input type="file" accept="image/*" multiple class="ei-photo-input" data-section="' + window.esc(sec) + '" style="display:none">';
+    html += '</label>';
+    html += '</div>';
     html += '</div>';
   }
   host.innerHTML = html;
@@ -397,6 +419,158 @@ function eiRenderChecklist() {
   for (var m = 0; m < notes.length; m++) {
     notes[m].addEventListener('input', eiOnItemChange);
   }
+  // Wire photo file inputs
+  var photoInputs = host.querySelectorAll('input.ei-photo-input');
+  for (var pi = 0; pi < photoInputs.length; pi++) {
+    photoInputs[pi].addEventListener('change', eiOnPhotoSelected);
+  }
+  // Render existing photos for each section
+  eiRenderSectionPhotos();
+}
+
+function sectionToSlug(s) {
+  return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+}
+
+// Render photo thumbnails for all sections in the current checklist.
+function eiRenderSectionPhotos() {
+  var type = eiState.machineType;
+  var sections = [];
+  var seen = {};
+  EI_ITEMS.forEach(function(it) {
+    if (it.types.indexOf(type) >= 0 && !seen[it.section]) {
+      seen[it.section] = true; sections.push(it.section);
+    }
+  });
+  sections.forEach(function(sec) {
+    var slug = sectionToSlug(sec);
+    var list = document.getElementById('eiPhotoList_' + slug);
+    if (!list) return;
+    var photos = eiState.sectionPhotos[sec] || [];
+    list.innerHTML = '';
+    photos.forEach(function(p, idx) {
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'position:relative;display:inline-block';
+      if (p.previewUrl) {
+        var img = document.createElement('img');
+        img.src = p.previewUrl;
+        img.style.cssText = 'width:80px;height:60px;object-fit:cover;border-radius:4px;display:block';
+        img.alt = p.name || 'photo';
+        wrap.appendChild(img);
+      }
+      var del = document.createElement('button');
+      del.type = 'button';
+      del.textContent = 'x';
+      del.style.cssText = 'position:absolute;top:0;right:0;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:0 4px 0 4px;font-size:11px;padding:1px 4px;cursor:pointer;line-height:1.4';
+      del.setAttribute('data-section', sec);
+      del.setAttribute('data-idx', String(idx));
+      del.addEventListener('click', eiOnPhotoDelete);
+      wrap.appendChild(del);
+      list.appendChild(wrap);
+    });
+  });
+}
+
+// Convert file to downscaled JPEG data URL via canvas.
+function eiFileToJpeg(file) {
+  return new Promise(function(resolve, reject) {
+    var img = new Image();
+    var url = URL.createObjectURL(file);
+    img.onload = function() {
+      URL.revokeObjectURL(url);
+      var w = img.naturalWidth, h = img.naturalHeight;
+      if (w > EI_MAX_DIM || h > EI_MAX_DIM) {
+        if (w >= h) { h = Math.round(h * EI_MAX_DIM / w); w = EI_MAX_DIM; }
+        else         { w = Math.round(w * EI_MAX_DIM / h); h = EI_MAX_DIM; }
+      }
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve({ dataUrl: canvas.toDataURL('image/jpeg', EI_JPEG_Q), w: w, h: h });
+    };
+    img.onerror = function() { URL.revokeObjectURL(url); reject(new Error('Image load failed')); };
+    img.src = url;
+  });
+}
+
+function eiOnPhotoSelected(e) {
+  var input   = e.target;
+  var section = input.getAttribute('data-section');
+  var files   = Array.prototype.slice.call(input.files || []);
+  input.value = ''; // reset so same file can be re-selected
+  if (!files.length || !eiState.id) {
+    if (!eiState.id) { eiShowMsg('Save a draft first before adding photos.', true); return; }
+    return;
+  }
+  var totalPhotos = Object.values(eiState.sectionPhotos)
+    .reduce(function(n, arr) { return n + arr.length; }, 0);
+  var secPhotos = eiState.sectionPhotos[section] || [];
+
+  var promises = files.slice(0, EI_MAX_PHOTOS_PER_SEC - secPhotos.length).map(function(file) {
+    if (totalPhotos >= EI_MAX_PHOTOS_TOTAL) {
+      eiShowMsg('Photo limit reached (20 per form).', true); return Promise.resolve(null);
+    }
+    totalPhotos++;
+    return eiFileToJpeg(file).then(function(res) {
+      return { dataUrl: res.dataUrl, w: res.w, h: res.h, name: file.name };
+    }).catch(function(err) {
+      eiShowMsg('Could not process photo: ' + err.message, true); return null;
+    });
+  });
+
+  Promise.all(promises).then(function(results) {
+    results = results.filter(Boolean);
+    if (!results.length) return;
+    var uploads = results.map(function(res) {
+      return fetch('/api/equipment-inspection', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'add_photo',
+          id: eiState.id,
+          section: section,
+          data: res.dataUrl,
+          name: res.name,
+          w: res.w,
+          h: res.h,
+        }),
+      }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d && d.ok) {
+          if (!eiState.sectionPhotos[section]) eiState.sectionPhotos[section] = [];
+          eiState.sectionPhotos[section].push({
+            n: d.photoIndex, name: d.name, w: d.w, h: d.h, previewUrl: res.dataUrl,
+          });
+        } else {
+          eiShowMsg((d && d.error) || 'Photo upload failed.', true);
+        }
+      }).catch(function() { eiShowMsg('Photo upload failed.', true); });
+    });
+    return Promise.all(uploads);
+  }).then(function() { eiRenderSectionPhotos(); });
+}
+
+function eiOnPhotoDelete(e) {
+  var btn     = e.currentTarget;
+  var section = btn.getAttribute('data-section');
+  var idx     = Number(btn.getAttribute('data-idx'));
+  if (!eiState.id || isNaN(idx)) return;
+  fetch('/api/equipment-inspection', {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'del_photo', id: eiState.id, section: section, photoIndex: idx }),
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d && d.ok) {
+      var arr = eiState.sectionPhotos[section] || [];
+      arr.splice(idx, 1);
+      // Re-number remaining
+      arr.forEach(function(p, i) { p.n = i; });
+      if (arr.length === 0) delete eiState.sectionPhotos[section];
+      else eiState.sectionPhotos[section] = arr;
+      eiRenderSectionPhotos();
+    } else {
+      eiShowMsg((d && d.error) || 'Delete failed.', true);
+    }
+  }).catch(function() { eiShowMsg('Delete failed.', true); });
 }
 
 function eiOnItemChange(e) {
@@ -577,6 +751,9 @@ function eiLoadRecord(id) {
         rec.items.forEach(function(it){ if (it && it.key) eiState.items[it.key] = {answer: it.answer||'', note: it.note||''}; });
       }
       eiState.safeToOperate = rec.safeToOperate != null ? rec.safeToOperate : null;
+      // Restore section photo metadata (previews won't be available for old photos).
+      eiState.sectionPhotos = (rec.sectionPhotos && typeof rec.sectionPhotos === 'object')
+        ? rec.sectionPhotos : {};
 
       // Set type toggle
       eiSetType(eiState.machineType);
@@ -586,7 +763,9 @@ function eiLoadRecord(id) {
       document.getElementById('eiProjectId').value = rec.projectId || '';
       document.getElementById('eiProjectName').value = rec.projectName || '';
       document.getElementById('eiProjectSearch').value = rec.projectId ? (rec.projectId + (rec.projectName ? ': ' + rec.projectName : '')) : '';
-      document.getElementById('eiInspectedBy').value = rec.inspectedBy || '';
+      // Inspected By: set select if value matches allowlist, else leave blank.
+      var ibSel = document.getElementById('eiInspectedBy');
+      ibSel.value = rec.inspectedBy || '';
       document.getElementById('eiOwnedRented').value = rec.ownedOrRented || '';
       document.getElementById('eiSerialNumber').value = rec.serialNumber || '';
       document.getElementById('eiMachineHours').value = rec.machineHours != null ? rec.machineHours : '';
@@ -597,6 +776,7 @@ function eiLoadRecord(id) {
       document.getElementById('eiSafeNo').classList.toggle('active',  rec.safeToOperate === false);
 
       document.getElementById('eiNewForm').style.display = 'inline-block';
+      eiRenderSectionPhotos();
       eiMarkSaved('Draft loaded');
     });
 }
@@ -657,12 +837,12 @@ document.getElementById('eiSubmit').addEventListener('click', function(){
 
 // ---- New form ----
 document.getElementById('eiNewForm').addEventListener('click', function(){
-  eiState.id = null; eiState.items = {}; eiState.safeToOperate = null;
+  eiState.id = null; eiState.items = {}; eiState.safeToOperate = null; eiState.sectionPhotos = {};
   document.getElementById('eiDate').value = eiTodayStr();
   document.getElementById('eiProjectId').value = '';
   document.getElementById('eiProjectName').value = '';
   document.getElementById('eiProjectSearch').value = '';
-  document.getElementById('eiInspectedBy').value = (eiState.me && eiState.me.name) || '';
+  document.getElementById('eiInspectedBy').value = ''; // select: user must choose
   document.getElementById('eiOwnedRented').value = '';
   document.getElementById('eiSerialNumber').value = '';
   document.getElementById('eiMachineHours').value = '';
@@ -712,7 +892,7 @@ function eiShowMsg(msg, isErr) {
 
       // Set defaults
       document.getElementById('eiDate').value = eiTodayStr();
-      document.getElementById('eiInspectedBy').value = me.name || '';
+      // Inspected By is now a select; do not auto-set from session name.
 
       // Load projects
       return fetch('/api/field-projects', {credentials:'same-origin'})
@@ -723,18 +903,7 @@ function eiShowMsg(msg, isErr) {
         })
         .catch(function(){});
     })
-    .then(function(){
-      // Load personnel for datalist
-      return fetch('/api/field-lists?type=personnel', {credentials:'same-origin'})
-        .then(function(r){ return r.json(); })
-        .then(function(d){
-          var dl = document.getElementById('eiInspectedByList');
-          if (dl && d && Array.isArray(d.personnel)) {
-            d.personnel.forEach(function(n){ var o = document.createElement('option'); o.value = n; dl.appendChild(o); });
-          }
-        })
-        .catch(function(){});
-    })
+    // Inspected By is now a fixed select; no personnel datalist fetch needed.
     .then(function(){
       loadEl.style.display = 'none';
       mainEl.style.display = 'block';

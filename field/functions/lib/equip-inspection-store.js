@@ -33,6 +33,12 @@
 // Machine type keys (canonical)
 export const MACHINE_TYPES = ['skid_steer', 'predrill_excavator', 'vibro_excavator'];
 
+// Inspected By: fixed allowlist (Derek, 2026-10-26).
+// Server validates against this set. Existing records with legacy free-text names
+// are accepted on load/print but cannot be re-saved with an unrecognised name.
+export const INSPECTED_BY_OPTIONS = ['John Willis', 'Seth Willis', 'Christian Boutte', 'Jordan Lemay'];
+export const INSPECTED_BY_SET    = new Set(INSPECTED_BY_OPTIONS);
+
 export const MACHINE_LABELS = {
   skid_steer:          'Skid Steer / Loader',
   predrill_excavator:  'Predrill Excavator',
@@ -77,10 +83,10 @@ export const CHECKLIST_ITEMS = [
   { key: 'uc_sprockets',   section: 'Tracks & Undercarriage', label: 'Sprockets: wear, cracks, missing teeth', types: EXCAVATOR_TYPES },
   { key: 'uc_idlers',      section: 'Tracks & Undercarriage', label: 'Front idlers: condition, leaks', types: EXCAVATOR_TYPES },
 
-  // ---- Bucket / Attachment -------------------------------------------------
-  { key: 'bk_teeth',        section: 'Bucket / Attachment', label: 'Bucket teeth / cutting edge: wear, cracks, secure', types: ALL_TYPES },
-  { key: 'bk_pins',         section: 'Bucket / Attachment', label: 'Bucket pins and bushings', types: ALL_TYPES },
-  { key: 'bk_quick_attach', section: 'Bucket / Attachment', label: 'Quick-attach / coupler: pins locked, indicator engaged', types: ALL_TYPES },
+  // ---- Bucket / Attachment (NOT on vibro_excavator per Derek, 2026-10-26) --
+  { key: 'bk_teeth',        section: 'Bucket / Attachment', label: 'Bucket teeth / cutting edge: wear, cracks, secure', types: ['skid_steer', 'predrill_excavator'] },
+  { key: 'bk_pins',         section: 'Bucket / Attachment', label: 'Bucket pins and bushings',                          types: ['skid_steer', 'predrill_excavator'] },
+  { key: 'bk_quick_attach', section: 'Bucket / Attachment', label: 'Quick-attach / coupler: pins locked, indicator engaged', types: ['skid_steer', 'predrill_excavator'] },
 
   // ---- Grease Points -------------------------------------------------------
   { key: 'gr_daily',       section: 'Lubrication', label: 'Daily grease points lubricated per schedule', types: ALL_TYPES },
@@ -103,13 +109,14 @@ export const CHECKLIST_ITEMS = [
   { key: 'pd_kelly',       section: 'Auger Drive Head', label: 'Kelly bar / attachment connection: pins locked, condition', types: ['predrill_excavator'] },
   { key: 'pd_hyd_lines',   section: 'Auger Drive Head', label: 'Hydraulic hoses to auger drive: condition, leaks, couplings', types: ['predrill_excavator'] },
 
-  // ---- Vibro Excavator: Vibro Probe Attachment -----------------------------
-  { key: 'vb_probe',       section: 'Vibrator / Probe', label: 'Vibrator / probe body: condition, tip/fin wear', types: ['vibro_excavator'] },
-  { key: 'vb_follower',    section: 'Vibrator / Probe', label: 'Follower tubes: condition, connections, alignment', types: ['vibro_excavator'] },
-  { key: 'vb_hopper',      section: 'Vibrator / Probe', label: 'Stone hopper / feed door: operation, wear, seals', types: ['vibro_excavator'] },
-  { key: 'vb_air_water',   section: 'Vibrator / Probe', label: 'Compressed air or water flush lines: connections, leaks', types: ['vibro_excavator'] },
-  { key: 'vb_hyd_hoses',   section: 'Vibrator / Probe', label: 'Hydraulic hoses to vibrator: condition, quick-disconnects', types: ['vibro_excavator'] },
-  { key: 'vb_power_pack',  section: 'Vibrator / Probe', label: 'Power pack / generator (if applicable): oil, fuel, start check', types: ['vibro_excavator'] },
+  // ---- Vibro Excavator: Flot (renamed from "Vibrator / Probe", Derek 2026-10-26) --
+  // Keys are unchanged for stored-data compatibility.
+  { key: 'vb_probe',       section: 'Flot', label: 'Flot body: condition, tip/fin wear',                                types: ['vibro_excavator'] },
+  { key: 'vb_follower',    section: 'Flot', label: 'Follower tubes: condition, connections, alignment',                 types: ['vibro_excavator'] },
+  { key: 'vb_hopper',      section: 'Flot', label: 'Stone hopper / feed door: operation, wear, seals',                 types: ['vibro_excavator'] },
+  { key: 'vb_air_water',   section: 'Flot', label: 'Compressed air or water flush lines: connections, leaks',          types: ['vibro_excavator'] },
+  { key: 'vb_hyd_hoses',   section: 'Flot', label: 'Hydraulic hoses to flot: condition, quick-disconnects',            types: ['vibro_excavator'] },
+  { key: 'vb_power_pack',  section: 'Flot', label: 'Power pack / generator (if applicable): oil, fuel, start check',  types: ['vibro_excavator'] },
 ];
 
 // Build a set of valid item keys for fast lookup.

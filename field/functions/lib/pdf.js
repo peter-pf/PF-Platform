@@ -150,7 +150,29 @@ export class PdfDoc {
     this.pages = [];
     this.cur = null;
     this.y = 0;
+    this._dynJpegs = []; // [{b64, w, h}] -- registered via addJpeg()
     this._newPage();
+  }
+
+  // Register an arbitrary JPEG for embedding. base64 must be raw (no data: prefix).
+  // w, h: pixel dimensions of the source image.
+  // Returns the index (used with placeJpeg()).
+  addJpeg(b64, w, h) {
+    this._dynJpegs.push({ b64, w: w || 1, h: h || 1 });
+    return this._dynJpegs.length - 1;
+  }
+
+  // Place a registered JPEG as a thumbnail at the current flow position.
+  // thumbW/thumbH: desired size in PDF points (1pt = 1/72 inch).
+  // Advances doc.y by thumbH + vGap.
+  placeJpeg(idx, x, thumbW, thumbH, vGap) {
+    vGap = vGap == null ? 0 : vGap;
+    this._ensure(thumbH + vGap);
+    const yBottom = this.y - thumbH;
+    this.cur.push(
+      `q ${thumbW.toFixed(2)} 0 0 ${thumbH.toFixed(2)} ${x.toFixed(2)} ${yBottom.toFixed(2)} cm /DImg${idx} Do Q`
+    );
+    this.y = yBottom - vGap;
   }
 
   _newPage() {
@@ -554,7 +576,21 @@ export class PdfDoc {
         `/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpg.length} >>`,
         jpg);
     }
-    const xobjRes = logoObjNum ? ` /XObject << /Im0 ${logoObjNum} 0 R >>` : '';
+    // ---- dynamic JPEG XObjects (/DImg0, /DImg1, ...) -----------------------
+    const dynImgNums = [];
+    for (const img of this._dynJpegs) {
+      const jpgBytes = base64ToBytes(img.b64);
+      const n = pushBin(objects, push,
+        `<< /Type /XObject /Subtype /Image /Width ${img.w} /Height ${img.h} ` +
+        `/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpgBytes.length} >>`,
+        jpgBytes);
+      dynImgNums.push(n);
+    }
+    let xobjDict = logoObjNum ? `/Im0 ${logoObjNum} 0 R` : '';
+    for (let di = 0; di < dynImgNums.length; di++) {
+      xobjDict += ` /DImg${di} ${dynImgNums[di]} 0 R`;
+    }
+    const xobjRes = xobjDict ? ` /XObject << ${xobjDict} >>` : '';
 
     const pagesObjNum = objects.length + 1;
     push('');

@@ -28,7 +28,7 @@
 //
 // NOTE: No email. Submit = save to D1 + PDF to SharePoint only (PRIMARY-8, 2026-10-25).
 
-import { PdfDoc, PF } from './pdf.js';
+import { PdfDoc, PF, bytesToBase64 } from './pdf.js';
 import { GRAPH } from './graph.js';
 import { CHECKLIST_ITEMS, MACHINE_LABELS } from './equip-inspection-store.js';
 
@@ -68,6 +68,57 @@ function sanitizeSerial(raw) {
 // ---------------------------------------------------------------------------
 // 2. RENDER: record -> PDF bytes (PF-branded)
 // ---------------------------------------------------------------------------
+
+// Photo thumbnail dimensions.
+const THUMB_W     = 180;   // pts (2.5 inches)
+const THUMB_GAP_X = 12;    // pts between thumbnails in same row
+const THUMB_GAP_Y = 8;     // pts between thumbnail rows
+const MAX_THUMB_H = 180;   // pts max height per thumbnail
+const THUMBS_PER_ROW = 2;
+
+// Decode JPEG from data-URL or raw base64 string.
+// Returns { b64, w, h } where w/h come from caller-supplied dims.
+function decodePhotoEntry(p) {
+  let b64 = p.data || '';
+  if (b64.startsWith('data:')) {
+    const comma = b64.indexOf(',');
+    b64 = comma >= 0 ? b64.slice(comma + 1) : '';
+  }
+  return { b64, w: p.w || 1, h: p.h || 1 };
+}
+
+// Embed section photos in the PDF (2 per row, proportional thumbnails).
+function embedSectionPhotos(doc, photos) {
+  if (!photos || !photos.length) return;
+  doc.spacer(6);
+  for (let i = 0; i < photos.length; i += THUMBS_PER_ROW) {
+    const rowSlice = photos.slice(i, i + THUMBS_PER_ROW);
+    // Register images and compute display dimensions.
+    const rowItems = rowSlice.map((p) => {
+      const { b64, w, h } = decodePhotoEntry(p);
+      const aspect  = h / w;
+      const dispH   = Math.min(Math.round(THUMB_W * aspect), MAX_THUMB_H);
+      const idx     = doc.addJpeg(b64, w, h);
+      return { idx, dispH };
+    });
+    const rowH = Math.max(...rowItems.map((r) => r.dispH));
+    // Ensure room for this thumbnail row; creates a new page if needed.
+    doc._ensure(rowH + THUMB_GAP_Y);
+    const yBase = doc.y - rowH;
+    for (let j = 0; j < rowItems.length; j++) {
+      const { idx, dispH } = rowItems[j];
+      const x = MARGIN + j * (THUMB_W + THUMB_GAP_X);
+      // Draw JPEG thumbnail using the raw cm + Do operator (not placeJpeg,
+      // because we want all images in the row at the same y-base).
+      doc.cur.push(
+        `q ${THUMB_W.toFixed(2)} 0 0 ${dispH.toFixed(2)} ${x.toFixed(2)} ${yBase.toFixed(2)} cm /DImg${idx} Do Q`
+      );
+    }
+    doc.y = yBase - THUMB_GAP_Y;
+  }
+  doc.spacer(2);
+}
+
 export function renderEquipInspectionPdf(rec) {
   const doc = new PdfDoc();
 
@@ -77,19 +128,16 @@ export function renderEquipInspectionPdf(rec) {
                     : rec.safeToOperate === false ? 'Safe to Operate: NO'
                     :                               'Safe to Operate: Not answered';
 
-  // ---- Brand header: empty title string so the band renders without a title ----
-  // We draw our own two-line title into the band below, so it never overlaps
-  // the right-side metadata block regardless of string width.
+  const sectionPhotos = (rec.sectionPhotos && typeof rec.sectionPhotos === 'object')
+    ? rec.sectionPhotos : {};
+
+  // ---- Brand header ----
   doc.brandHeader('', [
     { label: 'Machine',  value: typeLabel },
     { label: 'Job #',    value: rec.projectId || rec.jobNumber || '-' },
     { label: 'Date',     value: fmtDate(rec.date) },
     { label: 'Serial #', value: rec.serialNumber || '-' },
   ]);
-
-  // ---- Two-line "Daily Equipment / Inspection" in the charcoal band ----
-  // _draw(text, size, kind, x, baselineY, color)
-  // BAND_CTR_Y = 740; two lines at +7 / -7 relative to centre.
   doc._draw('Daily Equipment', 13, 'euro', TITLE_X, BAND_CTR_Y + 7, PF.white);
   doc._draw('Inspection',      13, 'euro', TITLE_X, BAND_CTR_Y - 7, PF.white);
 
@@ -118,27 +166,22 @@ export function renderEquipInspectionPdf(rec) {
     { label: 'Machine Hours',  value: rec.machineHours != null ? String(rec.machineHours) + ' hrs' : '-' },
   ], { valueW: 260 });
 
-  // ---- Deficiencies summary (Needs Attention items) near the top ----
+  // ---- Deficiencies Summary ----
   const items      = Array.isArray(rec.items) ? rec.items : [];
   const attention  = items.filter((it) => it && it.answer === 'Needs Attention');
-
   if (attention.length) {
     doc.heading('Deficiencies Summary');
     for (const it of attention) {
-      const def = CHECKLIST_ITEMS.find((d) => d.key === it.key);
+      const def   = CHECKLIST_ITEMS.find((d) => d.key === it.key);
       const label = def ? def.label : it.key;
-      doc.row(label, 'Needs Attention', {
-        size: 9.5, rightW: 95, rightColor: RED,
-      });
-      if (it.note) {
-        doc.text('Note: ' + it.note, { size: 8.5, color: PF.secondary, indent: 16 });
-      }
+      doc.row(label, 'Needs Attention', { size: 9.5, rightW: 95, rightColor: RED });
+      if (it.note) doc.text('Note: ' + it.note, { size: 8.5, color: PF.secondary, indent: 16 });
     }
     doc.spacer(4);
   }
 
-  // ---- Checklist sections ----
-  const bySection   = {};
+  // ---- Checklist sections with photos ----
+  const bySection    = {};
   const sectionOrder = [];
   for (const def of CHECKLIST_ITEMS) {
     if (!def.types.includes(rec.machineType)) continue;
@@ -157,34 +200,34 @@ export function renderEquipInspectionPdf(rec) {
   for (const section of sectionOrder) {
     doc.heading(section);
     for (const { label, answer, note } of bySection[section]) {
-      const displayAnswer = answer || '--';
-      const isAttn        = answer === 'Needs Attention';
-      doc.row(label, displayAnswer, {
+      const isAttn = answer === 'Needs Attention';
+      doc.row(label, answer || '--', {
         size:       9.5,
         rightW:     95,
         rightColor: isAttn ? RED : (answer === 'N/A' ? PF.secondary : PF.azureDark),
       });
-      if (note) {
-        doc.text('Note: ' + note, { size: 8.5, color: PF.secondary, indent: 16 });
-      }
+      if (note) doc.text('Note: ' + note, { size: 8.5, color: PF.secondary, indent: 16 });
+    }
+    // Embed photos for this section (if any).
+    const secPhotos = sectionPhotos[section];
+    if (Array.isArray(secPhotos) && secPhotos.length) {
+      embedSectionPhotos(doc, secPhotos);
     }
     doc.spacer(2);
   }
 
-  // ---- Overall deficiencies / notes free text ----
+  // ---- Inspector Notes ----
   if (rec.deficienciesNotes && String(rec.deficienciesNotes).trim()) {
     doc.heading('Inspector Notes');
     doc.text(rec.deficienciesNotes, { size: 10 });
   }
 
-  // ---- Footer note ----
   doc.spacer(8);
   doc.text(
     'This checklist is a starting-point template. Contact Derek Franke to refine items for your specific machine.',
     { size: 9, color: PF.secondary }
   );
 
-  // BLOCKER FIX: was doc.build() which does not exist. Correct method is toBytes().
   return doc.toBytes();
 }
 
@@ -211,6 +254,69 @@ const MACHINE_TYPE_FOLDERS = {
   vibro_excavator:    'Vibro Excavator',
 };
 
+// ---------------------------------------------------------------------------
+// 3b. UPLOAD SECTION PHOTOS TO SHAREPOINT
+// ---------------------------------------------------------------------------
+// Filename: YY-MMDD-<serial>-<sectionSlug>-<n>.jpg
+// Placed in the same serial folder as the PDF.
+
+export function sectionToSlug(section) {
+  return String(section).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+}
+
+// base64OrDataUrl -> JPEG bytes
+function jpegBytes(src) {
+  let b64 = src || '';
+  if (b64.startsWith('data:')) {
+    const comma = b64.indexOf(',');
+    b64 = comma >= 0 ? b64.slice(comma + 1) : '';
+  }
+  // base64 -> Uint8Array
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+export async function uploadSectionPhotos(env, token, rec, serialFolderId) {
+  const driveId       = encodeURIComponent(env.SP_DRIVE_ID);
+  const d             = rec.date || '';
+  const yy            = d.slice(2, 4);
+  const mmdd          = d.slice(5, 7) + d.slice(8, 10);
+  const serial        = sanitizeSerial(rec.serialNumber || 'unknown');
+  const sectionPhotos = (rec.sectionPhotos && typeof rec.sectionPhotos === 'object')
+    ? rec.sectionPhotos : {};
+
+  for (const [section, photos] of Object.entries(sectionPhotos)) {
+    if (!Array.isArray(photos)) continue;
+    const slug = sectionToSlug(section);
+    for (let n = 0; n < photos.length; n++) {
+      const p = photos[n];
+      if (!p || !p.data) continue;
+      const bytes    = jpegBytes(p.data);
+      const filename = `${yy}-${mmdd}-${serial}-${slug}-${n + 1}.jpg`;
+      const uploadUrl = `${GRAPH}/drives/${driveId}/items/${encodeURIComponent(serialFolderId)}:/${encodeURIComponent(filename)}:/content?@microsoft.graph.conflictBehavior=rename`;
+      try {
+        const resp = await fetch(uploadUrl, {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'image/jpeg' },
+          body: bytes,
+        });
+        if (resp.ok) {
+          const item = await resp.json();
+          // Store SP URL back in the photo record for reference.
+          p.spUrl = item.webUrl || '';
+          p.spId  = item.id || '';
+        } else {
+          console.error('[equip-inspection] photo SP upload failed', resp.status, section, n);
+        }
+      } catch (e) {
+        console.error('[equip-inspection] photo SP upload error', e && e.message, section, n);
+      }
+    }
+  }
+}
+
 export async function uploadEquipInspectionPdf(env, token, rec, pdfBytes) {
   const driveId      = encodeURIComponent(env.SP_DRIVE_ID);
   const filename     = pdfFilename(rec);
@@ -231,7 +337,7 @@ export async function uploadEquipInspectionPdf(env, token, rec, pdfBytes) {
     throw new Error(`SP upload failed ${uploadResp.status}: ${errText.slice(0, 200)}`);
   }
   const item = await uploadResp.json();
-  return { name: filename, itemId: item.id || '', webUrl: item.webUrl || '' };
+  return { name: filename, itemId: item.id || '', webUrl: item.webUrl || '', serialFolderId };
 }
 
 async function findChildFolder(env, token, parentId, name) {
