@@ -41,7 +41,7 @@
 
   /* Chrome layout */
   --topbar-h:    52px;
-  --nav-h:       58px;
+  --nav-h:       66px;
   --sidebar-w:   192px;
   --sticky-h:    0px;    /* pages with sticky submit bars override this */
   --content-col: 860px;  /* max content column width; pages override on #main for centering */
@@ -202,6 +202,21 @@ a:hover { text-decoration: underline; }
 .pf-nav-item[aria-current="page"] { color: var(--accent); }
 [data-theme="dark"] .pf-nav-item[aria-current="page"] { color: #5BC8FF; }
 
+/* Phone: 8 tabs at ~48px each — shrink labels to 8px, allow 2-line wrap */
+.pf-nav-item span {
+  font-size: 8px;
+  letter-spacing: 0;
+  line-height: 1.1;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-height: 18px; /* ~2 lines x 9px */
+}
+
 /* Account for both nav and optional sticky bar */
 body {
   padding-bottom: calc(var(--nav-h) + var(--sticky-h) + env(safe-area-inset-bottom));
@@ -221,6 +236,13 @@ body {
     flex: none; flex-direction: row; gap: 10px;
     padding: 9px 16px; font-size: 13px;
     letter-spacing: 0; text-transform: none; justify-content: flex-start;
+  }
+  /* Reset phone span constraints for desktop sidebar labels */
+  .pf-nav-item span {
+    font-size: inherit; letter-spacing: 0; line-height: inherit;
+    white-space: nowrap; overflow-wrap: normal;
+    display: block; -webkit-line-clamp: unset; overflow: visible;
+    max-height: none;
   }
   /* Subtle active: gray bg + blue text + left accent bar */
   .pf-nav-item[aria-current="page"] {
