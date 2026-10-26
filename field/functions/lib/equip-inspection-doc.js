@@ -200,11 +200,13 @@ export function renderEquipInspectionPdf(rec) {
   for (const section of sectionOrder) {
     doc.heading(section);
     for (const { label, answer, note } of bySection[section]) {
-      const isAttn = answer === 'Needs Attention';
-      doc.row(label, answer || '--', {
+      const isAttn    = answer === 'Needs Attention';
+      const isEmpty   = !answer;
+      const rightText = isEmpty ? 'Not checked' : answer;
+      doc.row(label, rightText, {
         size:       9.5,
         rightW:     95,
-        rightColor: isAttn ? RED : (answer === 'N/A' ? PF.secondary : PF.azureDark),
+        rightColor: isEmpty ? PF.muted : (isAttn ? RED : (answer === 'N/A' ? PF.secondary : PF.azureDark)),
       });
       if (note) doc.text('Note: ' + note, { size: 8.5, color: PF.secondary, indent: 16 });
     }
