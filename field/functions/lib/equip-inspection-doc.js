@@ -185,14 +185,15 @@ export function renderEquipInspectionPdf(rec) {
   ], { valueW: 260 });
 
   // ---- Deficiencies Summary ----
+  // Both 'Needs Attention' and 'Damaged' are deficiencies and render red.
   const items      = Array.isArray(rec.items) ? rec.items : [];
-  const attention  = items.filter((it) => it && it.answer === 'Needs Attention');
+  const attention  = items.filter((it) => it && (it.answer === 'Needs Attention' || it.answer === 'Damaged'));
   if (attention.length) {
     doc.heading('Deficiencies Summary');
     for (const it of attention) {
       const def   = CHECKLIST_ITEMS.find((d) => d.key === it.key);
       const label = def ? def.label : it.key;
-      doc.row(label, 'Needs Attention', { size: 9.5, rightW: 95, rightColor: RED });
+      doc.row(label, it.answer, { size: 9.5, rightW: 95, rightColor: RED });
       if (it.note) doc.text('Note: ' + it.note, { size: 8.5, color: PF.secondary, indent: 16 });
     }
     doc.spacer(4);
@@ -218,7 +219,8 @@ export function renderEquipInspectionPdf(rec) {
   for (const section of sectionOrder) {
     doc.heading(section);
     for (const { label, answer, note } of bySection[section]) {
-      const isAttn    = answer === 'Needs Attention';
+      // 'Needs Attention' and 'Damaged' both render red throughout the PDF.
+      const isAttn    = answer === 'Needs Attention' || answer === 'Damaged';
       const isEmpty   = !answer;
       const rightText = isEmpty ? 'Not checked' : answer;
       doc.row(label, rightText, {

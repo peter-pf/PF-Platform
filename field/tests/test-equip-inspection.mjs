@@ -805,6 +805,192 @@ test('M8: submit cleans up photo KV entries after upload (kvKeysToDelete)', () =
   assert.ok(apiSrc.includes('kvKeysToDelete'), 'submit must collect and delete KV keys after upload');
 });
 
+// ===========================================================================
+// N. DAMAGED ANSWER (2026-10-27 Derek request)
+// ===========================================================================
+
+// N1: VALID_ANSWERS includes 'Damaged'
+test('N1: VALID_ANSWERS includes Damaged', () => {
+  assert.ok(VALID_ANSWERS['Damaged'] != null, 'VALID_ANSWERS must include Damaged');
+});
+
+// N2: HTML EI_ANSWERS includes 'Damaged'
+test('N2: HTML EI_ANSWERS includes Damaged', () => {
+  assert.ok(htmlSrc.includes("'Damaged'"), 'EI_ANSWERS must include Damaged in HTML');
+});
+
+// N3: store VALID_ANSWERS source includes 'Damaged'
+test('N3: store source VALID_ANSWERS includes Damaged', () => {
+  assert.ok(storeSrc.includes("'Damaged'"), "store VALID_ANSWERS must list 'Damaged'");
+});
+
+// N4: doc.js treats Damaged as a deficiency (red in summary)
+test('N4: doc.js includes Damaged in deficiency filter', () => {
+  const docSrc3 = readFileSync(resolve(__dir, '../functions/lib/equip-inspection-doc.js'), 'utf8');
+  assert.ok(docSrc3.includes("it.answer === 'Damaged'"),
+    "doc.js deficiency filter must check it.answer === 'Damaged'");
+});
+
+// N5: doc.js per-item isAttn includes Damaged
+test('N5: doc.js per-item isAttn includes Damaged', () => {
+  const docSrc3 = readFileSync(resolve(__dir, '../functions/lib/equip-inspection-doc.js'), 'utf8');
+  assert.ok(docSrc3.includes("answer === 'Damaged'"),
+    "doc.js isAttn must include answer === 'Damaged'");
+});
+
+// N6: cleanItems accepts 'Damaged' as a valid answer (no items dropped)
+test('N6: cleanItems accepts Damaged answer', () => {
+  // Simulate cleanItems logic: Damaged must be in VALID_ANSWERS
+  const testItem = { key: 'fl_engine_oil', answer: 'Damaged', note: '' };
+  const answer = testItem.answer;
+  assert.ok(VALID_ANSWERS[answer] != null,
+    'cleanItems must not drop Damaged: it must be in VALID_ANSWERS');
+});
+
+// N7: PDF render with a Damaged item does not throw
+if (renderEquipInspectionPdf) {
+  test('N7: PDF render with Damaged answer does not throw', () => {
+    const rec = makeTestRecord('vibro_excavator');
+    // Set first vibro item to Damaged
+    if (rec.items.length > 0) rec.items[0].answer = 'Damaged';
+    assert.doesNotThrow(() => renderEquipInspectionPdf(rec));
+    const bytes = renderEquipInspectionPdf(rec);
+    assert.strictEqual(String.fromCharCode(...bytes.slice(0, 5)), '%PDF-');
+  });
+} else {
+  console.log('  SKIP N7: equip-inspection-doc.js could not be imported');
+}
+
+// ===========================================================================
+// O. MAST SECTION (2026-10-27 Derek request, Vibro Excavator only)
+// ===========================================================================
+
+// O1: store has all 7 Mast items
+test('O1: store has all 7 Mast section items', () => {
+  const mastKeys = ['ms_sheaves','ms_winch','ms_sled_wear','ms_bolts','ms_dry_molly','ms_isogenic','ms_hoses_manifold'];
+  const storeKeys = CHECKLIST_ITEMS.filter(d => d.section === 'Mast').map(d => d.key);
+  assert.deepStrictEqual(storeKeys, mastKeys, `Mast keys mismatch: ${JSON.stringify(storeKeys)}`);
+});
+
+// O2: all Mast items are vibro_excavator only
+test('O2: all Mast items have types=[vibro_excavator]', () => {
+  const mastItems = CHECKLIST_ITEMS.filter(d => d.section === 'Mast');
+  assert.strictEqual(mastItems.length, 7, 'Mast section must have exactly 7 items');
+  for (const it of mastItems) {
+    assert.deepStrictEqual(it.types, ['vibro_excavator'],
+      `Mast item ${it.key} must be vibro_excavator only`);
+  }
+});
+
+// O3: Mast items are NOT in Skid Steer or Predrill
+test('O3: Mast items absent from skid_steer and predrill_excavator', () => {
+  for (const type of ['skid_steer', 'predrill_excavator']) {
+    const items = CHECKLIST_ITEMS.filter(d => d.types.includes(type));
+    const mastInType = items.filter(d => d.section === 'Mast');
+    assert.strictEqual(mastInType.length, 0, `Mast section must not appear in ${type}`);
+  }
+});
+
+// O4: Mast items are in VALID_ITEM_KEYS
+test('O4: Mast item keys are in VALID_ITEM_KEYS', () => {
+  const mastKeys = ['ms_sheaves','ms_winch','ms_sled_wear','ms_bolts','ms_dry_molly','ms_isogenic','ms_hoses_manifold'];
+  for (const k of mastKeys) {
+    assert.ok(VALID_ITEM_KEYS.has(k), `VALID_ITEM_KEYS missing Mast key: ${k}`);
+  }
+});
+
+// O5: HTML has all 7 Mast item keys in EI_ITEMS
+test('O5: HTML EI_ITEMS has all 7 Mast item keys', () => {
+  const mastKeys = ['ms_sheaves','ms_winch','ms_sled_wear','ms_bolts','ms_dry_molly','ms_isogenic','ms_hoses_manifold'];
+  for (const k of mastKeys) {
+    assert.ok(htmlSrc.includes(`key:'${k}'`), `HTML EI_ITEMS missing Mast key: ${k}`);
+  }
+});
+
+// O6: HTML has all 7 Mast labels (exact Derek wording)
+test('O6: HTML EI_ITEMS has all 7 Mast labels (exact Derek wording)', () => {
+  const labels = [
+    'Check upper and lower sheaves',
+    'Check winch and cable',
+    'Check sled and wear bars',
+    'Check for missing bolts',
+    'Dry molly rails when needed',
+    'Check sled isogenic bearing',
+    'Inspect hoses and manifold',
+  ];
+  for (const lbl of labels) {
+    assert.ok(htmlSrc.includes(lbl), `HTML EI_ITEMS missing Mast label: "${lbl}"`);
+  }
+});
+
+// O7: store has all 7 Mast labels (exact Derek wording)
+test('O7: store has all 7 Mast labels (exact Derek wording)', () => {
+  const labels = [
+    'Check upper and lower sheaves',
+    'Check winch and cable',
+    'Check sled and wear bars',
+    'Check for missing bolts',
+    'Dry molly rails when needed',
+    'Check sled isogenic bearing',
+    'Inspect hoses and manifold',
+  ];
+  const mastItems = CHECKLIST_ITEMS.filter(d => d.section === 'Mast');
+  for (const lbl of labels) {
+    assert.ok(mastItems.some(it => it.label === lbl),
+      `store Mast section missing label: "${lbl}"`);
+  }
+});
+
+// O8: Vibro Excavator now has at least 32 checklist items (was 25 before Mast)
+test('O8: vibro_excavator checklist has at least 32 items after Mast section', () => {
+  const count = itemsForType('vibro_excavator').length;
+  assert.ok(count >= 32, `Expected >= 32 vibro items, got ${count}`);
+});
+
+// O9: Mast section appears after Flot in vibro_excavator section order
+test('O9: Mast section follows Flot section in vibro_excavator ordering', () => {
+  const sections = [];
+  const seen = {};
+  for (const it of CHECKLIST_ITEMS) {
+    if (it.types.includes('vibro_excavator') && !seen[it.section]) {
+      seen[it.section] = true;
+      sections.push(it.section);
+    }
+  }
+  const flotIdx = sections.indexOf('Flot');
+  const mastIdx = sections.indexOf('Mast');
+  assert.ok(flotIdx >= 0, 'Flot section must be present in vibro_excavator');
+  assert.ok(mastIdx >= 0, 'Mast section must be present in vibro_excavator');
+  assert.ok(mastIdx > flotIdx, 'Mast must come after Flot in vibro_excavator section order');
+});
+
+// O10: PDF render for vibro with Mast answers does not throw
+if (renderEquipInspectionPdf) {
+  test('O10: PDF render for vibro_excavator includes Mast items without throwing', () => {
+    const rec = makeTestRecord('vibro_excavator');
+    // Ensure Mast items are present with answers
+    const mastKeys = ['ms_sheaves','ms_winch','ms_sled_wear','ms_bolts','ms_dry_molly','ms_isogenic','ms_hoses_manifold'];
+    for (const k of mastKeys) {
+      if (!rec.items.find(it => it.key === k)) {
+        rec.items.push({ key: k, answer: 'Pass', note: '' });
+      }
+    }
+    assert.doesNotThrow(() => renderEquipInspectionPdf(rec));
+    const bytes = renderEquipInspectionPdf(rec);
+    assert.strictEqual(String.fromCharCode(...bytes.slice(0, 5)), '%PDF-');
+  });
+} else {
+  console.log('  SKIP O10: equip-inspection-doc.js could not be imported');
+}
+
+// O11: store keys are still unique after adding Mast
+test('O11: all CHECKLIST_ITEMS keys are still unique after adding Mast', () => {
+  const keys = CHECKLIST_ITEMS.map(it => it.key);
+  const unique = new Set(keys);
+  assert.equal(unique.size, keys.length,
+    `Duplicate keys after Mast addition: ${keys.filter((k,i) => keys.indexOf(k) !== i)}`);
+});
+
 setTimeout(() => {
   console.log(`\n  ${passed} passed, ${failed} failed\n`);
   if (failed) process.exit(1);

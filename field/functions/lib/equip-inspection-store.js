@@ -117,13 +117,27 @@ export const CHECKLIST_ITEMS = [
   { key: 'vb_air_water',   section: 'Flot', label: 'Compressed air or water flush lines: connections, leaks',          types: ['vibro_excavator'] },
   { key: 'vb_hyd_hoses',   section: 'Flot', label: 'Hydraulic hoses to flot: condition, quick-disconnects',            types: ['vibro_excavator'] },
   { key: 'vb_power_pack',  section: 'Flot', label: 'Power pack / generator (if applicable): oil, fuel, start check',  types: ['vibro_excavator'] },
+
+  // ---- Vibro Excavator: Mast (Derek 2026-10-27) ---------------------------
+  // Exact wording from Derek's request; placed after Flot.
+  { key: 'ms_sheaves',       section: 'Mast', label: 'Check upper and lower sheaves',     types: ['vibro_excavator'] },
+  { key: 'ms_winch',         section: 'Mast', label: 'Check winch and cable',              types: ['vibro_excavator'] },
+  { key: 'ms_sled_wear',     section: 'Mast', label: 'Check sled and wear bars',           types: ['vibro_excavator'] },
+  { key: 'ms_bolts',         section: 'Mast', label: 'Check for missing bolts',            types: ['vibro_excavator'] },
+  { key: 'ms_dry_molly',     section: 'Mast', label: 'Dry molly rails when needed',        types: ['vibro_excavator'] },
+  { key: 'ms_isogenic',      section: 'Mast', label: 'Check sled isogenic bearing',        types: ['vibro_excavator'] },
+  { key: 'ms_hoses_manifold',section: 'Mast', label: 'Inspect hoses and manifold',         types: ['vibro_excavator'] },
 ];
 
 // Build a set of valid item keys for fast lookup.
 export const VALID_ITEM_KEYS = new Set(CHECKLIST_ITEMS.map((d) => d.key));
 
 // Valid answers for checklist items.
-export const VALID_ANSWERS = { 'Pass': 1, 'Needs Attention': 1, 'N/A': 1, '': 1 };
+// 'Damaged' was added 2026-10-27 (Derek request): appears on all three form types,
+// renders red in PDF (same as 'Needs Attention') and is listed in the deficiencies
+// summary. Existing saved records that predate this change are not affected because
+// cleanItems() silently drops unrecognised answer values, and '' (empty) is still valid.
+export const VALID_ANSWERS = { 'Pass': 1, 'Needs Attention': 1, 'Damaged': 1, 'N/A': 1, '': 1 };
 
 // ---- D1 helpers (fail-closed: throw on any failure) -----------------------
 
