@@ -56,18 +56,16 @@ test('A2: Standard Operation on 5b counts as READY', () => {
   assert.equal(r.result, 'READY', `Expected READY, got ${r.result}; open: ${r.openItems}`);
 });
 
-test('A3: GC Restriction on 5a is NOT READY', () => {
+test('A3: GC Restriction on 5a counts as READY (documented constraint, crew plans around it)', () => {
   const items = makeItems({ '5a': 'GC Restriction' });
   const r = computeResult(items, 12);
-  assert.equal(r.result, 'NOT READY');
-  assert.ok(r.openItems.includes('5a'), '5a must be in openItems');
+  assert.equal(r.result, 'READY', `Expected READY, got ${r.result}; open: ${r.openItems}`);
 });
 
-test('A4: GC Restriction on 5b is NOT READY', () => {
+test('A4: GC Restriction on 5b counts as READY (documented constraint, crew plans around it)', () => {
   const items = makeItems({ '5b': 'GC Restriction' });
   const r = computeResult(items, 12);
-  assert.equal(r.result, 'NOT READY');
-  assert.ok(r.openItems.includes('5b'), '5b must be in openItems');
+  assert.equal(r.result, 'READY', `Expected READY, got ${r.result}; open: ${r.openItems}`);
 });
 
 test('A5: Needs Review on 5a is NOT READY', () => {
@@ -77,7 +75,7 @@ test('A5: Needs Review on 5a is NOT READY', () => {
   assert.ok(r.openItems.includes('5a'), '5a must be in openItems');
 });
 
-test('A6: Needs Review on 5b is NOT READY', () => {
+test('A6: Needs Review on 5b is NOT READY (only unresolved state)', () => {
   const items = makeItems({ '5b': 'Needs Review' });
   const r = computeResult(items, 12);
   assert.equal(r.result, 'NOT READY');
@@ -133,11 +131,11 @@ test('C5: legacy No on 5c still NOT READY', () => {
   assert.ok(r.openItems.includes('5c'));
 });
 
-test('C6: pre-R12 record: 5a/5b Standard Operation does not break scoring (schemaVersion=11)', () => {
+test('C6: pre-R12 record: 5a=GC Restriction, 5b=Standard Operation, 5c=None Required is READY', () => {
   // For a pre-R12 record, 1d-1h are skipped; 5a/5b/5c still scored.
-  const items = makeItems({ '5a': 'Standard Operation', '5b': 'Standard Operation', '5c': 'None Required' });
+  const items = makeItems({ '5a': 'GC Restriction', '5b': 'Standard Operation', '5c': 'None Required' });
   const r = computeResult(items, 11);
-  assert.equal(r.result, 'READY');
+  assert.equal(r.result, 'READY', `Expected READY, got ${r.result}; open: ${r.openItems}`);
 });
 
 test('C7: legacy record (no schemaVersion): new values still pass correctly', () => {
@@ -310,15 +308,31 @@ if (renderSiteReadinessPdf) {
     assert.ok(bytes.length > 1000, 'PDF must be at least 1 KB');
   });
 
-  test('H2: PDF renders with Needs Review / GC Restriction (NOT READY) without throwing', () => {
+  test('H2: PDF renders with GC Restriction / None Required (READY) without throwing', () => {
+    // GC Restriction on 5a/5b is a passing state; only Needs Review blocks
+    const rec = makeSrRecord({
+      result: 'READY',
+      openItems: [],
+      items: CHECKLIST_ITEMS.map(d => ({
+        key:    d.key,
+        answer: (['5a','5b'].includes(d.key) ? 'GC Restriction'
+                : d.key === '5c' ? 'None Required' : 'Yes'),
+        note: d.key === '5a' ? 'Contractor access restriction until next week' : '',
+      })),
+    });
+    assert.doesNotThrow(() => renderSiteReadinessPdf(rec));
+    const bytes = renderSiteReadinessPdf(rec);
+    assert.equal(String.fromCharCode(...bytes.slice(0,5)), '%PDF-');
+  });
+
+  test('H2b: PDF renders with Needs Review on 5a/5b/5c (NOT READY) without throwing', () => {
     const rec = makeSrRecord({
       result: 'NOT READY',
       openItems: ['5a', '5b', '5c'],
       items: CHECKLIST_ITEMS.map(d => ({
         key:    d.key,
-        answer: (['5a','5b'].includes(d.key) ? 'GC Restriction'
-                : d.key === '5c' ? 'Needs Review' : 'Yes'),
-        note: d.key === '5a' ? 'Contractor access restriction until next week' : '',
+        answer: (['5a','5b','5c'].includes(d.key) ? 'Needs Review' : 'Yes'),
+        note: d.key === '5a' ? 'Stone location still being worked out with GC' : '',
       })),
     });
     assert.doesNotThrow(() => renderSiteReadinessPdf(rec));

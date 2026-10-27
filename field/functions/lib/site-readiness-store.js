@@ -282,13 +282,16 @@ export const R12_KEYS = new Set(['1d', '1e', '1f', '1g', '1h']);
 
 // Per-item custom passing-answer sets (2026-10-27 Derek request).
 // Section 5a/5b use a 3-option dropdown (Standard Operation / GC Restriction / Needs Review).
+// Section 5a/5b use a 3-option dropdown (Standard Operation / GC Restriction / Needs Review).
 // Section 5c uses a 2-option dropdown (None Required / Needs Review).
-// 'Standard Operation' for 5a/5b and 'None Required' for 5c count as READY, matching the
-// logical equivalents of the old 'Yes' and 'N/A' answers.
+// Passing logic: "Needs Review" is the only open item on 5a, 5b and 5c.
+//   5a / 5b: Standard Operation and GC Restriction are both settled, documented states that
+//            the crew plans around -- they pass. Only "Needs Review" blocks.
+//   5c: None Required passes. Only "Needs Review" blocks.
 // Legacy records with the old 'Yes' / 'N/A' answers continue to pass in all three keys.
 const ITEM_PASSING = {
-  '5a': new Set(['Yes', 'N/A', 'Standard Operation']),
-  '5b': new Set(['Yes', 'N/A', 'Standard Operation']),
+  '5a': new Set(['Yes', 'N/A', 'Standard Operation', 'GC Restriction']),
+  '5b': new Set(['Yes', 'N/A', 'Standard Operation', 'GC Restriction']),
   '5c': new Set(['Yes', 'N/A', 'None Required']),
 };
 const GLOBAL_PASSING = new Set(['Yes', 'N/A']);
