@@ -308,7 +308,7 @@
             <div id="srMarkupSitePlanMsg" class="sr-up-msg"></div>
           </div>
           <div style="margin-top:10px">
-            <label>Site Superintendent signature</label>
+            <label>GC Signature</label>
             <div><input type="text" id="srSitePlanSuperName" placeholder="Printed name of superintendent" style="margin-bottom:6px"></div>
             <canvas id="srSigSiteSuperCanvas" width="400" height="120"
               style="border:1px solid var(--border);border-radius:6px;touch-action:none;cursor:crosshair;display:block;width:100%;max-width:400px;background:var(--surface-3)"></canvas>
@@ -319,8 +319,8 @@
             <div id="srSigSiteSuperMsg" class="sr-up-msg"></div>
           </div>
           <div style="margin-top:10px">
-            <label>PF Field Ops Mgr signature</label>
-            <div><input type="text" id="srSitePlanMgrName" placeholder="PF Field Ops Mgr printed name" style="margin-bottom:6px"></div>
+            <label>Pier Foundations Signature</label>
+            <div><input type="text" id="srSitePlanMgrName" placeholder="Printed name of PF representative" style="margin-bottom:6px"></div>
             <canvas id="srSigSiteMgrCanvas" width="400" height="120"
               style="border:1px solid var(--border);border-radius:6px;touch-action:none;cursor:crosshair;display:block;width:100%;max-width:400px;background:var(--surface-3)"></canvas>
             <div style="display:flex;gap:6px;margin-top:4px">
@@ -609,6 +609,16 @@ try {
   // Mirrors server SCHEMA_GUARDED_KEYS = {1b, 1c, 1d, 1e, 1f, 1g, 1h}.
   var CLIENT_GUARDED_KEYS = { '1b': 1, '1c': 1, '1d': 1, '1e': 1, '1f': 1, '1g': 1, '1h': 1 };
 
+  // Per-item answer sets for section 5 (2026-10-27 Derek request).
+  // Keys not listed here use the default ['Yes', 'No', 'N/A'] dropdown.
+  // Backward compat: if a stored record has an answer not in the new set (e.g. 'Yes'
+  // from before this change), it is shown as a '(legacy)' option and can be updated.
+  var SR_ITEM_ANSWERS = {
+    '5a': ['Standard Operation', 'GC Restriction', 'Needs Review'],
+    '5b': ['Standard Operation', 'GC Restriction', 'Needs Review'],
+    '5c': ['None Required', 'Needs Review'],
+  };
+
   var state = {
     records: [],
     editingId: null,
@@ -781,8 +791,16 @@ try {
           html += '<div class="sr-item-row">';
           html += '<select class="sr-ans" data-key="' + E(def.key) + '" aria-label="Answer for ' + E(def.key) + '">';
           html += '<option value="">Select</option>';
-          ['Yes', 'No', 'N/A'].forEach(function (a) {
-            html += '<option value="' + a + '"' + (stateItem.answer === a ? ' selected' : '') + '>' + a + '</option>';
+          var itemAnswers = SR_ITEM_ANSWERS[def.key] || ['Yes', 'No', 'N/A'];
+          // Backward compat: if the stored value isn't in the new answer set (e.g. legacy
+          // 'Yes'/'No'/'N/A' for 5a/5b/5c), show it as a selectable (legacy) option so
+          // the record loads without silently blanking the value.
+          var legacyAns = (stateItem.answer && itemAnswers.indexOf(stateItem.answer) < 0) ? stateItem.answer : null;
+          if (legacyAns) {
+            html += '<option value="' + E(legacyAns) + '" selected>' + E(legacyAns) + ' (legacy)</option>';
+          }
+          itemAnswers.forEach(function (a) {
+            html += '<option value="' + E(a) + '"' + (stateItem.answer === a ? ' selected' : '') + '>' + E(a) + '</option>';
           });
           html += '</select>';
           html += '<input type="text" class="sr-note" data-key="' + E(def.key) + '" placeholder="Note (optional)" value="' + E(stateItem.note) + '" aria-label="Note for ' + E(def.key) + '">';

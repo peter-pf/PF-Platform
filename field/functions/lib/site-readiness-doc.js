@@ -143,9 +143,9 @@ export function renderSiteReadinessPdf(rec) {
       doc.heading('Stone & Spoils Plan Sign-off');
       const sp = ops.sitePlan;
       const rows = [];
-      if (sp.desc)      rows.push({ label: 'Location description', value: sp.desc });
-      if (sp.superName) rows.push({ label: 'Site Superintendent',  value: sp.superName });
-      if (sp.pfMgrName) rows.push({ label: 'PF Field Ops Mgr',     value: sp.pfMgrName });
+      if (sp.desc)      rows.push({ label: 'Location description',    value: sp.desc });
+      if (sp.superName) rows.push({ label: 'GC Signature',             value: sp.superName });
+      if (sp.pfMgrName) rows.push({ label: 'Pier Foundations Signature', value: sp.pfMgrName });
       if (sp.capturedByName || sp.signedAt) {
         const by   = sp.capturedByName || '—';
         const when = sp.signedAt
@@ -177,9 +177,9 @@ export function renderSiteReadinessPdf(rec) {
       for (const sec of legacySecs) {
         if (!sec.item) continue;
         const rows = [];
-        if (sec.item.desc)      rows.push({ label: 'Location description', value: sec.item.desc });
-        if (sec.item.superName) rows.push({ label: 'Site Superintendent',  value: sec.item.superName });
-        if (sec.item.pfMgrName) rows.push({ label: 'PF Field Ops Mgr',     value: sec.item.pfMgrName });
+        if (sec.item.desc)      rows.push({ label: 'Location description',    value: sec.item.desc });
+        if (sec.item.superName) rows.push({ label: 'GC Signature',             value: sec.item.superName });
+        if (sec.item.pfMgrName) rows.push({ label: 'Pier Foundations Signature', value: sec.item.pfMgrName });
         if (sec.item.capturedByName || sec.item.signedAt) {
           const by   = sec.item.capturedByName || '—';
           const when = sec.item.signedAt

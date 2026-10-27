@@ -280,8 +280,21 @@ export function uploadBucketForItem(itemKey) {
 // Pre-R12 records (R11, legacy) must not show these as open items.
 export const R12_KEYS = new Set(['1d', '1e', '1f', '1g', '1h']);
 
+// Per-item custom passing-answer sets (2026-10-27 Derek request).
+// Section 5a/5b use a 3-option dropdown (Standard Operation / GC Restriction / Needs Review).
+// Section 5c uses a 2-option dropdown (None Required / Needs Review).
+// 'Standard Operation' for 5a/5b and 'None Required' for 5c count as READY, matching the
+// logical equivalents of the old 'Yes' and 'N/A' answers.
+// Legacy records with the old 'Yes' / 'N/A' answers continue to pass in all three keys.
+const ITEM_PASSING = {
+  '5a': new Set(['Yes', 'N/A', 'Standard Operation']),
+  '5b': new Set(['Yes', 'N/A', 'Standard Operation']),
+  '5c': new Set(['Yes', 'N/A', 'None Required']),
+};
+const GLOBAL_PASSING = new Set(['Yes', 'N/A']);
+
 // Compute the overall result from an items array.
-// Each item: { key, answer } where answer is 'Yes' | 'No' | 'N/A' | ''.
+// Each item: { key, answer } where answer is one of the allowed values for that key.
 // schemaVersion: the record's stored schemaVersion (number or undefined).
 //   R12 items (1d-1h) are only included in scoring when schemaVersion >= 12.
 //   Pre-R12 records (v11, legacy) are non-breaking: 1d-1h are skipped entirely.
@@ -294,7 +307,8 @@ export function computeResult(items, schemaVersion) {
     if (R12_KEYS.has(def.key) && !isR12) continue;
     const item = (items || []).find((it) => it && it.key === def.key);
     const answer = (item && item.answer) ? String(item.answer).trim() : '';
-    if (answer !== 'Yes' && answer !== 'N/A') {
+    const passingSet = ITEM_PASSING[def.key] || GLOBAL_PASSING;
+    if (!passingSet.has(answer)) {
       openItems.push(def.key);
     }
   }

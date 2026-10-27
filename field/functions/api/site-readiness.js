@@ -74,7 +74,15 @@ const MAX_SHORT     = 300;    // name / project / date cap
 const MAX_ITEMS     = 30;     // more than enough for current 25 items (R12 added 1d-1h)
 const MAX_ATTACH    = 60;     // bumped 30->60 for new bucket types (markup, sigs, safety)
 
-const VALID_ANSWERS = { 'Yes': 1, 'No': 1, 'N/A': 1 };
+// 2026-10-27 (Derek): 5a/5b now use Standard Operation / GC Restriction / Needs Review;
+// 5c uses None Required / Needs Review.  Old Yes/No/N/A kept for backward compat so
+// legacy records survive a re-save without having their answers wiped by cleanItems().
+const VALID_ANSWERS = {
+  'Yes': 1, 'No': 1, 'N/A': 1,                            // legacy / all other items
+  'Standard Operation': 1, 'GC Restriction': 1,            // 5a, 5b
+  'Needs Review': 1,                                        // 5a, 5b, 5c
+  'None Required': 1,                                       // 5c
+};
 const VALID_ITEM_KEYS = new Set(CHECKLIST_ITEMS.map((d) => d.key));
 
 const VALID_ACTIONS = { create: 1, update: 1, submit: 1 };
