@@ -619,6 +619,17 @@ try {
     '5c': ['None Required', 'Needs Review'],
   };
 
+  // Per-item passing sets for client-side computeResult.
+  // Must mirror server ITEM_PASSING in site-readiness-store.js exactly.
+  // Only 'Needs Review' is an open item on 5a / 5b / 5c.
+  // Every other checklist key uses CLIENT_GLOBAL_PASSING (Yes / N/A).
+  var CLIENT_GLOBAL_PASSING = { 'Yes': 1, 'N/A': 1 };
+  var CLIENT_ITEM_PASSING = {
+    '5a': { 'Standard Operation': 1, 'GC Restriction': 1, 'Yes': 1, 'N/A': 1 },
+    '5b': { 'Standard Operation': 1, 'GC Restriction': 1, 'Yes': 1, 'N/A': 1 },
+    '5c': { 'None Required': 1, 'Yes': 1, 'N/A': 1 },
+  };
+
   var state = {
     records: [],
     editingId: null,
@@ -676,7 +687,8 @@ try {
     var open = [];
     state.items.forEach(function (it) {
       if (!isR12 && CLIENT_R12_KEYS[it.key]) return; // skip R12 keys for pre-R12 loaded records
-      if (it.answer !== 'Yes' && it.answer !== 'N/A') open.push(it.key);
+      var passing = CLIENT_ITEM_PASSING[it.key] || CLIENT_GLOBAL_PASSING;
+      if (!passing[it.answer]) open.push(it.key);
     });
     return { result: open.length === 0 ? 'READY' : 'NOT READY', openItems: open };
   }
