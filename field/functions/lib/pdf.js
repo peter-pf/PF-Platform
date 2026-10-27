@@ -440,10 +440,42 @@ export class PdfDoc {
     for (const r of rows) {
       const rawLabel = String(r.label == null ? '' : r.label);
       const isSub = subLabels && subLabels.has(rawLabel) && (r.value == null || r.value === '');
-      // page-break guard
-      if (this._ensure(rowH)) { /* new page: no header repeat needed for a report */ }
-      const rowTop = this.y;
-      const rowBot = this.y - rowH;
+
+      // ---- pre-compute label (clipped), value, and whether to stack -----------
+      // Done before _ensure() so we can pass the correct total row height.
+      let label = toWinAnsi(rawLabel);
+      const indent = r.indent ? r.indent : 0;
+      const lx = labelX + indent;
+      const lMax = labelMaxW - indent;
+      if (!isSub && measure(label, size, 'helv') > lMax) {
+        while (label.length > 1 && measure(label + '...', size, 'helv') > lMax) label = label.slice(0, -1);
+        label = label + '...';
+      }
+
+      const rawValue = isSub ? '' : toWinAnsi(r.value == null ? '' : String(r.value));
+      const vLeading = size * 1.4;
+      let stacked = false;
+      let stackedLines = null;
+      let totalH = rowH;
+
+      if (rawValue) {
+        const vw = measure(rawValue, size, 'helvb');
+        // Overlap check: if the right-aligned value would start left of the label's
+        // right edge (+gap), switch to a stacked layout (label line, then value
+        // wrapped below it, full-width and left-aligned).
+        const lActualW = measure(label, size, 'helv');
+        // Stack when the right-aligned value would physically overlap the drawn
+        // label text (2 pt safety margin to absorb sub-pixel rounding).
+        if (valueRightX - vw < lx + lActualW + 2) {
+          stacked = true;
+          stackedLines = wrap(rawValue, size, 'helv', CONTENT_W - 16);
+          totalH = rowH + stackedLines.length * vLeading + 3;
+        }
+      }
+
+      // page-break guard with the correct total height
+      if (this._ensure(totalH)) { /* new page: no header repeat needed for a report */ }
+      const rowBot = this.y - totalH;
 
       if (isSub) {
         // group sub-heading: BLACK bold (Round 5), no value
@@ -456,24 +488,23 @@ export class PdfDoc {
       // Round 6 (Derek): NO row background fill. Rows sit on plain white and are
       // delineated by a thin grey separator LINE under each row instead.
 
-      // label (left, wrapped to one visible line; clip with ellipsis if needed)
-      let label = toWinAnsi(rawLabel);
-      const indent = r.indent ? r.indent : 0;
-      const lx = labelX + indent;
-      const lMax = labelMaxW - indent;
-      if (measure(label, size, 'helv') > lMax) {
-        while (label.length > 1 && measure(label + '...', size, 'helv') > lMax) label = label.slice(0, -1);
-        label = label + '...';
-      }
-      const baseline = rowBot + (rowH - size) / 2 + size * 0.22;
+      // label baseline: vertically centred in the label portion (top rowH of totalH)
+      const baseline = (this.y - rowH) + (rowH - size) / 2 + size * 0.22;
       this._draw(label, size, 'helv', lx, baseline, labelColor);
 
-      // value (RIGHT-ALIGNED to the shared right edge, bold) so the value column
-      // lines up top-to-bottom across every section.
-      const value = toWinAnsi(r.value == null ? '' : String(r.value));
-      if (value) {
-        const vw = measure(value, size, 'helvb');
-        this._draw(value, size, 'helvb', valueRightX - vw, baseline, valueColor);
+      if (stacked) {
+        // Value wraps below the label line, left-aligned, plain weight so it reads
+        // as a continuation of the label rather than a competing right column.
+        let vy = baseline - vLeading;
+        for (const vl of stackedLines) {
+          this._draw(vl, size, 'helv', lx, vy, valueColor);
+          vy -= vLeading;
+        }
+      } else if (rawValue) {
+        // value (RIGHT-ALIGNED to the shared right edge, bold) so the value column
+        // lines up top-to-bottom across every section.
+        const vw = measure(rawValue, size, 'helvb');
+        this._draw(rawValue, size, 'helvb', valueRightX - vw, baseline, valueColor);
       }
 
       // thin grey separator LINE under each data row (#C8D5DC, 0.5pt) -- the sole
