@@ -126,33 +126,42 @@ export async function fetchAttachmentPhotos(token, driveId, attachments, bucketT
   return sectionPhotos;
 }
 
+// Maximum photo size accepted from SharePoint.  Photos over this cap are
+// skipped (treated as placeholder) to prevent blowing Worker memory.
+// Checked against Content-Length header (fast-path) and actual arrayBuffer
+// size.  4 MB is well above any thumbnail (typically 50-200 KB) and still
+// safely below the 128 MB Worker memory limit.
+export const MAX_PHOTO_BYTES = 4 * 1024 * 1024; // 4 MB
+
 // Fetch one image from SharePoint: try thumbnail endpoint first (gives JPEG
 // ~800px), fall back to /content for direct jpeg/png.  Returns
 // {data, w, h} on success, null on failure (fail-soft).
+//
+// The AbortController timer remains active through the body read so a slow
+// /content response (large RAW file, etc.) is cancelled by the same timeout.
 async function _fetchOnePhoto(token, driveId, itemId, timeoutMs, fetchFn) {
-  const base         = `${GRAPH}/drives/${driveId}/items/${itemId}`;
-  const thumbUrl     = `${base}/thumbnails/0/large/content`;
-  const contentUrl   = `${base}/content`;
+  const base       = `${GRAPH}/drives/${driveId}/items/${itemId}`;
+  const thumbUrl   = `${base}/thumbnails/0/large/content`;
+  const contentUrl = `${base}/content`;
 
   for (let i = 0; i < 2; i++) {
-    const url = i === 0 ? thumbUrl : contentUrl;
+    const url   = i === 0 ? thumbUrl : contentUrl;
+    const ac    = new AbortController();
+    const timer = setTimeout(() => ac.abort(), timeoutMs);
+
     let resp;
     try {
-      const ac    = new AbortController();
-      const timer = setTimeout(() => ac.abort(), timeoutMs);
-      try {
-        resp = await fetchFn(url, {
-          headers: { Authorization: 'Bearer ' + token },
-          signal: ac.signal,
-        });
-      } finally {
-        clearTimeout(timer);
-      }
+      resp = await fetchFn(url, {
+        headers: { Authorization: 'Bearer ' + token },
+        signal: ac.signal,
+      });
     } catch {
-      return null; // abort (timeout) or network error
+      clearTimeout(timer);
+      return null; // timeout / network error during headers
     }
 
     if (!resp.ok) {
+      clearTimeout(timer);
       if (resp.status === 404 && i === 0) continue; // no thumbnail → try /content
       return null;
     }
@@ -161,12 +170,39 @@ async function _fetchOnePhoto(token, driveId, itemId, timeoutMs, fetchFn) {
     const isJpeg = ct.includes('image/jpeg') || ct.includes('image/jpg');
     const isPng  = ct.includes('image/png');
     if (!isJpeg && !isPng) {
-      if (i === 0) continue; // thumbnail may redirect to wrong type; try /content
+      clearTimeout(timer);
+      if (i === 0) continue; // thumbnail may give wrong type; try /content
       return null; // not an image (PDF, docx, etc.) — skip
     }
 
+    // Fast-path size check: if Content-Length is present and already over cap,
+    // skip without reading the body.
+    const clRaw = resp.headers.get('Content-Length');
+    const clNum = clRaw !== null ? parseInt(clRaw, 10) : NaN;
+    if (!isNaN(clNum) && clNum > MAX_PHOTO_BYTES) {
+      clearTimeout(timer);
+      if (i === 0) continue; // oversized thumbnail → try /content (rare but safe)
+      return null;
+    }
+
+    // Read body while abort signal is still active (timer NOT cleared yet).
+    let abuf;
     try {
-      const bytes = new Uint8Array(await resp.arrayBuffer());
+      abuf = await resp.arrayBuffer();
+    } catch {
+      clearTimeout(timer);
+      return null; // timeout or network error during body read
+    }
+    clearTimeout(timer); // body fully read — safe to clear now
+
+    // Post-read size guard (Content-Length absent or lied).
+    if (abuf.byteLength > MAX_PHOTO_BYTES) {
+      if (i === 0) continue;
+      return null;
+    }
+
+    try {
+      const bytes = new Uint8Array(abuf);
       const dims  = isJpeg ? _jpegDims(bytes) : _pngDims(bytes);
       const b64   = _uint8ToBase64(bytes);
       return { data: `data:${isJpeg ? 'image/jpeg' : 'image/png'};base64,${b64}`, w: dims.w, h: dims.h };

@@ -710,5 +710,153 @@ for (const [name, fn] of kTests) {
 }
 
 // ============================================================
+console.log('\n--- L. sectionPhotos isolation: not stored in rec or API response ---');
+// Verifies the BLOCK fix: base64 photo blobs must never be written onto rec,
+// stored in D1, or sent back to the browser in the submit response.
+
+const drApiSrc = readFileSync(resolve(wt, 'functions/api/daily-report.js'), 'utf8');
+const srApiSrc = readFileSync(resolve(wt, 'functions/api/site-readiness.js'), 'utf8');
+const eiApiSrc = readFileSync(resolve(wt, 'functions/api/equipment-inspection.js'), 'utf8');
+
+test('L1: DR: rec.sectionPhotos is NOT assigned (uses local variable)', () => {
+  assert.ok(!drApiSrc.includes('rec.sectionPhotos ='),
+    'L1: DR must not write base64 blobs onto rec (would persist to D1)');
+});
+
+test('L2: SR: rec.sectionPhotos is NOT assigned (uses local variable)', () => {
+  assert.ok(!srApiSrc.includes('rec.sectionPhotos ='),
+    'L2: SR must not write base64 blobs onto rec (would persist to D1)');
+});
+
+test('L3: DR: local drSectionPhotos variable passed as spread into render call', () => {
+  assert.ok(drApiSrc.includes('drSectionPhotos'), 'L3: drSectionPhotos local var present');
+  assert.ok(drApiSrc.includes('sectionPhotos: drSectionPhotos'),
+    'L3: spread into renderDailyReportPdf call (not onto rec)');
+});
+
+test('L4: SR: local srSectionPhotos variable passed as spread into render call', () => {
+  assert.ok(srApiSrc.includes('srSectionPhotos'), 'L4: srSectionPhotos local var present');
+  assert.ok(srApiSrc.includes('sectionPhotos: srSectionPhotos'),
+    'L4: spread into renderSiteReadinessPdf call (not onto rec)');
+});
+
+test('L5: EI path unchanged — EI uses KV blobs and does not import fetchAttachmentPhotos', () => {
+  // EI populates rec.sectionPhotos from its own KV storage (different design, not changed here).
+  assert.ok(eiApiSrc.includes('sectionPhotos'), 'L5: EI still handles sectionPhotos');
+  assert.ok(!eiApiSrc.includes('fetchAttachmentPhotos'),
+    'L5: EI must NOT import fetchAttachmentPhotos (EI uses KV, not SP Graph fetch)');
+});
+
+// ============================================================
+console.log('\n--- M. GRAPH_ID_RE itemId validation in DR cleanAttachments ---');
+
+test('M1: DR cleanAttachments defines and applies GRAPH_ID_RE to itemId', () => {
+  assert.ok(drApiSrc.includes('GRAPH_ID_RE'), 'M1: GRAPH_ID_RE constant defined in DR');
+  assert.ok(drApiSrc.includes('GRAPH_ID_RE.test(rawId)'),
+    'M1: GRAPH_ID_RE applied to itemId before storage');
+});
+
+test('M2: DR GRAPH_ID_RE pattern rejects slash, query-string, and other path chars', () => {
+  // Pattern must match the one in site-readiness.js exactly.
+  assert.ok(drApiSrc.includes('GRAPH_ID_RE = /^[A-Za-z0-9!._'),
+    'M2: GRAPH_ID_RE pattern present in DR source');
+  // Verify the regex behaviour against known good/bad ids.
+  const re = /^[A-Za-z0-9!._\-]{1,300}$/;
+  assert.ok(!re.test('abc/xyz'),   'M2: slash (path traversal) rejected');
+  assert.ok(!re.test('abc?xyz'),   'M2: question mark (query injection) rejected');
+  assert.ok(!re.test('abc xyz'),   'M2: space rejected');
+  assert.ok(!re.test(''),          'M2: empty string rejected');
+  assert.ok( re.test('016ISVH6546BCGQXTIBFFKDG4HC7AZI27B'), 'M2: valid SP item id accepted');
+  assert.ok( re.test('item-k01'), 'M2: dash allowed');
+});
+
+test('M3: SR cleanAttachments already had GRAPH_ID_RE (regression guard)', () => {
+  assert.ok(srApiSrc.includes('GRAPH_ID_RE'), 'M3: GRAPH_ID_RE present in SR');
+  assert.ok(srApiSrc.includes('GRAPH_ID_RE.test(rawId)'), 'M3: applied in SR cleanAttachments');
+});
+
+// ============================================================
+console.log('\n--- N. Per-photo byte cap (MAX_PHOTO_BYTES) ---');
+
+const { MAX_PHOTO_BYTES } = await import(resolve(wt, 'functions/lib/graph.js'));
+const graphSrc = readFileSync(resolve(wt, 'functions/lib/graph.js'), 'utf8');
+
+test('N1: MAX_PHOTO_BYTES exported from graph.js equals 4 MB', () => {
+  assert.equal(MAX_PHOTO_BYTES, 4 * 1024 * 1024, 'N1: MAX_PHOTO_BYTES = 4 MB');
+});
+
+test('N2: clearTimeout(timer) appears AFTER arrayBuffer() (signal active during body read)', () => {
+  const bodyReadIdx   = graphSrc.indexOf('abuf = await resp.arrayBuffer()');
+  const clearAfterIdx = graphSrc.indexOf('clearTimeout(timer); // body fully read');
+  assert.ok(bodyReadIdx > 0,          'N2: arrayBuffer() call in _fetchOnePhoto');
+  assert.ok(clearAfterIdx > bodyReadIdx, 'N2: clearTimeout after body read — timeout covers body');
+});
+
+const nTests = [
+  ['N3: Content-Length > MAX_PHOTO_BYTES causes photo to be skipped (no body read)', async () => {
+    const attachments = [{ bucket: 'photos', name: 'huge.jpg', itemId: 'item-n03' }];
+    let bodyReadCalled = false;
+    const mockFetch = async () => ({
+      ok: true, status: 200,
+      headers: { get: (k) => {
+        const kl = k.toLowerCase();
+        if (kl === 'content-type')   return 'image/jpeg';
+        if (kl === 'content-length') return String(MAX_PHOTO_BYTES + 1);
+        return null;
+      }},
+      arrayBuffer: async () => { bodyReadCalled = true; return new ArrayBuffer(0); },
+    });
+    const result = await fetchAttachmentPhotos('tok', 'drv', attachments, K_BUCKET_MAP,
+      { maxPhotos: 24, timeoutMs: 4000, fetchFn: mockFetch });
+    assert.deepEqual(result, {}, 'N3: oversized Content-Length -> photo skipped');
+    assert.equal(bodyReadCalled, false, 'N3: body NOT read when Content-Length over cap');
+  }],
+
+  ['N4: arrayBuffer.byteLength > MAX_PHOTO_BYTES causes photo to be skipped', async () => {
+    const attachments = [{ bucket: 'photos', name: 'huge2.jpg', itemId: 'item-n04' }];
+    const mockFetch = async () => ({
+      ok: true, status: 200,
+      // No Content-Length header (bypass fast-path check)
+      headers: { get: (k) => k.toLowerCase() === 'content-type' ? 'image/jpeg' : null },
+      arrayBuffer: async () => new ArrayBuffer(MAX_PHOTO_BYTES + 1),
+    });
+    const result = await fetchAttachmentPhotos('tok', 'drv', attachments, K_BUCKET_MAP,
+      { maxPhotos: 24, timeoutMs: 4000, fetchFn: mockFetch });
+    assert.deepEqual(result, {}, 'N4: oversized arrayBuffer -> photo skipped');
+  }],
+
+  ['N5: photo exactly at MAX_PHOTO_BYTES is accepted (boundary check)', async () => {
+    // The minimum-size JPEG still passes when Content-Length == MAX_PHOTO_BYTES exactly.
+    const attachments = [{ bucket: 'photos', name: 'ok.jpg', itemId: 'item-n05' }];
+    const mockFetch = async () => ({
+      ok: true, status: 200,
+      headers: { get: (k) => {
+        const kl = k.toLowerCase();
+        if (kl === 'content-type')   return 'image/jpeg';
+        if (kl === 'content-length') return String(MAX_PHOTO_BYTES); // exactly at limit
+        return null;
+      }},
+      // Return a real JPEG (K_JPEG_BYTES) — the Content-Length matches the cap exactly so it passes.
+      arrayBuffer: async () => K_JPEG_BYTES.buffer,
+    });
+    const result = await fetchAttachmentPhotos('tok', 'drv', attachments, K_BUCKET_MAP,
+      { maxPhotos: 24, timeoutMs: 4000, fetchFn: mockFetch });
+    assert.ok(Array.isArray(result.photos) && result.photos.length === 1,
+      'N5: photo at exact cap boundary is accepted');
+  }],
+];
+
+for (const [name, fn] of nTests) {
+  try {
+    await fn();
+    console.log('  PASS', name);
+    passed++;
+  } catch (e) {
+    console.error('  FAIL', name, '\n      ', e.message);
+    failed++;
+  }
+}
+
+// ============================================================
 console.log(`\n  ${passed} passed, ${failed} failed\n`);
 if (failed) process.exit(1);

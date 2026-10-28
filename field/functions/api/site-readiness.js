@@ -502,20 +502,25 @@ export async function onRequestPost(context) {
       photos:      'photos',
       safety_cert: '6a',
     };
+    // Keep photos in a LOCAL variable — never written onto rec, never stored in
+    // D1, never returned to the browser.  Each photo is up to MAX_PHOTO_BYTES
+    // of base64 data; writing them to rec would bloat D1 rows and leak large
+    // binary blobs to the client response.
+    let srSectionPhotos = {};
     try {
-      rec.sectionPhotos = await fetchAttachmentPhotos(
+      srSectionPhotos = await fetchAttachmentPhotos(
         token, env.SP_DRIVE_ID, rec.attachments,
         SR_PHOTO_BUCKETS,
         { maxPhotos: 24, timeoutMs: 4000 }
       );
     } catch {
-      // fail-soft: sectionPhotos stays undefined -> PDF renders without photos
+      // fail-soft: srSectionPhotos stays {} -> PDF renders without embedded photos
     }
 
-    // 1) Render PDF.
+    // 1) Render PDF. Pass photos in a spread so rec itself is never mutated.
     let pdfBytes, filename;
     try {
-      pdfBytes = renderSiteReadinessPdf(rec);
+      pdfBytes = renderSiteReadinessPdf({ ...rec, sectionPhotos: srSectionPhotos });
       filename = pdfFilename(rec);
     } catch (e) {
       console.error('api/site-readiness submit: pdf render failed:', e && e.message);

@@ -301,14 +301,21 @@ function cleanFutureIssues(input) {
 // only. bucket is constrained to the known upload buckets. Same angle-bracket
 // strip + length caps as every other field; webUrl is bounded to MAX_STR.
 // predrill added R9 (Derek 10/23/2026): predrill highlighted markup photos/PDFs.
+//
+// [SEC MED-02] itemId is validated against GRAPH_ID_RE (same as site-readiness.js)
+// to reject any path-traversal characters ('/', '?', etc.) before the id could
+// be used in a Graph URL. Invalid ids are blanked (ref still stored if name is
+// present, but the id cannot be used for a Graph fetch).
 const VALID_ATTACH_BUCKETS = { handlogs: 1, guhma: 1, photos: 1, predrill: 1 };
+const GRAPH_ID_RE = /^[A-Za-z0-9!._\-]{1,300}$/;
 function cleanAttachments(input) {
   if (!Array.isArray(input)) return [];
   const out = [];
   for (const a of input.slice(0, MAX_ATTACH_ROWS)) {
     if (!a || typeof a !== 'object') continue;
-    const name = s(a.name, MAX_SHORT);
-    const itemId = s(a.itemId, MAX_SHORT);
+    const name   = s(a.name, MAX_SHORT);
+    const rawId  = s(a.itemId, MAX_SHORT);
+    const itemId = GRAPH_ID_RE.test(rawId) ? rawId : '';
     if (!name && !itemId) continue;       // skip wholly empty refs
     const bucketRaw = s(a.bucket, MAX_SHORT);
     const bucket = VALID_ATTACH_BUCKETS[bucketRaw] ? bucketRaw : '';
@@ -526,23 +533,27 @@ export async function onRequestPost(context) {
     }
 
     // Fetch SharePoint photo bytes for 'photos' bucket attachments so the PDF
-    // renderer can embed them.  Fail-soft: never blocks submit; if fetch fails
-    // the PDF still generates (without embedded photos).
+    // renderer can embed them.  Fail-soft: never blocks submit.
+    // IMPORTANT: photos are kept in a LOCAL variable and passed only to the
+    // renderer.  They are NEVER written onto rec, stored in D1, or returned
+    // in the response — each photo is a base64 blob (up to 4 MB per photo).
     // DR photo bucket map: 'photos' attachment bucket -> sectionPhotos key 'photos'.
+    let drSectionPhotos = {};
     try {
-      rec.sectionPhotos = await fetchAttachmentPhotos(
+      drSectionPhotos = await fetchAttachmentPhotos(
         token, env.SP_DRIVE_ID, rec.attachments,
         { photos: 'photos' },
         { maxPhotos: 24, timeoutMs: 4000 }
       );
     } catch {
-      // fail-soft: sectionPhotos stays undefined -> PDF renders without photos
+      // fail-soft: drSectionPhotos stays {} -> PDF renders without embedded photos
     }
 
     // 1) Render the PDF (pure computation; ZERO $).
+    // Pass photos in a spread so rec itself is never mutated.
     let pdfBytes, filename;
     try {
-      pdfBytes = renderDailyReportPdf(rec);
+      pdfBytes = renderDailyReportPdf({ ...rec, sectionPhotos: drSectionPhotos });
       filename = pdfFilename(rec);
     } catch (e) {
       console.error('api/daily-report submit: pdf render failed:', e && e.message);
