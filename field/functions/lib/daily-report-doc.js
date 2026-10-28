@@ -53,7 +53,7 @@ export function renderDailyReportPdf(rec) {
     { label: 'Linear feet installed', value: (rec.lfInstalled != null) ? String(rec.lfInstalled) : '-' },
   ], { valueW: 130 });
 
-  // ---- crew (name + cost code ONLY — hours/time-in/out removed from PDF per Derek 10/28) ----
+  // ---- crew (name + cost code ONLY - hours/time-in/out removed from PDF per Derek 10/28) ----
   doc.heading('Crew');
   const crew = Array.isArray(rec.crew) ? rec.crew.filter((c) => c && c.name) : [];
   if (crew.length) {
@@ -134,7 +134,9 @@ export function renderDailyReportPdf(rec) {
       };
     });
     if (hasDowntime) {
-      delayRows.push({ label: 'Total downtime', value: `${Math.round(totalDowntime * 10) / 10} hr` });
+      // Round to 2dp (same precision as per-entry lines) so 0.75+0.75=1.5, not 1 or 1.50.
+      const totalRounded = Math.round(totalDowntime * 100) / 100;
+      delayRows.push({ label: 'Total downtime', value: `${totalRounded} hr` });
     }
     doc.table(delayRows, { valueW: 110 });
   } else {
@@ -311,7 +313,10 @@ export function buildEmailBody(rec) {
     });
     lines.push('Delays:');
     parts.forEach((p) => lines.push('  - ' + p));
-    if (hasDowntime) lines.push(`  Total downtime: ${Math.round(totalDowntime * 10) / 10} hr`);
+    if (hasDowntime) {
+      const totalRounded = Math.round(totalDowntime * 100) / 100;
+      lines.push(`  Total downtime: ${totalRounded} hr`);
+    }
   }
   if (rec.safety && rec.safety.trim()) lines.push(`Safety: ${rec.safety.trim().slice(0, 200)}`);
   lines.push('');

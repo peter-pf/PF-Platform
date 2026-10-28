@@ -9,7 +9,7 @@
 //   actions, attendees (JSON), status, pdf_name, pdf_web_url,
 //   emailed_to (JSON), sent_at, created_by, created_at, updated_at, updated_by
 
-export const KV_KEY = null; // D1 only — no KV
+export const KV_KEY = null; // D1 only - no KV
 
 // Toolbox Talk presenter options (mirrors INSPECTED_BY_OPTIONS in EI store).
 export const PRESENTER_OPTIONS = ['John Willis', 'Seth Willis', 'Christian Boutte', 'Jordan Lemay'];

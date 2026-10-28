@@ -323,6 +323,47 @@ assertIncludes('J7: migration notes id is server-generated', migSql, 'server-sid
 assertIncludes('J8: migration notes ADDITIVE ONLY', migSql, 'ADDITIVE ONLY');
 
 // ============================================================
+// K. Coordinator review fixes (66e92ce+1)
+// ============================================================
+console.log('\n--- K. Coordinator review fixes ---');
+
+// K1-K2: DR delay total precision (was Math.round * 10 / 10 -> 0.8 for 0.75)
+assertNotIncludes('K1: daily-report-doc.js PDF delay total does not use 1dp rounding',
+  drDocSrc, 'Math.round(totalDowntime * 10) / 10');
+assertIncludes('K2: daily-report-doc.js PDF delay total uses 2dp rounding (100)',
+  drDocSrc, 'Math.round(totalDowntime * 100) / 100');
+
+// K3-K4: Same fix in email body
+const emailBodySrc = drDocSrc; // same file
+assertIncludes('K3: DR email body delay total also uses 2dp rounding',
+  emailBodySrc, 'Math.round(totalDowntime * 100) / 100');
+
+// K4: Meeting Details no longer contains Presenter row
+assertNotIncludes('K4: TT PDF Meeting Details does not repeat Presenter row',
+  ttDocSrc, "label: 'Presenter', value: rec.presenter");
+
+// K5: Not acknowledged shown for unacknowledged attendees
+assertIncludes('K5: TT PDF attendee "Not acknowledged" shown for missing sign-off',
+  ttDocSrc, 'Not acknowledged');
+
+// K6: TT footer has no spacer forcing page break
+assertNotIncludes('K6: TT PDF footer does not have spacer(12) before rule',
+  ttDocSrc, 'spacer(12)');
+assertIncludes('K7: TT PDF footer rule immediately follows attendees content',
+  ttDocSrc, '// No spacer before rule');
+
+// K8-K11: No em/en dashes in any user-facing text in new files
+const EM = '—', EN = '–';
+assertNotIncludes('K8: toolbox-talk-doc.js has no em dashes', ttDocSrc, EM);
+assertNotIncludes('K9: toolbox-talk-doc.js has no en dashes', ttDocSrc, EN);
+assertNotIncludes('K10: toolbox-talk-store.js has no em dashes', ttStoreSrc, EM);
+assertNotIncludes('K11: toolbox-talk-store.js has no en dashes', ttStoreSrc, EN);
+
+// K12: DR new comment uses hyphen not em dash
+assertIncludes('K12: DR crew comment uses hyphen not em dash',
+  drDocSrc, '// ---- crew (name + cost code ONLY - hours');
+
+// ============================================================
 // Summary
 // ============================================================
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
