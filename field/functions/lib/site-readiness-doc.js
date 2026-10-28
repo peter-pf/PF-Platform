@@ -112,23 +112,45 @@ export function renderSiteReadinessPdf(rec) {
   for (const sec of sections) {
     doc.heading(sec.label);
     for (const def of sec.items) {
-      const item   = (rec.items || []).find((it) => it && it.key === def.key);
-      const answer = (item && item.answer) ? String(item.answer) : '-';
-      const note   = (item && item.note && String(item.note).trim()) ? String(item.note).trim() : '';
-      // Single-item table call per row so the separator appears at the right place
-      // even when a note follows.  The note uses doc.text() which word-wraps
-      // correctly for 200+ char strings — fixing the overlay reported by Derek.
-      doc.table([{ label: `${def.key}. ${def.label}`, value: answer }], { valueW: 60 });
+      const item       = (rec.items || []).find((it) => it && it.key === def.key);
+      const answer     = (item && item.answer) ? String(item.answer) : '-';
+      const note       = (item && item.note && String(item.note).trim()) ? String(item.note).trim() : '';
+      const itemPhotos = Array.isArray(sectionPhotos[def.key]) ? sectionPhotos[def.key] : [];
+      const hasPhotos  = itemPhotos.length > 0;
+
+      // table() renders the item row with right-aligned value.
+      // noDivider suppresses the built-in separator so we can draw it AFTER
+      // the note and photos that belong to this item — not between item and note.
+      doc.table([{ label: `${def.key}. ${def.label}`, value: answer }], {
+        valueW:    60,
+        noDivider: note || hasPhotos,
+      });
+
       if (note) {
         doc.text('Note: ' + note, { size: 9, color: PF.secondary, indent: 16 });
       }
-    }
-    // Embed photos for this section keyed by item key (photo_3a → key '3a', etc.).
-    const secPhotos = _collectSectionPhotos(sectionPhotos, sec.items);
-    if (secPhotos.length) {
-      doc.embedPhotos(secPhotos);
+      if (hasPhotos) {
+        // Small caption ("3a photos") above the grid so each photo group is labelled.
+        doc.text(`${def.key} photos`, { size: 8.5, color: PF.secondary, bold: true });
+        doc.embedPhotos(itemPhotos);
+      }
+      // Draw the separator AFTER the note/photos so it sits at the bottom of the
+      // complete item block — not between the row and its own note.
+      if (note || hasPhotos) {
+        doc.cur.push(
+          `0.784 0.835 0.863 RG 0.5 w 54.00 ${doc.y.toFixed(2)} m 558.00 ${doc.y.toFixed(2)} l S`
+        );
+      }
     }
     doc.spacer(2);
+  }
+
+  // Generic "Site Photos" bucket (Section 7 / bucket 'photos') — rendered after
+  // the checklist sections so they don't interrupt the item flow.
+  const genericPhotos = Array.isArray(sectionPhotos['photos']) ? sectionPhotos['photos'] : [];
+  if (genericPhotos.length) {
+    doc.heading('Site Photos');
+    doc.embedPhotos(genericPhotos);
   }
 
   // Gather all attachment refs up front (used in 4b/ops sections and the summary).

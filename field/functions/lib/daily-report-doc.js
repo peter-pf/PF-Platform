@@ -29,7 +29,10 @@ function fmtDate(s) {
 // ---------------------------------------------------------------------------
 export function renderDailyReportPdf(rec) {
   const doc = new PdfDoc();
-  const weather = [rec.precipitation, rec.temp].filter(Boolean).join('  ');
+  const weather = [rec.precipitation, rec.temp]
+    .map((v) => (v != null ? String(v).trim() : ''))
+    .filter(Boolean)
+    .join(' ');
   // Azure masthead: LEFT = wordmark/tagline/title, RIGHT = labeled job-info block.
   // Derek: put the categories (with text labels) in the header, project number
   // AMONG them (after the named fields). This block replaces the old duplicate

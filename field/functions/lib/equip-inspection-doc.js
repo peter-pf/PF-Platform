@@ -77,9 +77,31 @@ const THUMB_GAP_Y    = PHOTO_THUMB_GAP_Y;  // 8pt vertical gap
 const MAX_THUMB_H    = PHOTO_MAX_THUMB_H;  // 200pt cap
 const THUMBS_PER_ROW = PHOTO_PER_ROW;      // 2
 
-// embedSectionPhotos → now delegates to doc.embedPhotos() (shared PdfDoc method).
+// Embed section photos. Entries with p.unavailable=true or missing data emit
+// "Photo unavailable" text (fail-soft). Per-photo errors are caught so one bad
+// image never prevents the rest from rendering. Valid entries are batched and
+// passed to doc.embedPhotos() in runs.
 function embedSectionPhotos(doc, photos) {
-  doc.embedPhotos(photos);
+  if (!photos || !photos.length) return;
+  const valid = [];
+  const flushValid = () => {
+    if (valid.length) {
+      try {
+        doc.embedPhotos(valid.splice(0));
+      } catch {
+        doc.text('Photo unavailable', { size: 8.5, color: PF.secondary, indent: 8 });
+      }
+    }
+  };
+  for (const p of photos) {
+    if (!p || p.unavailable || !p.data) {
+      flushValid();
+      doc.text('Photo unavailable', { size: 8.5, color: PF.secondary, indent: 8 });
+    } else {
+      valid.push(p);
+    }
+  }
+  flushValid();
 }
 
 export function renderEquipInspectionPdf(rec) {
@@ -136,10 +158,17 @@ export function renderEquipInspectionPdf(rec) {
   if (attention.length) {
     doc.heading('Deficiencies Summary');
     for (const it of attention) {
-      const def   = CHECKLIST_ITEMS.find((d) => d.key === it.key);
+      const def  = CHECKLIST_ITEMS.find((d) => d.key === it.key);
       const label = def ? def.label : it.key;
-      doc.row(label, it.answer, { size: 9.5, rightW: 95, rightColor: RED });
-      if (it.note) doc.text('Note: ' + it.note, { size: 8.5, color: PF.secondary, indent: 16 });
+      const note  = it.note ? String(it.note).trim() : '';
+      // divider goes AFTER the note (same rule as main checklist section below)
+      doc.row(label, it.answer, { size: 9.5, rightW: 95, rightColor: RED, divider: !note });
+      if (note) {
+        doc.text('Note: ' + note, { size: 8.5, color: PF.secondary, indent: 16 });
+        doc.cur.push(
+          `0.784 0.835 0.863 RG 0.5 w ${MARGIN}.00 ${doc.y.toFixed(2)} m ${(612 - MARGIN)}.00 ${doc.y.toFixed(2)} l S`
+        );
+      }
     }
     doc.spacer(4);
   }

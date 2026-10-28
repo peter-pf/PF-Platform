@@ -54,7 +54,7 @@
 //     NEVER silently dropped.
 
 import { requireArea } from '../lib/auth.js';
-import { graphConfigured, getGraphToken } from '../lib/graph.js';
+import { graphConfigured, getGraphToken, fetchAttachmentPhotos } from '../lib/graph.js';
 import {
   renderDailyReportPdf, pdfFilename,
   sendReportEmail, buildEmailBody, uploadReportPdf,
@@ -523,6 +523,20 @@ export async function onRequestPost(context) {
     } catch (e) {
       console.error('api/daily-report submit: token mint failed:', e && e.message);
       return json({ status: 'error', message: 'Submit failed: could not reach the mail/SharePoint service. Your draft is saved.' }, 502);
+    }
+
+    // Fetch SharePoint photo bytes for 'photos' bucket attachments so the PDF
+    // renderer can embed them.  Fail-soft: never blocks submit; if fetch fails
+    // the PDF still generates (without embedded photos).
+    // DR photo bucket map: 'photos' attachment bucket -> sectionPhotos key 'photos'.
+    try {
+      rec.sectionPhotos = await fetchAttachmentPhotos(
+        token, env.SP_DRIVE_ID, rec.attachments,
+        { photos: 'photos' },
+        { maxPhotos: 24, timeoutMs: 4000 }
+      );
+    } catch {
+      // fail-soft: sectionPhotos stays undefined -> PDF renders without photos
     }
 
     // 1) Render the PDF (pure computation; ZERO $).

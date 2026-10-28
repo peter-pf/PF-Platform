@@ -593,5 +593,122 @@ test('J5: SR pre-R11 record still renders', () => {
 });
 
 // ============================================================
+console.log('\n--- K. fetchAttachmentPhotos (live data path) ---');
+
+const { fetchAttachmentPhotos } = await import(resolve(wt, 'functions/lib/graph.js'));
+
+// --- K mock helpers ---
+
+// Decode MINI_JPEG_B64 to a fresh Uint8Array (byteOffset=0).
+const K_JPEG_BYTES = new Uint8Array(Buffer.from(MINI_JPEG_B64, 'base64'));
+
+function kMockJpeg() {
+  return {
+    ok: true,
+    status: 200,
+    headers: { get: (k) => k.toLowerCase() === 'content-type' ? 'image/jpeg' : null },
+    arrayBuffer: async () => K_JPEG_BYTES.buffer,
+  };
+}
+
+function kMock404() {
+  return { ok: false, status: 404, headers: { get: () => null }, arrayBuffer: async () => new ArrayBuffer(0) };
+}
+
+function kMockNonImage() {
+  return { ok: true, status: 200, headers: { get: () => 'application/pdf' }, arrayBuffer: async () => new ArrayBuffer(0) };
+}
+
+const K_BUCKET_MAP = { photos: 'photos' };
+
+// Run async K tests via top-level await (ESM module already uses top-level await).
+const kTests = [
+  ['K1: success: attachment with known bucket returns data/w/h entry', async () => {
+    const attachments = [{ bucket: 'photos', name: 'site.jpg', itemId: 'item-k01' }];
+    const result = await fetchAttachmentPhotos('tok', 'drv', attachments, K_BUCKET_MAP,
+      { maxPhotos: 24, timeoutMs: 4000, fetchFn: async () => kMockJpeg() });
+    assert.ok(Array.isArray(result.photos) && result.photos.length === 1, 'K1: photos[0] present');
+    assert.ok(result.photos[0].data.startsWith('data:image/jpeg;'), 'K1: data URL correct');
+    assert.ok(result.photos[0].w > 0 && result.photos[0].h > 0, 'K1: dims populated');
+  }],
+
+  ['K2: 404 on thumbnail falls back to /content and succeeds', async () => {
+    const attachments = [{ bucket: 'photos', name: 'site.jpg', itemId: 'item-k02' }];
+    const result = await fetchAttachmentPhotos('tok', 'drv', attachments, K_BUCKET_MAP,
+      { maxPhotos: 24, timeoutMs: 4000, fetchFn: async (url) =>
+          url.includes('/thumbnails/') ? kMock404() : kMockJpeg() });
+    assert.ok(result.photos?.length === 1, 'K2: fallback to /content worked');
+  }],
+
+  ['K3: fetch throw (timeout / network error) is fail-soft -> empty sectionPhotos', async () => {
+    const attachments = [{ bucket: 'photos', name: 'site.jpg', itemId: 'item-k03' }];
+    const result = await fetchAttachmentPhotos('tok', 'drv', attachments, K_BUCKET_MAP,
+      { maxPhotos: 24, timeoutMs: 4000, fetchFn: async () => { throw new Error('network timeout'); } });
+    assert.deepEqual(result, {}, 'K3: timeout -> empty {}');
+  }],
+
+  ['K4: non-image content-type (pdf) is silently skipped', async () => {
+    const attachments = [{ bucket: 'photos', name: 'doc.pdf', itemId: 'item-k04' }];
+    const result = await fetchAttachmentPhotos('tok', 'drv', attachments, K_BUCKET_MAP,
+      { maxPhotos: 24, timeoutMs: 4000, fetchFn: async () => kMockNonImage() });
+    assert.deepEqual(result, {}, 'K4: non-image -> empty {}');
+  }],
+
+  ['K5: empty attachments array returns {}', async () => {
+    const result = await fetchAttachmentPhotos('tok', 'drv', [],
+      K_BUCKET_MAP, { fetchFn: async () => { throw new Error('should not call'); } });
+    assert.deepEqual(result, {}, 'K5: empty attachments -> {}');
+  }],
+
+  ['K6: attachment with unknown bucket is skipped (fetch never called)', async () => {
+    const attachments = [{ bucket: 'handlogs', name: 'log.pdf', itemId: 'item-k06' }];
+    let called = false;
+    await fetchAttachmentPhotos('tok', 'drv', attachments,
+      { photos: 'photos' }, // 'handlogs' not in map
+      { maxPhotos: 24, timeoutMs: 4000, fetchFn: async () => { called = true; return kMockJpeg(); } });
+    assert.equal(called, false, 'K6: unknown bucket -> no fetch');
+  }],
+
+  ['K7: multiple attachments with multiple SR buckets map to correct item keys', async () => {
+    const attachments = [
+      { bucket: 'grade_photo',   name: 'grade.jpg',  itemId: 'k-10' },
+      { bucket: 'photos',        name: 'site.jpg',   itemId: 'k-11' },
+      { bucket: 'sr_markup',     name: 'markup.jpg', itemId: 'k-12' },
+      { bucket: 'handlogs',      name: 'log.pdf',    itemId: 'k-13' }, // no mapping -> skip
+    ];
+    const SR_MAP = { grade_photo: '3a', photos: 'photos', sr_markup: '5d' };
+    const result = await fetchAttachmentPhotos('tok', 'drv', attachments, SR_MAP,
+      { maxPhotos: 24, timeoutMs: 4000, fetchFn: async () => kMockJpeg() });
+    assert.equal(result['3a']?.length, 1,      'K7: grade_photo -> 3a');
+    assert.equal(result['photos']?.length, 1,  'K7: photos -> photos');
+    assert.equal(result['5d']?.length, 1,      'K7: sr_markup -> 5d');
+    assert.equal(result['handlogs'], undefined, 'K7: handlogs not in result');
+  }],
+
+  ['K8: null/missing itemId entries in attachments are skipped', async () => {
+    const attachments = [
+      { bucket: 'photos', name: 'ok.jpg',     itemId: 'item-k08' },
+      { bucket: 'photos', name: 'bad.jpg',    itemId: null },      // no itemId
+      { bucket: 'photos', name: 'bad2.jpg' },                       // missing itemId
+      null,                                                           // null entry
+    ];
+    const result = await fetchAttachmentPhotos('tok', 'drv', attachments, K_BUCKET_MAP,
+      { maxPhotos: 24, timeoutMs: 4000, fetchFn: async () => kMockJpeg() });
+    assert.equal(result.photos?.length, 1, 'K8: only valid itemId fetched');
+  }],
+];
+
+for (const [name, fn] of kTests) {
+  try {
+    await fn();
+    console.log('  PASS', name);
+    passed++;
+  } catch (e) {
+    console.error('  FAIL', name, '\n      ', e.message);
+    failed++;
+  }
+}
+
+// ============================================================
 console.log(`\n  ${passed} passed, ${failed} failed\n`);
 if (failed) process.exit(1);

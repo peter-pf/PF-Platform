@@ -29,7 +29,7 @@
 // D1: table site_readiness (migration 0006_site_readiness.sql).
 
 import { requireArea } from '../lib/auth.js';
-import { graphConfigured, getGraphToken } from '../lib/graph.js';
+import { graphConfigured, getGraphToken, fetchAttachmentPhotos } from '../lib/graph.js';
 import {
   renderSiteReadinessPdf, pdfFilename,
   sendSiteReadinessEmail, buildEmailBody, uploadSiteReadinessPdf,
@@ -482,6 +482,34 @@ export async function onRequestPost(context) {
       console.error('api/site-readiness submit: token mint failed:', e && e.message);
       return json({ status: 'error',
         message: 'Submit failed: could not reach the mail/SharePoint service. Your draft is saved.' }, 502);
+    }
+
+    // Fetch SharePoint photo bytes for all photo-bucket attachments so the PDF
+    // renderer can embed them inline.  Fail-soft: never blocks submit.
+    // Mapping: attachment bucket name -> sectionPhotos key used by site-readiness-doc.js.
+    // Keyed to checklist item key (1a, 3a, etc.) for per-item photo placement,
+    // plus 'photos' for the generic site photos bucket (Section 7).
+    const SR_PHOTO_BUCKETS = {
+      photo_1a:    '1a',
+      photo_1b:    '1b',
+      photo_1c:    '1c',
+      grade_photo: '3a',
+      proof_roll:  '3d',
+      staking_photo: '3e',
+      photo_4b:    '4b',
+      photo_4c:    '4c',
+      sr_markup:   '5d',
+      photos:      'photos',
+      safety_cert: '6a',
+    };
+    try {
+      rec.sectionPhotos = await fetchAttachmentPhotos(
+        token, env.SP_DRIVE_ID, rec.attachments,
+        SR_PHOTO_BUCKETS,
+        { maxPhotos: 24, timeoutMs: 4000 }
+      );
+    } catch {
+      // fail-soft: sectionPhotos stays undefined -> PDF renders without photos
     }
 
     // 1) Render PDF.

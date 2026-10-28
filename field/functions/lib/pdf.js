@@ -204,7 +204,7 @@ export class PdfDoc {
     this.pages = [];
     this.cur = null;
     this.y = 0;
-    this._dynImages = []; // [{kind, ...}] -- registered via addImage() / addJpeg()
+    this._dynJpegs = []; // [{kind, ...}] -- registered via addImage() / addJpeg()
     this._newPage();
   }
 
@@ -224,14 +224,14 @@ export class PdfDoc {
     }
     if (!b64) return -1;
     if (mime === 'image/jpeg' || mime === 'image/jpg') {
-      this._dynImages.push({ kind: 'jpeg', b64, w: Math.max(w || 1, 1), h: Math.max(h || 1, 1) });
-      return this._dynImages.length - 1;
+      this._dynJpegs.push({ kind: 'jpeg', b64, w: Math.max(w || 1, 1), h: Math.max(h || 1, 1) });
+      return this._dynJpegs.length - 1;
     }
     if (mime === 'image/png') {
       const parsed = _parsePng(b64);
       if (!parsed) return -1;
-      this._dynImages.push(parsed);
-      return this._dynImages.length - 1;
+      this._dynJpegs.push(parsed);
+      return this._dynJpegs.length - 1;
     }
     return -1; // unsupported MIME type
   }
@@ -705,7 +705,11 @@ export class PdfDoc {
 
       // thin grey separator LINE under each data row (#C8D5DC, 0.5pt) -- the sole
       // row delineation now that the zebra fill is removed.
-      this.cur.push(`${col(PF.border)} RG 0.5 w ${MARGIN.toFixed(2)} ${rowBot.toFixed(2)} m ${(PAGE_W - MARGIN).toFixed(2)} ${rowBot.toFixed(2)} l S`);
+      // opts.noDivider suppresses the separator so callers can draw it manually
+      // AFTER a note or photo block that belongs to this row.
+      if (!opts.noDivider) {
+        this.cur.push(`${col(PF.border)} RG 0.5 w ${MARGIN.toFixed(2)} ${rowBot.toFixed(2)} m ${(PAGE_W - MARGIN).toFixed(2)} ${rowBot.toFixed(2)} l S`);
+      }
 
       this.y = rowBot;
     }
@@ -805,7 +809,7 @@ export class PdfDoc {
     }
     // ---- dynamic image XObjects (/DImg0, /DImg1, ...) -- JPEG + PNG ---------
     const dynImgNums = [];
-    for (const img of this._dynImages) {
+    for (const img of this._dynJpegs) {
       if (img.kind === 'jpeg') {
         const jpgBytes = base64ToBytes(img.b64);
         const n = pushBin(objects, push,
