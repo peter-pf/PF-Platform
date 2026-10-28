@@ -575,10 +575,9 @@ function ttSave(submit){
       ttState.status = d.status || 'draft';
       if (submit) {
         ttState.status = 'submitted';
-        var okMsg = 'Submitted.';
-        if (d.pdfWebUrl) okMsg += ' <a href="' + d.pdfWebUrl + '" target="_blank" rel="noopener">View PDF</a>';
-        if (d.emailedTo && d.emailedTo.length) okMsg += ' Emailed to ' + d.emailedTo.join(', ') + '.';
-        ttShowMsg(okMsg, 'ok');
+        // Build submit message with DOM APIs - never via innerHTML string concat
+        // so that pdfWebUrl cannot be used for XSS even if the server returns a bad value.
+        ttShowSubmitMsg(d.pdfWebUrl, d.emailedTo);
         document.getElementById('ttSaveBtn').disabled   = true;
         document.getElementById('ttSubmitBtn').disabled = true;
         document.getElementById('ttNewBtn').style.display = '';
@@ -603,6 +602,30 @@ function ttShowMsg(html, type){
   if (!el) return;
   el.className = 'tt-' + (type || 'muted');
   el.innerHTML = html;
+  el.style.display = '';
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// Build the "Submitted." message using DOM APIs so pdfWebUrl never reaches innerHTML.
+// Server-side also validates https-only, but defense in depth applies client-side too.
+function ttShowSubmitMsg(pdfWebUrl, emailedTo) {
+  var el = document.getElementById('ttMsg');
+  if (!el) return;
+  el.className = 'tt-ok';
+  while (el.firstChild) el.removeChild(el.firstChild);
+  el.appendChild(document.createTextNode('Submitted.'));
+  if (pdfWebUrl && /^https:\/\//i.test(String(pdfWebUrl))) {
+    el.appendChild(document.createTextNode(' '));
+    var a = document.createElement('a');
+    a.href = String(pdfWebUrl);
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.textContent = 'View PDF';
+    el.appendChild(a);
+  }
+  if (emailedTo && emailedTo.length) {
+    el.appendChild(document.createTextNode(' Emailed to ' + emailedTo.join(', ') + '.'));
+  }
   el.style.display = '';
   el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
@@ -635,9 +658,8 @@ function ttLoadRecord(rec){
     document.getElementById('ttSubmitBtn').disabled = true;
     document.getElementById('ttNewBtn').style.display = '';
     ttMarkSaved('Submitted');
-    if (rec.pdfWebUrl) {
-      ttShowMsg('Submitted. <a href="' + rec.pdfWebUrl + '" target="_blank" rel="noopener">View PDF</a>', 'ok');
-    }
+    // Use DOM-based helper so pdfWebUrl never reaches innerHTML.
+    ttShowSubmitMsg(rec.pdfWebUrl, null);
   } else {
     ttMarkSaved('Draft loaded');
   }

@@ -51,12 +51,21 @@ export async function onRequestGet(context) {
       return json({ ok: true, reports: [], note: 'No data store available.' });
     }
 
-    // Load all three record types in parallel.
-    const [drResult, srResult, ttResult] = await Promise.all([
+    // Load DR and SR in parallel. These are well-established; if either fails the
+    // outer try/catch returns 500, which is intentional (core data unavailable).
+    const [drResult, srResult] = await Promise.all([
       listReports(env, {}),
       listSrRecords(env, {}),
-      listTtRecords(env, {}),
     ]);
+
+    // TT is isolated: migration may not yet be applied in all environments.
+    // If TT errors for any reason, log it and return no TT rows so DR/SR still list.
+    let ttResult = null;
+    try {
+      ttResult = await listTtRecords(env, {});
+    } catch (e) {
+      console.error('api/past-reports: TT list failed, returning no TT rows:', e && e.message);
+    }
 
     // Visibility rule:
     //   SENT records  -> visible to ALL field_ops (including field crew).

@@ -221,7 +221,11 @@ export async function onRequest(context) {
       if (rec.status === 'draft' && rec.createdBy !== uid && session.role !== 'admin') {
         return jsonErr('Not found', 404);
       }
-      return json({ ok: true, record: rec });
+      // Sanitize pdfWebUrl: must be https:// or null (matches past-reports.js pattern).
+      const safeRec = Object.assign({}, rec, {
+        pdfWebUrl: /^https:\/\//i.test(String(rec.pdfWebUrl || '')) ? rec.pdfWebUrl : null,
+      });
+      return json({ ok: true, record: safeRec });
     }
     const projectId = url.searchParams.get('projectId') || undefined;
     const date      = url.searchParams.get('date')      || undefined;
@@ -234,7 +238,10 @@ export async function onRequest(context) {
       if (r.status === 'submitted') return true;
       if (isAdmin) return true;
       return r.createdBy === uid;
-    });
+    }).map((r) => Object.assign({}, r, {
+      // Sanitize pdfWebUrl: must be https:// or null.
+      pdfWebUrl: /^https:\/\//i.test(String(r.pdfWebUrl || '')) ? r.pdfWebUrl : null,
+    }));
     return json({ ok: true, records: filtered });
   }
 

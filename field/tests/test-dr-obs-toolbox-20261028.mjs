@@ -7,6 +7,8 @@
 //   E. Toolbox Talk API handler (toolbox-talk.js)
 //   F. auth.js areaForPath additions (/api/toolbox-talk, /toolbox-talk.html)
 //   G. past-reports.js includes TT records
+//   K. Coordinator review fixes (66e92ce+1)
+//   L. Verifier hardening (b7eaac2+1): TT isolation + pdfWebUrl XSS defense
 //
 // Run: node tests/test-dr-obs-toolbox-20261028.mjs
 
@@ -362,6 +364,77 @@ assertNotIncludes('K11: toolbox-talk-store.js has no en dashes', ttStoreSrc, EN)
 // K12: DR new comment uses hyphen not em dash
 assertIncludes('K12: DR crew comment uses hyphen not em dash',
   drDocSrc, '// ---- crew (name + cost code ONLY - hours');
+
+// ============================================================
+// L. Verifier hardening (b7eaac2+1)
+// ============================================================
+console.log('\n--- L. Verifier hardening: TT isolation + pdfWebUrl XSS defense ---');
+
+// L1: past-reports.js TT is NOT inside the same Promise.all as DR/SR.
+// The fix separates TT into its own try/catch so a missing table cannot 500 everyone.
+// Verify that the Promise.all call only destructs two results ([drResult, srResult]).
+assertNotIncludes('L1: past-reports.js Promise.all does not destruct three results including TT',
+  pastRepSrc, '[drResult, srResult, ttResult] = await Promise.all');
+// Verify TT is called outside Promise.all (after the parallel fetch).
+assertIncludes('L2: past-reports.js wraps listTtRecords in its own try/catch block',
+  pastRepSrc, 'try {\n      ttResult = await listTtRecords');
+
+// L3: past-reports.js logs the error when TT fails so ops can see it.
+assertIncludes('L3: past-reports.js logs TT list failure',
+  pastRepSrc, 'TT list failed');
+
+// L4: Functional test - TT throws, DR/SR still produce records.
+// This simulates the isolation pattern from past-reports.js directly.
+{
+  async function runWithTtError() {
+    const drResult = { reports: [{ id: 'dr1', date: '2026-10-28', status: 'sent', createdBy: 'u1' }] };
+    const srResult = { records: [{ id: 'sr1', date: '2026-10-28', status: 'sent', createdBy: 'u1' }] };
+    async function listTtThrows() { throw new Error('no such table: toolbox_talks'); }
+
+    // Same pattern as the fixed past-reports.js handler.
+    const [dr, sr] = await Promise.all([
+      Promise.resolve(drResult),
+      Promise.resolve(srResult),
+    ]);
+    let ttResult = null;
+    try { ttResult = await listTtThrows(); } catch (e) { /* isolated */ }
+
+    const drRecs = Array.isArray(dr.reports)  ? dr.reports  : [];
+    const srRecs = Array.isArray(sr.records)  ? sr.records  : [];
+    const ttRecs = ttResult && Array.isArray(ttResult.records) ? ttResult.records : [];
+    return { dr: drRecs.length, sr: srRecs.length, tt: ttRecs.length };
+  }
+  const counts = await runWithTtError();
+  assertEq('L4: when TT throws, DR records still returned', counts.dr, 1);
+  assertEq('L5: when TT throws, SR records still returned', counts.sr, 1);
+  assertEq('L6: when TT throws, TT rows are empty (not propagated as error)', counts.tt, 0);
+}
+
+// L7: toolbox-talk.js GET single-record sanitizes pdfWebUrl (https-only).
+assertIncludes('L7: toolbox-talk.js GET single-record sanitizes pdfWebUrl to null if not https',
+  ttApiSrc, 'pdfWebUrl: /^https:\\/\\//i.test(String(rec.pdfWebUrl');
+
+// L8: toolbox-talk.js GET list sanitizes pdfWebUrl in each mapped record.
+assertIncludes('L8: toolbox-talk.js GET list sanitizes pdfWebUrl in .map()',
+  ttApiSrc, 'pdfWebUrl: /^https:\\/\\//i.test(String(r.pdfWebUrl');
+
+// L9: toolbox-talk.html does NOT build pdfWebUrl into an innerHTML string (old pattern removed).
+assertNotIncludes('L9: toolbox-talk.html does not concat pdfWebUrl into innerHTML href string',
+  ttHtmlSrc, '"<a href=\\" + d.pdfWebUrl');
+assertNotIncludes('L10: toolbox-talk.html does not concat rec.pdfWebUrl into innerHTML href string',
+  ttHtmlSrc, '"<a href=\\" + rec.pdfWebUrl');
+
+// L11: toolbox-talk.html has the DOM-safe helper function.
+assertIncludes('L11: toolbox-talk.html defines ttShowSubmitMsg DOM-safe helper',
+  ttHtmlSrc, 'function ttShowSubmitMsg');
+
+// L12: DOM helper validates https:// client-side before building the link.
+assertIncludes('L12: ttShowSubmitMsg validates pdfWebUrl is https:// before building link',
+  ttHtmlSrc, '/^https:\\/\\//i.test(String(pdfWebUrl))');
+
+// L13: DOM helper uses createElement, not innerHTML, for the anchor.
+assertIncludes('L13: ttShowSubmitMsg uses createElement for the PDF anchor',
+  ttHtmlSrc, "document.createElement('a')");
 
 // ============================================================
 // Summary
