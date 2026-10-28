@@ -306,7 +306,7 @@ function cleanFutureIssues(input) {
 // to reject any path-traversal characters ('/', '?', etc.) before the id could
 // be used in a Graph URL. Invalid ids are blanked (ref still stored if name is
 // present, but the id cannot be used for a Graph fetch).
-const VALID_ATTACH_BUCKETS = { handlogs: 1, guhma: 1, photos: 1, predrill: 1 };
+const VALID_ATTACH_BUCKETS = { handlogs: 1, guhma: 1, photos: 1, predrill: 1, obs_photos: 1 };
 const GRAPH_ID_RE = /^[A-Za-z0-9!._\-]{1,300}$/;
 function cleanAttachments(input) {
   if (!Array.isArray(input)) return [];
@@ -417,6 +417,9 @@ export async function onRequestPost(context) {
           if (legacyStr.trim()) return [{ description: legacyStr, downtimeHours: null }];
           return [];
         })(),
+        // R_OBS: general site observations (new section 6, between Delays and Safety).
+        // Backward-compatible: old records that lack this field have it set to ''.
+        siteObservations: s(src.siteObservations != null ? src.siteObservations : (base.siteObservations || ''), MAX_STR),
         safety: s(src.safety != null ? src.safety : base.safety, MAX_STR),
         // ---- structured fleet/maintenance fields (HOURS = operating hours, NO $) ----
         equipmentOwned: (src.equipmentOwned != null) ? cleanEquipmentOwned(src.equipmentOwned) : (base.equipmentOwned || []),
@@ -542,7 +545,7 @@ export async function onRequestPost(context) {
     try {
       drSectionPhotos = await fetchAttachmentPhotos(
         token, env.SP_DRIVE_ID, rec.attachments,
-        { photos: 'photos' },
+        { photos: 'photos', obs_photos: 'obs_photos' },
         { maxPhotos: 24, timeoutMs: 4000 }
       );
     } catch {

@@ -550,6 +550,13 @@ const FIELD_PAGES = {
   // /api/cost-codes handler and never appear in the field_ops session's page.
   '/cost-codes.html':        'field_ops',
   '/cost-codes':             'field_ops',           // CF Pages clean-URL form
+  // Toolbox Talk safety meeting sign-in form (Derek, 2026-10-28). field_ops area =
+  // admin/partner/business_dev/field_ops so the crew can reach the form. ZERO
+  // financials (safety meeting content, attendees only). Without this entry the
+  // SENSITIVE_NAME_RE heuristic does NOT match "toolbox-talk", so it falls to
+  // default-deny (admin-only) — blocking every field crew member. Added explicitly.
+  '/toolbox-talk.html':      'field_ops',
+  '/toolbox-talk':           'field_ops',           // CF Pages clean-URL form
   // Time Off page — request form and own request history (field_ops area =
   // admin/partner/business_dev/field_ops so the crew can reach the form).
   // ZERO financials.
@@ -647,11 +654,17 @@ export function areaForPath(pathname) {
     // Without this line it falls to default-deny (admin-only) via the sensitive-
     // name heuristic matching "weather". The handler ALSO calls requireArea.
     if (pathname.startsWith('/api/weather'))        return 'field_ops';
-    // Past Reports combined listing (DFR + SR). field_ops area = admin/partner/
+    // Past Reports combined listing (DFR + SR + TT). field_ops area = admin/partner/
     // business_dev/field_ops. Drafts are scoped to the requesting user in the
     // handler. ZERO financials. Without this line the path falls to default-deny
     // (admin-only), blocking every field crew member.
     if (pathname.startsWith('/api/past-reports'))  return 'field_ops';
+    // Toolbox Talk safety meeting sign-in form (Derek, 2026-10-28). field_ops area =
+    // admin/partner/business_dev/field_ops so the crew can submit safety meetings.
+    // The endpoint also calls requireArea(session, 'field_ops'). ZERO financials
+    // (safety meeting content, attendees, and SP ref only). Without this line the
+    // path falls to default-deny (admin-only) and blocks every field crew member.
+    if (pathname.startsWith('/api/toolbox-talk'))  return 'field_ops';
     // Time Off request submission + own request history. field_ops area =
     // admin/partner/business_dev/field_ops so the crew can submit and view their
     // own requests. ZERO financials. Without this line path falls to default-deny

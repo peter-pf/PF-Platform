@@ -53,17 +53,14 @@ export function renderDailyReportPdf(rec) {
     { label: 'Linear feet installed', value: (rec.lfInstalled != null) ? String(rec.lfInstalled) : '-' },
   ], { valueW: 130 });
 
-  // ---- crew (name + HOURS only, never pay) ----
+  // ---- crew (name + cost code ONLY — hours/time-in/out removed from PDF per Derek 10/28) ----
   doc.heading('Crew');
-  const crew = Array.isArray(rec.crew) ? rec.crew.filter((c) => c && (c.name || c.hours != null)) : [];
+  const crew = Array.isArray(rec.crew) ? rec.crew.filter((c) => c && c.name) : [];
   if (crew.length) {
-    doc.table(crew.map((c) => {
-      const span = (c.start && c.end) ? `  ${c.start}-${c.end}` : '';
-      return {
-        label: (c.costCode ? `${c.name || '-'}  (${c.costCode})` : (c.name || '-')) + span,
-        value: (c.hours != null && c.hours !== '') ? `${c.hours} h` : '',
-      };
-    }), { valueW: 90 });
+    doc.table(crew.map((c) => ({
+      label: c.costCode ? `${c.name}  (${c.costCode})` : c.name,
+      value: '',
+    })));
   } else {
     doc.text('No crew recorded.', { size: 10 });
   }
@@ -144,6 +141,18 @@ export function renderDailyReportPdf(rec) {
     doc.text('None reported.', { size: 10 });
   }
 
+  // ---- general site observations (new section 6, between Delays and Safety) ----
+  // Backward-compatible: only rendered when the record has the field (old records omit it).
+  const obsText = rec.siteObservations && String(rec.siteObservations).trim();
+  const sectionPhotos = rec.sectionPhotos && typeof rec.sectionPhotos === 'object'
+    ? rec.sectionPhotos : {};
+  const obsPhotos = Array.isArray(sectionPhotos['obs_photos']) ? sectionPhotos['obs_photos'] : [];
+  if (obsText || obsPhotos.length) {
+    doc.heading('General Site Observations');
+    if (obsText) doc.text(obsText, { size: 10 });
+    if (obsPhotos.length) doc.embedPhotos(obsPhotos);
+  }
+
   // ---- safety ----
   doc.heading('Safety');
   doc.text(rec.safety && rec.safety.trim() ? rec.safety : 'None reported.', { size: 10 });
@@ -156,9 +165,8 @@ export function renderDailyReportPdf(rec) {
   // sectionPhotos['photos'] (or ['bottom']) holds [{data, w, h}] entries where
   // data is a JPEG or RGB-PNG data URL.  Records without sectionPhotos fall back
   // to the legacy name-only listing so existing saved reports still render fine.
+  // NOTE: sectionPhotos was already resolved above for the observations block.
   const attach = Array.isArray(rec.attachments) ? rec.attachments.filter((a) => a && (a.name || a.itemId)) : [];
-  const sectionPhotos = rec.sectionPhotos && typeof rec.sectionPhotos === 'object'
-    ? rec.sectionPhotos : {};
   const embeddedPhotos = Array.isArray(sectionPhotos['photos'] || sectionPhotos['bottom'])
     ? (sectionPhotos['photos'] || sectionPhotos['bottom'])
     : [];
@@ -170,8 +178,9 @@ export function renderDailyReportPdf(rec) {
 
   // Non-photo attachments (GUHMA, hand logs, predrill markup, etc.) always listed
   // by name since their bytes are in SharePoint, not in the record.
-  const otherAttach = attach.filter((a) => a.bucket !== 'photos');
-  // For photo attachments without embedded data (legacy records): list by name.
+  // Exclude 'photos' and 'obs_photos' from the text list when they are embedded.
+  const otherAttach = attach.filter((a) => a.bucket !== 'photos' && a.bucket !== 'obs_photos');
+  // For site photo attachments without embedded data (legacy records): list by name.
   const unembeddedPhotoAttach = embeddedPhotos.length
     ? []
     : attach.filter((a) => a.bucket === 'photos');
@@ -179,10 +188,11 @@ export function renderDailyReportPdf(rec) {
   if (otherAttach.length || unembeddedPhotoAttach.length) {
     doc.heading('Attachments (in SharePoint)');
     for (const a of [...unembeddedPhotoAttach, ...otherAttach]) {
-      const bkt = a.bucket === 'guhma'    ? 'GUHMA Data'
-                : a.bucket === 'handlogs' ? 'Hand Logs'
-                : a.bucket === 'photos'   ? 'Site Photo'
-                : a.bucket === 'predrill' ? 'Predrill Markup'
+      const bkt = a.bucket === 'guhma'      ? 'GUHMA Data'
+                : a.bucket === 'handlogs'   ? 'Hand Logs'
+                : a.bucket === 'photos'     ? 'Site Photo'
+                : a.bucket === 'predrill'   ? 'Predrill Markup'
+                : a.bucket === 'obs_photos' ? 'Observation Photo'
                 : '';
       doc.text('- ' + (a.name || a.itemId) + (bkt ? `  [${bkt}]` : ''), { size: 10 });
     }

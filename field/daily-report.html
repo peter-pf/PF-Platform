@@ -368,10 +368,31 @@
         </div>
       </div>
 
-      <!-- Section 6: Safety -->
+      <!-- Section 6: General Site Observations (NEW) -->
+      <div class="form-section" id="sec-observations">
+        <div class="form-section-hd">
+          <h2><span class="section-num" id="sn-observations">6</span> General Site Observations</h2>
+          <button type="button" class="section-toggle" data-target="sb-observations" aria-expanded="true" aria-label="Toggle General Site Observations section">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" style="width:18px;height:18px"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+          </button>
+        </div>
+        <div class="section-body" id="sb-observations">
+          <div class="form-sublabel">Obstructions, other contractors on site, access issues, notable conditions <span class="dr-flag">(optional)</span></div>
+          <textarea id="drObservations" placeholder="Describe any obstructions encountered, other contractors working on site, access issues, utility conflicts, or other general site conditions observed during the day." style="min-height:80px"></textarea>
+          <div class="form-sublabel" style="margin-top:12px">Observation photos <span class="dr-flag">(optional — 05 Field / Observations)</span></div>
+          <div class="dr-upload" id="drUpObsPhotos">
+            <input type="file" id="drFileObsPhotos" multiple accept="image/*,.heic" disabled>
+            <div class="dr-up-hint" data-up-hint>Select a project first to enable observation photo uploads.</div>
+            <div class="dr-up-list" data-up-list></div>
+            <div class="dr-up-msg" data-up-msg></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 7: Safety (was 6) -->
       <div class="form-section" id="sec-safety">
         <div class="form-section-hd">
-          <h2><span class="section-num" id="sn-safety">6</span> Safety</h2>
+          <h2><span class="section-num" id="sn-safety">7</span> Safety</h2>
           <button type="button" class="section-toggle" data-target="sb-safety" aria-expanded="true" aria-label="Toggle Safety section">
             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" style="width:18px;height:18px"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
           </button>
@@ -381,10 +402,10 @@
         </div>
       </div>
 
-      <!-- Section 7: Photos & Files -->
+      <!-- Section 8: Photos & Files (was 7) -->
       <div class="form-section" id="sec-files">
         <div class="form-section-hd">
-          <h2><span class="section-num" id="sn-files">7</span> Photos &amp; Files</h2>
+          <h2><span class="section-num" id="sn-files">8</span> Photos &amp; Files</h2>
           <button type="button" class="section-toggle" data-target="sb-files" aria-expanded="true" aria-label="Toggle Files section">
             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" style="width:18px;height:18px"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
           </button>
@@ -545,14 +566,15 @@ try {
     maintenance: [],
     delayEntries: [{description:'',downtimeHours:''}],
     future: [{equipment:'',description:''}],
-    attachments: { handlogs:[], guhma:[], photos:[], predrill:[] },
+    attachments: { handlogs:[], guhma:[], photos:[], predrill:[], obs_photos:[] },
   };
 
   var UP_BUCKETS = {
-    photos:   { input:'drFilePhotos',   wrap:'drUpPhotos',   label:'Site Photos' },
-    handlogs: { input:'drFileHandlogs', wrap:'drUpHandlogs', label:'Hand Logs' },
-    guhma:    { input:'drFileGuhma',    wrap:'drUpGuhma',    label:'GUHM Data' },
-    predrill: { input:'drFilePredrill', wrap:'drUpPredrill', label:'Predrill Markup' },
+    photos:     { input:'drFilePhotos',    wrap:'drUpPhotos',    label:'Site Photos' },
+    handlogs:   { input:'drFileHandlogs',  wrap:'drUpHandlogs',  label:'Hand Logs' },
+    guhma:      { input:'drFileGuhma',     wrap:'drUpGuhma',     label:'GUHM Data' },
+    predrill:   { input:'drFilePredrill',  wrap:'drUpPredrill',  label:'Predrill Markup' },
+    obs_photos: { input:'drFileObsPhotos', wrap:'drUpObsPhotos', label:'Observation Photos' },
   };
 
   /* ---- helpers ---- */
@@ -609,7 +631,7 @@ try {
     }
     sv('drForeman',b.foreman);sv('drPrecip',b.precipitation);sv('drTemp',b.temp);
     sv('drCols',b.columnsInstalled);sv('drLf',b.lfInstalled);
-    sv('drWork',b.workCompleted);sv('drSafety',b.safety);
+    sv('drWork',b.workCompleted);sv('drObservations',b.siteObservations);sv('drSafety',b.safety);
     // R7: restore delayEntries; fall back to old delays string for old offline drafts
     if(Array.isArray(b.delayEntries)&&b.delayEntries.length){
       state.delayEntries=b.delayEntries.map(function(d){return{description:d.description||'',downtimeHours:(d.downtimeHours!=null?d.downtimeHours:'')};});
@@ -1196,6 +1218,7 @@ try {
         if(hint){
           if(num){
             if(bk==='photos') hint.textContent='Photos upload to this project\'s 05 Field / 02 Project Photos folder. Allowed: .jpg .jpeg .png .heic, up to 50MB each.';
+            else if(bk==='obs_photos') hint.textContent='Observation photos upload to the project\'s 05 Field / Observations folder. Allowed: .jpg .jpeg .png .heic, up to 50MB each.';
             else hint.textContent='Files upload to this project QA/QC folder for the report date. Allowed: .guh .jpg .jpeg .png .heic .pdf .zip .xlsx, up to 50MB each.';
           } else {
             hint.textContent='Select a project first to enable uploads.';
@@ -1315,8 +1338,9 @@ try {
       maintenance:state.maintenance.filter(function(r){return(r.type||'').trim()||(r.item||'').trim()||(r.hourAtFailure||'').toString().trim();}),
       futureIssues:state.future.filter(function(r){return(r.equipment||'').trim()||(r.description||'').trim();}),
       delayEntries:state.delayEntries.filter(function(d){return(d.description||'').trim()||(d.downtimeHours||'').toString().trim();}),
+      siteObservations:document.getElementById('drObservations').value,
       safety:document.getElementById('drSafety').value,
-      attachments:(state.attachments.photos||[]).concat(state.attachments.handlogs||[]).concat(state.attachments.guhma||[]).concat(state.attachments.predrill||[]),
+      attachments:(state.attachments.photos||[]).concat(state.attachments.handlogs||[]).concat(state.attachments.guhma||[]).concat(state.attachments.predrill||[]).concat(state.attachments.obs_photos||[]),
     };
   }
 
@@ -1361,7 +1385,7 @@ try {
     setVal('drDate',r.date);setVal('drForeman',r.foreman);
     setVal('drPrecip',r.precipitation);setVal('drTemp',r.temp||(r.precipitation?'':r.weather));
     setVal('drCols',r.columnsInstalled);setVal('drLf',r.lfInstalled);
-    setVal('drWork',r.workCompleted);setVal('drSafety',r.safety);
+    setVal('drWork',r.workCompleted);setVal('drObservations',r.siteObservations);setVal('drSafety',r.safety);
     // R7: delayEntries replaces the old drDelays textarea. Load delayEntries if
     // present; fall back to the old `delays` string as a single entry.
     if(Array.isArray(r.delayEntries)&&r.delayEntries.length){
@@ -1389,15 +1413,15 @@ try {
     state.maintenance=maintenanceFromRecord(r.maintenance);
     var future=(Array.isArray(r.futureIssues)?r.futureIssues:[]).map(function(f){return{equipment:f.equipment||'',description:f.description||''};});
     while(future.length<1)future.push({equipment:'',description:''});state.future=future;
-    var att={handlogs:[],guhma:[],photos:[],predrill:[]};
+    var att={handlogs:[],guhma:[],photos:[],predrill:[],obs_photos:[]};
     (Array.isArray(r.attachments)?r.attachments:[]).forEach(function(a){
-      var bk=a.bucket==='guhma'?'guhma':(a.bucket==='photos'?'photos':(a.bucket==='predrill'?'predrill':'handlogs'));
+      var bk=a.bucket==='guhma'?'guhma':(a.bucket==='photos'?'photos':(a.bucket==='predrill'?'predrill':(a.bucket==='obs_photos'?'obs_photos':'handlogs')));
       att[bk].push({name:a.name||'',itemId:a.itemId||'',webUrl:a.webUrl||'',bucket:bk});
     });
     state.attachments=att;
     renderProject();renderForeman();renderCrew();renderOwned();renderRental();renderMaint();renderDelays();renderFuture();
-    renderUpList('photos',[]);renderUpList('handlogs',[]);renderUpList('guhma',[]);renderUpList('predrill',[]);
-    upMsg('photos','',null);upMsg('handlogs','',null);upMsg('guhma','',null);upMsg('predrill','',null);
+    renderUpList('photos',[]);renderUpList('handlogs',[]);renderUpList('guhma',[]);renderUpList('predrill',[]);renderUpList('obs_photos',[]);
+    upMsg('photos','',null);upMsg('handlogs','',null);upMsg('guhma','',null);upMsg('predrill','',null);upMsg('obs_photos','',null);
     updateUploadEnabled();updateEditBanner();updateCopyPrevBtn();
     updateDraftBanner(r.updatedAt||r.createdAt||null);
     msg('Editing report '+(window.pfFmtDate(r.date)||'')+' - '+(r.projectName||r.projectId||'')+'. Update the fields and re-send, or start a new report to cancel.',true);

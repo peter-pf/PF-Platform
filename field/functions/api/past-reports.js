@@ -1,8 +1,8 @@
 // Cloudflare Pages Function -- /api/past-reports
-// Returns a combined list of Daily Field Reports and Site Readiness records for
-// the authenticated user's role, sorted by date DESC.
+// Returns a combined list of Daily Field Reports, Site Readiness records,
+// and Toolbox Talks for the authenticated user's role, sorted by date DESC.
 //
-// RBAC: field_ops area (same gate as DFR + SR endpoints).
+// RBAC: field_ops area (same gate as DFR + SR + TT endpoints).
 //   field_ops = admin / partner / business_dev / field_ops
 //   ZERO financials: only operational metadata is returned (date, project, status,
 //   PDF name, SharePoint link).  No dollar amounts, rates, or costs.
@@ -10,12 +10,13 @@
 // RESPONSE:
 //   { ok: true, reports: [{ id, type, date, projectName, projectId, status,
 //                           pdfName, pdfWebUrl, submittedAt, createdAt }] }
-//   type = 'daily-report' | 'site-readiness'
+//   type = 'daily-report' | 'site-readiness' | 'toolbox-talk'
 //   reports sorted by date DESC, then createdAt DESC within the same date.
 
 import { requireArea } from '../lib/auth.js';
 import { listReports } from '../lib/daily-report-store.js';
-import { listRecords } from '../lib/site-readiness-store.js';
+import { listRecords as listSrRecords } from '../lib/site-readiness-store.js';
+import { listRecords as listTtRecords } from '../lib/toolbox-talk-store.js';
 
 const JSON_HEADERS = {
   'Content-Type': 'application/json',
@@ -50,10 +51,11 @@ export async function onRequestGet(context) {
       return json({ ok: true, reports: [], note: 'No data store available.' });
     }
 
-    // Load both record types in parallel.
-    const [drResult, srResult] = await Promise.all([
+    // Load all three record types in parallel.
+    const [drResult, srResult, ttResult] = await Promise.all([
       listReports(env, {}),
-      listRecords(env, {}),
+      listSrRecords(env, {}),
+      listTtRecords(env, {}),
     ]);
 
     // Visibility rule:
@@ -100,7 +102,24 @@ export async function onRequestGet(context) {
         createdAt:   s(r.createdAt),
       }));
 
-    const combined = drReports.concat(srReports).sort((a, b) => {
+    const ttReports = (ttResult && Array.isArray(ttResult.records) ? ttResult.records : [])
+      .filter(draftVisible)
+      .map((r) => ({
+        id:          s(r.id),
+        type:        'toolbox-talk',
+        date:        s(r.date),
+        projectName: s(r.projectName || r.projectId),
+        projectId:   s(r.projectId),
+        status:      s(r.status),
+        topic:       s(r.topic),
+        presenter:   s(r.presenter),
+        pdfName:     s(r.pdfName),
+        pdfWebUrl:   /^https:\/\//i.test(String(r.pdfWebUrl || '')) ? s(r.pdfWebUrl, 500) : '',
+        submittedAt: s(r.sentAt || r.submittedAt),
+        createdAt:   s(r.createdAt),
+      }));
+
+    const combined = drReports.concat(srReports).concat(ttReports).sort((a, b) => {
       // Primary sort: date DESC (ISO string compare works for YYYY-MM-DD)
       const dateCmp = String(b.date || '').localeCompare(String(a.date || ''));
       if (dateCmp !== 0) return dateCmp;

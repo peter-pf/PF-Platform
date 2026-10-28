@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>PF Toolbox Talk</title>
+<meta name="theme-color" content="#006DB0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="PF Field">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/pf-r5.css">
+<style>
+  :root { --sticky-h: 62px; }
+  input,select,textarea,button{font-family:inherit;font-size:inherit;}
+  input,select,textarea{background:var(--surface-3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 10px;width:100%;}
+  [data-theme="dark"] input,[data-theme="dark"] select,[data-theme="dark"] textarea{background:var(--surface-2);}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,109,176,.25);}
+  button{cursor:pointer;}
+  .btn{display:inline-block;padding:10px 20px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);font-weight:600;font-size:14px;cursor:pointer;transition:background .15s;}
+  .btn:hover{background:var(--accent-dark);}
+  .btn:disabled{opacity:.55;cursor:default;}
+  .btn-sm{padding:5px 13px;background:var(--surface-3);color:var(--text-2);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;font-weight:500;cursor:pointer;transition:border-color .15s,color .15s;}
+  .btn-sm:hover{border-color:var(--accent);color:var(--accent);}
+  :root{--content-col:1000px;}
+  #main{padding:14px;padding-bottom:max(24px,env(safe-area-inset-bottom));max-width:720px;margin:0 auto;}
+  @media(min-width:900px){#main{max-width:none;margin-left:var(--sidebar-w);margin-right:0;padding:18px 32px;}}
+  /* ---- draft status banner ---- */
+  #ttDraftStatus{font-size:11px;color:var(--text-3);padding:6px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;margin-bottom:10px;display:flex;align-items:center;flex-wrap:wrap;gap:4px;}
+  #ttDraftStatus .ds-saved{color:var(--green);}
+  #ttDraftStatus .ds-unsaved{color:var(--text-3);}
+  /* ---- form module ---- */
+  #mod-tt label{display:block;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-3);margin:0 0 5px;}
+  #mod-tt textarea{min-height:72px;font-family:inherit;resize:vertical;}
+  #mod-tt .tt-card{border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:12px;}
+  #mod-tt .tt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:4px 16px;}
+  #mod-tt .tt-section-h{font-size:13px;font-weight:700;color:var(--text);margin:0 0 4px;display:flex;align-items:center;gap:8px;}
+  #mod-tt .tt-section-h::before{content:'';display:inline-block;width:4px;height:16px;border-radius:2px;background:var(--accent);flex:0 0 auto;}
+  #mod-tt .tt-sn{display:inline-block;font-size:11px;background:var(--surface-3);border:1px solid var(--border);border-radius:10px;padding:1px 8px;color:var(--text-3);margin-right:4px;}
+  #mod-tt .tt-muted{color:var(--text-3);font-size:12px;}
+  #mod-tt .tt-err{color:var(--red);font-size:13px;margin-top:6px;}
+  #mod-tt .tt-ok{color:var(--green);font-size:13px;margin-top:6px;}
+  /* ---- attendee row ---- */
+  #mod-tt .tt-att-row{display:flex;align-items:center;gap:8px;border-top:1px solid var(--border);padding:7px 0;}
+  #mod-tt .tt-att-row:first-child{border-top:none;}
+  #mod-tt .tt-att-name{flex:1 1 auto;}
+  #mod-tt .tt-att-ack{flex:0 0 auto;display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text-2);}
+  #mod-tt .tt-att-rm{flex:0 0 auto;font-size:11px;padding:4px 9px;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--text-3);cursor:pointer;}
+  #mod-tt .tt-att-rm:hover{border-color:var(--amber);color:var(--amber);}
+  /* ---- other-topic row ---- */
+  #ttOtherRow{display:none;margin-top:8px;}
+  /* ---- project picker ---- */
+  .pf-picker{position:relative;}
+  .pf-picker-input{background:var(--surface-3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 10px;width:100%;}
+  [data-theme="dark"] .pf-picker-input{background:var(--surface-2);}
+  .pf-picker-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,109,176,.25);}
+  .pf-picker-list{position:absolute;left:0;right:0;top:calc(100% + 3px);z-index:200;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.13);max-height:220px;overflow-y:auto;margin:0;padding:0;list-style:none;}
+  .pf-picker-list li{padding:9px 12px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--border);}
+  .pf-picker-list li:last-child{border-bottom:none;}
+  .pf-picker-list li:hover,.pf-picker-list li[aria-selected="true"]{background:var(--accent-light);color:var(--accent-dark);}
+  [data-theme="dark"] .pf-picker-list li:hover,[data-theme="dark"] .pf-picker-list li[aria-selected="true"]{background:rgba(0,109,176,.2);color:#a8d4f5;}
+  .pf-picker-list li.pf-empty{color:var(--text-3);cursor:default;font-style:italic;}
+  /* ---- sticky submit bar ---- */
+  #ttStickyBar{position:fixed;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom));left:0;right:0;z-index:70;background:var(--surface-2);border-top:1px solid var(--border);padding:0 16px;display:flex;align-items:stretch;box-shadow:0 -2px 8px rgba(0,0,0,.07);}
+  [data-theme="dark"] #ttStickyBar{box-shadow:none;}
+  #ttStickyBar .pf-col{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 0;width:100%;}
+  @media(min-width:900px){#ttStickyBar{bottom:0;left:var(--sidebar-w);padding:0 32px;}}
+</style>
+<script>
+(function(){try{var t=localStorage.getItem('pf-theme');var dark=t==='dark'||(t==null&&window.matchMedia&&window.matchMedia('(prefers-color-scheme:dark)').matches);if(dark)document.documentElement.setAttribute('data-theme','dark');}catch(e){}}());
+</script>
+</head>
+<body>
+
+<!-- ---- SHARED NAV (same as all field portal pages) ---- -->
+<div id="pfTopBar">
+  <span id="pfTopLogo"><span class="pf-logo-mark">PF</span> <span class="pf-logo-text">Field Portal</span></span>
+  <div class="pf-top-right">
+    <button id="themeToggle" class="icon-btn" aria-label="Toggle dark mode">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+    </button>
+    <button id="logoutBtn" class="icon-btn" aria-label="Sign out">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+    </button>
+  </div>
+</div>
+
+<nav id="pfNav" aria-label="Main navigation">
+  <a href="/" class="pf-nav-item" data-paths="/, /index.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+    <span>Home</span>
+  </a>
+  <a href="/daily-report.html" class="pf-nav-item" data-paths="/daily-report.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><line x1="9" y1="12" x2="15" y2="12"></line><line x1="9" y1="16" x2="13" y2="16"></line></svg>
+    <span>Daily Report</span>
+  </a>
+  <a href="/equipment-inspection.html" class="pf-nav-item" data-paths="/equipment-inspection.html">
+    <span class="rig-icon" aria-hidden="true"></span>
+    <span>Equip. Inspect.</span>
+  </a>
+  <a href="/site-readiness.html" class="pf-nav-item" data-paths="/site-readiness.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
+    <span>Site Readiness</span>
+  </a>
+  <a href="/toolbox-talk.html" class="pf-nav-item pf-nav-active" data-paths="/toolbox-talk.html, /toolbox-talk">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+    <span>Toolbox Talk</span>
+  </a>
+  <a href="/past-reports.html" class="pf-nav-item" data-paths="/past-reports.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+    <span>Past Reports</span>
+  </a>
+  <a href="/cost-codes.html" class="pf-nav-item" data-paths="/cost-codes.html, /cost-codes">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+    <span>Cost Codes</span>
+  </a>
+  <a href="/schedule.html" class="pf-nav-item" data-paths="/schedule.html, /schedule">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+    <span>Schedule</span>
+  </a>
+  <a href="/time-off.html" class="pf-nav-item" data-paths="/time-off.html, /time-off">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><path d="M8 14l2 2 4-4"></path></svg>
+    <span>Time Off</span>
+  </a>
+</nav>
+
+<div id="loading">Loading...</div>
+<div id="authError"><p>Session expired. <a href="/login.html">Sign in again</a></p></div>
+
+<div id="main" style="display:none;">
+  <div class="pf-col">
+    <p class="page-title">Toolbox Talk</p>
+
+    <!-- Draft status banner -->
+    <div id="ttDraftStatus">
+      <span id="ttDsId" style="color:var(--text-3);"></span>
+      <span id="ttDsState" class="ds-unsaved">New record</span>
+    </div>
+
+    <div id="mod-tt">
+      <!-- ================================================================
+           SECTION 1: Meeting Info
+           ================================================================ -->
+      <div class="tt-card">
+        <div class="tt-section-h"><span id="sn-info" class="tt-sn">1</span>Meeting Info</div>
+        <div class="tt-grid" style="margin-top:10px;">
+          <div>
+            <label for="ttProjectSearch">Project</label>
+            <div class="pf-picker">
+              <input id="ttProjectSearch" class="pf-picker-input" type="search" autocomplete="off"
+                placeholder="Search project..." aria-haspopup="listbox" aria-expanded="false">
+              <ul id="ttProjectList" class="pf-picker-list" style="display:none;" role="listbox"></ul>
+              <input type="hidden" id="ttProjectId">
+              <input type="hidden" id="ttProjectName">
+            </div>
+          </div>
+          <div>
+            <label for="ttDate">Date</label>
+            <input id="ttDate" type="date" required>
+          </div>
+          <div>
+            <label for="ttTime">Time</label>
+            <input id="ttTime" type="time">
+          </div>
+          <div>
+            <label for="ttLocation">Location</label>
+            <input id="ttLocation" type="text" maxlength="300" placeholder="e.g. Job trailer, Job site">
+          </div>
+        </div>
+      </div>
+
+      <!-- ================================================================
+           SECTION 2: Presenter
+           ================================================================ -->
+      <div class="tt-card">
+        <div class="tt-section-h"><span id="sn-presenter" class="tt-sn">2</span>Presenter</div>
+        <div style="margin-top:10px;">
+          <label for="ttPresenter">Presented By</label>
+          <select id="ttPresenter">
+            <option value="">-- Select --</option>
+            <option value="John Willis">John Willis</option>
+            <option value="Seth Willis">Seth Willis</option>
+            <option value="Christian Boutte">Christian Boutte</option>
+            <option value="Jordan Lemay">Jordan Lemay</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- ================================================================
+           SECTION 3: Topic
+           ================================================================ -->
+      <div class="tt-card">
+        <div class="tt-section-h"><span id="sn-topic" class="tt-sn">3</span>Topic</div>
+        <div style="margin-top:10px;">
+          <label for="ttTopic">Safety Topic</label>
+          <select id="ttTopic">
+            <option value="">-- Select topic --</option>
+            <option value="fall_protection">Fall Protection</option>
+            <option value="excavation_trenching">Excavation and Trenching</option>
+            <option value="struck_caught">Struck-By and Caught-Between</option>
+            <option value="heavy_equipment_spotters">Heavy Equipment and Spotters</option>
+            <option value="ppe">PPE (Personal Protective Equipment)</option>
+            <option value="heat_cold_stress">Heat and Cold Stress</option>
+            <option value="housekeeping">Housekeeping</option>
+            <option value="electrical_overhead">Electrical and Overhead Lines</option>
+            <option value="utilities_locates">Utilities and Locates</option>
+            <option value="silica">Silica</option>
+            <option value="other">Other</option>
+          </select>
+          <div id="ttOtherRow">
+            <label for="ttTopicOther" style="margin-top:8px;">Specify Topic</label>
+            <input id="ttTopicOther" type="text" maxlength="300" placeholder="Describe the safety topic">
+          </div>
+        </div>
+      </div>
+
+      <!-- ================================================================
+           SECTION 4: Key Points Discussed
+           ================================================================ -->
+      <div class="tt-card">
+        <div class="tt-section-h"><span id="sn-keypoints" class="tt-sn">4</span>Key Points Discussed</div>
+        <div style="margin-top:10px;">
+          <label for="ttKeyPoints">Summary of key points covered in this toolbox talk</label>
+          <textarea id="ttKeyPoints" maxlength="4000" placeholder="Summarize the main points covered..."></textarea>
+          <p class="tt-muted" style="margin-top:4px;">Obstructions, other contractors on site, schedule changes, task-specific reminders, etc.</p>
+        </div>
+      </div>
+
+      <!-- ================================================================
+           SECTION 5: Site-Specific Hazards
+           ================================================================ -->
+      <div class="tt-card">
+        <div class="tt-section-h"><span id="sn-hazards" class="tt-sn">5</span>Hazards Specific to Today's Work</div>
+        <div style="margin-top:10px;">
+          <label for="ttHazards">Identify hazards specific to today's work activities</label>
+          <textarea id="ttHazards" maxlength="4000" placeholder="List hazards specific to today's tasks and locations..."></textarea>
+        </div>
+      </div>
+
+      <!-- ================================================================
+           SECTION 6: Questions or Concerns Raised
+           ================================================================ -->
+      <div class="tt-card">
+        <div class="tt-section-h"><span id="sn-questions" class="tt-sn">6</span>Questions or Concerns Raised</div>
+        <div style="margin-top:10px;">
+          <label for="ttQuestions">Questions, concerns, or items raised by attendees</label>
+          <textarea id="ttQuestions" maxlength="4000" placeholder="Document any questions or concerns raised..."></textarea>
+        </div>
+      </div>
+
+      <!-- ================================================================
+           SECTION 7: Corrective Actions
+           ================================================================ -->
+      <div class="tt-card">
+        <div class="tt-section-h"><span id="sn-actions" class="tt-sn">7</span>Corrective Actions</div>
+        <div style="margin-top:10px;">
+          <label for="ttActions">Corrective actions to address concerns raised (if any)</label>
+          <textarea id="ttActions" maxlength="4000" placeholder="Optional: list any corrective actions agreed upon..."></textarea>
+        </div>
+      </div>
+
+      <!-- ================================================================
+           SECTION 8: Attendees
+           ================================================================ -->
+      <div class="tt-card">
+        <div class="tt-section-h"><span id="sn-attendees" class="tt-sn">8</span>Attendees</div>
+        <p class="tt-muted" style="margin:8px 0;">List all attendees. Check the box when each person acknowledges the content.</p>
+        <div id="ttAttendeeList" style="margin-bottom:10px;"></div>
+        <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+          <div style="flex:1 1 200px;">
+            <label for="ttNewAttName">Add Attendee</label>
+            <input id="ttNewAttName" type="text" maxlength="80" placeholder="First Last">
+          </div>
+          <div style="flex:0 0 auto;padding-bottom:1px;">
+            <button type="button" class="btn" id="ttAddAttBtn" style="padding:8px 16px;">Add</button>
+          </div>
+        </div>
+        <p class="tt-muted" style="margin-top:6px;" id="ttAttCount"></p>
+      </div>
+
+      <!-- ================================================================
+           Result message
+           ================================================================ -->
+      <div id="ttMsg" style="display:none;margin-bottom:12px;"></div>
+
+    </div><!-- #mod-tt -->
+  </div><!-- .pf-col -->
+</div><!-- #main -->
+
+<!-- Sticky submit bar -->
+<div id="ttStickyBar">
+  <div class="pf-col">
+    <button id="ttSaveBtn" class="btn-sm">Save Draft</button>
+    <button id="ttSubmitBtn" class="btn">Submit &amp; Send PDF</button>
+    <button id="ttNewBtn" class="btn-sm" style="display:none;">New Talk</button>
+    <span id="ttSubmitMsg" style="font-size:12px;color:var(--text-3);"></span>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// Toolbox Talk form JS
+// No Playwright. No external dependencies.
+// ============================================================
+'use strict';
+
+var ttState = {
+  id:         null,
+  status:     'new',
+  attendees:  [],
+  saving:     false,
+};
+
+// ---- Auth / session ----
+(function checkAuth(){
+  fetch('/api/me', {credentials:'same-origin'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d || !d.name) { showAuthError(); return; }
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('main').style.display    = '';
+      ttInitForm();
+    })
+    .catch(showAuthError);
+})();
+
+function showAuthError(){
+  document.getElementById('loading').style.display   = 'none';
+  document.getElementById('authError').style.display = '';
+}
+
+// ---- Theme toggle ----
+var themeBtn = document.getElementById('themeToggle');
+if (themeBtn) themeBtn.addEventListener('click', function(){
+  var cur = document.documentElement.getAttribute('data-theme');
+  var next = (cur === 'dark') ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  try { localStorage.setItem('pf-theme', next); } catch(e){}
+});
+
+// ---- Logout ----
+var logoutBtn = document.getElementById('logoutBtn');
+if (logoutBtn) logoutBtn.addEventListener('click', function(){
+  fetch('/api/logout', {method:'POST',credentials:'same-origin'})
+    .finally(function(){ window.location.href='/login.html'; });
+});
+
+// ---- Main init ----
+function ttInitForm(){
+  // Set today's date as default
+  var today = new Date().toISOString().slice(0,10);
+  document.getElementById('ttDate').value = today;
+
+  // Topic show/hide Other field
+  document.getElementById('ttTopic').addEventListener('change', function(){
+    var show = this.value === 'other';
+    document.getElementById('ttOtherRow').style.display = show ? '' : 'none';
+    ttMarkUnsaved();
+  });
+
+  // All inputs trigger unsaved
+  ['ttDate','ttTime','ttLocation','ttPresenter','ttTopic','ttTopicOther',
+   'ttKeyPoints','ttHazards','ttQuestions','ttActions'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('input', ttMarkUnsaved);
+  });
+
+  // Add attendee button
+  document.getElementById('ttAddAttBtn').addEventListener('click', ttAddAttendee);
+  document.getElementById('ttNewAttName').addEventListener('keydown', function(e){
+    if (e.key === 'Enter') { e.preventDefault(); ttAddAttendee(); }
+  });
+
+  // Save draft
+  document.getElementById('ttSaveBtn').addEventListener('click', function(){ ttSave(false); });
+
+  // Submit
+  document.getElementById('ttSubmitBtn').addEventListener('click', function(){ ttSave(true); });
+
+  // New talk
+  document.getElementById('ttNewBtn').addEventListener('click', function(){
+    ttState = { id: null, status: 'new', attendees: [], saving: false };
+    document.getElementById('ttDate').value     = new Date().toISOString().slice(0,10);
+    document.getElementById('ttTime').value     = '';
+    document.getElementById('ttLocation').value = '';
+    document.getElementById('ttProjectSearch').value = '';
+    document.getElementById('ttProjectId').value     = '';
+    document.getElementById('ttProjectName').value   = '';
+    document.getElementById('ttPresenter').value     = '';
+    document.getElementById('ttTopic').value         = '';
+    document.getElementById('ttTopicOther').value    = '';
+    document.getElementById('ttOtherRow').style.display = 'none';
+    document.getElementById('ttKeyPoints').value = '';
+    document.getElementById('ttHazards').value   = '';
+    document.getElementById('ttQuestions').value = '';
+    document.getElementById('ttActions').value   = '';
+    ttRenderAttendees();
+    document.getElementById('ttMsg').style.display = 'none';
+    document.getElementById('ttNewBtn').style.display = 'none';
+    document.getElementById('ttSaveBtn').disabled   = false;
+    document.getElementById('ttSubmitBtn').disabled = false;
+    document.getElementById('ttDsId').textContent   = '';
+    document.getElementById('ttDsState').textContent = 'New record';
+    document.getElementById('ttDsState').className   = 'ds-unsaved';
+  });
+
+  // Nav active
+  document.querySelectorAll('.pf-nav-item').forEach(function(a){
+    var paths = (a.getAttribute('data-paths') || '').split(',').map(function(s){return s.trim();});
+    a.classList.toggle('pf-nav-active', paths.indexOf(window.location.pathname) >= 0 ||
+      paths.indexOf(window.location.pathname.replace(/\.html$/,'')) >= 0);
+  });
+
+  // Load projects
+  fetch('/api/field-projects', {credentials:'same-origin'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){ ttInitProjectPicker(d && d.projects ? d.projects : []); })
+    .catch(function(){ ttInitProjectPicker([]); });
+
+  // Check URL for id param (load existing)
+  var urlId = new URLSearchParams(window.location.search).get('id');
+  if (urlId) {
+    fetch('/api/toolbox-talk?id=' + encodeURIComponent(urlId), {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d && d.ok && d.record) ttLoadRecord(d.record);
+      })
+      .catch(function(){});
+  }
+}
+
+// ---- Attendees ----
+function ttRenderAttendees(){
+  var container = document.getElementById('ttAttendeeList');
+  if (!container) return;
+  container.innerHTML = '';
+  var atts = ttState.attendees;
+  if (!atts.length) {
+    container.innerHTML = '<p class="tt-muted">No attendees added yet.</p>';
+  } else {
+    atts.forEach(function(a, i){
+      var row = document.createElement('div');
+      row.className = 'tt-att-row';
+      var nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.className = 'tt-att-name';
+      nameInput.maxLength = 80;
+      nameInput.value = window.esc ? window.esc(a.name) : a.name;
+      nameInput.setAttribute('data-idx', i);
+      nameInput.setAttribute('aria-label', 'Attendee ' + (i+1) + ' name');
+      nameInput.addEventListener('input', function(){
+        ttState.attendees[parseInt(this.getAttribute('data-idx'))].name = this.value;
+        ttMarkUnsaved();
+      });
+      var ackLabel = document.createElement('label');
+      ackLabel.className = 'tt-att-ack';
+      var ackInput = document.createElement('input');
+      ackInput.type = 'checkbox';
+      ackInput.checked = !!a.acknowledged;
+      ackInput.setAttribute('data-idx', i);
+      ackInput.setAttribute('aria-label', 'Acknowledged');
+      ackInput.addEventListener('change', function(){
+        ttState.attendees[parseInt(this.getAttribute('data-idx'))].acknowledged = this.checked;
+        ttMarkUnsaved();
+      });
+      ackLabel.appendChild(ackInput);
+      ackLabel.appendChild(document.createTextNode(' Acknowledged'));
+      var rmBtn = document.createElement('button');
+      rmBtn.type = 'button';
+      rmBtn.className = 'tt-att-rm';
+      rmBtn.textContent = 'Remove';
+      rmBtn.setAttribute('data-idx', i);
+      rmBtn.addEventListener('click', function(){
+        ttState.attendees.splice(parseInt(this.getAttribute('data-idx')), 1);
+        ttRenderAttendees();
+        ttMarkUnsaved();
+      });
+      row.appendChild(nameInput);
+      row.appendChild(ackLabel);
+      row.appendChild(rmBtn);
+      container.appendChild(row);
+    });
+  }
+  var countEl = document.getElementById('ttAttCount');
+  if (countEl) countEl.textContent = atts.length + ' attendee' + (atts.length === 1 ? '' : 's');
+}
+
+function ttAddAttendee(){
+  var nameInput = document.getElementById('ttNewAttName');
+  var name = nameInput.value.trim().slice(0, 80);
+  if (!name) return;
+  ttState.attendees.push({ name: name, acknowledged: false });
+  nameInput.value = '';
+  ttRenderAttendees();
+  ttMarkUnsaved();
+  nameInput.focus();
+}
+
+// ---- Draft status ----
+function ttMarkUnsaved(){
+  var el = document.getElementById('ttDsState');
+  if (el) { el.textContent = 'Unsaved changes'; el.className = 'ds-unsaved'; }
+}
+function ttMarkSaved(label){
+  var el = document.getElementById('ttDsState');
+  if (el) { el.textContent = label || 'Saved'; el.className = 'ds-saved'; }
+  var idEl = document.getElementById('ttDsId');
+  if (idEl && ttState.id) idEl.textContent = ttState.id.slice(0, 24);
+}
+
+// ---- Collect body ----
+function ttCollectBody(){
+  return {
+    id:          ttState.id || undefined,
+    projectId:   document.getElementById('ttProjectId').value,
+    projectName: document.getElementById('ttProjectName').value,
+    date:        document.getElementById('ttDate').value,
+    time:        document.getElementById('ttTime').value,
+    location:    document.getElementById('ttLocation').value,
+    presenter:   document.getElementById('ttPresenter').value,
+    topic:       document.getElementById('ttTopic').value,
+    topicOther:  document.getElementById('ttTopicOther').value,
+    keyPoints:   document.getElementById('ttKeyPoints').value,
+    hazards:     document.getElementById('ttHazards').value,
+    questions:   document.getElementById('ttQuestions').value,
+    actions:     document.getElementById('ttActions').value,
+    attendees:   ttState.attendees.filter(function(a){ return a && a.name && a.name.trim(); }),
+  };
+}
+
+// ---- Save / Submit ----
+function ttSave(submit){
+  if (ttState.saving) return;
+  var body = ttCollectBody();
+  var action;
+  if (submit) {
+    action = 'submit';
+    if (!body.date)      { ttShowMsg('Date is required.', 'err'); return; }
+    if (!body.presenter) { ttShowMsg('Presenter is required.', 'err'); return; }
+    if (!body.topic)     { ttShowMsg('Topic is required.', 'err'); return; }
+    if (body.topic === 'other' && !body.topicOther.trim()){
+      ttShowMsg('Please specify the topic.', 'err'); return;
+    }
+  } else {
+    action = ttState.id ? 'update' : 'create';
+  }
+  body.action = action;
+  if (action === 'update' || action === 'submit') body.id = ttState.id;
+
+  ttState.saving = true;
+  document.getElementById('ttSaveBtn').disabled   = true;
+  document.getElementById('ttSubmitBtn').disabled = true;
+  document.getElementById('ttSubmitMsg').textContent = submit ? 'Submitting...' : 'Saving...';
+
+  fetch('/api/toolbox-talk', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      ttState.saving = false;
+      document.getElementById('ttSubmitMsg').textContent = '';
+      if (!d || !d.ok) {
+        ttShowMsg(d && d.error ? d.error : 'Save failed.', 'err');
+        document.getElementById('ttSaveBtn').disabled   = false;
+        document.getElementById('ttSubmitBtn').disabled = false;
+        return;
+      }
+      if (!ttState.id && d.id) ttState.id = d.id;
+      ttState.status = d.status || 'draft';
+      if (submit) {
+        ttState.status = 'submitted';
+        var okMsg = 'Submitted.';
+        if (d.pdfWebUrl) okMsg += ' <a href="' + d.pdfWebUrl + '" target="_blank" rel="noopener">View PDF</a>';
+        if (d.emailedTo && d.emailedTo.length) okMsg += ' Emailed to ' + d.emailedTo.join(', ') + '.';
+        ttShowMsg(okMsg, 'ok');
+        document.getElementById('ttSaveBtn').disabled   = true;
+        document.getElementById('ttSubmitBtn').disabled = true;
+        document.getElementById('ttNewBtn').style.display = '';
+        ttMarkSaved('Submitted');
+      } else {
+        ttMarkSaved('Draft saved');
+        document.getElementById('ttSaveBtn').disabled   = false;
+        document.getElementById('ttSubmitBtn').disabled = false;
+      }
+    })
+    .catch(function(){
+      ttState.saving = false;
+      document.getElementById('ttSaveBtn').disabled   = false;
+      document.getElementById('ttSubmitBtn').disabled = false;
+      document.getElementById('ttSubmitMsg').textContent = '';
+      ttShowMsg('Network error. Please try again.', 'err');
+    });
+}
+
+function ttShowMsg(html, type){
+  var el = document.getElementById('ttMsg');
+  if (!el) return;
+  el.className = 'tt-' + (type || 'muted');
+  el.innerHTML = html;
+  el.style.display = '';
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ---- Load existing record ----
+function ttLoadRecord(rec){
+  ttState.id         = rec.id;
+  ttState.status     = rec.status;
+  ttState.attendees  = Array.isArray(rec.attendees) ? rec.attendees : [];
+  document.getElementById('ttDate').value     = rec.date     || '';
+  document.getElementById('ttTime').value     = rec.time     || '';
+  document.getElementById('ttLocation').value = rec.location || '';
+  document.getElementById('ttPresenter').value = rec.presenter || '';
+  document.getElementById('ttTopic').value    = rec.topic    || '';
+  document.getElementById('ttTopicOther').value = rec.topicOther || '';
+  document.getElementById('ttOtherRow').style.display = (rec.topic === 'other') ? '' : 'none';
+  document.getElementById('ttKeyPoints').value = rec.keyPoints || '';
+  document.getElementById('ttHazards').value   = rec.hazards   || '';
+  document.getElementById('ttQuestions').value = rec.questions || '';
+  document.getElementById('ttActions').value   = rec.actions   || '';
+  if (rec.projectId) {
+    document.getElementById('ttProjectId').value = rec.projectId;
+    document.getElementById('ttProjectName').value = rec.projectName || '';
+    document.getElementById('ttProjectSearch').value = rec.projectId +
+      (rec.projectName ? ': ' + rec.projectName : '');
+  }
+  ttRenderAttendees();
+  if (rec.status === 'submitted') {
+    document.getElementById('ttSaveBtn').disabled   = true;
+    document.getElementById('ttSubmitBtn').disabled = true;
+    document.getElementById('ttNewBtn').style.display = '';
+    ttMarkSaved('Submitted');
+    if (rec.pdfWebUrl) {
+      ttShowMsg('Submitted. <a href="' + rec.pdfWebUrl + '" target="_blank" rel="noopener">View PDF</a>', 'ok');
+    }
+  } else {
+    ttMarkSaved('Draft loaded');
+  }
+}
+
+// ---- Project picker ----
+function ttInitProjectPicker(projects){
+  var searchEl  = document.getElementById('ttProjectSearch');
+  var listEl    = document.getElementById('ttProjectList');
+  var hiddenId  = document.getElementById('ttProjectId');
+  var hiddenName = document.getElementById('ttProjectName');
+
+  function renderList(query){
+    var q = (query || '').toLowerCase();
+    var matches = projects.filter(function(p){
+      return !q || p.number.toLowerCase().indexOf(q) >= 0 || (p.name||'').toLowerCase().indexOf(q) >= 0;
+    }).slice(0, 30);
+    listEl.innerHTML = '';
+    if (!matches.length){
+      var li = document.createElement('li'); li.className = 'pf-empty';
+      li.textContent = 'No matching projects'; listEl.appendChild(li);
+    } else {
+      matches.forEach(function(p){
+        var li = document.createElement('li');
+        li.textContent = p.number + (p.name ? ': ' + p.name : '');
+        li.setAttribute('data-number', p.number);
+        li.setAttribute('data-name', p.name || '');
+        li.addEventListener('mousedown', function(e){ e.preventDefault(); });
+        li.addEventListener('click', function(){
+          hiddenId.value = p.number; hiddenName.value = p.name || '';
+          searchEl.value = p.number + (p.name ? ': ' + p.name : '');
+          listEl.style.display = 'none'; searchEl.setAttribute('aria-expanded','false');
+          ttMarkUnsaved();
+        });
+        listEl.appendChild(li);
+      });
+    }
+    listEl.style.display = 'block'; searchEl.setAttribute('aria-expanded','true');
+  }
+  searchEl.addEventListener('input', function(){ renderList(searchEl.value); });
+  searchEl.addEventListener('focus', function(){ renderList(searchEl.value); });
+  searchEl.addEventListener('blur',  function(){ setTimeout(function(){
+    listEl.style.display='none'; searchEl.setAttribute('aria-expanded','false');
+  }, 180); });
+}
+</script>
+</body>
+</html>
