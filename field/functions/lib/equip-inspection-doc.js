@@ -28,7 +28,7 @@
 //
 // NOTE: No email. Submit = save to D1 + PDF to SharePoint only (PRIMARY-8, 2026-10-25).
 
-import { PdfDoc, PF, bytesToBase64 } from './pdf.js';
+import { PdfDoc, PF, bytesToBase64, PHOTO_THUMB_W, PHOTO_THUMB_GAP_X, PHOTO_THUMB_GAP_Y, PHOTO_MAX_THUMB_H, PHOTO_PER_ROW } from './pdf.js';
 import { GRAPH } from './graph.js';
 import { CHECKLIST_ITEMS, MACHINE_LABELS } from './equip-inspection-store.js';
 
@@ -69,72 +69,17 @@ function sanitizeSerial(raw) {
 // 2. RENDER: record -> PDF bytes (PF-branded)
 // ---------------------------------------------------------------------------
 
-// Photo thumbnail dimensions.
-const THUMB_W     = 180;   // pts (2.5 inches)
-const THUMB_GAP_X = 12;    // pts between thumbnails in same row
-const THUMB_GAP_Y = 8;     // pts between thumbnail rows
-const MAX_THUMB_H = 180;   // pts max height per thumbnail
-const THUMBS_PER_ROW = 2;
+// Photo thumbnail constants now come from pdf.js (shared with DR and SR).
+// Aliases for local readability:
+const THUMB_W        = PHOTO_THUMB_W;      // 240pt per thumbnail
+const THUMB_GAP_X    = PHOTO_THUMB_GAP_X;  // 12pt horizontal gap
+const THUMB_GAP_Y    = PHOTO_THUMB_GAP_Y;  // 8pt vertical gap
+const MAX_THUMB_H    = PHOTO_MAX_THUMB_H;  // 200pt cap
+const THUMBS_PER_ROW = PHOTO_PER_ROW;      // 2
 
-// Decode JPEG from data-URL or raw base64 string.
-// Returns { b64, w, h } where w/h come from caller-supplied dims.
-function decodePhotoEntry(p) {
-  let b64 = p.data || '';
-  if (b64.startsWith('data:')) {
-    const comma = b64.indexOf(',');
-    b64 = comma >= 0 ? b64.slice(comma + 1) : '';
-  }
-  return { b64, w: p.w || 1, h: p.h || 1 };
-}
-
-// Render one row of available photo thumbnails (up to THUMBS_PER_ROW).
-// Each entry in rowSlice must already have idx and dispH set.
-function _renderPhotoRow(doc, rowItems) {
-  if (!rowItems.length) return;
-  const rowH = Math.max(...rowItems.map((r) => r.dispH));
-  doc._ensure(rowH + THUMB_GAP_Y);
-  const yBase = doc.y - rowH;
-  for (let j = 0; j < rowItems.length; j++) {
-    const { idx, dispH } = rowItems[j];
-    const x = MARGIN + j * (THUMB_W + THUMB_GAP_X);
-    doc.cur.push(
-      `q ${THUMB_W.toFixed(2)} 0 0 ${dispH.toFixed(2)} ${x.toFixed(2)} ${yBase.toFixed(2)} cm /DImg${idx} Do Q`
-    );
-  }
-  doc.y = yBase - THUMB_GAP_Y;
-}
-
-// Embed section photos in the PDF (2 per row, proportional thumbnails).
-// Photos marked unavailable (p.unavailable=true or p.data missing) are skipped
-// gracefully with a "Photo unavailable" text note; a bad JPEG is caught per-item.
+// embedSectionPhotos → now delegates to doc.embedPhotos() (shared PdfDoc method).
 function embedSectionPhotos(doc, photos) {
-  if (!photos || !photos.length) return;
-  doc.spacer(6);
-  let pending = [];
-  const flushRow = () => { if (pending.length) { _renderPhotoRow(doc, pending); pending = []; } };
-
-  for (const p of photos) {
-    if (p.unavailable || !p.data) {
-      flushRow();
-      doc.text('Photo unavailable', { size: 8.5, color: PF.muted, indent: 8 });
-      continue;
-    }
-    try {
-      const { b64, w, h } = decodePhotoEntry(p);
-      const safeW  = Math.max(w || 1, 1);
-      const safeH  = Math.max(h || 1, 1);
-      const aspect = safeH / safeW;
-      const dispH  = Math.min(Math.round(THUMB_W * aspect), MAX_THUMB_H) || MAX_THUMB_H;
-      const idx    = doc.addJpeg(b64, safeW, safeH);
-      pending.push({ idx, dispH });
-      if (pending.length >= THUMBS_PER_ROW) flushRow();
-    } catch {
-      flushRow();
-      doc.text('Photo unavailable', { size: 8.5, color: PF.muted, indent: 8 });
-    }
-  }
-  flushRow();
-  doc.spacer(2);
+  doc.embedPhotos(photos);
 }
 
 export function renderEquipInspectionPdf(rec) {
@@ -223,12 +168,21 @@ export function renderEquipInspectionPdf(rec) {
       const isAttn    = answer === 'Needs Attention' || answer === 'Damaged';
       const isEmpty   = !answer;
       const rightText = isEmpty ? 'Not checked' : answer;
+      // divider:true draws the thin separator AFTER any note that follows,
+      // keeping the divider at the bottom of the full checklist item.
       doc.row(label, rightText, {
         size:       9.5,
         rightW:     95,
         rightColor: isEmpty ? PF.muted : (isAttn ? RED : (answer === 'N/A' ? PF.secondary : PF.azureDark)),
+        divider:    !note,   // separator here when no note; after the note otherwise
       });
-      if (note) doc.text('Note: ' + note, { size: 8.5, color: PF.secondary, indent: 16 });
+      if (note) {
+        doc.text('Note: ' + note, { size: 8.5, color: PF.secondary, indent: 16 });
+        // separator AFTER the note so the divider appears below the full item block
+        doc.cur.push(
+          `0.784 0.835 0.863 RG 0.5 w ${MARGIN}.00 ${doc.y.toFixed(2)} m ${(612 - MARGIN)}.00 ${doc.y.toFixed(2)} l S`
+        );
+      }
     }
     // Embed photos for this section (if any).
     const secPhotos = sectionPhotos[section];

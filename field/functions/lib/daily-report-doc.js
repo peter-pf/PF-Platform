@@ -9,7 +9,7 @@
 // The three side effects (PDF, email, SharePoint) live here so the endpoint stays
 // small and each concern is independently testable.
 
-import { PdfDoc, bytesToBase64, PF } from './pdf.js';
+import { PdfDoc, bytesToBase64, PF, PHOTO_THUMB_W, PHOTO_THUMB_GAP_X, PHOTO_MAX_THUMB_H } from './pdf.js';
 import { GRAPH } from './graph.js';
 
 // Convert an ISO date string (YYYY-MM-DD) to the MM/DD/YYYY display format
@@ -149,11 +149,33 @@ export function renderDailyReportPdf(rec) {
   doc.heading('Work Completed');
   doc.text(rec.workCompleted && rec.workCompleted.trim() ? rec.workCompleted : 'No narrative provided.', { size: 10 });
 
-  // ---- attachments (names only; the files live in SharePoint) ----
+  // ---- site photos: embedded grid when sectionPhotos present, else name list ----
+  // sectionPhotos['photos'] (or ['bottom']) holds [{data, w, h}] entries where
+  // data is a JPEG or RGB-PNG data URL.  Records without sectionPhotos fall back
+  // to the legacy name-only listing so existing saved reports still render fine.
   const attach = Array.isArray(rec.attachments) ? rec.attachments.filter((a) => a && (a.name || a.itemId)) : [];
-  if (attach.length) {
+  const sectionPhotos = rec.sectionPhotos && typeof rec.sectionPhotos === 'object'
+    ? rec.sectionPhotos : {};
+  const embeddedPhotos = Array.isArray(sectionPhotos['photos'] || sectionPhotos['bottom'])
+    ? (sectionPhotos['photos'] || sectionPhotos['bottom'])
+    : [];
+
+  if (embeddedPhotos.length) {
+    doc.heading('Site Photos');
+    doc.embedPhotos(embeddedPhotos);
+  }
+
+  // Non-photo attachments (GUHMA, hand logs, predrill markup, etc.) always listed
+  // by name since their bytes are in SharePoint, not in the record.
+  const otherAttach = attach.filter((a) => a.bucket !== 'photos');
+  // For photo attachments without embedded data (legacy records): list by name.
+  const unembeddedPhotoAttach = embeddedPhotos.length
+    ? []
+    : attach.filter((a) => a.bucket === 'photos');
+
+  if (otherAttach.length || unembeddedPhotoAttach.length) {
     doc.heading('Attachments (in SharePoint)');
-    for (const a of attach) {
+    for (const a of [...unembeddedPhotoAttach, ...otherAttach]) {
       const bkt = a.bucket === 'guhma'    ? 'GUHMA Data'
                 : a.bucket === 'handlogs' ? 'Hand Logs'
                 : a.bucket === 'photos'   ? 'Site Photo'

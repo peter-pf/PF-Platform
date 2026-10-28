@@ -7,9 +7,28 @@
 //   <projectFolder>/Site Readiness/<filename>
 // Filename: "YYYY-MM-DD - <job#> - Site Readiness - <READY|NOT READY>.pdf"
 
-import { PdfDoc, bytesToBase64, PF } from './pdf.js';
+import { PdfDoc, bytesToBase64, PF, PHOTO_THUMB_W, PHOTO_MAX_THUMB_H } from './pdf.js';
 import { GRAPH } from './graph.js';
 import { CHECKLIST_ITEMS, R12_KEYS } from './site-readiness-store.js';
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+// Collect embedded photo entries from rec.sectionPhotos for a set of checklist
+// items.  sectionPhotos is keyed by item key ('3a', '1a', etc.).  Returns a
+// flat array of photo entries suitable for doc.embedPhotos().
+function _collectSectionPhotos(sectionPhotos, items) {
+  if (!sectionPhotos || !items) return [];
+  const out = [];
+  for (const def of items) {
+    const ps = sectionPhotos[def.key];
+    if (Array.isArray(ps)) {
+      for (const p of ps) { if (p) out.push(p); }
+    }
+  }
+  return out;
+}
 
 // ---------------------------------------------------------------------------
 // 1) RENDER: record -> PDF bytes  (PF-branded, same palette as DFR)
@@ -86,22 +105,30 @@ export function renderSiteReadinessPdf(rec) {
     sec.items.push(def);
   }
 
+  // sectionPhotos keyed by item key (e.g. {'3a': [{data,w,h}], '1a': [...]}).
+  const sectionPhotos = (rec.sectionPhotos && typeof rec.sectionPhotos === 'object')
+    ? rec.sectionPhotos : {};
+
   for (const sec of sections) {
     doc.heading(sec.label);
-    const rows = [];
     for (const def of sec.items) {
-      const item = (rec.items || []).find((it) => it && it.key === def.key);
+      const item   = (rec.items || []).find((it) => it && it.key === def.key);
       const answer = (item && item.answer) ? String(item.answer) : '-';
       const note   = (item && item.note && String(item.note).trim()) ? String(item.note).trim() : '';
-      // Show item number + truncated label as the row label.
-      const rowLabel = `${def.key}. ${def.label}`;
-      rows.push({ label: rowLabel, value: answer });
-      // Note as an indented continuation row (no value column).
+      // Single-item table call per row so the separator appears at the right place
+      // even when a note follows.  The note uses doc.text() which word-wraps
+      // correctly for 200+ char strings — fixing the overlay reported by Derek.
+      doc.table([{ label: `${def.key}. ${def.label}`, value: answer }], { valueW: 60 });
       if (note) {
-        rows.push({ label: `     Note: ${note}`, value: '' });
+        doc.text('Note: ' + note, { size: 9, color: PF.secondary, indent: 16 });
       }
     }
-    doc.table(rows, { valueW: 60 });
+    // Embed photos for this section keyed by item key (photo_3a → key '3a', etc.).
+    const secPhotos = _collectSectionPhotos(sectionPhotos, sec.items);
+    if (secPhotos.length) {
+      doc.embedPhotos(secPhotos);
+    }
+    doc.spacer(2);
   }
 
   // Gather all attachment refs up front (used in 4b/ops sections and the summary).

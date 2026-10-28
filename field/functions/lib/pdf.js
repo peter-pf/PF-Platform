@@ -145,34 +145,193 @@ function wrap(str, size, kind, maxW) {
   return lines.length ? lines : [''];
 }
 
+// ---- Photo thumbnail constants (shared across all three field report PDFs) ---
+// 2 per row, left-aligned, proportional scaling.  Content width is 504pt;
+// 2 × 240 + 12 gap = 492pt (leaves a 12pt right margin).
+export const PHOTO_THUMB_W    = 240;   // pts per thumbnail
+export const PHOTO_THUMB_GAP_X = 12;   // horizontal gap between thumbnails
+export const PHOTO_THUMB_GAP_Y =  8;   // vertical gap between rows
+export const PHOTO_MAX_THUMB_H = 200;  // hard cap on thumbnail height
+export const PHOTO_PER_ROW    =  2;
+
+// ---- Minimal PNG parser (type 0 = grayscale, type 2 = RGB only) ----------
+// Returns { kind:'png', w, h, bitDepth, colors, colorSpace, idat:Uint8Array }
+// or null if the PNG cannot be embedded (unsupported type, malformed, etc.).
+// PDF /FlateDecode with /Predictor 15 can consume the raw IDAT data directly,
+// including the PNG per-scanline filter bytes.
+function _parsePng(b64) {
+  try {
+    const bytes = base64ToBytes(b64);
+    // PNG signature: 137 80 78 71 13 10 26 10
+    if (bytes.length < 33 || bytes[0] !== 137 || bytes[1] !== 80 || bytes[2] !== 78) return null;
+    let offset = 8;
+    let w = 0, h = 0, bitDepth = 0, colorType = 0;
+    const idatParts = [];
+    while (offset + 12 <= bytes.length) {
+      const len = ((bytes[offset] << 24) | (bytes[offset+1] << 16) | (bytes[offset+2] << 8) | bytes[offset+3]) >>> 0;
+      const type = String.fromCharCode(bytes[offset+4], bytes[offset+5], bytes[offset+6], bytes[offset+7]);
+      const ds   = offset + 8;
+      if (type === 'IHDR') {
+        w = ((bytes[ds] << 24) | (bytes[ds+1] << 16) | (bytes[ds+2] << 8) | bytes[ds+3]) >>> 0;
+        h = ((bytes[ds+4] << 24) | (bytes[ds+5] << 16) | (bytes[ds+6] << 8) | bytes[ds+7]) >>> 0;
+        bitDepth = bytes[ds+8];
+        colorType = bytes[ds+9];
+      } else if (type === 'IDAT') {
+        idatParts.push(bytes.slice(ds, ds + len));
+      } else if (type === 'IEND') { break; }
+      offset = ds + len + 4; // +4 CRC
+    }
+    // Support: 8-bit grayscale (type 0) and 8-bit RGB (type 2) only.
+    if (bitDepth !== 8 || (colorType !== 0 && colorType !== 2)) return null;
+    if (!w || !h || !idatParts.length) return null;
+    const totalLen = idatParts.reduce((s, c) => s + c.length, 0);
+    const idat = new Uint8Array(totalLen);
+    let pos = 0;
+    for (const c of idatParts) { idat.set(c, pos); pos += c.length; }
+    return {
+      kind: 'png',
+      w, h,
+      bitDepth,
+      colors:      colorType === 0 ? 1 : 3,
+      colorSpace:  colorType === 0 ? '/DeviceGray' : '/DeviceRGB',
+      idat,
+    };
+  } catch { return null; }
+}
+
 export class PdfDoc {
   constructor() {
     this.pages = [];
     this.cur = null;
     this.y = 0;
-    this._dynJpegs = []; // [{b64, w, h}] -- registered via addJpeg()
+    this._dynImages = []; // [{kind, ...}] -- registered via addImage() / addJpeg()
     this._newPage();
   }
 
-  // Register an arbitrary JPEG for embedding. base64 must be raw (no data: prefix).
-  // w, h: pixel dimensions of the source image.
-  // Returns the index (used with placeJpeg()).
-  addJpeg(b64, w, h) {
-    this._dynJpegs.push({ b64, w: w || 1, h: h || 1 });
-    return this._dynJpegs.length - 1;
+  // Register an image for embedding from a data URL or raw base64.
+  // Supports JPEG (image/jpeg) and grayscale/RGB PNG (image/png).
+  // Returns the image index (>= 0) on success, or -1 if the format cannot be
+  // embedded (unsupported PNG type, malformed data, etc.).
+  // Use placeImage() to lay out at a given position; idx -1 draws a placeholder.
+  addImage(dataOrB64, w, h) {
+    let b64 = dataOrB64 || '';
+    let mime = 'image/jpeg';
+    if (b64.startsWith('data:')) {
+      const sc = b64.indexOf(';');
+      const cm = b64.indexOf(',');
+      if (sc > 5 && cm > sc) mime = b64.slice(5, sc).toLowerCase();
+      b64 = cm >= 0 ? b64.slice(cm + 1) : '';
+    }
+    if (!b64) return -1;
+    if (mime === 'image/jpeg' || mime === 'image/jpg') {
+      this._dynImages.push({ kind: 'jpeg', b64, w: Math.max(w || 1, 1), h: Math.max(h || 1, 1) });
+      return this._dynImages.length - 1;
+    }
+    if (mime === 'image/png') {
+      const parsed = _parsePng(b64);
+      if (!parsed) return -1;
+      this._dynImages.push(parsed);
+      return this._dynImages.length - 1;
+    }
+    return -1; // unsupported MIME type
   }
 
-  // Place a registered JPEG as a thumbnail at the current flow position.
-  // thumbW/thumbH: desired size in PDF points (1pt = 1/72 inch).
-  // Advances doc.y by thumbH + vGap.
-  placeJpeg(idx, x, thumbW, thumbH, vGap) {
+  // Backward-compat: addJpeg() accepted raw base64 (no data: prefix) with w/h.
+  addJpeg(b64, w, h) {
+    // Strip data: prefix if present (called from EI with raw b64).
+    return this.addImage(b64, w, h);
+  }
+
+  // Place a registered image at (x, this.y - thumbH).
+  // If idx < 0 (unsupported or missing), renders a grey placeholder box.
+  // Advances doc.y by thumbH + vGap. Never splits across page break (caller must
+  // call _ensure() before grouping rows; placeImage handles single-image breaks).
+  placeImage(idx, x, thumbW, thumbH, vGap) {
     vGap = vGap == null ? 0 : vGap;
     this._ensure(thumbH + vGap);
     const yBottom = this.y - thumbH;
-    this.cur.push(
-      `q ${thumbW.toFixed(2)} 0 0 ${thumbH.toFixed(2)} ${x.toFixed(2)} ${yBottom.toFixed(2)} cm /DImg${idx} Do Q`
-    );
+    if (idx < 0) {
+      // Grey placeholder with border + label.
+      this.fillRect(x, yBottom, thumbW, thumbH, PF.bg3);
+      this.cur.push(
+        `${col(PF.border)} RG 0.5 w ${x.toFixed(2)} ${yBottom.toFixed(2)} ${thumbW.toFixed(2)} ${thumbH.toFixed(2)} re S`
+      );
+      this._draw('Photo unavailable', 8, 'helv', x + 4, yBottom + thumbH / 2 - 4, PF.muted);
+    } else {
+      this.cur.push(
+        `q ${thumbW.toFixed(2)} 0 0 ${thumbH.toFixed(2)} ${x.toFixed(2)} ${yBottom.toFixed(2)} cm /DImg${idx} Do Q`
+      );
+    }
     this.y = yBottom - vGap;
+  }
+
+  // Backward-compat: placeJpeg() used by equip-inspection-doc.js internals.
+  placeJpeg(idx, x, thumbW, thumbH, vGap) { return this.placeImage(idx, x, thumbW, thumbH, vGap); }
+
+  // Embed a photo array (any mix of JPEG / RGB-PNG) in a 2-per-row grid at the
+  // current flow position.  Each entry: { data, w, h } or { b64, w, h }.
+  //   data  : 'data:image/jpeg;base64,...' or 'data:image/png;base64,...' or raw b64
+  //   w, h  : pixel dimensions (used for aspect-ratio scaling)
+  // Missing / unsupported images render as a placeholder box (fail-soft).
+  // The grid never splits a photo row across a page break.
+  embedPhotos(photos) {
+    if (!Array.isArray(photos) || !photos.length) return this;
+    this.spacer(6);
+    let pending = [];
+    const W     = PHOTO_THUMB_W;
+    const GAP_X = PHOTO_THUMB_GAP_X;
+    const GAP_Y = PHOTO_THUMB_GAP_Y;
+    const MAX_H = PHOTO_MAX_THUMB_H;
+    const PER   = PHOTO_PER_ROW;
+
+    const flushRow = () => {
+      if (!pending.length) return;
+      const rowH = Math.max(...pending.map((r) => r.dispH));
+      // Ensure the whole row fits before starting; forces a page break if needed.
+      this._ensure(rowH + GAP_Y);
+      const yBase = this.y - rowH;
+      for (let j = 0; j < pending.length; j++) {
+        const { idx, dispH } = pending[j];
+        const x = MARGIN + j * (W + GAP_X);
+        if (idx >= 0) {
+          this.cur.push(
+            `q ${W.toFixed(2)} 0 0 ${dispH.toFixed(2)} ${x.toFixed(2)} ${yBase.toFixed(2)} cm /DImg${idx} Do Q`
+          );
+        } else {
+          this.fillRect(x, yBase, W, dispH, PF.bg3);
+          this.cur.push(
+            `${col(PF.border)} RG 0.5 w ${x.toFixed(2)} ${yBase.toFixed(2)} ${W.toFixed(2)} ${dispH.toFixed(2)} re S`
+          );
+          this._draw('Photo unavailable', 8, 'helv', x + 4, yBase + dispH / 2 - 4, PF.muted);
+        }
+      }
+      this.y = yBase - GAP_Y;
+      pending = [];
+    };
+
+    for (const p of photos) {
+      const placeholderH = Math.min(W, MAX_H);
+      if (!p || (!p.data && !p.b64)) {
+        pending.push({ idx: -1, dispH: placeholderH });
+        if (pending.length >= PER) flushRow();
+        continue;
+      }
+      try {
+        const raw = p.data || p.b64 || '';
+        const safeW = Math.max(p.w || 1, 1);
+        const safeH = Math.max(p.h || 1, 1);
+        const aspect = safeH / safeW;
+        const dispH  = Math.min(Math.round(W * aspect), MAX_H) || MAX_H;
+        const idx    = this.addImage(raw, safeW, safeH);
+        pending.push({ idx, dispH });
+      } catch {
+        pending.push({ idx: -1, dispH: placeholderH });
+      }
+      if (pending.length >= PER) flushRow();
+    }
+    flushRow();
+    this.spacer(2);
+    return this;
   }
 
   _newPage() {
@@ -245,6 +404,13 @@ export class PdfDoc {
   //   title  : the report title (e.g. "Daily Field Report")
   //   meta   : array of { label, value } rendered right-aligned as a block. The
   //            caller decides the field order (project number goes among these).
+  //
+  // Title / metadata collision guard (2026-10-28):
+  //   The metadata block bounds are pre-computed first so we know its left edge
+  //   before placing the title.  If the title would run into the metadata block,
+  //   it wraps to two lines at 13pt (the same approach equip-inspection-doc.js
+  //   already uses manually).  A guaranteed 20pt gap is maintained between the
+  //   title's right edge and the metadata block's leftmost character.
   brandHeader(title, meta) {
     meta = Array.isArray(meta) ? meta.filter((m) => m && (m.label || m.value)) : [];
     // CHARCOAL masthead (Round 4). Taller band so the logo lockup fits cleanly.
@@ -254,64 +420,85 @@ export class PdfDoc {
     this.fillRect(0, bandY, PAGE_W, bandH, PF.charcoal);
     this.fillRect(0, bandY, PAGE_W, 3, PF.azure);
 
-    // ---- LEFT: the PF logo lockup, VERTICALLY CENTERED in the band ----
-    // (Round 8, Derek) The JPEG is pre-flattened onto the same charcoal so it
-    // sits seamlessly with no visible box. It carries the "PIER FOUNDATIONS"
-    // wordmark, so the separate text wordmark stays removed. The logo is now
-    // centered on the band's vertical center line (not top-aligned).
     const bandCenterY = bandY + bandH / 2;
-    let logoRightX = MARGIN;                          // where the title will start after the logo
+
+    // ---- Pre-compute metadata block dimensions FIRST (needed for title placement) ----
+    const mSize     = 9.5;
+    const mLead     = 15;
+    const rightEdge = PAGE_W - MARGIN;  // 558
+    const metaGap   = 6;               // gap between label col and value col
+    let labelW = 0, valueW = 0;
+    const metaRows = meta.map((m) => {
+      const label = toWinAnsi((m.label || '') + ':');
+      const value = toWinAnsi(m.value == null || m.value === '' ? '-' : String(m.value));
+      labelW = Math.max(labelW, measure(label, mSize, 'helvb'));
+      valueW = Math.max(valueW, measure(value, mSize, 'helvb'));
+      return { label, value };
+    });
+    const maxBlockW = rightEdge - (MARGIN + 275); // ≈229pt: room for logo+title on left
+    if (labelW + metaGap + valueW > maxBlockW) {
+      valueW = Math.max(60, maxBlockW - metaGap - labelW);
+    }
+    const labelRightX = rightEdge - valueW - metaGap;
+    const valueLeftX  = rightEdge - valueW;
+    // Leftmost pixel any metadata character can reach.
+    const metaLeft = meta.length ? (labelRightX - labelW) : rightEdge;
+
+    // ---- LEFT: PF logo lockup, VERTICALLY CENTERED in the band ----
+    let logoRightX = MARGIN;
     if (LOGO_OK) {
-      const vPad = 20;                               // top+bottom breathing room
-      let logoH = bandH - vPad * 2;                  // logo height, band minus padding
+      const vPad = 20;
+      let logoH = bandH - vPad * 2;
       let logoW = PF_LOGO.width * (logoH / PF_LOGO.height);
-      const maxW = 190;                              // keep logo compact so the title fits beside it
-      if (logoW > maxW) { const s2 = maxW / logoW; logoW = maxW; logoH = logoH * s2; }
+      const maxLogoW = 190;
+      if (logoW > maxLogoW) { const s = maxLogoW / logoW; logoW = maxLogoW; logoH = logoH * s; }
       const logoX = MARGIN - 2;
-      const logoY = bandCenterY - logoH / 2;         // vertically centered
+      const logoY = bandCenterY - logoH / 2;
       this.drawImage(logoX, logoY, logoW, logoH);
       logoRightX = logoX + logoW;
     } else {
-      // fallback text wordmark, vertically centered
       const wmSize = 15;
       this._draw('PIER FOUNDATIONS', wmSize, 'euro', MARGIN, bandCenterY - wmSize * 0.35, PF.white);
       logoRightX = MARGIN + measure('PIER FOUNDATIONS', wmSize, 'euro');
     }
 
-    // ---- report title (white Eurostile), to the RIGHT of the logo, also ----
-    // vertically centered on the band center line. Sits in the gap between the
-    // logo's right edge and the metadata block on the far right.
-    const titleSize = 16;
-    const titleX = logoRightX + 18;                  // small gap after the logo
-    const titleBaseline = bandCenterY - titleSize * 0.35; // optical vertical centering
-    this._draw(title, titleSize, 'euro', titleX, titleBaseline, PF.white);
+    // ---- Report title (white Eurostile), between logo and metadata block ----
+    // Guaranteed gap: title right edge must not come within 20pt of metaLeft.
+    const titleX        = logoRightX + 18;
+    const MIN_TITLE_GAP = 20;
+    const maxTitleW     = metaLeft - MIN_TITLE_GAP - titleX;
+
+    if (title) {
+      const BIG  = 16;
+      const SMALL = 13;
+      if (maxTitleW > 0 && measure(title, BIG, 'euro') <= maxTitleW) {
+        // Fits single line at full size.
+        this._draw(title, BIG, 'euro', titleX, bandCenterY - BIG * 0.35, PF.white);
+      } else {
+        // Wrap to two lines at smaller size.
+        const words = toWinAnsi(title).split(/\s+/).filter(Boolean);
+        let split = 1;
+        for (let i = 1; i < words.length; i++) {
+          const l1 = words.slice(0, i).join(' ');
+          const l2 = words.slice(i).join(' ');
+          const capW = maxTitleW > 0 ? maxTitleW : (metaLeft - titleX - 4);
+          if (measure(l1, SMALL, 'euro') <= capW && measure(l2, SMALL, 'euro') <= capW) {
+            split = i; break;
+          }
+        }
+        if (split === 1 && words.length > 1) split = Math.ceil(words.length / 2);
+        this._draw(words.slice(0, split).join(' '), SMALL, 'euro', titleX, bandCenterY + SMALL * 0.65, PF.white);
+        this._draw(words.slice(split).join(' '),    SMALL, 'euro', titleX, bandCenterY - SMALL * 0.65, PF.white);
+      }
+    }
 
     // ---- RIGHT: labeled metadata block (light-grey labels, white values) ----
     if (meta.length) {
-      const mSize = 9.5;
-      const mLead = 15;
-      const rightEdge = PAGE_W - MARGIN;
       const blockH = meta.length * mLead;
       let by = bandY + (bandH - blockH) / 2 + blockH - mLead + 3;
-      let labelW = 0, valueW = 0;
-      const rows = meta.map((m) => {
-        const label = toWinAnsi((m.label || '') + ':');
-        const value = toWinAnsi(m.value == null || m.value === '' ? '-' : String(m.value));
-        labelW = Math.max(labelW, measure(label, mSize, 'helvb'));
-        valueW = Math.max(valueW, measure(value, mSize, 'helvb'));
-        return { label, value };
-      });
-      const gap = 6;
-      const maxBlockW = (PAGE_W - MARGIN) - (MARGIN + 275); // leave room for logo+title
-      let blockW = labelW + gap + valueW;
-      if (blockW > maxBlockW) { valueW = Math.max(60, maxBlockW - gap - labelW); blockW = labelW + gap + valueW; }
-      const labelRightX = rightEdge - valueW - gap;
-      const valueLeftX = rightEdge - valueW;
-      for (const r of rows) {
+      for (const r of metaRows) {
         const lw = measure(r.label, mSize, 'helvb');
-        // labels: muted light grey
         this._draw(r.label, mSize, 'helvb', labelRightX - lw, by, PF.lightGrey);
-        // values: solid white (clip if huge)
         let v = r.value;
         while (v.length > 1 && measure(v, mSize, 'helvb') > valueW) v = v.slice(0, -1);
         if (v !== r.value && v.length > 1) v = v.slice(0, -1) + '.';
@@ -374,7 +561,10 @@ export class PdfDoc {
     return this;
   }
 
-  // Two-column row (left label, right value). opts: {rightW, size, color, rightColor, indent}
+  // Two-column row (left label, right value).
+  // opts: {rightW, size, color, rightColor, indent, divider}
+  //   divider: true → draw a thin grey separator line at the bottom of the row,
+  //            matching table()'s row separator style (used in EI section items).
   row(left, right, opts) {
     opts = opts || {};
     const size = opts.size || 10;
@@ -398,6 +588,12 @@ export class PdfDoc {
     }
     if (rightStr) {
       this._draw(rightStr, size, 'helvb', rightX, yStart, opts.rightColor || PF.azureDark);
+    }
+    // Optional thin separator matching table()'s row dividers.
+    if (opts.divider) {
+      this.cur.push(
+        `${col(PF.border)} RG 0.5 w ${MARGIN.toFixed(2)} ${this.y.toFixed(2)} m ${(PAGE_W - MARGIN).toFixed(2)} ${this.y.toFixed(2)} l S`
+      );
     }
     return this;
   }
@@ -607,15 +803,28 @@ export class PdfDoc {
         `/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpg.length} >>`,
         jpg);
     }
-    // ---- dynamic JPEG XObjects (/DImg0, /DImg1, ...) -----------------------
+    // ---- dynamic image XObjects (/DImg0, /DImg1, ...) -- JPEG + PNG ---------
     const dynImgNums = [];
-    for (const img of this._dynJpegs) {
-      const jpgBytes = base64ToBytes(img.b64);
-      const n = pushBin(objects, push,
-        `<< /Type /XObject /Subtype /Image /Width ${img.w} /Height ${img.h} ` +
-        `/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpgBytes.length} >>`,
-        jpgBytes);
-      dynImgNums.push(n);
+    for (const img of this._dynImages) {
+      if (img.kind === 'jpeg') {
+        const jpgBytes = base64ToBytes(img.b64);
+        const n = pushBin(objects, push,
+          `<< /Type /XObject /Subtype /Image /Width ${img.w} /Height ${img.h} ` +
+          `/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpgBytes.length} >>`,
+          jpgBytes);
+        dynImgNums.push(n);
+      } else if (img.kind === 'png') {
+        // RGB/grayscale PNG: embed raw IDAT bytes with /FlateDecode + Predictor 15
+        // (the PNG per-scanline filter bytes are handled natively by PDF viewers).
+        const decParms =
+          `/Predictor 15 /Colors ${img.colors} /BitsPerComponent ${img.bitDepth} /Columns ${img.w}`;
+        const n = pushBin(objects, push,
+          `<< /Type /XObject /Subtype /Image /Width ${img.w} /Height ${img.h} ` +
+          `/ColorSpace ${img.colorSpace} /BitsPerComponent ${img.bitDepth} ` +
+          `/Filter /FlateDecode /DecodeParms << ${decParms} >> /Length ${img.idat.length} >>`,
+          img.idat);
+        dynImgNums.push(n);
+      }
     }
     let xobjDict = logoObjNum ? `/Im0 ${logoObjNum} 0 R` : '';
     for (let di = 0; di < dynImgNums.length; di++) {
