@@ -462,35 +462,29 @@ export class PdfDoc {
       logoRightX = MARGIN + measure('PIER FOUNDATIONS', wmSize, 'euro');
     }
 
-    // ---- Report title (white Eurostile), between logo and metadata block ----
-    // Guaranteed gap: title right edge must not come within 20pt of metaLeft.
+    // ---- Report title (white Eurostile) + subtitle — consistent across all reports ----
+    // Single-line shrink-to-fit: never wraps; shrinks from TITLE_MAX down to TITLE_MIN.
+    // Fixed baseline positions so every report type has identical header placement.
+    //   titleBaseY : main title baseline (slightly above band centre)
+    //   subBaseY   : "Pier Foundations" subtitle baseline (slightly below band centre)
     const titleX        = logoRightX + 18;
     const MIN_TITLE_GAP = 20;
     const maxTitleW     = metaLeft - MIN_TITLE_GAP - titleX;
+    const TITLE_MAX     = 15;
+    const TITLE_MIN     = 10;
+    const titleBaseY    = bandCenterY + 9;
+    const subBaseY      = bandCenterY - 7;
 
     if (title) {
-      const BIG  = 16;
-      const SMALL = 13;
-      if (maxTitleW > 0 && measure(title, BIG, 'euro') <= maxTitleW) {
-        // Fits single line at full size.
-        this._draw(title, BIG, 'euro', titleX, bandCenterY - BIG * 0.35, PF.white);
-      } else {
-        // Wrap to two lines at smaller size.
-        const words = toWinAnsi(title).split(/\s+/).filter(Boolean);
-        let split = 1;
-        for (let i = 1; i < words.length; i++) {
-          const l1 = words.slice(0, i).join(' ');
-          const l2 = words.slice(i).join(' ');
-          const capW = maxTitleW > 0 ? maxTitleW : (metaLeft - titleX - 4);
-          if (measure(l1, SMALL, 'euro') <= capW && measure(l2, SMALL, 'euro') <= capW) {
-            split = i; break;
-          }
-        }
-        if (split === 1 && words.length > 1) split = Math.ceil(words.length / 2);
-        this._draw(words.slice(0, split).join(' '), SMALL, 'euro', titleX, bandCenterY + SMALL * 0.65, PF.white);
-        this._draw(words.slice(split).join(' '),    SMALL, 'euro', titleX, bandCenterY - SMALL * 0.65, PF.white);
+      let tSize = TITLE_MAX;
+      if (maxTitleW > 0) {
+        const ts = toWinAnsi(title);
+        while (tSize > TITLE_MIN && measure(ts, tSize, 'euro') > maxTitleW) tSize -= 0.5;
       }
+      this._draw(toWinAnsi(title), tSize, 'euro', titleX, titleBaseY, PF.white);
     }
+    // Sub-label "Pier Foundations" — always drawn for brand consistency.
+    this._draw('Pier Foundations', 8, 'helv', titleX, subBaseY, PF.lightGrey);
 
     // ---- RIGHT: labeled metadata block (light-grey labels, white values) ----
     if (meta.length) {

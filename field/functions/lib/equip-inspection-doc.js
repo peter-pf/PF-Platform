@@ -33,18 +33,6 @@ import { GRAPH } from './graph.js';
 import { CHECKLIST_ITEMS, MACHINE_LABELS } from './equip-inspection-store.js';
 
 // ---------------------------------------------------------------------------
-// bandHeader geometry constants -- must mirror brandHeader() in pdf.js exactly.
-// ---------------------------------------------------------------------------
-const PAGE_H     = 792;
-const MARGIN     = 54;
-const BAND_H     = 104;
-const BAND_Y     = PAGE_H - BAND_H;      // = 688
-const BAND_CTR_Y = BAND_Y + BAND_H / 2;  // = 740
-
-// The logo occupies logoX=52, logoW<=190, so logoRightX<=242.
-// titleX is 18pt after the logo's right edge. Use 260 conservatively.
-const TITLE_X    = 260;
-
 // Red colour for "Needs Attention" answer text in the PDF.
 const RED = [0.75, 0.12, 0.12];
 
@@ -117,14 +105,12 @@ export function renderEquipInspectionPdf(rec) {
     ? rec.sectionPhotos : {};
 
   // ---- Brand header ----
-  doc.brandHeader('', [
+  doc.brandHeader('Daily Equipment Inspection', [
     { label: 'Machine',  value: typeLabel },
     { label: 'Job #',    value: rec.projectId || rec.jobNumber || '-' },
     { label: 'Date',     value: fmtDate(rec.date) },
     { label: 'Serial #', value: rec.serialNumber || '-' },
   ]);
-  doc._draw('Daily Equipment', 13, 'euro', TITLE_X, BAND_CTR_Y + 7, PF.white);
-  doc._draw('Inspection',      13, 'euro', TITLE_X, BAND_CTR_Y - 7, PF.white);
 
   doc.spacer(2);
 

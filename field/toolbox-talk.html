@@ -75,17 +75,30 @@
 </head>
 <body>
 
-<!-- ---- SHARED NAV (same as all field portal pages) ---- -->
-<div id="pfTopBar">
-  <span id="pfTopLogo"><span class="pf-logo-mark">PF</span> <span class="pf-logo-text">Field Portal</span></span>
-  <div class="pf-top-right">
-    <button id="themeToggle" class="icon-btn" aria-label="Toggle dark mode">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-    </button>
-    <button id="logoutBtn" class="icon-btn" aria-label="Sign out">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-    </button>
-  </div>
+<div id="topbar">
+  <a href="/" class="tb-brand" aria-label="PF Field Portal">
+    <div class="tb-mark">PF</div>
+    <span class="tb-title">Toolbox Talk</span>
+  </a>
+  <details class="acct-menu" id="acctMenu">
+    <summary>
+      <span class="acct-btn">
+        <span class="acct-name" id="acctName"></span>
+        <svg class="acct-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </span>
+    </summary>
+    <div class="acct-dropdown">
+      <button type="button" class="acct-item" onclick="window.pfToggleTheme()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>
+        <span id="acctThemeLabel">Dark mode</span>
+      </button>
+      <div class="acct-divider"></div>
+      <a class="acct-item" id="logoutLink" href="/api/logout">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+        Sign Out
+      </a>
+    </div>
+  </details>
 </div>
 
 <nav id="pfNav" aria-label="Main navigation">
@@ -317,12 +330,19 @@ var ttState = {
 // ---- Auth / session ----
 (function checkAuth(){
   fetch('/api/me', {credentials:'same-origin'})
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      if (!d || !d.name) { showAuthError(); return; }
-      document.getElementById('loading').style.display = 'none';
-      document.getElementById('main').style.display    = 'block';
-      ttInitForm();
+    .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+    .then(function(r){
+      if (r.ok && r.d && r.d.status === 'ok') {
+        var acctNm = document.getElementById('acctName');
+        if (acctNm) acctNm.textContent = r.d.name || '';
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('main').style.display    = 'block';
+        ttInitForm();
+      } else if (r.d && r.d.status === 'must_reset') {
+        window.location.href = '/reset-password.html';
+      } else {
+        showAuthError();
+      }
     })
     .catch(showAuthError);
 })();
@@ -331,22 +351,6 @@ function showAuthError(){
   document.getElementById('loading').style.display   = 'none';
   document.getElementById('authError').style.display = 'block';
 }
-
-// ---- Theme toggle ----
-var themeBtn = document.getElementById('themeToggle');
-if (themeBtn) themeBtn.addEventListener('click', function(){
-  var cur = document.documentElement.getAttribute('data-theme');
-  var next = (cur === 'dark') ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', next);
-  try { localStorage.setItem('pf-theme', next); } catch(e){}
-});
-
-// ---- Logout ----
-var logoutBtn = document.getElementById('logoutBtn');
-if (logoutBtn) logoutBtn.addEventListener('click', function(){
-  fetch('/api/logout', {method:'POST',credentials:'same-origin'})
-    .finally(function(){ window.location.href='/login.html'; });
-});
 
 // ---- Main init ----
 function ttInitForm(){

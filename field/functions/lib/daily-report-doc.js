@@ -58,7 +58,7 @@ export function renderDailyReportPdf(rec) {
   const crew = Array.isArray(rec.crew) ? rec.crew.filter((c) => c && c.name) : [];
   if (crew.length) {
     doc.table(crew.map((c) => ({
-      label: c.costCode ? `${c.name}  (${c.costCode})` : c.name,
+      label: c.name,  // cost code kept in data/timesheet; not shown in PDF per Derek 10/29
       value: '',
     })));
   } else {

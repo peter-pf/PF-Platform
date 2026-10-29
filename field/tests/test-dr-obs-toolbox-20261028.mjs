@@ -50,6 +50,9 @@ const authSrc    = readFileSync(path.join(root, 'functions/lib/auth.js'),       
 const pastRepSrc = readFileSync(path.join(root, 'functions/api/past-reports.js'),      'utf8');
 const ttHtmlSrc  = readFileSync(path.join(root, 'toolbox-talk.html'),                  'utf8');
 const indexHtml  = readFileSync(path.join(root, 'index.html'),                         'utf8');
+const pdfSrc     = readFileSync(path.join(root, 'functions/lib/pdf.js'),               'utf8');
+const eiDocSrc   = readFileSync(path.join(root, 'functions/lib/equip-inspection-doc.js'), 'utf8');
+const prHtmlSrc  = readFileSync(path.join(root, 'past-reports.html'),                  'utf8');
 
 // ============================================================
 // A. DR PDF crew hours removal
@@ -64,8 +67,8 @@ assertNotIncludes('A3: daily-report-doc.js does not include hours total in crew 
   drDocSrc, 'hours:');
 assertIncludes('A4: daily-report-doc.js still includes crew names in crew section',
   drDocSrc, 'c.name');
-assertIncludes('A5: daily-report-doc.js still includes cost codes in crew section',
-  drDocSrc, 'c.costCode');
+assertNotIncludes('A5: daily-report-doc.js no longer shows cost code in PDF crew label (Derek 10/29)',
+  drDocSrc, '`${c.name}  (${c.costCode})');
 assertIncludes('A6: DR doc comment notes hours/time-in/out removed from PDF per Derek',
   drDocSrc, 'hours/time-in/out removed from PDF per Derek');
 
@@ -493,6 +496,75 @@ navPages.forEach(function (page, idx) {
   assert('M' + (10 + idx) + ': ' + page + ' contains /toolbox-talk.html href',
     src.includes('href="/toolbox-talk.html"'));
 });
+
+// ============================================================
+// N. Derek round 10/29 — crew, PDF header, TT topbar, past-reports
+// ============================================================
+console.log('\n// N: Derek 10/29 changes');
+
+// N1-N2: DR PDF crew — cost code removed from display
+assert('N1: DR PDF crew label uses c.name only (no cost code in parentheses)',
+  drDocSrc.includes('label: c.name,') && !drDocSrc.includes('`${c.name}  (${c.costCode})`'));
+assert('N2: DR PDF crew comment notes cost code kept in data not PDF',
+  drDocSrc.includes('cost code kept in data'));
+
+// N3-N7: PDF header — brandHeader shrink-to-fit + Pier Foundations subtitle
+assertIncludes('N3: pdf.js brandHeader uses shrink-to-fit (TITLE_MAX to TITLE_MIN)', pdfSrc, 'TITLE_MIN');
+assertIncludes('N4: pdf.js brandHeader draws Pier Foundations subtitle', pdfSrc, "'Pier Foundations'");
+assertIncludes('N5: pdf.js brandHeader has fixed titleBaseY (single-line placement)', pdfSrc, 'titleBaseY');
+assertIncludes('N6: pdf.js brandHeader has fixed subBaseY (subtitle placement)', pdfSrc, 'subBaseY');
+assertNotIncludes('N7: pdf.js brandHeader no longer wraps title to two lines (split logic removed)', pdfSrc, 'words.slice(0, split)');
+
+// N8-N9: EI doc uses brandHeader with full title; no manual _draw for it
+assertIncludes('N8: equip-inspection-doc.js passes full title to brandHeader',
+  eiDocSrc, "'Daily Equipment Inspection'");
+assertNotIncludes('N9: equip-inspection-doc.js no longer has manual _draw for "Daily Equipment"',
+  eiDocSrc, "_draw('Daily Equipment'");
+
+// N10-N13: TT topbar — standard markup matching other pages
+assertIncludes('N10: toolbox-talk.html uses id="topbar" (standard topbar id)', ttHtmlSrc, 'id="topbar"');
+assertIncludes('N11: toolbox-talk.html has tb-brand anchor', ttHtmlSrc, 'class="tb-brand"');
+assertIncludes('N12: toolbox-talk.html has tb-mark div', ttHtmlSrc, 'class="tb-mark"');
+assertNotIncludes('N13: toolbox-talk.html no longer has old pfTopBar id', ttHtmlSrc, 'id="pfTopBar"');
+
+// N14: TT topbar matches DR topbar brand markup exactly (tb-mark + tb-title pattern)
+(function(){
+  function extractTopbarBrand(src) {
+    const m = src.match(/<div[^>]+id="topbar"[^>]*>([\s\S]*?)<\/div>\s*\n\s*<nav/);
+    if (!m) return null;
+    const inner = m[1];
+    // Extract the tb-brand anchor content
+    const brand = inner.match(/<a[^>]+class="tb-brand"[^>]*>([\s\S]*?)<\/a>/);
+    return brand ? brand[1].trim().replace(/\s+/g, ' ') : null;
+  }
+  const drBrand = extractTopbarBrand(readFileSync(path.join(root, 'daily-report.html'), 'utf8'));
+  const ttBrand = extractTopbarBrand(ttHtmlSrc);
+  // Both should have tb-mark and tb-title (exact text differs by page, structure must match)
+  assert('N14: TT topbar has same structural elements as DR topbar (tb-mark + tb-title)',
+    ttBrand && ttBrand.includes('tb-mark') && ttBrand.includes('tb-title') &&
+    drBrand && drBrand.includes('tb-mark') && drBrand.includes('tb-title'));
+})();
+
+// N15-N18: past-reports API includes EI records
+assertIncludes('N15: past-reports.js imports listRecords from equip-inspection-store',
+  pastRepSrc, "from '../lib/equip-inspection-store.js'");
+assertIncludes('N16: past-reports.js maps EI records to type equipment-inspection',
+  pastRepSrc, "'equipment-inspection'");
+assertIncludes('N17: past-reports.js wraps EI list in its own try/catch (isolated)',
+  pastRepSrc, 'EI list failed');
+assertIncludes('N18: past-reports.js includes eiReports in combined list',
+  pastRepSrc, '.concat(eiReports)');
+
+// N19-N22: past-reports.html — type toggle buttons
+assertIncludes('N19: past-reports.html has type toggle div', prHtmlSrc, 'id="typeToggle"');
+assertIncludes('N20: past-reports.html has Equipment Inspection type button',
+  prHtmlSrc, 'data-type="equipment-inspection"');
+assertIncludes('N21: past-reports.html has Toolbox Talk type button',
+  prHtmlSrc, 'data-type="toolbox-talk"');
+assertIncludes('N22: past-reports.html filterType dropdown has equipment-inspection option',
+  prHtmlSrc, '<option value="equipment-inspection">');
+assertIncludes('N23: past-reports.html filterType dropdown has toolbox-talk option',
+  prHtmlSrc, '<option value="toolbox-talk">');
 
 // ============================================================
 // Summary

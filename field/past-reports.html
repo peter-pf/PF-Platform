@@ -40,6 +40,16 @@
   .pr-badge{font-size:11px;padding:2px 9px;border-radius:10px;background:var(--surface-3);color:var(--text-3);font-weight:600;white-space:nowrap;flex:0 0 auto;}
   .pr-badge.daily{background:rgba(0,109,176,.14);color:var(--accent-dark);}
   .pr-badge.sr{background:rgba(63,185,80,.15);color:var(--green);}
+  .pr-badge.ei{background:rgba(155,66,245,.12);color:#8b3fc7;}
+  [data-theme="dark"] .pr-badge.ei{color:#c084fc;}
+  .pr-badge.tt{background:rgba(220,100,20,.12);color:#b85a0a;}
+  [data-theme="dark"] .pr-badge.tt{color:#fb923c;}
+  /* ---- report type toggle buttons ---- */
+  #typeToggle{display:flex;flex-wrap:wrap;gap:0;border:1px solid var(--accent);border-radius:6px;overflow:hidden;margin-bottom:12px;}
+  .pr-type-btn{flex:1 1 0;padding:8px 10px;background:var(--surface-3);color:var(--text-2);border:none;border-right:1px solid var(--accent);font-weight:600;font-size:12px;cursor:pointer;transition:background .12s,color .12s;text-align:center;white-space:nowrap;}
+  .pr-type-btn:last-child{border-right:none;}
+  .pr-type-btn.active{background:var(--accent);color:#fff;}
+  .pr-type-btn:hover:not(.active){background:var(--accent-light);color:var(--accent-dark);}
   .pr-badge.status-ready{background:rgba(63,185,80,.15);color:var(--green);}
   .pr-badge.status-not-ready{background:rgba(210,153,34,.15);color:var(--amber);}
   .pr-badge.status-sent{background:rgba(0,109,176,.14);color:var(--accent-dark);}
@@ -130,12 +140,21 @@
 
 <div id="main" style="display:none">
 <div class="pf-col">
+  <div id="typeToggle" role="group" aria-label="Report type">
+    <button type="button" class="pr-type-btn active" data-type="">All</button>
+    <button type="button" class="pr-type-btn" data-type="daily-report">Daily Report</button>
+    <button type="button" class="pr-type-btn" data-type="site-readiness">Site Readiness</button>
+    <button type="button" class="pr-type-btn" data-type="equipment-inspection">Equip. Inspect.</button>
+    <button type="button" class="pr-type-btn" data-type="toolbox-talk">Toolbox Talk</button>
+  </div>
   <div id="filterBar">
     <input type="text" id="filterText" placeholder="Search project or type..." autocomplete="off" aria-label="Search">
     <select id="filterType" aria-label="Form type">
       <option value="">All types</option>
       <option value="daily-report">Daily Report</option>
       <option value="site-readiness">Site Readiness</option>
+      <option value="equipment-inspection">Equipment Inspection</option>
+      <option value="toolbox-talk">Toolbox Talk</option>
     </select>
     <label>From <input type="date" id="filterFrom" aria-label="From date"></label>
     <label>To <input type="date" id="filterTo" aria-label="To date"></label>
@@ -215,6 +234,22 @@ function wireFilters(){
     var el=document.getElementById(id);
     if(el&&!el.dataset.wired){el.dataset.wired='1';el.addEventListener('input',renderList);el.addEventListener('change',renderList);}
   });
+  // Type-toggle buttons: clicking sets filterType select + re-renders.
+  var toggleEl=document.getElementById('typeToggle');
+  if(toggleEl&&!toggleEl.dataset.wired){
+    toggleEl.dataset.wired='1';
+    toggleEl.addEventListener('click',function(e){
+      var btn=e.target.closest('.pr-type-btn');
+      if(!btn)return;
+      var type=btn.dataset.type||'';
+      var sel=document.getElementById('filterType');
+      if(sel)sel.value=type;
+      Array.from(toggleEl.querySelectorAll('.pr-type-btn')).forEach(function(b){
+        b.classList.toggle('active',b===btn);
+      });
+      renderList();
+    });
+  }
 }
 
 function renderList(){
@@ -243,10 +278,12 @@ function renderList(){
   if(!filtered.length){listEl.innerHTML='<div class="pr-empty">No reports match your filters.</div>';return;}
 
   listEl.innerHTML=filtered.map(function(r){
-    var typeLabel=r.type==='daily-report'?'Daily Report':'Site Readiness';
+    var typeLabelMap={'daily-report':'Daily Report','site-readiness':'Site Readiness','equipment-inspection':'Equip. Inspect.','toolbox-talk':'Toolbox Talk'};
+    var typeLabel=typeLabelMap[r.type]||E(r.type||'Report');
+    var typeClsMap={'daily-report':'daily','site-readiness':'sr','equipment-inspection':'ei','toolbox-talk':'tt'};
     // typeCls and statusCls are derived from whitelisted values — use E() as
     // defense-in-depth so server data never reaches an unescaped class attribute.
-    var typeCls=E(r.type==='daily-report'?'daily':'sr');
+    var typeCls=E(typeClsMap[r.type]||'');
     var statusKey=r.status==='sent'?'sent':(r.result==='READY'?'ready':(r.result==='NOT READY'?'not-ready':'draft'));
     var statusCls='status-'+E(statusKey);
     var statusLabel=r.result||r.status||'draft';

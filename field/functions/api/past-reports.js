@@ -1,8 +1,9 @@
 // Cloudflare Pages Function -- /api/past-reports
 // Returns a combined list of Daily Field Reports, Site Readiness records,
-// and Toolbox Talks for the authenticated user's role, sorted by date DESC.
+// Equipment Inspection records, and Toolbox Talks for the authenticated
+// user's role, sorted by date DESC.
 //
-// RBAC: field_ops area (same gate as DFR + SR + TT endpoints).
+// RBAC: field_ops area (same gate as DFR + SR + EI + TT endpoints).
 //   field_ops = admin / partner / business_dev / field_ops
 //   ZERO financials: only operational metadata is returned (date, project, status,
 //   PDF name, SharePoint link).  No dollar amounts, rates, or costs.
@@ -10,12 +11,13 @@
 // RESPONSE:
 //   { ok: true, reports: [{ id, type, date, projectName, projectId, status,
 //                           pdfName, pdfWebUrl, submittedAt, createdAt }] }
-//   type = 'daily-report' | 'site-readiness' | 'toolbox-talk'
+//   type = 'daily-report' | 'site-readiness' | 'equipment-inspection' | 'toolbox-talk'
 //   reports sorted by date DESC, then createdAt DESC within the same date.
 
 import { requireArea } from '../lib/auth.js';
 import { listReports } from '../lib/daily-report-store.js';
 import { listRecords as listSrRecords } from '../lib/site-readiness-store.js';
+import { listRecords as listEiRecords } from '../lib/equip-inspection-store.js';
 import { listRecords as listTtRecords } from '../lib/toolbox-talk-store.js';
 
 const JSON_HEADERS = {
@@ -57,6 +59,14 @@ export async function onRequestGet(context) {
       listReports(env, {}),
       listSrRecords(env, {}),
     ]);
+
+    // EI is isolated: table may not exist in all environments.
+    let eiRecs = null;
+    try {
+      eiRecs = await listEiRecords(env, {});
+    } catch (e) {
+      console.error('api/past-reports: EI list failed, returning no EI rows:', e && e.message);
+    }
 
     // TT is isolated: migration may not yet be applied in all environments.
     // If TT errors for any reason, log it and return no TT rows so DR/SR still list.
@@ -111,6 +121,23 @@ export async function onRequestGet(context) {
         createdAt:   s(r.createdAt),
       }));
 
+    const eiReports = (Array.isArray(eiRecs) ? eiRecs : [])
+      .filter(draftVisible)
+      .map((r) => ({
+        id:          s(r.id),
+        type:        'equipment-inspection',
+        date:        s(r.date),
+        projectName: s(r.projectName || r.projectId),
+        projectId:   s(r.projectId),
+        status:      s(r.status),
+        machineType: s(r.machineType),
+        serialNumber: s(r.serialNumber),
+        pdfName:     s(r.pdfName),
+        pdfWebUrl:   /^https:\/\//i.test(String(r.pdfWebUrl || '')) ? s(r.pdfWebUrl, 500) : '',
+        submittedAt: s(r.submittedAt),
+        createdAt:   s(r.createdAt),
+      }));
+
     const ttReports = (ttResult && Array.isArray(ttResult.records) ? ttResult.records : [])
       .filter(draftVisible)
       .map((r) => ({
@@ -128,7 +155,7 @@ export async function onRequestGet(context) {
         createdAt:   s(r.createdAt),
       }));
 
-    const combined = drReports.concat(srReports).concat(ttReports).sort((a, b) => {
+    const combined = drReports.concat(srReports).concat(eiReports).concat(ttReports).sort((a, b) => {
       // Primary sort: date DESC (ISO string compare works for YYYY-MM-DD)
       const dateCmp = String(b.date || '').localeCompare(String(a.date || ''));
       if (dateCmp !== 0) return dateCmp;
