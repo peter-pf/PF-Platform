@@ -284,9 +284,12 @@ function renderList(){
     // typeCls and statusCls are derived from whitelisted values — use E() as
     // defense-in-depth so server data never reaches an unescaped class attribute.
     var typeCls=E(typeClsMap[r.type]||'');
-    var statusKey=r.status==='sent'?'sent':(r.result==='READY'?'ready':(r.result==='NOT READY'?'not-ready':'draft'));
+    // DR/SR write status='sent'; EI/TT write status='submitted'. Both mean the
+    // same thing (complete/visible to all) and get the same green sent treatment.
+    var isSubmitted=(r.status==='sent'||r.status==='submitted');
+    var statusKey=isSubmitted?'sent':(r.result==='READY'?'ready':(r.result==='NOT READY'?'not-ready':'draft'));
     var statusCls='status-'+E(statusKey);
-    var statusLabel=r.result||r.status||'draft';
+    var statusLabel=isSubmitted?(r.result||'sent'):(r.result||r.status||'draft');
     var pdfHtml='';
     if(r.pdfWebUrl&&/^https:\/\//i.test(r.pdfWebUrl)){
       pdfHtml='<a href="'+E(r.pdfWebUrl)+'" target="_blank" rel="noopener" class="pr-pdf-link">View PDF</a>';

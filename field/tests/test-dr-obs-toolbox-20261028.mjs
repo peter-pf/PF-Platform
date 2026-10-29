@@ -655,6 +655,49 @@ assertIncludes(
   ttApiSrc,
   "rec.status === 'draft' && rec.createdBy !== uid && session.role !== 'admin'");
 
+// P16-P18: past-reports.html badge — 'submitted' gets same green/sent treatment as 'sent'
+assertIncludes(
+  "P16: past-reports.html renderList introduces isSubmitted covering both sent and submitted",
+  prHtmlSrc, "r.status==='sent'||r.status==='submitted'");
+assertIncludes(
+  "P17: past-reports.html statusKey uses isSubmitted (not just sent check) for green badge",
+  prHtmlSrc, "var statusKey=isSubmitted?'sent'");
+assertIncludes(
+  "P18: past-reports.html statusLabel falls back to 'sent' for submitted records (no raw 'submitted' text)",
+  prHtmlSrc, "r.result||'sent'");
+
+// P19-P22: runtime badge logic — reconstruct renderList statusKey/statusLabel for all cases
+(function runBadgeTests() {
+  function badge(r) {
+    var isSubmitted = (r.status === 'sent' || r.status === 'submitted');
+    var statusKey = isSubmitted ? 'sent'
+      : (r.result === 'READY' ? 'ready'
+      : (r.result === 'NOT READY' ? 'not-ready' : 'draft'));
+    var statusLabel = isSubmitted ? (r.result || 'sent') : (r.result || r.status || 'draft');
+    return { statusKey, statusLabel };
+  }
+  // EI submitted → green, label 'sent'
+  var ei = badge({ status: 'submitted', type: 'equipment-inspection' });
+  assertEq('P19: EI submitted statusKey = sent (green)', ei.statusKey, 'sent');
+  assertEq('P20: EI submitted statusLabel = sent',       ei.statusLabel, 'sent');
+  // TT submitted → green, label 'sent'
+  var tt = badge({ status: 'submitted', type: 'toolbox-talk' });
+  assertEq('P21: TT submitted statusKey = sent (green)', tt.statusKey, 'sent');
+  assertEq('P22: TT submitted statusLabel = sent',       tt.statusLabel, 'sent');
+  // DR sent → green, label 'sent'
+  var dr = badge({ status: 'sent', type: 'daily-report' });
+  assertEq('P23: DR sent statusKey = sent', dr.statusKey, 'sent');
+  assertEq('P24: DR sent statusLabel = sent', dr.statusLabel, 'sent');
+  // SR sent+READY → green, label 'READY'
+  var sr = badge({ status: 'sent', result: 'READY', type: 'site-readiness' });
+  assertEq('P25: SR sent statusKey = sent (green)',  sr.statusKey, 'sent');
+  assertEq('P26: SR sent statusLabel = READY',       sr.statusLabel, 'READY');
+  // draft → grey, label 'draft'
+  var dr2 = badge({ status: 'draft', type: 'daily-report' });
+  assertEq('P27: DR draft statusKey = draft (grey)', dr2.statusKey, 'draft');
+  assertEq('P28: DR draft statusLabel = draft',      dr2.statusLabel, 'draft');
+})();
+
 // ============================================================
 // Summary
 // ============================================================
