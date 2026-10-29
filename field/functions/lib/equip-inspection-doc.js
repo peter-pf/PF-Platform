@@ -33,6 +33,9 @@ import { GRAPH } from './graph.js';
 import { CHECKLIST_ITEMS, MACHINE_LABELS } from './equip-inspection-store.js';
 
 // ---------------------------------------------------------------------------
+// Layout constant used in the render function (matches pdf.js MARGIN).
+const MARGIN = 54;
+
 // Red colour for "Needs Attention" answer text in the PDF.
 const RED = [0.75, 0.12, 0.12];
 
