@@ -320,6 +320,9 @@
 // ============================================================
 'use strict';
 
+// UUID v4 pattern for client-side id validation (mirrors server UUID_RE).
+var TT_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 var ttState = {
   id:         null,
   status:     'new',
@@ -548,8 +551,40 @@ function ttSave(submit){
     if (body.topic === 'other' && !body.topicOther.trim()){
       ttShowMsg('Please specify the topic.', 'err'); return;
     }
+    // If no server draft exists yet, create one first to get a server UUID,
+    // then retry the submit.  Without this, sending action='submit' with a null
+    // id fails the server-side UUID check ("Invalid id format").
+    if (!TT_UUID_RE.test(ttState.id || '')) {
+      ttState.saving = true;
+      document.getElementById('ttSaveBtn').disabled   = true;
+      document.getElementById('ttSubmitBtn').disabled = true;
+      document.getElementById('ttSubmitMsg').textContent = 'Submitting...';
+      fetch('/api/toolbox-talk', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(Object.assign({}, body, { action: 'create' })),
+      }).then(function(r){ return r.json(); }).then(function(d){
+        ttState.saving = false;
+        if (!d || !d.ok || !d.id) {
+          document.getElementById('ttSaveBtn').disabled   = false;
+          document.getElementById('ttSubmitBtn').disabled = false;
+          document.getElementById('ttSubmitMsg').textContent = '';
+          ttShowMsg((d && d.error) || 'Could not start record. Please try again.', 'err');
+          return;
+        }
+        ttState.id = d.id; // store server UUID, then retry submit
+        ttSave(true);
+      }).catch(function(){
+        ttState.saving = false;
+        document.getElementById('ttSaveBtn').disabled   = false;
+        document.getElementById('ttSubmitBtn').disabled = false;
+        document.getElementById('ttSubmitMsg').textContent = '';
+        ttShowMsg('Network error. Please try again.', 'err');
+      });
+      return;
+    }
   } else {
-    action = ttState.id ? 'update' : 'create';
+    action = TT_UUID_RE.test(ttState.id || '') ? 'update' : 'create';
   }
   body.action = action;
   if (action === 'update' || action === 'submit') body.id = ttState.id;

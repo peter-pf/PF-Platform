@@ -370,16 +370,75 @@ var EI_ITEMS = [
 // 'Damaged' added 2026-10-27 (Derek request): renders red in PDF, listed in deficiencies.
 var EI_ANSWERS = ['Pass', 'Needs Attention', 'Damaged', 'N/A'];
 
-// ---- State ----
+// UUID v4 pattern for client-side id validation (mirrors server UUID_RE).
+var UUID_RE_CLIENT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// ---- Global state (machine-type-independent) ----
 var eiState = {
-  id: null,
   machineType: 'skid_steer',
-  items: {}, // key -> {answer, note}
-  safeToOperate: null,
   projects: [],
   me: null,
-  sectionPhotos: {}, // sectionName -> [{n, name, w, h, previewUrl}]
 };
+
+// Per-machine independent form state, keyed by machineType.
+// Each machine keeps its own draft id, checklist answers, header field values,
+// safe-to-operate answer, notes, and photo metadata.  Switching machine type
+// saves the current DOM values and loads the new machine's saved state so that
+// answers entered for one machine never bleed into another.
+var eiMachineStates = {};
+
+function eiInitMachineState(type) {
+  if (!eiMachineStates[type]) {
+    eiMachineStates[type] = {
+      id: null,           // server-generated UUID; null until successfully saved
+      items: {},          // key -> {answer, note}
+      safeToOperate: null,
+      sectionPhotos: {},  // sectionName -> [{n, name, w, h, previewUrl}]
+      date: eiTodayStr(),
+      projectId: '',
+      projectName: '',
+      inspectedBy: '',
+      ownedOrRented: '',
+      serialNumber: '',
+      machineHours: null,
+      deficienciesNotes: '',
+    };
+  }
+  return eiMachineStates[type];
+}
+
+// Save current DOM header/assessment values into the current machine's state.
+// Must be called before switching machine type so no values are lost.
+function eiSaveDomToCurrentState() {
+  var ms = eiMachineStates[eiState.machineType];
+  if (!ms) return;
+  ms.date = document.getElementById('eiDate').value;
+  ms.projectId = document.getElementById('eiProjectId').value;
+  ms.projectName = document.getElementById('eiProjectName').value;
+  ms.inspectedBy = document.getElementById('eiInspectedBy').value;
+  ms.ownedOrRented = document.getElementById('eiOwnedRented').value;
+  ms.serialNumber = document.getElementById('eiSerialNumber').value;
+  var mhv = document.getElementById('eiMachineHours').value;
+  ms.machineHours = mhv !== '' ? Number(mhv) : null;
+  ms.deficienciesNotes = document.getElementById('eiDeficiencies').value;
+  // safeToOperate and items are kept in sync by their event listeners.
+}
+
+// Load a machine's saved state into the DOM header and assessment fields.
+function eiLoadStateToDom(ms) {
+  document.getElementById('eiDate').value = ms.date || eiTodayStr();
+  document.getElementById('eiProjectId').value = ms.projectId || '';
+  document.getElementById('eiProjectName').value = ms.projectName || '';
+  document.getElementById('eiProjectSearch').value = ms.projectId
+    ? (ms.projectId + (ms.projectName ? ': ' + ms.projectName : '')) : '';
+  document.getElementById('eiInspectedBy').value = ms.inspectedBy || '';
+  document.getElementById('eiOwnedRented').value = ms.ownedOrRented || '';
+  document.getElementById('eiSerialNumber').value = ms.serialNumber || '';
+  document.getElementById('eiMachineHours').value = ms.machineHours != null ? ms.machineHours : '';
+  document.getElementById('eiDeficiencies').value = ms.deficienciesNotes || '';
+  document.getElementById('eiSafeYes').classList.toggle('active', ms.safeToOperate === true);
+  document.getElementById('eiSafeNo').classList.toggle('active', ms.safeToOperate === false);
+}
 
 // --- Photo upload constants ---
 var EI_MAX_DIM = 1600;
@@ -392,6 +451,7 @@ function eiRenderChecklist() {
   var host = document.getElementById('eiChecklist');
   if (!host) return;
   var type = eiState.machineType;
+  var ms   = eiMachineStates[type] || eiInitMachineState(type);
   var items = EI_ITEMS.filter(function(it){ return it.types.indexOf(type) >= 0; });
   var sections = [];
   var bySection = {};
@@ -408,7 +468,7 @@ function eiRenderChecklist() {
     var secItems = bySection[sec];
     for (var j = 0; j < secItems.length; j++) {
       var d = secItems[j];
-      var saved = eiState.items[d.key] || {};
+      var saved = ms.items[d.key] || {};
       var ansVal = saved.answer || '';
       var noteVal = saved.note || '';
       html += '<div class="ei-item">';
@@ -472,7 +532,8 @@ function eiRenderSectionPhotos() {
     var slug = sectionToSlug(sec);
     var list = document.getElementById('eiPhotoList_' + slug);
     if (!list) return;
-    var photos = eiState.sectionPhotos[sec] || [];
+    var msph = eiMachineStates[eiState.machineType];
+    var photos = (msph && msph.sectionPhotos[sec]) || [];
     list.innerHTML = '';
     photos.forEach(function(p, idx) {
       var wrap = document.createElement('div');
@@ -524,13 +585,14 @@ function eiOnPhotoSelected(e) {
   var section = input.getAttribute('data-section');
   var files   = Array.prototype.slice.call(input.files || []);
   input.value = ''; // reset so same file can be re-selected
-  if (!files.length || !eiState.id) {
-    if (!eiState.id) { eiShowMsg('Save a draft first before adding photos.', true); return; }
+  var ms = eiMachineStates[eiState.machineType];
+  if (!files.length || !ms.id) {
+    if (!ms.id) { eiShowMsg('Save a draft first before adding photos.', true); return; }
     return;
   }
-  var totalPhotos = Object.values(eiState.sectionPhotos)
+  var totalPhotos = Object.values(ms.sectionPhotos)
     .reduce(function(n, arr) { return n + arr.length; }, 0);
-  var secPhotos = eiState.sectionPhotos[section] || [];
+  var secPhotos = ms.sectionPhotos[section] || [];
 
   var promises = files.slice(0, EI_MAX_PHOTOS_PER_SEC - secPhotos.length).map(function(file) {
     if (totalPhotos >= EI_MAX_PHOTOS_TOTAL) {
@@ -553,7 +615,7 @@ function eiOnPhotoSelected(e) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'add_photo',
-          id: eiState.id,
+          id: ms.id,
           section: section,
           data: res.dataUrl,
           name: res.name,
@@ -562,8 +624,8 @@ function eiOnPhotoSelected(e) {
         }),
       }).then(function(r) { return r.json(); }).then(function(d) {
         if (d && d.ok) {
-          if (!eiState.sectionPhotos[section]) eiState.sectionPhotos[section] = [];
-          eiState.sectionPhotos[section].push({
+          if (!ms.sectionPhotos[section]) ms.sectionPhotos[section] = [];
+          ms.sectionPhotos[section].push({
             n: d.photoIndex, name: d.name, w: d.w, h: d.h, previewUrl: res.dataUrl,
           });
         } else {
@@ -579,19 +641,20 @@ function eiOnPhotoDelete(e) {
   var btn     = e.currentTarget;
   var section = btn.getAttribute('data-section');
   var idx     = Number(btn.getAttribute('data-idx'));
-  if (!eiState.id || isNaN(idx)) return;
+  var ms = eiMachineStates[eiState.machineType];
+  if (!ms || !ms.id || isNaN(idx)) return;
   fetch('/api/equipment-inspection', {
     method: 'POST', credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'del_photo', id: eiState.id, section: section, photoIndex: idx }),
+    body: JSON.stringify({ action: 'del_photo', id: ms.id, section: section, photoIndex: idx }),
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d && d.ok) {
-      var arr = eiState.sectionPhotos[section] || [];
+      var arr = ms.sectionPhotos[section] || [];
       arr.splice(idx, 1);
       // Re-number remaining
       arr.forEach(function(p, i) { p.n = i; });
-      if (arr.length === 0) delete eiState.sectionPhotos[section];
-      else eiState.sectionPhotos[section] = arr;
+      if (arr.length === 0) delete ms.sectionPhotos[section];
+      else ms.sectionPhotos[section] = arr;
       eiRenderSectionPhotos();
     } else {
       eiShowMsg((d && d.error) || 'Delete failed.', true);
@@ -603,21 +666,32 @@ function eiOnItemChange(e) {
   var el = e.target;
   var key = el.getAttribute('data-key');
   if (!key) return;
-  if (!eiState.items[key]) eiState.items[key] = {answer:'', note:''};
-  if (el.tagName === 'SELECT') eiState.items[key].answer = el.value;
-  else eiState.items[key].note = el.value;
+  var ms = eiMachineStates[eiState.machineType];
+  if (!ms.items[key]) ms.items[key] = {answer:'', note:''};
+  if (el.tagName === 'SELECT') ms.items[key].answer = el.value;
+  else ms.items[key].note = el.value;
   eiMarkUnsaved();
 }
 
 // ---- Type toggle ----
 function eiSetType(type) {
+  if (type !== eiState.machineType) {
+    // Flush current DOM header/assessment values into the current machine's
+    // state before switching, so no user input is lost.
+    eiSaveDomToCurrentState();
+  }
   eiState.machineType = type;
+  eiInitMachineState(type); // ensure per-machine state exists
   var btns = document.querySelectorAll('.ei-type-btn');
   for (var i = 0; i < btns.length; i++) {
     btns[i].classList.toggle('active', btns[i].getAttribute('data-type') === type);
   }
+  // Restore this machine's saved header/assessment values into the DOM.
+  eiLoadStateToDom(eiMachineStates[type]);
   eiRenderChecklist();
-  eiMarkUnsaved();
+  // Update draft status indicator.
+  var ms = eiMachineStates[type];
+  if (ms.id) { eiMarkSaved('Draft loaded'); } else { eiMarkUnsaved(); }
 }
 document.getElementById('eiTypeToggle').addEventListener('click', function(e){
   var btn = e.target.closest('.ei-type-btn');
@@ -626,13 +700,13 @@ document.getElementById('eiTypeToggle').addEventListener('click', function(e){
 
 // ---- Safe-to-operate toggle ----
 document.getElementById('eiSafeYes').addEventListener('click', function(){
-  eiState.safeToOperate = true;
+  eiMachineStates[eiState.machineType].safeToOperate = true;
   document.getElementById('eiSafeYes').classList.add('active');
   document.getElementById('eiSafeNo').classList.remove('active');
   eiMarkUnsaved();
 });
 document.getElementById('eiSafeNo').addEventListener('click', function(){
-  eiState.safeToOperate = false;
+  eiMachineStates[eiState.machineType].safeToOperate = false;
   document.getElementById('eiSafeNo').classList.add('active');
   document.getElementById('eiSafeYes').classList.remove('active');
   eiMarkUnsaved();
@@ -646,12 +720,18 @@ function eiMarkUnsaved() {
 function eiMarkSaved(label) {
   var el = document.getElementById('eiDsState');
   if (el) { el.textContent = label || 'Saved'; el.className = 'ds-saved'; }
+  var ms = eiMachineStates[eiState.machineType];
   var fn = document.getElementById('eiDsFilename');
-  if (fn && eiState.id) fn.textContent = eiState.id.slice(0, 24);
+  if (fn) fn.textContent = (ms && ms.id) ? ms.id.slice(0, 24) : 'No draft';
 }
 
 // ---- Collect form body ----
+// id is the server-generated UUID from the current machine's state, or null if no
+// draft has been saved yet.  The server ignores id on 'create' actions, and validates
+// it as a UUID on 'update'/'submit'.  Callers that need to submit must obtain a
+// server UUID first (via 'create') before issuing 'submit'.
 function eiCollectBody() {
+  var ms = eiMachineStates[eiState.machineType];
   var items = [];
   var seenKeys = {};
   var itemDefs = EI_ITEMS.filter(function(it){ return it.types.indexOf(eiState.machineType) >= 0; });
@@ -659,12 +739,12 @@ function eiCollectBody() {
     var d = itemDefs[i];
     if (seenKeys[d.key]) continue;
     seenKeys[d.key] = true;
-    var saved = eiState.items[d.key] || {};
+    var saved = ms.items[d.key] || {};
     items.push({ key: d.key, answer: saved.answer || '', note: saved.note || '' });
   }
   var mh = document.getElementById('eiMachineHours').value;
   return {
-    id:               eiState.id || ('ei-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8)),
+    id:               ms.id,   // null when no server draft exists; server ignores on create
     machineType:      eiState.machineType,
     date:             document.getElementById('eiDate').value,
     projectId:        document.getElementById('eiProjectId').value,
@@ -674,7 +754,7 @@ function eiCollectBody() {
     serialNumber:     document.getElementById('eiSerialNumber').value,
     machineHours:     mh !== '' ? Number(mh) : null,
     items:            items,
-    safeToOperate:    eiState.safeToOperate,
+    safeToOperate:    ms.safeToOperate,
     deficienciesNotes: document.getElementById('eiDeficiencies').value,
   };
 }
@@ -769,40 +849,43 @@ function eiLoadRecord(id) {
     .then(function(r){ return r.json(); })
     .then(function(d){
       if (!d || !d.record) return;
-      var rec = d.record;
-      eiState.id = rec.id;
-      eiState.machineType = rec.machineType || 'skid_steer';
-      eiState.items = {};
+      var rec  = d.record;
+      var type = rec.machineType || 'skid_steer';
+
+      // Save current DOM header values before switching machines.
+      if (type !== eiState.machineType) { eiSaveDomToCurrentState(); }
+
+      // Populate the target machine's state with the loaded record.
+      eiInitMachineState(type);
+      var ms = eiMachineStates[type];
+      ms.id = rec.id;
+      ms.items = {};
       if (Array.isArray(rec.items)) {
-        rec.items.forEach(function(it){ if (it && it.key) eiState.items[it.key] = {answer: it.answer||'', note: it.note||''}; });
+        rec.items.forEach(function(it){ if (it && it.key) ms.items[it.key] = {answer: it.answer||'', note: it.note||''}; });
       }
-      eiState.safeToOperate = rec.safeToOperate != null ? rec.safeToOperate : null;
-      // Restore section photo metadata (previews won't be available for old photos).
-      eiState.sectionPhotos = (rec.sectionPhotos && typeof rec.sectionPhotos === 'object')
-        ? rec.sectionPhotos : {};
+      ms.safeToOperate   = rec.safeToOperate != null ? rec.safeToOperate : null;
+      ms.sectionPhotos   = (rec.sectionPhotos && typeof rec.sectionPhotos === 'object') ? rec.sectionPhotos : {};
+      ms.date            = rec.date || '';
+      ms.projectId       = rec.projectId || '';
+      ms.projectName     = rec.projectName || '';
+      ms.inspectedBy     = rec.inspectedBy || '';
+      ms.ownedOrRented   = rec.ownedOrRented || '';
+      ms.serialNumber    = rec.serialNumber || '';
+      ms.machineHours    = rec.machineHours != null ? rec.machineHours : null;
+      ms.deficienciesNotes = rec.deficienciesNotes || '';
 
-      // Set type toggle
-      eiSetType(eiState.machineType);
+      // Switch toggle to match the record's machine type.
+      eiState.machineType = type;
+      var btns = document.querySelectorAll('.ei-type-btn');
+      for (var i = 0; i < btns.length; i++) {
+        btns[i].classList.toggle('active', btns[i].getAttribute('data-type') === type);
+      }
 
-      // Set header fields
-      document.getElementById('eiDate').value = rec.date || '';
-      document.getElementById('eiProjectId').value = rec.projectId || '';
-      document.getElementById('eiProjectName').value = rec.projectName || '';
-      document.getElementById('eiProjectSearch').value = rec.projectId ? (rec.projectId + (rec.projectName ? ': ' + rec.projectName : '')) : '';
-      // Inspected By: set select if value matches allowlist, else leave blank.
-      var ibSel = document.getElementById('eiInspectedBy');
-      ibSel.value = rec.inspectedBy || '';
-      document.getElementById('eiOwnedRented').value = rec.ownedOrRented || '';
-      document.getElementById('eiSerialNumber').value = rec.serialNumber || '';
-      document.getElementById('eiMachineHours').value = rec.machineHours != null ? rec.machineHours : '';
-      document.getElementById('eiDeficiencies').value = rec.deficienciesNotes || '';
-
-      // Safe-to-operate
-      document.getElementById('eiSafeYes').classList.toggle('active', rec.safeToOperate === true);
-      document.getElementById('eiSafeNo').classList.toggle('active',  rec.safeToOperate === false);
+      // Load state into DOM and re-render checklist (which calls eiRenderSectionPhotos).
+      eiLoadStateToDom(ms);
+      eiRenderChecklist();
 
       document.getElementById('eiNewForm').style.display = 'inline-block';
-      eiRenderSectionPhotos();
       eiMarkSaved('Draft loaded');
     });
 }
@@ -810,22 +893,24 @@ function eiLoadRecord(id) {
 window.eiLoadRecord = eiLoadRecord;
 
 // ---- Save draft ----
+// Fix: determine create vs update by checking whether the current machine's
+// ms.id is a server-generated UUID (not null, not an old local fallback).
+// The old code set eiState.id to a local 'ei-...' string and then checked its
+// length, which always routed fresh forms through 'update' and got a 400.
 document.getElementById('eiSaveDraft').addEventListener('click', function(){
+  var ms   = eiMachineStates[eiState.machineType];
   var body = eiCollectBody();
-  eiState.id = body.id;
-  body.action = 'create';
-  // If existing id on server, use update
+  var action = UUID_RE_CLIENT.test(ms.id || '') ? 'update' : 'create';
   fetch('/api/equipment-inspection', {
     method: 'POST', credentials: 'same-origin',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify(Object.assign({}, body, {action: eiState.id && eiState.id.length > 10 ? 'update' : 'create'})),
+    body: JSON.stringify(Object.assign({}, body, {action: action})),
   })
   .then(function(r){ return r.json(); })
   .then(function(d){
     if (d && d.ok) {
+      if (d.id) ms.id = d.id; // store server-generated UUID in per-machine state
       eiMarkSaved('Draft saved');
-      // Try to persist server-side id
-      if (d.id) eiState.id = d.id;
     } else {
       eiShowMsg((d && d.error) || 'Could not save draft', true);
     }
@@ -834,12 +919,12 @@ document.getElementById('eiSaveDraft').addEventListener('click', function(){
 });
 
 // ---- Submit ----
-document.getElementById('eiSubmit').addEventListener('click', function(){
-  var body = eiCollectBody();
-  if (!body.serialNumber) { eiShowMsg('Serial number is required before submitting.', true); return; }
-  if (!body.date) { eiShowMsg('Date is required before submitting.', true); return; }
-  if (body.safeToOperate === null) { eiShowMsg('Please answer Safe to Operate before submitting.', true); return; }
-  eiState.id = body.id;
+// Sends 'submit' action to the API.  If no server draft exists yet (ms.id is
+// null or not a UUID), auto-creates a draft first to obtain a server-generated
+// UUID, then submits in a second request.  This fixes the "Invalid id format"
+// error that blocked Christian Boutte and any crew member who presses
+// "Submit & save PDF" without first saving a draft (2026-10-29).
+function eiDoSubmit(body) {
   fetch('/api/equipment-inspection', {
     method: 'POST', credentials: 'same-origin',
     headers: {'Content-Type':'application/json'},
@@ -859,16 +944,56 @@ document.getElementById('eiSubmit').addEventListener('click', function(){
     }
   })
   .catch(function(){ eiShowMsg('Network error during submission', true); });
+}
+
+document.getElementById('eiSubmit').addEventListener('click', function(){
+  var body = eiCollectBody();
+  if (!body.serialNumber) { eiShowMsg('Serial number is required before submitting.', true); return; }
+  if (!body.date) { eiShowMsg('Date is required before submitting.', true); return; }
+  if (body.safeToOperate === null) { eiShowMsg('Please answer Safe to Operate before submitting.', true); return; }
+  var ms = eiMachineStates[eiState.machineType];
+  // Auto-create a server draft when none exists, then submit with the server UUID.
+  if (!UUID_RE_CLIENT.test(ms.id || '')) {
+    fetch('/api/equipment-inspection', {
+      method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(Object.assign({}, body, {action: 'create'})),
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d || !d.ok || !d.id) {
+        eiShowMsg((d && d.error) || 'Could not start record. Check connection and retry.', true);
+        return;
+      }
+      ms.id  = d.id;  // persist server UUID in per-machine state
+      body.id = d.id; // supply UUID to the submit request
+      eiDoSubmit(body);
+    })
+    .catch(function(){ eiShowMsg('Network error during submission. Check connection and retry.', true); });
+    return;
+  }
+  eiDoSubmit(body);
 });
 
 // ---- New form ----
+// Resets only the CURRENT machine's state; other machines keep their drafts.
 document.getElementById('eiNewForm').addEventListener('click', function(){
-  eiState.id = null; eiState.items = {}; eiState.safeToOperate = null; eiState.sectionPhotos = {};
+  var ms = eiMachineStates[eiState.machineType];
+  ms.id = null;
+  ms.items = {};
+  ms.safeToOperate = null;
+  ms.sectionPhotos = {};
+  ms.date = eiTodayStr();
+  ms.projectId = ''; ms.projectName = '';
+  ms.inspectedBy = ''; ms.ownedOrRented = '';
+  ms.serialNumber = ''; ms.machineHours = null;
+  ms.deficienciesNotes = '';
+  // Reflect the cleared state in the DOM.
   document.getElementById('eiDate').value = eiTodayStr();
   document.getElementById('eiProjectId').value = '';
   document.getElementById('eiProjectName').value = '';
   document.getElementById('eiProjectSearch').value = '';
-  document.getElementById('eiInspectedBy').value = ''; // select: user must choose
+  document.getElementById('eiInspectedBy').value = '';
   document.getElementById('eiOwnedRented').value = '';
   document.getElementById('eiSerialNumber').value = '';
   document.getElementById('eiMachineHours').value = '';
@@ -934,8 +1059,10 @@ function eiShowMsg(msg, isErr) {
       loadEl.style.display = 'none';
       mainEl.style.display = 'block';
       barEl.style.display = 'flex';
-      // Set nav active state
       if (window.pfSetNavActive) window.pfSetNavActive('/equipment-inspection.html');
+      // Initialize per-machine state for all 3 types with today's date.
+      ['skid_steer', 'predrill_excavator', 'vibro_excavator'].forEach(eiInitMachineState);
+      eiMachineStates['skid_steer'].date = document.getElementById('eiDate').value;
       eiRenderChecklist();
       eiLoadList();
     })
