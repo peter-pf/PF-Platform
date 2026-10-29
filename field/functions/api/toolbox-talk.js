@@ -36,33 +36,15 @@ import {
   upsertRecord, loadRecordById, listRecords, countRecords,
   PRESENTER_SET, PRESENTER_OPTIONS, TOPIC_KEYS, TOPIC_LABELS,
 } from '../lib/toolbox-talk-store.js';
+import { resolveMailingList } from '../lib/mailing-lists.js';
 
 // ---------------------------------------------------------------------------
-// RECIPIENTS  --  *** THE ONE PLACE TO FLIP TEST -> PRODUCTION ***
+// RECIPIENTS -- now read from the mailing_lists D1 table (migration 0011).
 // ---------------------------------------------------------------------------
-// ACTIVE = TEST_RECIPIENTS (Derek only) until Derek approves the layout.
-// When ready, flip ACTIVE_RECIPIENTS = PROD_RECIPIENTS (or set env var
-// TOOLBOX_TALK_RECIPIENTS).  Per Derek 10/28/2026.
-// John Willis email confirmed from existing site-readiness PROD_RECIPIENTS.
-const TEST_RECIPIENTS = ['dfranke@pierfoundations.com'];
-const PROD_RECIPIENTS = [
-  'breinking@pierfoundations.com',
-  'jreinking@pierfoundations.com',
-  'dfranke@pierfoundations.com',
-  'jwillis@pierfoundations.com',
-];
-// >>> FLIP HERE <<< : ACTIVE_RECIPIENTS = TEST_RECIPIENTS until Derek approves.
-// Per Derek 10/28/2026.  Flip ACTIVE_RECIPIENTS to PROD_RECIPIENTS on go-live.
-const ACTIVE_RECIPIENTS = TEST_RECIPIENTS;
-
-function resolveRecipients(env) {
-  // Allow an env override for testing without redeploy.
-  if (env && env.TOOLBOX_TALK_RECIPIENTS) {
-    return env.TOOLBOX_TALK_RECIPIENTS
-      .split(',').map((s) => s.trim()).filter(Boolean);
-  }
-  return ACTIVE_RECIPIENTS;
-}
+// The old TEST_RECIPIENTS / PROD_RECIPIENTS / ACTIVE_RECIPIENTS constants and
+// the TOOLBOX_TALK_RECIPIENTS env-var override have been RETIRED.
+// Seed (migration 0011): toolbox_talk: dfranke@pierfoundations.com
+// FAIL-SAFE: if D1 unreachable or list empty, warning returned; email skipped.
 
 // ---------------------------------------------------------------------------
 const MAX_BODY_BYTES  = 64 * 1024;
@@ -357,15 +339,22 @@ export async function onRequest(context) {
       }
     }
 
-    // Email the PDF.
-    const recipients = resolveRecipients(env);
-    if (recipients.length && graphConfigured(env)) {
+    // Email the PDF. Recipients from D1 mailing_lists table.
+    // FAIL-SAFE: if D1 unreachable or list empty, skip email and return warning.
+    // The record and SP upload are NOT reverted.
+    let ttEmailWarning = null;
+    const { recipients, warning: ttMailingWarning } = await resolveMailingList(env.DB, 'toolbox_talk');
+    if (ttMailingWarning) {
+      ttEmailWarning = ttMailingWarning;
+    } else if (recipients.length && graphConfigured(env)) {
       let token;
       try { token = await getGraphToken(env); }
-      catch (e) { console.error('[toolbox-talk] Graph token (email) failed:', e && e.message); }
+      catch (e) {
+        console.error('[toolbox-talk] Graph token (email) failed:', e && e.message);
+        ttEmailWarning = 'Email not sent: could not reach mail service. The record and PDF were saved.';
+      }
       if (token) {
         try {
-          const topicLabel = TOPIC_LABELS[body.topic] || body.topic || '';
           const subject = `Toolbox Talk - ${body.projectName || body.projectId || 'Project'} - ${body.date}`;
           const bodyText = buildEmailBody(body);
           await sendTalkEmail(env, token, {
@@ -375,7 +364,7 @@ export async function onRequest(context) {
           body.sentAt    = new Date().toISOString();
         } catch (e) {
           console.error('[toolbox-talk] Email send failed:', e && e.message);
-          // Non-fatal: record is still saved.
+          ttEmailWarning = 'Email not sent: send failed. The record and PDF were saved. Please notify your supervisor.';
         }
       }
     }
@@ -384,13 +373,14 @@ export async function onRequest(context) {
     catch (e) { return jsonErr('Service temporarily unavailable', 503); }
 
     return json({
-      ok:         true,
-      id:         body.id,
-      status:     'submitted',
-      pdfName:    body.pdfName,
-      pdfWebUrl:  body.pdfWebUrl  || null,
-      emailedTo:  body.emailedTo  || null,
-      sentAt:     body.sentAt     || null,
+      ok:          true,
+      id:          body.id,
+      status:      'submitted',
+      pdfName:     body.pdfName,
+      pdfWebUrl:   body.pdfWebUrl  || null,
+      emailedTo:   body.emailedTo  || null,
+      sentAt:      body.sentAt     || null,
+      emailWarning: ttEmailWarning || undefined,
     });
   }
 

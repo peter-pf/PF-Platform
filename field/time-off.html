@@ -140,7 +140,23 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><path d="M8 14l2 2 4-4"></path></svg>
     <span>Time Off</span>
   </a>
+  <a href="/mailing-lists.html" class="pf-nav-item" data-paths="/mailing-lists.html, /mailing-lists" style="display:none" id="mlNavItem">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,12 2,6"></polyline></svg>
+    <span>Mailing Lists</span>
+  </a>
 </nav>
+
+<!-- Submit confirm modal (Derek, 2026-10-29) -->
+<div id="submitConfirmModal" role="dialog" aria-modal="true" aria-labelledby="toModalMsg" style="display:none;position:fixed;inset:0;z-index:200;align-items:center;justify-content:center;">
+  <div style="position:absolute;inset:0;background:rgba(0,0,0,.45);" id="toModalOverlay"></div>
+  <div style="position:relative;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px 20px;max-width:320px;width:90%;margin:auto;">
+    <p id="toModalMsg" style="margin:0 0 20px;font-size:.95rem;text-align:center;">Are you sure you are ready to submit?</p>
+    <div style="display:flex;gap:10px;justify-content:center;">
+      <button type="button" id="toModalCancel" class="btn btn-secondary">Cancel</button>
+      <button type="button" id="toModalConfirm" class="btn btn-primary">Submit</button>
+    </div>
+  </div>
+</div>
 
 <div id="loading">Loading...</div>
 <div id="authError"><p>Session expired. <a href="/login.html">Sign in again</a></p></div>
@@ -222,6 +238,18 @@
 </div>
 
 <script src="/js/pf-shared.js"></script>
+<script>
+// ---- confirm modal helpers (TO) ----
+function pfShowConfirmModalTO(cb){
+  window.pfConfirmModalCallback=cb;
+  var m=document.getElementById('submitConfirmModal');
+  if(m){m.style.display='flex';var btn=document.getElementById('toModalConfirm');if(btn)delete btn.dataset.firing;}
+}
+function pfHideConfirmModalTO(){
+  var m=document.getElementById('submitConfirmModal');
+  if(m){m.style.display='none';}window.pfConfirmModalCallback=null;
+}
+</script>
 <script>
 "use strict";
 window.esc = window.esc || function(s){
@@ -385,6 +413,12 @@ document.getElementById('startDate').addEventListener('change', function() {
 });
 
 // ---- Form submit ----
+document.getElementById('toModalCancel').addEventListener('click', pfHideConfirmModalTO);
+document.getElementById('toModalOverlay').addEventListener('click', pfHideConfirmModalTO);
+document.getElementById('toModalConfirm').addEventListener('click', function(){
+  if(this.dataset.firing){return;}this.dataset.firing='1';
+  pfHideConfirmModalTO();window.pfConfirmModalCallback&&window.pfConfirmModalCallback();
+});
 document.getElementById('toForm').addEventListener('submit', function(e) {
   e.preventDefault();
   var btn = document.getElementById('submitBtn');
@@ -398,6 +432,17 @@ document.getElementById('toForm').addEventListener('submit', function(e) {
   if (!startDate || !endDate) { showMsg(msgEl,'Start and end dates are required.','err'); return; }
   if (endDate < startDate)    { showMsg(msgEl,'End date must be on or after start date.','err'); return; }
   if (halfDay && startDate !== endDate) { showMsg(msgEl,'Half-day requests must be a single day.','err'); return; }
+
+  // Show confirm modal before committing the request.
+  if (!this.dataset.confirmed) {
+    var form = this;
+    pfShowConfirmModalTO(function(){
+      form.dataset.confirmed = '1';
+      form.requestSubmit();
+    });
+    return;
+  }
+  delete this.dataset.confirmed;
 
   btn.disabled = true; btn.textContent = 'Submitting...';
   msgEl.innerHTML = '';
@@ -445,6 +490,9 @@ document.getElementById('toForm').addEventListener('submit', function(e) {
       if (res.ok && res.d && res.d.status === 'ok') {
         _myUid  = res.d.uid  || '';
         if (acctNm) acctNm.textContent = res.d.name || '';
+        var _em=(res.d.email||'').toLowerCase();
+        var _mlNav=document.getElementById('mlNavItem');
+        if(_mlNav&&['breinking@pierfoundations.com','jreinking@pierfoundations.com','dfranke@pierfoundations.com'].indexOf(_em)>=0) _mlNav.style.display='';
         if (loadEl) loadEl.style.display = 'none';
         if (mainEl) mainEl.style.display = 'block';
         loadData();

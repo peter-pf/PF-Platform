@@ -167,6 +167,11 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><path d="M8 14l2 2 4-4"></path></svg>
     <span>Time Off</span>
   </a>
+  <!-- Owner-only: shown by JS after /api/me confirms owner email -->
+  <a href="/mailing-lists.html" class="pf-nav-item" data-paths="/mailing-lists.html, /mailing-lists" style="display:none" id="mlNavItem">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+    <span>Mailing Lists</span>
+  </a>
 </nav>
 
 <div id="loading">Loading...</div>
@@ -359,13 +364,17 @@ window.esc = window.esc || function(s){
   var greetNm = document.getElementById('greetName');
   var acctNm  = document.getElementById('acctName');
 
+  var OWNER_EMAILS_IDX = ['breinking@pierfoundations.com','jreinking@pierfoundations.com','dfranke@pierfoundations.com'];
   fetch('/api/me', {credentials:'same-origin'})
     .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
     .then(function(r){
       if(r.ok && r.d && r.d.status==='ok'){
-        var name = window.esc(r.d.name || r.d.role || '');
         if(greetNm) greetNm.textContent = r.d.name || 'Field Portal';
         if(acctNm) acctNm.textContent = r.d.name || '';
+        // Show Mailing Lists nav item for the 3 owners only
+        var em = (r.d.email || '').toLowerCase();
+        var mlNav = document.getElementById('mlNavItem');
+        if(mlNav && OWNER_EMAILS_IDX.indexOf(em) >= 0) mlNav.style.display = '';
         if(loadEl) loadEl.style.display='none';
         if(mainEl) mainEl.style.display='block';
       } else if(r.d && r.d.status==='must_reset'){

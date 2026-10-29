@@ -569,6 +569,13 @@ const FIELD_PAGES = {
   // has the same role membership as field_ops, so either area gives the crew
   // access. We keep it as 'field_ops' to group all field crew pages together.
   // (The earlier '/schedule.html': 'schedule' entry wins if it exists — harmless.)
+  // Mailing Lists settings page (Derek/Brad/Jonathan, 2026-10-29). Classified
+  // field_ops so the middleware passes authenticated requests through; the REAL
+  // owner gate is enforced server-side in /api/mailing-lists by the OWNER_EMAILS
+  // allowlist.  Any authenticated user who navigates to the page URL directly is
+  // redirected by the page script after /api/mailing-lists returns 403.
+  '/mailing-lists.html':     'field_ops',
+  '/mailing-lists':          'field_ops',           // CF Pages clean-URL form
 };
 
 // Filename keywords that mark a page as financial/contract/precon even if it is
@@ -671,6 +678,13 @@ export function areaForPath(pathname) {
     // (admin-only). Exact match only: /api/time-off with optional trailing slash
     // or query; never matches sub-paths like a future /api/time-off-admin variant.
     if (pathname === '/api/time-off' || pathname.startsWith('/api/time-off/')) return 'field_ops';
+    // Mailing Lists settings API (Derek/Brad/Jonathan, 2026-10-29). Classified
+    // field_ops so authenticated requests reach the handler; the REAL owner gate
+    // is enforced inside the handler via OWNER_EMAILS allowlist.  Non-owners get
+    // 403 from the handler, not from the middleware.  Without this line the path
+    // would fall to default-deny (admin-only), blocking partner/field_ops callers
+    // from even reaching the owner check and getting a meaningful response.
+    if (pathname.startsWith('/api/mailing-lists')) return 'field_ops';
     // Cost Codes reference (QuickBooks chart of accounts). field_ops area so the
     // crew and office can both look up codes. The handler SERVER-SIDE filters
     // restricted rows (balance sheet / income / management / insurance / interest)

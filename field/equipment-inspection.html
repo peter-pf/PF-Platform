@@ -166,6 +166,11 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><path d="M8 14l2 2 4-4"></path></svg>
     <span>Time Off</span>
   </a>
+  <!-- Owner-only: shown by JS after /api/me confirms owner email -->
+  <a href="/mailing-lists.html" class="pf-nav-item" data-paths="/mailing-lists.html, /mailing-lists" style="display:none" id="mlNavItem">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+    <span>Mailing Lists</span>
+  </a>
 </nav>
 
 <!-- Sticky submit bar -->
@@ -174,6 +179,18 @@
     <button type="button" class="btn" id="eiSaveDraft">Save draft</button>
     <button type="button" class="btn" id="eiSubmit">Submit &amp; save PDF</button>
     <button type="button" class="btn btn-sm" id="eiNewForm" style="display:none">Start new form</button>
+  </div>
+</div>
+
+<!-- Submit confirm modal (Derek, 2026-10-29) -->
+<div id="submitConfirmModal" role="dialog" aria-modal="true" aria-labelledby="eiModalMsg" style="display:none;position:fixed;inset:0;z-index:200;align-items:center;justify-content:center;">
+  <div style="position:absolute;inset:0;background:rgba(0,0,0,.45);" id="eiModalOverlay"></div>
+  <div style="position:relative;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px 20px;max-width:320px;width:90%;margin:auto;">
+    <p id="eiModalMsg" style="margin:0 0 20px;font-size:.95rem;text-align:center;">Are you sure you are ready to submit?</p>
+    <div style="display:flex;gap:10px;justify-content:center;">
+      <button type="button" id="eiModalCancel" class="btn btn-secondary">Cancel</button>
+      <button type="button" id="eiModalConfirm" class="btn btn-primary">Submit</button>
+    </div>
   </div>
 </div>
 
@@ -289,6 +306,18 @@
 </div><!-- end #main -->
 
 <script src="/js/pf-shared.js"></script>
+<script>
+// ---- confirm modal helpers (EI) ----
+function pfShowConfirmModalEI(cb){
+  window.pfConfirmModalCallback=cb;
+  var m=document.getElementById('submitConfirmModal');
+  if(m){m.style.display='flex';var btn=document.getElementById('eiModalConfirm');if(btn)delete btn.dataset.firing;}
+}
+function pfHideConfirmModalEI(){
+  var m=document.getElementById('submitConfirmModal');
+  if(m){m.style.display='none';}window.pfConfirmModalCallback=null;
+}
+</script>
 <script>
 // ---- logout hygiene ----
 document.addEventListener('DOMContentLoaded', function(){
@@ -1009,40 +1038,49 @@ document.getElementById('eiSubmit').addEventListener('click', function(){
   if (!body.serialNumber) { eiShowMsg('Serial number is required before submitting.', true); return; }
   if (!body.date) { eiShowMsg('Date is required before submitting.', true); return; }
   if (body.safeToOperate === null) { eiShowMsg('Please answer Safe to Operate before submitting.', true); return; }
-  // Capture which machine initiated this submit so eiDoSubmit can mark the correct
-  // machine state even if the user switches machines while the request is in flight.
-  var submittingType = eiState.machineType;
-  // Set guard and disable button BEFORE any fetch (covers both auto-create and direct submit paths).
-  eiSubmitting = true;
-  document.getElementById('eiSubmit').disabled = true;
-  var ms = eiMachineStates[submittingType];
-  // Auto-create a server draft when none exists, then submit with the server UUID.
-  if (!UUID_RE_CLIENT.test(ms.id || '')) {
-    fetch('/api/equipment-inspection', {
-      method: 'POST', credentials: 'same-origin',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify(Object.assign({}, body, {action: 'create'})),
-    })
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      if (!d || !d.ok || !d.id) {
+  // All validation passed — show confirm modal before committing.
+  pfShowConfirmModalEI(function(){
+    // Capture which machine initiated this submit so eiDoSubmit can mark the correct
+    // machine state even if the user switches machines while the request is in flight.
+    var submittingType = eiState.machineType;
+    // Set guard and disable button BEFORE any fetch (covers both auto-create and direct submit paths).
+    eiSubmitting = true;
+    document.getElementById('eiSubmit').disabled = true;
+    var ms = eiMachineStates[submittingType];
+    // Auto-create a server draft when none exists, then submit with the server UUID.
+    if (!UUID_RE_CLIENT.test(ms.id || '')) {
+      fetch('/api/equipment-inspection', {
+        method: 'POST', credentials: 'same-origin',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(Object.assign({}, body, {action: 'create'})),
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d || !d.ok || !d.id) {
+          eiSubmitting = false;
+          eiUpdateSubmitButtons(); // restore correct button state for current machine
+          eiShowMsg((d && d.error) || 'Could not start record. Check connection and retry.', true);
+          return;
+        }
+        ms.id  = d.id;  // persist server UUID in per-machine state
+        body.id = d.id; // supply UUID to the submit request
+        eiDoSubmit(body, submittingType); // eiDoSubmit owns eiSubmitting reset from here
+      })
+      .catch(function(){
         eiSubmitting = false;
         eiUpdateSubmitButtons(); // restore correct button state for current machine
-        eiShowMsg((d && d.error) || 'Could not start record. Check connection and retry.', true);
-        return;
-      }
-      ms.id  = d.id;  // persist server UUID in per-machine state
-      body.id = d.id; // supply UUID to the submit request
-      eiDoSubmit(body, submittingType); // eiDoSubmit owns eiSubmitting reset from here
-    })
-    .catch(function(){
-      eiSubmitting = false;
-      eiUpdateSubmitButtons(); // restore correct button state for current machine
-      eiShowMsg('Network error during submission. Check connection and retry.', true);
-    });
-    return;
-  }
-  eiDoSubmit(body, submittingType); // eiDoSubmit owns eiSubmitting reset from here
+        eiShowMsg('Network error during submission. Check connection and retry.', true);
+      });
+      return;
+    }
+    eiDoSubmit(body, submittingType); // eiDoSubmit owns eiSubmitting reset from here
+  });
+});
+document.getElementById('eiModalCancel').addEventListener('click', pfHideConfirmModalEI);
+document.getElementById('eiModalOverlay').addEventListener('click', pfHideConfirmModalEI);
+document.getElementById('eiModalConfirm').addEventListener('click', function(){
+  if(this.dataset.firing){return;}this.dataset.firing='1';
+  pfHideConfirmModalEI();window.pfConfirmModalCallback&&window.pfConfirmModalCallback();
 });
 
 // ---- New form ----
@@ -1106,6 +1144,9 @@ function eiShowMsg(msg, isErr) {
       window.PF_ME = me;
       var acctName = document.getElementById('acctName');
       if (acctName) acctName.textContent = me.name || me.uid;
+      var _em=(me.email||'').toLowerCase();
+      var _mlNav=document.getElementById('mlNavItem');
+      if(_mlNav&&['breinking@pierfoundations.com','jreinking@pierfoundations.com','dfranke@pierfoundations.com'].indexOf(_em)>=0) _mlNav.style.display='';
       var themeLabel = document.getElementById('acctThemeLabel');
       if (themeLabel) {
         var isDark = document.documentElement.getAttribute('data-theme') === 'dark';

@@ -68,11 +68,20 @@ async function runPage(filename) {
         const u = String(url);
         if (u.includes('/api/me')) {
           // status:'ok' is required by DR and SR auth checks; name is required by TT/EI
+          // email must be an owner so mailing-lists.html shows #main (not redirect)
           return {
             ok: true,
             status: 200,
-            json: async () => ({ ok: true, status: 'ok', name: 'Test User', uid: 'u1', role: 'field_ops' }),
-            text: async () => '{"ok":true,"status":"ok","name":"Test User","uid":"u1","role":"field_ops"}',
+            json: async () => ({ ok: true, status: 'ok', name: 'Test User', uid: 'u1', role: 'field_ops', email: 'dfranke@pierfoundations.com' }),
+            text: async () => '{"ok":true,"status":"ok","name":"Test User","uid":"u1","role":"field_ops","email":"dfranke@pierfoundations.com"}',
+          };
+        }
+        if (u.includes('/api/mailing-lists')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ ok: true, lists: {} }),
+            text: async () => '{"ok":true,"lists":{}}',
           };
         }
         if (u.includes('/api/field-projects')) {
@@ -158,6 +167,7 @@ const FORMS = [
   { file: 'daily-report.html',       label: 'Daily Report'          },
   { file: 'site-readiness.html',     label: 'Site Readiness'        },
   { file: 'equipment-inspection.html', label: 'Equipment Inspection' },
+  { file: 'mailing-lists.html',      label: 'Mailing Lists'         },
 ];
 
 // ---- Static analysis: no `display = ''` for CSS-hidden elements ------------

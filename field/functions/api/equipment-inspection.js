@@ -1,7 +1,7 @@
 // Cloudflare Pages Function -- /api/equipment-inspection
 // FIELD OPERATIONS Daily Equipment Inspection form (Derek, 2026-10-25).
 //
-// On SUBMIT, the platform does TWO things (no email -- PRIMARY-8, 2026-10-25):
+// On SUBMIT, the platform does THREE things (email added 2026-10-29 per Derek):
 //   1. Render the form into a PDF (server-side, see lib/equip-inspection-doc.js).
 //   2. Save that PDF into SharePoint:
 //      05 - Field Operations/Equipment Checklist/<Machine Type>/<Serial>/<filename>
@@ -30,7 +30,9 @@ import { graphConfigured, getGraphToken } from '../lib/graph.js';
 import {
   renderEquipInspectionPdf, pdfFilename,
   uploadEquipInspectionPdf, uploadSectionPhotos, sectionToSlug,
+  sendEquipInspectionEmail,
 } from '../lib/equip-inspection-doc.js';
+import { resolveMailingList } from '../lib/mailing-lists.js';
 import {
   upsertRecord, loadRecordById, listRecords, countRecords,
   CHECKLIST_ITEMS, VALID_ITEM_KEYS, VALID_ANSWERS, MACHINE_TYPES,
@@ -555,30 +557,59 @@ export async function onRequest(context) {
       return jsonErr('PDF generation failed', 500);
     }
 
-    // Graph: upload PDF and section photos to SharePoint.
-    // spUploadWarning is set if the upload fails so the response can surface it
-    // to the user rather than silently appearing successful.
+    // Graph: upload PDF and section photos to SharePoint, then email the PDF.
+    // spUploadWarning is set if the upload fails (surfaced to user).
+    // eiEmailWarning is set if email fails (also surfaced to user).
+    // Both are non-fatal: the record is always saved.
     let spUploadWarning = null;
+    let eiEmailWarning  = null;
+    let graphToken      = null; // hoisted so SP and email both use the same token
+
     if (graphConfigured(env)) {
-      let token;
-      try { token = await getGraphToken(env); }
+      try { graphToken = await getGraphToken(env); }
       catch (e) {
         console.error('[equip-inspection] Graph token failed:', e && e.message);
         spUploadWarning = 'PDF could not be saved to SharePoint (auth error). Your submission is recorded. Please notify your supervisor.';
       }
-      if (token) {
+      if (graphToken) {
         try {
-          const ref = await uploadEquipInspectionPdf(env, token, body, pdfBytes);
+          const ref = await uploadEquipInspectionPdf(env, graphToken, body, pdfBytes);
           body.pdfItemId = ref.itemId;
           body.pdfWebUrl = ref.webUrl;
           // Upload individual section photos to same SP folder.
           if (ref.serialFolderId) {
-            try { await uploadSectionPhotos(env, token, body, ref.serialFolderId); }
+            try { await uploadSectionPhotos(env, graphToken, body, ref.serialFolderId); }
             catch (e) { console.error('[equip-inspection] photo SP upload batch failed:', e && e.message); }
           }
         } catch (e) {
           console.error('[equip-inspection] SP upload failed:', e && e.message);
           spUploadWarning = 'PDF could not be saved to SharePoint. Your submission is recorded. Please notify your supervisor.';
+        }
+      }
+    }
+
+    // Email the PDF to the equipment_inspection mailing list.
+    // FAIL-SAFE: if D1 unreachable or list empty, skip email and set warning.
+    // SP upload and D1 record are NOT reverted on email failure.
+    const { recipients: eiRecipients, warning: eiMailingWarning } =
+      await resolveMailingList(env.DB, 'equipment_inspection');
+    if (eiMailingWarning) {
+      eiEmailWarning = eiMailingWarning;
+    } else if (eiRecipients.length) {
+      if (!graphToken) {
+        // Token failed earlier — can't email.
+        eiEmailWarning = 'Email not sent: could not reach mail service. Your submission is recorded.';
+      } else {
+        try {
+          await sendEquipInspectionEmail(env, graphToken, {
+            recipients: eiRecipients,
+            rec: body,
+            pdfBytes,
+            filename: body.pdfName,
+          });
+        } catch (e) {
+          console.error('[equip-inspection] email failed:', e && e.message);
+          eiEmailWarning = 'PDF saved. Email notification could not be sent. Please notify your supervisor.';
         }
       }
     }
@@ -599,10 +630,13 @@ export async function onRequest(context) {
     try { await upsertRecord(env, body); }
     catch (e) { return e.isD1Error ? jsonErr('Service temporarily unavailable', 503) : jsonErr('Server error', 500); }
 
+    // Combine SP and email warnings into a single user-visible string.
+    const combinedWarning = [spUploadWarning, eiEmailWarning].filter(Boolean).join(' ') || null;
+
     return json({
       ok: true, id: body.id, status: 'submitted',
       pdfName: body.pdfName, pdfWebUrl: body.pdfWebUrl || null,
-      spWarning: spUploadWarning,
+      spWarning: combinedWarning,
     });
   }
 

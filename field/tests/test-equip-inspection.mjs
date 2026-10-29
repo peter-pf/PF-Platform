@@ -566,20 +566,23 @@ test('K4: API has rate limit on submit', () => {
   assert.ok(apiSrc.includes('429'), 'rate limit must return 429');
 });
 
-test('K5: no email code in API (PRIMARY-8)', () => {
-  assert.ok(!apiSrc.includes('sendEquipInspectionEmail'), 'email send must be removed');
+test('K5: EI email added per Derek 2026-10-29 (D1-backed, fail-safe)', () => {
+  // Previously K5 asserted no email existed (PRIMARY-8). Derek requested email on
+  // EI submit 2026-10-29 via mailing lists feature. Now we verify email IS present
+  // and uses D1 mailing_lists table (not hardcoded recipients).
+  assert.ok(apiSrc.includes('sendEquipInspectionEmail'), 'email send must be present in EI API');
+  assert.ok(apiSrc.includes('resolveMailingList'),        'EI API must use resolveMailingList from D1');
   assert.ok(!apiSrc.includes('TEST_RECIPIENTS'),          'TEST_RECIPIENTS must be removed');
   assert.ok(!apiSrc.includes('PROD_RECIPIENTS'),          'PROD_RECIPIENTS must be removed');
-  assert.ok(!apiSrc.includes('ACTIVE_RECIPIENTS'),        'ACTIVE_RECIPIENTS must be removed');
-  assert.ok(!apiSrc.includes('resolveRecipients'),        'resolveRecipients must be removed');
+  assert.ok(!apiSrc.includes('resolveRecipients'),        'old resolveRecipients must be removed');
 });
 
-test('K6: no email code in doc file (PRIMARY-8)', () => {
+test('K6: EI email function in doc file (added 2026-10-29)', () => {
   const docSrc = readFileSync(
     resolve(__dir, '../functions/lib/equip-inspection-doc.js'), 'utf8'
   );
-  assert.ok(!docSrc.includes('sendEquipInspectionEmail'), 'email function must be removed from doc');
-  assert.ok(!docSrc.includes('buildEmailBody'),           'email body builder must be removed from doc');
+  // Previously K6 asserted no email existed. Now we verify sendEquipInspectionEmail is present.
+  assert.ok(docSrc.includes('sendEquipInspectionEmail'), 'email function must exist in doc file');
 });
 
 test('K7: inspectedBy is a <select> with the correct 4 allowlist options', () => {

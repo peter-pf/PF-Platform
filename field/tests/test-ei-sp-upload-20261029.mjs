@@ -117,9 +117,10 @@ console.log('\n--- W: equipment-inspection.js spUploadWarning wiring ---');
   );
 
   // W4: spWarning is returned in the json response
+  // Updated 2026-10-29: now uses combinedWarning (merges spUploadWarning + eiEmailWarning)
   assert(
     'W4: spWarning included in submit response',
-    src.includes('spWarning: spUploadWarning')
+    src.includes('spWarning: combinedWarning') || src.includes('spWarning: spUploadWarning')
   );
 
   // W5: console.error still present for the SP upload failure (server-side logging retained)

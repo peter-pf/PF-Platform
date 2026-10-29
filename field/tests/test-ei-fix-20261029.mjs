@@ -390,8 +390,8 @@ test('T2: eiSavingDraft module-scope flag declared', () => {
 test('T3: eiSubmit click handler has in-flight guard before any fetch', () => {
   const clickIdx = htmlSrc.indexOf("getElementById('eiSubmit').addEventListener('click'");
   assert.ok(clickIdx !== -1, 'eiSubmit click handler must exist');
-  // Find the body of the handler (from the click to the next top-level });)
-  const handlerSlice = htmlSrc.slice(clickIdx, clickIdx + 1200);
+  // Find the body of the handler — use 2400 chars to cover the modal callback wrapper added in R15
+  const handlerSlice = htmlSrc.slice(clickIdx, clickIdx + 2400);
   const guardIdx  = handlerSlice.indexOf('if (eiSubmitting) return;');
   const fetchIdx  = handlerSlice.indexOf("fetch('/api/equipment-inspection'");
   assert.ok(guardIdx !== -1, 'eiSubmit handler must have if (eiSubmitting) return; guard');
@@ -402,7 +402,8 @@ test('T3: eiSubmit click handler has in-flight guard before any fetch', () => {
 // T4: eiSubmitting is set to true BEFORE the first fetch in the submit handler.
 test('T4: eiSubmitting set true before first fetch in submit handler', () => {
   const clickIdx = htmlSrc.indexOf("getElementById('eiSubmit').addEventListener('click'");
-  const handlerSlice = htmlSrc.slice(clickIdx, clickIdx + 1200);
+  // Use 2400 chars to cover the modal callback wrapper added in R15
+  const handlerSlice = htmlSrc.slice(clickIdx, clickIdx + 2400);
   const setTrueIdx = handlerSlice.indexOf('eiSubmitting = true;');
   const fetchIdx   = handlerSlice.indexOf("fetch('/api/equipment-inspection'");
   assert.ok(setTrueIdx !== -1, 'eiSubmitting = true must appear in submit handler');

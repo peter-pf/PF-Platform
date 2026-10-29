@@ -38,33 +38,15 @@ import {
   upsertRecord, loadRecordById, listRecords, countRecords,
   CHECKLIST_ITEMS, computeResult, R12_KEYS,
 } from '../lib/site-readiness-store.js';
+import { resolveMailingList } from '../lib/mailing-lists.js';
 
 // ===========================================================================
-// RECIPIENTS  --  *** THE ONE PLACE TO FLIP TEST -> PRODUCTION ***
+// RECIPIENTS -- now read from the mailing_lists D1 table (migration 0011).
 // ===========================================================================
-// TEST: PDF email goes ONLY to Peter until Derek approves the layout and gives
-// the final mailing list. When ready, populate PROD_RECIPIENTS and flip
-// ACTIVE_RECIPIENTS = PROD_RECIPIENTS (or set env var SITE_READINESS_RECIPIENTS).
-const TEST_RECIPIENTS = ['pfpeter@agentmail.to'];
-const PROD_RECIPIENTS = [
-  'dfranke@pierfoundations.com',
-  'jwillis@pierfoundations.com',
-  'breinking@pierfoundations.com',
-  'swillis@pierfoundations.com',
-  'jreinking@pierfoundations.com',
-];
-// >>> FLIP HERE <<< : ACTIVE_RECIPIENTS = TEST_RECIPIENTS until Derek approves.
-// Per Derek 10/21/2026. Flip ACTIVE_RECIPIENTS to PROD_RECIPIENTS on his go-live.
-const ACTIVE_RECIPIENTS = TEST_RECIPIENTS;
-
-function resolveRecipients(env) {
-  const raw = env && env.SITE_READINESS_RECIPIENTS;
-  if (raw && String(raw).trim()) {
-    const list = String(raw).split(',').map((s) => s.trim()).filter((s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s));
-    if (list.length) return list;
-  }
-  return ACTIVE_RECIPIENTS;
-}
+// The old TEST_RECIPIENTS / PROD_RECIPIENTS / ACTIVE_RECIPIENTS constants and
+// the SITE_READINESS_RECIPIENTS env-var override have been RETIRED.
+// Seed (migration 0011): site_readiness: pfpeter@agentmail.to
+// FAIL-SAFE: if D1 unreachable or list empty, warning returned; email skipped.
 
 // ---------------------------------------------------------------------------
 const MAX_BODY_BYTES = 64 * 1024;  // bumped 32->64 to accommodate new fields + extra refs
@@ -456,10 +438,8 @@ export async function onRequestPost(context) {
         message: 'Submit is unavailable: the server email/SharePoint integration is not configured. Your draft is saved.' }, 503);
     }
 
-    const recipients = resolveRecipients(env);
-    if (!recipients.length) {
-      return json({ status: 'error', message: 'Submit is unavailable: no recipient list is configured.' }, 503);
-    }
+    // Read recipients from D1 mailing_lists table (migration 0011).
+    const { recipients, warning: mailingListWarning } = await resolveMailingList(env.DB, 'site_readiness');
 
     // Stamp submit audit (same first-submit / re-submit semantics as DFR).
     const isEdit = !!(rec.submittedAt || rec.status === 'sent');
@@ -527,16 +507,19 @@ export async function onRequestPost(context) {
       return json({ status: 'error', message: 'Submit failed while building the PDF. Your draft is saved.' }, 500);
     }
 
-    // 2) Email.
-    try {
-      // Subject == generated filename without the .pdf extension so they can never drift.
-      const subject = filename.replace(/\.pdf$/i, '');
-      const bodyText = buildEmailBody(rec);
-      await sendSiteReadinessEmail(env, token, { recipients, subject, bodyText, pdfBytes, filename });
-    } catch (e) {
-      console.error('api/site-readiness submit: email failed:', e && e.message);
-      return json({ status: 'error',
-        message: 'Submit failed while sending the email. Your draft is saved; please retry.' }, 502);
+    // 2) Email (skipped with warning if mailing list unavailable or empty).
+    let emailWarning = mailingListWarning || null;
+    if (!emailWarning && recipients.length) {
+      try {
+        // Subject == generated filename without the .pdf extension so they can never drift.
+        const subject = filename.replace(/\.pdf$/i, '');
+        const bodyText = buildEmailBody(rec);
+        await sendSiteReadinessEmail(env, token, { recipients, subject, bodyText, pdfBytes, filename });
+      } catch (e) {
+        console.error('api/site-readiness submit: email failed:', e && e.message);
+        return json({ status: 'error',
+          message: 'Submit failed while sending the email. Your draft is saved; please retry.' }, 502);
+      }
     }
 
     // 3) Upload to SharePoint (project folder / Site Readiness subfolder).
@@ -545,23 +528,23 @@ export async function onRequestPost(context) {
       uploaded = await uploadSiteReadinessPdf(env, token, rec.projectId, filename, pdfBytes);
     } catch (e) {
       console.error('api/site-readiness submit: SharePoint upload failed:', e && e.message);
-      // Email already went out; SP failed. Report partial failure.
       return json({ status: 'error',
-        message: 'The form was emailed but could NOT be saved to SharePoint. Please retry or notify an admin.' }, 502);
+        message: 'The form' + (emailWarning ? '' : ' was emailed but') + ' could NOT be saved to SharePoint. Please retry or notify an admin.' }, 502);
     }
 
-    // Both side effects succeeded -> finalize the record.
+    // Finalize the record.
     rec.status = 'sent';
     rec.pdfName = filename;
     rec.pdfWebUrl = (uploaded && uploaded.webUrl) || null;
-    rec.emailedTo = recipients.slice();
+    rec.emailedTo = emailWarning ? [] : recipients.slice();
     rec.sentAt = new Date().toISOString();
     rec.updatedAt = rec.sentAt;
 
     const stamp = await upsertRecord(env, rec);
     return json({
       ok: true, saved: true, action, record: rec, meta: { updated: stamp },
-      distribution: { emailedTo: recipients, pdf: filename, sharepoint: uploaded },
+      distribution: { emailedTo: rec.emailedTo, pdf: filename, sharepoint: uploaded },
+      emailWarning: emailWarning || undefined,
     });
 
   } catch (err) {

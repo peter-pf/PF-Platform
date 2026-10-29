@@ -334,6 +334,59 @@ export async function uploadEquipInspectionPdf(env, token, rec, pdfBytes) {
   return { name: filename, itemId: item.id || '', webUrl: item.webUrl || '', serialFolderId: serialId };
 }
 
+// ---------------------------------------------------------------------------
+// 5) EMAIL: send the EI PDF to the mailing list (AS peter@).
+// Subject: "Equipment Inspection - <Machine> - <Serial> - <Date> - <Inspector>"
+// Same Graph sendMail pattern as the other form endpoints.
+// ---------------------------------------------------------------------------
+export const MAIL_FROM = 'peter@pierfoundations.com';
+
+export async function sendEquipInspectionEmail(env, token, { recipients, rec, pdfBytes, filename }) {
+  const machineLabel = (rec.machineType || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  const subject = [
+    'Equipment Inspection',
+    machineLabel || rec.machineType || 'Equipment',
+    rec.serialNumber || '',
+    rec.date || '',
+    rec.inspectedBy || '',
+  ].filter(Boolean).join(' - ');
+
+  const bodyText = [
+    `Equipment inspection submitted for ${machineLabel || rec.machineType || 'equipment'}.`,
+    '',
+    `Machine: ${machineLabel || rec.machineType || '-'}`,
+    `Serial:  ${rec.serialNumber || '-'}`,
+    `Date:    ${rec.date || '-'}`,
+    `Inspector: ${rec.inspectedBy || '-'}`,
+    `Safe to Operate: ${rec.safeToOperate === true ? 'Yes' : rec.safeToOperate === false ? 'No' : '-'}`,
+  ].join('\n');
+
+  const toRecipients = recipients.map((addr) => ({ emailAddress: { address: addr } }));
+  const message = {
+    subject,
+    body: { contentType: 'Text', content: bodyText },
+    toRecipients,
+    attachments: [{
+      '@odata.type': '#microsoft.graph.fileAttachment',
+      name: filename,
+      contentType: 'application/pdf',
+      contentBytes: bytesToBase64(pdfBytes),
+    }],
+  };
+  const url = `${GRAPH}/users/${encodeURIComponent(MAIL_FROM)}/sendMail`;
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, saveToSentItems: true }),
+  });
+  if (resp.status !== 202) {
+    let detail = '';
+    try { detail = (await resp.text()).slice(0, 300); } catch (e) { /* ignore */ }
+    throw new Error('sendMail failed ' + resp.status + (detail ? ' ' + detail : ''));
+  }
+  return true;
+}
+
 async function findChildFolder(env, token, parentId, name) {
   const driveId = encodeURIComponent(env.SP_DRIVE_ID);
   const listUrl = `${GRAPH}/drives/${driveId}/items/${encodeURIComponent(parentId)}/children?$select=id,name,folder&$top=999`;

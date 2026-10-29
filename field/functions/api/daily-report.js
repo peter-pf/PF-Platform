@@ -62,45 +62,25 @@ import {
 import {
   upsertReport, loadReportById, listReports, countReports,
 } from '../lib/daily-report-store.js';
+import { resolveMailingList } from '../lib/mailing-lists.js';
 
 // ===========================================================================
-// RECIPIENTS  --  *** THE ONE PLACE TO FLIP TEST -> PRODUCTION ***
+// RECIPIENTS -- now read from the mailing_lists D1 table (migration 0011).
 // ===========================================================================
-// During build/test the daily-report PDF email goes ONLY to Peter so the three
-// partners are never bothered while the layout is being reviewed. Once Peter/Derek
-// approve the layout, comment out TEST_RECIPIENTS and uncomment PROD_RECIPIENTS
-// (or set env.DAILY_REPORT_RECIPIENTS to a comma-separated list, which overrides
-// both). This is deliberately a single server-side constant - the client can
-// NEVER influence who receives the report.
-const TEST_RECIPIENTS = ['pfpeter@agentmail.to'];
-const PROD_RECIPIENTS = [
-  'dfranke@pierfoundations.com',
-  'jwillis@pierfoundations.com',
-  'breinking@pierfoundations.com',
-  'jreinking@pierfoundations.com',
-  'swillis@pierfoundations.com',
-  'rvanamburg@pierfoundations.com',
-  'jlemay@pierfoundations.com',
-  'cboutte@pierfoundations.com',
-];
-// >>> FLIP HERE <<< : ACTIVE_RECIPIENTS = TEST_RECIPIENTS (test) or PROD_RECIPIENTS (go-live).
-// PF FIELD PORTAL (pf-field project): defaults to TEST_RECIPIENTS so the new
-// project does not email the 3 partners before Derek approves this portal for
-// production. When Derek signs off, flip to PROD_RECIPIENTS (or set env var
-// DAILY_REPORT_RECIPIENTS to the 3 partner addresses without a code deploy).
-// Per Derek 10/21/2026. Flip ACTIVE_RECIPIENTS to PROD_RECIPIENTS on his go-live.
-const ACTIVE_RECIPIENTS = TEST_RECIPIENTS;
-
-// Resolve the recipient list: an env override wins (easiest ops flip, no deploy),
-// otherwise the ACTIVE_RECIPIENTS constant above.
-function resolveRecipients(env) {
-  const raw = env && env.DAILY_REPORT_RECIPIENTS;
-  if (raw && String(raw).trim()) {
-    const list = String(raw).split(',').map((s) => s.trim()).filter((s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s));
-    if (list.length) return list;
-  }
-  return ACTIVE_RECIPIENTS;
-}
+// Recipients are managed at runtime via the owner-only /api/mailing-lists
+// endpoint and the Mailing Lists settings page. There is ONE source of truth.
+//
+// The old TEST_RECIPIENTS / PROD_RECIPIENTS / ACTIVE_RECIPIENTS constants and
+// the DAILY_REPORT_RECIPIENTS env-var override have been RETIRED.  The env var
+// is deliberately not read here.  To change the list, use the Mailing Lists UI.
+//
+// FAIL-SAFE: if D1 is unreachable or the list is empty, resolveMailingList()
+// returns { recipients: [], warning: '...' }.  The submit handler surfaces the
+// warning to the user and skips sending email.  The record and SP upload still
+// succeed.  We do NOT fall back to any hardcoded address.
+//
+// Seed (from migration 0011, matching the former ACTIVE_RECIPIENTS exactly):
+//   daily_report: pfpeter@agentmail.to
 
 // The SharePoint "Daily Reports Output (TEST)" folder drive-item id. FIXED on the
 // server (never client-supplied). env override so production can point at the real
@@ -505,10 +485,10 @@ export async function onRequestPost(context) {
         message: 'Submit is unavailable: the server email/SharePoint integration is not configured. Your draft is saved.' }, 503);
     }
 
-    const recipients = resolveRecipients(env);
-    if (!recipients.length) {
-      return json({ status: 'error', message: 'Submit is unavailable: no recipient list is configured.' }, 503);
-    }
+    // Read recipients from D1 mailing_lists table (migration 0011).
+    // FAIL-SAFE: if D1 is unreachable or the list is empty, surface a warning
+    // and skip email.  The record and SP upload still succeed.
+    const { recipients, warning: mailingListWarning } = await resolveMailingList(env.DB, 'daily_report');
 
     // Stamp submit audit onto the record used to render (so the PDF footer and
     // email reflect the submit), but only persist 'sent' AFTER both side effects
@@ -564,39 +544,43 @@ export async function onRequestPost(context) {
     }
 
     // 2) Email the PDF to the mailing list (AS peter@). 3) Upload to SharePoint.
-    //    Run both; require BOTH to succeed before flipping the record to 'sent'.
+    //    If the mailing list is empty/unreachable (mailingListWarning set), skip
+    //    email but still upload to SP and finalize the record.
     let uploaded;
-    try {
-      // Subject == generated filename without the .pdf extension so they can never drift.
-      const subject = filename.replace(/\.pdf$/i, '');
-      const bodyText = buildEmailBody(rec);
-      await sendReportEmail(env, token, { recipients, subject, bodyText, pdfBytes, filename });
-    } catch (e) {
-      console.error('api/daily-report submit: email failed:', e && e.message);
-      return json({ status: 'error', message: 'Submit failed while sending the email. Your draft is saved; please retry.' }, 502);
+    let emailWarning = mailingListWarning || null;
+    if (!emailWarning && recipients.length) {
+      try {
+        // Subject == generated filename without the .pdf extension so they can never drift.
+        const subject = filename.replace(/\.pdf$/i, '');
+        const bodyText = buildEmailBody(rec);
+        await sendReportEmail(env, token, { recipients, subject, bodyText, pdfBytes, filename });
+      } catch (e) {
+        console.error('api/daily-report submit: email failed:', e && e.message);
+        return json({ status: 'error', message: 'Submit failed while sending the email. Your draft is saved; please retry.' }, 502);
+      }
     }
     try {
       uploaded = await uploadReportPdf(env, token, outputFolderId(env), filename, pdfBytes);
     } catch (e) {
       console.error('api/daily-report submit: SharePoint upload failed:', e && e.message);
-      // Email already went out, but SharePoint failed. Report the partial failure
-      // clearly rather than claiming success. The record stays a draft.
+      // Email already went out (or was skipped), but SharePoint failed.
       return json({ status: 'error',
-        message: 'The report was emailed but could NOT be saved to SharePoint. Please retry or notify an admin.' }, 502);
+        message: 'The report' + (emailWarning ? '' : ' was emailed but') + ' could NOT be saved to SharePoint. Please retry or notify an admin.' }, 502);
     }
 
-    // Both side effects succeeded -> finalize the record.
+    // Finalize the record.
     rec.status = 'sent';
     rec.pdfName = filename;
     rec.pdfWebUrl = (uploaded && uploaded.webUrl) || null;
-    rec.emailedTo = recipients.slice();
+    rec.emailedTo = emailWarning ? [] : recipients.slice();
     rec.sentAt = new Date().toISOString();
     rec.updatedAt = rec.sentAt;
 
     const stamp = await upsertReport(env, rec);
     return json({
       ok: true, saved: true, action, record: rec, meta: { updated: stamp },
-      distribution: { emailedTo: recipients, pdf: filename, sharepoint: uploaded },
+      distribution: { emailedTo: rec.emailedTo, pdf: filename, sharepoint: uploaded },
+      emailWarning: emailWarning || undefined,
     });
   } catch (err) {
     console.error('api/daily-report POST error:', err);

@@ -191,6 +191,11 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><path d="M8 14l2 2 4-4"></path></svg>
     <span>Time Off</span>
   </a>
+  <!-- Owner-only: shown by JS after /api/me confirms owner email -->
+  <a href="/mailing-lists.html" class="pf-nav-item" data-paths="/mailing-lists.html, /mailing-lists" style="display:none" id="mlNavItem">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+    <span>Mailing Lists</span>
+  </a>
 </nav>
 
 <!-- sticky submit/draft bar -->
@@ -199,6 +204,18 @@
     <button type="button" class="btn" id="srSaveDraft">Save draft</button>
     <button type="button" class="btn" id="srSubmit">Submit &amp; send form</button>
     <button type="button" class="btn btn-sm" id="srNewForm" style="display:none">Start new form</button>
+  </div>
+</div>
+
+<!-- Submit confirm modal (Derek, 2026-10-29) -->
+<div id="submitConfirmModal" role="dialog" aria-modal="true" aria-labelledby="srModalMsg" style="display:none;position:fixed;inset:0;z-index:200;align-items:center;justify-content:center;">
+  <div style="position:absolute;inset:0;background:rgba(0,0,0,.45);" id="srModalOverlay"></div>
+  <div style="position:relative;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px 20px;max-width:320px;width:90%;margin:auto;">
+    <p id="srModalMsg" style="margin:0 0 20px;font-size:.95rem;text-align:center;">Are you sure you are ready to submit?</p>
+    <div style="display:flex;gap:10px;justify-content:center;">
+      <button type="button" id="srModalCancel" class="btn btn-secondary">Cancel</button>
+      <button type="button" id="srModalConfirm" class="btn btn-primary">Submit</button>
+    </div>
   </div>
 </div>
 
@@ -355,6 +372,18 @@
 
 <script src="/js/pf-shared.js"></script>
 <script>
+// ---- Submit confirm modal helpers (SR) ----
+function pfShowConfirmModalSR(cb){
+  window.pfConfirmModalCallbackSR=cb;
+  var m=document.getElementById('submitConfirmModal');
+  if(m){m.style.display='flex';var btn=document.getElementById('srModalConfirm');if(btn)delete btn.dataset.firing;}
+}
+function pfHideConfirmModalSR(){
+  var m=document.getElementById('submitConfirmModal');
+  if(m)m.style.display='none';window.pfConfirmModalCallbackSR=null;
+}
+</script>
+<script>
 // LOGOUT HYGIENE
 document.addEventListener('DOMContentLoaded', function(){
   var logoutLink = document.getElementById('logoutLink');
@@ -424,6 +453,9 @@ window.showModule = function () {};
         var acctNm = document.getElementById('acctName');
         if(acctNm) acctNm.textContent = r.d.name || '';
         if (userLabel) userLabel.textContent = r.d.name || r.d.role || '';
+        var _em=(r.d.email||'').toLowerCase();
+        var _mlNav=document.getElementById('mlNavItem');
+        if(_mlNav&&['breinking@pierfoundations.com','jreinking@pierfoundations.com','dfranke@pierfoundations.com'].indexOf(_em)>=0) _mlNav.style.display='';
         if (loadingEl) loadingEl.style.display = 'none';
         if (mainEl) mainEl.style.display = 'block';
         if (typeof window.showModule === 'function') window.showModule('site-readiness');
@@ -1178,7 +1210,16 @@ try {
     var sd = document.getElementById('srSaveDraft');
     if (sd && !sd.dataset.wired) { sd.dataset.wired = '1'; sd.addEventListener('click', function () { save(false); }); }
     var sub = document.getElementById('srSubmit');
-    if (sub && !sub.dataset.wired) { sub.dataset.wired = '1'; sub.addEventListener('click', function () { save(true); }); }
+    if (sub && !sub.dataset.wired) { sub.dataset.wired = '1'; sub.addEventListener('click', function () { pfShowConfirmModalSR(function(){ save(true); }); }); }
+    if (!document.getElementById('submitConfirmModal').dataset.wired) {
+      document.getElementById('submitConfirmModal').dataset.wired = '1';
+      document.getElementById('srModalCancel').addEventListener('click', pfHideConfirmModalSR);
+      document.getElementById('srModalOverlay').addEventListener('click', pfHideConfirmModalSR);
+      document.getElementById('srModalConfirm').addEventListener('click', function() {
+        if (this.dataset.firing) return; this.dataset.firing = '1';
+        pfHideConfirmModalSR(); window.pfConfirmModalCallbackSR && window.pfConfirmModalCallbackSR();
+      });
+    }
     var nf = document.getElementById('srNewForm');
     if (nf && !nf.dataset.wired) { nf.dataset.wired = '1'; nf.addEventListener('click', function () { resetForm(); msg('Started a new form.', true); }); }
     // Offline restore/dismiss

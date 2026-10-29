@@ -17,28 +17,15 @@
 
 import { requireArea } from '../lib/auth.js';
 import { getGraphToken, graphConfigured, GRAPH } from '../lib/graph.js';
+import { resolveMailingList } from '../lib/mailing-lists.js';
 
 // ---------------------------------------------------------------------------
-// Recipients — TEST → PROD flip
+// RECIPIENTS -- now read from the mailing_lists D1 table (migration 0011).
 // ---------------------------------------------------------------------------
-const TEST_RECIPIENTS = ['peter@pierfoundations.com'];
-const PROD_RECIPIENTS = [
-  'breinking@pierfoundations.com',
-  'jreinking@pierfoundations.com',
-  'dfranke@pierfoundations.com',
-];
-// >>> FLIPPED TO PROD <<<
-const ACTIVE_RECIPIENTS = PROD_RECIPIENTS;
-
-function resolveRecipients(env) {
-  const raw = env && env.TIME_OFF_RECIPIENTS;
-  if (raw && String(raw).trim()) {
-    const list = String(raw).split(',').map(s => s.trim())
-      .filter(s => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s));
-    if (list.length) return list;
-  }
-  return ACTIVE_RECIPIENTS;
-}
+// The old TEST_RECIPIENTS / PROD_RECIPIENTS / ACTIVE_RECIPIENTS constants and
+// the TIME_OFF_RECIPIENTS env-var override have been RETIRED.
+// Seed (migration 0011): time_off: breinking@, jreinking@, dfranke@
+// FAIL-SAFE: if D1 unreachable or list empty, warning returned; email skipped.
 
 const MAIL_FROM    = 'peter@pierfoundations.com';
 // Platform Time Off Review tab — owners approve/deny requests here.
@@ -192,6 +179,15 @@ function countCalendarDays(startIso, endIso) {
 
 async function sendRequestEmail(env, { requesterName, type, startDate, endDate, halfDay, dayCount, note }) {
   if (!graphConfigured(env)) return;
+
+  // Read recipients from D1 mailing_lists table.
+  // FAIL-SAFE: if D1 unreachable or list empty, log and skip.
+  const { recipients, warning: mlWarning } = await resolveMailingList(env.DB, 'time_off');
+  if (mlWarning || !recipients.length) {
+    console.warn('time_off_email_skip:', mlWarning || 'empty list');
+    return;
+  }
+
   let token;
   try { token = await getGraphToken(env); } catch (e) {
     console.error('time_off_token_fail', e?.constructor?.name || 'Error'); return;
@@ -218,7 +214,6 @@ async function sendRequestEmail(env, { requesterName, type, startDate, endDate, 
     PLATFORM_TIME_OFF_REVIEW_URL,
   ].filter(l => l !== undefined).join('\n');
 
-  const recipients = resolveRecipients(env);
   // Subject includes type so owners can see Vacation vs Home Day at a glance.
   const subject    = `Time Off Request (${type}) — ${requesterName}: ${datesStr}`;
   const message    = {

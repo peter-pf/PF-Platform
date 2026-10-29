@@ -219,11 +219,14 @@ assertIncludes('E19: topic required on submit', ttApiSrc, 'Topic is required');
 assertIncludes('E20: SP upload on submit', ttApiSrc, 'uploadTalkPdf');
 assertIncludes('E21: email send on submit', ttApiSrc, 'sendTalkEmail');
 assertIncludes('E22: TEST_RECIPIENTS defined', ttApiSrc, 'TEST_RECIPIENTS');
-assertIncludes('E23: PROD_RECIPIENTS includes Brad', ttApiSrc, 'breinking@pierfoundations.com');
-assertIncludes('E24: PROD_RECIPIENTS includes Jonathan', ttApiSrc, 'jreinking@pierfoundations.com');
-assertIncludes('E25: PROD_RECIPIENTS includes Derek', ttApiSrc, 'dfranke@pierfoundations.com');
-assertIncludes('E26: PROD_RECIPIENTS includes John Willis (jwillis@)', ttApiSrc, 'jwillis@pierfoundations.com');
-assertIncludes('E27: ACTIVE_RECIPIENTS = TEST_RECIPIENTS (flip gate)', ttApiSrc, 'ACTIVE_RECIPIENTS = TEST_RECIPIENTS');
+// E23-E27 updated 2026-10-29: recipients migrated from hardcoded PROD_RECIPIENTS to D1 mailing_lists table.
+// Addresses (Brad/Jonathan/Derek/Willis) now live in the D1 seed (migration 0011).
+// Verify D1 integration pattern instead of hardcoded addresses.
+assertIncludes('E23: TT uses resolveMailingList (D1 recipients)', ttApiSrc, 'resolveMailingList');
+assertIncludes('E24: TT reads from toolbox_talk list key', ttApiSrc, 'toolbox_talk');
+assertIncludes('E25: PROD_RECIPIENTS includes Derek (in seed comment)', ttApiSrc, 'dfranke@pierfoundations.com');
+assertIncludes('E26: TT imports mailing-lists lib', ttApiSrc, 'mailing-lists');
+assertIncludes('E27: TT has emailWarning fail-safe path', ttApiSrc, 'ttEmailWarning');
 assertIncludes('E28: isCrossSite blocks cross-origin POST', ttApiSrc, 'isCrossSite');
 assertIncludes('E29: D1 503 on store failure (fail-closed)', ttApiSrc, 'Service temporarily unavailable');
 assertIncludes('E30: emailedTo written to record after send', ttApiSrc, 'body.emailedTo = recipients.slice()');
