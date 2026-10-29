@@ -567,6 +567,95 @@ assertIncludes('N23: past-reports.html filterType dropdown has toolbox-talk opti
   prHtmlSrc, '<option value="toolbox-talk">');
 
 // ============================================================
+// P. past-reports.js visibility: draftVisible fix + EI/TT GET gates
+// ============================================================
+// P1-P4: source-level checks on the draftVisible fix
+console.log('\n--- P. past-reports visibility: draftVisible + EI/TT GET gates ---');
+
+const eiApiSrc = readFileSync(path.join(root, 'functions/api/equipment-inspection.js'), 'utf8');
+
+assertIncludes('P1: past-reports.js draftVisible now checks status === submitted',
+  pastRepSrc, "st === 'submitted'");
+assertIncludes('P2: past-reports.js draftVisible still checks status === sent',
+  pastRepSrc, "st === 'sent'");
+assertIncludes('P3: past-reports.js comment explains both DR/SR (sent) and EI/TT (submitted)',
+  pastRepSrc, "EI and TT write status='submitted'");
+
+// P4-P9: runtime behavioural tests — reconstruct draftVisible logic and exercise all cases.
+// We inline the exact function logic from past-reports.js to avoid an ES module dynamic import.
+(function runDraftVisibleTests() {
+  // Reconstruction mirrors the patched draftVisible exactly.
+  function makeDraftVisible(callerUid, callerName, isAdmin) {
+    function s(v) { return v == null ? '' : String(v).slice(0, 300); }
+    return function draftVisible(r) {
+      const st = s(r.status);
+      if (st === 'sent' || st === 'submitted') return true;
+      if (isAdmin) return true;
+      const cb = s(r.createdBy);
+      return (callerUid && cb === callerUid) || (callerName && cb === callerName);
+    };
+  }
+
+  // Non-creator field_ops user (uid='user-b', name='User B')
+  const nonCreator = makeDraftVisible('user-b', 'User B', false);
+  // Creator (uid='user-a')
+  const creator    = makeDraftVisible('user-a', 'User A', false);
+  // Admin
+  const admin      = makeDraftVisible('user-c', 'Admin C', true);
+
+  // P4: submitted DR (status='sent') — visible to non-creator
+  assert('P4: non-creator sees submitted DR (status=sent)',
+    nonCreator({ status: 'sent', createdBy: 'user-a' }));
+
+  // P5: submitted SR (status='sent') — visible to non-creator
+  assert('P5: non-creator sees submitted SR (status=sent)',
+    nonCreator({ status: 'sent', createdBy: 'user-a' }));
+
+  // P6: submitted EI (status='submitted') — visible to non-creator after fix
+  assert('P6: non-creator sees submitted EI (status=submitted)',
+    nonCreator({ status: 'submitted', createdBy: 'user-a' }));
+
+  // P7: submitted TT (status='submitted') — visible to non-creator after fix
+  assert('P7: non-creator sees submitted TT (status=submitted)',
+    nonCreator({ status: 'submitted', createdBy: 'user-a' }));
+
+  // P8: another user's draft DR — NOT visible to non-creator
+  assert('P8: non-creator does NOT see another user draft (DR status=draft)',
+    !nonCreator({ status: 'draft', createdBy: 'user-a' }));
+
+  // P9: another user's draft EI — NOT visible to non-creator
+  assert('P9: non-creator does NOT see another user draft (EI status=draft)',
+    !nonCreator({ status: 'draft', createdBy: 'user-a' }));
+
+  // P10: another user's draft TT — NOT visible to non-creator
+  assert('P10: non-creator does NOT see another user draft (TT status=draft)',
+    !nonCreator({ status: 'draft', createdBy: 'user-a' }));
+
+  // P11: creator CAN see their own draft
+  assert('P11: creator sees own draft (uid match)',
+    creator({ status: 'draft', createdBy: 'user-a' }));
+
+  // P12: admin sees any draft
+  assert('P12: admin sees any draft regardless of createdBy',
+    admin({ status: 'draft', createdBy: 'user-a' }));
+})();
+
+// P13-P14: EI and TT single-record GET gates only block status='draft', not 'submitted'.
+// This means a non-creator can open a submitted EI or TT record (e.g. to view the PDF).
+assertIncludes(
+  "P13: EI single-record GET gates on status==='draft' only (submitted records pass through)",
+  eiApiSrc,
+  "rec.status === 'draft' && rec.createdBy !== uid && session.role !== 'admin'");
+assertNotIncludes(
+  "P14: EI single-record GET does NOT gate on status==='submitted'",
+  eiApiSrc.slice(0, eiApiSrc.indexOf('// ---- POST:')),  // GET section only
+  "rec.status === 'submitted' && rec.createdBy !== uid");
+assertIncludes(
+  "P15: TT single-record GET gates on status==='draft' only (submitted records pass through)",
+  ttApiSrc,
+  "rec.status === 'draft' && rec.createdBy !== uid && session.role !== 'admin'");
+
+// ============================================================
 // Summary
 // ============================================================
 console.log('\n' + passed + ' passed, ' + failed + ' failed');

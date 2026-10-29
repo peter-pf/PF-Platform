@@ -78,12 +78,15 @@ export async function onRequestGet(context) {
     }
 
     // Visibility rule:
-    //   SENT records  -> visible to ALL field_ops (including field crew).
-    //   DRAFT records -> visible ONLY to their creator (createdBy === callerUid)
-    //                    OR to admins (who see everything).
+    //   SENT or SUBMITTED records -> visible to ALL field_ops (including field crew).
+    //   DRAFT records             -> visible ONLY to their creator (createdBy === callerUid)
+    //                               OR to admins (who see everything).
+    // DR and SR write status='sent' on submit; EI and TT write status='submitted'.
+    // Both are treated as "submitted/complete" here so all 4 types surface to non-creators.
     // This prevents crew members from enumerating each other's in-progress drafts.
     function draftVisible(r) {
-      if (s(r.status) === 'sent') return true;
+      const st = s(r.status);
+      if (st === 'sent' || st === 'submitted') return true;
       if (isAdmin) return true;
       const cb = s(r.createdBy);
       // Match uid (new records) OR display name (legacy records written before uid migration).
