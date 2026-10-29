@@ -437,6 +437,64 @@ assertIncludes('L13: ttShowSubmitMsg uses createElement for the PDF anchor',
   ttHtmlSrc, "document.createElement('a')");
 
 // ============================================================
+// M. Nav consistency — Toolbox Talk present on every nav page
+// ============================================================
+
+import { readdirSync } from 'fs';
+
+// Helper: extract href values from pf-nav-item anchors.
+function navHrefs(htmlSrc) {
+  const hrefs = [];
+  const re = /class="pf-nav-item[^"]*"[^>]*data-paths="([^"]+)"/g;
+  let m;
+  while ((m = re.exec(htmlSrc)) !== null) {
+    // data-paths may be comma-separated; take the first (canonical) path.
+    hrefs.push(m[1].split(',')[0].trim());
+  }
+  return hrefs;
+}
+
+const indexHtmlSrc = readFileSync(path.join(root, 'index.html'), 'utf8');
+const canonicalNavHrefs = navHrefs(indexHtmlSrc).sort();
+
+// Pages that should carry the full shared nav.
+const navPages = [
+  'daily-report.html',
+  'site-readiness.html',
+  'equipment-inspection.html',
+  'past-reports.html',
+  'time-off.html',
+  'schedule.html',
+  'cost-codes.html',
+  'toolbox-talk.html',
+];
+
+console.log('\n// M: Nav consistency');
+
+// M1: index.html has a /toolbox-talk.html nav item.
+assert('M1: index.html has /toolbox-talk.html nav item',
+  canonicalNavHrefs.includes('/toolbox-talk.html'));
+
+// M2-M8+: Each nav page has the exact same nav hrefs as index.html.
+navPages.forEach(function (page, idx) {
+  const src = readFileSync(path.join(root, page), 'utf8');
+  const pageHrefs = navHrefs(src).sort();
+  const missing = canonicalNavHrefs.filter(h => !pageHrefs.includes(h));
+  const extra   = pageHrefs.filter(h => !canonicalNavHrefs.includes(h));
+  const label = 'M' + (2 + idx) + ': ' + page + ' nav matches index.html';
+  assert(label, missing.length === 0 && extra.length === 0,
+    (missing.length ? 'missing=' + JSON.stringify(missing) : '') +
+    (extra.length   ? ' extra='  + JSON.stringify(extra)   : ''));
+});
+
+// M10: Every nav page contains a literal /toolbox-talk link (belt-and-suspenders).
+navPages.forEach(function (page, idx) {
+  const src = readFileSync(path.join(root, page), 'utf8');
+  assert('M' + (10 + idx) + ': ' + page + ' contains /toolbox-talk.html href',
+    src.includes('href="/toolbox-talk.html"'));
+});
+
+// ============================================================
 // Summary
 // ============================================================
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
