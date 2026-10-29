@@ -556,10 +556,16 @@ export async function onRequest(context) {
     }
 
     // Graph: upload PDF and section photos to SharePoint.
+    // spUploadWarning is set if the upload fails so the response can surface it
+    // to the user rather than silently appearing successful.
+    let spUploadWarning = null;
     if (graphConfigured(env)) {
       let token;
       try { token = await getGraphToken(env); }
-      catch (e) { console.error('[equip-inspection] Graph token failed:', e && e.message); }
+      catch (e) {
+        console.error('[equip-inspection] Graph token failed:', e && e.message);
+        spUploadWarning = 'PDF could not be saved to SharePoint (auth error). Your submission is recorded. Please notify your supervisor.';
+      }
       if (token) {
         try {
           const ref = await uploadEquipInspectionPdf(env, token, body, pdfBytes);
@@ -572,6 +578,7 @@ export async function onRequest(context) {
           }
         } catch (e) {
           console.error('[equip-inspection] SP upload failed:', e && e.message);
+          spUploadWarning = 'PDF could not be saved to SharePoint. Your submission is recorded. Please notify your supervisor.';
         }
       }
     }
@@ -595,6 +602,7 @@ export async function onRequest(context) {
     return json({
       ok: true, id: body.id, status: 'submitted',
       pdfName: body.pdfName, pdfWebUrl: body.pdfWebUrl || null,
+      spWarning: spUploadWarning,
     });
   }
 

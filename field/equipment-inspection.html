@@ -976,7 +976,13 @@ function eiDoSubmit(body, submittingType) {
       var ms = eiMachineStates[submittingType];
       if (ms) ms.submitted = true;
       eiSubmitting = false; // reset in-flight guard
-      eiShowMsg('Submitted. PDF saved to SharePoint (' + (d.pdfName || '') + ').', false);
+      // If the API signals a SharePoint upload warning, show it prominently so
+      // the user knows the PDF did not reach SharePoint and can notify a supervisor.
+      if (d.spWarning) {
+        eiShowMsg('Submitted. WARNING: ' + d.spWarning, true);
+      } else {
+        eiShowMsg('Submitted. PDF saved to SharePoint (' + (d.pdfName || '') + ').', false);
+      }
       eiMarkSaved('Submitted');
       // Refresh buttons for whichever machine is currently displayed.
       // If the user stayed on the submitted machine: Submit/Save Draft disable, New-form shows.

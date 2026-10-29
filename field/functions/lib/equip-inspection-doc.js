@@ -331,7 +331,7 @@ export async function uploadEquipInspectionPdf(env, token, rec, pdfBytes) {
     throw new Error(`SP upload failed ${uploadResp.status}: ${errText.slice(0, 200)}`);
   }
   const item = await uploadResp.json();
-  return { name: filename, itemId: item.id || '', webUrl: item.webUrl || '', serialFolderId };
+  return { name: filename, itemId: item.id || '', webUrl: item.webUrl || '', serialFolderId: serialId };
 }
 
 async function findChildFolder(env, token, parentId, name) {
