@@ -380,6 +380,11 @@ var eiState = {
   me: null,
 };
 
+// In-flight guards: prevent double-tap from firing duplicate create/submit requests.
+// Mirror TT's ttState.saving pattern.
+var eiSubmitting  = false; // true while a submit (or auto-create-then-submit) is in flight
+var eiSavingDraft = false; // true while a save-draft request is in flight
+
 // Per-machine independent form state, keyed by machineType.
 // Each machine keeps its own draft id, checklist answers, header field values,
 // safe-to-operate answer, notes, and photo metadata.  Switching machine type
@@ -895,9 +900,12 @@ window.eiLoadRecord = eiLoadRecord;
 // ---- Save draft ----
 // Fix: determine create vs update by checking whether the current machine's
 // ms.id is a server-generated UUID (not null, not an old local fallback).
-// The old code set eiState.id to a local 'ei-...' string and then checked its
-// length, which always routed fresh forms through 'update' and got a 400.
+// eiSavingDraft guard prevents double-tap from firing two create requests when
+// ms.id is still null (the first request hasn't returned a UUID yet).
 document.getElementById('eiSaveDraft').addEventListener('click', function(){
+  if (eiSavingDraft) return;
+  eiSavingDraft = true;
+  document.getElementById('eiSaveDraft').disabled = true;
   var ms   = eiMachineStates[eiState.machineType];
   var body = eiCollectBody();
   var action = UUID_RE_CLIENT.test(ms.id || '') ? 'update' : 'create';
@@ -908,6 +916,8 @@ document.getElementById('eiSaveDraft').addEventListener('click', function(){
   })
   .then(function(r){ return r.json(); })
   .then(function(d){
+    eiSavingDraft = false;
+    document.getElementById('eiSaveDraft').disabled = false;
     if (d && d.ok) {
       if (d.id) ms.id = d.id; // store server-generated UUID in per-machine state
       eiMarkSaved('Draft saved');
@@ -915,7 +925,11 @@ document.getElementById('eiSaveDraft').addEventListener('click', function(){
       eiShowMsg((d && d.error) || 'Could not save draft', true);
     }
   })
-  .catch(function(){ eiShowMsg('Network error saving draft', true); });
+  .catch(function(){
+    eiSavingDraft = false;
+    document.getElementById('eiSaveDraft').disabled = false;
+    eiShowMsg('Network error saving draft', true);
+  });
 });
 
 // ---- Submit ----
@@ -933,6 +947,7 @@ function eiDoSubmit(body) {
   .then(function(r){ return r.json(); })
   .then(function(d){
     if (d && d.ok) {
+      eiSubmitting = false; // reset flag; button intentionally stays disabled on success
       eiShowMsg('Submitted. PDF saved to SharePoint (' + (d.pdfName || '') + ').', false);
       eiMarkSaved('Submitted');
       document.getElementById('eiSubmit').disabled = true;
@@ -940,17 +955,27 @@ function eiDoSubmit(body) {
       document.getElementById('eiNewForm').style.display = 'inline-block';
       eiLoadList();
     } else {
+      eiSubmitting = false;
+      document.getElementById('eiSubmit').disabled = false;
       eiShowMsg((d && d.error) || 'Submission failed', true);
     }
   })
-  .catch(function(){ eiShowMsg('Network error during submission', true); });
+  .catch(function(){
+    eiSubmitting = false;
+    document.getElementById('eiSubmit').disabled = false;
+    eiShowMsg('Network error during submission', true);
+  });
 }
 
 document.getElementById('eiSubmit').addEventListener('click', function(){
+  if (eiSubmitting) return; // in-flight guard: block double-tap
   var body = eiCollectBody();
   if (!body.serialNumber) { eiShowMsg('Serial number is required before submitting.', true); return; }
   if (!body.date) { eiShowMsg('Date is required before submitting.', true); return; }
   if (body.safeToOperate === null) { eiShowMsg('Please answer Safe to Operate before submitting.', true); return; }
+  // Set guard and disable button BEFORE any fetch (covers both auto-create and direct submit paths).
+  eiSubmitting = true;
+  document.getElementById('eiSubmit').disabled = true;
   var ms = eiMachineStates[eiState.machineType];
   // Auto-create a server draft when none exists, then submit with the server UUID.
   if (!UUID_RE_CLIENT.test(ms.id || '')) {
@@ -962,17 +987,23 @@ document.getElementById('eiSubmit').addEventListener('click', function(){
     .then(function(r){ return r.json(); })
     .then(function(d){
       if (!d || !d.ok || !d.id) {
+        eiSubmitting = false;
+        document.getElementById('eiSubmit').disabled = false;
         eiShowMsg((d && d.error) || 'Could not start record. Check connection and retry.', true);
         return;
       }
       ms.id  = d.id;  // persist server UUID in per-machine state
       body.id = d.id; // supply UUID to the submit request
-      eiDoSubmit(body);
+      eiDoSubmit(body); // eiDoSubmit owns eiSubmitting reset from here
     })
-    .catch(function(){ eiShowMsg('Network error during submission. Check connection and retry.', true); });
+    .catch(function(){
+      eiSubmitting = false;
+      document.getElementById('eiSubmit').disabled = false;
+      eiShowMsg('Network error during submission. Check connection and retry.', true);
+    });
     return;
   }
-  eiDoSubmit(body);
+  eiDoSubmit(body); // eiDoSubmit owns eiSubmitting reset from here
 });
 
 // ---- New form ----

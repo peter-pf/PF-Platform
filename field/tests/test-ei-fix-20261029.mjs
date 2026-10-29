@@ -366,6 +366,131 @@ test('S5: no remaining references to eiState.sectionPhotos in HTML', () => {
   );
 });
 
+// ===========================================================================
+// T. IN-FLIGHT GUARD TESTS (double-tap prevention — verifier requirement)
+// ===========================================================================
+
+// T1: module-scope eiSubmitting flag is declared.
+test('T1: eiSubmitting module-scope flag declared', () => {
+  assert.ok(
+    htmlSrc.includes('var eiSubmitting') || htmlSrc.includes('let eiSubmitting') || htmlSrc.includes('const eiSubmitting'),
+    'eiSubmitting must be declared at module scope'
+  );
+});
+
+// T2: module-scope eiSavingDraft flag is declared.
+test('T2: eiSavingDraft module-scope flag declared', () => {
+  assert.ok(
+    htmlSrc.includes('var eiSavingDraft') || htmlSrc.includes('let eiSavingDraft') || htmlSrc.includes('const eiSavingDraft'),
+    'eiSavingDraft must be declared at module scope'
+  );
+});
+
+// T3: eiSubmit click handler has if (eiSubmitting) return; guard BEFORE any fetch.
+test('T3: eiSubmit click handler has in-flight guard before any fetch', () => {
+  const clickIdx = htmlSrc.indexOf("getElementById('eiSubmit').addEventListener('click'");
+  assert.ok(clickIdx !== -1, 'eiSubmit click handler must exist');
+  // Find the body of the handler (from the click to the next top-level });)
+  const handlerSlice = htmlSrc.slice(clickIdx, clickIdx + 1200);
+  const guardIdx  = handlerSlice.indexOf('if (eiSubmitting) return;');
+  const fetchIdx  = handlerSlice.indexOf("fetch('/api/equipment-inspection'");
+  assert.ok(guardIdx !== -1, 'eiSubmit handler must have if (eiSubmitting) return; guard');
+  assert.ok(fetchIdx !== -1, 'eiSubmit handler must contain a fetch');
+  assert.ok(guardIdx < fetchIdx, 'eiSubmitting guard must appear before any fetch in eiSubmit handler');
+});
+
+// T4: eiSubmitting is set to true BEFORE the first fetch in the submit handler.
+test('T4: eiSubmitting set true before first fetch in submit handler', () => {
+  const clickIdx = htmlSrc.indexOf("getElementById('eiSubmit').addEventListener('click'");
+  const handlerSlice = htmlSrc.slice(clickIdx, clickIdx + 1200);
+  const setTrueIdx = handlerSlice.indexOf('eiSubmitting = true;');
+  const fetchIdx   = handlerSlice.indexOf("fetch('/api/equipment-inspection'");
+  assert.ok(setTrueIdx !== -1, 'eiSubmitting = true must appear in submit handler');
+  assert.ok(setTrueIdx < fetchIdx, 'eiSubmitting = true must be BEFORE the first fetch in submit handler');
+});
+
+// T5: eiSubmitting is reset to false on the auto-create error path (before return).
+test('T5: eiSubmitting reset false on auto-create error path', () => {
+  // The auto-create error path ends with a return; eiSubmitting = false should appear
+  // before it in the then() callback that checks !d.ok.
+  const autoCreateBlock = htmlSrc.slice(
+    htmlSrc.indexOf("action: 'create'}"),
+    htmlSrc.indexOf("action: 'create'}") + 600
+  );
+  assert.ok(
+    autoCreateBlock.includes('eiSubmitting = false'),
+    'eiSubmitting must be reset to false on auto-create error path'
+  );
+});
+
+// T6: eiSubmitting is reset to false in the auto-create .catch() path.
+test('T6: eiSubmitting reset false in auto-create catch', () => {
+  // The catch after the auto-create fetch should reset eiSubmitting.
+  // We look for "Network error during submission" catch block.
+  const catchIdx = htmlSrc.indexOf('Network error during submission. Check connection and retry.');
+  assert.ok(catchIdx !== -1, 'auto-create catch block with network error message must exist');
+  // The catch function wraps eiSubmitting = false nearby
+  const catchSlice = htmlSrc.slice(catchIdx - 200, catchIdx + 50);
+  assert.ok(
+    catchSlice.includes('eiSubmitting = false'),
+    'eiSubmitting must be reset to false in auto-create catch'
+  );
+});
+
+// T7: eiDoSubmit resets eiSubmitting on the submission-failed (error) path.
+test('T7: eiDoSubmit resets eiSubmitting on submission-failed path', () => {
+  const doSubmitIdx = htmlSrc.indexOf('function eiDoSubmit(body)');
+  assert.ok(doSubmitIdx !== -1, 'eiDoSubmit function must exist');
+  // eiDoSubmit spans ~28 lines; use 1500 chars to capture the full function body.
+  const doSubmitSlice = htmlSrc.slice(doSubmitIdx, doSubmitIdx + 1500);
+  // There should be eiSubmitting = false in the else (error) branch
+  const errorBranchIdx = doSubmitSlice.indexOf('Submission failed');
+  assert.ok(errorBranchIdx !== -1, 'eiDoSubmit must contain Submission failed error string');
+  const errorBranchSlice = doSubmitSlice.slice(0, errorBranchIdx + 80);
+  assert.ok(
+    errorBranchSlice.includes('eiSubmitting = false'),
+    'eiDoSubmit must reset eiSubmitting on the submission-failed (error) path'
+  );
+});
+
+// T8: eiDoSubmit resets eiSubmitting in its .catch() path.
+test('T8: eiDoSubmit resets eiSubmitting in catch path', () => {
+  const doSubmitIdx = htmlSrc.indexOf('function eiDoSubmit(body)');
+  // eiDoSubmit spans ~28 lines; use 1500 chars to capture the full function body.
+  const doSubmitSlice = htmlSrc.slice(doSubmitIdx, doSubmitIdx + 1500);
+  const catchIdx = doSubmitSlice.lastIndexOf('.catch(function()');
+  assert.ok(catchIdx !== -1, 'eiDoSubmit must have a .catch() handler');
+  const catchSlice = doSubmitSlice.slice(catchIdx, catchIdx + 120);
+  assert.ok(
+    catchSlice.includes('eiSubmitting = false'),
+    'eiDoSubmit .catch must reset eiSubmitting'
+  );
+});
+
+// T9: Save Draft handler has if (eiSavingDraft) return; guard before any fetch.
+test('T9: Save Draft handler has eiSavingDraft in-flight guard before fetch', () => {
+  const draftClickIdx = htmlSrc.indexOf("getElementById('eiSaveDraft').addEventListener('click'");
+  assert.ok(draftClickIdx !== -1, 'eiSaveDraft click handler must exist');
+  const handlerSlice = htmlSrc.slice(draftClickIdx, draftClickIdx + 800);
+  const guardIdx = handlerSlice.indexOf('if (eiSavingDraft) return;');
+  const fetchIdx = handlerSlice.indexOf("fetch('/api/equipment-inspection'");
+  assert.ok(guardIdx !== -1, 'Save Draft handler must have if (eiSavingDraft) return; guard');
+  assert.ok(fetchIdx !== -1, 'Save Draft handler must contain a fetch');
+  assert.ok(guardIdx < fetchIdx, 'eiSavingDraft guard must appear before fetch in Save Draft handler');
+});
+
+// T10: Save Draft handler resets eiSavingDraft on both error and catch paths.
+test('T10: Save Draft handler resets eiSavingDraft on error and catch paths', () => {
+  const draftClickIdx = htmlSrc.indexOf("getElementById('eiSaveDraft').addEventListener('click'");
+  const handlerSlice = htmlSrc.slice(draftClickIdx, draftClickIdx + 1000);
+  // Count resets: error path (else branch) + catch path = at least 2
+  const resetCount = (handlerSlice.match(/eiSavingDraft = false/g) || []).length;
+  assert.ok(
+    resetCount >= 2,
+    `Save Draft handler must reset eiSavingDraft on at least 2 error paths (error+catch), found ${resetCount}`
+  );
+});
+
 setTimeout(() => {
   console.log(`\n  ${passed} passed, ${failed} failed\n`);
   if (failed) process.exit(1);
