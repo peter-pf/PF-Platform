@@ -78,7 +78,7 @@ test('P5: Submit handler auto-creates when ms.id is not a UUID', () => {
     "Submit handler must guard with UUID_RE_CLIENT.test(ms.id || '')"
   );
   assert.ok(
-    htmlSrc.includes("action: 'create'") && htmlSrc.includes('eiDoSubmit(body)'),
+    htmlSrc.includes("action: 'create'") && htmlSrc.includes('eiDoSubmit(body,'),
     'Submit handler must auto-create then call eiDoSubmit'
   );
 });
@@ -287,7 +287,7 @@ test('R12: eiNewForm resets per-machine state, not flat eiState fields', () => {
     'eiNewForm must not reset flat eiState fields (old pattern)'
   );
   assert.ok(
-    htmlSrc.includes("ms.id = null;\n  ms.items = {};"),
+    htmlSrc.includes('ms.id = null;') && htmlSrc.includes('ms.items = {};'),
     'eiNewForm must reset ms.id and ms.items'
   );
 });
@@ -439,10 +439,10 @@ test('T6: eiSubmitting reset false in auto-create catch', () => {
 
 // T7: eiDoSubmit resets eiSubmitting on the submission-failed (error) path.
 test('T7: eiDoSubmit resets eiSubmitting on submission-failed path', () => {
-  const doSubmitIdx = htmlSrc.indexOf('function eiDoSubmit(body)');
+  const doSubmitIdx = htmlSrc.indexOf('function eiDoSubmit(body'); // matches both signatures
   assert.ok(doSubmitIdx !== -1, 'eiDoSubmit function must exist');
-  // eiDoSubmit spans ~28 lines; use 1500 chars to capture the full function body.
-  const doSubmitSlice = htmlSrc.slice(doSubmitIdx, doSubmitIdx + 1500);
+  // eiDoSubmit spans ~35 lines; use 1800 chars to capture the full function body.
+  const doSubmitSlice = htmlSrc.slice(doSubmitIdx, doSubmitIdx + 1800);
   // There should be eiSubmitting = false in the else (error) branch
   const errorBranchIdx = doSubmitSlice.indexOf('Submission failed');
   assert.ok(errorBranchIdx !== -1, 'eiDoSubmit must contain Submission failed error string');
@@ -455,9 +455,9 @@ test('T7: eiDoSubmit resets eiSubmitting on submission-failed path', () => {
 
 // T8: eiDoSubmit resets eiSubmitting in its .catch() path.
 test('T8: eiDoSubmit resets eiSubmitting in catch path', () => {
-  const doSubmitIdx = htmlSrc.indexOf('function eiDoSubmit(body)');
-  // eiDoSubmit spans ~28 lines; use 1500 chars to capture the full function body.
-  const doSubmitSlice = htmlSrc.slice(doSubmitIdx, doSubmitIdx + 1500);
+  const doSubmitIdx = htmlSrc.indexOf('function eiDoSubmit(body'); // matches both signatures
+  // eiDoSubmit spans ~35 lines; use 1800 chars to capture the full function body.
+  const doSubmitSlice = htmlSrc.slice(doSubmitIdx, doSubmitIdx + 1800);
   const catchIdx = doSubmitSlice.lastIndexOf('.catch(function()');
   assert.ok(catchIdx !== -1, 'eiDoSubmit must have a .catch() handler');
   const catchSlice = doSubmitSlice.slice(catchIdx, catchIdx + 120);
@@ -489,6 +489,116 @@ test('T10: Save Draft handler resets eiSavingDraft on error and catch paths', ()
     resetCount >= 2,
     `Save Draft handler must reset eiSavingDraft on at least 2 error paths (error+catch), found ${resetCount}`
   );
+});
+
+// ===========================================================================
+// U. PER-MACHINE SUBMITTED STATE (NO-GO #2 fix — machine-switch button state)
+// ===========================================================================
+
+// U1: eiInitMachineState initialises submitted: false.
+test('U1: eiInitMachineState includes submitted: false', () => {
+  const initIdx = htmlSrc.indexOf('function eiInitMachineState(type)');
+  assert.ok(initIdx !== -1, 'eiInitMachineState must exist');
+  const initSlice = htmlSrc.slice(initIdx, initIdx + 600);
+  assert.ok(initSlice.includes('submitted: false'), 'eiInitMachineState must include submitted: false');
+});
+
+// U2: eiUpdateSubmitButtons helper function is declared.
+test('U2: eiUpdateSubmitButtons helper is declared', () => {
+  assert.ok(
+    htmlSrc.includes('function eiUpdateSubmitButtons()'),
+    'eiUpdateSubmitButtons helper function must be declared'
+  );
+});
+
+// U3: eiUpdateSubmitButtons reads ms.submitted for the current machine.
+test('U3: eiUpdateSubmitButtons reads ms.submitted from current machine state', () => {
+  const fnIdx = htmlSrc.indexOf('function eiUpdateSubmitButtons()');
+  const fnSlice = htmlSrc.slice(fnIdx, fnIdx + 400);
+  assert.ok(fnSlice.includes('ms.submitted') || fnSlice.includes('ms ? !!ms.submitted'),
+    'eiUpdateSubmitButtons must reference ms.submitted');
+  assert.ok(fnSlice.includes("eiMachineStates[eiState.machineType]"),
+    'eiUpdateSubmitButtons must read from eiMachineStates[eiState.machineType]');
+});
+
+// U4: eiLoadStateToDom calls eiUpdateSubmitButtons so machine-switch always
+//     restores the correct button state.
+test('U4: eiLoadStateToDom calls eiUpdateSubmitButtons', () => {
+  const fnIdx = htmlSrc.indexOf('function eiLoadStateToDom(ms)');
+  assert.ok(fnIdx !== -1, 'eiLoadStateToDom must exist');
+  // Function body is ~1000 chars; use 1200 to be safe.
+  const fnSlice = htmlSrc.slice(fnIdx, fnIdx + 1200);
+  assert.ok(fnSlice.includes('eiUpdateSubmitButtons()'),
+    'eiLoadStateToDom must call eiUpdateSubmitButtons()');
+});
+
+// U5: eiDoSubmit sets ms.submitted = true on the submitting machine on success.
+test('U5: eiDoSubmit sets ms.submitted = true on success', () => {
+  const fnIdx = htmlSrc.indexOf('function eiDoSubmit(body');
+  assert.ok(fnIdx !== -1, 'eiDoSubmit must exist');
+  const fnSlice = htmlSrc.slice(fnIdx, fnIdx + 1800);
+  // ms.submitted = true must appear before 'Submitted. PDF saved'
+  const setIdx  = fnSlice.indexOf('ms.submitted = true');
+  const msgIdx  = fnSlice.indexOf('Submitted. PDF saved');
+  assert.ok(setIdx !== -1, 'eiDoSubmit must set ms.submitted = true on success');
+  assert.ok(msgIdx !== -1, 'eiDoSubmit must contain success message');
+  assert.ok(setIdx < msgIdx, 'ms.submitted = true must be set before the success message');
+});
+
+// U6: eiDoSubmit captures submittingType parameter (not eiState.machineType after the fact).
+test('U6: eiDoSubmit accepts submittingType parameter', () => {
+  assert.ok(
+    htmlSrc.includes('function eiDoSubmit(body, submittingType)'),
+    'eiDoSubmit must accept a submittingType parameter'
+  );
+});
+
+// U7: eiLoadRecord sets ms.submitted based on rec.status.
+test('U7: eiLoadRecord sets ms.submitted from record status', () => {
+  const fnIdx = htmlSrc.indexOf('function eiLoadRecord(id)');
+  assert.ok(fnIdx !== -1, 'eiLoadRecord must exist');
+  const fnSlice = htmlSrc.slice(fnIdx, fnIdx + 2000);
+  assert.ok(
+    fnSlice.includes("ms.submitted = (rec.status === 'submitted')"),
+    "eiLoadRecord must set ms.submitted = (rec.status === 'submitted')"
+  );
+});
+
+// U8: eiNewForm handler sets ms.submitted = false.
+test('U8: eiNewForm handler resets ms.submitted to false', () => {
+  const handlerIdx = htmlSrc.indexOf("getElementById('eiNewForm').addEventListener('click'");
+  assert.ok(handlerIdx !== -1, 'eiNewForm click handler must exist');
+  const handlerSlice = htmlSrc.slice(handlerIdx, handlerIdx + 800);
+  assert.ok(
+    handlerSlice.includes('ms.submitted = false'),
+    'eiNewForm handler must set ms.submitted = false'
+  );
+});
+
+// U9: submit click handler captures submittingType before any fetch and passes
+//     it to eiDoSubmit.
+test('U9: submit click handler captures submittingType and passes to eiDoSubmit', () => {
+  const clickIdx = htmlSrc.indexOf("getElementById('eiSubmit').addEventListener('click'");
+  // Handler spans ~40 lines; use 2200 chars to reach all eiDoSubmit call sites.
+  const handlerSlice = htmlSrc.slice(clickIdx, clickIdx + 2200);
+  assert.ok(
+    handlerSlice.includes('var submittingType = eiState.machineType'),
+    'submit handler must capture submittingType = eiState.machineType'
+  );
+  assert.ok(
+    handlerSlice.includes('eiDoSubmit(body, submittingType)'),
+    'submit handler must pass submittingType to eiDoSubmit'
+  );
+});
+
+// U10: eiSetType shows 'Submitted' status when ms.submitted is true.
+test('U10: eiSetType uses ms.submitted to set Submitted status indicator', () => {
+  const fnIdx = htmlSrc.indexOf('function eiSetType(type)');
+  assert.ok(fnIdx !== -1, 'eiSetType must exist');
+  // Function body is ~1050 chars with comments; use 1300 to be safe.
+  const fnSlice = htmlSrc.slice(fnIdx, fnIdx + 1300);
+  assert.ok(fnSlice.includes("ms.submitted"), 'eiSetType must check ms.submitted');
+  assert.ok(fnSlice.includes("'Submitted'"), "eiSetType must call eiMarkSaved('Submitted')");
 });
 
 setTimeout(() => {
