@@ -447,7 +447,7 @@ export class PdfDoc {
     // ---- LEFT: PF logo lockup, VERTICALLY CENTERED in the band ----
     let logoRightX = MARGIN;
     if (LOGO_OK) {
-      const vPad = 20;
+      const vPad = 26; // Derek 2026-10-29: a little smaller so title has more room
       let logoH = bandH - vPad * 2;
       let logoW = PF_LOGO.width * (logoH / PF_LOGO.height);
       const maxLogoW = 190;
@@ -462,18 +462,16 @@ export class PdfDoc {
       logoRightX = MARGIN + measure('PIER FOUNDATIONS', wmSize, 'euro');
     }
 
-    // ---- Report title (white Eurostile) + subtitle — consistent across all reports ----
+    // ---- Report title (white Eurostile) — vertically centered in band ----
     // Single-line shrink-to-fit: never wraps; shrinks from TITLE_MAX down to TITLE_MIN.
-    // Fixed baseline positions so every report type has identical header placement.
-    //   titleBaseY : main title baseline (slightly above band centre)
-    //   subBaseY   : "Pier Foundations" subtitle baseline (slightly below band centre)
+    // Subtitle "Pier Foundations" removed 2026-10-29 per Derek; title now stands alone.
+    // titleBaseY: baseline placed so cap-height mid-point aligns with bandCenterY.
+    //   bandCenterY - tSize*0.35 ≈ bandCenterY - capHeight/2 (using capHeight ≈ 0.70×size).
     const titleX        = logoRightX + 18;
     const MIN_TITLE_GAP = 20;
     const maxTitleW     = metaLeft - MIN_TITLE_GAP - titleX;
     const TITLE_MAX     = 15;
     const TITLE_MIN     = 10;
-    const titleBaseY    = bandCenterY + 9;
-    const subBaseY      = bandCenterY - 7;
 
     if (title) {
       let tSize = TITLE_MAX;
@@ -481,10 +479,9 @@ export class PdfDoc {
         const ts = toWinAnsi(title);
         while (tSize > TITLE_MIN && measure(ts, tSize, 'euro') > maxTitleW) tSize -= 0.5;
       }
+      const titleBaseY = bandCenterY - tSize * 0.35;
       this._draw(toWinAnsi(title), tSize, 'euro', titleX, titleBaseY, PF.white);
     }
-    // Sub-label "Pier Foundations" — always drawn for brand consistency.
-    this._draw('Pier Foundations', 8, 'helv', titleX, subBaseY, PF.lightGrey);
 
     // ---- RIGHT: labeled metadata block (light-grey labels, white values) ----
     if (meta.length) {

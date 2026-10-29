@@ -508,11 +508,11 @@ assert('N1: DR PDF crew label uses c.name only (no cost code in parentheses)',
 assert('N2: DR PDF crew comment notes cost code kept in data not PDF',
   drDocSrc.includes('cost code kept in data'));
 
-// N3-N7: PDF header — brandHeader shrink-to-fit + Pier Foundations subtitle
+// N3-N7: PDF header — brandHeader shrink-to-fit; subtitle removed 2026-10-29 per Derek
 assertIncludes('N3: pdf.js brandHeader uses shrink-to-fit (TITLE_MAX to TITLE_MIN)', pdfSrc, 'TITLE_MIN');
-assertIncludes('N4: pdf.js brandHeader draws Pier Foundations subtitle', pdfSrc, "'Pier Foundations'");
-assertIncludes('N5: pdf.js brandHeader has fixed titleBaseY (single-line placement)', pdfSrc, 'titleBaseY');
-assertIncludes('N6: pdf.js brandHeader has fixed subBaseY (subtitle placement)', pdfSrc, 'subBaseY');
+assertNotIncludes('N4: pdf.js brandHeader subtitle "Pier Foundations" removed (Derek 2026-10-29)', pdfSrc, "'Pier Foundations'");
+assertIncludes('N5: pdf.js brandHeader has titleBaseY (optical-center formula)', pdfSrc, 'titleBaseY');
+assertNotIncludes('N6: pdf.js brandHeader subBaseY constant removed (subtitle gone)', pdfSrc, 'subBaseY');
 assertNotIncludes('N7: pdf.js brandHeader no longer wraps title to two lines (split logic removed)', pdfSrc, 'words.slice(0, split)');
 
 // N8-N9: EI doc uses brandHeader with full title; no manual _draw for it
