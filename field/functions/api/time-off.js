@@ -17,7 +17,7 @@
 
 import { requireArea } from '../lib/auth.js';
 import { getGraphToken, graphConfigured, GRAPH } from '../lib/graph.js';
-import { resolveMailingList } from '../lib/mailing-lists.js';
+import { resolveMailingList, resolveMailingListWithNames } from '../lib/mailing-lists.js';
 
 // ---------------------------------------------------------------------------
 // RECIPIENTS -- now read from the mailing_lists D1 table (migration 0011).
@@ -177,16 +177,24 @@ function countCalendarDays(startIso, endIso) {
   return calendarDays(startIso, endIso); // reuses existing helper
 }
 
-async function sendRequestEmail(env, { requesterName, type, startDate, endDate, halfDay, dayCount, note }) {
+// preResolvedEmails: optional string[] resolved before context.waitUntil; skips D1 re-query.
+async function sendRequestEmail(env, { requesterName, type, startDate, endDate, halfDay, dayCount, note, preResolvedEmails }) {
   if (!graphConfigured(env)) return;
 
-  // Read recipients from D1 mailing_lists table.
-  // FAIL-SAFE: if D1 unreachable or list empty, log and skip.
-  const { recipients, warning: mlWarning } = await resolveMailingList(env.DB, 'time_off');
-  if (mlWarning || !recipients.length) {
-    console.warn('time_off_email_skip:', mlWarning || 'empty list');
-    return;
+  // If caller already resolved the mailing list (before context.waitUntil), use it directly.
+  // Otherwise fall back to querying D1 here (legacy path).
+  let recipients;
+  if (preResolvedEmails) {
+    recipients = preResolvedEmails;
+  } else {
+    const { recipients: r, warning: mlWarning } = await resolveMailingList(env.DB, 'time_off');
+    if (mlWarning || !r.length) {
+      console.warn('time_off_email_skip:', mlWarning || 'empty list');
+      return;
+    }
+    recipients = r;
   }
+  if (!recipients.length) return;
 
   let token;
   try { token = await getGraphToken(env); } catch (e) {
@@ -462,9 +470,15 @@ export async function onRequestPost(context) {
       return json({ ok: false, error: 'Failed to save request.' }, 500);
     }
 
+    // Resolve mailing list BEFORE context.waitUntil so we can include emailedTo in the
+    // response. The email itself fires asynchronously; we tell the client who will receive it.
+    const { recipients: toNamedRecipients, warning: toMailingWarning } =
+      await resolveMailingListWithNames(env.DB, 'time_off');
+
     context.waitUntil(sendRequestEmail(env, {
       requesterName: name || uid, type, startDate, endDate,
       halfDay: !!halfDay, dayCount, note,
+      preResolvedEmails: toNamedRecipients.map((r) => r.email),
     }));
 
     // Soft warning (not a block) if a Vacation request would exceed the remaining
@@ -479,8 +493,12 @@ export async function onRequestPost(context) {
       } catch { /* non-fatal — warning is best-effort */ }
     }
 
-    return json({ ok: true, id, status: 'pending', day_count: dayCount,
-                  ...(vacationWarning ? { vacation_warning: vacationWarning } : {}) });
+    return json({
+      ok: true, id, status: 'pending', day_count: dayCount,
+      emailedTo: toMailingWarning ? [] : toNamedRecipients,
+      emailWarning: toMailingWarning || undefined,
+      ...(vacationWarning ? { vacation_warning: vacationWarning } : {}),
+    });
   }
 
   // ---- Cancel own pending request (race-safe) ----------------------------

@@ -36,7 +36,7 @@ import {
   upsertRecord, loadRecordById, listRecords, countRecords,
   PRESENTER_SET, PRESENTER_OPTIONS, TOPIC_KEYS, TOPIC_LABELS,
 } from '../lib/toolbox-talk-store.js';
-import { resolveMailingList } from '../lib/mailing-lists.js';
+import { resolveMailingList, resolveMailingListWithNames } from '../lib/mailing-lists.js';
 
 // ---------------------------------------------------------------------------
 // RECIPIENTS -- now read from the mailing_lists D1 table (migration 0011).
@@ -343,7 +343,7 @@ export async function onRequest(context) {
     // FAIL-SAFE: if D1 unreachable or list empty, skip email and return warning.
     // The record and SP upload are NOT reverted.
     let ttEmailWarning = null;
-    const { recipients, warning: ttMailingWarning } = await resolveMailingList(env.DB, 'toolbox_talk');
+    const { recipients, warning: ttMailingWarning } = await resolveMailingListWithNames(env.DB, 'toolbox_talk');
     if (ttMailingWarning) {
       ttEmailWarning = ttMailingWarning;
     } else if (recipients.length && graphConfigured(env)) {
@@ -358,9 +358,9 @@ export async function onRequest(context) {
           const subject = `Toolbox Talk - ${body.projectName || body.projectId || 'Project'} - ${body.date}`;
           const bodyText = buildEmailBody(body);
           await sendTalkEmail(env, token, {
-            recipients, subject, bodyText, pdfBytes, filename: body.pdfName,
+            recipients: recipients.map((r) => r.email), subject, bodyText, pdfBytes, filename: body.pdfName,
           });
-          body.emailedTo = recipients.slice();
+          body.emailedTo = recipients.slice(); // [{name,email}]
           body.sentAt    = new Date().toISOString();
         } catch (e) {
           console.error('[toolbox-talk] Email send failed:', e && e.message);

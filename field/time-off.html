@@ -157,6 +157,15 @@
     </div>
   </div>
 </div>
+<!-- Submit success modal (Derek, 2026-10-30) -->
+<div id="toSuccessModal" role="dialog" aria-modal="true" aria-labelledby="toSuccessTitle" style="display:none;position:fixed;inset:0;z-index:210;align-items:center;justify-content:center;">
+  <div style="position:absolute;inset:0;background:rgba(0,0,0,.45);"></div>
+  <div style="position:relative;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px 20px;max-width:360px;width:90%;margin:auto;">
+    <p id="toSuccessTitle" style="margin:0 0 12px;font-size:1rem;font-weight:600;">Confirmed: submitted</p>
+    <div id="toSuccessRecipients"></div>
+    <button type="button" id="toSuccessOk" class="btn btn-primary" style="margin-top:16px;width:100%">OK</button>
+  </div>
+</div>
 
 <div id="loading">Loading...</div>
 <div id="authError"><p>Session expired. <a href="/login.html">Sign in again</a></p></div>
@@ -239,6 +248,42 @@
 
 <script src="/js/pf-shared.js"></script>
 <script>
+// ---- Submit success modal helpers (TO) ----
+function pfShowTOSuccessModal(emailedTo, emailWarning) {
+  var m = document.getElementById('toSuccessModal');
+  if (!m) return;
+  var rec = document.getElementById('toSuccessRecipients');
+  if (rec) {
+    while (rec.firstChild) rec.removeChild(rec.firstChild);
+    var warn = emailWarning || null;
+    if (warn) {
+      var p = document.createElement('p');
+      p.style.cssText = 'margin:0 0 6px;font-size:.875rem;';
+      p.textContent = warn;
+      rec.appendChild(p);
+    } else if (emailedTo && emailedTo.length) {
+      var lbl = document.createElement('p');
+      lbl.style.cssText = 'margin:0 0 4px;font-size:.875rem;font-weight:600;';
+      lbl.textContent = 'Emailed to:';
+      rec.appendChild(lbl);
+      var ul = document.createElement('ul');
+      ul.style.cssText = 'margin:0 0 4px;padding-left:16px;font-size:.875rem;';
+      for (var i = 0; i < emailedTo.length; i++) {
+        var li = document.createElement('li');
+        var r = emailedTo[i];
+        li.textContent = (typeof r === 'object' && r !== null) ? (r.name + ' (' + r.email + ')') : String(r);
+        ul.appendChild(li);
+      }
+      rec.appendChild(ul);
+    } else {
+      var p2 = document.createElement('p');
+      p2.style.cssText = 'margin:0 0 6px;font-size:.875rem;';
+      p2.textContent = 'No recipients on the mailing list.';
+      rec.appendChild(p2);
+    }
+  }
+  m.style.display = 'flex';
+}
 // ---- confirm modal helpers (TO) ----
 function pfShowConfirmModalTO(cb){
   window.pfConfirmModalCallback=cb;
@@ -419,6 +464,10 @@ document.getElementById('toModalConfirm').addEventListener('click', function(){
   if(this.dataset.firing){return;}this.dataset.firing='1';
   var cb=window.pfConfirmModalCallback;pfHideConfirmModalTO();if(cb)cb();
 });
+// Success modal OK wiring
+document.getElementById('toSuccessOk').addEventListener('click', function(){
+  document.getElementById('toSuccessModal').style.display = 'none';
+});
 document.getElementById('toForm').addEventListener('submit', function(e) {
   e.preventDefault();
   var btn = document.getElementById('submitBtn');
@@ -458,6 +507,7 @@ document.getElementById('toForm').addEventListener('submit', function(e) {
       if (res.ok && res.d.ok) {
         var successMsg = 'Request submitted. The owners will be notified.';
         showMsg(msgEl, successMsg, 'ok');
+        pfShowTOSuccessModal(res.d.emailedTo || [], res.d.emailWarning);
         if (res.d.vacation_warning) {
           // Append warning below the success message (non-blocking)
           var warnDiv = document.createElement('div');

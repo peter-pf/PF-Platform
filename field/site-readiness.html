@@ -218,6 +218,15 @@
     </div>
   </div>
 </div>
+<!-- Submit success modal (Derek, 2026-10-30) -->
+<div id="srSuccessModal" role="dialog" aria-modal="true" aria-labelledby="srSuccessTitle" style="display:none;position:fixed;inset:0;z-index:210;align-items:center;justify-content:center;">
+  <div style="position:absolute;inset:0;background:rgba(0,0,0,.45);"></div>
+  <div style="position:relative;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px 20px;max-width:360px;width:90%;margin:auto;">
+    <p id="srSuccessTitle" style="margin:0 0 12px;font-size:1rem;font-weight:600;">Confirmed: submitted</p>
+    <div id="srSuccessRecipients"></div>
+    <button type="button" id="srSuccessOk" class="btn btn-primary" style="margin-top:16px;width:100%">OK</button>
+  </div>
+</div>
 
 <div id="loading">Loading...</div>
 <div id="authError">
@@ -372,6 +381,47 @@
 
 <script src="/js/pf-shared.js"></script>
 <script>
+// ---- Submit success modal helpers (SR) ----
+function pfShowSRSuccessModal(emailedTo, emailWarning, spWarning) {
+  var m = document.getElementById('srSuccessModal');
+  if (!m) return;
+  var rec = document.getElementById('srSuccessRecipients');
+  if (rec) {
+    while (rec.firstChild) rec.removeChild(rec.firstChild);
+    var warn = emailWarning || null;
+    if (warn) {
+      var p = document.createElement('p');
+      p.style.cssText = 'margin:0 0 6px;font-size:.875rem;';
+      p.textContent = warn;
+      rec.appendChild(p);
+    } else if (emailedTo && emailedTo.length) {
+      var lbl = document.createElement('p');
+      lbl.style.cssText = 'margin:0 0 4px;font-size:.875rem;font-weight:600;';
+      lbl.textContent = 'Emailed to:';
+      rec.appendChild(lbl);
+      var ul = document.createElement('ul');
+      ul.style.cssText = 'margin:0 0 4px;padding-left:16px;font-size:.875rem;';
+      for (var i = 0; i < emailedTo.length; i++) {
+        var li = document.createElement('li');
+        li.textContent = emailedTo[i].name + ' (' + emailedTo[i].email + ')';
+        ul.appendChild(li);
+      }
+      rec.appendChild(ul);
+    } else {
+      var p2 = document.createElement('p');
+      p2.style.cssText = 'margin:0 0 6px;font-size:.875rem;';
+      p2.textContent = 'No recipients on the mailing list.';
+      rec.appendChild(p2);
+    }
+    if (spWarning) {
+      var pw = document.createElement('p');
+      pw.style.cssText = 'margin:6px 0 0;font-size:.875rem;color:var(--red,#c00);';
+      pw.textContent = 'SharePoint: ' + spWarning;
+      rec.appendChild(pw);
+    }
+  }
+  m.style.display = 'flex';
+}
 // ---- Submit confirm modal helpers (SR) ----
 function pfShowConfirmModalSR(cb){
   window.pfConfirmModalCallbackSR=cb;
@@ -1220,6 +1270,13 @@ try {
         var cb=window.pfConfirmModalCallbackSR;pfHideConfirmModalSR();if(cb)cb();
       });
     }
+    // Success modal OK wiring
+    if (!document.getElementById('srSuccessModal').dataset.wired) {
+      document.getElementById('srSuccessModal').dataset.wired = '1';
+      document.getElementById('srSuccessOk').addEventListener('click', function () {
+        document.getElementById('srSuccessModal').style.display = 'none';
+      });
+    }
     var nf = document.getElementById('srNewForm');
     if (nf && !nf.dataset.wired) { nf.dataset.wired = '1'; nf.addEventListener('click', function () { resetForm(); msg('Started a new form.', true); }); }
     // Offline restore/dismiss
@@ -1307,9 +1364,11 @@ try {
           .then(function (r2) {
             if (r2.ok && r2.body && r2.body.saved) {
               upsertRecord(r2.body.record);
-              var to = (r2.body.distribution && r2.body.distribution.emailedTo) || [];
+              var dist2 = r2.body.distribution || {};
+              var to = dist2.emailedTo || [];
               msg((editing ? 'Form updated and re-sent' : 'Form sent') +
                 ': emailed' + (to.length ? ' to ' + to.length + ' recipient(s)' : '') + ' and saved to SharePoint.', true);
+              pfShowSRSuccessModal(to, r2.body.emailWarning, null);
               srClearOfflineDraft(); resetForm(); renderList();
             } else {
               upsertRecord(rec);

@@ -38,7 +38,7 @@ import {
   upsertRecord, loadRecordById, listRecords, countRecords,
   CHECKLIST_ITEMS, computeResult, R12_KEYS,
 } from '../lib/site-readiness-store.js';
-import { resolveMailingList } from '../lib/mailing-lists.js';
+import { resolveMailingList, resolveMailingListWithNames } from '../lib/mailing-lists.js';
 
 // ===========================================================================
 // RECIPIENTS -- now read from the mailing_lists D1 table (migration 0011).
@@ -439,7 +439,7 @@ export async function onRequestPost(context) {
     }
 
     // Read recipients from D1 mailing_lists table (migration 0011).
-    const { recipients, warning: mailingListWarning } = await resolveMailingList(env.DB, 'site_readiness');
+    const { recipients, warning: mailingListWarning } = await resolveMailingListWithNames(env.DB, 'site_readiness');
 
     // Stamp submit audit (same first-submit / re-submit semantics as DFR).
     const isEdit = !!(rec.submittedAt || rec.status === 'sent');
@@ -514,7 +514,7 @@ export async function onRequestPost(context) {
         // Subject == generated filename without the .pdf extension so they can never drift.
         const subject = filename.replace(/\.pdf$/i, '');
         const bodyText = buildEmailBody(rec);
-        await sendSiteReadinessEmail(env, token, { recipients, subject, bodyText, pdfBytes, filename });
+        await sendSiteReadinessEmail(env, token, { recipients: recipients.map((r) => r.email), subject, bodyText, pdfBytes, filename });
       } catch (e) {
         console.error('api/site-readiness submit: email failed:', e && e.message);
         return json({ status: 'error',
@@ -536,7 +536,7 @@ export async function onRequestPost(context) {
     rec.status = 'sent';
     rec.pdfName = filename;
     rec.pdfWebUrl = (uploaded && uploaded.webUrl) || null;
-    rec.emailedTo = emailWarning ? [] : recipients.slice();
+    rec.emailedTo = emailWarning ? [] : recipients.slice(); // [{name,email}]
     rec.sentAt = new Date().toISOString();
     rec.updatedAt = rec.sentAt;
 

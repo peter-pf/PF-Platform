@@ -67,7 +67,7 @@ const SEED = {
     '299 VSC Loader',
     'Trailer & Tooling',
   ],
-  personnel: ['John Willis', 'Seth Willis', 'Jordan Lemay'],
+  personnel: ['John Willis', 'Seth Willis', 'Christian Boutte', 'Jordan Lemay'],
   foremen: ['John Willis'],
 };
 
@@ -145,10 +145,14 @@ async function loadStored(env) {
 // one source of truth for the form.
 function buildResponse(stored) {
   const base = stored || {};
+  // Strip any exact "test" entry (case-insensitive) that may have been added to
+  // the KV store during development. Old submitted records that referenced "test"
+  // still load fine; this only removes it from the dropdown offered to new entries.
+  const stripTest = (list) => list.filter((v) => v.toLowerCase() !== 'test');
   return {
     ownedEquipment: cleanList(Array.isArray(base.ownedEquipment) ? base.ownedEquipment : SEED.ownedEquipment),
-    personnel:      cleanList(Array.isArray(base.personnel)      ? base.personnel      : SEED.personnel),
-    foremen:        cleanList(Array.isArray(base.foremen)        ? base.foremen        : SEED.foremen),
+    personnel:      stripTest(cleanList(Array.isArray(base.personnel) ? base.personnel : SEED.personnel)),
+    foremen:        stripTest(cleanList(Array.isArray(base.foremen)   ? base.foremen   : SEED.foremen)),
     rentalCategories: RENTAL_CATEGORIES.slice(),
     maintenanceCategories: MAINTENANCE_CATEGORIES.slice(),
     // Per-category subcategory lists (owner-editable). Seed = each category -> [].

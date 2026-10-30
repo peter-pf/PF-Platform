@@ -62,7 +62,7 @@ import {
 import {
   upsertReport, loadReportById, listReports, countReports,
 } from '../lib/daily-report-store.js';
-import { resolveMailingList } from '../lib/mailing-lists.js';
+import { resolveMailingList, resolveMailingListWithNames } from '../lib/mailing-lists.js';
 
 // ===========================================================================
 // RECIPIENTS -- now read from the mailing_lists D1 table (migration 0011).
@@ -488,7 +488,7 @@ export async function onRequestPost(context) {
     // Read recipients from D1 mailing_lists table (migration 0011).
     // FAIL-SAFE: if D1 is unreachable or the list is empty, surface a warning
     // and skip email.  The record and SP upload still succeed.
-    const { recipients, warning: mailingListWarning } = await resolveMailingList(env.DB, 'daily_report');
+    const { recipients, warning: mailingListWarning } = await resolveMailingListWithNames(env.DB, 'daily_report');
 
     // Stamp submit audit onto the record used to render (so the PDF footer and
     // email reflect the submit), but only persist 'sent' AFTER both side effects
@@ -553,7 +553,7 @@ export async function onRequestPost(context) {
         // Subject == generated filename without the .pdf extension so they can never drift.
         const subject = filename.replace(/\.pdf$/i, '');
         const bodyText = buildEmailBody(rec);
-        await sendReportEmail(env, token, { recipients, subject, bodyText, pdfBytes, filename });
+        await sendReportEmail(env, token, { recipients: recipients.map((r) => r.email), subject, bodyText, pdfBytes, filename });
       } catch (e) {
         console.error('api/daily-report submit: email failed:', e && e.message);
         return json({ status: 'error', message: 'Submit failed while sending the email. Your draft is saved; please retry.' }, 502);
@@ -572,7 +572,7 @@ export async function onRequestPost(context) {
     rec.status = 'sent';
     rec.pdfName = filename;
     rec.pdfWebUrl = (uploaded && uploaded.webUrl) || null;
-    rec.emailedTo = emailWarning ? [] : recipients.slice();
+    rec.emailedTo = emailWarning ? [] : recipients.slice(); // [{name,email}]
     rec.sentAt = new Date().toISOString();
     rec.updatedAt = rec.sentAt;
 

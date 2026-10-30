@@ -32,7 +32,7 @@ import {
   uploadEquipInspectionPdf, uploadSectionPhotos, sectionToSlug,
   sendEquipInspectionEmail,
 } from '../lib/equip-inspection-doc.js';
-import { resolveMailingList } from '../lib/mailing-lists.js';
+import { resolveMailingList, resolveMailingListWithNames } from '../lib/mailing-lists.js';
 import {
   upsertRecord, loadRecordById, listRecords, countRecords,
   CHECKLIST_ITEMS, VALID_ITEM_KEYS, VALID_ANSWERS, MACHINE_TYPES,
@@ -592,7 +592,7 @@ export async function onRequest(context) {
     // FAIL-SAFE: if D1 unreachable or list empty, skip email and set warning.
     // SP upload and D1 record are NOT reverted on email failure.
     const { recipients: eiRecipients, warning: eiMailingWarning } =
-      await resolveMailingList(env.DB, 'equipment_inspection');
+      await resolveMailingListWithNames(env.DB, 'equipment_inspection');
     if (eiMailingWarning) {
       eiEmailWarning = eiMailingWarning;
     } else if (eiRecipients.length) {
@@ -602,7 +602,7 @@ export async function onRequest(context) {
       } else {
         try {
           await sendEquipInspectionEmail(env, graphToken, {
-            recipients: eiRecipients,
+            recipients: eiRecipients.map((r) => r.email),
             rec: body,
             pdfBytes,
             filename: body.pdfName,
@@ -637,6 +637,8 @@ export async function onRequest(context) {
       ok: true, id: body.id, status: 'submitted',
       pdfName: body.pdfName, pdfWebUrl: body.pdfWebUrl || null,
       spWarning: combinedWarning,
+      emailedTo: (eiMailingWarning || eiEmailWarning) ? [] : eiRecipients.slice(),
+      emailWarning: eiMailingWarning || eiEmailWarning || undefined,
     });
   }
 

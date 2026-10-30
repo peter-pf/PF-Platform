@@ -95,6 +95,45 @@ export async function resolveMailingList(db, listKey) {
   }
 }
 
+/**
+ * Resolve the mailing list, then look up display names from the users table.
+ * Returns { recipients: [{name, email}][], warning: string|null }.
+ *   warning is non-null if D1 was unreachable or the list was empty.
+ *   name is the users.name for that email, or the email itself if not found.
+ * Never used for sending — callers extract .email when passing to email helpers.
+ */
+export async function resolveMailingListWithNames(db, listKey) {
+  const { recipients: emails, warning } = await resolveMailingList(db, listKey);
+  if (warning || !emails.length) {
+    return { recipients: [], warning };
+  }
+  // Look up display names from the users table (best-effort; any error → fall back).
+  try {
+    const placeholders = emails.map(() => '?').join(',');
+    const { results } = await db
+      .prepare(`SELECT email, name FROM users WHERE lower(email) IN (${placeholders})`)
+      .bind(...emails)
+      .all();
+    const nameMap = Object.create(null);
+    for (const row of (results || [])) {
+      nameMap[String(row.email).toLowerCase()] = row.name;
+    }
+    return {
+      recipients: emails.map((email) => ({
+        name: nameMap[email.toLowerCase()] || email,
+        email,
+      })),
+      warning: null,
+    };
+  } catch {
+    // Name lookup failure: fall back to email as display name.
+    return {
+      recipients: emails.map((email) => ({ name: email, email })),
+      warning: null,
+    };
+  }
+}
+
 // ---- D1 write helpers -------------------------------------------------------
 
 /**
