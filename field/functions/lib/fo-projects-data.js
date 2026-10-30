@@ -37,7 +37,7 @@
 
 export const FO_PROJECTS = [
   { number: '25-026',  name: 'The Granary',               city_state: 'Noblesville, IN',       address: 'S 8th St & Walnut St, Noblesville, IN 46060' },
-  { number: '26-007',  name: 'Madison Lifestyle District Parking Garage', city_state: 'South Bend, IN', address: '416 Dr Martin Luther King Jr Blvd, South Bend, IN 46601' },
+  { number: '26-007',  name: 'Madison Lifestyle',    city_state: 'South Bend, IN', address: '416 Dr Martin Luther King Jr Blvd, South Bend, IN 46601' },
   { number: '26-014',  name: 'TPS Dayton',                city_state: 'Dayton, OH',             address: '125 Sears Street, Dayton, OH 45402' },
   { number: '26-019',  name: 'Vivera Northbrook',         city_state: null,                     address: null },
   { number: '26-020',  name: 'EVPL Red Bank Rd Bldg',     city_state: null,                     address: null },

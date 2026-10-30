@@ -47,7 +47,7 @@ console.log('\nP1: List contents');
 
 const EXPECTED = [
   { number: '25-026', name: 'The Granary' },
-  { number: '26-007', name: 'Madison Lifestyle District Parking Garage' },
+  { number: '26-007', name: 'Madison Lifestyle' },
   { number: '26-014', name: 'TPS Dayton' },
   { number: '26-019', name: 'Vivera Northbrook' },
   { number: '26-020', name: 'EVPL Red Bank Rd Bldg' },
