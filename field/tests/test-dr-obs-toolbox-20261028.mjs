@@ -288,7 +288,7 @@ assertIncludes('H9: TT HTML has Questions or Concerns section', ttHtmlSrc, 'Ques
 assertIncludes('H10: TT HTML has Corrective Actions section', ttHtmlSrc, 'Corrective Actions');
 assertIncludes('H11: TT HTML has Attendees section with dynamic list', ttHtmlSrc, 'id="ttAttendeeList"');
 assertIncludes('H12: TT HTML has Add Attendee button', ttHtmlSrc, 'id="ttAddAttBtn"');
-assertIncludes('H13: TT HTML has Acknowledged checkbox for attendees', ttHtmlSrc, 'Acknowledged');
+assertNotIncludes('H13: TT HTML does not have Acknowledged checkbox (removed R6 per Derek 2026-10-30)', ttHtmlSrc, 'aria-label="Acknowledged"');
 assertIncludes('H14: TT HTML has project picker (same pattern as DR/SR/EI)', ttHtmlSrc, 'ttProjectSearch');
 assertIncludes('H15: TT HTML has Save Draft button', ttHtmlSrc, 'id="ttSaveBtn"');
 assertIncludes('H16: TT HTML has Submit button', ttHtmlSrc, 'id="ttSubmitBtn"');
@@ -350,8 +350,8 @@ assertIncludes('K3: DR email body delay total also uses 2dp rounding',
 assertNotIncludes('K4: TT PDF Meeting Details does not repeat Presenter row',
   ttDocSrc, "label: 'Presenter', value: rec.presenter");
 
-// K5: Not acknowledged shown for unacknowledged attendees
-assertIncludes('K5: TT PDF attendee "Not acknowledged" shown for missing sign-off',
+// K5: Acknowledged column removed from PDF R6 per Derek 2026-10-30
+assertNotIncludes('K5: TT PDF attendee acknowledged column removed R6',
   ttDocSrc, 'Not acknowledged');
 
 // K6: TT footer has no spacer forcing page break

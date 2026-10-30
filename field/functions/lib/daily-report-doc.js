@@ -88,7 +88,8 @@ export function renderDailyReportPdf(rec) {
     doc.table(eqRows, { valueW: 110, subLabels: new Set(['Owned', 'Rental']) });
   }
 
-  // ---- maintenance (category / type / detail / hour-at-failure; subcategory removed R7) --
+  // ---- maintenance (category / type / detail; hourAtFailure removed from display R6 per Derek 2026-10-30) --
+  // hourAtFailure may exist in old stored records but is omitted from PDF output for all records.
   const maint = Array.isArray(rec.maintenance)
     ? rec.maintenance.filter((m) => m && (m.type || m.item || m.category))
     : [];
@@ -98,9 +99,9 @@ export function renderDailyReportPdf(rec) {
       const bits = [m.type, m.item].filter(Boolean).join(' - ');
       return {
         label: `${m.category || 'General'}: ${bits || '-'}`,
-        value: (m.hourAtFailure != null && m.hourAtFailure !== '') ? `${m.hourAtFailure} hr` : '',
+        value: '',
       };
-    }), { valueW: 90 });
+    }));
   }
 
   // ---- future issues (equipment + description, no $) ----

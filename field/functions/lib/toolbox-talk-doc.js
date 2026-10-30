@@ -72,14 +72,16 @@ export function renderToolboxTalkPdf(rec) {
     doc.text(actions, { size: 10 });
   }
 
-  // ---- Attendees ----
+  // ---- Attendees (attendance-only; acknowledged removed R6 per Derek 2026-10-30) ----
+  // Old records may have acknowledged flags in stored data; they are intentionally
+  // omitted from the PDF for all records (new and re-rendered old).
   const attendees = Array.isArray(rec.attendees) ? rec.attendees.filter((a) => a && a.name) : [];
   doc.heading('Attendees');
   if (attendees.length) {
     doc.table(attendees.map((a, i) => ({
       label: `${i + 1}. ${a.name}`,
-      value: a.acknowledged ? 'Acknowledged' : 'Not acknowledged',
-    })), { valueW: 130 });
+      value: '',
+    })));
   } else {
     doc.text('No attendees recorded.', { size: 10 });
   }

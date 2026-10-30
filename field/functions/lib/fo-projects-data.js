@@ -33,4 +33,10 @@ export const FO_PROJECTS = [
   { number: '26-022',  name: 'DFS Grain Bins',                                           city_state: 'Oskaloosa, IA',             address: '2905 S 33rd St, Oskaloosa, IA 52577' },
   { number: '25-2001', name: 'Greenways Trail ITP Extension',                            city_state: 'Plymouth, IN',              address: null },
   { number: '25-2002', name: 'Herrick Village',                                          city_state: 'Racine, WI',                address: null },
+  // Upcoming: in schedule (finalized/active), not yet complete — added R6 2026-10-30 per Derek.
+  // Source: schedule-data.js (bucket != completed) cross-ref bid-log.json for authoritative names.
+  { number: '25-015',  name: 'Stadium Flats (Garbin)',                                   city_state: 'South Bend, IN',            address: null },
+  { number: '26-003',  name: 'The Canopy - Herman Ave Apartments (Garbin)',              city_state: 'Cleveland, OH',             address: null },
+  { number: '26-004',  name: 'Old National Bank New Build (Garbin)',                     city_state: 'Grand Rapids, MI',          address: null },
+  { number: '26-006',  name: 'Battle Creek Fire Station - 3 (Garbin)',                   city_state: 'Battle Creek, MI',          address: null },
 ];

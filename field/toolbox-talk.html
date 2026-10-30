@@ -296,7 +296,7 @@
            ================================================================ -->
       <div class="tt-card">
         <div class="tt-section-h"><span id="sn-attendees" class="tt-sn">8</span>Attendees</div>
-        <p class="tt-muted" style="margin:8px 0;">List all attendees. Check the box when each person acknowledges the content.</p>
+        <p class="tt-muted" style="margin:8px 0;">List all attendees present.</p>
         <div id="ttAttendeeList" style="margin-bottom:10px;"></div>
         <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
           <div style="flex:1 1 200px;">
@@ -498,19 +498,8 @@ function ttRenderAttendees(){
         ttState.attendees[parseInt(this.getAttribute('data-idx'))].name = this.value;
         ttMarkUnsaved();
       });
-      var ackLabel = document.createElement('label');
-      ackLabel.className = 'tt-att-ack';
-      var ackInput = document.createElement('input');
-      ackInput.type = 'checkbox';
-      ackInput.checked = !!a.acknowledged;
-      ackInput.setAttribute('data-idx', i);
-      ackInput.setAttribute('aria-label', 'Acknowledged');
-      ackInput.addEventListener('change', function(){
-        ttState.attendees[parseInt(this.getAttribute('data-idx'))].acknowledged = this.checked;
-        ttMarkUnsaved();
-      });
-      ackLabel.appendChild(ackInput);
-      ackLabel.appendChild(document.createTextNode(' Acknowledged'));
+      // acknowledged checkbox removed R6 per Derek 2026-10-30 — attendance-only.
+      // Old records may have acknowledged:true; it is preserved in stored data but not shown.
       var rmBtn = document.createElement('button');
       rmBtn.type = 'button';
       rmBtn.className = 'tt-att-rm';
@@ -522,7 +511,6 @@ function ttRenderAttendees(){
         ttMarkUnsaved();
       });
       row.appendChild(nameInput);
-      row.appendChild(ackLabel);
       row.appendChild(rmBtn);
       container.appendChild(row);
     });
