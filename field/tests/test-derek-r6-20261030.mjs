@@ -37,10 +37,10 @@ function test(name, fn) {
   catch (e) { console.error('  FAIL', name, '\n      ', e.message); failed++; }
 }
 function assertIncludes(desc, str, sub) {
-  assert(desc, String(str).includes(sub), 'expected to find: ' + JSON.stringify(sub));
+  assert(String(str).includes(sub), desc + ': expected to find: ' + JSON.stringify(sub));
 }
 function assertNotIncludes(desc, str, sub) {
-  assert(desc, !String(str).includes(sub), 'expected NOT to find: ' + JSON.stringify(sub));
+  assert(!String(str).includes(sub), desc + ': expected NOT to find: ' + JSON.stringify(sub));
 }
 
 // ============================================================
@@ -127,24 +127,30 @@ test('1h: old record PDF does not print hourAtFailure numeric value in maintenan
 // ============================================================
 console.log('\n--- Item 2: Upcoming projects in fo-projects-data.js ---');
 
-test('2a: Stadium Flats (25-015) present in fo-projects-data.js', () => {
-  assertIncludes('2a', foProjSrc, "'25-015'");
-  assertIncludes('2a name', foProjSrc, 'Stadium Flats');
+// Tests 2a-2d were originally written for the R6 interim list (25-015, 26-003, 26-004,
+// 26-006). Those projects were removed by c7b6687 ("update project list to 11 active
+// projects per Derek 2026-10-30") which superseded the R6 list with the final 11-project
+// list. Rewritten here to assert 4 of the 8 new R7 projects; the full 11-project list is
+// verified exhaustively by test-projects-list-20261030.mjs (P1a-P1h).
+
+test('2a: 26-019 (Vivera Northbrook) present in R7 active list', () => {
+  assertIncludes('2a', foProjSrc, "'26-019'");
+  assertIncludes('2a name', foProjSrc, 'Vivera Northbrook');
 });
 
-test('2b: The Canopy - Herman Ave Apartments (26-003) present', () => {
-  assertIncludes('2b', foProjSrc, "'26-003'");
-  assertIncludes('2b name', foProjSrc, 'The Canopy');
+test('2b: 26-025 (Prysmian Expansion) present in R7 active list', () => {
+  assertIncludes('2b', foProjSrc, "'26-025'");
+  assertIncludes('2b name', foProjSrc, 'Prysmian Expansion');
 });
 
-test('2c: Old National Bank New Build (26-004) present', () => {
-  assertIncludes('2c', foProjSrc, "'26-004'");
-  assertIncludes('2c name', foProjSrc, 'Old National Bank');
+test('2c: 26-027 (Westfield Ice Arena) present in R7 active list', () => {
+  assertIncludes('2c', foProjSrc, "'26-027'");
+  assertIncludes('2c name', foProjSrc, 'Westfield Ice Arena');
 });
 
-test('2d: Battle Creek Fire Station - 3 (26-006) present', () => {
-  assertIncludes('2d', foProjSrc, "'26-006'");
-  assertIncludes('2d name', foProjSrc, 'Battle Creek Fire Station');
+test('2d: 26-028 (The Hangar) present in R7 active list', () => {
+  assertIncludes('2d', foProjSrc, "'26-028'");
+  assertIncludes('2d name', foProjSrc, 'The Hangar');
 });
 
 test('2e: Projects carried forward from R6 list are still present (25-026, 26-007, 26-014)', () => {
