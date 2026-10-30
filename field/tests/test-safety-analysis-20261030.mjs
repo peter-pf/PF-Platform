@@ -692,6 +692,32 @@ test('I15: in-flight guard: ttSave checks ttState.saving', function() {
   assert.ok(ttSrc.includes('if (ttState.saving) return;'), 'ttSave must have in-flight guard');
 });
 
+test('I16: index.html quick-action tile for toolbox-talk says "Safety Analysis" not "Toolbox Talk"', function() {
+  // The qa-btn primary tile linking to /toolbox-talk.html must display "Safety Analysis"
+  const qaIdx = idxSrc.indexOf('href="/toolbox-talk.html" class="qa-btn primary"');
+  assert.ok(qaIdx >= 0, 'index.html must have qa-btn primary for toolbox-talk');
+  const window = idxSrc.slice(qaIdx, qaIdx + 400);
+  assert.ok(window.includes('Safety Analysis'), 'qa-btn tile must say "Safety Analysis"');
+  assert.ok(!window.includes('Toolbox Talk'), 'qa-btn tile must NOT say "Toolbox Talk"');
+});
+
+test('I17: ttShowMsg uses textContent not innerHTML (XSS defense)', function() {
+  // Server error text (d.error) goes into ttShowMsg -- must not use innerHTML
+  assert.ok(ttSrc.includes('el.textContent = msg'), 'ttShowMsg must set textContent not innerHTML');
+  // And the old innerHTML must not be present in the function
+  const fnIdx = ttSrc.indexOf('function ttShowMsg(');
+  assert.ok(fnIdx >= 0, 'ttShowMsg function must exist');
+  const fnWindow = ttSrc.slice(fnIdx, fnIdx + 200);
+  assert.ok(!fnWindow.includes('innerHTML'), 'ttShowMsg must not use innerHTML');
+});
+
+test('I18: hazard key validation uses static error message not user-echoed key', function() {
+  // Prevents XSS: do not echo user-supplied key value into error message
+  const apiSrc = readFileSync(resolve(__dir, '../functions/api/toolbox-talk.js'), 'utf8');
+  assert.ok(!apiSrc.includes('invalid hazard key: ${k}'), 'must not echo user key in error');
+  assert.ok(apiSrc.includes('Invalid hazard selection.'), 'must use static hazard error message');
+});
+
 // ===========================================================================
 // Summary
 // ===========================================================================

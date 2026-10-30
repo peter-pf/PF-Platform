@@ -188,7 +188,7 @@ function buildBody(src, base, uid, newServerId) {
   if (!Array.isArray(rawHazardChecks)) return { err: 'hazardChecks must be an array' };
   for (const k of rawHazardChecks) {
     if (!HAZARD_KEYS.has(String(k || ''))) {
-      return { err: `invalid hazard key: ${k}` };
+      return { err: 'Invalid hazard selection.' };
     }
   }
 
