@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>PF Toolbox Talk</title>
+<title>PF Safety Analysis</title>
 <meta name="theme-color" content="#006DB0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -37,19 +37,33 @@
   #mod-tt textarea{min-height:72px;font-family:inherit;resize:vertical;}
   #mod-tt .tt-card{border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:12px;}
   #mod-tt .tt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:4px 16px;}
+  #mod-tt .tt-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;}
+  @media(max-width:480px){#mod-tt .tt-grid-2{grid-template-columns:1fr;}}
   #mod-tt .tt-section-h{font-size:13px;font-weight:700;color:var(--text);margin:0 0 4px;display:flex;align-items:center;gap:8px;}
   #mod-tt .tt-section-h::before{content:'';display:inline-block;width:4px;height:16px;border-radius:2px;background:var(--accent);flex:0 0 auto;}
   #mod-tt .tt-sn{display:inline-block;font-size:11px;background:var(--surface-3);border:1px solid var(--border);border-radius:10px;padding:1px 8px;color:var(--text-3);margin-right:4px;}
   #mod-tt .tt-muted{color:var(--text-3);font-size:12px;}
   #mod-tt .tt-err{color:var(--red);font-size:13px;margin-top:6px;}
   #mod-tt .tt-ok{color:var(--green);font-size:13px;margin-top:6px;}
+  /* ---- hazard checkboxes ---- */
+  .haz-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:4px 12px;margin-top:8px;}
+  .haz-item{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;}
+  .haz-item input[type="checkbox"]{width:auto;flex:0 0 auto;margin:0;cursor:pointer;}
+  /* ---- hierarchy names ---- */
+  .hier-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+  .hier-rank{flex:0 0 24px;font-weight:700;font-size:13px;color:var(--text-3);text-align:right;}
+  .hier-input{flex:1 1 auto;}
   /* ---- attendee row ---- */
   #mod-tt .tt-att-row{display:flex;align-items:center;gap:8px;border-top:1px solid var(--border);padding:7px 0;}
   #mod-tt .tt-att-row:first-child{border-top:none;}
-  #mod-tt .tt-att-name{flex:1 1 auto;}
-  #mod-tt .tt-att-ack{flex:0 0 auto;display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text-2);}
+  #mod-tt .tt-att-name{flex:1 1 120px;min-width:80px;}
+  #mod-tt .tt-att-title{flex:1 1 100px;min-width:60px;}
+  #mod-tt .tt-att-ack{flex:0 0 auto;display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text-2);white-space:nowrap;}
+  #mod-tt .tt-att-ack input[type="checkbox"]{width:auto;margin:0;cursor:pointer;}
   #mod-tt .tt-att-rm{flex:0 0 auto;font-size:11px;padding:4px 9px;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--text-3);cursor:pointer;}
   #mod-tt .tt-att-rm:hover{border-color:var(--amber);color:var(--amber);}
+  /* ---- acknowledgment statement ---- */
+  #ttAckStatement{font-size:12px;color:var(--text-2);border:1px solid var(--border);background:var(--surface-2);border-radius:6px;padding:10px 12px;margin-bottom:10px;line-height:1.5;}
   /* ---- other-topic row ---- */
   #ttOtherRow{display:none;margin-top:8px;}
   /* ---- project picker ---- */
@@ -78,7 +92,7 @@
 <div id="topbar">
   <a href="/" class="tb-brand" aria-label="PF Field Portal">
     <div class="tb-mark">PF</div>
-    <span class="tb-title">Toolbox Talk</span>
+    <span class="tb-title">Safety Analysis</span>
   </a>
   <details class="acct-menu" id="acctMenu">
     <summary>
@@ -119,8 +133,8 @@
     <span>Site Readiness</span>
   </a>
   <a href="/toolbox-talk.html" class="pf-nav-item pf-nav-active" data-paths="/toolbox-talk.html, /toolbox-talk">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-    <span>Toolbox Talk</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+    <span>Safety Analysis</span>
   </a>
   <a href="/past-reports.html" class="pf-nav-item" data-paths="/past-reports.html">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
@@ -144,7 +158,7 @@
   </a>
 </nav>
 
-<!-- Submit confirm modal (Derek, 2026-10-29) -->
+<!-- Submit confirm modal -->
 <div id="submitConfirmModal" role="dialog" aria-modal="true" aria-labelledby="ttModalMsg" style="display:none;position:fixed;inset:0;z-index:200;align-items:center;justify-content:center;">
   <div style="position:absolute;inset:0;background:rgba(0,0,0,.45);" id="ttModalOverlay"></div>
   <div style="position:relative;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px 20px;max-width:320px;width:90%;margin:auto;">
@@ -155,7 +169,7 @@
     </div>
   </div>
 </div>
-<!-- Submit success modal (Derek, 2026-10-30) -->
+<!-- Submit success modal -->
 <div id="ttSuccessModal" role="dialog" aria-modal="true" aria-labelledby="ttSuccessTitle" style="display:none;position:fixed;inset:0;z-index:210;align-items:center;justify-content:center;">
   <div style="position:absolute;inset:0;background:rgba(0,0,0,.45);"></div>
   <div style="position:relative;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px 20px;max-width:360px;width:90%;margin:auto;">
@@ -170,7 +184,7 @@
 
 <div id="main" style="display:none;">
   <div class="pf-col">
-    <p class="page-title">Toolbox Talk</p>
+    <p class="page-title">Safety Analysis</p>
 
     <!-- Draft status banner -->
     <div id="ttDraftStatus">
@@ -180,10 +194,10 @@
 
     <div id="mod-tt">
       <!-- ================================================================
-           SECTION 1: Meeting Info
+           SECTION 1: Project Info
            ================================================================ -->
       <div class="tt-card">
-        <div class="tt-section-h"><span id="sn-info" class="tt-sn">1</span>Meeting Info</div>
+        <div class="tt-section-h"><span id="sn-info" class="tt-sn">1</span>Project Info</div>
         <div class="tt-grid" style="margin-top:10px;">
           <div>
             <label for="ttProjectSearch">Project</label>
@@ -200,117 +214,158 @@
             <input id="ttDate" type="date" required>
           </div>
           <div>
-            <label for="ttTime">Time</label>
-            <input id="ttTime" type="time">
+            <label for="ttLocation">Location (City, State)</label>
+            <input id="ttLocation" type="text" maxlength="300" placeholder="e.g. Westfield, IN">
           </div>
           <div>
-            <label for="ttLocation">Location</label>
-            <input id="ttLocation" type="text" maxlength="300" placeholder="e.g. Job trailer, Job site">
+            <label for="ttSuperintendent">Superintendent</label>
+            <select id="ttSuperintendent">
+              <option value="">-- Select --</option>
+              <option value="John Willis">John Willis</option>
+              <option value="Seth Willis">Seth Willis</option>
+            </select>
           </div>
         </div>
       </div>
 
       <!-- ================================================================
-           SECTION 2: Presenter
+           SECTION 2: Jobsite Safety Analysis
            ================================================================ -->
       <div class="tt-card">
-        <div class="tt-section-h"><span id="sn-presenter" class="tt-sn">2</span>Presenter</div>
-        <div style="margin-top:10px;">
-          <label for="ttPresenter">Presented By</label>
-          <select id="ttPresenter">
-            <option value="">-- Select --</option>
-            <option value="John Willis">John Willis</option>
-            <option value="Seth Willis">Seth Willis</option>
-            <option value="Christian Boutte">Christian Boutte</option>
-            <option value="Jordan Lemay">Jordan Lemay</option>
-          </select>
-        </div>
-      </div>
+        <div class="tt-section-h"><span id="sn-jsa" class="tt-sn">2</span>Jobsite Safety Analysis</div>
 
-      <!-- ================================================================
-           SECTION 3: Topic
-           ================================================================ -->
-      <div class="tt-card">
-        <div class="tt-section-h"><span id="sn-topic" class="tt-sn">3</span>Topic</div>
         <div style="margin-top:10px;">
-          <label for="ttTopic">Safety Topic</label>
-          <select id="ttTopic">
-            <option value="">-- Select topic --</option>
-            <option value="fall_protection">Fall Protection</option>
-            <option value="excavation_trenching">Excavation and Trenching</option>
-            <option value="struck_caught">Struck-By and Caught-Between</option>
-            <option value="heavy_equipment_spotters">Heavy Equipment and Spotters</option>
-            <option value="ppe">PPE (Personal Protective Equipment)</option>
-            <option value="heat_cold_stress">Heat and Cold Stress</option>
-            <option value="housekeeping">Housekeeping</option>
-            <option value="electrical_overhead">Electrical and Overhead Lines</option>
-            <option value="utilities_locates">Utilities and Locates</option>
-            <option value="silica">Silica</option>
-            <option value="other">Other</option>
-          </select>
-          <div id="ttOtherRow">
-            <label for="ttTopicOther" style="margin-top:8px;">Specify Topic</label>
-            <input id="ttTopicOther" type="text" maxlength="300" placeholder="Describe the safety topic">
+          <label for="ttJsaSteps">Sequence of Basic Job Steps</label>
+          <textarea id="ttJsaSteps" maxlength="4000" placeholder="List the basic steps of the work to be performed..."></textarea>
+        </div>
+
+        <div style="margin-top:10px;">
+          <label for="ttJsaHazards">Potential Hazards</label>
+          <textarea id="ttJsaHazards" maxlength="4000" placeholder="Describe potential hazards associated with each step..."></textarea>
+        </div>
+
+        <div style="margin-top:10px;">
+          <label for="ttJsaPreventative">Preventative Measures</label>
+          <textarea id="ttJsaPreventative" maxlength="4000" placeholder="Describe measures to prevent or control each hazard..."></textarea>
+        </div>
+
+        <!-- 20 hazard checkboxes -->
+        <div style="margin-top:14px;">
+          <label>Check Off Potential Hazards</label>
+          <div class="haz-grid" id="ttHazardChecks">
+            <label class="haz-item"><input type="checkbox" value="personal_injury"><span>Personal Injury</span></label>
+            <label class="haz-item"><input type="checkbox" value="equipment_lifting"><span>Equipment Lifting</span></label>
+            <label class="haz-item"><input type="checkbox" value="vehicle_operations"><span>Vehicle Operations</span></label>
+            <label class="haz-item"><input type="checkbox" value="rotating_equipment"><span>Rotating Equipment</span></label>
+            <label class="haz-item"><input type="checkbox" value="equipment_operations"><span>Equipment Operations</span></label>
+            <label class="haz-item"><input type="checkbox" value="excavations"><span>Excavations</span></label>
+            <label class="haz-item"><input type="checkbox" value="pinch_points"><span>Pinch Points</span></label>
+            <label class="haz-item"><input type="checkbox" value="environment"><span>Environment</span></label>
+            <label class="haz-item"><input type="checkbox" value="overhead_work"><span>Overhead Work</span></label>
+            <label class="haz-item"><input type="checkbox" value="welding_burning"><span>Welding/Burning</span></label>
+            <label class="haz-item"><input type="checkbox" value="site_access"><span>Site Access</span></label>
+            <label class="haz-item"><input type="checkbox" value="air_quality"><span>Air Quality</span></label>
+            <label class="haz-item"><input type="checkbox" value="lack_of_ppe"><span>Lack of PPE</span></label>
+            <label class="haz-item"><input type="checkbox" value="ladder_use"><span>Ladder Use</span></label>
+            <label class="haz-item"><input type="checkbox" value="new_worker"><span>New Worker</span></label>
+            <label class="haz-item"><input type="checkbox" value="tools"><span>Tools</span></label>
+            <label class="haz-item"><input type="checkbox" value="pipeline_plumbing"><span>Pipeline/Plumbing</span></label>
+            <label class="haz-item"><input type="checkbox" value="struck_by"><span>Struck By</span></label>
+            <label class="haz-item"><input type="checkbox" value="electrical"><span>Electrical</span></label>
+            <label class="haz-item"><input type="checkbox" value="chemicals"><span>Chemicals</span></label>
+          </div>
+        </div>
+
+        <!-- Hierarchy of Competency: 5 ranked name fields -->
+        <div style="margin-top:14px;">
+          <label>Hierarchy of Competency</label>
+          <div style="margin-top:6px;" id="ttHierarchyList">
+            <div class="hier-row"><span class="hier-rank">1</span><input class="hier-input" type="text" maxlength="80" placeholder="Name" data-hier="0" id="ttHier0" aria-label="Hierarchy rank 1"></div>
+            <div class="hier-row"><span class="hier-rank">2</span><input class="hier-input" type="text" maxlength="80" placeholder="Name" data-hier="1" id="ttHier1" aria-label="Hierarchy rank 2"></div>
+            <div class="hier-row"><span class="hier-rank">3</span><input class="hier-input" type="text" maxlength="80" placeholder="Name" data-hier="2" id="ttHier2" aria-label="Hierarchy rank 3"></div>
+            <div class="hier-row"><span class="hier-rank">4</span><input class="hier-input" type="text" maxlength="80" placeholder="Name" data-hier="3" id="ttHier3" aria-label="Hierarchy rank 4"></div>
+            <div class="hier-row"><span class="hier-rank">5</span><input class="hier-input" type="text" maxlength="80" placeholder="Name" data-hier="4" id="ttHier4" aria-label="Hierarchy rank 5"></div>
           </div>
         </div>
       </div>
 
       <!-- ================================================================
-           SECTION 4: Key Points Discussed
+           SECTION 3: Toolbox Talk
            ================================================================ -->
       <div class="tt-card">
-        <div class="tt-section-h"><span id="sn-keypoints" class="tt-sn">4</span>Key Points Discussed</div>
+        <div class="tt-section-h"><span id="sn-tt" class="tt-sn">3</span>Toolbox Talk</div>
+
+        <div class="tt-grid" style="margin-top:10px;">
+          <div>
+            <label for="ttPresenter">Presented By</label>
+            <select id="ttPresenter">
+              <option value="">-- Select --</option>
+              <option value="John Willis">John Willis</option>
+              <option value="Seth Willis">Seth Willis</option>
+              <option value="Christian Boutte">Christian Boutte</option>
+              <option value="Jordan Lemay">Jordan Lemay</option>
+            </select>
+          </div>
+          <div>
+            <label for="ttTopic">Safety Topic</label>
+            <select id="ttTopic">
+              <option value="">-- Select topic --</option>
+              <option value="fall_protection">Fall Protection</option>
+              <option value="excavation_trenching">Excavation and Trenching</option>
+              <option value="struck_caught">Struck-By and Caught-Between</option>
+              <option value="heavy_equipment_spotters">Heavy Equipment and Spotters</option>
+              <option value="ppe">PPE (Personal Protective Equipment)</option>
+              <option value="heat_cold_stress">Heat and Cold Stress</option>
+              <option value="housekeeping">Housekeeping</option>
+              <option value="electrical_overhead">Electrical and Overhead Lines</option>
+              <option value="utilities_locates">Utilities and Locates</option>
+              <option value="silica">Silica</option>
+              <option value="other">Other</option>
+            </select>
+            <div id="ttOtherRow">
+              <label for="ttTopicOther" style="margin-top:8px;">Specify Topic</label>
+              <input id="ttTopicOther" type="text" maxlength="300" placeholder="Describe the safety topic">
+            </div>
+          </div>
+        </div>
+
         <div style="margin-top:10px;">
-          <label for="ttKeyPoints">Summary of key points covered in this toolbox talk</label>
+          <label for="ttKeyPoints">Key Points Discussed</label>
           <textarea id="ttKeyPoints" maxlength="4000" placeholder="Summarize the main points covered..."></textarea>
-          <p class="tt-muted" style="margin-top:4px;">Obstructions, other contractors on site, schedule changes, task-specific reminders, etc.</p>
         </div>
-      </div>
-
-      <!-- ================================================================
-           SECTION 5: Site-Specific Hazards
-           ================================================================ -->
-      <div class="tt-card">
-        <div class="tt-section-h"><span id="sn-hazards" class="tt-sn">5</span>Hazards Specific to Today's Work</div>
         <div style="margin-top:10px;">
-          <label for="ttHazards">Identify hazards specific to today's work activities</label>
+          <label for="ttHazards">Hazards Specific to Today's Work</label>
           <textarea id="ttHazards" maxlength="4000" placeholder="List hazards specific to today's tasks and locations..."></textarea>
         </div>
-      </div>
-
-      <!-- ================================================================
-           SECTION 6: Questions or Concerns Raised
-           ================================================================ -->
-      <div class="tt-card">
-        <div class="tt-section-h"><span id="sn-questions" class="tt-sn">6</span>Questions or Concerns Raised</div>
         <div style="margin-top:10px;">
-          <label for="ttQuestions">Questions, concerns, or items raised by attendees</label>
+          <label for="ttQuestions">Questions or Concerns Raised</label>
           <textarea id="ttQuestions" maxlength="4000" placeholder="Document any questions or concerns raised..."></textarea>
         </div>
-      </div>
-
-      <!-- ================================================================
-           SECTION 7: Corrective Actions
-           ================================================================ -->
-      <div class="tt-card">
-        <div class="tt-section-h"><span id="sn-actions" class="tt-sn">7</span>Corrective Actions</div>
         <div style="margin-top:10px;">
-          <label for="ttActions">Corrective actions to address concerns raised (if any)</label>
+          <label for="ttActions">Corrective Actions</label>
           <textarea id="ttActions" maxlength="4000" placeholder="Optional: list any corrective actions agreed upon..."></textarea>
         </div>
       </div>
 
       <!-- ================================================================
-           SECTION 8: Attendees
+           SECTION 4: Crew Acknowledgment
            ================================================================ -->
       <div class="tt-card">
-        <div class="tt-section-h"><span id="sn-attendees" class="tt-sn">8</span>Attendees</div>
-        <p class="tt-muted" style="margin:8px 0;">List all attendees present.</p>
+        <div class="tt-section-h"><span id="sn-crew" class="tt-sn">4</span>Crew Acknowledgment</div>
+        <div id="ttAckStatement">
+          By checking Acknowledged, I confirm I attended this safety briefing, I understand the hazards and
+          preventative measures reviewed on this form, and I agree to follow them.
+          This serves as my digital signature.
+        </div>
         <div id="ttAttendeeList" style="margin-bottom:10px;"></div>
         <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
-          <div style="flex:1 1 200px;">
-            <label for="ttNewAttName">Add Attendee</label>
+          <div style="flex:1 1 140px;">
+            <label for="ttNewAttName">Add Crew Member</label>
             <input id="ttNewAttName" type="text" maxlength="80" placeholder="First Last">
+          </div>
+          <div style="flex:1 1 100px;">
+            <label for="ttNewAttTitle">Title</label>
+            <input id="ttNewAttTitle" type="text" maxlength="80" placeholder="e.g. Operator">
           </div>
           <div style="flex:0 0 auto;padding-bottom:1px;">
             <button type="button" class="btn" id="ttAddAttBtn" style="padding:8px 16px;">Add</button>
@@ -333,14 +388,14 @@
   <div class="pf-col">
     <button id="ttSaveBtn" class="btn-sm">Save Draft</button>
     <button id="ttSubmitBtn" class="btn">Submit &amp; Send PDF</button>
-    <button id="ttNewBtn" class="btn-sm" style="display:none;">New Talk</button>
+    <button id="ttNewBtn" class="btn-sm" style="display:none;">New</button>
     <span id="ttSubmitMsg" style="font-size:12px;color:var(--text-3);"></span>
   </div>
 </div>
 
 <script>
 // ============================================================
-// Toolbox Talk form JS
+// Safety Analysis form JS (toolbox-talk.html)
 // No Playwright. No external dependencies.
 // ============================================================
 'use strict';
@@ -377,7 +432,6 @@ function pfShowTTSuccessModal(emailedTo, emailWarning, spWarning) {
       ul.style.cssText = 'margin:0 0 4px;padding-left:16px;font-size:.875rem;';
       for (var i = 0; i < emailedTo.length; i++) {
         var li = document.createElement('li');
-        // emailedTo items are {name,email} objects; guard against legacy string format
         var r = emailedTo[i];
         li.textContent = (typeof r === 'object' && r !== null) ? (r.name + ' (' + r.email + ')') : String(r);
         ul.appendChild(li);
@@ -450,16 +504,34 @@ function ttInitForm(){
     ttMarkUnsaved();
   });
 
-  // All inputs trigger unsaved
-  ['ttDate','ttTime','ttLocation','ttPresenter','ttTopic','ttTopicOther',
+  // All text inputs/selects/textareas trigger unsaved
+  ['ttDate','ttLocation','ttSuperintendent','ttPresenter','ttTopic','ttTopicOther',
+   'ttJsaSteps','ttJsaHazards','ttJsaPreventative',
    'ttKeyPoints','ttHazards','ttQuestions','ttActions'].forEach(function(id){
     var el = document.getElementById(id);
     if (el) el.addEventListener('input', ttMarkUnsaved);
   });
 
-  // Add attendee button
+  // Hierarchy inputs
+  [0,1,2,3,4].forEach(function(i){
+    var el = document.getElementById('ttHier' + i);
+    if (el) el.addEventListener('input', ttMarkUnsaved);
+  });
+
+  // Hazard checkboxes
+  var hcContainer = document.getElementById('ttHazardChecks');
+  if (hcContainer) {
+    hcContainer.querySelectorAll('input[type="checkbox"]').forEach(function(cb){
+      cb.addEventListener('change', ttMarkUnsaved);
+    });
+  }
+
+  // Add crew member button
   document.getElementById('ttAddAttBtn').addEventListener('click', ttAddAttendee);
   document.getElementById('ttNewAttName').addEventListener('keydown', function(e){
+    if (e.key === 'Enter') { e.preventDefault(); ttAddAttendee(); }
+  });
+  document.getElementById('ttNewAttTitle').addEventListener('keydown', function(e){
     if (e.key === 'Enter') { e.preventDefault(); ttAddAttendee(); }
   });
 
@@ -479,12 +551,12 @@ function ttInitForm(){
     document.getElementById('ttSuccessModal').style.display = 'none';
   });
 
-  // New talk
+  // New record
   document.getElementById('ttNewBtn').addEventListener('click', function(){
     ttState = { id: null, status: 'new', attendees: [], saving: false };
-    document.getElementById('ttDate').value     = new Date().toISOString().slice(0,10);
-    document.getElementById('ttTime').value     = '';
-    document.getElementById('ttLocation').value = '';
+    document.getElementById('ttDate').value          = new Date().toISOString().slice(0,10);
+    document.getElementById('ttLocation').value      = '';
+    document.getElementById('ttSuperintendent').value= '';
     document.getElementById('ttProjectSearch').value = '';
     document.getElementById('ttProjectId').value     = '';
     document.getElementById('ttProjectName').value   = '';
@@ -492,18 +564,29 @@ function ttInitForm(){
     document.getElementById('ttTopic').value         = '';
     document.getElementById('ttTopicOther').value    = '';
     document.getElementById('ttOtherRow').style.display = 'none';
-    document.getElementById('ttKeyPoints').value = '';
-    document.getElementById('ttHazards').value   = '';
-    document.getElementById('ttQuestions').value = '';
-    document.getElementById('ttActions').value   = '';
+    document.getElementById('ttJsaSteps').value      = '';
+    document.getElementById('ttJsaHazards').value    = '';
+    document.getElementById('ttJsaPreventative').value = '';
+    document.getElementById('ttKeyPoints').value     = '';
+    document.getElementById('ttHazards').value       = '';
+    document.getElementById('ttQuestions').value     = '';
+    document.getElementById('ttActions').value       = '';
+    // Clear hierarchy
+    [0,1,2,3,4].forEach(function(i){
+      var el = document.getElementById('ttHier' + i);
+      if (el) el.value = '';
+    });
+    // Clear hazard checkboxes
+    var hcCont = document.getElementById('ttHazardChecks');
+    if (hcCont) hcCont.querySelectorAll('input[type="checkbox"]').forEach(function(cb){ cb.checked = false; });
     ttRenderAttendees();
     document.getElementById('ttMsg').style.display = 'none';
-    document.getElementById('ttNewBtn').style.display = 'none';
-    document.getElementById('ttSaveBtn').disabled   = false;
-    document.getElementById('ttSubmitBtn').disabled = false;
-    document.getElementById('ttDsId').textContent   = '';
-    document.getElementById('ttDsState').textContent = 'New record';
-    document.getElementById('ttDsState').className   = 'ds-unsaved';
+    document.getElementById('ttNewBtn').style.display  = 'none';
+    document.getElementById('ttSaveBtn').disabled      = false;
+    document.getElementById('ttSubmitBtn').disabled    = false;
+    document.getElementById('ttDsId').textContent      = '';
+    document.getElementById('ttDsState').textContent   = 'New record';
+    document.getElementById('ttDsState').className     = 'ds-unsaved';
   });
 
   // Nav active
@@ -538,24 +621,56 @@ function ttRenderAttendees(){
   container.innerHTML = '';
   var atts = ttState.attendees;
   if (!atts.length) {
-    container.innerHTML = '<p class="tt-muted">No attendees added yet.</p>';
+    container.innerHTML = '<p class="tt-muted">No crew members added yet.</p>';
   } else {
     atts.forEach(function(a, i){
       var row = document.createElement('div');
       row.className = 'tt-att-row';
+
+      // Name input
       var nameInput = document.createElement('input');
       nameInput.type = 'text';
       nameInput.className = 'tt-att-name';
       nameInput.maxLength = 80;
       nameInput.value = window.esc ? window.esc(a.name) : a.name;
       nameInput.setAttribute('data-idx', i);
-      nameInput.setAttribute('aria-label', 'Attendee ' + (i+1) + ' name');
+      nameInput.setAttribute('aria-label', 'Crew member ' + (i+1) + ' name');
+      nameInput.placeholder = 'Name';
       nameInput.addEventListener('input', function(){
         ttState.attendees[parseInt(this.getAttribute('data-idx'))].name = this.value;
         ttMarkUnsaved();
       });
-      // acknowledged checkbox removed R6 per Derek 2026-10-30 — attendance-only.
-      // Old records may have acknowledged:true; it is preserved in stored data but not shown.
+
+      // Title input
+      var titleInput = document.createElement('input');
+      titleInput.type = 'text';
+      titleInput.className = 'tt-att-title';
+      titleInput.maxLength = 80;
+      titleInput.value = a.title || '';
+      titleInput.setAttribute('data-idx', i);
+      titleInput.setAttribute('aria-label', 'Crew member ' + (i+1) + ' title');
+      titleInput.placeholder = 'Title';
+      titleInput.addEventListener('input', function(){
+        ttState.attendees[parseInt(this.getAttribute('data-idx'))].title = this.value;
+        ttMarkUnsaved();
+      });
+
+      // Acknowledged checkbox
+      var ackWrap = document.createElement('label');
+      ackWrap.className = 'tt-att-ack';
+      var ackBox = document.createElement('input');
+      ackBox.type = 'checkbox';
+      ackBox.checked = !!a.acknowledged;
+      ackBox.setAttribute('data-idx', i);
+      ackBox.setAttribute('aria-label', 'Acknowledged by crew member ' + (i+1));
+      ackBox.addEventListener('change', function(){
+        ttState.attendees[parseInt(this.getAttribute('data-idx'))].acknowledged = this.checked;
+        ttMarkUnsaved();
+      });
+      ackWrap.appendChild(ackBox);
+      ackWrap.appendChild(document.createTextNode(' Ack'));
+
+      // Remove button
       var rmBtn = document.createElement('button');
       rmBtn.type = 'button';
       rmBtn.className = 'tt-att-rm';
@@ -566,21 +681,27 @@ function ttRenderAttendees(){
         ttRenderAttendees();
         ttMarkUnsaved();
       });
+
       row.appendChild(nameInput);
+      row.appendChild(titleInput);
+      row.appendChild(ackWrap);
       row.appendChild(rmBtn);
       container.appendChild(row);
     });
   }
   var countEl = document.getElementById('ttAttCount');
-  if (countEl) countEl.textContent = atts.length + ' attendee' + (atts.length === 1 ? '' : 's');
+  if (countEl) countEl.textContent = atts.length + ' crew member' + (atts.length === 1 ? '' : 's');
 }
 
 function ttAddAttendee(){
-  var nameInput = document.getElementById('ttNewAttName');
-  var name = nameInput.value.trim().slice(0, 80);
+  var nameInput  = document.getElementById('ttNewAttName');
+  var titleInput = document.getElementById('ttNewAttTitle');
+  var name  = nameInput.value.trim().slice(0, 80);
+  var title = titleInput ? titleInput.value.trim().slice(0, 80) : '';
   if (!name) return;
-  ttState.attendees.push({ name: name, acknowledged: false });
+  ttState.attendees.push({ name: name, title: title, acknowledged: false });
   nameInput.value = '';
+  if (titleInput) titleInput.value = '';
   ttRenderAttendees();
   ttMarkUnsaved();
   nameInput.focus();
@@ -598,23 +719,49 @@ function ttMarkSaved(label){
   if (idEl && ttState.id) idEl.textContent = ttState.id.slice(0, 24);
 }
 
+// ---- Collect hazard checks ----
+function ttCollectHazardChecks(){
+  var checks = [];
+  var container = document.getElementById('ttHazardChecks');
+  if (!container) return checks;
+  container.querySelectorAll('input[type="checkbox"]:checked').forEach(function(cb){
+    checks.push(cb.value);
+  });
+  return checks;
+}
+
+// ---- Collect hierarchy names ----
+function ttCollectHierarchyNames(){
+  var names = [];
+  [0,1,2,3,4].forEach(function(i){
+    var el = document.getElementById('ttHier' + i);
+    names.push(el ? el.value.trim().slice(0, 80) : '');
+  });
+  return names;
+}
+
 // ---- Collect body ----
 function ttCollectBody(){
   return {
-    id:          ttState.id || undefined,
-    projectId:   document.getElementById('ttProjectId').value,
-    projectName: document.getElementById('ttProjectName').value,
-    date:        document.getElementById('ttDate').value,
-    time:        document.getElementById('ttTime').value,
-    location:    document.getElementById('ttLocation').value,
-    presenter:   document.getElementById('ttPresenter').value,
-    topic:       document.getElementById('ttTopic').value,
-    topicOther:  document.getElementById('ttTopicOther').value,
-    keyPoints:   document.getElementById('ttKeyPoints').value,
-    hazards:     document.getElementById('ttHazards').value,
-    questions:   document.getElementById('ttQuestions').value,
-    actions:     document.getElementById('ttActions').value,
-    attendees:   ttState.attendees.filter(function(a){ return a && a.name && a.name.trim(); }),
+    id:              ttState.id || undefined,
+    projectId:       document.getElementById('ttProjectId').value,
+    projectName:     document.getElementById('ttProjectName').value,
+    date:            document.getElementById('ttDate').value,
+    location:        document.getElementById('ttLocation').value,
+    superintendent:  document.getElementById('ttSuperintendent').value,
+    presenter:       document.getElementById('ttPresenter').value,
+    topic:           document.getElementById('ttTopic').value,
+    topicOther:      document.getElementById('ttTopicOther').value,
+    jsaSteps:        document.getElementById('ttJsaSteps').value,
+    jsaHazards:      document.getElementById('ttJsaHazards').value,
+    jsaPreventative: document.getElementById('ttJsaPreventative').value,
+    hazardChecks:    ttCollectHazardChecks(),
+    hierarchyNames:  ttCollectHierarchyNames(),
+    keyPoints:       document.getElementById('ttKeyPoints').value,
+    hazards:         document.getElementById('ttHazards').value,
+    questions:       document.getElementById('ttQuestions').value,
+    actions:         document.getElementById('ttActions').value,
+    attendees:       ttState.attendees.filter(function(a){ return a && a.name && a.name.trim(); }),
   };
 }
 
@@ -625,12 +772,8 @@ function ttSave(submit){
   var action;
   if (submit) {
     action = 'submit';
-    if (!body.date)      { ttShowMsg('Date is required.', 'err'); return; }
-    if (!body.presenter) { ttShowMsg('Presenter is required.', 'err'); return; }
-    if (!body.topic)     { ttShowMsg('Topic is required.', 'err'); return; }
-    if (body.topic === 'other' && !body.topicOther.trim()){
-      ttShowMsg('Please specify the topic.', 'err'); return;
-    }
+    if (!body.date)           { ttShowMsg('Date is required.', 'err'); return; }
+    if (!body.superintendent) { ttShowMsg('Superintendent is required.', 'err'); return; }
     // If no server draft exists yet, create one first to get a server UUID,
     // then retry the submit.  Without this, sending action='submit' with a null
     // id fails the server-side UUID check ("Invalid id format").
@@ -652,7 +795,7 @@ function ttSave(submit){
           ttShowMsg((d && d.error) || 'Could not start record. Please try again.', 'err');
           return;
         }
-        ttState.id = d.id; // store server UUID, then retry submit
+        ttState.id = d.id;
         ttSave(true);
       }).catch(function(){
         ttState.saving = false;
@@ -694,8 +837,6 @@ function ttSave(submit){
       ttState.status = d.status || 'draft';
       if (submit) {
         ttState.status = 'submitted';
-        // Build submit message with DOM APIs - never via innerHTML string concat
-        // so that pdfWebUrl cannot be used for XSS even if the server returns a bad value.
         ttShowSubmitMsg(d.pdfWebUrl, d.emailedTo);
         pfShowTTSuccessModal(d.emailedTo || [], d.emailWarning, null);
         document.getElementById('ttSaveBtn').disabled   = true;
@@ -726,8 +867,6 @@ function ttShowMsg(html, type){
   el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-// Build the "Submitted." message using DOM APIs so pdfWebUrl never reaches innerHTML.
-// Server-side also validates https-only, but defense in depth applies client-side too.
 function ttShowSubmitMsg(pdfWebUrl, emailedTo) {
   var el = document.getElementById('ttMsg');
   if (!el) return;
@@ -744,7 +883,6 @@ function ttShowSubmitMsg(pdfWebUrl, emailedTo) {
     el.appendChild(a);
   }
   if (emailedTo && emailedTo.length) {
-    // emailedTo items are {name,email} objects; guard against legacy string format
     var names = emailedTo.map(function(r) {
       return (typeof r === 'object' && r !== null) ? r.name : String(r);
     });
@@ -759,30 +897,51 @@ function ttLoadRecord(rec){
   ttState.id         = rec.id;
   ttState.status     = rec.status;
   ttState.attendees  = Array.isArray(rec.attendees) ? rec.attendees : [];
-  document.getElementById('ttDate').value     = rec.date     || '';
-  document.getElementById('ttTime').value     = rec.time     || '';
-  document.getElementById('ttLocation').value = rec.location || '';
-  document.getElementById('ttPresenter').value = rec.presenter || '';
-  document.getElementById('ttTopic').value    = rec.topic    || '';
-  document.getElementById('ttTopicOther').value = rec.topicOther || '';
-  document.getElementById('ttOtherRow').style.display = (rec.topic === 'other') ? 'block' : 'none';
-  document.getElementById('ttKeyPoints').value = rec.keyPoints || '';
-  document.getElementById('ttHazards').value   = rec.hazards   || '';
-  document.getElementById('ttQuestions').value = rec.questions || '';
-  document.getElementById('ttActions').value   = rec.actions   || '';
+
+  document.getElementById('ttDate').value           = rec.date           || '';
+  document.getElementById('ttLocation').value       = rec.location       || '';
+  document.getElementById('ttSuperintendent').value = rec.superintendent  || '';
   if (rec.projectId) {
-    document.getElementById('ttProjectId').value = rec.projectId;
-    document.getElementById('ttProjectName').value = rec.projectName || '';
     document.getElementById('ttProjectSearch').value = rec.projectId +
       (rec.projectName ? ' - ' + rec.projectName : '');
   }
+  document.getElementById('ttProjectId').value = rec.projectId || '';
+  document.getElementById('ttProjectName').value = rec.projectName || '';
+  document.getElementById('ttPresenter').value      = rec.presenter      || '';
+  document.getElementById('ttTopic').value          = rec.topic          || '';
+  document.getElementById('ttTopicOther').value     = rec.topicOther     || '';
+  document.getElementById('ttOtherRow').style.display = (rec.topic === 'other') ? 'block' : 'none';
+  document.getElementById('ttJsaSteps').value       = rec.jsaSteps       || '';
+  document.getElementById('ttJsaHazards').value     = rec.jsaHazards     || '';
+  document.getElementById('ttJsaPreventative').value= rec.jsaPreventative|| '';
+  document.getElementById('ttKeyPoints').value      = rec.keyPoints      || '';
+  document.getElementById('ttHazards').value        = rec.hazards        || '';
+  document.getElementById('ttQuestions').value      = rec.questions      || '';
+  document.getElementById('ttActions').value        = rec.actions        || '';
+
+  // Restore hierarchy names
+  var hierNames = Array.isArray(rec.hierarchyNames) ? rec.hierarchyNames : [];
+  [0,1,2,3,4].forEach(function(i){
+    var el = document.getElementById('ttHier' + i);
+    if (el) el.value = hierNames[i] || '';
+  });
+
+  // Restore hazard checks
+  var hcCont = document.getElementById('ttHazardChecks');
+  if (hcCont) {
+    var checkedKeys = new Set(Array.isArray(rec.hazardChecks) ? rec.hazardChecks : []);
+    hcCont.querySelectorAll('input[type="checkbox"]').forEach(function(cb){
+      cb.checked = checkedKeys.has(cb.value);
+    });
+  }
+
   ttRenderAttendees();
+
   if (rec.status === 'submitted') {
-    document.getElementById('ttSaveBtn').disabled   = true;
-    document.getElementById('ttSubmitBtn').disabled = true;
-    document.getElementById('ttNewBtn').style.display = '';
+    document.getElementById('ttSaveBtn').disabled      = true;
+    document.getElementById('ttSubmitBtn').disabled    = true;
+    document.getElementById('ttNewBtn').style.display  = '';
     ttMarkSaved('Submitted');
-    // Use DOM-based helper so pdfWebUrl never reaches innerHTML.
     ttShowSubmitMsg(rec.pdfWebUrl, null);
   } else {
     ttMarkSaved('Draft loaded');

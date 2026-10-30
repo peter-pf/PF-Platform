@@ -297,20 +297,21 @@ test('6g: TT HTML in-flight guard preserved (dataset.firing)', () => {
   assertIncludes('6g', ttHtmlSrc, 'dataset.firing');
 });
 
-test('6h: TT PDF does not show "Acknowledged" or "Not acknowledged" per attendee', () => {
-  assertNotIncludes('6h no-acked', ttDocSrc, "a.acknowledged ? 'Acknowledged'");
-  assertNotIncludes('6h no-not-acked', ttDocSrc, 'Not acknowledged');
+test('6h: SA PDF shows Acknowledged/Not-acknowledged per attendee (acknowledged restored in SA)', () => {
+  // Safety Analysis spec restores acknowledged functionality removed in bdc19d2
+  assertIncludes('6h acked', ttDocSrc, "a.acknowledged ? 'Acknowledged'");
+  assertIncludes('6h not-acked', ttDocSrc, 'Not acknowledged');
 });
 
-test('6i: TT PDF attendees section still renders attendee names', () => {
-  assertIncludes('6i', ttDocSrc, 'a.name');
-  assertIncludes('6i heading', ttDocSrc, "doc.heading('Attendees')");
+test('6i: SA PDF crew section uses "Crew Acknowledgment" heading', () => {
+  assertIncludes('6i name', ttDocSrc, 'a.name');
+  assertIncludes('6i heading', ttDocSrc, "doc.heading('Crew Acknowledgment')");
 });
 
-test('6j: TT PDF renders attendee table with just the name label and blank value', () => {
-  // New pattern: { label: `${i + 1}. ${a.name}`, value: '' }
-  assertIncludes('6j', ttDocSrc, "a.name}");
-  assertIncludes('6j value-blank', ttDocSrc, "value: ''");
+test('6j: SA PDF renders attendee row with name/title and ack status', () => {
+  // Pattern: nameTitle = a.name + (a.title ? ' / ' + a.title : ''), ackLabel = a.acknowledged ? ...
+  assertIncludes('6j nameTitle', ttDocSrc, "a.name + (a.title ?");
+  assertIncludes('6j ackLabel', ttDocSrc, 'ackLabel');
 });
 
 test('6k: TT API server still accepts acknowledged field (backward compat for old records)', () => {

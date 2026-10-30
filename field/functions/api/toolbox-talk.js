@@ -1,6 +1,9 @@
 // Cloudflare Pages Function -- /api/toolbox-talk
-// FIELD OPERATIONS Toolbox Talk / Safety Meeting sign-in form.
-// Requested by Derek Franke (owner), 2026-10-28.
+// FIELD OPERATIONS Safety Analysis form (previously "Toolbox Talk").
+// Derek Franke (owner) requested rename + form expansion, 2026-10-30.
+//
+// DISPLAY NAME: "Safety Analysis"  (label changes only)
+// STORAGE:      toolbox_talks table, toolbox_talk mailing-list key, SP folder UNCHANGED.
 //
 // On SUBMIT the platform does THREE things:
 //   1. Render the form into a PDF (server-side, lib/toolbox-talk-doc.js).
@@ -17,13 +20,15 @@
 //       (b) submitted records are locked.
 //   - id format is validated as UUID before any D1 lookup.
 //   - Date is validated: must match YYYY-MM-DD and be a real calendar date.
-//   - attendee names are capped at 80 chars each; list capped at 50 entries.
+//   - superintendent must be in SUPERINTENDENT_SET (or empty for drafts).
+//   - hazard_checks keys must all be in HAZARD_KEYS allowlist.
+//   - attendee names and titles are capped at 80 chars each; list capped at 50 entries.
 //   - All free-text fields are server-side length-capped before storage.
 //   - KV rate limit on submit (10/hour per uid).
 //   - D1 failures return 503 (fail-closed; no silent KV fallback).
 //
 // RBAC: field_ops area.
-// D1: table toolbox_talks (migration 0010_toolbox_talks.sql).
+// D1: table toolbox_talks (migrations 0010 + 0012).
 // KV: PF_SCHEDULE -- used ONLY for rate-limiting (no photo blobs here).
 
 import { requireArea } from '../lib/auth.js';
@@ -35,6 +40,8 @@ import {
 import {
   upsertRecord, loadRecordById, listRecords, countRecords,
   PRESENTER_SET, PRESENTER_OPTIONS, TOPIC_KEYS, TOPIC_LABELS,
+  SUPERINTENDENT_SET, SUPERINTENDENT_OPTIONS,
+  HAZARD_KEYS,
 } from '../lib/toolbox-talk-store.js';
 import { resolveMailingList, resolveMailingListWithNames } from '../lib/mailing-lists.js';
 
@@ -53,6 +60,7 @@ const MAX_STR         = 4000;     // long-form safety text
 const MAX_SHORT       = 300;
 const MAX_ATTENDEES   = 50;
 const MAX_NAME        = 80;
+const MAX_HIER        = 5;        // hierarchy of competency: max 5 entries
 
 const VALID_ACTIONS = { create: 1, update: 1, submit: 1 };
 
@@ -114,7 +122,7 @@ function s(v, maxLen) {
 }
 
 // Validate and clean the attendees array.
-// Each entry: { name: string (required, max 80 chars), acknowledged: bool }
+// Each entry: { name: string (required, max 80), title: string (optional, max 80), acknowledged: bool }
 function cleanAttendees(raw) {
   if (!Array.isArray(raw)) return [];
   const out = [];
@@ -122,10 +130,30 @@ function cleanAttendees(raw) {
     if (!a || typeof a !== 'object') continue;
     const name = cap(a.name, MAX_NAME).trim();
     if (!name) continue;
+    const title = cap(a.title != null ? a.title : '', MAX_NAME).trim();
     const ack = a.acknowledged === true || a.acknowledged === 'true';
-    out.push({ name, acknowledged: ack });
+    out.push({ name, title, acknowledged: ack });
   }
   return out;
+}
+
+// Validate and clean the hazard_checks array.
+// Each entry must be a key in HAZARD_KEYS.
+function cleanHazardChecks(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const k of raw) {
+    const key = String(k || '');
+    if (HAZARD_KEYS.has(key)) out.push(key);
+  }
+  // deduplicate
+  return [...new Set(out)];
+}
+
+// Validate and clean hierarchy_names: up to MAX_HIER strings, max 80 chars each.
+function cleanHierarchyNames(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, MAX_HIER).map((n) => cap(n, MAX_NAME).trim());
 }
 
 // Build a sanitized record body.
@@ -148,33 +176,57 @@ function buildBody(src, base, uid, newServerId) {
     return { err: `presenter must be one of: ${PRESENTER_OPTIONS.join(', ')}` };
   }
 
+  const rawSuperintendent = src.superintendent != null
+    ? String(src.superintendent) : (base && base.superintendent) || '';
+  if (rawSuperintendent && !SUPERINTENDENT_SET.has(rawSuperintendent)) {
+    return { err: `superintendent must be one of: ${SUPERINTENDENT_OPTIONS.join(', ')}` };
+  }
+
+  // Validate hazard check keys
+  const rawHazardChecks = src.hazardChecks != null
+    ? src.hazardChecks : (base && base.hazardChecks) || [];
+  if (!Array.isArray(rawHazardChecks)) return { err: 'hazardChecks must be an array' };
+  for (const k of rawHazardChecks) {
+    if (!HAZARD_KEYS.has(String(k || ''))) {
+      return { err: `invalid hazard key: ${k}` };
+    }
+  }
+
   const id = newServerId || (base && base.id);
 
   return {
     body: {
       id,
-      projectId:    cap(src.projectId    != null ? src.projectId    : (base && base.projectId)    || '', MAX_SHORT),
-      projectName:  cap(src.projectName  != null ? src.projectName  : (base && base.projectName)  || '', MAX_SHORT),
-      date:         cap(rawDate, MAX_SHORT),
-      time:         cap(src.time         != null ? src.time         : (base && base.time)         || '', 10),
-      location:     cap(src.location     != null ? src.location     : (base && base.location)     || '', MAX_SHORT),
-      presenter:    cap(rawPresenter, MAX_NAME),
-      topic:        cap(rawTopic, MAX_SHORT),
-      topicOther:   cap(src.topicOther   != null ? src.topicOther   : (base && base.topicOther)   || '', MAX_SHORT),
-      keyPoints:    cap(src.keyPoints    != null ? src.keyPoints    : (base && base.keyPoints)    || '', MAX_STR),
-      hazards:      cap(src.hazards      != null ? src.hazards      : (base && base.hazards)      || '', MAX_STR),
-      questions:    cap(src.questions    != null ? src.questions    : (base && base.questions)    || '', MAX_STR),
-      actions:      cap(src.actions      != null ? src.actions      : (base && base.actions)      || '', MAX_STR),
-      attendees:    cleanAttendees(src.attendees != null ? src.attendees : (base && base.attendees) || []),
-      status:       base ? base.status : 'draft',
-      pdfName:      base ? (base.pdfName || null) : null,
-      pdfWebUrl:    base ? (base.pdfWebUrl || null) : null,
-      emailedTo:    base ? (base.emailedTo || null) : null,
-      sentAt:       base ? (base.sentAt || null) : null,
-      createdBy:    base ? base.createdBy : uid,
-      createdAt:    base ? base.createdAt : now,
-      updatedAt:    now,
-      updatedBy:    uid,
+      projectId:       cap(src.projectId    != null ? src.projectId    : (base && base.projectId)    || '', MAX_SHORT),
+      projectName:     cap(src.projectName  != null ? src.projectName  : (base && base.projectName)  || '', MAX_SHORT),
+      date:            cap(rawDate, MAX_SHORT),
+      time:            cap(src.time         != null ? src.time         : (base && base.time)         || '', 10),
+      location:        cap(src.location     != null ? src.location     : (base && base.location)     || '', MAX_SHORT),
+      superintendent:  cap(rawSuperintendent, MAX_NAME),
+      presenter:       cap(rawPresenter, MAX_NAME),
+      topic:           cap(rawTopic, MAX_SHORT),
+      topicOther:      cap(src.topicOther   != null ? src.topicOther   : (base && base.topicOther)   || '', MAX_SHORT),
+      keyPoints:       cap(src.keyPoints    != null ? src.keyPoints    : (base && base.keyPoints)    || '', MAX_STR),
+      hazards:         cap(src.hazards      != null ? src.hazards      : (base && base.hazards)      || '', MAX_STR),
+      questions:       cap(src.questions    != null ? src.questions    : (base && base.questions)    || '', MAX_STR),
+      actions:         cap(src.actions      != null ? src.actions      : (base && base.actions)      || '', MAX_STR),
+      jsaSteps:        cap(src.jsaSteps     != null ? src.jsaSteps     : (base && base.jsaSteps)     || '', MAX_STR),
+      jsaHazards:      cap(src.jsaHazards   != null ? src.jsaHazards   : (base && base.jsaHazards)   || '', MAX_STR),
+      jsaPreventative: cap(src.jsaPreventative != null ? src.jsaPreventative : (base && base.jsaPreventative) || '', MAX_STR),
+      hazardChecks:    cleanHazardChecks(rawHazardChecks),
+      hierarchyNames:  cleanHierarchyNames(
+        src.hierarchyNames != null ? src.hierarchyNames : (base && base.hierarchyNames) || []
+      ),
+      attendees:       cleanAttendees(src.attendees != null ? src.attendees : (base && base.attendees) || []),
+      status:          base ? base.status : 'draft',
+      pdfName:         base ? (base.pdfName || null) : null,
+      pdfWebUrl:       base ? (base.pdfWebUrl || null) : null,
+      emailedTo:       base ? (base.emailedTo || null) : null,
+      sentAt:          base ? (base.sentAt || null) : null,
+      createdBy:       base ? base.createdBy : uid,
+      createdAt:       base ? base.createdAt : now,
+      updatedAt:       now,
+      updatedBy:       uid,
     },
   };
 }
@@ -203,7 +255,6 @@ export async function onRequest(context) {
       if (rec.status === 'draft' && rec.createdBy !== uid && session.role !== 'admin') {
         return jsonErr('Not found', 404);
       }
-      // Sanitize pdfWebUrl: must be https:// or null (matches past-reports.js pattern).
       const safeRec = Object.assign({}, rec, {
         pdfWebUrl: /^https:\/\//i.test(String(rec.pdfWebUrl || '')) ? rec.pdfWebUrl : null,
       });
@@ -214,14 +265,12 @@ export async function onRequest(context) {
     let result;
     try { result = await listRecords(env, { projectId, date }); }
     catch (e) { return jsonErr('Service temporarily unavailable', 503); }
-    // Scope drafts to the caller unless admin.
     const isAdmin = session.role === 'admin';
     const filtered = (result.records || []).filter((r) => {
       if (r.status === 'submitted') return true;
       if (isAdmin) return true;
       return r.createdBy === uid;
     }).map((r) => Object.assign({}, r, {
-      // Sanitize pdfWebUrl: must be https:// or null.
       pdfWebUrl: /^https:\/\//i.test(String(r.pdfWebUrl || '')) ? r.pdfWebUrl : null,
     }));
     return json({ ok: true, records: filtered });
@@ -300,12 +349,9 @@ export async function onRequest(context) {
     const rlOk  = await checkRateLimit(env.PF_SCHEDULE, rlKey, RL_SUBMIT_MAX, RL_SUBMIT_TTL);
     if (!rlOk) return jsonErr('Too many submissions this hour. Please wait.', 429);
 
-    // Presenter is required on submit.
-    if (!body.presenter) return jsonErr('Presenter is required', 400);
-    // Date is required on submit.
-    if (!body.date) return jsonErr('Date is required', 400);
-    // Topic is required on submit.
-    if (!body.topic) return jsonErr('Topic is required', 400);
+    // Required fields on submit.
+    if (!body.date)           return jsonErr('Date is required', 400);
+    if (!body.superintendent) return jsonErr('Superintendent is required', 400);
 
     body.status      = 'submitted';
     body.submittedBy = uid;
@@ -334,14 +380,11 @@ export async function onRequest(context) {
           body.pdfItemId = spItem.id    || null;
         } catch (e) {
           console.error('[toolbox-talk] SP upload failed:', e && e.message);
-          // Non-fatal: PDF exists; SP upload failure should not block the submit.
         }
       }
     }
 
     // Email the PDF. Recipients from D1 mailing_lists table.
-    // FAIL-SAFE: if D1 unreachable or list empty, skip email and return warning.
-    // The record and SP upload are NOT reverted.
     let ttEmailWarning = null;
     const { recipients, warning: ttMailingWarning } = await resolveMailingListWithNames(env.DB, 'toolbox_talk');
     if (ttMailingWarning) {
@@ -355,12 +398,12 @@ export async function onRequest(context) {
       }
       if (token) {
         try {
-          const subject = `Toolbox Talk - ${body.projectName || body.projectId || 'Project'} - ${body.date}`;
+          const subject = `Safety Analysis - ${body.projectName || body.projectId || 'Project'} - ${body.date}`;
           const bodyText = buildEmailBody(body);
           await sendTalkEmail(env, token, {
             recipients: recipients.map((r) => r.email), subject, bodyText, pdfBytes, filename: body.pdfName,
           });
-          body.emailedTo = recipients.slice(); // [{name,email}]
+          body.emailedTo = recipients.slice();
           body.sentAt    = new Date().toISOString();
         } catch (e) {
           console.error('[toolbox-talk] Email send failed:', e && e.message);

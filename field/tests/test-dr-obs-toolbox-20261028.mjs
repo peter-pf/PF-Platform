@@ -145,12 +145,12 @@ assertIncludes('D4: toolbox-talk-doc.js exports uploadTalkPdf', ttDocSrc, 'expor
 assertIncludes('D5: toolbox-talk-doc.js exports buildEmailBody', ttDocSrc, 'export function buildEmailBody');
 assertIncludes('D6: SP folder path set correctly', ttDocSrc, '05 - Field Operations/Toolbox Talks');
 assertIncludes('D7: SP folder includes year subfolder', ttDocSrc, 'TT_SP_BASE_PATH}/${year}');
-assertIncludes('D8: PDF renders Meeting Details section', ttDocSrc, 'Meeting Details');
+assertIncludes('D8: PDF renders Project Info section', ttDocSrc, 'Project Info');
 assertIncludes('D9: PDF renders Key Points Discussed section', ttDocSrc, 'Key Points Discussed');
 assertIncludes('D10: PDF renders Hazards section', ttDocSrc, "Hazards Specific to Today");
 assertIncludes('D11: PDF renders Questions section', ttDocSrc, 'Questions or Concerns Raised');
-assertIncludes('D12: PDF renders Attendees section', ttDocSrc, 'Attendees');
-assertIncludes('D13: pdfFilename uses Toolbox Talk suffix', ttDocSrc, 'Toolbox Talk.pdf');
+assertIncludes('D12: PDF renders Crew Acknowledgment section', ttDocSrc, 'Crew Acknowledgment');
+assertIncludes('D13: pdfFilename uses Safety Analysis suffix', ttDocSrc, 'Safety Analysis.pdf');
 assertNotIncludes('D14: toolbox-talk-doc.js contains no financial data (no pricing/rates)',
   ttDocSrc, 'pricing');
 assertIncludes('D15: ensureFolder handles 409 (already exists) correctly',
@@ -162,7 +162,7 @@ const ttDocModule = await import(path.join(root, 'functions/lib/toolbox-talk-doc
 if (ttDocModule) {
   const fn1 = ttDocModule.pdfFilename({ date: '2026-10-28', projectName: 'Peter Sample Job 99-999' });
   assert('D16: pdfFilename produces correct filename pattern',
-    fn1 === '26-1028-Peter Sample Job 99-999-Toolbox Talk.pdf',
+    fn1 === '26-1028-Peter Sample Job 99-999-Safety Analysis.pdf',
     'got: ' + fn1);
   const fn2 = ttDocModule.pdfFilename({ date: '2026-10-28', projectName: '' });
   assertIncludes('D17: pdfFilename falls back to "Project" when name is empty', fn2, 'Project');
@@ -213,9 +213,9 @@ assertIncludes('E13: submitted records locked (409)', ttApiSrc, 'Record already 
 assertIncludes('E14: server generates id on create (UUID)', ttApiSrc, 'crypto.randomUUID()');
 assertNotIncludes('E15: client id never trusted on create', ttApiSrc, 'src.id on create');
 assertIncludes('E16: cleanAttendees caps at MAX_ATTENDEES', ttApiSrc, 'MAX_ATTENDEES');
-assertIncludes('E17: presenter required on submit', ttApiSrc, 'Presenter is required');
+assertIncludes('E17: superintendent required on submit (SA spec)', ttApiSrc, 'Superintendent is required');
 assertIncludes('E18: date required on submit', ttApiSrc, 'Date is required');
-assertIncludes('E19: topic required on submit', ttApiSrc, 'Topic is required');
+assertIncludes('E19: SUPERINTENDENT_SET validates superintendent field', ttApiSrc, 'SUPERINTENDENT_SET');
 assertIncludes('E20: SP upload on submit', ttApiSrc, 'uploadTalkPdf');
 assertIncludes('E21: email send on submit', ttApiSrc, 'sendTalkEmail');
 assertIncludes('E22: TEST_RECIPIENTS defined', ttApiSrc, 'TEST_RECIPIENTS');
@@ -276,7 +276,7 @@ assertIncludes('G7: past-reports.js comment updated to include Toolbox Talks',
 // ============================================================
 console.log('\n--- H. toolbox-talk.html form structure ---');
 
-assertIncludes('H1: TT HTML has Meeting Info section', ttHtmlSrc, 'Meeting Info');
+assertIncludes('H1: SA HTML has Project Info section', ttHtmlSrc, 'Project Info');
 assertIncludes('H2: TT HTML has Presenter section', ttHtmlSrc, 'Presenter');
 assertIncludes('H3: TT HTML has Topic section with dropdown', ttHtmlSrc, 'id="ttTopic"');
 assertIncludes('H4: TT HTML includes all 11 standard topics', ttHtmlSrc, 'fall_protection');
@@ -346,12 +346,12 @@ const emailBodySrc = drDocSrc; // same file
 assertIncludes('K3: DR email body delay total also uses 2dp rounding',
   emailBodySrc, 'Math.round(totalDowntime * 100) / 100');
 
-// K4: Meeting Details no longer contains Presenter row
-assertNotIncludes('K4: TT PDF Meeting Details does not repeat Presenter row',
+// K4: SA PDF Toolbox Talk section includes Presenter row (restored in SA spec after R6)
+assertIncludes('K4: SA PDF Toolbox Talk section includes Presenter row',
   ttDocSrc, "label: 'Presenter', value: rec.presenter");
 
-// K5: Acknowledged column removed from PDF R6 per Derek 2026-10-30
-assertNotIncludes('K5: TT PDF attendee acknowledged column removed R6',
+// K5: SA spec restores acknowledged per attendee (reversed from R6 removal)
+assertIncludes('K5: SA PDF attendee Crew Acknowledgment shows ack status',
   ttDocSrc, 'Not acknowledged');
 
 // K6: TT footer has no spacer forcing page break
