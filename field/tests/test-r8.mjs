@@ -239,7 +239,7 @@ function mockJsonResponse(data, status = 200) {
 console.log('\nWeather tile tests:');
 
 await test('1. success: precomputed coords + NWS → 3-day forecast', async () => {
-  // 26-001 (WPAFB) has coords precomputed in job-coords.js
+  // 26-014 (TPS Dayton) has address-level coords precomputed in job-coords.js
   mockFetch([
     ['api.weather.gov/points', () => mockJsonResponse({
       properties: { forecast: 'https://api.weather.gov/gridpoints/ILN/49,72/forecast' }
@@ -264,7 +264,7 @@ await test('1. success: precomputed coords + NWS → 3-day forecast', async () =
     session: { uid: 'u1', role: 'field_ops', name: 'Test' },
     env: { PF_SCHEDULE: kv },
   });
-  ctx.request = new Request('https://field.pierfoundations.com/api/weather?job=26-001', { method: 'GET' });
+  ctx.request = new Request('https://field.pierfoundations.com/api/weather?job=26-014', { method: 'GET' });
 
   const resp = await wxOnRequest(ctx);
   restoreFetch();
@@ -327,7 +327,7 @@ await test('3. NWS /points fails → status:unavailable', async () => {
     session: { uid: 'u1', role: 'field_ops', name: 'Test' },
     env: { PF_SCHEDULE: makeKV() },
   });
-  ctx.request = new Request('https://field.pierfoundations.com/api/weather?job=26-001', { method: 'GET' });
+  ctx.request = new Request('https://field.pierfoundations.com/api/weather?job=26-014', { method: 'GET' });
 
   const resp = await wxOnRequest(ctx);
   restoreFetch();
@@ -349,7 +349,7 @@ await test('4. NWS forecast endpoint fails → status:unavailable', async () => 
     session: { uid: 'u1', role: 'field_ops', name: 'Test' },
     env: { PF_SCHEDULE: makeKV() },
   });
-  ctx.request = new Request('https://field.pierfoundations.com/api/weather?job=26-001', { method: 'GET' });
+  ctx.request = new Request('https://field.pierfoundations.com/api/weather?job=26-014', { method: 'GET' });
 
   const resp = await wxOnRequest(ctx);
   restoreFetch();

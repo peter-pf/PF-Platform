@@ -147,12 +147,12 @@ test('2d: Battle Creek Fire Station - 3 (26-006) present', () => {
   assertIncludes('2d name', foProjSrc, 'Battle Creek Fire Station');
 });
 
-test('2e: All existing 17 projects still present (no deletions)', () => {
-  const existing = ['25-026', '26-001', '26-002', '26-007', '26-008', '26-009',
-                    '26-010', '26-011', '26-012', '26-013', '26-014', '26-015',
-                    '26-016', '26-017', '26-022', '25-2001', '25-2002'];
-  for (const num of existing) {
-    assert.ok(foProjSrc.includes(`'${num}'`), `expected '${num}' to be present`);
+test('2e: Projects carried forward from R6 list are still present (25-026, 26-007, 26-014)', () => {
+  // R7 (2026-10-30) replaced the full project list with 11 active projects per Derek.
+  // The 3 projects already in the R6 list that are also in the R7 list must remain.
+  const carriedForward = ['25-026', '26-007', '26-014'];
+  for (const num of carriedForward) {
+    assert.ok(foProjSrc.includes(`'${num}'`), `expected '${num}' to still be present`);
   }
 });
 
@@ -170,10 +170,10 @@ test('2h: SR, EI, TT all call /api/field-projects (shared dropdown source)', () 
   assertIncludes('2h TT', ttHtmlSrc, '/api/field-projects');
 });
 
-test('2i: FO_PROJECTS has 21 entries (17 existing + 4 upcoming)', () => {
-  // Count occurrences of `number:` in the data file
+test('2i: FO_PROJECTS has 11 entries (replaced with active-projects list per Derek 2026-10-30)', () => {
+  // R7 replaced the 21-entry list with exactly 11 active projects.
   const matches = foProjSrc.match(/number:/g) || [];
-  assert.ok(matches.length === 21, `expected 21 projects, got ${matches.length}`);
+  assert.ok(matches.length === 11, `expected 11 projects, got ${matches.length}`);
 });
 
 // ============================================================
