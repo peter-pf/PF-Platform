@@ -5,7 +5,7 @@
 // SECURITY MODEL (for the COO security review):
 //  - This endpoint is ALREADY behind the server-side auth gate in
 //    functions/_middleware.js. Every request -- GET, PUT, POST -- must carry a
-//    valid signed pf_auth_token cookie (or Basic Auth). External/unauthenticated
+//    valid signed pf_session cookie. External/unauthenticated
 //    callers are rejected with 401 before they ever reach this code. We do NOT
 //    weaken or bypass that gate here.
 //  - This is a WRITE endpoint, so it is defense-in-depth hardened:
@@ -181,8 +181,7 @@ function clientBaseVersion(input) {
 // `gc_name`. The crew (field_ops) needs the schedule (their assignments) but
 // MUST NOT see job dollar values or GC names. This is the SERVER-SIDE boundary:
 // on READ, strip those two fields from every job when the caller is a field_ops
-// session. admin / partner (and the shared-auth admin fallback, whose role is
-// 'admin') get the full state unchanged. Writes still PERSIST value/gc_name
+// session. admin / partner get the full state unchanged. Writes still PERSIST value/gc_name
 // (sanitizeJob), so partner/admin edits round-trip — we only redact on read for
 // field_ops. Fails CLOSED: if the role is unknown/missing we DROP the sensitive
 // fields rather than leak them.

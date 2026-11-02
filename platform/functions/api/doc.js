@@ -7,7 +7,7 @@
 // SECURITY MODEL (for the COO security review):
 //  - This endpoint is ALREADY behind the server-side auth gate in
 //    functions/_middleware.js. Every request must carry a valid signed
-//    pf_auth_token cookie (or Basic Auth) -- external/unauthenticated callers
+//    pf_session cookie -- external/unauthenticated callers
 //    are rejected with 401 BEFORE they ever reach this code. We do NOT weaken
 //    or bypass that gate here. (/api/* is covered by the middleware; this file
 //    lives under /api/, so it inherits the gate.)
