@@ -7,7 +7,7 @@
 
 ---
 
-## Implementation Status: Auth + XSS hardening built, deployed, and verified June 2, 2026.
+## Implementation Status: Auth + XSS hardening June 2, 2026. Per-user D1 login June 18, 2026. SEC-04 shared-fallback removed November 2, 2026.
 
 ## 1. Overview
 
@@ -23,7 +23,7 @@ This SRS captures the security requirements the platform must meet. It was creat
 |---|-------------|--------|
 | AUTH-1 | All page routes and all `/api/*` routes require authentication before serving any content | DONE |
 | AUTH-2 | Authentication is enforced server-side (Cloudflare Pages Functions middleware), with no client-side-only gate that can be bypassed | DONE |
-| AUTH-3 | Initial login uses HTTP Basic Auth; on success the server issues a session cookie | DONE |
+| AUTH-3 | Initial login uses per-user PBKDF2-HMAC-SHA256 password check against D1; on success the server issues a signed session cookie. Shared HTTP Basic Auth fallback was removed 2026-11-02 (SEC-04) | DONE (updated 2026-11-02) |
 | AUTH-4 | The session token is cryptographically signed (HMAC-SHA256) so it cannot be forged by hand-crafting its contents | DONE |
 | AUTH-5 | Token verification recomputes and constant-time-compares the signature BEFORE trusting any payload field | DONE |
 | AUTH-6 | The session cookie is `HttpOnly`, `Secure`, `SameSite=Strict`, with a 24-hour expiry | DONE |
@@ -90,3 +90,4 @@ All tests run against the live production deployment after the hardening deploy:
 | SEC-007 brittle .env parsing | (pipeline hardening) | BACKLOG |
 | SEC-009 file IDs in source | (config hygiene) | BACKLOG |
 | SEC-010 no token revocation | TOK-1 | BACKLOG |
+| SEC-04 shared Basic-Auth / pf_auth_token fallback grants admin to anyone with the portal password | AUTH-3, AUTH-7 | FIXED 2026-11-02 — fallback removed, PF_AUTH_USER + PF_AUTH_PASS secrets deleted; every user must authenticate with individual D1 account |
