@@ -295,17 +295,20 @@ function buildBody(src, base, session, nowIso) {
   const raw4b = raw4bSrc != null ? raw4bSrc : raw4bBase;
 
   const body = {
-    date:        isoDateOrToday(src.date != null ? src.date : base.date),
-    projectId:   s(src.projectId != null ? src.projectId : base.projectId, MAX_SHORT),
-    projectName: s(src.projectName != null ? src.projectName : base.projectName, MAX_SHORT),
-    gcContact:   s(src.gcContact != null ? src.gcContact : base.gcContact, MAX_SHORT),
-    siteAddress: s(src.siteAddress != null ? src.siteAddress : base.siteAddress, MAX_STR),
-    inspectedBy: s(src.inspectedBy != null ? src.inspectedBy : base.inspectedBy, MAX_SHORT),
+    date:         isoDateOrToday(src.date != null ? src.date : base.date),
+    projectId:    s(src.projectId != null ? src.projectId : base.projectId, MAX_SHORT),
+    projectName:  s(src.projectName != null ? src.projectName : base.projectName, MAX_SHORT),
+    gcContact:    s(src.gcContact != null ? src.gcContact : base.gcContact, MAX_SHORT),
+    siteAddress:  s(src.siteAddress != null ? src.siteAddress : base.siteAddress, MAX_STR),
+    inspectedBy:  s(src.inspectedBy != null ? src.inspectedBy : base.inspectedBy, MAX_SHORT),
     items,
-    attachments: src.attachments != null ? cleanAttachments(src.attachments) : (base.attachments || []),
-    sigName:     s(src.sigName != null ? src.sigName : base.sigName, MAX_SHORT),
-    sigDate:     isoDateOrToday(src.sigDate != null ? src.sigDate : base.sigDate),
-    opsSignoffs: cleanOpsSignoffs(srcOps, baseOps, session, nowIso),
+    attachments:  src.attachments != null ? cleanAttachments(src.attachments) : (base.attachments || []),
+    sigName:      s(src.sigName != null ? src.sigName : base.sigName, MAX_SHORT),
+    sigDate:      isoDateOrToday(src.sigDate != null ? src.sigDate : base.sigDate),
+    opsSignoffs:  cleanOpsSignoffs(srcOps, baseOps, session, nowIso),
+    // Internal Crew Comments: free-form text for the installing crew. Not a checklist item;
+    // never affects READY/NOT READY result. Sanitized via s() (strips angle brackets, MAX_STR).
+    crewComments: s(src.crewComments != null ? src.crewComments : (base.crewComments || ''), MAX_STR),
     result,
     openItems,
   };

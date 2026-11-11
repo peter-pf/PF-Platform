@@ -153,6 +153,15 @@ export function renderSiteReadinessPdf(rec) {
     doc.embedPhotos(genericPhotos);
   }
 
+  // Internal Crew Comments — optional free-form field for installing crew.
+  // Not a checklist item; has no effect on READY/NOT READY result.
+  // Value was sanitized server-side (s() strips angle brackets); PDF renders as plain text.
+  if (rec.crewComments && String(rec.crewComments).trim()) {
+    doc.heading('Internal Crew Comments');
+    doc.text(String(rec.crewComments).trim(), { size: 10 });
+    doc.spacer(4);
+  }
+
   // Gather all attachment refs up front (used in 4b/ops sections and the summary).
   const allAttach = Array.isArray(rec.attachments) ? rec.attachments : [];
 
@@ -388,6 +397,12 @@ export function buildEmailBody(rec) {
   if (rec.result === 'NOT READY' && Array.isArray(rec.openItems) && rec.openItems.length) {
     lines.push('');
     lines.push('Open items: ' + rec.openItems.join(', '));
+  }
+  // Internal Crew Comments: plain-text section (no HTML escaping needed; email body is text/plain).
+  if (rec.crewComments && String(rec.crewComments).trim()) {
+    lines.push('');
+    lines.push('Internal Crew Comments:');
+    lines.push(String(rec.crewComments).trim());
   }
   lines.push('');
   lines.push('The full form is attached as a PDF. This is an automated message from the PF Platform.');

@@ -292,6 +292,17 @@
         <!-- Checklist sections rendered by JS -->
         <div id="srChecklist"></div>
 
+        <!-- Internal Crew Comments (Brad 2026-11-11) -->
+        <!-- Optional free-form field. Not a checklist item. Never affects READY/NOT READY. -->
+        <div class="sr-section-h" style="margin-top:16px">Internal Crew Comments</div>
+        <div style="font-size:12px;color:var(--text-3);margin-bottom:6px">
+          Notes the installing crew needs to know (access, staging, utilities, super contact,
+          anything agreed with the GC). Internal to PF.
+        </div>
+        <textarea id="srCrewComments" rows="4"
+          placeholder="Access gate codes, staging area, utility lines to call, superintendent contact, pre-mobilization agreements with GC, etc."
+          style="resize:vertical;min-height:80px"></textarea>
+
         <!-- Section 7: Site Photos -->
         <div class="sr-section-h">7. Site Photos <span style="font-size:11px;color:var(--text-3);font-weight:400">(upload to 05&nbsp;Field / 02&nbsp;Project Photos)</span></div>
         <div style="font-size:12px;color:var(--text-3);margin-bottom:6px">
@@ -627,7 +638,7 @@ try {
     var b=local.body;
     function sv(id,v){var el=document.getElementById(id);if(el)el.value=(v==null?'':String(v));}
     if(b.projectId){srPickerSetValue(b.projectId,b.projectName||b.projectId);var hid2=document.getElementById('srProjectId');if(hid2)hid2.value=b.projectId;}
-    sv('srDate',b.date);sv('srGcContact',b.gcContact);sv('srSiteAddress',b.siteAddress);sv('srSigName',b.sigName);sv('srSigDate',b.sigDate);
+    sv('srDate',b.date);sv('srGcContact',b.gcContact);sv('srSiteAddress',b.siteAddress);sv('srSigName',b.sigName);sv('srSigDate',b.sigDate);sv('srCrewComments',b.crewComments);
     if(Array.isArray(b.items)){
       b.items.forEach(function(bi){var it=state.items.find(function(x){return x.key===bi.key;});if(it){it.answer=bi.answer||'';it.note=bi.note||'';}});
     }
@@ -1300,16 +1311,17 @@ try {
     function gv(id){ var el=document.getElementById(id); return el ? el.value : ''; }
     return {
       schemaVersion: 12,
-      projectId:   pid,
-      projectName: pname,
-      date:        (document.getElementById('srDate') || {}).value || '',
-      gcContact:   (document.getElementById('srGcContact') || {}).value || '',
-      siteAddress: (document.getElementById('srSiteAddress') || {}).value || '',
-      inspectedBy: (inspected || {}).value || '',
-      items:       state.items.map(function (it) { return { key: it.key, answer: it.answer, note: it.note }; }),
-      attachments: state.attachments.slice().concat(state.photoAttachments || []),
-      sigName:     (sigName || {}).value || '',
-      sigDate:     (sigDate || {}).value || '',
+      projectId:    pid,
+      projectName:  pname,
+      date:         (document.getElementById('srDate') || {}).value || '',
+      gcContact:    (document.getElementById('srGcContact') || {}).value || '',
+      siteAddress:  (document.getElementById('srSiteAddress') || {}).value || '',
+      inspectedBy:  (inspected || {}).value || '',
+      items:        state.items.map(function (it) { return { key: it.key, answer: it.answer, note: it.note }; }),
+      attachments:  state.attachments.slice().concat(state.photoAttachments || []),
+      sigName:      (sigName || {}).value || '',
+      sigDate:      (sigDate || {}).value || '',
+      crewComments: gv('srCrewComments'),
       opsSignoffs: {
         sitePlan: {
           desc:      gv('srSitePlanDesc'),
@@ -1397,7 +1409,7 @@ try {
     state.opsSignoffs = { sitePlan: { desc: '', superName: '', pfMgrName: '' } };
     state.loadedSchemaVersion = null; // null = new form; computeResult treats as R12
     ['srProject', 'srProjectId', 'srDate', 'srGcContact', 'srSiteAddress', 'srSigName', 'srSigDate',
-     'srSitePlanDesc', 'srSitePlanSuperName', 'srSitePlanMgrName'].forEach(function (id) {
+     'srCrewComments', 'srSitePlanDesc', 'srSitePlanSuperName', 'srSitePlanMgrName'].forEach(function (id) {
       var el = document.getElementById(id); if (el) el.value = '';
     });
     // Clear picker display
@@ -1434,6 +1446,7 @@ try {
     setVal('srInspectedBy', r.inspectedBy);
     setVal('srSigName', r.sigName);
     setVal('srSigDate', r.sigDate);
+    setVal('srCrewComments', r.crewComments);
 
     var pid = (r.projectId != null && String(r.projectId).trim()) ? String(r.projectId) : (r.projectName || '');
     var present = state.projects.some(function (p) { return String(p.id) === pid; });
