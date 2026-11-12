@@ -202,7 +202,14 @@ def main():
 
     print(f'Listing folder: {SOP_FOLDER}')
     items = list_folder(drive_id, SOP_FOLDER, tok)
-    pdf_items = [i for i in items if i.get('file') and i['name'].lower().endswith('.pdf')]
+    # Filter: PDFs only, skip docx and any archived copies (e.g. *_rev00_archived.pdf)
+    pdf_items = [
+        i for i in items
+        if i.get('file')
+        and i['name'].lower().endswith('.pdf')
+        and not i['name'].lower().endswith('.docx')
+        and 'archived' not in i['name'].lower()
+    ]
     print(f'  Found {len(pdf_items)} PDF file(s):')
     for i in pdf_items:
         print(f'    {i["name"]} ({i.get("size", 0):,} bytes, modified {i.get("lastModifiedDateTime","?")})')
