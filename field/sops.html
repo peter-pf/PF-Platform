@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>SOPs – PF Field Portal</title>
+<meta name="theme-color" content="#006DB0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="PF Field">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/pf-r5.css">
+<style>
+/* ---- SOP page styles ---- */
+.sop-index{margin-bottom:20px;}
+.sop-index-row{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding:9px 0;border-bottom:1px solid var(--border);font-size:.85rem;}
+.sop-index-row:first-child{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text-3);padding-top:0;}
+.sop-index-row:last-child{border-bottom:none;}
+.sop-index-title{flex:1 1 180px;font-weight:600;color:var(--text-0);}
+.sop-index-num{flex:0 0 110px;color:var(--text-2);}
+.sop-index-rev{flex:0 0 60px;color:var(--text-2);}
+.sop-index-date{flex:0 0 130px;color:var(--text-2);}
+.sop-index-actions{flex:0 0 auto;display:flex;gap:8px;}
+.sop-link{color:var(--accent);font-weight:600;text-decoration:none;font-size:.8rem;white-space:nowrap;}
+.sop-link:hover{text-decoration:underline;}
+/* ---- SOP document card ---- */
+.sop-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;margin-bottom:20px;}
+.sop-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;}
+.sop-card-title{font-size:1rem;font-weight:700;color:var(--text-0);margin:0 0 4px;}
+.sop-card-meta{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:.78rem;color:var(--text-2);}
+.sop-card-meta span{white-space:nowrap;}
+.sop-dl-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:.78rem;font-weight:600;color:var(--text-1);text-decoration:none;white-space:nowrap;flex-shrink:0;}
+.sop-dl-btn:hover{border-color:var(--accent);color:var(--accent);text-decoration:none;}
+.sop-dl-btn svg{width:14px;height:14px;}
+/* ---- SOP body typography ---- */
+.sop-body{font-size:.875rem;line-height:1.6;color:var(--text-1);}
+.sop-body h2{font-size:.95rem;font-weight:700;color:var(--text-0);margin:16px 0 6px;padding-top:4px;}
+.sop-body h3{font-size:.88rem;font-weight:700;color:var(--text-0);margin:12px 0 5px;}
+.sop-body p{margin:0 0 8px;}
+.sop-body ul{margin:4px 0 8px 18px;padding:0;}
+.sop-body ol{margin:4px 0 8px 18px;padding:0;}
+.sop-body li{margin-bottom:3px;}
+.sop-body .sop-important{font-style:italic;border-left:3px solid var(--amber);padding-left:10px;margin:8px 0;color:var(--text-1);}
+/* Fill-in line rendered from PDF \_\_\_ escape */
+.sop-fill{display:inline-block;min-width:120px;border-bottom:1px solid var(--text-2);vertical-align:bottom;height:1em;}
+/* Checklist items */
+.sop-checklist{list-style:none;margin:4px 0 8px 0;padding:0;}
+.sop-checklist li{display:flex;align-items:flex-start;gap:7px;margin-bottom:4px;}
+.sop-checklist li input[type="checkbox"]{margin-top:3px;flex-shrink:0;}
+/* Sign-off table */
+.sop-signoff{margin-top:12px;font-size:.82rem;}
+.sop-signoff p{margin:0 0 10px;display:flex;gap:8px;flex-wrap:wrap;align-items:baseline;}
+.sop-signoff strong{min-width:160px;color:var(--text-0);}
+.sop-signoff .sop-fill{min-width:180px;}
+.sop-table{width:100%;border-collapse:collapse;font-size:.82rem;margin:8px 0;}
+.sop-table th{text-align:left;padding:5px 8px;border:1px solid var(--border);background:var(--bg-2);font-weight:600;color:var(--text-0);}
+.sop-table td{padding:5px 8px;border:1px solid var(--border);color:var(--text-1);}
+hr.sop-rule{border:none;border-top:1px solid var(--border);margin:16px 0;}
+</style>
+<!-- No-flash theme -->
+<script>(function(){try{var t=localStorage.getItem('pf-theme');var d=t==='dark'||(t==null&&window.matchMedia&&window.matchMedia('(prefers-color-scheme:dark)').matches);if(d)document.documentElement.setAttribute('data-theme','dark');}catch(e){}}());</script>
+</head>
+<body>
+
+<div id="topbar">
+  <a href="/" class="tb-brand" aria-label="PF Field Portal">
+    <div class="tb-mark">PF</div>
+    <span class="tb-title">Field Portal</span>
+  </a>
+  <details class="acct-menu" id="acctMenu">
+    <summary>
+      <span class="acct-btn">
+        <span class="acct-name" id="acctName"></span>
+        <svg class="acct-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </span>
+    </summary>
+    <div class="acct-dropdown">
+      <button type="button" class="acct-item" onclick="window.pfToggleTheme()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>
+        <span id="acctThemeLabel">Dark mode</span>
+      </button>
+      <div class="acct-divider"></div>
+      <a class="acct-item" href="/api/logout">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+        Sign Out
+      </a>
+    </div>
+  </details>
+</div>
+
+<nav id="pfNav" aria-label="Main navigation">
+  <a href="/" class="pf-nav-item" data-paths="/, /index.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+    <span>Home</span>
+  </a>
+  <a href="/daily-report.html" class="pf-nav-item" data-paths="/daily-report.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><line x1="9" y1="12" x2="15" y2="12"></line><line x1="9" y1="16" x2="13" y2="16"></line></svg>
+    <span>Daily Report</span>
+  </a>
+  <a href="/equipment-inspection.html" class="pf-nav-item" data-paths="/equipment-inspection.html">
+    <span class="rig-icon" aria-hidden="true"></span>
+    <span>Equip. Inspect.</span>
+  </a>
+  <a href="/site-readiness.html" class="pf-nav-item" data-paths="/site-readiness.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
+    <span>Site Readiness</span>
+  </a>
+  <a href="/toolbox-talk.html" class="pf-nav-item" data-paths="/toolbox-talk.html, /toolbox-talk">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+    <span>Safety Analysis</span>
+  </a>
+  <a href="/past-reports.html" class="pf-nav-item" data-paths="/past-reports.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+    <span>Past Reports</span>
+  </a>
+  <a href="/cost-codes.html" class="pf-nav-item" data-paths="/cost-codes.html, /cost-codes">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+    <span>Cost Codes</span>
+  </a>
+  <a href="/schedule.html" class="pf-nav-item" data-paths="/schedule.html, /schedule">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+    <span>Schedule</span>
+  </a>
+  <a href="/time-off.html" class="pf-nav-item" data-paths="/time-off.html, /time-off">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><path d="M8 14l2 2 4-4"></path></svg>
+    <span>Time Off</span>
+  </a>
+  <a href="/sops.html" class="pf-nav-item" data-paths="/sops.html, /sops">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 0 3-3h7z"></path></svg>
+    <span>SOPs</span>
+  </a>
+  <!-- Owner-only: shown by JS after /api/me confirms owner email -->
+  <a href="/mailing-lists.html" class="pf-nav-item" data-paths="/mailing-lists.html, /mailing-lists" style="display:none" id="mlNavItem">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,12 2,6"></polyline></svg>
+    <span>Mailing Lists</span>
+  </a>
+</nav>
+
+<div id="loading">Loading...</div>
+<div id="authError"><p>Session expired. <a href="/login.html">Sign in again</a></p></div>
+
+<div id="main">
+<div class="pf-col">
+
+  <p class="page-title">Standard Operating Procedures</p>
+
+  <!-- Index -->
+  <div class="sop-index" id="sopIndex">
+    <div class="sop-index-row">
+      <span class="sop-index-title">Title</span>
+      <span class="sop-index-num">SOP Number</span>
+      <span class="sop-index-rev">Rev.</span>
+      <span class="sop-index-date">Effective Date</span>
+      <span class="sop-index-actions">Links</span>
+    </div>
+    <div class="sop-index-row" data-sop="sop-he001">
+      <span class="sop-index-title">Daily Heavy Equipment Inspections</span>
+      <span class="sop-index-num">HE-SOP-001</span>
+      <span class="sop-index-rev">00</span>
+      <span class="sop-index-date">Not yet set</span>
+      <span class="sop-index-actions">
+        <a href="#sop-he001" class="sop-link">View</a>
+        <a href="/sops/Daily_Heavy_Equipment_Inspections_sop.pdf" class="sop-link" download>PDF</a>
+      </span>
+    </div>
+    <div class="sop-index-row" data-sop="sop-saf002">
+      <span class="sop-index-title">Pier Foundations – Jobsite Walk and Inspection</span>
+      <span class="sop-index-num">SOP-SAF-002</span>
+      <span class="sop-index-rev">00</span>
+      <span class="sop-index-date">Not yet set</span>
+      <span class="sop-index-actions">
+        <a href="#sop-saf002" class="sop-link">View</a>
+        <a href="/sops/Pier_Foundations_Jobsite_Walk_sop.pdf" class="sop-link" download>PDF</a>
+      </span>
+    </div>
+    <div class="sop-index-row" data-sop="sop-ops001">
+      <span class="sop-index-title">Pier Foundations – Pre-Job Site Visit and Superintendent Walk</span>
+      <span class="sop-index-num">SOP-OPS-001</span>
+      <span class="sop-index-rev">01</span>
+      <span class="sop-index-date">November 11, 2026</span>
+      <span class="sop-index-actions">
+        <a href="#sop-ops001" class="sop-link">View</a>
+        <a href="/sops/Pier_Foundations_Pre-Job_Site_Visit_sop.pdf" class="sop-link" download>PDF</a>
+      </span>
+    </div>
+    <div class="sop-index-row" data-sop="sop-pf001">
+      <span class="sop-index-title">Pier Foundations – Project Closeout Before Demobilization</span>
+      <span class="sop-index-num">PF-XXX</span>
+      <span class="sop-index-rev">00</span>
+      <span class="sop-index-date">Not yet set</span>
+      <span class="sop-index-actions">
+        <a href="#sop-pf001" class="sop-link">View</a>
+        <a href="/sops/Pier_Foundations_Project_Closeout_Before_Demobilization_sop.pdf" class="sop-link" download>PDF</a>
+      </span>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       SOP 1: HE-SOP-001 Daily Heavy Equipment Inspections
+       ====================================================================== -->
+  <div class="sop-card" id="sop-he001">
+    <div class="sop-card-head">
+      <div>
+        <p class="sop-card-title">Daily Heavy Equipment Inspections</p>
+        <div class="sop-card-meta">
+          <span>SOP Number: HE-SOP-001</span>
+          <span>Department: Operations / Equipment</span>
+          <span>Effective Date: <span class="sop-fill"></span></span>
+          <span>Revision: 00</span>
+          <span>Approved By: <span class="sop-fill"></span></span>
+        </div>
+      </div>
+      <a href="/sops/Daily_Heavy_Equipment_Inspections_sop.pdf" class="sop-dl-btn" download aria-label="Download PDF for Daily Heavy Equipment Inspections">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        Download PDF
+      </a>
+    </div>
+    <div class="sop-body">
+
+      <h2>1. PURPOSE</h2>
+      <p>To establish a standardized procedure for inspecting heavy equipment before operation to identify defects, prevent equipment damage, reduce the risk of injury, and ensure equipment is safe to operate.</p>
+
+      <h2>2. SCOPE</h2>
+      <p>This procedure applies to all employees who operate, inspect, or maintain company equipment, including:</p>
+      <ul>
+        <li>Drill rigs</li>
+        <li>Excavators</li>
+        <li>Skid steer loaders</li>
+        <li>Compact track loaders</li>
+        <li>Wheel loaders</li>
+      </ul>
+
+      <h2>3. OPERATOR RESPONSIBILITIES</h2>
+      <p>All employees who operate company equipment must:</p>
+      <ul>
+        <li>Complete a physical pre-operation inspection before operating any equipment.</li>
+        <li>Access and complete the appropriate company-approved digital inspection form.</li>
+        <li>Submit the completed digital inspection form before operating the equipment.</li>
+        <li>Inspect the equipment for damage, leaks, worn components, and unsafe conditions.</li>
+        <li>Immediately report defects or safety concerns to their supervisor.</li>
+        <li>Remove unsafe equipment from service according to company procedures.</li>
+        <li>Stop operation if an unsafe condition develops during use.</li>
+      </ul>
+      <p>Every employee must complete their own inspection before operating the equipment. An inspection completed by another employee does not satisfy this requirement.</p>
+
+      <h2>4. DAILY PRE-OPERATION INSPECTION</h2>
+
+      <h3>4.1 General Inspection</h3>
+      <p>Before operation, inspect the following, as applicable:</p>
+      <ul>
+        <li>Overall equipment condition</li>
+        <li>Structural components, frames, and welds</li>
+        <li>Fluid leaks and visible hose damage</li>
+        <li>Engine oil, coolant, hydraulic fluid, and fuel levels</li>
+        <li>Tires, tracks, wheels, and undercarriage</li>
+        <li>Electrical wiring, batteries, and connections</li>
+        <li>Steps, handrails, and access points</li>
+        <li>Guards, covers, and safety decals</li>
+        <li>Fire extinguisher, if required</li>
+        <li>Seat belts and operator restraint systems</li>
+        <li>Lights, mirrors, cameras, horns, and warning alarms</li>
+      </ul>
+
+      <h3>4.2 Drill Rig Inspection</h3>
+      <p>In addition to the general inspection, operators must inspect applicable components, including:</p>
+      <ul>
+        <li>Drill mast, tower, and structural supports</li>
+        <li>Drill head and rotation system</li>
+        <li>Hydraulic hoses, cylinders, fittings, and connection</li>
+        <li>Drill steel and bits for visible damage or excessive wear.</li>
+        <li>Tracks, tires, brakes, and travel controls</li>
+        <li>Emergency stops and safety interlocks</li>
+        <li>Guards and protective devices</li>
+        <li>Operator controls, gauges, and warning indicators</li>
+        <li>Lighting, alarms, and communication systems</li>
+      </ul>
+      <p class="sop-important">Never inspect, adjust, or clear drill tooling while components are rotating or energized. Follow the manufacturer's procedures and applicable hazardous-energy-control requirements before performing maintenance or accessing hazardous areas.</p>
+
+      <h3>4.3 Excavator Inspection</h3>
+      <p>In addition to the general inspection, operators must inspect:</p>
+      <ul>
+        <li>Boom, stick, and bucket for cracks, bending, or visible structural damage</li>
+        <li>Boom and stick pins, bushings, and retaining hardware</li>
+        <li>Hydraulic cylinders and visible cylinder rods</li>
+        <li>Hydraulic hoses and lines along the boom and stick</li>
+        <li>Swing bearing area and visible swing components</li>
+        <li>Tracks, rollers, idlers, sprockets, and undercarriage</li>
+        <li>Counterweight and access covers</li>
+        <li>Quick coupler and attachment locking mechanism</li>
+        <li>Cab, doors, windows, mirrors, and cameras</li>
+        <li>Seat belt and operator restraint system</li>
+        <li>Travel controls and swing controls</li>
+        <li>Horn, travel alarm, lights, and other warning devices, where equipped</li>
+        <li>Instrument panel, gauges, and warning indicators</li>
+      </ul>
+      <p>Operational checks:</p>
+      <ul>
+        <li>Verify normal engine operation and hydraulic response.</li>
+        <li>Check boom, stick, and bucket movements in a clear, controlled area.</li>
+        <li>Verify travel and swing functions operate as intended.</li>
+        <li>Confirm the attachment is properly secured using the manufacturer's specified verification procedure.</li>
+      </ul>
+      <p class="sop-important">Do not operate an excavator with damaged structural components, a defective control or braking system, an unsecured attachment, or any other condition that makes the machine unsafe.</p>
+
+      <h3>4.4 Skid Steer and Compact Track Loader Inspection</h3>
+      <p>Inspect the following:</p>
+      <ul>
+        <li>Tires or tracks and associated components</li>
+        <li>Lift arms and structural components</li>
+        <li>Bucket, forks, or other attachments</li>
+        <li>Attachment mounting plate and locking mechanism</li>
+        <li>Hydraulic hoses and auxiliary hydraulic connections</li>
+        <li>Lift-arm support device, where equipped and required</li>
+        <li>Seat belt and restraint bar, where equipped</li>
+        <li>Operator presence system and safety interlocks</li>
+        <li>Cab door or protective enclosure</li>
+        <li>Horn and warning alarms</li>
+        <li>Joystick controls and travel functions</li>
+        <li>Lift, tilt, and auxiliary hydraulic functions</li>
+      </ul>
+      <p>Verify that safety interlocks and operator restraint systems function according to the manufacturer's instructions.</p>
+
+      <h3>4.5 Wheel Loader Inspection</h3>
+      <p>Inspect the following:</p>
+      <ul>
+        <li>Tires, wheels, and wheel hardware</li>
+        <li>Articulation joint and pivot areas</li>
+        <li>Steering system and steering cylinders</li>
+        <li>Loader arms and lift cylinders</li>
+        <li>Bucket, cutting edge, and teeth</li>
+        <li>Bucket linkage, pins, and retaining hardware</li>
+        <li>Hydraulic hoses and fittings</li>
+        <li>Service brakes and parking brake</li>
+        <li>Transmission and travel controls</li>
+        <li>Backup alarm and camera, where equipped</li>
+        <li>Lights, mirrors, and visibility systems</li>
+        <li>Instrument panel and warning indicators</li>
+      </ul>
+      <p>Verify normal steering, braking, lifting, lowering, and bucket tilt functions in a controlled area.</p>
+
+      <h3>4.6 Operational Inspection</h3>
+      <p>After completing the physical walk-around, start and test the equipment according to the manufacturer's instructions. Verify that:</p>
+      <ul>
+        <li>Gauges and warning indicators function normally.</li>
+        <li>Controls respond correctly.</li>
+        <li>Brakes and steering function properly, where applicable.</li>
+        <li>Horns, alarms, and required warning devices operate.</li>
+        <li>Emergency stops and safety interlocks function as intended.</li>
+        <li>No abnormal noises, vibrations, smoke, or fluid leaks are present.</li>
+      </ul>
+      <p>Perform functional tests only when the area is clear and testing can be completed safely.</p>
+
+      <h2>5. DIGITAL INSPECTION FORM REQUIREMENTS</h2>
+      <p>Before operating equipment, every employee must:</p>
+      <ol>
+        <li>Access the appropriate company-approved digital inspection form.</li>
+        <li>Identify the correct equipment type and unit number.</li>
+        <li>Physically inspect the equipment using this SOP and the applicable checklist.</li>
+        <li>Complete all required fields.</li>
+        <li>Document any defects or deficiencies.</li>
+        <li>Attach photographs when required by company procedures.</li>
+        <li>Submit the completed digital inspection form before operating the equipment.</li>
+        <li>Report safety-critical defects to the supervisor immediately.</li>
+      </ol>
+      <p>An inspection must not be completed solely on the basis of another employee's inspection or without physically inspecting the equipment.</p>
+
+      <h2>6. DEFECT REPORTING AND OUT-OF-SERVICE PROCEDURE</h2>
+      <p>If a defect or unsafe condition is identified:</p>
+      <ol>
+        <li>Do not operate equipment with a condition that makes it unsafe.</li>
+        <li>Notify the supervisor immediately.</li>
+        <li>Park and secure the equipment in a safe location if it can be moved safely.</li>
+        <li>Lower attachments or implements when safe to do so.</li>
+        <li>Shut down and secure the equipment according to the manufacturer's instructions.</li>
+        <li>Identify the equipment as out of service using the company's approved procedure.</li>
+        <li>Document the defect in the digital inspection form.</li>
+        <li>Submit a maintenance request when required.</li>
+        <li>Keep the equipment out of service until necessary repairs and verification are completed.</li>
+      </ol>
+      <p>Only authorized personnel may perform repairs.</p>
+
+      <h2>7. RETURN TO SERVICE</h2>
+      <p>Equipment removed from service may return to operation only after:</p>
+      <ul>
+        <li>The reported defect has been evaluated.</li>
+        <li>Required repairs have been completed.</li>
+        <li>Necessary post-repair inspections and functional tests have been performed.</li>
+        <li>The equipment has been determined safe to operate.</li>
+        <li>Required maintenance documentation has been completed.</li>
+      </ul>
+
+      <h2>8. SUPERVISOR RESPONSIBILITIES</h2>
+      <p>Supervisors must ensure that:</p>
+      <ul>
+        <li>All operators understand the inspection requirements.</li>
+        <li>Employees complete and submit their own digital inspection forms before operation.</li>
+        <li>Inspection records are reviewed according to company procedures.</li>
+        <li>Reported defects receive appropriate corrective action.</li>
+        <li>Unsafe equipment remains out of service until properly cleared.</li>
+      </ul>
+
+      <h2>9. RECORDKEEPING</h2>
+      <p>All digital inspection forms must be retained in the company's designated recordkeeping system. Records must include:</p>
+      <ul>
+        <li>Inspection date and time</li>
+        <li>Operator's name</li>
+        <li>Equipment type and unit number</li>
+        <li>Inspection results</li>
+        <li>Identified defects</li>
+        <li>Corrective actions, when applicable</li>
+        <li>Equipment status</li>
+      </ul>
+      <p>Records must be retained according to company policy and applicable regulatory requirements.</p>
+
+      <h2>10. TRAINING AND COMPLIANCE</h2>
+      <p>All employees must be trained and authorized to operate the specific equipment assigned to them. Employees are required to follow this SOP and complete all required inspections before operating equipment. Failure to follow this procedure will be addressed according to company policy.</p>
+
+      <h2>11. APPROVAL</h2>
+      <div class="sop-signoff">
+        <p><strong>Prepared By:</strong> <span class="sop-fill"></span></p>
+        <p><strong>Reviewed By:</strong> <span class="sop-fill"></span></p>
+        <p><strong>Approved By:</strong> <span class="sop-fill"></span></p>
+        <p><strong>Date:</strong> <span class="sop-fill"></span></p>
+      </div>
+
+    </div><!-- /.sop-body -->
+  </div><!-- /#sop-he001 -->
+
+  <!-- ======================================================================
+       SOP 2: SOP-SAF-002 Pier Foundations – Jobsite Walk and Inspection
+       ====================================================================== -->
+  <div class="sop-card" id="sop-saf002">
+    <div class="sop-card-head">
+      <div>
+        <p class="sop-card-title">Pier Foundations – Jobsite Walk and Inspection</p>
+        <div class="sop-card-meta">
+          <span>SOP Number: SOP-SAF-002</span>
+          <span>Department: Operations / Safety</span>
+          <span>Effective Date: <span class="sop-fill"></span></span>
+          <span>Revision: 00</span>
+          <span>Approved By: <span class="sop-fill"></span></span>
+        </div>
+      </div>
+      <a href="/sops/Pier_Foundations_Jobsite_Walk_sop.pdf" class="sop-dl-btn" download aria-label="Download PDF for Jobsite Walk and Inspection">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        Download PDF
+      </a>
+    </div>
+    <div class="sop-body">
+
+      <h2>1. PURPOSE</h2>
+      <p>The purpose of this Standard Operating Procedure (SOP) is to establish a consistent process for conducting jobsite walks on pier foundation projects. The jobsite walk is intended to identify unsafe conditions, verify that work is being performed according to project requirements, ensure equipment and personnel are operating safely, and address potential hazards before incidents occur.</p>
+
+      <h2>2. SCOPE</h2>
+      <p>This procedure applies to all employees, supervisors, project managers, and subcontractors involved in pier foundation construction activities.</p>
+      <p>Activities covered include, but are not limited to:</p>
+      <ul>
+        <li>Drilling operations and drilled pier installation.</li>
+        <li>Drill rig setup and operation.</li>
+        <li>Excavation and spoil removal.</li>
+        <li>Heavy equipment operation.</li>
+        <li>Material storage and handling.</li>
+        <li>General site housekeeping and access.</li>
+        <li>Utilities both above and below ground.</li>
+      </ul>
+
+      <h2>3. RESPONSIBILITIES</h2>
+
+      <h3>3.1 Project Manager</h3>
+      <ul>
+        <li>Ensure jobsite walks are conducted as required by the project.</li>
+        <li>Verify that identified hazards are addressed.</li>
+        <li>Provide resources necessary to correct unsafe conditions.</li>
+        <li>Ensure project requirements and safety procedures are followed.</li>
+      </ul>
+
+      <h3>3.2 Superintendent / Foreman</h3>
+      <ul>
+        <li>Conduct or coordinate jobsite walks.</li>
+        <li>Review work activities, site conditions, and upcoming operations.</li>
+        <li>Identify hazards and implement corrective actions.</li>
+        <li>Communicate findings to employees and subcontractors.</li>
+        <li>Document deficiencies and verify corrective actions are completed.</li>
+      </ul>
+
+      <h3>3.3 Safety Personnel</h3>
+      <ul>
+        <li>Assist with hazard identification and risk assessments.</li>
+        <li>Verify compliance with applicable safety requirements.</li>
+        <li>Document unsafe conditions and follow up on corrective actions.</li>
+        <li>Recommend additional controls when necessary.</li>
+      </ul>
+
+      <h3>3.4 Employees</h3>
+      <ul>
+        <li>Participate in jobsite safety discussions.</li>
+        <li>Report hazards, damaged equipment, and unsafe conditions.</li>
+        <li>Follow established safety procedures.</li>
+        <li>Stop work when an immediate danger is identified.</li>
+      </ul>
+
+      <h2>4. REQUIRED PERSONAL PROTECTIVE EQUIPMENT (PPE)</h2>
+      <p>Personnel participating in the jobsite walk must wear the PPE required by the site-specific safety plan. Minimum PPE typically includes:</p>
+      <ul>
+        <li>Hard hat.</li>
+        <li>High-visibility clothing.</li>
+        <li>Safety glasses.</li>
+        <li>Work boots.</li>
+        <li>Work gloves appropriate for the task.</li>
+        <li>Hearing protection where required.</li>
+        <li>Additional PPE based on identified hazards.</li>
+      </ul>
+      <p>Personnel must remain outside designated equipment operating zones and follow all site access restrictions.</p>
+
+      <h2>5. PROCEDURE</h2>
+
+      <h3>5.1 Pre-Walk Preparation</h3>
+      <p>Before beginning the jobsite walk, the person conducting the inspection shall:</p>
+      <ol>
+        <li>Review the planned work activities for the day.</li>
+        <li>Review the site-specific safety plan and applicable Job Hazard Analysis (JHA).</li>
+        <li>Identify active work areas, equipment locations, and personnel assignments.</li>
+        <li>Review underground utility information and known site hazards.</li>
+        <li>Identify areas where drilling and VSC installation will be performed.</li>
+        <li>Coordinate with the superintendent or foreman to determine the safest inspection route.</li>
+        <li>Verify that required PPE is available and being worn.</li>
+        <li>Obtain authorization before entering restricted work zones.</li>
+      </ol>
+
+      <h3>5.2 General Site Conditions</h3>
+      <p>Inspect the overall jobsite for the following:</p>
+      <ul>
+        <li>Safe access and egress throughout the work area.</li>
+        <li>Adequate housekeeping and clear walking paths.</li>
+        <li>Mud, standing water, uneven ground, and slip or trip hazards.</li>
+        <li>Adequate lighting and visibility.</li>
+        <li>Proper storage of tools, materials, and equipment.</li>
+        <li>Proper placement of spoil piles and construction materials.</li>
+        <li>Vehicle and pedestrian traffic separation.</li>
+        <li>Barricades and warning signs around hazardous areas.</li>
+        <li>Emergency access routes and emergency equipment.</li>
+        <li>Weather conditions affecting ground stability or equipment operation.</li>
+      </ul>
+      <p>Any condition presenting an immediate danger must be addressed before personnel enter the affected area.</p>
+
+      <h3>5.3 Drilling Operations and Pier Locations</h3>
+      <p>Inspect all active and planned pier drilling locations. Verify the following:</p>
+      <ul>
+        <li>Pier locations are identified and established according to project requirements.</li>
+        <li>Underground utilities have been identified and appropriately cleared before ground disturbance.</li>
+        <li>The drilling area is stable and suitable for equipment setup.</li>
+        <li>Spoil piles are placed where they will not interfere with equipment stability, access, or personnel movement.</li>
+        <li>Drilling equipment is positioned according to manufacturer requirements and the approved work plan.</li>
+        <li>Workers remain clear of rotating equipment, drill tooling, and other moving components.</li>
+        <li>Drill augers and tooling are handled using approved procedures.</li>
+        <li>Equipment operators and ground personnel maintain effective communication.</li>
+        <li>Required exclusion zones are established and maintained.</li>
+      </ul>
+      <p class="sop-important">Important: Never approach rotating drill tooling or attempt to clear material from moving equipment. Drilling and related movements must be stopped and the equipment secured before personnel enter the applicable danger zone.</p>
+
+      <h3>5.4 Drill Rig and Heavy Equipment</h3>
+      <p>Inspect drill rigs, excavators, wheel loaders, skid steers, cranes, and other equipment operating in the work area. Verify the following:</p>
+      <ul>
+        <li>Required pre-operation inspections have been completed and documented.</li>
+        <li>Equipment is in safe operating condition.</li>
+        <li>Operators are trained and authorized for the equipment they operate.</li>
+        <li>Backup alarms, cameras, lights, and other safety devices function as required.</li>
+        <li>Tires, tracks, hydraulic systems, hoses, and visible structural components show no obvious unsafe conditions.</li>
+        <li>Equipment is positioned on suitable ground.</li>
+        <li>Required clearances from excavations, pier holes, overhead obstructions, and utilities are maintained.</li>
+        <li>Equipment travel paths are clear.</li>
+        <li>Spotters are used when required by the site conditions or work plan.</li>
+        <li>Personnel remain clear of blind spots, swing radiuses, and pinch points.</li>
+        <li>Equipment is secured when unattended.</li>
+      </ul>
+      <p>Defective equipment must be removed from service when the defect affects safe operation. The equipment must not be returned to service until the issue is properly addressed.</p>
+
+      <h3>5.5 Excavations, Open Holes, and Ground Conditions</h3>
+      <p>Inspect excavations, pier holes, and areas affected by drilling or heavy equipment. Verify the following:</p>
+      <ul>
+        <li>Open holes are protected against unauthorized access and accidental falls.</li>
+        <li>Required protective systems are in place for applicable excavations.</li>
+        <li>Ground conditions are suitable for equipment travel and setup.</li>
+        <li>Cracking, settlement, sloughing, or other signs of ground instability are evaluated.</li>
+        <li>Spoil piles and equipment are kept back from excavation edges as required by applicable standards and the site-specific plan.</li>
+        <li>Water accumulation is controlled.</li>
+        <li>Safe access and egress are provided where required.</li>
+        <li>Personnel do not enter drilled shafts or confined spaces without the required evaluation, authorization, and protective measures.</li>
+      </ul>
+      <p class="sop-important">Important: Never assume a drilled pier is safe to enter simply because drilling has stopped. Entry into a drilled shaft requires a separate hazard assessment and compliance with applicable entry, atmospheric testing, fall protection, and rescue requirements.</p>
+
+      <h3>5.6 Environmental and Housekeeping Conditions</h3>
+      <p>Verify that:</p>
+      <ul>
+        <li>Fuel and hydraulic fluid leaks are identified and addressed.</li>
+        <li>Spill kits are available where required</li>
+        <li>Waste materials are removed or stored appropriately</li>
+        <li>Drainage and erosion controls are maintained.</li>
+        <li>Tools and materials are secured at the end of the shift.</li>
+        <li>Site conditions comply with applicable environmental requirements.</li>
+      </ul>
+
+      <h2>6. HAZARD IDENTIFICATION AND CORRECTIVE ACTIONS</h2>
+      <p>During the jobsite walk, all identified hazards must be evaluated and addressed according to their severity.</p>
+
+      <h3>6.1 Immediate Hazards</h3>
+      <p>If an immediate danger is identified:</p>
+      <ol>
+        <li>Stop the affected work.</li>
+        <li>Warn personnel who may be exposed.</li>
+        <li>Secure or isolate the affected area.</li>
+        <li>Notify the superintendent or responsible supervisor.</li>
+        <li>Implement appropriate corrective measures.</li>
+        <li>Verify that the hazard has been controlled before authorizing work to resume.</li>
+      </ol>
+
+      <h3>6.2 Non-Immediate Hazards</h3>
+      <p>For hazards that do not present an immediate danger:</p>
+      <ol>
+        <li>Document the condition.</li>
+        <li>Assign corrective action to a responsible person.</li>
+        <li>Establish a completion deadline.</li>
+        <li>Track the issue until it is corrected.</li>
+        <li>Verify and document completion.</li>
+      </ol>
+      <p>Work must not continue when an identified condition creates an unacceptable risk to personnel or equipment.</p>
+
+      <h2>7. DOCUMENTATION</h2>
+      <p>The person conducting the jobsite walk shall complete the applicable inspection form or digital reporting system. Documentation must include:</p>
+      <ul>
+        <li>Project name and location.</li>
+        <li>Date and time of inspection.</li>
+        <li>Name of the person conducting the walk.</li>
+        <li>Work activities in progress.</li>
+        <li>Equipment and work areas inspected.</li>
+        <li>Hazards or deficiencies identified.</li>
+        <li>Photographs when appropriate.</li>
+        <li>Corrective actions required.</li>
+        <li>Person responsible for each corrective action.</li>
+        <li>Target completion date.</li>
+        <li>Verification that corrective actions have been completed.</li>
+      </ul>
+      <p>Inspection findings must be communicated to the superintendent or designated project representative.</p>
+      <p>Outstanding safety deficiencies must remain documented until corrective actions are verified as complete.</p>
+
+      <h2>8. FREQUENCY</h2>
+      <p>Jobsite walks shall be conducted at the frequency established by the project safety plan and company requirements. Additional inspections should be conducted when:</p>
+      <ul>
+        <li>A new work activity begins.</li>
+        <li>Equipment or drilling locations change.</li>
+        <li>Ground conditions change.</li>
+        <li>Weather creates additional hazards.</li>
+        <li>A significant incident or near miss occurs.</li>
+        <li>New hazards are identified.</li>
+        <li>Corrective actions require follow-up verification.</li>
+      </ul>
+      <p>The jobsite walk does not replace required equipment inspections, excavation inspections, or task-specific safety assessments.</p>
+
+      <h2>9. STOP-WORK AUTHORITY</h2>
+      <p>All employees have the responsibility to report unsafe conditions and the authority to stop work when they identify an immediate danger or a condition that cannot be performed safely.</p>
+      <p>Work shall not resume until the hazard has been evaluated, appropriate controls have been implemented, and the responsible supervisor has authorized work to resume.</p>
+      <p>No employee shall be retaliated against for raising a good-faith safety concern.</p>
+
+      <h2>10. COMPLETION AND SIGN-OFF</h2>
+      <p>At the conclusion of the jobsite walk, the person conducting the inspection shall:</p>
+      <ol>
+        <li>Review findings with the superintendent or foreman.</li>
+        <li>Communicate significant hazards to affected employees.</li>
+        <li>Assign and document corrective actions.</li>
+        <li>Verify that immediate hazards have been controlled.</li>
+        <li>Submit the completed inspection form.</li>
+        <li>Follow up on outstanding corrective actions.</li>
+      </ol>
+      <div class="sop-signoff">
+        <p><strong>Inspector Name:</strong> <span class="sop-fill"></span></p>
+        <p><strong>Project:</strong> <span class="sop-fill"></span></p>
+        <p><strong>Date:</strong> <span class="sop-fill"></span></p>
+        <p><strong>Signature:</strong> <span class="sop-fill"></span></p>
+        <p><strong>Superintendent / Foreman:</strong> <span class="sop-fill"></span></p>
+        <p><strong>Outstanding Corrective Actions:</strong></p>
+        <p><strong>Date Corrective Actions Completed:</strong> <span class="sop-fill"></span></p>
+      </div>
+
+    </div><!-- /.sop-body -->
+  </div><!-- /#sop-saf002 -->
+
+  <!-- ======================================================================
+       SOP 3: SOP-OPS-001 Pre-Job Site Visit and Superintendent Walk
+       ====================================================================== -->
+  <div class="sop-card" id="sop-ops001">
+    <div class="sop-card-head">
+      <div>
+        <p class="sop-card-title">Pier Foundations – Pre-Job Site Visit and Superintendent Walk</p>
+        <div class="sop-card-meta">
+          <span>SOP Number: SOP-OPS-001</span>
+          <span>Department: Operations / Field Construction</span>
+          <span>Effective Date: November 11, 2026</span>
+          <span>Revision: 01</span>
+        </div>
+      </div>
+      <a href="/sops/Pier_Foundations_Pre-Job_Site_Visit_sop.pdf" class="sop-dl-btn" download aria-label="Download PDF for Pre-Job Site Visit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        Download PDF
+      </a>
+    </div>
+    <div class="sop-body">
+
+      <h2>1. PURPOSE</h2>
+      <p>This Standard Operating Procedure establishes a consistent process for visiting a project site and meeting with the GC superintendent before Pier Foundations mobilizes. The pre-job visit confirms site conditions, opens the working relationship between PF and the GC field team and ensures that any obstacles to safe and efficient production are identified and resolved before the crew arrives.</p>
+
+      <h2>2. SCOPE</h2>
+      <p>This procedure applies to all Pier Foundations projects involving on-site aggregate pier installation. It must be completed before crew and equipment mobilization. The PF Field Operations Manager or the designated project superintendent is responsible for completing this visit.</p>
+      <p>This procedure is separate from and does not replace the ongoing jobsite walk and inspection required by SOP-SAF-002.</p>
+
+      <h2>3. RESPONSIBILITIES</h2>
+
+      <h3>3.1 Field Operations Manager / PF Superintendent</h3>
+      <ul>
+        <li>Schedule and conduct the pre-job site visit.</li>
+        <li>Complete the portal Site Readiness checklist upon return.</li>
+        <li>Send the same-day recap email to all required recipients.</li>
+        <li>Complete and sign the SOP sign-off.</li>
+        <li>Escalate any identified issues to PF ownership before mobilization.</li>
+      </ul>
+
+      <h3>3.2 Project Manager</h3>
+      <ul>
+        <li>Provide project documents to the person conducting the visit before they leave the office.</li>
+        <li>Confirm a current utility locate ticket (811) is on file.</li>
+        <li>Receive the recap email and monitor open items to resolution.</li>
+        <li>Coordinate with PF ownership on escalated items.</li>
+      </ul>
+
+      <h3>3.3 PF Ownership (Brad, Jonathan, Derek)</h3>
+      <ul>
+        <li>Receive the recap email as cc recipients.</li>
+        <li>Make decisions on utility conflicts flagged for upper-management action.</li>
+        <li>Handle utility-proximity conversations directly with the GC when required.</li>
+      </ul>
+
+      <h3>3.4 Job Lead / Foreman</h3>
+      <ul>
+        <li>Receive the recap email.</li>
+        <li>Review all notes in the portal Site Readiness form before mobilization.</li>
+      </ul>
+
+      <h2>4. PROCEDURE</h2>
+
+      <h3>4.1 Schedule the Site Visit</h3>
+      <p>Contact the GC superintendent (or the designated GC site contact) to arrange the visit.</p>
+      <p>Timing: Schedule the visit at least 48 hours before the planned mobilization date (recommended). Never arrive on site for the pre-job visit on mobilization morning.</p>
+      <p>How to contact: Call the superintendent first. Follow up by email confirming the date, time, your name and your role at PF.</p>
+      <p>Confirm the following when scheduling:</p>
+      <ul>
+        <li>The superintendent or a qualified GC representative will be on site for the full walk.</li>
+        <li>Site access details are known (gate code, sign-in requirements, PPE rules, parking).</li>
+        <li>Working grade has been completed or the superintendent can speak to its current status.</li>
+      </ul>
+
+      <h3>4.2 Pre-Visit Preparation</h3>
+      <p>Gather and review the following before arriving on site.</p>
+      <p>Project documents:</p>
+      <ul>
+        <li>Aggregate pier plan and specification sheets</li>
+        <li>Geotech report (review recommended bearing depths, groundwater notes and any special instructions)</li>
+        <li>Staking and surveying requirements (see PF Staking Best Practice)</li>
+        <li>Site Readiness Requirements (see PF Site Readiness Best Practice)</li>
+        <li>Current submittal and shop drawing package</li>
+      </ul>
+      <p>Site status items to verify before leaving the office:</p>
+      <ul>
+        <li>Public utility locate ticket (811) is on file and current</li>
+        <li>Private utility locate has been arranged by the GC</li>
+        <li>Proof roll status (confirm whether the passing letter has been received by PF)</li>
+        <li>Staking schedule (confirm survey company has been engaged and drawings provided)</li>
+      </ul>
+      <p>PPE: Hard hat, high-visibility vest, safety glasses and work boots.</p>
+
+      <h3>4.3 On-Site Walk with the Superintendent</h3>
+      <p>Walk the entire building pad and access route with the GC superintendent. Address each topic below during the walk.</p>
+      <p>Access and haul route:</p>
+      <ul>
+        <li>Confirm truck entry points and the route from the street to the building pad.</li>
+        <li>Confirm temporary construction stone entrance has been placed or is scheduled before mob.</li>
+        <li>Confirm a lowboy trailer can enter and exit for equipment mobilization and demobilization.</li>
+        <li>Note any height, weight or width restrictions affecting trucks or equipment.</li>
+      </ul>
+      <p>Laydown and staging:</p>
+      <ul>
+        <li>Identify where PF equipment will be staged (rig, excavator, support equipment and service truck).</li>
+        <li>Confirm space for stone deliveries of 200 to 300 TN per day, to be dumped within roughly 50 ft of the active work area.</li>
+        <li>Agree on and document the spoil pile location, off the building pad.</li>
+      </ul>
+      <p>Working platform and grade:</p>
+      <ul>
+        <li>Confirm the building pad is at the working grade elevation provided to PF.</li>
+        <li>Variance greater than 3 inches from submitted working grade may result in a change order. Flag it on this visit.</li>
+        <li>Confirm 4 to 6 inches of stone working platform has been placed.</li>
+        <li>Confirm the proof roll has been completed and a passing letter is available. If not, record as an open item and get a confirmed completion date.</li>
+        <li>Confirm the pad extends at least 10 ft beyond the building footprint on all sides.</li>
+      </ul>
+      <p>Staking:</p>
+      <ul>
+        <li>Confirm whisker stakes are placed or have a confirmed schedule with a date.</li>
+        <li>Confirm the survey company has received PF drawings and the working grade elevation.</li>
+        <li>Identify the grade stake and photograph it (required for portal checklist item 3a).</li>
+      </ul>
+      <p>Utilities:</p>
+      <ul>
+        <li>Confirm all underground utilities within and near the building pad have been located and marked.</li>
+        <li>3-foot rule: Nothing within 3 ft of a located utility line gets installed without an upper-management decision. Brad handles utility conflicts directly with the GC. If any pier location falls within 3 ft of a marked line, record it and escalate to ownership per Section 4.7 before crew mobilizes.</li>
+        <li>Pothole and physically verify utilities near pier locations when proximity is a concern.</li>
+        <li>Confirm that no new utilities will be installed within 10 ft of the building pad until PF scope is complete.</li>
+      </ul>
+      <p>Overhead hazards:</p>
+      <ul>
+        <li>Identify overhead power lines, structural elements or other obstructions that could fall within reach of the drill mast or boom at full height.</li>
+        <li>Record clearances and flag any lines or obstacles requiring coordination with the GC or utility company.</li>
+      </ul>
+      <p>Other trades and schedule:</p>
+      <ul>
+        <li>Confirm whether other subcontractors will be working in the area during PF operations and how that traffic will be managed.</li>
+        <li>Confirm the planned PF start date and working hours with the superintendent.</li>
+        <li>Confirm the superintendent's direct phone number and best method of contact during the job.</li>
+      </ul>
+
+      <h3>4.4 Photography</h3>
+      <p>Take photographs throughout the walk. Capture at minimum:</p>
+      <ul>
+        <li>Site access route and entrance condition</li>
+        <li>Building pad overview from each accessible side</li>
+        <li>Grade stake with elevation reading visible (required for portal checklist item 3a)</li>
+        <li>Proof roll letter or passing notation if visible on site</li>
+        <li>Any utility marks or flags near pier locations</li>
+        <li>Any conditions requiring follow-up: soft areas, overhead lines, spoil pile location and others</li>
+      </ul>
+      <p>Upload all site visit photos to the portal Site Readiness form for the project (see Section 4.6).</p>
+
+      <h3>4.5 Recap Email</h3>
+      <p>Send the recap email the same day as the visit, before the end of the business day.</p>
+      <p>Recipients:</p>
+      <ul>
+        <li>To: GC Superintendent</li>
+        <li>CC: PF Project Manager, Brad Reinking, Jonathan Reinking, Derek Franke, Job Lead / Foreman</li>
+        <li>Subject: [Project Name] - [Job Number] - Pre-Mob Site Visit Recap - [Date MM/DD/YY]</li>
+      </ul>
+      <p>The email must cover:</p>
+      <ul>
+        <li>What was discussed during the walk</li>
+        <li>Items agreed upon (access route, staging areas, spoil location, staking schedule and start date)</li>
+        <li>Open items requiring GC action before mobilization (pad grade, proof roll, utility marking and others)</li>
+        <li>Any utility conflicts, identified by location and pier number</li>
+        <li>Other conditions the crew needs to know about before arrival</li>
+        <li>Site photos attached or linked</li>
+      </ul>
+      <p>Template:</p>
+      <p>[Superintendent First Name],</p>
+      <p>Thank you for walking the site with us today. Here is a recap of what we covered.</p>
+      <p>Agreed items:</p>
+      <ul><li>[Item]</li></ul>
+      <p>Open items / GC action required before mobilization:</p>
+      <ul><li>[Item]</li></ul>
+      <p>Utility notes:</p>
+      <ul><li>[Located lines noted, any 3-ft conflicts flagged with pier location]</li></ul>
+      <p>Site conditions:</p>
+      <ul><li>[Pad readiness, grade, proof roll and staking status]</li></ul>
+      <p>Photos are attached for reference.</p>
+      <p>Please reach out if anything changes before our mobilization date.</p>
+      <p>[PF Representative Name]<br>Pier Foundations, LLC<br>[Phone number]</p>
+      <p>Note: Even if the superintendent does not respond, PF has a written record of what was discussed and agreed. This record protects PF and the GC.</p>
+
+      <h3>4.6 Portal Site Readiness Checklist</h3>
+      <p>Log into the PF Field Portal and open the Site Readiness page. Create or update the Site Readiness form for the project.</p>
+      <p>Each checklist item is answered Yes, No or N/A. Each item also has a Note field for context the crew will need on the job. Use the Note field for every item that requires a follow-up action or specific detail.</p>
+      <p>Checklist sections and items (from the portal form):</p>
+      <p>Section 1: Site Prep:</p>
+      <ul>
+        <li>1a. Temp construction stone drive from street to pad (each truck entry)</li>
+        <li>1b. Spoil pile locations identified off the building pad</li>
+      </ul>
+      <p>Section 2: Utilities:</p>
+      <ul>
+        <li>2a. Private utilities located and marked by GC</li>
+        <li>2b. Public utilities located and marked (PF)</li>
+        <li>2c. No new utilities within 10 ft of pad until PF scope complete</li>
+      </ul>
+      <p>Section 3: Building Pad:</p>
+      <ul>
+        <li>3a. At working grade elevation per GC (variance &gt;3 in. may be a change order) + grade stake photo upload</li>
+        <li>3b. Pad overbuilt 10 ft on all sides</li>
+        <li>3c. 4 to 6 inch stone working platform placed</li>
+        <li>3d. Proof rolled and inspected by 3rd party testing agency + passing proof roll letter upload</li>
+      </ul>
+      <p>Section 4: PF General Operations:</p>
+      <ul>
+        <li>4a. Stone delivery plan confirmed (200 to 300 TN/day, within roughly 50 ft of work)</li>
+        <li>4b. Lowboy access for mob/demob confirmed (or GC notified of constraints)</li>
+        <li>4c. Field Ops Manager jobsite visit completed prior to mob</li>
+      </ul>
+      <p>Mark item 4c Yes upon completing this pre-job visit.</p>
+      <p>Using the Note fields: Enter all crew-relevant details in the Note field on the applicable item line. For example:</p>
+      <ul>
+        <li>"Stone entrance on [side] only, gate code [code]" (item 1a)</li>
+        <li>"Spoil pile: [location]" (item 1b)</li>
+        <li>"[Utility] marked [distance] from pad, piers [clear / list conflicts]" (item 2a)</li>
+        <li>"Proof roll passed [date], letter in project folder" (item 3d)</li>
+      </ul>
+      <p>Enter everything the installing crew needs to know in the Internal Crew Comments box. This is the primary place for mob notes, access specifics, site quirks and anything else that does not belong on a single checklist item. Use the per-item Note fields for item-specific details that apply only to that line.</p>
+      <p>Upload site photos to the form (Section 4.4). The form result shows READY when all items are answered Yes or N/A. Submit and send the form when complete. The form generates a PDF and delivers it to the project team.</p>
+
+      <h3>4.7 Escalation of Issues</h3>
+      <p>Contact Brad Reinking or Jonathan Reinking directly by phone for any of the following before mobilization:</p>
+      <ul>
+        <li>Any utility conflict within 3 ft of a pier location</li>
+        <li>Building pad variance greater than 3 inches from submitted working grade with no resolution plan</li>
+        <li>Proof roll not complete with no confirmed completion date before mob</li>
+        <li>Access restrictions that require rerouting equipment or coordinating at the ownership level</li>
+        <li>Site conditions that cannot be resolved at the field level and may affect crew safety or production</li>
+      </ul>
+      <p class="sop-important">Important: Do not resolve utility conflicts in the field without upper-management authorization.</p>
+
+      <h2>5. DOCUMENTATION</h2>
+      <p>The following records are required for every pre-job site visit:</p>
+      <table class="sop-table">
+        <thead><tr><th>Record</th><th>Location</th></tr></thead>
+        <tbody>
+          <tr><td>Completed portal Site Readiness form</td><td>PF Field Portal / auto-filed to SharePoint</td></tr>
+          <tr><td>Internal Crew Comments</td><td>Portal Site Readiness form / Internal Crew Comments field</td></tr>
+          <tr><td>Grade stake photo</td><td>Uploaded to portal item 3a</td></tr>
+          <tr><td>Proof roll letter</td><td>Uploaded to portal item 3d</td></tr>
+          <tr><td>Site visit photos</td><td>Portal Site Photos section</td></tr>
+          <tr><td>Recap email sent to superintendent</td><td>Sent items (email record)</td></tr>
+        </tbody>
+      </table>
+      <p>Outstanding open items from the recap email must remain tracked until resolved. Escalated items must be cleared before crew mobilization.</p>
+
+      <h2>6. QUICK REFERENCE CHECKLIST</h2>
+      <p>Complete each step in order. Use this page as a companion during and after the visit.</p>
+      <p><strong>Before the Visit</strong></p>
+      <ul class="sop-checklist">
+        <li><input type="checkbox" disabled> Superintendent contacted and visit scheduled (at least 48 hours before mob, recommended)</li>
+        <li><input type="checkbox" disabled> Project documents gathered (pier plan, geotech, submittal, staking and site readiness docs)</li>
+        <li><input type="checkbox" disabled> Public utility locate ticket (811) confirmed current</li>
+        <li><input type="checkbox" disabled> Private utility locate arranged by GC (confirm status)</li>
+        <li><input type="checkbox" disabled> Proof roll status confirmed with PM</li>
+      </ul>
+      <p><strong>On-Site Walk</strong></p>
+      <ul class="sop-checklist">
+        <li><input type="checkbox" disabled> Access route and truck entry confirmed</li>
+        <li><input type="checkbox" disabled> Staging area and stone delivery space confirmed</li>
+        <li><input type="checkbox" disabled> Spoil pile location agreed and documented</li>
+        <li><input type="checkbox" disabled> Working grade and pad elevation verified</li>
+        <li><input type="checkbox" disabled> Stone working platform (4 to 6 inches) confirmed</li>
+        <li><input type="checkbox" disabled> Proof roll verified: passing letter obtained or open item recorded with completion date</li>
+        <li><input type="checkbox" disabled> Staking schedule confirmed and grade stake photographed</li>
+        <li><input type="checkbox" disabled> Utility marks reviewed: 3-ft conflicts escalated if present</li>
+        <li><input type="checkbox" disabled> Overhead hazards identified and recorded</li>
+        <li><input type="checkbox" disabled> Other trades coordination confirmed</li>
+        <li><input type="checkbox" disabled> Start date and superintendent direct contact confirmed</li>
+      </ul>
+      <p><strong>After the Visit (same day)</strong></p>
+      <ul class="sop-checklist">
+        <li><input type="checkbox" disabled> Recap email sent (To: superintendent, CC: PM, Brad, Jonathan, Derek, job lead)</li>
+        <li><input type="checkbox" disabled> Portal Site Readiness form completed and submitted</li>
+        <li><input type="checkbox" disabled> Internal Crew Comments completed</li>
+        <li><input type="checkbox" disabled> Grade stake photo uploaded (item 3a)</li>
+        <li><input type="checkbox" disabled> Proof roll letter uploaded (item 3d) or open item recorded</li>
+        <li><input type="checkbox" disabled> Site visit photos uploaded</li>
+        <li><input type="checkbox" disabled> Utility conflicts escalated to ownership if applicable</li>
+        <li><input type="checkbox" disabled> SOP sign-off completed and signed</li>
+      </ul>
+
+      <hr class="sop-rule">
+      <p><strong>SIGN-OFF</strong></p>
+      <div class="sop-signoff">
+        <p><strong>PF Representative:</strong> <span class="sop-fill"></span></p>
+        <p><strong>Project:</strong> <span class="sop-fill"></span></p>
+        <p><strong>Date of Visit:</strong> <span class="sop-fill"></span></p>
+        <p>By signing, I certify that I completed this pre-job site visit and that I agree with everything included in this SOP checklist and in my recap email.</p>
+        <p><strong>Signature:</strong> <span class="sop-fill"></span></p>
+        <p><strong>GC Superintendent:</strong> <span class="sop-fill"></span></p>
+        <p><strong>Portal Site Readiness Form Submitted:</strong> <input type="checkbox" disabled> Yes <input type="checkbox" disabled> No</p>
+      </div>
+
+    </div><!-- /.sop-body -->
+  </div><!-- /#sop-ops001 -->
+
+  <!-- ======================================================================
+       SOP 4: PF-XXX Project Closeout Before Demobilization
+       ====================================================================== -->
+  <div class="sop-card" id="sop-pf001">
+    <div class="sop-card-head">
+      <div>
+        <p class="sop-card-title">Pier Foundations – Project Closeout Before Demobilization</p>
+        <div class="sop-card-meta">
+          <span>SOP Number: PF-XXX</span>
+          <span>Department: Operations / Field Construction</span>
+          <span>Effective Date: <span class="sop-fill"></span></span>
+          <span>Revision: 00</span>
+        </div>
+      </div>
+      <a href="/sops/Pier_Foundations_Project_Closeout_Before_Demobilization_sop.pdf" class="sop-dl-btn" download aria-label="Download PDF for Project Closeout">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        Download PDF
+      </a>
+    </div>
+    <div class="sop-body">
+
+      <h2>1. PURPOSE</h2>
+      <p>To establish a standardized procedure for completing final inspections, verifying project requirements, documenting completed work, and preparing the jobsite for demobilization following pier foundation operations.</p>
+      <p>This procedure ensures that all work is completed, equipment and materials are accounted for, the jobsite is left in an acceptable condition, and all required documentation is submitted before leaving the project.</p>
+
+      <h2>2. SCOPE</h2>
+      <p>This SOP applies to all employees, foremen, superintendents, and subcontractors involved in pier foundation installation and project closeout activities.</p>
+      <p>This procedure must be completed before equipment, personnel, and materials are demobilized from the project site.</p>
+
+      <h2>3. RESPONSIBILITIES</h2>
+      <p><strong>Project Manager</strong></p>
+      <ul>
+        <li>Verify that all contractual scope requirements have been completed.</li>
+        <li>Confirm that required project documentation has been submitted.</li>
+        <li>Resolve outstanding work items or coordinate corrective actions.</li>
+        <li>Confirm authorization to demobilize.</li>
+        <li>Verify that all piles are installed and accounted for with proper depths.</li>
+        <li>Verify testing is completed and and passed.</li>
+      </ul>
+      <p><strong>Superintendent / Foreman</strong></p>
+      <ul>
+        <li>Conduct the final jobsite walk.</li>
+        <li>Verify completion of pier foundation work.</li>
+        <li>Confirm that equipment, tools, materials, and supplies are accounted for.</li>
+        <li>Identify and communicate outstanding items.</li>
+        <li>Complete the required digital closeout forms and inspections.</li>
+      </ul>
+      <p><strong>Equipment Operators</strong></p>
+      <ul>
+        <li>Complete required equipment inspections before loading or transporting equipment.</li>
+        <li>Report equipment damage, defects, or maintenance issues.</li>
+        <li>Secure equipment for transport.</li>
+        <li>Ensure equipment is cleaned as required before leaving the site.</li>
+        <li>Ensure trailer load is secured and ready for transport.</li>
+        <li>Make sure there is no loose dirt or gravel on trailer deck.</li>
+        <li>Ensure tracks are clean for trucking</li>
+        <li>Unplug 2 speed wire on drill rig and secure it</li>
+        <li>Verify Conex box is locked and all tools are secured.</li>
+        <li>Verify trucking with PM and stage equipment in area approved by Site Super.</li>
+      </ul>
+      <p><strong>All Employees</strong></p>
+      <ul>
+        <li>Remove personal tools, trash, and loose materials.</li>
+        <li>Follow site safety requirements during closeout.</li>
+        <li>Report hazards, incomplete work, or damaged property to the foreman.</li>
+        <li>Assist with final cleanup and demobilization activities as directed.</li>
+      </ul>
+
+      <h2>4. PROCEDURE</h2>
+
+      <h3>4.1 Final Pier Foundation Inspection</h3>
+      <p>Before demobilization, the superintendent or foreman shall conduct a final walkthrough of the pier foundation work areas. Verify the following:</p>
+      <ul>
+        <li>All required pier locations have been installed according to the approved project plans and specifications.</li>
+        <li>Pier locations, quantities, and installation records have been reviewed for completeness.</li>
+        <li>Required pier depths, elevations, and other installation criteria have been documented.</li>
+        <li>Concrete placement records, grout records, or other applicable installation records have been completed, as required by the project.</li>
+        <li>Required inspection reports and testing documentation have been completed or coordinated with the responsible parties.</li>
+        <li>Any required as-built measurements or location records have been collected.</li>
+        <li>Outstanding deficiencies, rejected work, or incomplete installations have been identified and communicated.</li>
+        <li>All required corrective work has been completed or formally documented for resolution.</li>
+      </ul>
+      <p class="sop-important">Important: Any work requiring inspection or acceptance by the owner, engineer, or other authorized representative must follow the project's specified approval process. Do not cover or alter work requiring inspection before the required inspection is completed.</p>
+
+      <h3>4.2 Project Documentation and Records</h3>
+      <p>Before leaving the site, verify that all required project records have been completed and submitted through the designated company system. Documentation may include:</p>
+      <ul>
+        <li>Daily reports and installation logs.</li>
+        <li>Pier installation records.</li>
+        <li>Drilling depth and elevation records.</li>
+        <li>Concrete or grout placement tickets and records, when applicable.</li>
+        <li>Required testing and inspection reports.</li>
+        <li>Equipment inspection forms.</li>
+        <li>Jobsite safety inspections and incident reports, if applicable.</li>
+        <li>Nonconformance reports and corrective action documentation, if applicable.</li>
+        <li>Photographs of completed work.</li>
+        <li>As-built documentation and final measurements.</li>
+        <li>Delivery tickets and material usage records, as required.</li>
+        <li>Customer or owner acceptance documentation, when required.</li>
+      </ul>
+      <p>The superintendent or foreman shall verify that records are legible, complete, and submitted to the appropriate project personnel.</p>
+
+      <h3>4.3 Final Jobsite Walkthrough</h3>
+      <p>The superintendent or foreman shall complete a final walkthrough of the entire work area. Verify the following:</p>
+      <ul>
+        <li>All pier foundation work areas have been inspected.</li>
+        <li>All spoils and excess stone are consolidated and Site Super is ok with location.</li>
+        <li>Temporary materials, barricades, signs, and protection systems have been removed when authorized and no longer required.</li>
+        <li>Access roads, staging areas, and work areas have been cleaned.</li>
+        <li>Fencing, gates, utilities, drainage features, and surrounding property have not been damaged by construction activities, or any damage has been documented and reported.</li>
+        <li>No open holes, exposed hazards, or unsecured materials remain.</li>
+        <li>All remaining hazards have been addressed or communicated to the responsible party.</li>
+      </ul>
+      <p>Photographs should be taken of completed work areas and any conditions requiring follow-up.</p>
+
+      <h3>4.4 Equipment and Tool Accountability</h3>
+      <p>Before equipment and personnel leave the project, the foreman shall verify that all company-owned and rented equipment, tools, and accessories are accounted for. This includes, as applicable:</p>
+      <ul>
+        <li>Drill rigs.</li>
+        <li>Excavators.</li>
+        <li>Skid loaders and wheel loaders.</li>
+        <li>Support equipment and service vehicles.</li>
+        <li>Augers, drilling tools, and attachments.</li>
+        <li>Tooling, hoses, cables, and lifting accessories.</li>
+        <li>Survey equipment and other project-specific tools.</li>
+        <li>Fueling equipment and temporary storage units.</li>
+      </ul>
+      <p>Verify the following:</p>
+      <ul>
+        <li>All equipment has been inspected for damage or mechanical issues.</li>
+        <li>Equipment defects have been reported to the appropriate supervisor.</li>
+        <li>Tools and attachments have been secured for transport.</li>
+        <li>Rented equipment has been identified and prepared for return.</li>
+        <li>Equipment is free of excessive soil, concrete, grout, and debris as required by company procedures and transport requirements.</li>
+        <li>Equipment has been parked, loaded, and secured safely.</li>
+        <li>All equipment movements comply with applicable transportation and company requirements.</li>
+      </ul>
+      <p>Any missing equipment, tools, or accessories must be reported before demobilization is considered complete.</p>
+
+      <h3>4.5 Materials and Supplies</h3>
+      <p>The foreman shall verify that remaining materials and supplies are accounted for and properly handled.</p>
+      <ul>
+        <li>Identify unused materials that are left onsite such as stone are the GCs to do what they like with.</li>
+        <li>Verify that rented materials and equipment are ready for return.</li>
+        <li>Remove unnecessary supplies, packaging, and construction debris.</li>
+        <li>Secure materials approved for transport.</li>
+        <li>Properly manage fuel, lubricants, chemicals, and other regulated materials.</li>
+        <li>Dispose of waste according to project requirements and applicable regulations.</li>
+        <li>Document damaged, unused, or excess materials as required.</li>
+      </ul>
+      <p>Do not abandon materials or supplies at the project site without authorization.</p>
+
+      <h3>4.6 Safety and Environmental Closeout</h3>
+      <p>Before demobilization, verify that the worksite has been left in a safe condition.</p>
+      <ul>
+        <li>Remove unnecessary trip hazards and loose debris.</li>
+        <li>Secure or remove temporary equipment and materials.</li>
+        <li>Verify that no personnel are working in areas affected by equipment loading or transport.</li>
+        <li>Confirm that equipment loading areas are controlled and clear.</li>
+        <li>Verify that hazardous materials have been properly secured or removed.</li>
+        <li>Confirm that open excavations, holes, and other hazards have been secured or addressed according to project requirements.</li>
+        <li>Maintain required barriers, warning signs, and protective measures until the associated hazard has been eliminated or control is no longer required.</li>
+        <li>Report any remaining safety or environmental concerns to the superintendent and project manager.</li>
+      </ul>
+
+      <h3>4.7 Customer and Project Coordination</h3>
+      <p>Before final departure, the superintendent or project manager shall verify that required coordination has been completed.</p>
+      <ul>
+        <li>Notify the appropriate project representative that field operations are complete.</li>
+        <li>Complete the required final walkthrough with the owner, general contractor, or designated representative when required.</li>
+        <li>Document outstanding deficiencies or punch-list items.</li>
+        <li>Confirm that remaining work, if any, has an assigned responsible party and documented completion plan.</li>
+        <li>Obtain required approvals or acknowledgments before removing equipment when specified by the contract or project requirements.</li>
+        <li>Communicate the planned demobilization date and confirm that equipment removal will not interfere with other site operations.</li>
+      </ul>
+      <p>Demobilization does not constitute final contractual acceptance unless the applicable project requirements specifically establish that status.</p>
+
+      <h2>5. FINAL CLOSEOUT CHECKLIST</h2>
+      <p>The superintendent or foreman shall complete the designated digital project closeout form before demobilization.</p>
+      <p><strong>Pier Foundation Completion</strong></p>
+      <ul class="sop-checklist">
+        <li><input type="checkbox" disabled> All required pier installations completed or outstanding work documented.</li>
+        <li><input type="checkbox" disabled> Installation records reviewed and submitted.</li>
+        <li><input type="checkbox" disabled> Required testing and inspection records completed or coordinated.</li>
+        <li><input type="checkbox" disabled> As-built information and photographs collected.</li>
+        <li><input type="checkbox" disabled> Deficiencies identified and communicated.</li>
+      </ul>
+      <p><strong>Documentation</strong></p>
+      <ul class="sop-checklist">
+        <li><input type="checkbox" disabled> Daily reports completed.</li>
+        <li><input type="checkbox" disabled> Required installation records submitted.</li>
+        <li><input type="checkbox" disabled> Concrete, grout, and testing records submitted when applicable.</li>
+        <li><input type="checkbox" disabled> Equipment inspection forms completed.</li>
+        <li><input type="checkbox" disabled> Required safety and environmental documentation completed.</li>
+        <li><input type="checkbox" disabled> Outstanding items documented and assigned.</li>
+      </ul>
+      <p><strong>Jobsite Cleanup</strong></p>
+      <ul class="sop-checklist">
+        <li><input type="checkbox" disabled> Drilling spoils and construction debris managed.</li>
+        <li><input type="checkbox" disabled> Work areas cleaned.</li>
+        <li><input type="checkbox" disabled> Access roads and staging areas inspected.</li>
+        <li><input type="checkbox" disabled> Disturbed areas restored as required.</li>
+        <li><input type="checkbox" disabled> Temporary materials removed when authorized.</li>
+        <li><input type="checkbox" disabled> Remaining hazards addressed or communicated.</li>
+      </ul>
+      <p><strong>Equipment and Materials</strong></p>
+      <ul class="sop-checklist">
+        <li><input type="checkbox" disabled> All equipment accounted for.</li>
+        <li><input type="checkbox" disabled> Tools and attachments accounted for.</li>
+        <li><input type="checkbox" disabled> Equipment inspected and prepared for transport.</li>
+        <li><input type="checkbox" disabled> Rental equipment identified for return.</li>
+        <li><input type="checkbox" disabled> Unused materials accounted for.</li>
+        <li><input type="checkbox" disabled> Waste and regulated materials handled properly.</li>
+      </ul>
+      <p><strong>Final Authorization</strong></p>
+      <ul class="sop-checklist">
+        <li><input type="checkbox" disabled> Final jobsite walkthrough completed.</li>
+        <li><input type="checkbox" disabled> Customer or project representative notified, as required.</li>
+        <li><input type="checkbox" disabled> Outstanding work and deficiencies documented.</li>
+        <li><input type="checkbox" disabled> Required approvals obtained.</li>
+        <li><input type="checkbox" disabled> Digital closeout form submitted.</li>
+        <li><input type="checkbox" disabled> Superintendent or authorized representative approves demobilization.</li>
+      </ul>
+
+      <h2>6. NONCOMPLIANCE AND OUTSTANDING ITEMS</h2>
+      <p>If incomplete work, missing documentation, equipment issues, environmental concerns, or unsafe site conditions are identified during closeout:</p>
+      <ol>
+        <li>Stop the affected closeout activity when necessary to prevent injury, damage, or noncompliant work.</li>
+        <li>Notify the superintendent and project manager.</li>
+        <li>Document the issue using the designated company reporting system.</li>
+        <li>Assign responsibility for corrective action.</li>
+        <li>Establish a completion plan and communicate any remaining obligations.</li>
+        <li>Obtain required authorization before proceeding with affected demobilization activities.</li>
+      </ol>
+      <p>Outstanding items must not be represented as complete. Any approved exceptions must be documented and assigned for follow-up.</p>
+
+      <h2>7. COMPLETION AND APPROVAL</h2>
+      <p>Demobilization may proceed once the required closeout activities are complete, required documentation has been submitted, equipment and materials have been accounted for, and the responsible project representative has authorized departure.</p>
+      <p>Any remaining contractual, safety, environmental, or documentation obligations must be clearly documented and assigned to the appropriate responsible party.</p>
+
+      <h2>8. RECORD RETENTION</h2>
+      <p>All closeout checklists, installation records, inspection reports, photographs, and supporting documentation shall be submitted and retained according to company procedures and project-specific recordkeeping requirements.</p>
+
+      <h2>9. APPROVAL</h2>
+      <div class="sop-signoff">
+        <p><strong>Completed By:</strong> <span class="sop-fill"></span></p>
+        <p><strong>Position:</strong> <span class="sop-fill"></span></p>
+        <p><strong>Date:</strong> <span class="sop-fill"></span></p>
+        <p><strong>Reviewed By:</strong> <span class="sop-fill"></span></p>
+        <p><strong>Position:</strong> <span class="sop-fill"></span></p>
+        <p><strong>Date:</strong> <span class="sop-fill"></span></p>
+        <p><strong>Demobilization Authorized By:</strong> <span class="sop-fill"></span></p>
+        <p><strong>Date:</strong> <span class="sop-fill"></span></p>
+      </div>
+
+    </div><!-- /.sop-body -->
+  </div><!-- /#sop-pf001 -->
+
+</div><!-- /.pf-col -->
+</div><!-- #main -->
+
+<script src="/js/pf-shared.js"></script>
+<script>
+"use strict";
+(function(){
+  var loadEl = document.getElementById('loading');
+  var mainEl = document.getElementById('main');
+  var errEl  = document.getElementById('authError');
+  var acctNm = document.getElementById('acctName');
+  var OWNER_EMAILS_IDX = ['breinking@pierfoundations.com','jreinking@pierfoundations.com','dfranke@pierfoundations.com'];
+
+  fetch('/api/me', {credentials:'same-origin'})
+    .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+    .then(function(r){
+      if(r.ok && r.d && r.d.status==='ok'){
+        if(acctNm) acctNm.textContent = r.d.name || '';
+        var em = (r.d.email || '').toLowerCase();
+        var mlNav = document.getElementById('mlNavItem');
+        if(mlNav && OWNER_EMAILS_IDX.indexOf(em) >= 0) mlNav.style.display = '';
+        if(loadEl) loadEl.style.display='none';
+        if(mainEl) mainEl.style.display='block';
+      } else if(r.d && r.d.status==='must_reset'){
+        window.location.href='/reset-password.html';
+      } else {
+        window.location.href='/login.html?next='+encodeURIComponent(window.location.pathname);
+      }
+    })
+    .catch(function(){
+      if(loadEl) loadEl.style.display='none';
+      if(errEl) errEl.style.display='block';
+    });
+})();
+</script>
+</body>
+</html>

@@ -168,6 +168,7 @@ const FORMS = [
   { file: 'site-readiness.html',     label: 'Site Readiness'        },
   { file: 'equipment-inspection.html', label: 'Equipment Inspection' },
   { file: 'mailing-lists.html',      label: 'Mailing Lists'         },
+  { file: 'sops.html',               label: 'SOPs'                  },
 ];
 
 // ---- Static analysis: no `display = ''` for CSS-hidden elements ------------

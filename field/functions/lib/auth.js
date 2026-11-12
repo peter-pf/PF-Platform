@@ -576,6 +576,12 @@ const FIELD_PAGES = {
   // redirected by the page script after /api/mailing-lists returns 403.
   '/mailing-lists.html':     'field_ops',
   '/mailing-lists':          'field_ops',           // CF Pages clean-URL form
+  // SOPs reference library (Derek 2026-11-12). Read-only index + online copies
+  // of field SOPs. field_ops area = admin/partner/business_dev/field_ops so the
+  // crew can access the page. The PDF assets under /sops/ are gated separately
+  // via the /sops/ prefix check in areaForPath. ZERO financials.
+  '/sops.html':              'field_ops',
+  '/sops':                   'field_ops',           // CF Pages clean-URL form
 };
 
 // Filename keywords that mark a page as financial/contract/precon even if it is
@@ -899,6 +905,15 @@ export function areaForPath(pathname) {
     // (Field-safe / BD-safe data files must be added to DATA_FILE_AREAS explicitly.)
     return 'user_admin';
   }
+
+  // ---- SOPs directory — field_ops gate (Derek 2026-11-12) -----------------
+  // The /sops/ directory holds static PDF copies of field SOPs. Field crew
+  // must be able to download them, but non-authenticated users must not.
+  // PDF is NOT in STATIC_ASSET_EXT_RE by design (to prevent data files from
+  // leaking via extension; this means PDF also falls through to default-deny
+  // without an explicit prefix entry). Classified field_ops = admin/partner/
+  // business_dev/field_ops. ZERO financials (SOP document copies only).
+  if (pathname.startsWith('/sops/')) return 'field_ops';
 
   // ---- HR module (same-origin embed at /hr/) — TIGHT gate -----------------
   // The HR module is served as static files under /hr/. It carries HR-confidential
