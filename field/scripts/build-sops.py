@@ -110,7 +110,16 @@ def graph_get(url: str, tok: str) -> dict:
 
 
 def get_drive_id(tok: str) -> str:
-    """Find the drive ID for the Documents library on the PF site."""
+    """Find the drive ID for the Documents library on the PF site.
+
+    Checks SP_DRIVE_ID in environment first (fastest, avoids site discovery
+    which requires Sites.Read.All that may not be granted to the app).
+    Falls back to discovery via site host:path if the env var is absent.
+    """
+    env_drive = os.environ.get('SP_DRIVE_ID') or load_env().get('SP_DRIVE_ID')
+    if env_drive:
+        return env_drive
+
     site_url = (
         f'https://graph.microsoft.com/v1.0/sites/'
         f'{SITE_HOST}:{SITE_PATH}'
@@ -224,7 +233,7 @@ def main():
     updated    = []
 
     for item in pdf_items:
-        name     = item['name']
+        name     = item['name'].replace(' ', '_')  # normalize SP spaces to underscores
         dest     = out_dir / name
         item_id  = item['id']
 
