@@ -102,7 +102,9 @@ try {
 }
 
 // ---- Shared test session objects ----
-const DEREK_UID    = '518075f1-ec9f-413b-bdd9-8924c4b62959';
+// Derek's UID is intentionally NOT hardcoded here — read it from HARDWARE_ALLOWED_UIDS
+// so the test stays in sync with hardware-access.js and the UID lives in one place only.
+const DEREK_UID    = [...HARDWARE_ALLOWED_UIDS][0];
 const BRAD_UID     = 'f3d1be05-4401-4276-b172-c1240cdc1921';  // example non-Derek admin
 const sessionDerek  = { uid: DEREK_UID,  role: 'admin', name: 'Derek Franke' };
 const sessionBrad   = { uid: BRAD_UID,   role: 'admin', name: 'Brad Reinking' };
@@ -505,6 +507,137 @@ console.log('\n--- S. Static analysis ---');
     src.includes('id="topbar"') && !src.includes('pfBuildHeader'));
   assert('S7: hardware.html has pfNav with hwNavItem (always-visible — this is the hardware page)',
     src.includes('id="pfNav"') && src.includes('id="hwNavItem"'));
+}
+
+// ============================================================================
+// P-AUTH  Page /api/me auth init: hwNavItem visibility and no-crash contract
+// ============================================================================
+// REGRESSION test for commit 3b0835c which inserted r.d.uid in pages whose
+// callbacks use res.d or me (no .d), causing ReferenceError that aborted the
+// auth success handler before #main was shown.  Those 3 assertions below are
+// the ones that FAIL on 3b0835c and PASS on this commit.
+// ============================================================================
+console.log('\n--- P-AUTH. Page auth init (hwNavItem visibility + no crash) ---');
+
+{
+  const ALL_FIELD_PAGES = [
+    'index.html', 'cost-codes.html', 'daily-report.html', 'equipment-inspection.html',
+    'mailing-lists.html', 'past-reports.html', 'schedule.html', 'site-readiness.html',
+    'sops.html', 'time-off.html', 'toolbox-talk.html', 'hardware.html',
+  ];
+
+  async function runPageAuthInit(pageFile, hardwareAllowedFlag, pageDir) {
+    const dir = pageDir || root;
+    const pageSrc = readFileSync(path.join(dir, pageFile), 'utf8');
+    let html = pageSrc
+      .replace(/<link[^>]+pf-r5\.css[^>]*>/gi, '<style>' + css + '</style>')
+      .replace(/<script[^>]+pf-shared\.js[^>]*><\/script>/gi,
+               '<script>' + sharedJs + '</script>');
+
+    const mePayload = {
+      ok: true, status: 'ok',
+      uid: DEREK_UID, name: 'Derek Franke', role: 'admin',
+      email: 'dfranke@pierfoundations.com',
+      hardwareAllowed: hardwareAllowedFlag,
+    };
+
+    const dom = new JSDOM(html, {
+      url: 'https://field.pierfoundations.com/' + pageFile,
+      runScripts: 'dangerously',
+      pretendToBeVisual: true,
+      beforeParse(window) {
+        window.fetch = async function(url) {
+          const u = String(url);
+          if (u.includes('/api/me')) {
+            return { ok: true, status: 200, json: async () => mePayload };
+          }
+          // Stub all other API calls so the page can complete init
+          return {
+            ok: true, status: 200,
+            json: async () => ({ ok: true, status: 'ok', diagrams: [], absences: [],
+              items: [], users: [], projects: [], records: [], lists: {} }),
+          };
+        };
+        const store = {};
+        try {
+          Object.defineProperty(window, 'localStorage', {
+            value: {
+              getItem: k => store[k] ?? null,
+              setItem: (k,v) => { store[k] = String(v); },
+              removeItem: k => { delete store[k]; },
+              clear: () => { Object.keys(store).forEach(k => delete store[k]); },
+              key: i => Object.keys(store)[i] ?? null,
+              get length() { return Object.keys(store).length; },
+            }, writable: true, configurable: true,
+          });
+        } catch (e) {}
+        window.console = { log:()=>{}, warn:()=>{}, error:()=>{}, info:()=>{} };
+      },
+    });
+
+    // Allow async chains to settle (auth + any secondary fetches)
+    for (let i = 0; i < 40; i++) {
+      await new Promise(r => setTimeout(r, 10));
+    }
+    return dom;
+  }
+
+  for (const pageFile of ALL_FIELD_PAGES) {
+    const tag = 'P-AUTH-' + pageFile.replace('.html', '');
+
+    // --- hardwareAllowed = true ---
+    {
+      let dom = null, exc = null;
+      try { dom = await runPageAuthInit(pageFile, true); }
+      catch (e) { exc = e; }
+
+      assert(tag + '[hw=true]: no exception during page init',
+        exc === null, exc ? String(exc).slice(0, 120) : '');
+
+      if (dom) {
+        const doc = dom.window.document;
+        const mainEl  = doc.getElementById('main');
+        const hwNavEl = doc.getElementById('hwNavItem');
+
+        // KEY REGRESSION CHECK — FAILS on 3b0835c for schedule, time-off, equipment-inspection
+        // because ReferenceError in those pages aborted the success handler before main.style='block'
+        assert(tag + '[hw=true]: #main shown after auth (not display:none or empty)',
+          mainEl != null && mainEl.style.display === 'block',
+          '#main.style.display=' + (mainEl ? '"' + mainEl.style.display + '"' : 'NOT FOUND'));
+
+        assert(tag + '[hw=true]: hwNavItem present in DOM',
+          hwNavEl != null, 'hwNavItem not found in ' + pageFile);
+
+        if (hwNavEl) {
+          // hardware.html hwNavItem has no display:none — always ''
+          // All other pages set it to '' (un-hides from 'none') when hardwareAllowed=true
+          assert(tag + '[hw=true]: hwNavItem visible (display not "none")',
+            hwNavEl.style.display !== 'none',
+            'hwNavItem.style.display="' + hwNavEl.style.display + '"');
+        }
+        dom.window.close();
+      }
+    }
+
+    // --- hardwareAllowed = false (skip hardware.html — always visible there) ---
+    if (pageFile !== 'hardware.html') {
+      let dom = null, exc = null;
+      try { dom = await runPageAuthInit(pageFile, false); }
+      catch (e) { exc = e; }
+
+      assert(tag + '[hw=false]: no exception during page init',
+        exc === null, exc ? String(exc).slice(0, 120) : '');
+
+      if (dom) {
+        const doc = dom.window.document;
+        const hwNavEl = doc.getElementById('hwNavItem');
+        assert(tag + '[hw=false]: hwNavItem stays hidden when not hardwareAllowed',
+          hwNavEl != null && hwNavEl.style.display === 'none',
+          'hwNavItem.style.display="' + (hwNavEl ? hwNavEl.style.display : 'NOT FOUND') + '"');
+        dom.window.close();
+      }
+    }
+  }
 }
 
 // ============================================================================

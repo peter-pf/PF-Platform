@@ -1,9 +1,9 @@
 // Cloudflare Pages Function — /api/me
-// Returns the CURRENT caller's own identity {name, role, email} so the SPA can
-// tailor its UI (e.g. hide financial modules from field_ops; show Mailing Lists
-// menu only for the 3 owners). It returns NO business data — only the session the
-// middleware already verified and injected into context.data.session, plus a
-// D1 email lookup keyed on the session uid.
+// Returns the CURRENT caller's own identity {name, role, email, hardwareAllowed}
+// so the SPA can tailor its UI (e.g. hide financial modules from field_ops; show
+// Mailing Lists menu only for the 3 owners; show Hardware nav only for allowed
+// UIDs). It returns NO business data — only the session the middleware already
+// verified and injected into context.data.session, plus a D1 email lookup.
 //
 // SECURITY:
 //  - The middleware has already authenticated the request before this runs
@@ -18,6 +18,8 @@
 //    cannot grant access to anything.
 //  - If D1 is unavailable, email is omitted gracefully (UI hides the menu;
 //    the API gate still enforces by email lookup independently).
+
+import { hardwareAllowed } from '../lib/hardware-access.js';
 
 export async function onRequestGet(context) {
   const headers = {
@@ -58,5 +60,6 @@ export async function onRequestGet(context) {
     name: session.name || '',
     role: session.role,
     email: email || '',
+    hardwareAllowed: hardwareAllowed(session),
   }), { status: 200, headers });
 }
