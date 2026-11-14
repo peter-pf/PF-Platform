@@ -21,6 +21,7 @@ import {
   verifySession, getCookie, areaForPath, roleCanAccess, isRestrictedSession,
   checkSessionRevoked,
 } from './lib/auth.js';
+import { hardwareAllowed } from './lib/hardware-access.js';
 
 // Paths that don't require auth at all.
 // NOTE: Cloudflare Pages serves "foo.html" at the clean URL "/foo" (308), so we
@@ -187,6 +188,24 @@ export async function onRequest(context) {
       if (!roleCanAccess(session.role, area)) {
         return deny(request);
       }
+
+      // ---- Hardware preview gate (UID-level, beyond role check) ----
+      // The hardware page, images, and API are gated to Derek only during preview
+      // (HARDWARE_GO_LIVE = false in lib/hardware-access.js). The role check above
+      // already filtered out non-admin users; this check further restricts to
+      // only the allowed UIDs. Set HARDWARE_GO_LIVE = true to open to all
+      // admin-role users (and redeploy).
+      if (
+        path === '/hardware.html' ||
+        path === '/hardware' ||
+        path.startsWith('/hardware-img/') ||
+        path.startsWith('/api/hardware')
+      ) {
+        if (!hardwareAllowed(session)) {
+          return deny(request);
+        }
+      }
+
       return context.next();
     }
     // Invalid/expired session cookie: fall through to unauthenticated handling.

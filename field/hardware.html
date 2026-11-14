@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Hardware | PF Field Portal</title>
+  <link rel="stylesheet" href="pf-r5.css">
+  <script src="/js/pf-shared.js"></script>
+  <style>
+    /* ---- Hardware page styles ---- */
+
+    /* Toggle bar */
+    .hw-toggle-bar {
+      display: flex;
+      gap: 8px;
+      padding: 12px 16px 0;
+    }
+    .hw-toggle-btn {
+      flex: 1;
+      padding: 8px 0;
+      border: 1.5px solid var(--pf-blue, #1a56db);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--pf-blue, #1a56db);
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .hw-toggle-btn.active {
+      background: var(--pf-blue, #1a56db);
+      color: #fff;
+    }
+
+    /* Diagram grid */
+    .hw-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      padding: 12px 16px;
+    }
+    @media (min-width: 600px) {
+      .hw-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    .hw-card {
+      background: #fff;
+      border: 1px solid #dde;
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+      transition: box-shadow 0.15s;
+    }
+    .hw-card:hover, .hw-card:focus {
+      box-shadow: 0 3px 10px rgba(26,86,219,.18);
+      outline: none;
+    }
+    .hw-card-thumb {
+      width: 100%;
+      height: 100px;
+      object-fit: cover;
+      object-position: 0 0;
+      display: block;
+      background: #f0f0f0;
+    }
+    .hw-card-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #222;
+      padding: 6px 8px;
+      line-height: 1.25;
+    }
+    .hw-card-page {
+      font-size: 0.7rem;
+      color: #777;
+      padding: 0 8px 6px;
+    }
+
+    /* ---- Viewer overlay ---- */
+    .hw-viewer-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9000;
+      background: rgba(0,0,0,0.92);
+      flex-direction: column;
+    }
+    .hw-viewer-overlay.open {
+      display: flex;
+    }
+
+    /* Viewer header */
+    .hw-viewer-header {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      background: #111;
+      color: #fff;
+    }
+    .hw-viewer-title {
+      flex: 1;
+      font-size: 0.9rem;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .hw-zoom-btn {
+      width: 36px; height: 36px;
+      border-radius: 6px;
+      border: 1px solid #444;
+      background: #222;
+      color: #fff;
+      font-size: 1.3rem;
+      line-height: 1;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      touch-action: manipulation;
+    }
+    .hw-zoom-btn:active { background: #444; }
+    .hw-close-btn {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      border: 1.5px solid #666;
+      background: transparent;
+      color: #fff;
+      font-size: 1.1rem;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      touch-action: manipulation;
+    }
+    .hw-close-btn:active { background: #333; }
+
+    /* Diagram viewport */
+    .hw-diagram-viewport {
+      flex: 1 1 auto;
+      overflow: hidden;
+      position: relative;
+      cursor: grab;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .hw-diagram-viewport.grabbing { cursor: grabbing; }
+
+    /* Diagram container — scaled/translated by JS */
+    .hw-diagram-container {
+      position: absolute;
+      top: 0; left: 0;
+      transform-origin: 0 0;
+      /* width/height set by JS to natural image dimensions */
+    }
+    .hw-diagram-img {
+      display: block;
+      /* width set by JS; height auto */
+    }
+
+    /* Hotspot buttons */
+    .hw-hotspot {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      background: rgba(26,86,219,0.82);
+      border: 2px solid #fff;
+      color: #fff;
+      font-size: 9px;
+      font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      touch-action: manipulation;
+      box-shadow: 0 1px 4px rgba(0,0,0,.5);
+      transition: background 0.1s, transform 0.1s;
+      /* Scale counter-corrected by JS so balloon stays 24px regardless of zoom */
+    }
+    .hw-hotspot:hover, .hw-hotspot.active {
+      background: rgba(220,30,30,0.9);
+    }
+
+    /* Parts list pane */
+    .hw-parts-pane {
+      flex: 0 0 auto;
+      max-height: 38vh;
+      overflow-y: auto;
+      background: #1a1a2e;
+      border-top: 1px solid #333;
+    }
+    table.hw-parts-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.72rem;
+    }
+    .hw-parts-table thead {
+      position: sticky; top: 0;
+      background: #111;
+    }
+    .hw-parts-table th {
+      color: #aaa;
+      font-weight: 600;
+      padding: 5px 8px;
+      text-align: left;
+      border-bottom: 1px solid #333;
+      white-space: nowrap;
+    }
+    .hw-parts-table td {
+      padding: 5px 8px;
+      color: #dde;
+      border-bottom: 1px solid #252538;
+      vertical-align: top;
+    }
+    .hw-parts-table tr { cursor: pointer; }
+    .hw-parts-table tr:hover td, .hw-parts-table tr.active td {
+      background: rgba(26,86,219,0.25);
+    }
+    .hw-parts-table .has-inv td:first-child::after {
+      content: ' •';
+      color: #4ade80;
+      font-weight: 900;
+    }
+
+    /* Detail card */
+    .hw-detail-card {
+      display: none;
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 9100;
+      background: #fff;
+      border-radius: 14px 14px 0 0;
+      padding: 16px;
+      box-shadow: 0 -4px 24px rgba(0,0,0,.35);
+      max-height: 65vh;
+      overflow-y: auto;
+    }
+    .hw-detail-card.open { display: block; }
+    .hw-detail-close {
+      float: right;
+      border: none;
+      background: none;
+      font-size: 1.3rem;
+      color: #555;
+      cursor: pointer;
+      padding: 0 4px;
+      line-height: 1;
+    }
+    .hw-detail-item-num {
+      font-size: 0.7rem;
+      color: #888;
+      margin-bottom: 2px;
+    }
+    .hw-detail-desc {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #111;
+      margin-bottom: 8px;
+    }
+    .hw-detail-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-size: 0.82rem;
+      color: #333;
+    }
+    .hw-detail-label {
+      min-width: 90px;
+      color: #888;
+      font-weight: 600;
+    }
+    .hw-detail-inv-link {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 7px 14px;
+      background: #1a56db;
+      color: #fff;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .hw-detail-no-inv {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 7px 14px;
+      background: #f0f0f0;
+      color: #888;
+      border-radius: 6px;
+      font-size: 0.82rem;
+    }
+
+    /* Error / loading state */
+    #hwError {
+      display: none;
+      padding: 20px 16px;
+      color: #c00;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="authError" style="display:none;padding:20px;color:#c00;">
+    <p>You are not authorised to view this page. <a href="/login.html">Sign in</a></p>
+  </div>
+
+  <div id="main" style="display:none;">
+    <!-- Standard portal header injected by pf-shared.js -->
+    <div id="pfHeader"></div>
+
+    <div id="hwError"></div>
+
+    <!-- Toggle bar: Mast / Vibro -->
+    <div class="hw-toggle-bar" id="hwToggleBar">
+      <button class="hw-toggle-btn active" data-type="mast" onclick="hwSetType('mast')">Mast</button>
+      <button class="hw-toggle-btn"        data-type="vibro" onclick="hwSetType('vibro')">Vibro</button>
+    </div>
+
+    <!-- Diagram grid -->
+    <div class="hw-grid" id="hwGrid"></div>
+
+    <!-- Viewer overlay (shown when a diagram is selected) -->
+    <div class="hw-viewer-overlay" id="hwViewer">
+      <div class="hw-viewer-header">
+        <span class="hw-viewer-title" id="hwViewerTitle"></span>
+        <button class="hw-zoom-btn" onclick="hwZoomStep(-0.4)" title="Zoom out">&#8722;</button>
+        <button class="hw-zoom-btn" onclick="hwZoomStep(+0.4)" title="Zoom in">&#43;</button>
+        <button class="hw-close-btn" onclick="hwCloseViewer()" title="Close">&#10005;</button>
+      </div>
+
+      <!-- Diagram viewport with pinch/pan/zoom -->
+      <div class="hw-diagram-viewport" id="hwViewport">
+        <div class="hw-diagram-container" id="hwDiagramContainer">
+          <img class="hw-diagram-img" id="hwDiagramImg" alt="Hardware diagram" src="">
+          <!-- Hotspot buttons injected here by JS -->
+        </div>
+      </div>
+
+      <!-- Parts list table -->
+      <div class="hw-parts-pane">
+        <table class="hw-parts-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Description</th>
+              <th>Part No.</th>
+              <th>Qty</th>
+              <th>Size</th>
+              <th>Grade</th>
+            </tr>
+          </thead>
+          <tbody id="hwPartsTbody"></tbody>
+        </table>
+      </div>
+    </div><!-- /hw-viewer-overlay -->
+
+    <!-- Detail card (shown over viewer when a hotspot/row is tapped) -->
+    <div class="hw-detail-card" id="hwDetailCard">
+      <button class="hw-detail-close" onclick="hwCloseDetail()">&#10005;</button>
+      <div class="hw-detail-item-num" id="hwDetailItemNum"></div>
+      <div class="hw-detail-desc"     id="hwDetailDesc"></div>
+      <div class="hw-detail-row"><span class="hw-detail-label">Part No.</span><span id="hwDetailPart"></span></div>
+      <div class="hw-detail-row" id="hwDetailQtyRow"><span class="hw-detail-label">Qty / Assy</span><span id="hwDetailQty"></span></div>
+      <div class="hw-detail-row" id="hwDetailSizeRow"><span class="hw-detail-label">Size</span><span id="hwDetailSize"></span></div>
+      <div class="hw-detail-row" id="hwDetailGradeRow"><span class="hw-detail-label">Grade</span><span id="hwDetailGrade"></span></div>
+      <div class="hw-detail-row" id="hwDetailFinishRow"><span class="hw-detail-label">Finish</span><span id="hwDetailFinish"></span></div>
+      <div id="hwDetailInvArea"></div>
+    </div>
+
+  </div><!-- /main -->
+
+  <script>
+  // ============================================================
+  //  Hardware page — PRO-DIG MMS3 diagram viewer
+  //  Auth: session via /api/me; diagram data via /api/hardware.
+  //  Feature-gated (Derek only until HARDWARE_GO_LIVE = true).
+  // ============================================================
+
+  // ---- Auth check ---------------------------------------------------
+  (async function() {
+    let me;
+    try {
+      const r = await fetch('/api/me', { credentials: 'same-origin' });
+      me = await r.json();
+    } catch (e) {
+      me = { status: 'error' };
+    }
+    if (!me || me.status !== 'ok') {
+      document.getElementById('authError').style.display = 'block';
+      return;
+    }
+    document.getElementById('main').style.display = 'block';
+
+    // Inject standard header with active-page highlighting
+    if (window.pfBuildHeader) window.pfBuildHeader({ active: 'hardware', name: me.name });
+
+    await hwInit();
+  })();
+
+  // ---- State --------------------------------------------------------
+  let hwDiagrams    = [];
+  let hwCurrentType = 'mast';
+  let hwCurrentDiag = null;
+
+  // Zoom / pan state
+  let hwScale       = 1.0;
+  let hwTx          = 0;      // translateX (px)
+  let hwTy          = 0;      // translateY (px)
+  let hwNaturalW    = 0;      // natural image width (px)
+  let hwNaturalH    = 0;      // natural image height (px)
+  const HW_MIN_SCALE = 0.5;
+  const HW_MAX_SCALE = 8.0;
+
+  // Active part
+  let hwActiveItem = null;
+
+  // ---- Init ---------------------------------------------------------
+  async function hwInit() {
+    let data;
+    try {
+      const r = await fetch('/api/hardware', { credentials: 'same-origin' });
+      data = await r.json();
+    } catch (e) {
+      hwShowError('Could not load hardware data. Please reload.');
+      return;
+    }
+    if (!data.ok) {
+      hwShowError(data.error || 'Hardware data unavailable.');
+      return;
+    }
+    hwDiagrams = data.diagrams || [];
+    hwRenderGrid();
+  }
+
+  function hwShowError(msg) {
+    const el = document.getElementById('hwError');
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  // ---- Toggle -------------------------------------------------------
+  function hwSetType(type) {
+    hwCurrentType = type;
+    document.querySelectorAll('.hw-toggle-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.type === type);
+    });
+    hwRenderGrid();
+  }
+
+  // ---- Grid render --------------------------------------------------
+  function hwRenderGrid() {
+    const grid = document.getElementById('hwGrid');
+    grid.innerHTML = '';
+    const filtered = hwDiagrams.filter(d => d.type === hwCurrentType);
+    if (!filtered.length) {
+      grid.innerHTML = '<p style="padding:16px;color:#888;font-size:.85rem;">No diagrams available.</p>';
+      return;
+    }
+    filtered.forEach(diag => {
+      const card = document.createElement('div');
+      card.className = 'hw-card';
+      card.setAttribute('tabindex', '0');
+      card.setAttribute('role', 'button');
+      card.setAttribute('aria-label', diag.label);
+      card.innerHTML =
+        '<img class="hw-card-thumb" src="/hardware-img/' + window.esc(diag.id) + '.png" alt="">' +
+        '<div class="hw-card-label">' + window.esc(diag.label) + '</div>' +
+        '<div class="hw-card-page">Manual ' + window.esc(diag.pageRef) + '</div>';
+      card.onclick = () => hwOpenViewer(diag);
+      card.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') hwOpenViewer(diag); };
+      grid.appendChild(card);
+    });
+  }
+
+  // ---- Viewer -------------------------------------------------------
+  function hwOpenViewer(diag) {
+    hwCurrentDiag = diag;
+    hwActiveItem  = null;
+
+    document.getElementById('hwViewerTitle').textContent = diag.label;
+
+    // Reset zoom
+    hwScale = 1.0; hwTx = 0; hwTy = 0;
+
+    // Load image
+    const img = document.getElementById('hwDiagramImg');
+    img.src = '/hardware-img/' + diag.id + '.png';
+    img.onload = function() {
+      hwNaturalW = img.naturalWidth;
+      hwNaturalH = img.naturalHeight;
+      hwFitToViewport();
+      hwRenderHotspots();
+    };
+
+    // Render parts table
+    hwRenderPartsTable(diag.parts);
+
+    // Show overlay
+    document.getElementById('hwViewer').classList.add('open');
+    document.body.style.overflow = 'hidden';
+
+    // Attach gesture handlers
+    hwAttachGestures();
+  }
+
+  function hwCloseViewer() {
+    document.getElementById('hwViewer').classList.remove('open');
+    document.body.style.overflow = '';
+    hwCloseDetail();
+    hwDetachGestures();
+    hwCurrentDiag = null;
+  }
+
+  // Fit diagram to viewport width on first open
+  function hwFitToViewport() {
+    const vp = document.getElementById('hwViewport');
+    const vpW = vp.clientWidth;
+    const vpH = vp.clientHeight;
+
+    // Scale so the image fills the width
+    hwScale = vpW / hwNaturalW;
+    hwTx = 0;
+    // Centre vertically if the scaled height < viewport height
+    const scaledH = hwNaturalH * hwScale;
+    hwTy = scaledH < vpH ? (vpH - scaledH) / 2 : 0;
+
+    hwApplyTransform();
+  }
+
+  function hwApplyTransform() {
+    const container = document.getElementById('hwDiagramContainer');
+    const img       = document.getElementById('hwDiagramImg');
+    // Set the container / image dimensions to natural size, then apply scale via transform
+    img.style.width  = hwNaturalW + 'px';
+    img.style.height = hwNaturalH + 'px';
+    container.style.transform =
+      'translate(' + hwTx + 'px,' + hwTy + 'px) scale(' + hwScale + ')';
+    // Counter-scale hotspots so they remain a consistent tap target size
+    const hsFontScale = 1 / hwScale;
+    document.querySelectorAll('.hw-hotspot').forEach(h => {
+      h.style.transform =
+        'translate(-50%,-50%) scale(' + hsFontScale + ')';
+    });
+  }
+
+  function hwZoomStep(delta) {
+    const vp = document.getElementById('hwViewport');
+    const cx = vp.clientWidth / 2;
+    const cy = vp.clientHeight / 2;
+    hwZoomAround(cx, cy, hwScale + delta * hwScale);
+  }
+
+  // Zoom around a viewport point (vx, vy)
+  function hwZoomAround(vx, vy, newScale) {
+    newScale = Math.max(HW_MIN_SCALE, Math.min(HW_MAX_SCALE, newScale));
+    // Before: point (vx, vy) corresponds to image coord:
+    //   ix = (vx - hwTx) / hwScale
+    //   iy = (vy - hwTy) / hwScale
+    // After zoom, we want the SAME image coordinate to map to the SAME viewport point:
+    //   hwTx_new = vx - ix * newScale
+    const ix = (vx - hwTx) / hwScale;
+    const iy = (vy - hwTy) / hwScale;
+    hwTx = vx - ix * newScale;
+    hwTy = vy - iy * newScale;
+    hwScale = newScale;
+    hwApplyTransform();
+  }
+
+  // ---- Hotspot render -----------------------------------------------
+  function hwRenderHotspots() {
+    const container = document.getElementById('hwDiagramContainer');
+    // Remove any existing hotspots
+    container.querySelectorAll('.hw-hotspot').forEach(h => h.remove());
+
+    if (!hwCurrentDiag) return;
+
+    hwCurrentDiag.parts.forEach(part => {
+      if (!part.hotspot) return;
+      const btn = document.createElement('button');
+      btn.className = 'hw-hotspot';
+      btn.setAttribute('aria-label', 'Item ' + part.item + ': ' + part.desc);
+      btn.textContent = part.item;
+      // Position relative to the natural image dimensions (transform-origin 0,0)
+      btn.style.left = part.hotspot.x + '%';
+      btn.style.top  = part.hotspot.y + '%';
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        hwShowDetail(part);
+      });
+      container.appendChild(btn);
+    });
+
+    // Apply counter-scale immediately
+    const hsFontScale = 1 / hwScale;
+    container.querySelectorAll('.hw-hotspot').forEach(h => {
+      h.style.transform = 'translate(-50%,-50%) scale(' + hsFontScale + ')';
+    });
+  }
+
+  // ---- Parts table --------------------------------------------------
+  function hwRenderPartsTable(parts) {
+    const tbody = document.getElementById('hwPartsTbody');
+    tbody.innerHTML = '';
+    parts.forEach(part => {
+      const tr = document.createElement('tr');
+      if (part.invId) tr.classList.add('has-inv');
+      tr.innerHTML =
+        '<td>' + window.esc(part.item) + '</td>' +
+        '<td>' + window.esc(part.desc) + '</td>' +
+        '<td style="font-family:monospace;font-size:.7rem;">' + window.esc(part.partNumber) + '</td>' +
+        '<td style="text-align:center;">' + window.esc(part.qty || '') + '</td>' +
+        '<td>' + window.esc(part.size || '') + '</td>' +
+        '<td>' + window.esc(part.grade || '') + '</td>';
+      tr.onclick = () => hwShowDetail(part);
+      tbody.appendChild(tr);
+    });
+  }
+
+  // ---- Detail card --------------------------------------------------
+  function hwShowDetail(part) {
+    // Highlight matching hotspot and table row
+    if (hwActiveItem !== part.item) {
+      hwActiveItem = part.item;
+      document.querySelectorAll('.hw-hotspot').forEach(h => {
+        h.classList.toggle('active', h.textContent.trim() === String(part.item));
+      });
+      document.querySelectorAll('#hwPartsTbody tr').forEach((tr, i) => {
+        const diag = hwCurrentDiag;
+        if (diag && i < diag.parts.length) {
+          tr.classList.toggle('active', diag.parts[i].item === part.item);
+        }
+      });
+    }
+
+    document.getElementById('hwDetailItemNum').textContent  = 'Item ' + part.item;
+    document.getElementById('hwDetailDesc').textContent     = part.desc;
+    document.getElementById('hwDetailPart').textContent     = part.partNumber;
+    document.getElementById('hwDetailQty').textContent      = part.qty  || '—';
+    document.getElementById('hwDetailSize').textContent     = part.size  || '—';
+    document.getElementById('hwDetailGrade').textContent    = part.grade || '—';
+    document.getElementById('hwDetailFinish').textContent   = part.finish || '—';
+
+    // Show/hide rows with no data
+    ['Qty','Size','Grade','Finish'].forEach(k => {
+      const row = document.getElementById('hwDetail' + k + 'Row');
+      if (row) row.style.display = document.getElementById('hwDetail' + k).textContent === '—' ? 'none' : 'flex';
+    });
+
+    // Inventory link
+    const invArea = document.getElementById('hwDetailInvArea');
+    if (part.invId) {
+      invArea.innerHTML = '<a class="hw-detail-inv-link" href="/inventory.html#' +
+        window.esc(part.invId) + '">View in Inventory &rarr;</a>';
+    } else {
+      invArea.innerHTML = '<span class="hw-detail-no-inv">Not linked to inventory</span>';
+    }
+
+    document.getElementById('hwDetailCard').classList.add('open');
+  }
+
+  function hwCloseDetail() {
+    document.getElementById('hwDetailCard').classList.remove('open');
+    hwActiveItem = null;
+    document.querySelectorAll('.hw-hotspot').forEach(h => h.classList.remove('active'));
+    document.querySelectorAll('#hwPartsTbody tr').forEach(tr => tr.classList.remove('active'));
+  }
+
+  // ---- Touch / mouse gesture handling -------------------------------
+  // Single-finger pan + double-tap zoom; two-finger pinch zoom.
+
+  let _drag       = null;    // { startX, startY, startTx, startTy }
+  let _pinch      = null;    // { startDist, startScale, midX, midY }
+  let _lastTap    = 0;       // timestamp of last tap for double-tap detection
+  let _gestureMoved = false;
+
+  function _dist(t) {
+    const dx = t[0].clientX - t[1].clientX;
+    const dy = t[0].clientY - t[1].clientY;
+    return Math.hypot(dx, dy);
+  }
+  function _mid(t, el) {
+    const r = el.getBoundingClientRect();
+    return {
+      x: (t[0].clientX + t[1].clientX) / 2 - r.left,
+      y: (t[0].clientY + t[1].clientY) / 2 - r.top,
+    };
+  }
+
+  function onTouchStart(e) {
+    if (e.touches.length === 1) {
+      const t = e.touches[0];
+      _drag = { startX: t.clientX, startY: t.clientY, startTx: hwTx, startTy: hwTy };
+      _gestureMoved = false;
+    } else if (e.touches.length === 2) {
+      _drag = null;
+      const m = _mid(e.touches, e.currentTarget);
+      _pinch = { startDist: _dist(e.touches), startScale: hwScale, midX: m.x, midY: m.y };
+      _gestureMoved = true;
+      e.preventDefault();
+    }
+  }
+  function onTouchMove(e) {
+    if (_pinch && e.touches.length >= 2) {
+      e.preventDefault();
+      const newDist = _dist(e.touches);
+      const newScale = _pinch.startScale * (newDist / _pinch.startDist);
+      hwZoomAround(_pinch.midX, _pinch.midY, newScale);
+    } else if (_drag && e.touches.length === 1) {
+      const t = e.touches[0];
+      const dx = t.clientX - _drag.startX;
+      const dy = t.clientY - _drag.startY;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+        _gestureMoved = true;
+        hwTx = _drag.startTx + dx;
+        hwTy = _drag.startTy + dy;
+        hwApplyTransform();
+        e.preventDefault();
+      }
+    }
+  }
+  function onTouchEnd(e) {
+    if (!_gestureMoved && e.changedTouches.length === 1) {
+      // Double-tap to toggle zoom
+      const now = Date.now();
+      if (now - _lastTap < 300) {
+        const t = e.changedTouches[0];
+        const r = e.currentTarget.getBoundingClientRect();
+        const vx = t.clientX - r.left;
+        const vy = t.clientY - r.top;
+        if (hwScale > 1.1) {
+          hwFitToViewport();
+        } else {
+          hwZoomAround(vx, vy, hwScale * 2.5);
+        }
+        _lastTap = 0;
+        return;
+      }
+      _lastTap = now;
+    }
+    _drag  = null;
+    _pinch = null;
+  }
+
+  // Mouse (desktop)
+  function onMouseDown(e) {
+    if (e.button !== 0) return;
+    _drag = { startX: e.clientX, startY: e.clientY, startTx: hwTx, startTy: hwTy };
+    _gestureMoved = false;
+    e.currentTarget.classList.add('grabbing');
+  }
+  function onMouseMove(e) {
+    if (!_drag) return;
+    const dx = e.clientX - _drag.startX;
+    const dy = e.clientY - _drag.startY;
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) _gestureMoved = true;
+    hwTx = _drag.startTx + dx;
+    hwTy = _drag.startTy + dy;
+    hwApplyTransform();
+  }
+  function onMouseUp(e) {
+    _drag = null;
+    e.currentTarget.classList.remove('grabbing');
+  }
+  function onWheel(e) {
+    e.preventDefault();
+    const r  = e.currentTarget.getBoundingClientRect();
+    const vx = e.clientX - r.left;
+    const vy = e.clientY - r.top;
+    const factor = e.deltaY < 0 ? 1.15 : 0.87;
+    hwZoomAround(vx, vy, hwScale * factor);
+  }
+
+  let _gestureAttached = false;
+  function hwAttachGestures() {
+    if (_gestureAttached) return;
+    const vp = document.getElementById('hwViewport');
+    vp.addEventListener('touchstart',  onTouchStart, { passive: false });
+    vp.addEventListener('touchmove',   onTouchMove,  { passive: false });
+    vp.addEventListener('touchend',    onTouchEnd,   { passive: true  });
+    vp.addEventListener('mousedown',   onMouseDown,  { passive: true  });
+    vp.addEventListener('mousemove',   onMouseMove,  { passive: true  });
+    vp.addEventListener('mouseup',     onMouseUp,    { passive: true  });
+    vp.addEventListener('mouseleave',  onMouseUp,    { passive: true  });
+    vp.addEventListener('wheel',       onWheel,      { passive: false });
+    _gestureAttached = true;
+  }
+  function hwDetachGestures() {
+    if (!_gestureAttached) return;
+    const vp = document.getElementById('hwViewport');
+    vp.removeEventListener('touchstart',  onTouchStart);
+    vp.removeEventListener('touchmove',   onTouchMove);
+    vp.removeEventListener('touchend',    onTouchEnd);
+    vp.removeEventListener('mousedown',   onMouseDown);
+    vp.removeEventListener('mousemove',   onMouseMove);
+    vp.removeEventListener('mouseup',     onMouseUp);
+    vp.removeEventListener('mouseleave',  onMouseUp);
+    vp.removeEventListener('wheel',       onWheel);
+    _gestureAttached = false;
+  }
+  </script>
+</body>
+</html>

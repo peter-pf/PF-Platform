@@ -847,6 +847,12 @@ export function areaForPath(pathname) {
     // ?pending=1, POST mark-sent) are enforced IN the handler via
     // requireArea('bd_send_bridge'); template/queue actions via business_dev.
     if (pathname.startsWith('/api/bd-send'))        return 'business_dev';
+    // Hardware diagram viewer API (PRO-DIG MMS3 mast + vibro data). Classified
+    // 'user_admin' so only admin-role users pass the RBAC check; an additional
+    // UID preview gate (hardware-access.js HARDWARE_ALLOWED_UIDS) is enforced in
+    // _middleware.js AFTER this check and directly in the handler. ZERO financials
+    // (part numbers, descriptions, and diagram metadata only).
+    if (pathname.startsWith('/api/hardware'))      return 'user_admin';
     if (pathname.startsWith('/api/users'))         return 'user_admin';
     // /api/data proxies the live SharePoint data set (bid log + project master).
     // BD sees the full bid log (Brad 2026-06-23) -> classify as financials
@@ -914,6 +920,15 @@ export function areaForPath(pathname) {
   // without an explicit prefix entry). Classified field_ops = admin/partner/
   // business_dev/field_ops. ZERO financials (SOP document copies only).
   if (pathname.startsWith('/sops/')) return 'field_ops';
+
+  // ---- Hardware diagram images — admin + UID preview gate -----------------
+  // PNG and other image files under /hardware-img/ carry proprietary PRO-DIG
+  // manual diagrams. This prefix check MUST come BEFORE STATIC_ASSET_EXT_RE so
+  // the .png extension fallback does not grant 'general' (all-authenticated) access.
+  // The 'user_admin' area means only admin-role users pass the RBAC check here;
+  // _middleware.js then applies an additional UID-level preview gate via
+  // hardware-access.js hardwareAllowed(). ZERO financials.
+  if (pathname.startsWith('/hardware-img/')) return 'user_admin';
 
   // ---- HR module (same-origin embed at /hr/) — TIGHT gate -----------------
   // The HR module is served as static files under /hr/. It carries HR-confidential
