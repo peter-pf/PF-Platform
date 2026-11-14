@@ -19,8 +19,9 @@
 //  - If D1 is unavailable, email is omitted gracefully (UI hides the menu;
 //    the API gate still enforces by email lookup independently).
 
-import { hardwareAllowed } from '../lib/hardware-access.js';
-import { vendorsAllowed }  from '../lib/vendors-access.js';
+import { hardwareAllowed }                       from '../lib/hardware-access.js';
+import { vendorsAllowed, vendorsCanEdit }         from '../lib/vendors-access.js';
+import { serviceLogAllowed, serviceLogCanEdit }   from '../lib/servicelog-access.js';
 
 export async function onRequestGet(context) {
   const headers = {
@@ -61,7 +62,10 @@ export async function onRequestGet(context) {
     name: session.name || '',
     role: session.role,
     email: email || '',
-    hardwareAllowed: hardwareAllowed(session),
-    vendorsAllowed:  vendorsAllowed(session),
+    hardwareAllowed:   hardwareAllowed(session),
+    vendorsAllowed:    vendorsAllowed(session),
+    vendorsCanEdit:    vendorsCanEdit(session),
+    serviceLogAllowed: serviceLogAllowed(session),
+    serviceLogCanEdit: serviceLogCanEdit(session),
   }), { status: 200, headers });
 }

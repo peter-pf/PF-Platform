@@ -222,6 +222,12 @@ export async function onRequestPost(context) {
       }
       if (!company) return json({ ok: false, error: 'Company name is required.' }, 400);
 
+      // Website scheme check: must be empty or start with http:// or https://.
+      const website = cap(body.website, 'website');
+      if (website && !/^https?:\/\//i.test(website)) {
+        return json({ ok: false, error: 'Website must start with https:// or http://.' }, 400);
+      }
+
       // Verify section exists.
       const sec = await db.prepare('SELECT id FROM vendors_sections WHERE id=?').bind(section_id).first();
       if (!sec) return json({ ok: false, error: 'Section not found.' }, 404);
@@ -241,7 +247,7 @@ export async function onRequestPost(context) {
         id, section_id, company,
         cap(body.category, 'category'), cap(body.contact, 'contact'),
         cap(body.phone, 'phone'), cap(body.address, 'address'),
-        cap(body.website, 'website'), cap(body.account_num, 'account_num'),
+        website, cap(body.account_num, 'account_num'),
         cap(body.notes, 'notes'), nextSort, actor, now
       ).run();
 
@@ -262,6 +268,12 @@ export async function onRequestPost(context) {
       if (!id || typeof id !== 'string') return json({ ok: false, error: 'id required.' }, 400);
       if (!company) return json({ ok: false, error: 'Company name is required.' }, 400);
 
+      // Website scheme check: must be empty or start with http:// or https://.
+      const website = cap(body.website, 'website');
+      if (website && !/^https?:\/\//i.test(website)) {
+        return json({ ok: false, error: 'Website must start with https:// or http://.' }, 400);
+      }
+
       const result = await db.prepare(
         `UPDATE vendors_items
          SET company=?, category=?, contact=?, phone=?, address=?,
@@ -270,7 +282,7 @@ export async function onRequestPost(context) {
       ).bind(
         company, cap(body.category,'category'), cap(body.contact,'contact'),
         cap(body.phone,'phone'), cap(body.address,'address'),
-        cap(body.website,'website'), cap(body.account_num,'account_num'),
+        website, cap(body.account_num,'account_num'),
         cap(body.notes,'notes'), actor, now, id
       ).run();
       if (!result.meta?.changes) return json({ ok: false, error: 'Item not found.' }, 404);

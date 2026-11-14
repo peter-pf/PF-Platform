@@ -1,0 +1,1448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Service Log | PF Field Portal</title>
+  <link rel="stylesheet" href="pf-r5.css">
+  <script src="/js/pf-shared.js"></script>
+  <style>
+    /* ---- Service Log page styles ---- */
+
+    /* Machine summary section */
+    .sl-summary {
+      padding: 12px 16px 0;
+    }
+    .sl-summary-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #667;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 8px;
+    }
+    .sl-summary-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .sl-summary-card {
+      background: var(--card-bg, #fff);
+      border: 1px solid #dde;
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 4px 12px;
+    }
+    .sl-summary-machine {
+      flex: 0 0 100%;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--text, #111);
+      margin-bottom: 2px;
+    }
+    .sl-summary-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      flex: 0 0 100%;
+    }
+    .sl-summary-item {
+      font-size: 0.78rem;
+      color: #667;
+    }
+    .sl-summary-item strong {
+      color: var(--text, #111);
+      font-weight: 600;
+    }
+    .sl-overdue-badge {
+      display: inline-block;
+      background: #c00;
+      color: #fff;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 4px;
+      margin-left: 4px;
+      vertical-align: middle;
+    }
+    .sl-no-summary {
+      font-size: 0.84rem;
+      color: #888;
+      padding: 2px 0 6px;
+    }
+
+    /* Interval tracking lines */
+    .sl-hours-line {
+      flex: 0 0 100%;
+      font-size: 0.75rem;
+      color: #667;
+      margin-top: 2px;
+    }
+    .sl-hours-source {
+      font-size: 0.72rem;
+      color: #999;
+      margin-bottom: 4px;
+    }
+    .sl-intervals {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      flex: 0 0 100%;
+      margin-top: 4px;
+    }
+    .sl-interval-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+      cursor: pointer;
+    }
+    .sl-interval-label {
+      flex: 0 0 50px;
+      font-weight: 600;
+      color: var(--text, #111);
+    }
+    .sl-interval-status {
+      flex: 1;
+      color: #556;
+    }
+    .sl-interval-tasks {
+      display: none;
+      padding: 6px 8px;
+      background: rgba(0,0,0,.03);
+      border-radius: 6px;
+      font-size: 0.75rem;
+      color: #445;
+      margin-top: 2px;
+    }
+    .sl-interval-tasks.open { display: block; }
+    .sl-interval-tasks ul { margin: 0; padding-left: 16px; }
+    .sl-interval-tasks li { margin-bottom: 2px; }
+    .sl-interval-tasks .sl-tasks-empty { color: #aaa; font-style: italic; }
+    .sl-amber-badge {
+      display: inline-block;
+      background: #d97706;
+      color: #fff;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 4px;
+      margin-left: 4px;
+      vertical-align: middle;
+    }
+    .sl-no-hours {
+      flex: 0 0 100%;
+      font-size: 0.75rem;
+      color: #aaa;
+      font-style: italic;
+      margin-top: 4px;
+    }
+
+    /* Filter + action bar */
+    .sl-action-bar {
+      display: flex;
+      gap: 8px;
+      padding: 12px 16px 0;
+      align-items: center;
+    }
+    .sl-machine-select {
+      flex: 1;
+      padding: 8px 10px;
+      border: 1.5px solid #ccd;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      background: var(--input-bg, #fff);
+      color: var(--text, #111);
+      min-width: 0;
+    }
+    .sl-machine-select:focus { outline: none; border-color: var(--pf-blue, #1a56db); }
+    .sl-add-btn {
+      flex: 0 0 auto;
+      padding: 8px 14px;
+      background: var(--pf-blue, #1a56db);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .sl-add-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    /* Entry list */
+    .sl-list {
+      padding: 10px 16px 80px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .sl-card {
+      background: var(--card-bg, #fff);
+      border: 1px solid #dde;
+      border-radius: 10px;
+      padding: 12px 14px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.07);
+    }
+    .sl-card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .sl-card-title {
+      flex: 1;
+      min-width: 0;
+    }
+    .sl-card-machine {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text, #111);
+    }
+    .sl-card-meta {
+      font-size: 0.78rem;
+      color: #667;
+      margin-top: 2px;
+    }
+    .sl-card-actions {
+      display: flex;
+      gap: 4px;
+      flex: 0 0 auto;
+    }
+    .sl-edit-btn, .sl-del-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px 6px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .sl-edit-btn { color: var(--pf-blue, #1a56db); }
+    .sl-del-btn  { color: #c00; }
+    .sl-edit-btn:hover { background: rgba(26,86,219,.08); }
+    .sl-del-btn:hover  { background: rgba(200,0,0,.08); }
+
+    /* Detail rows */
+    .sl-details {
+      margin-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .sl-detail-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 0.84rem;
+    }
+    .sl-detail-label {
+      flex: 0 0 80px;
+      color: #667;
+      font-size: 0.78rem;
+    }
+    .sl-detail-val {
+      color: var(--text, #111);
+      word-break: break-word;
+    }
+    .sl-updated {
+      margin-top: 6px;
+      font-size: 0.72rem;
+      color: #999;
+    }
+    .sl-empty {
+      padding: 32px 16px;
+      text-align: center;
+      color: #888;
+      font-size: 0.9rem;
+    }
+    .sl-error {
+      padding: 12px 16px;
+      color: #c00;
+      font-size: 0.9rem;
+    }
+
+    /* ---- Add/edit bottom sheet ---- */
+    .sl-sheet-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 8000;
+      background: rgba(0,0,0,0.42);
+    }
+    .sl-sheet-backdrop.open { display: block; }
+    .sl-sheet {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      z-index: 8001;
+      background: var(--card-bg, #fff);
+      border-radius: 16px 16px 0 0;
+      padding: 0 0 env(safe-area-inset-bottom, 0);
+      box-shadow: 0 -4px 24px rgba(0,0,0,.15);
+      max-height: 90vh;
+      overflow-y: auto;
+      transform: translateY(100%);
+      transition: transform 0.22s cubic-bezier(0.32,0,0.67,0);
+    }
+    .sl-sheet.open { transform: translateY(0); }
+    .sl-sheet-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 16px 10px;
+      border-bottom: 1px solid #eee;
+      position: sticky;
+      top: 0;
+      background: var(--card-bg, #fff);
+      z-index: 1;
+    }
+    .sl-sheet-title { font-size: 1rem; font-weight: 700; }
+    .sl-sheet-close {
+      background: none; border: none; cursor: pointer;
+      font-size: 1.3rem; color: #666; padding: 4px 8px;
+    }
+    .sl-sheet-body {
+      padding: 14px 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .sl-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .sl-field label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #555;
+    }
+    .sl-field input, .sl-field textarea, .sl-field select {
+      padding: 9px 11px;
+      border: 1.5px solid #ccd;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      background: var(--input-bg, #fff);
+      color: var(--text, #111);
+      font-family: inherit;
+    }
+    .sl-field input:focus, .sl-field textarea:focus, .sl-field select:focus {
+      outline: none;
+      border-color: var(--pf-blue, #1a56db);
+    }
+    .sl-field textarea { resize: vertical; min-height: 56px; }
+    .sl-required-star { color: #c00; margin-left: 2px; }
+    .sl-other-machine {
+      margin-top: 6px;
+    }
+    .sl-sheet-save-btn {
+      width: 100%;
+      padding: 12px;
+      background: var(--pf-blue, #1a56db);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+    .sl-sheet-save-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .sl-sheet-err {
+      color: #c00;
+      font-size: 0.85rem;
+      display: none;
+    }
+    .sl-sheet-err.show { display: block; }
+
+    /* ---- Delete confirm dialog ---- */
+    .sl-confirm-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9000;
+      background: rgba(0,0,0,0.5);
+      align-items: center;
+      justify-content: center;
+    }
+    .sl-confirm-backdrop.open { display: flex; }
+    .sl-confirm-dialog {
+      background: var(--card-bg, #fff);
+      border-radius: 12px;
+      padding: 20px 20px 16px;
+      margin: 16px;
+      max-width: 340px;
+      width: 100%;
+    }
+    .sl-confirm-title { font-weight: 700; font-size: 1rem; margin-bottom: 8px; }
+    .sl-confirm-msg   { font-size: 0.9rem; color: #555; margin-bottom: 16px; }
+    .sl-confirm-btns  { display: flex; gap: 8px; justify-content: flex-end; }
+    .sl-confirm-cancel {
+      padding: 8px 16px; border: 1.5px solid #ccc; border-radius: 8px;
+      background: none; cursor: pointer; font-size: 0.9rem;
+    }
+    .sl-confirm-delete {
+      padding: 8px 16px; background: #c00; color: #fff;
+      border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem;
+      font-weight: 700;
+    }
+    .sl-confirm-delete:disabled { opacity: 0.6; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+<div id="topbar">
+  <a href="/" class="tb-brand" aria-label="PF Field Portal">
+    <div class="tb-mark">PF</div>
+    <span class="tb-title">Service Log</span>
+  </a>
+  <details class="acct-menu" id="acctMenu">
+    <summary>
+      <span class="acct-btn">
+        <span class="acct-name" id="acctName"></span>
+        <svg class="acct-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </span>
+    </summary>
+    <div class="acct-dropdown">
+      <button type="button" class="acct-item" onclick="window.pfToggleTheme()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>
+        <span id="acctThemeLabel">Dark mode</span>
+      </button>
+      <div class="acct-divider"></div>
+      <a class="acct-item" href="/api/logout">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+        Sign Out
+      </a>
+    </div>
+  </details>
+</div>
+
+<nav id="pfNav" aria-label="Main navigation">
+  <a href="/" class="pf-nav-item" data-paths="/, /index.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+    <span>Home</span>
+  </a>
+  <a href="/daily-report.html" class="pf-nav-item" data-paths="/daily-report.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><line x1="9" y1="12" x2="15" y2="12"></line><line x1="9" y1="16" x2="13" y2="16"></line></svg>
+    <span>Daily Report</span>
+  </a>
+  <a href="/equipment-inspection.html" class="pf-nav-item" data-paths="/equipment-inspection.html">
+    <span class="rig-icon" aria-hidden="true"></span>
+    <span>Equip. Inspect.</span>
+  </a>
+  <a href="/site-readiness.html" class="pf-nav-item" data-paths="/site-readiness.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
+    <span>Site Readiness</span>
+  </a>
+  <a href="/toolbox-talk.html" class="pf-nav-item" data-paths="/toolbox-talk.html, /toolbox-talk">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+    <span>Safety Analysis</span>
+  </a>
+  <a href="/past-reports.html" class="pf-nav-item" data-paths="/past-reports.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+    <span>Past Reports</span>
+  </a>
+  <a href="/cost-codes.html" class="pf-nav-item" data-paths="/cost-codes.html, /cost-codes">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+    <span>Cost Codes</span>
+  </a>
+  <a href="/schedule.html" class="pf-nav-item" data-paths="/schedule.html, /schedule">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+    <span>Schedule</span>
+  </a>
+  <a href="/time-off.html" class="pf-nav-item" data-paths="/time-off.html, /time-off">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><path d="M8 14l2 2 4-4"></path></svg>
+    <span>Time Off</span>
+  </a>
+  <a href="/sops.html" class="pf-nav-item" data-paths="/sops.html, /sops">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 0 3-3h7z"></path></svg>
+    <span>SOPs</span>
+  </a>
+  <a href="/mailing-lists.html" class="pf-nav-item" data-paths="/mailing-lists.html, /mailing-lists" style="display:none" id="mlNavItem">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,12 2,6"></polyline></svg>
+    <span>Mailing Lists</span>
+  </a>
+  <a href="/hardware.html" class="pf-nav-item" data-paths="/hardware.html, /hardware" style="display:none" id="hwNavItem">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+    <span>Hardware</span>
+  </a>
+  <a href="/vendors.html" class="pf-nav-item" data-paths="/vendors.html, /vendors" style="display:none" id="vnNavItem">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+    <span>Vendors</span>
+  </a>
+  <a href="/service-log.html" class="pf-nav-item" data-paths="/service-log.html, /service-log" id="slNavItem">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1" ry="1"/><path d="m9 14 2 2 4-4"/></svg>
+    <span>Service Log</span>
+  </a>
+</nav>
+
+  <div id="authError" style="display:none;padding:20px;color:#c00;">
+    <p>You are not authorised to view this page. <a href="/login.html">Sign in</a></p>
+  </div>
+
+  <div id="main" style="display:none;">
+    <div id="slError" class="sl-error"></div>
+
+    <!-- Machine summary -->
+    <div class="sl-summary">
+      <div class="sl-summary-title">Machine Status</div>
+      <div class="sl-summary-list" id="slSummaryList">
+        <div class="sl-no-summary">Loading...</div>
+      </div>
+    </div>
+
+    <!-- Filter + add bar -->
+    <div class="sl-action-bar">
+      <select class="sl-machine-select" id="slMachineFilter" onchange="slRenderList()" aria-label="Filter by machine">
+        <option value="">All machines</option>
+      </select>
+      <button class="sl-add-btn" id="slAddBtn" style="display:none" onclick="slOpenAdd()">+ Add entry</button>
+    </div>
+
+    <!-- Entry list -->
+    <div class="sl-list" id="slList"></div>
+  </div>
+
+  <!-- Add/edit bottom sheet -->
+  <div class="sl-sheet-backdrop" id="slSheetBackdrop" onclick="slCloseSheet()"></div>
+  <div class="sl-sheet" id="slSheet" role="dialog" aria-modal="true" aria-labelledby="slSheetTitle">
+    <div class="sl-sheet-header">
+      <span class="sl-sheet-title" id="slSheetTitle">Add Entry</span>
+      <button class="sl-sheet-close" onclick="slCloseSheet()" aria-label="Close">&#10005;</button>
+    </div>
+    <div class="sl-sheet-body">
+      <div id="slSheetErr" class="sl-sheet-err"></div>
+      <input type="hidden" id="slEditId">
+
+      <div class="sl-field">
+        <label for="slFldMachine">Machine <span class="sl-required-star">*</span></label>
+        <select id="slFldMachine" onchange="slOnMachineChange()">
+          <option value="">Select machine...</option>
+          <!-- populated by JS from /api/field-lists ownedEquipment -->
+        </select>
+        <input type="text" id="slFldMachineOther" class="sl-other-machine" maxlength="120"
+               placeholder="Enter machine name..." style="display:none" autocomplete="off">
+      </div>
+
+      <div class="sl-field">
+        <label for="slFldDate">Service Date <span class="sl-required-star">*</span></label>
+        <input type="date" id="slFldDate" max="2099-12-31">
+      </div>
+
+      <div class="sl-field">
+        <label for="slFldHourMeter">Hour Meter (hrs)</label>
+        <input type="number" id="slFldHourMeter" min="0" max="99999" step="0.1" placeholder="e.g. 1234.5">
+      </div>
+
+      <div class="sl-field">
+        <label for="slFldServiceType">Service Type <span class="sl-required-star">*</span></label>
+        <select id="slFldServiceType">
+          <option value="">Select type...</option>
+          <option value="Oil &amp; Filters">Oil &amp; Filters</option>
+          <option value="Grease">Grease</option>
+          <option value="Hydraulic">Hydraulic</option>
+          <option value="Repair">Repair</option>
+          <option value="Inspection">Inspection</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+
+      <div class="sl-field">
+        <label for="slFldServiceInterval">Scheduled Service</label>
+        <select id="slFldServiceInterval">
+          <option value="">None / unscheduled</option>
+          <option value="500">500 hr service</option>
+          <option value="1000">1,000 hr service</option>
+          <option value="2000">2,000 hr service</option>
+        </select>
+      </div>
+
+      <div class="sl-field">
+        <label for="slFldDescription">Description</label>
+        <textarea id="slFldDescription" maxlength="500" rows="2" placeholder="What was done..."></textarea>
+      </div>
+
+      <div class="sl-field">
+        <label for="slFldParts">Parts Used</label>
+        <textarea id="slFldParts" maxlength="500" rows="2" placeholder="Part numbers, quantities..."></textarea>
+      </div>
+
+      <div class="sl-field">
+        <label for="slFldVendor">Vendor</label>
+        <input type="text" id="slFldVendor" list="slVendorList" maxlength="120"
+               placeholder="Start typing or enter name..." autocomplete="off">
+        <datalist id="slVendorList">
+          <!-- populated from /api/service-log vendorNames -->
+        </datalist>
+      </div>
+
+      <div class="sl-field">
+        <label for="slFldCost">Cost ($)</label>
+        <input type="number" id="slFldCost" min="0" step="0.01" placeholder="e.g. 125.00">
+      </div>
+
+      <div class="sl-field">
+        <label for="slFldPerformedBy">Performed By</label>
+        <input type="text" id="slFldPerformedBy" maxlength="80" placeholder="Technician / shop name">
+      </div>
+
+      <div class="sl-field">
+        <label for="slFldNextHours">Next Due (hrs)</label>
+        <input type="number" id="slFldNextHours" min="0" max="99999" step="0.1"
+               placeholder="e.g. 1500 (meter reading)">
+      </div>
+
+      <div class="sl-field">
+        <label for="slFldNextDate">Next Due (date)</label>
+        <input type="date" id="slFldNextDate" max="2099-12-31">
+      </div>
+
+      <div class="sl-field">
+        <label for="slFldNotes">Notes</label>
+        <textarea id="slFldNotes" maxlength="500" rows="2" placeholder="Additional details..."></textarea>
+      </div>
+
+      <button class="sl-sheet-save-btn" id="slSheetSave" onclick="slSaveEntry()">Save</button>
+    </div>
+  </div>
+
+  <!-- Delete confirm dialog -->
+  <div class="sl-confirm-backdrop" id="slConfirmBackdrop">
+    <div class="sl-confirm-dialog">
+      <div class="sl-confirm-title">Delete entry?</div>
+      <div class="sl-confirm-msg" id="slConfirmMsg">This cannot be undone.</div>
+      <div class="sl-confirm-btns">
+        <button class="sl-confirm-cancel" onclick="slCloseConfirm()">Cancel</button>
+        <button class="sl-confirm-delete" id="slConfirmOk" onclick="slDoDelete()">Delete</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ---- State ------------------------------------------------------------
+  var _entries          = [];    // [{id, machine, service_date, service_interval, ...}]
+  var _machines         = [];    // ownedEquipment list from /api/field-lists
+  var _vendorNames      = [];    // company names from vendors_items
+  var _machineHoursData = {};    // {[machineName]: {hours, source, date}} from server
+  var _machineTaskData  = {};    // {[machineName]: {label, source, gaps, 500:{tasks,source,gaps}, ...}}
+  var _machineBaselines = {};    // {[machineName]: {500: n|null, 1000: n|null, 2000: n|null}}
+  var _canEdit          = false; // from api/me serviceLogCanEdit
+  var _pendingDel       = null;  // {id, machine}
+  var _editId           = null;  // null = add, string = edit
+
+  // ---- Interval config (mirrors service-intervals.js logic, client-side) ----
+  // Machines that track hour intervals (by name pattern).
+  // Pattern is kept deliberately light; the server authoritative copy is service-intervals.js.
+  var INTERVAL_PATTERNS = [
+    { key: 'cat_336',            re: /cat\s*336/i },
+    { key: 'deere_350g',         re: /deere\s*350/i },
+    { key: 'sany_365',           re: /sany\s*365/i },
+    { key: 'cat_308',            re: /cat\s*308/i },
+    { key: 'sullair_compressor', re: /sullair|sulair|air\s*comp/i },
+  ];
+  var AUGER_RE = /\bauger\b|\bbit\b|\bflighting\b|\btrailer\b/i;
+
+  function slHasIntervals(machineName) {
+    if (!machineName) return false;
+    if (AUGER_RE.test(machineName)) return false;
+    for (var i = 0; i < INTERVAL_PATTERNS.length; i++) {
+      if (INTERVAL_PATTERNS[i].re.test(machineName)) return true;
+    }
+    return false;
+  }
+
+  // Compute next-due for a single interval level given entries for a machine.
+  // baselineHours: {500:n, 1000:n, 2000:n} from machineBaselines (server); null values = 0.
+  // Returns {level, nextDue, hoursLeft, status: 'ok'|'amber'|'overdue', noReading, usingBaseline}
+  function slIntervalStatus(level, machineEntries, currentHours, baselineHours) {
+    if (currentHours == null) {
+      return { level: level, nextDue: level, hoursLeft: null, status: 'ok', noReading: true, usingBaseline: false };
+    }
+    // Most recent entry where service_interval >= level (cumulative: 2000 h service resets 500 h too)
+    var lastEntry = null;
+    var latestDate = '';
+    for (var i = 0; i < machineEntries.length; i++) {
+      var e = machineEntries[i];
+      if (e.service_interval != null && e.service_interval >= level && e.hour_meter != null) {
+        // entries are sorted date DESC; take first found (most recent date)
+        if (!lastEntry || (e.service_date || '') > latestDate) {
+          lastEntry = e;
+          latestDate = e.service_date || '';
+        }
+      }
+    }
+
+    var usingBaseline = false;
+    var baseline;
+    if (lastEntry) {
+      baseline = lastEntry.hour_meter;
+    } else if (baselineHours && baselineHours[level] != null) {
+      // Use machine-specific baseline (e.g. from CAT ECM report)
+      baseline = baselineHours[level];
+      usingBaseline = true;
+    } else {
+      baseline = 0;
+    }
+
+    var nextDue  = baseline + level;
+    var hoursLeft = nextDue - currentHours;
+    var status = currentHours >= nextDue ? 'overdue' : (hoursLeft <= 50 ? 'amber' : 'ok');
+    return { level: level, nextDue: nextDue, hoursLeft: hoursLeft, status: status, noReading: false, usingBaseline: usingBaseline };
+  }
+
+  // Compute all interval statuses for a machine
+  function slMachineIntervalStatuses(machineName, entries, machineHoursData, machineBaselines) {
+    if (!slHasIntervals(machineName)) return null;
+    var machineEntries = entries.filter(function(e){ return e.machine === machineName; });
+    var hoursInfo = machineHoursData[machineName] || null;
+    var currentHours = hoursInfo ? hoursInfo.hours : null;
+    var baselines = (machineBaselines && machineBaselines[machineName]) ? machineBaselines[machineName] : null;
+    return {
+      currentHours: currentHours,
+      hoursSource:  hoursInfo,
+      levels: [500, 1000, 2000].map(function(level) {
+        return slIntervalStatus(level, machineEntries, currentHours, baselines);
+      }),
+    };
+  }
+  // Expose for tests
+  window.slMachineIntervalStatuses = slMachineIntervalStatuses;
+  window.slIntervalStatus = slIntervalStatus;
+  window.slHasIntervals   = slHasIntervals;
+  window.slGetMachineBaselines = function() { return _machineBaselines; };
+  window.slGetMachineTaskData  = function() { return _machineTaskData; };
+
+  var mainEl  = document.getElementById('main');
+  var errEl   = document.getElementById('authError');
+  var acctNm  = document.getElementById('acctName');
+
+  // ---- Auth init (async IIFE) -------------------------------------------
+  (async function slAuthInit() {
+    var me;
+    try {
+      var r = await fetch('/api/me', {credentials: 'same-origin'});
+      me = await r.json();
+    } catch (e) {
+      me = {status: 'error'};
+    }
+    if (!me || me.status !== 'ok') {
+      if (errEl) errEl.style.display = 'block';
+      return;
+    }
+    if (acctNm) acctNm.textContent = me.name || '';
+
+    // Show/hide sibling nav items (this page; slNavItem is always visible here)
+    try{var _hwNav=document.getElementById('hwNavItem');if(_hwNav&&me.hardwareAllowed) _hwNav.style.display='';}catch(e){}
+    try{var _vnNav=document.getElementById('vnNavItem');if(_vnNav&&me.vendorsAllowed) _vnNav.style.display='';}catch(e){}
+
+    // Owner-only: mailing lists nav
+    var _mlNav = document.getElementById('mlNavItem');
+    var _em = (me.email || '').toLowerCase();
+    if (_mlNav && ['breinking@pierfoundations.com','jreinking@pierfoundations.com','dfranke@pierfoundations.com'].indexOf(_em) >= 0) {
+      _mlNav.style.display = '';
+    }
+
+    // Dark mode label
+    var themeLabel = document.getElementById('acctThemeLabel');
+    if (themeLabel && window.pfGetTheme) {
+      themeLabel.textContent = window.pfGetTheme() === 'dark' ? 'Light mode' : 'Dark mode';
+    }
+
+    if (mainEl) mainEl.style.display = 'block';
+
+    _canEdit = !!me.serviceLogCanEdit;
+
+    // Show add button if editor
+    var addBtn = document.getElementById('slAddBtn');
+    if (addBtn && _canEdit) addBtn.style.display = '';
+
+    await slInit();
+  })();
+
+  // ---- Init ------------------------------------------------------------
+  async function slInit() {
+    // Load field-lists (ownedEquipment) and service-log data in parallel
+    var [listsResult, logResult] = await Promise.all([
+      slFetchFieldLists(),
+      slLoadData(),
+    ]);
+    // listsResult + logResult handled internally (they set state and render)
+  }
+
+  // Fetch ownedEquipment list from /api/field-lists
+  async function slFetchFieldLists() {
+    try {
+      var r = await fetch('/api/field-lists', {credentials: 'same-origin'});
+      var d = await r.json();
+      if (d && Array.isArray(d.ownedEquipment)) {
+        _machines = d.ownedEquipment.filter(function(m){ return m && m.trim(); });
+      }
+    } catch (e) {
+      // non-fatal: machine picker will just show Other
+    }
+    slPopulateMachinePicker();
+    slPopulateMachineFilter();
+  }
+
+  function slPopulateMachinePicker() {
+    var sel = document.getElementById('slFldMachine');
+    if (!sel) return;
+    // Keep the first "Select machine..." option
+    while (sel.options.length > 1) sel.remove(1);
+    _machines.forEach(function(m) {
+      var opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = m;
+      sel.appendChild(opt);
+    });
+    var optOther = document.createElement('option');
+    optOther.value = '__other__';
+    optOther.textContent = 'Other...';
+    sel.appendChild(optOther);
+  }
+
+  function slPopulateMachineFilter() {
+    var sel = document.getElementById('slMachineFilter');
+    if (!sel) return;
+    // Keep "All machines" option; rebuild machine options from entries
+    while (sel.options.length > 1) sel.remove(1);
+    // Machines that appear in entries (preserve order: most recent first)
+    var seen = {};
+    _entries.forEach(function(e) {
+      if (e.machine && !seen[e.machine]) {
+        seen[e.machine] = true;
+        var opt = document.createElement('option');
+        opt.value = e.machine;
+        opt.textContent = e.machine;
+        sel.appendChild(opt);
+      }
+    });
+  }
+
+  async function slLoadData() {
+    var errDiv = document.getElementById('slError');
+    errDiv.style.display = 'none';
+    errDiv.textContent = '';
+    try {
+      var r = await fetch('/api/service-log', {credentials: 'same-origin'});
+      var d = await r.json();
+      if (!d.ok) {
+        errDiv.textContent = window.esc ? window.esc(d.error || 'Failed to load service log.') : (d.error || 'Failed to load service log.');
+        errDiv.style.display = 'block';
+        return;
+      }
+      _entries          = Array.isArray(d.entries) ? d.entries : [];
+      _vendorNames      = Array.isArray(d.vendorNames) ? d.vendorNames : [];
+      _machineHoursData = (d.machineHoursData && typeof d.machineHoursData === 'object') ? d.machineHoursData : {};
+      _machineTaskData  = (d.machineTaskData  && typeof d.machineTaskData  === 'object') ? d.machineTaskData  : {};
+      _machineBaselines = (d.machineBaselines && typeof d.machineBaselines === 'object') ? d.machineBaselines : {};
+      slPopulateVendorList();
+      slPopulateMachineFilter();
+      slRenderSummary();
+      slRenderList();
+    } catch (e) {
+      errDiv.textContent = 'Network error loading service log.';
+      errDiv.style.display = 'block';
+    }
+  }
+
+  // ---- Vendor datalist ------------------------------------------------
+  function slPopulateVendorList() {
+    var dl = document.getElementById('slVendorList');
+    if (!dl) return;
+    dl.innerHTML = '';
+    _vendorNames.forEach(function(name) {
+      var opt = document.createElement('option');
+      opt.value = name;
+      dl.appendChild(opt);
+    });
+  }
+
+  // ---- Machine summary ------------------------------------------------
+  // Compute per-machine summary from entries (sorted newest-first by service_date).
+  // Returns [{machine, lastDate, lastHourMeter, nextDueHours, nextDueDate}]
+  function slComputeSummary(entries) {
+    var byMachine = {};
+    entries.forEach(function(e) {
+      var m = e.machine || '';
+      if (!byMachine[m]) {
+        byMachine[m] = [];
+      }
+      byMachine[m].push(e);
+    });
+    var today = new Date().toISOString().slice(0, 10);
+    var summary = [];
+    Object.keys(byMachine).forEach(function(m) {
+      var rows = byMachine[m]; // already sorted by service_date DESC from server
+      var latest = rows[0];
+      summary.push({
+        machine:      m,
+        lastDate:     latest.service_date || '',
+        lastHourMeter: latest.hour_meter,
+        nextDueHours: latest.next_due_hours,
+        nextDueDate:  latest.next_due_date || '',
+        overdue:      !!(latest.next_due_date && latest.next_due_date < today),
+      });
+    });
+    return summary;
+  }
+  // Expose for tests
+  window.slComputeSummary = slComputeSummary;
+
+  function slRenderSummary() {
+    var list = document.getElementById('slSummaryList');
+    if (!list) return;
+    list.innerHTML = '';
+
+    var summary = slComputeSummary(_entries);
+
+    if (summary.length === 0) {
+      var emp = document.createElement('div');
+      emp.className = 'sl-no-summary';
+      emp.textContent = 'No service entries yet.';
+      list.appendChild(emp);
+      return;
+    }
+
+    summary.forEach(function(s) {
+      var card = document.createElement('div');
+      card.className = 'sl-summary-card';
+
+      var machineDiv = document.createElement('div');
+      machineDiv.className = 'sl-summary-machine';
+      machineDiv.textContent = s.machine;
+      card.appendChild(machineDiv);
+
+      var row = document.createElement('div');
+      row.className = 'sl-summary-row';
+
+      function addItem(label, value, extra) {
+        var item = document.createElement('span');
+        item.className = 'sl-summary-item';
+        var strong = document.createElement('strong');
+        strong.textContent = value || '—';
+        item.textContent = label + ': ';
+        item.appendChild(strong);
+        if (extra) item.appendChild(extra);
+        row.appendChild(item);
+      }
+
+      var lastDateFormatted = s.lastDate ? (window.pfFmtDate ? window.pfFmtDate(s.lastDate) : s.lastDate) : '—';
+      addItem('Last service', lastDateFormatted);
+
+      if (s.lastHourMeter != null) {
+        addItem('Hour meter', s.lastHourMeter.toLocaleString() + ' hrs');
+      }
+
+      if (s.nextDueHours != null) {
+        addItem('Next due (hrs)', s.nextDueHours.toLocaleString() + ' hrs');
+      }
+
+      if (s.nextDueDate) {
+        var nextDateFormatted = window.pfFmtDate ? window.pfFmtDate(s.nextDueDate) : s.nextDueDate;
+        var badge = null;
+        if (s.overdue) {
+          badge = document.createElement('span');
+          badge.className = 'sl-overdue-badge';
+          badge.textContent = 'OVERDUE';
+        }
+        addItem('Next due (date)', nextDateFormatted, badge);
+      }
+
+      card.appendChild(row);
+
+      // ---- Interval tracking lines (500/1000/2000 hr) ----
+      var intervalStatus = slMachineIntervalStatuses(s.machine, _entries, _machineHoursData, _machineBaselines);
+      if (intervalStatus) {
+        // Current hours source line
+        var hoursInfo = intervalStatus.hoursSource;
+        if (hoursInfo) {
+          var hLine = document.createElement('div');
+          hLine.className = 'sl-hours-source';
+          var dateStr = hoursInfo.date ? (window.pfFmtDate ? window.pfFmtDate(hoursInfo.date) : hoursInfo.date) : '';
+          hLine.textContent = Number(hoursInfo.hours).toLocaleString() + ' h current, from ' +
+            hoursInfo.source + (dateStr ? ' on ' + dateStr : '');
+          card.appendChild(hLine);
+        } else {
+          var noH = document.createElement('div');
+          noH.className = 'sl-no-hours';
+          noH.textContent = 'No hours reported yet';
+          card.appendChild(noH);
+        }
+
+        // 500/1000/2000 rows
+        var intervalsDiv = document.createElement('div');
+        intervalsDiv.className = 'sl-intervals';
+
+        intervalStatus.levels.forEach(function(lvl) {
+          var iRow = document.createElement('div');
+          iRow.className = 'sl-interval-row';
+          iRow.setAttribute('aria-expanded', 'false');
+
+          var label = document.createElement('span');
+          label.className = 'sl-interval-label';
+          label.textContent = lvl.level.toLocaleString() + ' h';
+          iRow.appendChild(label);
+
+          var statusSpan = document.createElement('span');
+          statusSpan.className = 'sl-interval-status';
+
+          if (lvl.noReading) {
+            statusSpan.textContent = 'No hours reported — due at ' + lvl.nextDue.toLocaleString() + ' h (baseline 0)';
+          } else if (lvl.status === 'overdue') {
+            statusSpan.textContent = 'due at ' + lvl.nextDue.toLocaleString() + ' h (';
+            var ob = document.createElement('span');
+            ob.className = 'sl-overdue-badge';
+            ob.textContent = 'OVERDUE ' + Math.abs(Math.round(lvl.hoursLeft)) + ' h';
+            statusSpan.appendChild(ob);
+            statusSpan.appendChild(document.createTextNode(')'));
+          } else if (lvl.status === 'amber') {
+            statusSpan.textContent = 'due at ' + lvl.nextDue.toLocaleString() + ' h (';
+            var ab = document.createElement('span');
+            ab.className = 'sl-amber-badge';
+            ab.textContent = Math.round(lvl.hoursLeft) + ' h left';
+            statusSpan.appendChild(ab);
+            statusSpan.appendChild(document.createTextNode(')'));
+          } else {
+            statusSpan.textContent = 'due at ' + lvl.nextDue.toLocaleString() +
+              ' h (' + Math.round(lvl.hoursLeft).toLocaleString() + ' h left)';
+          }
+          iRow.appendChild(statusSpan);
+
+          // Expandable task list — uses real data from machineTaskData
+          var tasksDiv = document.createElement('div');
+          tasksDiv.className = 'sl-interval-tasks';
+          var lvlData = _machineTaskData[s.machine] && _machineTaskData[s.machine][lvl.level];
+          var tasks   = (lvlData && Array.isArray(lvlData.tasks)) ? lvlData.tasks : [];
+          var taskGaps = (lvlData && lvlData.gaps) ? lvlData.gaps : null;
+          var taskSrc  = _machineTaskData[s.machine] ? _machineTaskData[s.machine].source : null;
+
+          if (tasks.length > 0) {
+            var ul = document.createElement('ul');
+            tasks.forEach(function(t) {
+              var li = document.createElement('li');
+              li.textContent = t;
+              ul.appendChild(li);
+            });
+            tasksDiv.appendChild(ul);
+          } else if (taskGaps) {
+            var gapSpan = document.createElement('span');
+            gapSpan.className = 'sl-tasks-empty';
+            gapSpan.textContent = taskGaps;
+            tasksDiv.appendChild(gapSpan);
+          } else {
+            var emptyNote = document.createElement('span');
+            emptyNote.className = 'sl-tasks-empty';
+            emptyNote.textContent = 'Task list not yet sourced.';
+            tasksDiv.appendChild(emptyNote);
+          }
+
+          if (taskSrc) {
+            var srcDiv = document.createElement('div');
+            srcDiv.style.cssText = 'margin-top:5px;font-size:0.68rem;color:#888;';
+            srcDiv.textContent = 'Source: ' + taskSrc;
+            tasksDiv.appendChild(srcDiv);
+          }
+
+          if (lvl.usingBaseline && _machineTaskData[s.machine]) {
+            var blDiv = document.createElement('div');
+            blDiv.style.cssText = 'margin-top:3px;font-size:0.68rem;color:#a06000;';
+            blDiv.textContent = 'Baseline from ' + (_machineTaskData[s.machine].label || s.machine) + ' ECM/shop record (no service log entry for this level yet).';
+            tasksDiv.appendChild(blDiv);
+          }
+
+          iRow.appendChild(tasksDiv);
+
+          iRow.addEventListener('click', function() {
+            var isOpen = tasksDiv.classList.contains('open');
+            tasksDiv.classList.toggle('open', !isOpen);
+            iRow.setAttribute('aria-expanded', String(!isOpen));
+          });
+
+          intervalsDiv.appendChild(iRow);
+        });
+
+        card.appendChild(intervalsDiv);
+      }
+
+      list.appendChild(card);
+    });
+  }
+
+  // ---- Render entry list ----------------------------------------------
+  function slRenderList() {
+    var list = document.getElementById('slList');
+    if (!list) return;
+    list.innerHTML = '';
+
+    var filterMachine = (document.getElementById('slMachineFilter') || {}).value || '';
+
+    var filtered = filterMachine
+      ? _entries.filter(function(e){ return e.machine === filterMachine; })
+      : _entries;
+
+    if (filtered.length === 0) {
+      var emp = document.createElement('div');
+      emp.className = 'sl-empty';
+      emp.textContent = filterMachine
+        ? 'No entries for this machine.'
+        : 'No service entries yet - tap Add entry';
+      list.appendChild(emp);
+      return;
+    }
+
+    filtered.forEach(function(entry) {
+      list.appendChild(slBuildCard(entry));
+    });
+  }
+  window.slRenderList = slRenderList;
+
+  function slBuildCard(entry) {
+    var card = document.createElement('div');
+    card.className = 'sl-card';
+
+    var header = document.createElement('div');
+    header.className = 'sl-card-header';
+
+    var titleDiv = document.createElement('div');
+    titleDiv.className = 'sl-card-title';
+
+    var machineDiv = document.createElement('div');
+    machineDiv.className = 'sl-card-machine';
+    machineDiv.textContent = entry.machine || '';
+    titleDiv.appendChild(machineDiv);
+
+    var metaDiv = document.createElement('div');
+    metaDiv.className = 'sl-card-meta';
+    var dateStr = entry.service_date ? (window.pfFmtDate ? window.pfFmtDate(entry.service_date) : entry.service_date) : '';
+    metaDiv.textContent = [dateStr, entry.service_type].filter(Boolean).join(' · ');
+    titleDiv.appendChild(metaDiv);
+
+    header.appendChild(titleDiv);
+
+    if (_canEdit) {
+      var acts = document.createElement('div');
+      acts.className = 'sl-card-actions';
+
+      var editBtn = document.createElement('button');
+      editBtn.className = 'sl-edit-btn';
+      editBtn.textContent = 'Edit';
+      editBtn.setAttribute('aria-label', 'Edit entry for ' + (entry.machine || 'machine'));
+      editBtn.addEventListener('click', function() { slOpenEdit(entry); });
+
+      var delBtn = document.createElement('button');
+      delBtn.className = 'sl-del-btn';
+      delBtn.textContent = 'Delete';
+      delBtn.setAttribute('aria-label', 'Delete entry for ' + (entry.machine || 'machine'));
+      delBtn.addEventListener('click', function() { slConfirmDelete(entry.id, entry.machine || 'this entry'); });
+
+      acts.appendChild(editBtn);
+      acts.appendChild(delBtn);
+      header.appendChild(acts);
+    }
+    card.appendChild(header);
+
+    // Detail rows
+    var details = document.createElement('div');
+    details.className = 'sl-details';
+
+    function addRow(label, value) {
+      if (value == null || value === '') return;
+      var row = document.createElement('div');
+      row.className = 'sl-detail-row';
+      var lbl = document.createElement('span');
+      lbl.className = 'sl-detail-label';
+      lbl.textContent = label;
+      var val = document.createElement('span');
+      val.className = 'sl-detail-val';
+      val.textContent = String(value);
+      row.appendChild(lbl);
+      row.appendChild(val);
+      details.appendChild(row);
+    }
+
+    if (entry.hour_meter != null) addRow('Hour meter', entry.hour_meter.toLocaleString() + ' hrs');
+    if (entry.service_interval != null) addRow('Scheduled', entry.service_interval.toLocaleString() + ' hr service');
+    if (entry.description)   addRow('Description', entry.description);
+    if (entry.parts_used)    addRow('Parts used', entry.parts_used);
+    if (entry.vendor)        addRow('Vendor', entry.vendor);
+    if (entry.cost != null)  addRow('Cost', '$' + Number(entry.cost).toFixed(2));
+    if (entry.performed_by)  addRow('Performed by', entry.performed_by);
+    if (entry.next_due_hours != null) addRow('Next due (hrs)', entry.next_due_hours.toLocaleString() + ' hrs');
+    if (entry.next_due_date) {
+      var nd = window.pfFmtDate ? window.pfFmtDate(entry.next_due_date) : entry.next_due_date;
+      addRow('Next due (date)', nd);
+    }
+    if (entry.notes)         addRow('Notes', entry.notes);
+
+    if (details.children.length > 0) card.appendChild(details);
+
+    if (entry.updated_by && entry.updated_at) {
+      var upd = document.createElement('div');
+      upd.className = 'sl-updated';
+      var ts = entry.updated_at ? entry.updated_at.replace('T',' ').slice(0,16) : '';
+      upd.textContent = 'Updated by ' + (entry.updated_by || '') + (ts ? ' on ' + ts : '');
+      card.appendChild(upd);
+    }
+
+    return card;
+  }
+
+  // ---- Machine picker change -------------------------------------------
+  function slOnMachineChange() {
+    var sel = document.getElementById('slFldMachine');
+    var other = document.getElementById('slFldMachineOther');
+    if (!sel || !other) return;
+    if (sel.value === '__other__') {
+      other.style.display = '';
+      other.focus();
+    } else {
+      other.style.display = 'none';
+      other.value = '';
+    }
+  }
+  window.slOnMachineChange = slOnMachineChange;
+
+  function slGetMachineValue() {
+    var sel = document.getElementById('slFldMachine');
+    if (!sel) return '';
+    if (sel.value === '__other__') {
+      return (document.getElementById('slFldMachineOther') || {}).value || '';
+    }
+    return sel.value;
+  }
+
+  // Set machine picker to a specific value (for edit)
+  function slSetMachineValue(machine) {
+    var sel = document.getElementById('slFldMachine');
+    var other = document.getElementById('slFldMachineOther');
+    if (!sel) return;
+    // Check if the machine is in the select options
+    var found = false;
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === machine) {
+        sel.value = machine;
+        found = true;
+        break;
+      }
+    }
+    if (!found && machine) {
+      sel.value = '__other__';
+      if (other) {
+        other.style.display = '';
+        other.value = machine;
+      }
+    } else {
+      if (other) {
+        other.style.display = 'none';
+        other.value = '';
+      }
+    }
+  }
+
+  // ---- Add / Edit sheet -----------------------------------------------
+  function slClearSheet() {
+    document.getElementById('slEditId').value = '';
+    document.getElementById('slFldMachine').value = '';
+    if (document.getElementById('slFldMachineOther')) {
+      document.getElementById('slFldMachineOther').style.display = 'none';
+      document.getElementById('slFldMachineOther').value = '';
+    }
+    document.getElementById('slFldDate').value = '';
+    document.getElementById('slFldHourMeter').value = '';
+    document.getElementById('slFldServiceType').value = '';
+    document.getElementById('slFldServiceInterval').value = '';
+    document.getElementById('slFldDescription').value = '';
+    document.getElementById('slFldParts').value = '';
+    document.getElementById('slFldVendor').value = '';
+    document.getElementById('slFldCost').value = '';
+    document.getElementById('slFldPerformedBy').value = '';
+    document.getElementById('slFldNextHours').value = '';
+    document.getElementById('slFldNextDate').value = '';
+    document.getElementById('slFldNotes').value = '';
+    document.getElementById('slSheetErr').className = 'sl-sheet-err';
+    document.getElementById('slSheetErr').textContent = '';
+    document.getElementById('slSheetSave').disabled = false;
+    document.getElementById('slSheetSave').textContent = 'Save';
+  }
+
+  function slOpenAdd() {
+    _editId = null;
+    slClearSheet();
+    document.getElementById('slSheetTitle').textContent = 'Add Entry';
+    document.getElementById('slSheetBackdrop').classList.add('open');
+    document.getElementById('slSheet').classList.add('open');
+    setTimeout(function(){ document.getElementById('slFldMachine').focus(); }, 100);
+  }
+
+  function slOpenEdit(entry) {
+    _editId = entry.id;
+    slClearSheet();
+    document.getElementById('slSheetTitle').textContent = 'Edit Entry';
+    document.getElementById('slEditId').value = entry.id;
+    slSetMachineValue(entry.machine || '');
+    document.getElementById('slFldDate').value = entry.service_date || '';
+    document.getElementById('slFldHourMeter').value = entry.hour_meter != null ? entry.hour_meter : '';
+    document.getElementById('slFldServiceType').value = entry.service_type || '';
+    document.getElementById('slFldServiceInterval').value = entry.service_interval != null ? String(entry.service_interval) : '';
+    document.getElementById('slFldDescription').value = entry.description || '';
+    document.getElementById('slFldParts').value = entry.parts_used || '';
+    document.getElementById('slFldVendor').value = entry.vendor || '';
+    document.getElementById('slFldCost').value = entry.cost != null ? entry.cost : '';
+    document.getElementById('slFldPerformedBy').value = entry.performed_by || '';
+    document.getElementById('slFldNextHours').value = entry.next_due_hours != null ? entry.next_due_hours : '';
+    document.getElementById('slFldNextDate').value = entry.next_due_date || '';
+    document.getElementById('slFldNotes').value = entry.notes || '';
+    document.getElementById('slSheetBackdrop').classList.add('open');
+    document.getElementById('slSheet').classList.add('open');
+    setTimeout(function(){ document.getElementById('slFldMachine').focus(); }, 100);
+  }
+
+  function slCloseSheet() {
+    document.getElementById('slSheetBackdrop').classList.remove('open');
+    document.getElementById('slSheet').classList.remove('open');
+    _editId = null;
+  }
+
+  async function slSaveEntry() {
+    var saveBtn = document.getElementById('slSheetSave');
+    if (saveBtn.disabled) return;
+    var errDiv = document.getElementById('slSheetErr');
+    errDiv.className = 'sl-sheet-err';
+    errDiv.textContent = '';
+
+    var machine = slGetMachineValue().trim();
+    var service_date = document.getElementById('slFldDate').value.trim();
+    var service_type = document.getElementById('slFldServiceType').value.trim();
+
+    if (!machine) {
+      errDiv.textContent = 'Machine is required.';
+      errDiv.className = 'sl-sheet-err show';
+      document.getElementById('slFldMachine').focus();
+      return;
+    }
+    if (!service_date) {
+      errDiv.textContent = 'Service date is required.';
+      errDiv.className = 'sl-sheet-err show';
+      document.getElementById('slFldDate').focus();
+      return;
+    }
+    if (!service_type) {
+      errDiv.textContent = 'Service type is required.';
+      errDiv.className = 'sl-sheet-err show';
+      document.getElementById('slFldServiceType').focus();
+      return;
+    }
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+
+    var isEdit  = !!_editId;
+    var intervalVal = document.getElementById('slFldServiceInterval').value;
+    var payload = {
+      action:           isEdit ? 'edit_entry' : 'add_entry',
+      machine:          machine,
+      service_date:     service_date,
+      service_type:     service_type,
+      service_interval: intervalVal !== '' ? intervalVal : null,
+      hour_meter:       document.getElementById('slFldHourMeter').value !== '' ? document.getElementById('slFldHourMeter').value : null,
+      description:      document.getElementById('slFldDescription').value.trim(),
+      parts_used:       document.getElementById('slFldParts').value.trim(),
+      vendor:           document.getElementById('slFldVendor').value.trim(),
+      cost:             document.getElementById('slFldCost').value !== '' ? document.getElementById('slFldCost').value : null,
+      performed_by:     document.getElementById('slFldPerformedBy').value.trim(),
+      next_due_hours:   document.getElementById('slFldNextHours').value !== '' ? document.getElementById('slFldNextHours').value : null,
+      next_due_date:    document.getElementById('slFldNextDate').value.trim() || null,
+      notes:            document.getElementById('slFldNotes').value.trim(),
+    };
+    if (isEdit) payload.id = _editId;
+
+    try {
+      var r = await fetch('/api/service-log', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload),
+      });
+      var d = await r.json();
+      if (!d.ok) {
+        errDiv.textContent = d.error || 'Save failed.';
+        errDiv.className = 'sl-sheet-err show';
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save';
+        return;
+      }
+      slCloseSheet();
+      await slLoadData();
+    } catch (e) {
+      errDiv.textContent = 'Network error. Please try again.';
+      errDiv.className = 'sl-sheet-err show';
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save';
+    }
+  }
+
+  // ---- Delete confirm --------------------------------------------------
+  function slConfirmDelete(id, name) {
+    _pendingDel = {id: id, name: name};
+    var msg = 'Delete the entry for "' + name + '"? This cannot be undone.';
+    document.getElementById('slConfirmMsg').textContent = msg;
+    document.getElementById('slConfirmOk').disabled = false;
+    document.getElementById('slConfirmOk').textContent = 'Delete';
+    document.getElementById('slConfirmBackdrop').classList.add('open');
+  }
+
+  function slCloseConfirm() {
+    document.getElementById('slConfirmBackdrop').classList.remove('open');
+    _pendingDel = null;
+  }
+
+  async function slDoDelete() {
+    if (!_pendingDel) return;
+    var okBtn = document.getElementById('slConfirmOk');
+    if (okBtn.disabled) return;
+    okBtn.disabled = true;
+    okBtn.textContent = 'Deleting…';
+
+    try {
+      var r = await fetch('/api/service-log', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action: 'delete_entry', id: _pendingDel.id}),
+      });
+      var d = await r.json();
+      if (!d.ok) {
+        alert(d.error || 'Delete failed.');
+        okBtn.disabled = false;
+        okBtn.textContent = 'Delete';
+        return;
+      }
+      slCloseConfirm();
+      await slLoadData();
+    } catch (e) {
+      alert('Network error.');
+      okBtn.disabled = false;
+      okBtn.textContent = 'Delete';
+    }
+  }
+
+  // Expose for inline event attributes + tests
+  window.slOpenAdd        = slOpenAdd;
+  window.slOpenEdit       = slOpenEdit;
+  window.slCloseSheet     = slCloseSheet;
+  window.slSaveEntry      = slSaveEntry;
+  window.slCloseConfirm   = slCloseConfirm;
+  window.slConfirmDelete  = slConfirmDelete;
+  window.slDoDelete       = slDoDelete;
+  window.slRenderSummary  = slRenderSummary;
+
+})();
+</script>
+</body>
+</html>

@@ -513,6 +513,13 @@ const PAGE_AREAS = {
   // /api/vendors entry and redeploy. ZERO financials.
   '/vendors.html':           'user_admin',
   '/vendors':                'user_admin',       // CF Pages clean-URL form (308 from .html)
+  // Service Log page (equipment service history, Derek 2026-11-14). Classified
+  // 'user_admin' so only admin-role users pass the RBAC check; _middleware.js
+  // applies an additional UID preview gate (SERVICELOG_ALLOWED_UIDS). When
+  // SERVICELOG_GO_LIVE=true the page reads can be opened to field_ops — change
+  // both this entry and the /api/service-log entry and redeploy. Carries cost data.
+  '/service-log.html':       'user_admin',
+  '/service-log':            'user_admin',       // CF Pages clean-URL form (308 from .html)
 };
 
 // HTML pages the FIELD CREW is explicitly allowed to reach (their operational
@@ -867,6 +874,13 @@ export function areaForPath(pathname) {
     // When VENDORS_GO_LIVE=true reads may be opened to field_ops — that
     // requires changing this entry to 'field_ops' and redeploying.
     if (pathname.startsWith('/api/vendors'))       return 'user_admin';
+    // Service Log API (equipment service history). Classified 'user_admin' so only
+    // admin-role users pass the RBAC check; an additional UID preview gate
+    // (servicelog-access.js SERVICELOG_ALLOWED_UIDS) is enforced in _middleware.js
+    // AFTER this check and directly in the handler. Carries cost/hour_meter data.
+    // When SERVICELOG_GO_LIVE=true reads may be opened to field_ops — requires
+    // changing this entry and redeploying.
+    if (pathname.startsWith('/api/service-log'))   return 'user_admin';
     if (pathname.startsWith('/api/users'))         return 'user_admin';
     // /api/data proxies the live SharePoint data set (bid log + project master).
     // BD sees the full bid log (Brad 2026-06-23) -> classify as financials
