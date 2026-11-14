@@ -455,15 +455,17 @@ async function getBody(resp) {
   const r1 = await onRequestPost(makeCtx(db, DEREK_UID, async () => ({ action: 'seed' })));
   const b1 = await getBody(r1);
   assert('CRUD9a: seed on empty returns ok:true', b1.ok === true, JSON.stringify(b1));
-  // Add a section manually
+  // The seed created 1 section ("Local (Fort Wayne)") + 7 items; add one more
   await onRequestPost(makeCtx(db, DEREK_UID, async () => ({ action: 'add_section', name: 'Manual' })));
-  assert('CRUD9b-pre: section added', db._data.vendors_sections.length === 1);
+  assert('CRUD9b-pre: Derek can add section after seed (now 2 total)',
+    db._data.vendors_sections.length === 2,
+    'got ' + db._data.vendors_sections.length);
   // Second seed call: not empty → skipped
   const r3 = await onRequestPost(makeCtx(db, DEREK_UID, async () => ({ action: 'seed' })));
   const b3 = await getBody(r3);
   assert('CRUD9b: seed skipped when not empty',
     b3.ok === true && b3.seeded === false, JSON.stringify(b3));
-  assert('CRUD9c: section not overwritten', db._data.vendors_sections.length === 1);
+  assert('CRUD9c: section count unchanged after skipped re-seed', db._data.vendors_sections.length === 2);
 }
 
 // CRUD10: me.js returns vendorsAllowed
@@ -472,6 +474,46 @@ async function getBody(resp) {
     meSrc.includes('vendorsAllowed'), 'vendorsAllowed not in me.js');
   assert('CRUD10b: me.js response includes vendorsAllowed:',
     meSrc.includes('vendorsAllowed:'), 'vendorsAllowed: not in me.js response');
+}
+
+// CRUD11: vendors-seed.js content — real data, not placeholder
+{
+  const EXPECTED_COMPANIES = [
+    'Geiger Machine',
+    'H & S Fabrication, LLC',
+    'Fastenal',
+    'Applied Industrial Technologies',
+    'Carter Welding Repair & Supplies Inc',
+    'MacAllister Machinery (Fort Wayne Parts)',
+    'Cummins Sales and Service (Fort Wayne Branch)',
+  ];
+
+  assert('CRUD11a: seed has exactly 7 entries',
+    VENDORS_SEED.length === 7, 'got ' + VENDORS_SEED.length);
+
+  assert('CRUD11b: seed companies match expected list (file order)',
+    EXPECTED_COMPANIES.every((co, i) => VENDORS_SEED[i]?.company === co),
+    JSON.stringify(VENDORS_SEED.map(v => v.company)));
+
+  assert('CRUD11c: no placeholder / test data in seed',
+    VENDORS_SEED.every(v =>
+      !/example|sample|test|lorem/i.test(v.company || '') &&
+      !/example|sample|test|lorem/i.test(v.notes || '')
+    ), 'found placeholder in: ' + JSON.stringify(VENDORS_SEED.map(v => v.company)));
+
+  assert('CRUD11d: all seed entries have section_name "Local (Fort Wayne)"',
+    VENDORS_SEED.every(v => v.section_name === 'Local (Fort Wayne)'));
+
+  assert('CRUD11e: all seed entries have a phone number',
+    VENDORS_SEED.every(v => typeof v.phone === 'string' && v.phone.length > 5),
+    'missing phone: ' + JSON.stringify(VENDORS_SEED.filter(v => !v.phone).map(v => v.company)));
+
+  assert('CRUD11f: no dollar totals / invoice numbers / SharePoint IDs in seed notes',
+    VENDORS_SEED.every(v => {
+      const n = (v.notes || '');
+      // no $ amounts, no SharePoint item IDs (016ISVH...), no "Inv \d+"
+      return !n.includes('$') && !/016[A-Z0-9]{30,}/i.test(n) && !/\bInv\s+\d+/i.test(n);
+    }), 'internal data leaked to seed notes');
 }
 
 // ============================================================================
