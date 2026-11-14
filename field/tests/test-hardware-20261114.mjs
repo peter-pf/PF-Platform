@@ -61,7 +61,7 @@ const hwDataSrc = readFileSync(
 ).replace(/^export /gm, '');
 const hwDataMod = {};
 {
-  const fn = new Function('module', hwDataSrc + '\nmodule.exports={DIAGRAMS,DIAGRAM_BY_ID};');
+  const fn = new Function('module', hwDataSrc + '\nmodule.exports={DIAGRAMS};');
   fn(hwDataMod);
 }
 const { DIAGRAMS } = hwDataMod.exports;
@@ -221,6 +221,28 @@ DIAGRAMS.forEach(d => {
     /^[a-z0-9-]+$/.test(d.id));
 });
 
+// D7 Balloon coverage:
+//   Every drawn balloon (hotspot != null) must have non-empty desc and partNumber.
+//   Every diagram must have at least one tappable hotspot.
+console.log('\n--- D7. Balloon coverage ---');
+DIAGRAMS.forEach(diag => {
+  let hotspotCount = 0;
+  diag.parts.forEach((part, i) => {
+    if (part.hotspot !== null && part.hotspot !== undefined) {
+      hotspotCount++;
+      const ctx = diag.id + '[' + i + '] item=' + part.item;
+      assert('D7-desc-' + ctx + ': drawn balloon has non-empty desc',
+        typeof part.desc === 'string' && part.desc.trim().length > 0,
+        'desc=' + part.desc);
+      assert('D7-pn-' + ctx + ': drawn balloon has non-empty partNumber',
+        typeof part.partNumber === 'string' && part.partNumber.trim().length > 0,
+        'partNumber=' + part.partNumber);
+    }
+  });
+  assert('D7-cov-' + diag.id + ': at least one tappable hotspot',
+    hotspotCount > 0, 'found ' + hotspotCount);
+});
+
 // ============================================================================
 // C  Click / handler tests (jsdom)
 // ============================================================================
@@ -359,7 +381,7 @@ async function runHardwarePageTest(diagramsToReturn) {
       const descEl = doc.getElementById('hwDetailDesc');
       assert('C1c: detail card shows part description',
         descEl && descEl.textContent === testPart.desc,
-        'got "' + (descEl && descEl.textContent) + '"');
+        'got "' + (descEl && descEl.textContent) + '" expected "' + testPart.desc + '"');
 
       const partEl = doc.getElementById('hwDetailPart');
       assert('C1d: detail card shows part number',
