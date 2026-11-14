@@ -565,6 +565,8 @@
   }
 
   // ---- Hotspot render -----------------------------------------------
+  // Supports multi-instance parts via part.hotspots:[{x,y},...] array.
+  // Falls back to part.hotspot:{x,y} for single-instance parts.
   function hwRenderHotspots() {
     const container = document.getElementById('hwDiagramContainer');
     // Remove any existing hotspots
@@ -573,19 +575,24 @@
     if (!hwCurrentDiag) return;
 
     hwCurrentDiag.parts.forEach(part => {
-      if (!part.hotspot) return;
-      const btn = document.createElement('button');
-      btn.className = 'hw-hotspot';
-      btn.setAttribute('aria-label', 'Item ' + part.item + ': ' + part.desc);
-      btn.textContent = part.item;
-      // Position relative to the natural image dimensions (transform-origin 0,0)
-      btn.style.left = part.hotspot.x + '%';
-      btn.style.top  = part.hotspot.y + '%';
-      btn.addEventListener('click', e => {
-        e.stopPropagation();
-        hwShowDetail(part);
+      // Resolve instances: multi-instance array takes precedence over single hotspot
+      const instances = part.hotspots != null ? part.hotspots
+                      : part.hotspot  != null ? [part.hotspot]
+                      : [];
+      instances.forEach(hs => {
+        const btn = document.createElement('button');
+        btn.className = 'hw-hotspot';
+        btn.setAttribute('aria-label', 'Item ' + part.item + ': ' + part.desc);
+        btn.textContent = part.item;
+        // Position relative to the natural image dimensions (transform-origin 0,0)
+        btn.style.left = hs.x + '%';
+        btn.style.top  = hs.y + '%';
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          hwShowDetail(part);
+        });
+        container.appendChild(btn);
       });
-      container.appendChild(btn);
     });
 
     // Apply counter-scale immediately

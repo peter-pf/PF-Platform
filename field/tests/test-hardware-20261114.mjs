@@ -182,6 +182,11 @@ DIAGRAMS.forEach(diag => {
     assert('D3-' + ctx + ': partNumber is non-blank',
       typeof part.partNumber === 'string' && part.partNumber.trim().length > 0);
 
+    // Resolve instances the same way the frontend does
+    const instances = part.hotspots != null ? part.hotspots
+                    : part.hotspot  != null ? [part.hotspot]
+                    : [];
+
     if (part.hotspot !== null && part.hotspot !== undefined) {
       assert('D1-hs-x-' + ctx + ': hotspot.x in [0,100]',
         typeof part.hotspot.x === 'number' &&
@@ -192,6 +197,22 @@ DIAGRAMS.forEach(diag => {
         typeof part.hotspot.y === 'number' &&
         part.hotspot.y >= 0 && part.hotspot.y <= 100,
         'y=' + part.hotspot.y);
+    }
+
+    // Validate every element in hotspots array
+    if (Array.isArray(part.hotspots)) {
+      part.hotspots.forEach((hs, j) => {
+        assert('D1-mhs-' + ctx + '[' + j + ']: hotspots[' + j + '].x in [0,100]',
+          typeof hs.x === 'number' && hs.x >= 0 && hs.x <= 100,
+          'x=' + hs.x);
+        assert('D1-mhs-' + ctx + '[' + j + ']: hotspots[' + j + '].y in [0,100]',
+          typeof hs.y === 'number' && hs.y >= 0 && hs.y <= 100,
+          'y=' + hs.y);
+      });
+      // Multi-instance parts must have at least 2 entries
+      assert('D7-multi-' + ctx + ': hotspots array has >= 2 instances',
+        part.hotspots.length >= 2,
+        'length=' + part.hotspots.length);
     }
 
     if (part.invId !== null && part.invId !== undefined) {
@@ -222,14 +243,18 @@ DIAGRAMS.forEach(d => {
 });
 
 // D7 Balloon coverage:
-//   Every drawn balloon (hotspot != null) must have non-empty desc and partNumber.
+//   Every drawn balloon (any instance) must have non-empty desc and partNumber.
 //   Every diagram must have at least one tappable hotspot.
+//   Multi-instance parts: every hotspots[] entry must have valid x/y (checked above in D1-mhs).
 console.log('\n--- D7. Balloon coverage ---');
 DIAGRAMS.forEach(diag => {
-  let hotspotCount = 0;
+  let instanceCount = 0;
   diag.parts.forEach((part, i) => {
-    if (part.hotspot !== null && part.hotspot !== undefined) {
-      hotspotCount++;
+    const instances = part.hotspots != null ? part.hotspots
+                    : part.hotspot  != null ? [part.hotspot]
+                    : [];
+    if (instances.length > 0) {
+      instanceCount += instances.length;
       const ctx = diag.id + '[' + i + '] item=' + part.item;
       assert('D7-desc-' + ctx + ': drawn balloon has non-empty desc',
         typeof part.desc === 'string' && part.desc.trim().length > 0,
@@ -239,8 +264,8 @@ DIAGRAMS.forEach(diag => {
         'partNumber=' + part.partNumber);
     }
   });
-  assert('D7-cov-' + diag.id + ': at least one tappable hotspot',
-    hotspotCount > 0, 'found ' + hotspotCount);
+  assert('D7-cov-' + diag.id + ': at least one tappable hotspot instance',
+    instanceCount > 0, 'found ' + instanceCount);
 });
 
 // ============================================================================
@@ -367,7 +392,7 @@ async function runHardwarePageTest(diagramsToReturn) {
 
   // Call hwShowDetail directly (simulate a table row click)
   if (window.hwShowDetail) {
-    const testPart = sampleDiag.parts.find(p => p.hotspot);
+    const testPart = sampleDiag.parts.find(p => p.hotspot || (Array.isArray(p.hotspots) && p.hotspots.length > 0));
     if (testPart) {
       // hwCurrentDiag must be set for active-row highlighting; set it via hwOpenViewer
       // but jsdom can't load images, so we set state directly
@@ -399,6 +424,60 @@ async function runHardwarePageTest(diagramsToReturn) {
   }
 
   dom.window.close();
+}
+
+// C4 / C5 — multi-instance hotspot rendering
+// A part with hotspots:[...] must render one button per instance;
+// clicking any instance activates ALL buttons for that item.
+{
+  // Find first multi-instance diagram
+  const multiDiag = DIAGRAMS.find(d => d.parts.some(p => Array.isArray(p.hotspots) && p.hotspots.length >= 2));
+  if (multiDiag) {
+    const dom    = await runHardwarePageTest([multiDiag]);
+    const window = dom.window;
+    const doc    = window.document;
+
+    // hwOpenViewer sets the internal let binding hwCurrentDiag = diag.
+    // We call it to prime state, then manually call hwRenderHotspots because
+    // jsdom does not fire img.onload (which is what normally calls it).
+    if (window.hwOpenViewer) window.hwOpenViewer(multiDiag);
+    // Manually trigger hotspot render (image onload won't fire in jsdom)
+    if (window.hwRenderHotspots) window.hwRenderHotspots();
+
+    // Find a multi-instance part
+    const multiPart = multiDiag.parts.find(p => Array.isArray(p.hotspots) && p.hotspots.length >= 2);
+    const itemTxt   = String(multiPart.item);
+
+    const allBtns = doc.querySelectorAll('.hw-hotspot');
+    const matchBtns = [...allBtns].filter(b => b.textContent.trim() === itemTxt);
+
+    assert('C4a: multi-instance part renders >= 2 hotspot buttons',
+      matchBtns.length >= 2,
+      'item=' + itemTxt + ' found=' + matchBtns.length);
+
+    // Simulate click on first button via hwShowDetail
+    if (window.hwShowDetail) {
+      window.hwShowDetail(multiPart);
+      const activeBtns = [...doc.querySelectorAll('.hw-hotspot.active')];
+      const activeForItem = activeBtns.filter(b => b.textContent.trim() === itemTxt);
+      assert('C4b: clicking multi-instance activates all its buttons',
+        activeForItem.length >= 2,
+        'active=' + activeForItem.length + ' expected>=' + 2);
+
+      // Close — all should deactivate
+      window.hwCloseDetail();
+      const stillActive = [...doc.querySelectorAll('.hw-hotspot.active')];
+      assert('C5: hwCloseDetail removes all active hotspot classes',
+        stillActive.length === 0,
+        'still active=' + stillActive.length);
+    } else {
+      assert('C4b: hwShowDetail available', false, 'not found');
+    }
+
+    dom.window.close();
+  } else {
+    console.log('  SKIP C4/C5: no multi-instance diagram found in DIAGRAMS');
+  }
 }
 
 // ============================================================================
