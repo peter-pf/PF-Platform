@@ -173,6 +173,9 @@ DIAGRAMS.forEach(diag => {
     diag.id && diag.label && (diag.type === 'mast' || diag.type === 'vibro') &&
     Array.isArray(diag.parts));
 
+  assert('D1-pageRef-' + diag.id + ': has non-empty pageRef string',
+    typeof diag.pageRef === 'string' && diag.pageRef.trim().length > 0);
+
   assert('D4-' + diag.id + ': at least one part',
     diag.parts.length > 0);
 
@@ -498,6 +501,10 @@ console.log('\n--- S. Static analysis ---');
     src.includes('/api/hardware'));
   assert('S5: hardware.html fetches /api/me for auth (consistent with other pages)',
     src.includes('/api/me'));
+  assert('S6: hardware.html has static topbar (not broken pfBuildHeader)',
+    src.includes('id="topbar"') && !src.includes('pfBuildHeader'));
+  assert('S7: hardware.html has pfNav with hwNavItem (always-visible — this is the hardware page)',
+    src.includes('id="pfNav"') && src.includes('id="hwNavItem"'));
 }
 
 // ============================================================================

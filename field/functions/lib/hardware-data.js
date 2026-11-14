@@ -7,6 +7,7 @@ export const DIAGRAMS = [
   {
     id: 'mast-complete',
     label: 'Mast Assembly — Complete', type: 'mast',
+    pageRef: 'p.24',
     image: 'mast-complete.png',
     parts: [
       { item:'1',   partNumber:'VM978-41430', desc:'MMS3 - 30FT STROKE - MAIN TUBE 12"X12"X3/8" W.T.',              qty:1,  hotspot:{x:68.6,y:6.7},  invId:null },
@@ -84,6 +85,7 @@ export const DIAGRAMS = [
   {
     id: 'mast-fairlead',
     label: 'Mast — Fairlead Assembly', type: 'mast',
+    pageRef: 'p.25',
     image: 'mast-fairlead.png',
     parts: [
       { item:'1', partNumber:'VM978-20361', desc:'MMS3 - 2019 - FAIRLEAD BODY ASSM',              qty:1, hotspot:{x:46.5,y:13.7}, invId:null },
@@ -94,6 +96,7 @@ export const DIAGRAMS = [
   {
     id: 'vibro-coupling',
     label: 'Vibro — Stinger/Coupling Assembly', type: 'vibro',
+    pageRef: 'p.27',
     image: 'vibro-coupling.png',
     parts: [
       { item:'1',     partNumber:'VM978-20344', desc:'STINGER ASSM - LOWER TUBE ASSM',                                             qty:1,  hotspot:null,             invId:null },
@@ -153,6 +156,7 @@ export const DIAGRAMS = [
   {
     id: 'mast-foot',
     label: 'Mast — Foot Assembly', type: 'mast',
+    pageRef: 'p.30',
     image: 'mast-foot.png',
     parts: [
       { item:'1', partNumber:'VM978-20339', desc:'BREAK AWAY LOWER FOOT ASSEMBLY',                       qty:1, hotspot:{x:52.2,y:45.2}, invId:null },
@@ -166,6 +170,7 @@ export const DIAGRAMS = [
   {
     id: 'mast-pivot',
     label: 'Mast — Tube Side Pivot Mount', type: 'mast',
+    pageRef: 'p.31',
     image: 'mast-pivot.png',
     parts: [
       { item:'1',  partNumber:'VM978-41470', desc:'MMS3-2018-30FT - MAIN TUBE GUSSET PLATE',                       qty:1, hotspot:{x:45.2,y:7.3},  invId:null },
@@ -188,6 +193,7 @@ export const DIAGRAMS = [
   {
     id: 'vibro-boom',
     label: 'Vibro — Boom Assembly', type: 'vibro',
+    pageRef: 'pp.32–33',
     image: 'vibro-boom.png',
     parts: [
       { item:'2',  partNumber:'7-600-099',   desc:'DEFAULT ISOLATOR - ASSEMBLY',                             qty:2,  hotspot:{x:45.1,y:61.9}, invId:null },
@@ -213,6 +219,7 @@ export const DIAGRAMS = [
   {
     id: 'mast-sled',
     label: 'Mast — Sled Assembly', type: 'mast',
+    pageRef: 'p.34',
     image: 'mast-sled.png',
     parts: [
       { item:'1', partNumber:'VM978-10169', desc:'MMS3, SLED, SUBASSEMBLY',                                  qty:1,  hotspot:{x:47.6,y:55.1}, invId:null },
@@ -225,6 +232,7 @@ export const DIAGRAMS = [
   {
     id: 'vibro-nose',
     label: 'Vibro — Nose Strut Assembly', type: 'vibro',
+    pageRef: 'p.35',
     image: 'vibro-nose.png',
     parts: [
       { item:'1', partNumber:'VM978-41500', desc:'UNIVERSAL BACK PLATE, ATTACHMENT',                         qty:1, hotspot:{x:70.6,y:27.4}, invId:null },
