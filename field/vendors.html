@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Vendors | PF Field Portal</title>
+  <link rel="stylesheet" href="pf-r5.css">
+  <script src="/js/pf-shared.js"></script>
+  <style>
+    /* ---- Vendors page styles ---- */
+
+    /* Section tabs */
+    .vn-tab-bar {
+      display: flex;
+      gap: 6px;
+      padding: 10px 16px 0;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .vn-tab-btn {
+      padding: 7px 14px;
+      border: 1.5px solid var(--pf-blue, #1a56db);
+      border-radius: 20px;
+      background: transparent;
+      color: var(--pf-blue, #1a56db);
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.14s, color 0.14s;
+      white-space: nowrap;
+    }
+    .vn-tab-btn.active {
+      background: var(--pf-blue, #1a56db);
+      color: #fff;
+    }
+    .vn-tab-rename-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--pf-blue, #1a56db);
+      font-size: 0.75rem;
+      padding: 2px 4px;
+      vertical-align: middle;
+      margin-left: 2px;
+      opacity: 0.7;
+    }
+    .vn-tab-rename-btn:hover { opacity: 1; }
+
+    /* Search + action bar */
+    .vn-action-bar {
+      display: flex;
+      gap: 8px;
+      padding: 10px 16px 0;
+      align-items: center;
+    }
+    .vn-search {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1.5px solid #ccd;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      background: var(--input-bg, #fff);
+      color: var(--text, #111);
+      min-width: 0;
+    }
+    .vn-search:focus { outline: none; border-color: var(--pf-blue, #1a56db); }
+    .vn-add-btn {
+      flex: 0 0 auto;
+      padding: 8px 14px;
+      background: var(--pf-blue, #1a56db);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .vn-add-sec-btn {
+      flex: 0 0 auto;
+      padding: 8px 10px;
+      background: transparent;
+      color: var(--pf-blue, #1a56db);
+      border: 1.5px solid var(--pf-blue, #1a56db);
+      border-radius: 8px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    /* Vendor card list */
+    .vn-list {
+      padding: 10px 16px 80px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .vn-card {
+      background: var(--card-bg, #fff);
+      border: 1px solid #dde;
+      border-radius: 10px;
+      padding: 12px 14px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.07);
+    }
+    .vn-card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .vn-company {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text, #111);
+      word-break: break-word;
+    }
+    .vn-category {
+      font-size: 0.78rem;
+      color: #667;
+      margin-top: 2px;
+    }
+    .vn-card-actions {
+      display: flex;
+      gap: 4px;
+      flex: 0 0 auto;
+    }
+    .vn-edit-btn, .vn-del-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px 6px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .vn-edit-btn { color: var(--pf-blue, #1a56db); }
+    .vn-del-btn  { color: #c00; }
+    .vn-edit-btn:hover { background: rgba(26,86,219,.08); }
+    .vn-del-btn:hover  { background: rgba(200,0,0,.08); }
+
+    /* Detail rows */
+    .vn-details {
+      margin-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .vn-detail-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 0.84rem;
+    }
+    .vn-detail-label {
+      flex: 0 0 72px;
+      color: #667;
+      font-size: 0.78rem;
+    }
+    .vn-detail-val {
+      color: var(--text, #111);
+      word-break: break-word;
+    }
+    .vn-detail-val a {
+      color: var(--pf-blue, #1a56db);
+      text-decoration: none;
+    }
+    .vn-detail-val a:hover { text-decoration: underline; }
+
+    .vn-updated {
+      margin-top: 6px;
+      font-size: 0.72rem;
+      color: #999;
+    }
+    .vn-empty {
+      padding: 32px 16px;
+      text-align: center;
+      color: #888;
+      font-size: 0.9rem;
+    }
+    .vn-error {
+      padding: 12px 16px;
+      color: #c00;
+      font-size: 0.9rem;
+    }
+
+    /* ---- Bottom sheet (add/edit) ---- */
+    .vn-sheet-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 8000;
+      background: rgba(0,0,0,0.42);
+    }
+    .vn-sheet-backdrop.open { display: block; }
+    .vn-sheet {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      z-index: 8001;
+      background: var(--card-bg, #fff);
+      border-radius: 16px 16px 0 0;
+      padding: 0 0 env(safe-area-inset-bottom, 0);
+      box-shadow: 0 -4px 24px rgba(0,0,0,.15);
+      max-height: 90vh;
+      overflow-y: auto;
+      transform: translateY(100%);
+      transition: transform 0.22s cubic-bezier(0.32,0,0.67,0);
+    }
+    .vn-sheet.open {
+      transform: translateY(0);
+    }
+    .vn-sheet-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 16px 10px;
+      border-bottom: 1px solid #eee;
+      position: sticky;
+      top: 0;
+      background: var(--card-bg, #fff);
+      z-index: 1;
+    }
+    .vn-sheet-title {
+      font-size: 1rem;
+      font-weight: 700;
+    }
+    .vn-sheet-close {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 1.3rem;
+      color: #666;
+      padding: 4px 8px;
+    }
+    .vn-sheet-body {
+      padding: 14px 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .vn-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .vn-field label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #555;
+    }
+    .vn-field input, .vn-field textarea, .vn-field select {
+      padding: 9px 11px;
+      border: 1.5px solid #ccd;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      background: var(--input-bg, #fff);
+      color: var(--text, #111);
+      font-family: inherit;
+    }
+    .vn-field input:focus, .vn-field textarea:focus, .vn-field select:focus {
+      outline: none;
+      border-color: var(--pf-blue, #1a56db);
+    }
+    .vn-field textarea { resize: vertical; min-height: 60px; }
+    .vn-required-star { color: #c00; margin-left: 2px; }
+    .vn-sheet-save-btn {
+      width: 100%;
+      padding: 12px;
+      background: var(--pf-blue, #1a56db);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+    .vn-sheet-save-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .vn-sheet-err {
+      color: #c00;
+      font-size: 0.85rem;
+      display: none;
+    }
+    .vn-sheet-err.show { display: block; }
+
+    /* ---- Delete confirm dialog ---- */
+    .vn-confirm-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9000;
+      background: rgba(0,0,0,0.5);
+      align-items: center;
+      justify-content: center;
+    }
+    .vn-confirm-backdrop.open { display: flex; }
+    .vn-confirm-dialog {
+      background: var(--card-bg, #fff);
+      border-radius: 12px;
+      padding: 20px 20px 16px;
+      margin: 16px;
+      max-width: 340px;
+      width: 100%;
+    }
+    .vn-confirm-title { font-weight: 700; font-size: 1rem; margin-bottom: 8px; }
+    .vn-confirm-msg   { font-size: 0.9rem; color: #555; margin-bottom: 16px; }
+    .vn-confirm-btns  { display: flex; gap: 8px; justify-content: flex-end; }
+    .vn-confirm-cancel {
+      padding: 8px 16px; border: 1.5px solid #ccc; border-radius: 8px;
+      background: none; cursor: pointer; font-size: 0.9rem;
+    }
+    .vn-confirm-delete {
+      padding: 8px 16px; background: #c00; color: #fff;
+      border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem;
+      font-weight: 700;
+    }
+    .vn-confirm-delete:disabled { opacity: 0.6; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+<div id="topbar">
+  <a href="/" class="tb-brand" aria-label="PF Field Portal">
+    <div class="tb-mark">PF</div>
+    <span class="tb-title">Vendors</span>
+  </a>
+  <details class="acct-menu" id="acctMenu">
+    <summary>
+      <span class="acct-btn">
+        <span class="acct-name" id="acctName"></span>
+        <svg class="acct-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </span>
+    </summary>
+    <div class="acct-dropdown">
+      <button type="button" class="acct-item" onclick="window.pfToggleTheme()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>
+        <span id="acctThemeLabel">Dark mode</span>
+      </button>
+      <div class="acct-divider"></div>
+      <a class="acct-item" href="/api/logout">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+        Sign Out
+      </a>
+    </div>
+  </details>
+</div>
+
+<nav id="pfNav" aria-label="Main navigation">
+  <a href="/" class="pf-nav-item" data-paths="/, /index.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+    <span>Home</span>
+  </a>
+  <a href="/daily-report.html" class="pf-nav-item" data-paths="/daily-report.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><line x1="9" y1="12" x2="15" y2="12"></line><line x1="9" y1="16" x2="13" y2="16"></line></svg>
+    <span>Daily Report</span>
+  </a>
+  <a href="/equipment-inspection.html" class="pf-nav-item" data-paths="/equipment-inspection.html">
+    <span class="rig-icon" aria-hidden="true"></span>
+    <span>Equip. Inspect.</span>
+  </a>
+  <a href="/site-readiness.html" class="pf-nav-item" data-paths="/site-readiness.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
+    <span>Site Readiness</span>
+  </a>
+  <a href="/toolbox-talk.html" class="pf-nav-item" data-paths="/toolbox-talk.html, /toolbox-talk">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+    <span>Safety Analysis</span>
+  </a>
+  <a href="/past-reports.html" class="pf-nav-item" data-paths="/past-reports.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+    <span>Past Reports</span>
+  </a>
+  <a href="/cost-codes.html" class="pf-nav-item" data-paths="/cost-codes.html, /cost-codes">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+    <span>Cost Codes</span>
+  </a>
+  <a href="/schedule.html" class="pf-nav-item" data-paths="/schedule.html, /schedule">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+    <span>Schedule</span>
+  </a>
+  <a href="/time-off.html" class="pf-nav-item" data-paths="/time-off.html, /time-off">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><path d="M8 14l2 2 4-4"></path></svg>
+    <span>Time Off</span>
+  </a>
+  <a href="/sops.html" class="pf-nav-item" data-paths="/sops.html, /sops">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 0 3-3h7z"></path></svg>
+    <span>SOPs</span>
+  </a>
+  <a href="/mailing-lists.html" class="pf-nav-item" data-paths="/mailing-lists.html, /mailing-lists" style="display:none" id="mlNavItem">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,12 2,6"></polyline></svg>
+    <span>Mailing Lists</span>
+  </a>
+  <a href="/hardware.html" class="pf-nav-item" data-paths="/hardware.html, /hardware" style="display:none" id="hwNavItem">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+    <span>Hardware</span>
+  </a>
+  <a href="/vendors.html" class="pf-nav-item" data-paths="/vendors.html, /vendors" id="vnNavItem">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+    <span>Vendors</span>
+  </a>
+</nav>
+
+  <div id="authError" style="display:none;padding:20px;color:#c00;">
+    <p>You are not authorised to view this page. <a href="/login.html">Sign in</a></p>
+  </div>
+
+  <div id="main" style="display:none;">
+    <div id="vnError" class="vn-error"></div>
+
+    <!-- Section tab bar -->
+    <div class="vn-tab-bar" id="vnTabBar"></div>
+
+    <!-- Search + add buttons -->
+    <div class="vn-action-bar" id="vnActionBar" style="display:none;">
+      <input type="search" class="vn-search" id="vnSearch" placeholder="Search vendors..." aria-label="Search vendors" oninput="vnRenderList()">
+      <button class="vn-add-sec-btn" id="vnAddSecBtn" style="display:none;" onclick="vnOpenAddSection()">+ Section</button>
+      <button class="vn-add-btn"     id="vnAddBtn"    style="display:none;" onclick="vnOpenAdd()">+ Add Vendor</button>
+    </div>
+
+    <!-- Vendor card list -->
+    <div class="vn-list" id="vnList"></div>
+  </div>
+
+  <!-- Add/edit bottom sheet -->
+  <div class="vn-sheet-backdrop" id="vnSheetBackdrop" onclick="vnCloseSheet()"></div>
+  <div class="vn-sheet" id="vnSheet" role="dialog" aria-modal="true" aria-labelledby="vnSheetTitle">
+    <div class="vn-sheet-header">
+      <span class="vn-sheet-title" id="vnSheetTitle">Add Vendor</span>
+      <button class="vn-sheet-close" onclick="vnCloseSheet()" aria-label="Close">&#10005;</button>
+    </div>
+    <div class="vn-sheet-body">
+      <div id="vnSheetErr" class="vn-sheet-err"></div>
+      <input type="hidden" id="vnEditId">
+      <div class="vn-field">
+        <label for="vnFldCompany">Company <span class="vn-required-star">*</span></label>
+        <input type="text" id="vnFldCompany" maxlength="120" autocomplete="organization" placeholder="e.g. Fort Wayne Aggregate Supply">
+      </div>
+      <div class="vn-field">
+        <label for="vnFldCategory">What they supply</label>
+        <input type="text" id="vnFldCategory" maxlength="80" placeholder="e.g. Aggregate, Hardware, Equipment parts">
+      </div>
+      <div class="vn-field">
+        <label for="vnFldContact">Contact name</label>
+        <input type="text" id="vnFldContact" maxlength="80" autocomplete="name" placeholder="e.g. Jane Smith">
+      </div>
+      <div class="vn-field">
+        <label for="vnFldPhone">Phone</label>
+        <input type="tel" id="vnFldPhone" maxlength="40" autocomplete="tel" placeholder="e.g. 260-555-0100">
+      </div>
+      <div class="vn-field">
+        <label for="vnFldAddress">Address</label>
+        <input type="text" id="vnFldAddress" maxlength="200" autocomplete="street-address" placeholder="e.g. 1234 Industrial Blvd, Fort Wayne, IN 46803">
+      </div>
+      <div class="vn-field">
+        <label for="vnFldWebsite">Website</label>
+        <input type="url" id="vnFldWebsite" maxlength="200" placeholder="https://...">
+      </div>
+      <div class="vn-field">
+        <label for="vnFldAccount">Account #</label>
+        <input type="text" id="vnFldAccount" maxlength="60" placeholder="PF customer / account number">
+      </div>
+      <div class="vn-field">
+        <label for="vnFldNotes">Notes</label>
+        <textarea id="vnFldNotes" maxlength="500" rows="2" placeholder="Delivery hours, special contacts, etc."></textarea>
+      </div>
+      <button class="vn-sheet-save-btn" id="vnSheetSave" onclick="vnSaveItem()">Save</button>
+    </div>
+  </div>
+
+  <!-- Delete confirm dialog -->
+  <div class="vn-confirm-backdrop" id="vnConfirmBackdrop">
+    <div class="vn-confirm-dialog">
+      <div class="vn-confirm-title" id="vnConfirmTitle">Delete vendor?</div>
+      <div class="vn-confirm-msg"   id="vnConfirmMsg">This cannot be undone.</div>
+      <div class="vn-confirm-btns">
+        <button class="vn-confirm-cancel" onclick="vnCloseConfirm()">Cancel</button>
+        <button class="vn-confirm-delete" id="vnConfirmOk" onclick="vnDoDelete()">Delete</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ---- State ------------------------------------------------------------
+  var _sections   = [];      // [{id, name, sort_order}]
+  var _items      = {};      // {section_id: [{...}]}
+  var _activeSec  = null;    // current section id
+  var _canEdit    = false;   // set from api/me response (vendorsAllowed implies read; edit gated separately)
+  var _pendingDel = null;    // {type: 'item'|'section', id, name}
+  var _editId     = null;    // null = add mode, string = edit mode
+
+  var loadEl  = document.getElementById('loading');
+  var mainEl  = document.getElementById('main');
+  var errEl   = document.getElementById('authError');
+  var acctNm  = document.getElementById('acctName');
+
+  // ---- Auth init (async IIFE) -------------------------------------------
+  (async function vnAuthInit() {
+    var me;
+    try {
+      var r = await fetch('/api/me', {credentials: 'same-origin'});
+      me = await r.json();
+    } catch (e) {
+      me = {status: 'error'};
+    }
+    if (!me || me.status !== 'ok') {
+      if (errEl) errEl.style.display = 'block';
+      return;
+    }
+    if (acctNm) acctNm.textContent = me.name || '';
+
+    // Show/hide hardware nav (this page; vnNavItem is always visible here)
+    try{var _hwNav=document.getElementById('hwNavItem');if(_hwNav&&me.hardwareAllowed) _hwNav.style.display='';}catch(e){}
+
+    // Owner-only: mailing lists nav
+    var _mlNav = document.getElementById('mlNavItem');
+    var _em = (me.email || '').toLowerCase();
+    if (_mlNav && ['breinking@pierfoundations.com','jreinking@pierfoundations.com','dfranke@pierfoundations.com'].indexOf(_em) >= 0) {
+      _mlNav.style.display = '';
+    }
+
+    // Dark mode label
+    var themeLabel = document.getElementById('acctThemeLabel');
+    if (themeLabel && window.pfGetTheme) {
+      themeLabel.textContent = window.pfGetTheme() === 'dark' ? 'Light mode' : 'Dark mode';
+    }
+
+    if (mainEl) mainEl.style.display = 'block';
+
+    // Determine edit access (server enforces independently; this is UI only)
+    _canEdit = !!me.vendorsAllowed;
+
+    await vnInit();
+  })();
+
+  // ---- Init ------------------------------------------------------------
+  async function vnInit() {
+    // Apply seed first (idempotent — only runs if tables are empty)
+    if (_canEdit) {
+      try {
+        await fetch('/api/vendors', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({action: 'seed'}),
+        });
+      } catch (e) {
+        // non-fatal
+      }
+    }
+
+    await vnLoadData();
+  }
+
+  async function vnLoadData() {
+    var errDiv = document.getElementById('vnError');
+    errDiv.style.display = 'none';
+    errDiv.textContent = '';
+    try {
+      var r = await fetch('/api/vendors', {credentials: 'same-origin'});
+      var d = await r.json();
+      if (!d.ok) {
+        errDiv.textContent = window.esc ? window.esc(d.error || 'Failed to load vendors.') : (d.error || 'Failed to load vendors.');
+        errDiv.style.display = 'block';
+        return;
+      }
+      _sections = Array.isArray(d.sections) ? d.sections : [];
+      _items    = (d.items && typeof d.items === 'object') ? d.items : {};
+
+      // Set active section to first if not set or section no longer exists
+      var secIds = _sections.map(function(s){ return s.id; });
+      if (!_activeSec || secIds.indexOf(_activeSec) < 0) {
+        _activeSec = _sections.length > 0 ? _sections[0].id : null;
+      }
+
+      vnRenderTabs();
+      vnRenderList();
+    } catch (e) {
+      errDiv.textContent = 'Network error loading vendors.';
+      errDiv.style.display = 'block';
+    }
+  }
+
+  // ---- Render tabs -----------------------------------------------------
+  function vnRenderTabs() {
+    var bar = document.getElementById('vnTabBar');
+    bar.innerHTML = '';
+
+    _sections.forEach(function(sec) {
+      var btn = document.createElement('button');
+      btn.className = 'vn-tab-btn' + (sec.id === _activeSec ? ' active' : '');
+      btn.textContent = '';
+      btn.appendChild(document.createTextNode(window.esc ? '' : ''));
+
+      // Use textContent for safety
+      btn.textContent = sec.name;
+      btn.setAttribute('data-secid', sec.id);
+      btn.addEventListener('click', function() {
+        _activeSec = sec.id;
+        vnRenderTabs();
+        vnRenderList();
+      });
+
+      if (_canEdit) {
+        var renBtn = document.createElement('button');
+        renBtn.className = 'vn-tab-rename-btn';
+        renBtn.setAttribute('aria-label', 'Rename section');
+        renBtn.textContent = '✎'; // pencil
+        renBtn.setAttribute('data-secid', sec.id);
+        renBtn.setAttribute('data-secname', sec.name);
+        renBtn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          vnOpenRenameSection(sec.id, sec.name);
+        });
+        btn.appendChild(renBtn);
+      }
+      bar.appendChild(btn);
+    });
+
+    // Show/hide action bar + edit buttons
+    var actionBar = document.getElementById('vnActionBar');
+    actionBar.style.display = '';
+    var addBtn    = document.getElementById('vnAddBtn');
+    var addSecBtn = document.getElementById('vnAddSecBtn');
+    if (addBtn)    addBtn.style.display    = _canEdit ? '' : 'none';
+    if (addSecBtn) addSecBtn.style.display = _canEdit ? '' : 'none';
+  }
+
+  // ---- Render card list ------------------------------------------------
+  function vnRenderList() {
+    var list = document.getElementById('vnList');
+    list.innerHTML = '';
+
+    if (_sections.length === 0) {
+      var emp = document.createElement('div');
+      emp.className = 'vn-empty';
+      emp.textContent = _canEdit
+        ? 'No sections yet. Use "+ Section" to create one.'
+        : 'No vendors added yet.';
+      list.appendChild(emp);
+      return;
+    }
+
+    if (!_activeSec) return;
+
+    var query = (document.getElementById('vnSearch').value || '').toLowerCase().trim();
+    var secItems = _items[_activeSec] || [];
+
+    var filtered = query ? secItems.filter(function(it) {
+      return (it.company || '').toLowerCase().indexOf(query) >= 0
+          || (it.category || '').toLowerCase().indexOf(query) >= 0
+          || (it.contact  || '').toLowerCase().indexOf(query) >= 0
+          || (it.phone    || '').toLowerCase().indexOf(query) >= 0
+          || (it.notes    || '').toLowerCase().indexOf(query) >= 0;
+    }) : secItems;
+
+    if (filtered.length === 0) {
+      var emp2 = document.createElement('div');
+      emp2.className = 'vn-empty';
+      emp2.textContent = query
+        ? 'No vendors match your search.'
+        : (_canEdit ? 'No vendors in this section yet. Tap "+ Add Vendor" to add one.' : 'No vendors in this section yet.');
+      list.appendChild(emp2);
+      return;
+    }
+
+    filtered.forEach(function(item) {
+      list.appendChild(vnBuildCard(item));
+    });
+  }
+
+  function vnBuildCard(item) {
+    var e = window.esc || function(s){ return String(s||''); };
+
+    var card = document.createElement('div');
+    card.className = 'vn-card';
+
+    var header = document.createElement('div');
+    header.className = 'vn-card-header';
+
+    var info = document.createElement('div');
+    var company = document.createElement('div');
+    company.className = 'vn-company';
+    company.textContent = item.company || '';
+    info.appendChild(company);
+
+    if (item.category) {
+      var cat = document.createElement('div');
+      cat.className = 'vn-category';
+      cat.textContent = item.category;
+      info.appendChild(cat);
+    }
+    header.appendChild(info);
+
+    if (_canEdit) {
+      var acts = document.createElement('div');
+      acts.className = 'vn-card-actions';
+
+      var editBtn = document.createElement('button');
+      editBtn.className = 'vn-edit-btn';
+      editBtn.textContent = 'Edit';
+      editBtn.setAttribute('aria-label', 'Edit ' + (item.company || 'vendor'));
+      editBtn.addEventListener('click', function() { vnOpenEdit(item); });
+
+      var delBtn = document.createElement('button');
+      delBtn.className = 'vn-del-btn';
+      delBtn.textContent = 'Delete';
+      delBtn.setAttribute('aria-label', 'Delete ' + (item.company || 'vendor'));
+      delBtn.addEventListener('click', function() { vnConfirmDelete('item', item.id, item.company || 'this vendor'); });
+
+      acts.appendChild(editBtn);
+      acts.appendChild(delBtn);
+      header.appendChild(acts);
+    }
+    card.appendChild(header);
+
+    // Detail rows
+    var details = document.createElement('div');
+    details.className = 'vn-details';
+
+    function addRow(label, value, isLink, linkHref) {
+      if (!value) return;
+      var row = document.createElement('div');
+      row.className = 'vn-detail-row';
+      var lbl = document.createElement('span');
+      lbl.className = 'vn-detail-label';
+      lbl.textContent = label;
+      var val = document.createElement('span');
+      val.className = 'vn-detail-val';
+      if (isLink && linkHref) {
+        var a = document.createElement('a');
+        a.href = linkHref;
+        if (linkHref.startsWith('tel:') || linkHref.startsWith('http')) {
+          a.setAttribute('rel', 'noopener');
+          if (linkHref.startsWith('http')) a.target = '_blank';
+        }
+        a.textContent = value;
+        val.appendChild(a);
+      } else {
+        val.textContent = value;
+      }
+      row.appendChild(lbl);
+      row.appendChild(val);
+      details.appendChild(row);
+    }
+
+    if (item.contact) addRow('Contact', item.contact, false, null);
+    if (item.phone)   addRow('Phone',   item.phone,   true,  'tel:' + item.phone.replace(/\s/g,''));
+    if (item.address) {
+      var mapsHref = 'https://maps.google.com/?q=' + encodeURIComponent(item.address);
+      addRow('Address', item.address, true, mapsHref);
+    }
+    if (item.website) {
+      var siteHref = item.website.startsWith('http') ? item.website : 'https://' + item.website;
+      addRow('Website', item.website, true, siteHref);
+    }
+    if (item.account_num) addRow('Account #', item.account_num, false, null);
+    if (item.notes)       addRow('Notes',     item.notes,       false, null);
+
+    if (details.children.length > 0) card.appendChild(details);
+
+    if (item.updated_by && item.updated_at) {
+      var upd = document.createElement('div');
+      upd.className = 'vn-updated';
+      var ts = item.updated_at ? item.updated_at.replace('T',' ').slice(0,16) : '';
+      upd.textContent = 'Updated by ' + (item.updated_by || '') + (ts ? ' on ' + ts : '');
+      card.appendChild(upd);
+    }
+
+    return card;
+  }
+
+  // ---- Add / Edit sheet ------------------------------------------------
+  function vnOpenAdd() {
+    _editId = null;
+    document.getElementById('vnSheetTitle').textContent = 'Add Vendor';
+    document.getElementById('vnEditId').value = '';
+    document.getElementById('vnFldCompany').value  = '';
+    document.getElementById('vnFldCategory').value = '';
+    document.getElementById('vnFldContact').value  = '';
+    document.getElementById('vnFldPhone').value    = '';
+    document.getElementById('vnFldAddress').value  = '';
+    document.getElementById('vnFldWebsite').value  = '';
+    document.getElementById('vnFldAccount').value  = '';
+    document.getElementById('vnFldNotes').value    = '';
+    document.getElementById('vnSheetErr').className = 'vn-sheet-err';
+    document.getElementById('vnSheetErr').textContent = '';
+    document.getElementById('vnSheetSave').disabled = false;
+    document.getElementById('vnSheetBackdrop').classList.add('open');
+    document.getElementById('vnSheet').classList.add('open');
+    setTimeout(function(){ document.getElementById('vnFldCompany').focus(); }, 100);
+  }
+
+  function vnOpenEdit(item) {
+    _editId = item.id;
+    document.getElementById('vnSheetTitle').textContent = 'Edit Vendor';
+    document.getElementById('vnEditId').value = item.id;
+    document.getElementById('vnFldCompany').value  = item.company     || '';
+    document.getElementById('vnFldCategory').value = item.category    || '';
+    document.getElementById('vnFldContact').value  = item.contact     || '';
+    document.getElementById('vnFldPhone').value    = item.phone       || '';
+    document.getElementById('vnFldAddress').value  = item.address     || '';
+    document.getElementById('vnFldWebsite').value  = item.website     || '';
+    document.getElementById('vnFldAccount').value  = item.account_num || '';
+    document.getElementById('vnFldNotes').value    = item.notes       || '';
+    document.getElementById('vnSheetErr').className = 'vn-sheet-err';
+    document.getElementById('vnSheetErr').textContent = '';
+    document.getElementById('vnSheetSave').disabled = false;
+    document.getElementById('vnSheetBackdrop').classList.add('open');
+    document.getElementById('vnSheet').classList.add('open');
+    setTimeout(function(){ document.getElementById('vnFldCompany').focus(); }, 100);
+  }
+
+  function vnCloseSheet() {
+    document.getElementById('vnSheetBackdrop').classList.remove('open');
+    document.getElementById('vnSheet').classList.remove('open');
+    _editId = null;
+  }
+
+  async function vnSaveItem() {
+    var saveBtn = document.getElementById('vnSheetSave');
+    if (saveBtn.disabled) return;
+    var errDiv = document.getElementById('vnSheetErr');
+    errDiv.className = 'vn-sheet-err';
+    errDiv.textContent = '';
+
+    var company = document.getElementById('vnFldCompany').value.trim();
+    if (!company) {
+      errDiv.textContent = 'Company name is required.';
+      errDiv.className = 'vn-sheet-err show';
+      document.getElementById('vnFldCompany').focus();
+      return;
+    }
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+
+    var isEdit  = !!_editId;
+    var payload = {
+      action:      isEdit ? 'edit_item' : 'add_item',
+      company:     company,
+      category:    document.getElementById('vnFldCategory').value.trim(),
+      contact:     document.getElementById('vnFldContact').value.trim(),
+      phone:       document.getElementById('vnFldPhone').value.trim(),
+      address:     document.getElementById('vnFldAddress').value.trim(),
+      website:     document.getElementById('vnFldWebsite').value.trim(),
+      account_num: document.getElementById('vnFldAccount').value.trim(),
+      notes:       document.getElementById('vnFldNotes').value.trim(),
+    };
+    if (isEdit) {
+      payload.id = _editId;
+    } else {
+      payload.section_id = _activeSec;
+    }
+
+    try {
+      var r = await fetch('/api/vendors', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload),
+      });
+      var d = await r.json();
+      if (!d.ok) {
+        errDiv.textContent = d.error || 'Save failed.';
+        errDiv.className = 'vn-sheet-err show';
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save';
+        return;
+      }
+      vnCloseSheet();
+      await vnLoadData();
+    } catch (e) {
+      errDiv.textContent = 'Network error. Please try again.';
+      errDiv.className = 'vn-sheet-err show';
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save';
+    }
+  }
+
+  // ---- Add / rename section --------------------------------------------
+  function vnOpenAddSection() {
+    var name = prompt('New section name:');
+    if (!name || !name.trim()) return;
+    vnApiAddSection(name.trim());
+  }
+
+  function vnOpenRenameSection(secId, currentName) {
+    var name = prompt('Rename section:', currentName);
+    if (!name || !name.trim() || name.trim() === currentName) return;
+    vnApiRenameSection(secId, name.trim());
+  }
+
+  async function vnApiAddSection(name) {
+    try {
+      var r = await fetch('/api/vendors', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action: 'add_section', name: name}),
+      });
+      var d = await r.json();
+      if (!d.ok) { alert(d.error || 'Failed to add section.'); return; }
+      if (d.section) _activeSec = d.section.id;
+      await vnLoadData();
+    } catch (e) {
+      alert('Network error.');
+    }
+  }
+
+  async function vnApiRenameSection(secId, name) {
+    try {
+      var r = await fetch('/api/vendors', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action: 'edit_section', id: secId, name: name}),
+      });
+      var d = await r.json();
+      if (!d.ok) { alert(d.error || 'Failed to rename section.'); return; }
+      await vnLoadData();
+    } catch (e) {
+      alert('Network error.');
+    }
+  }
+
+  // ---- Delete confirm --------------------------------------------------
+  function vnConfirmDelete(type, id, name) {
+    _pendingDel = {type: type, id: id, name: name};
+    var title = type === 'section'
+      ? 'Delete section?'
+      : 'Delete vendor?';
+    var msg = type === 'section'
+      ? 'Delete "' + name + '" and all its vendors? This cannot be undone.'
+      : 'Delete "' + name + '"? This cannot be undone.';
+    document.getElementById('vnConfirmTitle').textContent = title;
+    document.getElementById('vnConfirmMsg').textContent   = msg;
+    document.getElementById('vnConfirmOk').disabled = false;
+    document.getElementById('vnConfirmOk').textContent = 'Delete';
+    document.getElementById('vnConfirmBackdrop').classList.add('open');
+  }
+
+  function vnCloseConfirm() {
+    document.getElementById('vnConfirmBackdrop').classList.remove('open');
+    _pendingDel = null;
+  }
+
+  async function vnDoDelete() {
+    if (!_pendingDel) return;
+    var okBtn = document.getElementById('vnConfirmOk');
+    if (okBtn.disabled) return;
+    okBtn.disabled = true;
+    okBtn.textContent = 'Deleting…';
+
+    var action = _pendingDel.type === 'section' ? 'delete_section' : 'delete_item';
+    try {
+      var r = await fetch('/api/vendors', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action: action, id: _pendingDel.id}),
+      });
+      var d = await r.json();
+      if (!d.ok) {
+        alert(d.error || 'Delete failed.');
+        okBtn.disabled = false;
+        okBtn.textContent = 'Delete';
+        return;
+      }
+      if (_pendingDel.type === 'section' && _activeSec === _pendingDel.id) {
+        _activeSec = null;
+      }
+      vnCloseConfirm();
+      await vnLoadData();
+    } catch (e) {
+      alert('Network error.');
+      okBtn.disabled = false;
+      okBtn.textContent = 'Delete';
+    }
+  }
+
+  // Expose for inline onclick attributes in sheet (save button uses onclick=vnSaveItem)
+  window.vnOpenAdd          = vnOpenAdd;
+  window.vnOpenEdit         = vnOpenEdit;
+  window.vnCloseSheet       = vnCloseSheet;
+  window.vnSaveItem         = vnSaveItem;
+  window.vnOpenAddSection   = vnOpenAddSection;
+  window.vnCloseConfirm     = vnCloseConfirm;
+  window.vnConfirmDelete    = vnConfirmDelete;
+  window.vnDoDelete         = vnDoDelete;
+  window.vnRenderList       = vnRenderList;
+
+})();
+</script>
+</body>
+</html>

@@ -22,6 +22,7 @@ import {
   checkSessionRevoked,
 } from './lib/auth.js';
 import { hardwareAllowed } from './lib/hardware-access.js';
+import { vendorsAllowed }  from './lib/vendors-access.js';
 
 // Paths that don't require auth at all.
 // NOTE: Cloudflare Pages serves "foo.html" at the clean URL "/foo" (308), so we
@@ -202,6 +203,23 @@ export async function onRequest(context) {
         path.startsWith('/api/hardware')
       ) {
         if (!hardwareAllowed(session)) {
+          return deny(request);
+        }
+      }
+
+      // ---- Vendors preview gate (UID-level, beyond role check) ----
+      // The vendors page and API are gated to Derek only during preview
+      // (VENDORS_GO_LIVE = false in lib/vendors-access.js). The role check
+      // above already filtered out non-admin users; this check further
+      // restricts to only the allowed UIDs.
+      // Set VENDORS_GO_LIVE = true to open reads to all authenticated users
+      // (writes stay restricted to VENDORS_EDITORS regardless).
+      if (
+        path === '/vendors.html' ||
+        path === '/vendors' ||
+        path.startsWith('/api/vendors')
+      ) {
+        if (!vendorsAllowed(session)) {
           return deny(request);
         }
       }

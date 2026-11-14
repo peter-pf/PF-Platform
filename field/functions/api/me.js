@@ -20,6 +20,7 @@
 //    the API gate still enforces by email lookup independently).
 
 import { hardwareAllowed } from '../lib/hardware-access.js';
+import { vendorsAllowed }  from '../lib/vendors-access.js';
 
 export async function onRequestGet(context) {
   const headers = {
@@ -61,5 +62,6 @@ export async function onRequestGet(context) {
     role: session.role,
     email: email || '',
     hardwareAllowed: hardwareAllowed(session),
+    vendorsAllowed:  vendorsAllowed(session),
   }), { status: 200, headers });
 }
