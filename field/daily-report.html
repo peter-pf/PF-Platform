@@ -1026,6 +1026,13 @@ try {
       }catch(e){}
       updateCopyPrevBtn();
       checkOfflineDraft();
+      // Auto-fill weather for the restored last job on new-report page load.
+      // selectPick is not invoked on a programmatic drPickerSetValue, so we fire
+      // explicitly here. All guards inside autoFillWeather still apply:
+      // not editing, today, both fields empty, late-response re-check handles a
+      // draft restore that happens after this call (checkOfflineDraft only shows
+      // the banner — fields stay empty until the user clicks Restore).
+      if(!state.editingId&&lastJob)autoFillWeather(lastJob);
     }).catch(function(){
       if(wrap)wrap.style.display='block';
       state.reports=[];buildMaintenanceRows();
