@@ -107,6 +107,8 @@
   #drOfflineBanner.hidden{display:none;}
   /* ---- copy-prev button ---- */
   #drCopyPrev{display:none;margin-top:6px;}
+  /* ---- auto-weather note (shown below the weather fields after auto-fill) ---- */
+  #drWeatherNote{font-size:11px;color:var(--text-3);margin-top:4px;line-height:1.4;}
   /* ---- Form sections ---- */
   .tf-progress-wrap{height:3px;background:var(--border);border-radius:2px;margin:0 0 18px;overflow:hidden;}
   .tf-progress-bar{height:100%;background:var(--accent);border-radius:2px;width:0%;transition:width .35s cubic-bezier(.4,0,.2,1);}
@@ -336,7 +338,7 @@
                 <option value="Snow">Snow</option>
               </select>
             </div>
-            <div><label for="drTemp">Temperature</label><input type="text" id="drTemp" placeholder="72 F"></div>
+            <div><label for="drTemp">Temperature</label><input type="text" id="drTemp" placeholder="72 F"><div id="drWeatherNote" style="display:none"></div></div>
           </div>
         </div>
       </div>
@@ -692,6 +694,79 @@ try {
     return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   }
 
+  /* ---- auto-weather fill ---- */
+  var _weatherReqId = 0;
+
+  // Auto-fill drTemp and drPrecip with current conditions when a project is
+  // selected on a NEW report whose date is today and both fields are empty.
+  // Safe: never overwrites user input; bails on edit, non-today dates, failures.
+  function autoFillWeather(jobNumber) {
+    if (state.editingId) return; // never on edit
+    if (!jobNumber) return;
+
+    var dateEl = document.getElementById('drDate');
+    var date = (dateEl && dateEl.value) ? String(dateEl.value).trim() : '';
+    var today = todayIso();
+    // If a date is explicitly set and it isn't today, skip silently
+    if (date && date !== today) return;
+
+    var tempEl   = document.getElementById('drTemp');
+    var precipEl = document.getElementById('drPrecip');
+    // Don't clobber anything already typed/selected
+    if ((tempEl && String(tempEl.value).trim()) || (precipEl && String(precipEl.value).trim())) return;
+
+    var reqDate = date || today;
+    var reqId = ++_weatherReqId;
+    var url = '/api/weather-now?job=' + encodeURIComponent(jobNumber) + '&date=' + encodeURIComponent(reqDate);
+
+    fetch(url, { credentials: 'same-origin' })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        // Discard if a newer request superseded this one
+        if (reqId !== _weatherReqId) return;
+        if (!data || data.status !== 'ok') return;
+
+        // Re-check emptiness — user may have typed while fetch was in flight
+        var t2 = document.getElementById('drTemp');
+        var p2 = document.getElementById('drPrecip');
+        if (!t2 || !p2) return;
+        if (String(t2.value).trim() || String(p2.value).trim()) return;
+        // Re-check not editing (user may have clicked Edit on a past report)
+        if (state.editingId) return;
+
+        if (data.tempF != null) t2.value = data.tempF + ' F';
+        if (data.condition)     p2.value = data.condition;
+
+        // Show source note
+        var noteEl = document.getElementById('drWeatherNote');
+        if (noteEl) {
+          var src;
+          if (data.source === 'forecast') {
+            src = "from today's forecast";
+          } else {
+            var station = data.stationName || data.stationId || 'weather station';
+            var timePart = '';
+            if (data.observedAt) {
+              var d = new Date(data.observedAt);
+              var h = d.getHours(), mn = d.getMinutes();
+              var ampm = h >= 12 ? 'PM' : 'AM';
+              h = h % 12 || 12;
+              timePart = ' at ' + h + ':' + (mn < 10 ? '0' + mn : mn) + ' ' + ampm;
+            }
+            src = station + timePart;
+          }
+          noteEl.textContent = 'Filled from ' + src + ' — change if needed';
+          noteEl.style.display = '';
+        }
+      })
+      .catch(function() { /* fail silently — offline-safe, no-op */ });
+  }
+
+  function clearWeatherNote() {
+    var noteEl = document.getElementById('drWeatherNote');
+    if (noteEl) { noteEl.textContent = ''; noteEl.style.display = 'none'; }
+  }
+
   /* ---- offline draft ---- */
   var _offlineTimer=null;
   function offlineDraftKey(){
@@ -810,6 +885,7 @@ try {
       try{if(id)localStorage.setItem('pf-last-job',id);}catch(e){}
       var hid2=document.getElementById('drProjectId');if(hid2)hid2.value=id||'';
       updateUploadEnabled();updateDraftBanner(state.draftSavedAt);updateCopyPrevBtn();scheduleOfflineSave();
+      if(id)autoFillWeather(id);
     }
     search.addEventListener('focus',openList);
     search.addEventListener('input',function(){buildList(this.value);list.style.display='block';search.setAttribute('aria-expanded','true');});
@@ -1204,7 +1280,12 @@ try {
     var dd=document.getElementById('drDate');
     if(dd&&!dd.dataset.wired){
       dd.dataset.wired='1';
-      dd.addEventListener('change',function(){updateDraftBanner(state.draftSavedAt);scheduleOfflineSave();});
+      dd.addEventListener('change',function(){
+        updateDraftBanner(state.draftSavedAt);scheduleOfflineSave();
+        clearWeatherNote();
+        var pid=(document.getElementById('drProject')||{}).value||'';
+        autoFillWeather(pid);
+      });
     }
     Object.keys(UP_BUCKETS).forEach(function(bk){
       var inp=document.getElementById(UP_BUCKETS[bk].input);
@@ -1606,6 +1687,7 @@ try {
 
   function resetForm(){
     state.editingId=null;state.draftId=null;state.draftSavedAt=null;
+    clearWeatherNote();
     updateEditBanner();
     ['drProject','drProjectId','drForeman','drPrecip','drTemp','drCols','drLf','drWork','drSafety'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
     // Clear picker display
