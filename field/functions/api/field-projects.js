@@ -69,11 +69,28 @@ async function kvWrite(kv, resolved) {
 }
 
 export async function onRequestGet(context) {
-  const { env } = context;
+  const { env, request } = context;
   const denied = requireArea(context.data && context.data.session, 'field_ops');
   if (denied) return denied;
 
-  const numbers = FO_PROJECTS.map((p) => p.number);
+  // Non-job entries (NJ-*) are only returned when the caller passes ?includeNonJob=1.
+  // ONLY daily-report.html should pass this flag.  Every other picker
+  // (site-readiness, equipment-inspection, toolbox-talk, index weather tile)
+  // must NOT include NJ entries: those forms route PDFs via PROJ_NUM_RE-gated
+  // SharePoint folders, so an NJ project would cause the submit to email first
+  // and then throw on upload — producing duplicate emails on each retry.
+  const url = new URL(request.url);
+  const includeNonJob = url.searchParams.get('includeNonJob') === '1';
+  const NJ_RE = /^NJ-/;
+
+  const visibleProjects = includeNonJob
+    ? FO_PROJECTS
+    : FO_PROJECTS.filter((p) => !NJ_RE.test(p.number));
+
+  // SP folder resolution only applies to real (NN-NNN) projects.
+  // NJ entries have no SharePoint folder and always return spFolder:null.
+  const realProjects = visibleProjects.filter((p) => !NJ_RE.test(p.number));
+  const numbers = realProjects.map((p) => p.number);
   const spFolders = {};
 
   // ---- KV cache read --------------------------------------------------------
@@ -104,10 +121,11 @@ export async function onRequestGet(context) {
 
   // ---- Build response -------------------------------------------------------
   // spFolder: real SP folder name or null (client shows safe fallback when null).
-  const projects = FO_PROJECTS.map((p) => ({
+  // NJ entries always get spFolder:null — they have no SharePoint routing.
+  const projects = visibleProjects.map((p) => ({
     number:   p.number,
     name:     p.name,
-    spFolder: spFolders[p.number] !== undefined ? spFolders[p.number] : null,
+    spFolder: NJ_RE.test(p.number) ? null : (spFolders[p.number] !== undefined ? spFolders[p.number] : null),
   }));
 
   return new Response(JSON.stringify({ ok: true, projects }), {

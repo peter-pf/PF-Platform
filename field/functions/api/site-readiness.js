@@ -435,6 +435,19 @@ export async function onRequestPost(context) {
     }
 
     // ---- SUBMIT: 3-step flow (PDF -> email -> SharePoint) -------------------
+    // Guard: require a real project number before we do anything irreversible.
+    // Non-job entries (NJ-*) cannot be submitted here: the SR submit emails at
+    // step 2, then uploadSiteReadinessPdf throws on PROJ_NUM_RE at step 3.
+    // That leaves the record as a draft and sends a duplicate email on each retry.
+    // Reject before any email, PDF, or state change.
+    {
+      const REAL_PROJ_RE = /^[0-9]{2}-[0-9]{2,4}$/;
+      if (!REAL_PROJ_RE.test(String(rec.projectId || ''))) {
+        return json({ status: 'error',
+          message: 'Site Readiness forms require a real job number.' }, 400);
+      }
+    }
+
     // FAIL CLOSED: if Graph/SharePoint not configured we do NOT flip to 'sent'.
     if (!graphConfigured(env)) {
       return json({ status: 'error',
