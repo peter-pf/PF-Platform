@@ -506,13 +506,12 @@ const PAGE_AREAS = {
   '/index.html':             'general',          // portal home/landing
   '/denied.html':            'general',          // access-denied notice (any auth user)
   '/reset-password.html':    'general',          // reset UI (restricted-session gated separately)
-  // Vendor / parts-supplier directory (Derek 2026-11-14). Classified 'user_admin'
-  // so only admin-role users pass the RBAC check; _middleware.js applies an
-  // additional UID preview gate (VENDORS_ALLOWED_UIDS). When VENDORS_GO_LIVE=true
-  // the page reads can be opened to field_ops — change both this entry and the
-  // /api/vendors entry and redeploy. ZERO financials.
-  '/vendors.html':           'user_admin',
-  '/vendors':                'user_admin',       // CF Pages clean-URL form (308 from .html)
+  // Vendor / parts-supplier directory. VENDORS_GO_LIVE=true (2026-11-19):
+  // opened to all field portal users. Classified 'field_ops' so admin/partner/
+  // business_dev/field_ops all pass RBAC; hr blocked. ZERO financials.
+  // _middleware.js vendorsAllowed() is still enforced (belt+suspenders).
+  '/vendors.html':           'field_ops',
+  '/vendors':                'field_ops',        // CF Pages clean-URL form (308 from .html)
   // Service Log page (equipment service history, Derek 2026-11-14). Classified
   // 'user_admin' so only admin-role users pass the RBAC check; _middleware.js
   // applies an additional UID preview gate (SERVICELOG_ALLOWED_UIDS). When
@@ -868,12 +867,10 @@ export function areaForPath(pathname) {
     // (part numbers, descriptions, and diagram metadata only).
     if (pathname.startsWith('/api/hardware'))      return 'user_admin';
     // Vendor / parts-supplier directory API. Classified 'user_admin' so only
-    // admin-role users pass the RBAC check; an additional UID preview gate
-    // (vendors-access.js VENDORS_ALLOWED_UIDS) is enforced in _middleware.js
-    // AFTER this check and directly in the handler. ZERO financials.
-    // When VENDORS_GO_LIVE=true reads may be opened to field_ops — that
-    // requires changing this entry to 'field_ops' and redeploying.
-    if (pathname.startsWith('/api/vendors'))       return 'user_admin';
+    // Vendor API. VENDORS_GO_LIVE=true (2026-11-19): opened to field portal
+    // users. Classified 'field_ops' (admin/partner/business_dev/field_ops).
+    // vendorsAllowed() in _middleware.js and handler still enforced. ZERO financials.
+    if (pathname.startsWith('/api/vendors'))       return 'field_ops';
     // Service Log API (equipment service history). Classified 'user_admin' so only
     // admin-role users pass the RBAC check; an additional UID preview gate
     // (servicelog-access.js SERVICELOG_ALLOWED_UIDS) is enforced in _middleware.js

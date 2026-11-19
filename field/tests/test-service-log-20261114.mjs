@@ -240,8 +240,8 @@ if (areaForPath) {
     areaForPath('/api/hardware') === 'user_admin',
     'got: ' + areaForPath('/api/hardware'));
 
-  assert('G-PATH-6: /api/vendors still returns user_admin (regression)',
-    areaForPath('/api/vendors') === 'user_admin',
+  assert('G-PATH-6: /api/vendors returns field_ops (vendors go-live 2026-11-19)',
+    areaForPath('/api/vendors') === 'field_ops',
     'got: ' + areaForPath('/api/vendors'));
 } else {
   console.log('  SKIP G-PATH: areaForPath not loaded');

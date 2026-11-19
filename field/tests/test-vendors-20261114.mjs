@@ -69,6 +69,7 @@ const { VENDORS_SEED } = vnSeedMod.exports;
 // strip all `export ` prefixes (covers const, function, async function)
 const authSrc = readFileSync(path.join(root, 'functions/lib/auth.js'), 'utf8');
 let areaForPath;
+let roleCanAccess;
 try {
   const lines = authSrc.split('\n');
   const fnStart = lines.findIndex(l => l.startsWith('export function areaForPath'));
@@ -80,10 +81,11 @@ try {
     .slice(rolesStart)
     .join('\n')
     .replace(/^export /gm, '');
-  const fn = new Function('module', relevantSrc + '\nmodule.exports = { areaForPath };');
+  const fn = new Function('module', relevantSrc + '\nmodule.exports = { areaForPath, roleCanAccess };');
   const m = {};
   fn(m);
-  areaForPath = m.exports.areaForPath;
+  areaForPath    = m.exports.areaForPath;
+  roleCanAccess  = m.exports.roleCanAccess;
 } catch (e) {
   console.warn('  WARN: could not load areaForPath (' + (e && e.message) + ')');
 }
@@ -161,20 +163,20 @@ console.log('\n--- G. Feature gate ---');
 if (areaForPath) {
   console.log('\n--- G-PATH. areaForPath classification ---');
 
-  assert('G-PATH-1: /vendors.html returns user_admin',
-    areaForPath('/vendors.html') === 'user_admin',
+  assert('G-PATH-1: /vendors.html returns field_ops (go-live)',
+    areaForPath('/vendors.html') === 'field_ops',
     'got: ' + areaForPath('/vendors.html'));
 
-  assert('G-PATH-2: /vendors returns user_admin (clean URL)',
-    areaForPath('/vendors') === 'user_admin',
+  assert('G-PATH-2: /vendors returns field_ops (clean URL, go-live)',
+    areaForPath('/vendors') === 'field_ops',
     'got: ' + areaForPath('/vendors'));
 
-  assert('G-PATH-3: /api/vendors returns user_admin',
-    areaForPath('/api/vendors') === 'user_admin',
+  assert('G-PATH-3: /api/vendors returns field_ops (go-live)',
+    areaForPath('/api/vendors') === 'field_ops',
     'got: ' + areaForPath('/api/vendors'));
 
-  assert('G-PATH-4: /api/vendors/list returns user_admin',
-    areaForPath('/api/vendors/list') === 'user_admin',
+  assert('G-PATH-4: /api/vendors/list returns field_ops (go-live)',
+    areaForPath('/api/vendors/list') === 'field_ops',
     'got: ' + areaForPath('/api/vendors/list'));
 
   // Existing hardware paths still correct after our edit
@@ -183,6 +185,84 @@ if (areaForPath) {
     'got: ' + areaForPath('/api/hardware'));
 } else {
   console.log('  SKIP G-PATH: areaForPath not loaded');
+}
+
+// ============================================================================
+// G-RBAC  roleCanAccess: vendors paths are field_ops area (go-live)
+// ============================================================================
+if (roleCanAccess && areaForPath) {
+  console.log('\n--- G-RBAC. RBAC for vendors paths (field_ops area, go-live) ---');
+
+  const vendorArea = areaForPath('/vendors.html');
+  const apiArea    = areaForPath('/api/vendors');
+
+  // admin/partner/business_dev/field_ops all pass the field_ops area check
+  assert('G-RBAC-1: admin can access /vendors.html (field_ops area)',
+    roleCanAccess('admin', vendorArea) === true);
+  assert('G-RBAC-2: partner can access /vendors.html',
+    roleCanAccess('partner', vendorArea) === true);
+  assert('G-RBAC-3: business_dev can access /vendors.html',
+    roleCanAccess('business_dev', vendorArea) === true);
+  assert('G-RBAC-4: field_ops can access /vendors.html (go-live opens reads)',
+    roleCanAccess('field_ops', vendorArea) === true);
+  assert('G-RBAC-5: hr is blocked from /vendors.html (not in field_ops area)',
+    roleCanAccess('hr', vendorArea) === false);
+
+  assert('G-RBAC-6: field_ops can access /api/vendors (read endpoint)',
+    roleCanAccess('field_ops', apiArea) === true);
+  assert('G-RBAC-7: admin can access /api/vendors',
+    roleCanAccess('admin', apiArea) === true);
+  assert('G-RBAC-8: hr is blocked from /api/vendors',
+    roleCanAccess('hr', apiArea) === false);
+
+  // Write gate is vendorsCanEdit (Derek UID), independent of RBAC area.
+  // Simulate a field_ops session that passes RBAC but is not in VENDORS_EDITORS.
+  const sessionFieldOps = { uid: 'crew-001-uid', role: 'field_ops', name: 'Joe Crew' };
+  assert('G-RBAC-9: vendorsCanEdit rejects field_ops uid (writes Derek-only)',
+    vendorsCanEdit(sessionFieldOps) === false);
+  assert('G-RBAC-10: vendorsAllowed accepts field_ops uid when GO_LIVE=true (view ok)',
+    vendorsAllowed(sessionFieldOps) === true);
+} else {
+  console.log('  SKIP G-RBAC: roleCanAccess or areaForPath not loaded');
+}
+
+// ============================================================================
+// G-RBAC-API  field_ops GET succeeds; field_ops POST write action -> 403
+// ============================================================================
+console.log('\n--- G-RBAC-API. field_ops API access: GET ok, write -> 403 ---');
+{
+  const FIELD_OPS_UID = 'crew-001-uid';
+  const sessionFieldOps = { uid: FIELD_OPS_UID, role: 'field_ops', name: 'Joe Crew' };
+
+  // GET: field_ops has a valid session + vendorsAllowed=true (GO_LIVE) -> 200
+  {
+    const db = makeDb();
+    // Use same ctx shape as makeCtx but with field_ops session and GET method
+    const ctx = {
+      data: { session: sessionFieldOps },
+      env: { DB: db },
+      request: { method: 'GET', json: async () => ({}) },
+    };
+    const resp = await onRequestGet(ctx);
+    assert('G-RBAC-API-1: GET /api/vendors with field_ops session -> 200',
+      resp.status === 200, 'status=' + resp.status);
+    const body = JSON.parse(await resp.text());
+    assert('G-RBAC-API-2: GET response ok=true for field_ops',
+      body.ok === true, JSON.stringify(body).slice(0, 80));
+  }
+
+  // POST write (add_section): field_ops passes vendorsAllowed but vendorsCanEdit=false -> 403
+  {
+    const db = makeDb();
+    const ctx = {
+      data: { session: sessionFieldOps },
+      env: { DB: db },
+      request: { method: 'POST', json: async () => ({ action: 'add_section', name: 'Test Section' }) },
+    };
+    const resp = await onRequestPost(ctx);
+    assert('G-RBAC-API-3: POST add_section with field_ops session -> 403 (write denied)',
+      resp.status === 403, 'status=' + resp.status);
+  }
 }
 
 // ============================================================================
