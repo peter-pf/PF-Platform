@@ -176,10 +176,11 @@ test('2h: SR, EI, TT all call /api/field-projects (shared dropdown source)', () 
   assertIncludes('2h TT', ttHtmlSrc, '/api/field-projects');
 });
 
-test('2i: FO_PROJECTS has 11 entries (replaced with active-projects list per Derek 2026-10-30)', () => {
+test('2i: FO_PROJECTS has 11 real-job entries (replaced with active-projects list per Derek 2026-10-30) + 2 non-job entries', () => {
   // R7 replaced the 21-entry list with exactly 11 active projects.
+  // 2026-11-19: 2 non-job entries (NJ-1 Farm, NJ-2 Shop) added per Seth/Brad request.
   const matches = foProjSrc.match(/number:/g) || [];
-  assert.ok(matches.length === 11, `expected 11 projects, got ${matches.length}`);
+  assert.ok(matches.length === 13, `expected 13 projects (11 real + 2 NJ), got ${matches.length}`);
 });
 
 // ============================================================

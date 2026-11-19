@@ -57,10 +57,19 @@ const EXPECTED = [
   { number: '26-026', name: 'POET - N Manchester' },
   { number: '26-027', name: 'Westfield Ice Arena' },
   { number: '26-028', name: 'The Hangar' },
+  // Non-job entries added 2026-11-19 (Seth/Brad request)
+  { number: 'NJ-1',   name: 'Non-Job: Farm' },
+  { number: 'NJ-2',   name: 'Non-Job: Shop' },
 ];
+// Real job entries only (no NJ-* non-job entries). Used for SP folder checks.
+const REAL_JOB_PROJECTS = FO_PROJECTS.filter(p => /^\d{2}-\d{2,4}$/.test(p.number));
 
-test('P1a: exactly 11 projects in FO_PROJECTS', () => {
-  assert.equal(FO_PROJECTS.length, 11, `expected 11, got ${FO_PROJECTS.length}`);
+test('P1a: exactly 13 projects in FO_PROJECTS (11 real jobs + 2 non-job entries)', () => {
+  assert.equal(FO_PROJECTS.length, 13, `expected 13, got ${FO_PROJECTS.length}`);
+});
+
+test('P1a-jobs: exactly 11 real job entries (NN-NNN format)', () => {
+  assert.equal(REAL_JOB_PROJECTS.length, 11, `expected 11, got ${REAL_JOB_PROJECTS.length}`);
 });
 
 test('P1b: all project numbers match exactly', () => {
@@ -204,8 +213,9 @@ const SP_FOLDERS = {
   '26-028': '26-028 - The Hangar - Elford',
 };
 
-test('P3a: nameMatchesProject resolves each of the 11 SP folder names', () => {
-  for (const p of FO_PROJECTS) {
+test('P3a: nameMatchesProject resolves each of the 11 real-job SP folder names', () => {
+  // NJ-* entries have no SP project folder and are excluded from this check.
+  for (const p of REAL_JOB_PROJECTS) {
     const folderName = SP_FOLDERS[p.number];
     assert.ok(folderName, `No known SP folder for ${p.number} — add it to SP_FOLDERS`);
     assert.ok(
@@ -215,9 +225,16 @@ test('P3a: nameMatchesProject resolves each of the 11 SP folder names', () => {
   }
 });
 
-test('P3b: all 11 projects have an SP folder (none MISSING)', () => {
-  assert.equal(Object.keys(SP_FOLDERS).length, 11, 'SP_FOLDERS should list all 11 projects');
-  for (const num of FO_PROJECTS.map(p => p.number)) {
+test('P3a-nj: NJ-* entries have no SP folder (uploads blocked by PROJ_NUM_RE)', () => {
+  const njEntries = FO_PROJECTS.filter(p => p.number.startsWith('NJ-'));
+  for (const p of njEntries) {
+    assert.ok(!SP_FOLDERS[p.number], `NJ entry ${p.number} should NOT have an SP folder`);
+  }
+});
+
+test('P3b: all 11 real job projects have an SP folder (none MISSING)', () => {
+  assert.equal(Object.keys(SP_FOLDERS).length, 11, 'SP_FOLDERS should list all 11 real-job projects');
+  for (const num of REAL_JOB_PROJECTS.map(p => p.number)) {
     assert.ok(SP_FOLDERS[num], `${num} has no SP folder entry`);
   }
 });
