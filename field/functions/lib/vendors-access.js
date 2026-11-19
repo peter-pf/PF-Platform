@@ -1,17 +1,12 @@
 // Vendors page feature flag — supplier/parts directory for Derek's field ops.
 //
-// CURRENT STATE: preview mode.  Only Derek Franke may access the page.
+// CURRENT STATE: go-live.  All authenticated field portal users may read.
+//   Writes (add/edit/delete) remain restricted to VENDORS_EDITORS only.
 //
-// TO GO LIVE (open reads to all authenticated users, writes stay EDITORS-only):
-//   Set VENDORS_GO_LIVE = true  (requires redeploy — one-line change here).
-//   The page will then be accessible to any authenticated user for reading.
-//   Writes (add/edit/delete) remain restricted to VENDORS_EDITORS regardless
-//   of VENDORS_GO_LIVE — controlled by the second flag below.
-//
-// ADMIN-ONLY NOTE: During preview mode Brad, Jonathan, and other admins
-// are blocked by the UID check below.  They gain access when GO_LIVE is true.
+// TO REVERT TO PREVIEW (Derek-only access):
+//   Set VENDORS_GO_LIVE = false and redeploy.
 
-export const VENDORS_GO_LIVE = false;
+export const VENDORS_GO_LIVE = true;
 
 // When VENDORS_GO_LIVE is false, only the UIDs in this Set may access the
 // vendors page, its API endpoint, and read vendor data.
@@ -35,9 +30,10 @@ export const VENDORS_EDITORS = new Set([
 
 // Returns true if the given session is allowed to view vendor content.
 // Called by _middleware.js for every vendor path.
+// A valid session (uid present) is always required regardless of GO_LIVE.
 export function vendorsAllowed(session) {
-  if (VENDORS_GO_LIVE) return true;
   if (!session || !session.uid) return false;
+  if (VENDORS_GO_LIVE) return true;
   return VENDORS_ALLOWED_UIDS.has(session.uid);
 }
 

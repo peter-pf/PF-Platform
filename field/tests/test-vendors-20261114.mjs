@@ -120,8 +120,8 @@ const sharedJs = readFileSync(path.join(root, 'js/pf-shared.js'), 'utf8');
 // ============================================================================
 console.log('\n--- G. Feature gate ---');
 {
-  assert('G1: VENDORS_GO_LIVE is false (preview mode)',
-    VENDORS_GO_LIVE === false);
+  assert('G1: VENDORS_GO_LIVE is true (go-live)',
+    VENDORS_GO_LIVE === true);
 
   assert('G2: VENDORS_ALLOWED_UIDS has exactly 1 entry',
     VENDORS_ALLOWED_UIDS.size === 1);
@@ -136,8 +136,8 @@ console.log('\n--- G. Feature gate ---');
   assert('G4: vendorsAllowed accepts Derek uid',
     vendorsAllowed(sessionDerek) === true);
 
-  assert('G5: vendorsAllowed rejects unknown uid',
-    vendorsAllowed(sessionOther) === false);
+  assert('G5: vendorsAllowed accepts any authenticated uid when GO_LIVE=true',
+    vendorsAllowed(sessionOther) === true);
 
   assert('G6: vendorsAllowed rejects null session',
     vendorsAllowed(null) === false);

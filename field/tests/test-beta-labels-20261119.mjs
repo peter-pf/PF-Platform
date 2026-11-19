@@ -5,7 +5,7 @@
 //
 // Gates checked:
 //   Hardware   — HARDWARE_GO_LIVE=false + HARDWARE_ALLOWED_UIDS (Derek UID only)
-//   Vendors    — VENDORS_GO_LIVE=false  + VENDORS_ALLOWED_UIDS  (Derek UID only)
+//   Vendors    — VENDORS_GO_LIVE=true (go-live; Beta label removed)
 //   Service Log— SERVICELOG_GO_LIVE=false + SERVICELOG_ALLOWED_UIDS (Derek UID only)
 //
 // Run: node field/tests/test-beta-labels-20261119.mjs  (from PF-Platform root)
@@ -49,11 +49,13 @@ const NAV_PAGES = [
   'service-log.html',
 ];
 
-// Derek-only pages with their own topbar title / <title>
+// Derek-only pages with their own topbar title / <title>.
+// beta: true  = still in preview; nav + title carry " (Beta)"
+// beta: false = go-live; nav label and title are plain (no Beta suffix)
 const DEREK_PAGES = [
-  { file: 'hardware.html',     label: 'Hardware',    titleExpect: 'Hardware (Beta) | PF Field Portal' },
-  { file: 'vendors.html',      label: 'Vendors',     titleExpect: 'Vendors (Beta) | PF Field Portal'  },
-  { file: 'service-log.html',  label: 'Service Log', titleExpect: 'Service Log (Beta) | PF Field Portal' },
+  { file: 'hardware.html',     label: 'Hardware',    beta: true,  titleExpect: 'Hardware (Beta) | PF Field Portal' },
+  { file: 'vendors.html',      label: 'Vendors',     beta: false, titleExpect: 'Vendors | PF Field Portal' },
+  { file: 'service-log.html',  label: 'Service Log', beta: true,  titleExpect: 'Service Log (Beta) | PF Field Portal' },
 ];
 
 // General tabs that must NOT carry (Beta)
@@ -73,7 +75,7 @@ const GENERAL_NAV_LABELS = [
 // ============================================================================
 // 1. Nav label checks — every page in the portal
 // ============================================================================
-console.log('\n--- 1. Nav (Beta) labels present in every portal page ---');
+console.log('\n--- 1. Nav (Beta) labels for still-preview tabs; Vendors go-live (no Beta) ---');
 
 for (const file of NAV_PAGES) {
   const src = readFileSync(path.join(root, file), 'utf8');
@@ -83,10 +85,11 @@ for (const file of NAV_PAGES) {
     src.includes('<span>Hardware (Beta)</span>'),
     'Hardware nav span missing (Beta)'
   );
+  // Vendors is go-live: nav label must be plain "Vendors" (no Beta suffix)
   assert(
-    `${file}: nav has Vendors (Beta)`,
-    src.includes('<span>Vendors (Beta)</span>'),
-    'Vendors nav span missing (Beta)'
+    `${file}: nav has Vendors (go-live, no Beta)`,
+    src.includes('<span>Vendors</span>'),
+    'Vendors nav span missing plain label'
   );
   assert(
     `${file}: nav has Service Log (Beta)`,
@@ -96,9 +99,9 @@ for (const file of NAV_PAGES) {
 }
 
 // ============================================================================
-// 2. Old (un-suffixed) nav spans must be absent in every page
+// 2. Nav span correctness — no stale Beta on Vendors; Hardware/SL still have it
 // ============================================================================
-console.log('\n--- 2. No bare (non-Beta) nav spans for Derek-only tabs ---');
+console.log('\n--- 2. No stale Beta on Vendors nav; Hardware and Service Log keep (Beta) ---');
 
 for (const file of NAV_PAGES) {
   const src = readFileSync(path.join(root, file), 'utf8');
@@ -108,10 +111,11 @@ for (const file of NAV_PAGES) {
     !src.includes('<span>Hardware</span>'),
     'found bare Hardware nav span without (Beta)'
   );
+  // Vendors is go-live: "Vendors (Beta)" must be absent
   assert(
-    `${file}: no bare <span>Vendors</span>`,
-    !src.includes('<span>Vendors</span>'),
-    'found bare Vendors nav span without (Beta)'
+    `${file}: no <span>Vendors (Beta)</span> (Vendors is go-live)`,
+    !src.includes('<span>Vendors (Beta)</span>'),
+    'found stale Vendors (Beta) nav span after go-live'
   );
   assert(
     `${file}: no bare <span>Service Log</span>`,
@@ -121,18 +125,28 @@ for (const file of NAV_PAGES) {
 }
 
 // ============================================================================
-// 3. Derek-only pages: topbar title and <title> tag carry (Beta)
+// 3. Derek-only pages: topbar tb-title and <title> match expected state
 // ============================================================================
-console.log('\n--- 3. Derek-only pages: topbar tb-title and <title> carry (Beta) ---');
+console.log('\n--- 3. Derek-only pages: topbar tb-title and <title> ---');
 
-for (const { file, label, titleExpect } of DEREK_PAGES) {
+for (const { file, label, beta, titleExpect } of DEREK_PAGES) {
   const src = readFileSync(path.join(root, file), 'utf8');
 
-  assert(
-    `${file}: tb-title contains "${label} (Beta)"`,
-    src.includes(`<span class="tb-title">${label} (Beta)</span>`),
-    `tb-title span not updated to ${label} (Beta)`
-  );
+  if (beta) {
+    assert(
+      `${file}: tb-title contains "${label} (Beta)"`,
+      src.includes(`<span class="tb-title">${label} (Beta)</span>`),
+      `tb-title span not updated to ${label} (Beta)`
+    );
+  } else {
+    // go-live: tb-title must be plain label, no (Beta)
+    assert(
+      `${file}: tb-title is plain "${label}" (go-live, no Beta)`,
+      src.includes(`<span class="tb-title">${label}</span>`) &&
+        !src.includes(`<span class="tb-title">${label} (Beta)</span>`),
+      `tb-title should be "${label}" without (Beta)`
+    );
+  }
   assert(
     `${file}: <title> is "${titleExpect}"`,
     src.includes(`<title>${titleExpect}</title>`),
@@ -175,7 +189,7 @@ for (const file of NAV_PAGES) {
 }
 
 // ============================================================================
-// 6. No gate code changed — access control files unmodified
+// 6. Access-control lib files carry correct gate constants
 // ============================================================================
 console.log('\n--- 6. Access-control lib files carry correct gate constants ---');
 
@@ -185,8 +199,8 @@ console.log('\n--- 6. Access-control lib files carry correct gate constants ---'
   assert('hardware-access.js: Derek UID present', hw.includes('518075f1-ec9f-413b-bdd9-8924c4b62959'));
 
   const vn = readFileSync(path.join(root, 'functions/lib/vendors-access.js'), 'utf8');
-  assert('vendors-access.js: VENDORS_GO_LIVE = false', vn.includes('VENDORS_GO_LIVE = false'));
-  assert('vendors-access.js: Derek UID present', vn.includes('518075f1-ec9f-413b-bdd9-8924c4b62959'));
+  assert('vendors-access.js: VENDORS_GO_LIVE = true (go-live)', vn.includes('VENDORS_GO_LIVE = true'));
+  assert('vendors-access.js: Derek UID present in VENDORS_EDITORS', vn.includes('518075f1-ec9f-413b-bdd9-8924c4b62959'));
 
   const sl = readFileSync(path.join(root, 'functions/lib/servicelog-access.js'), 'utf8');
   assert('servicelog-access.js: SERVICELOG_GO_LIVE = false', sl.includes('SERVICELOG_GO_LIVE = false'));
