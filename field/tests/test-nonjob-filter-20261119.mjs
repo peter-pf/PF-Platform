@@ -1,16 +1,15 @@
 #!/usr/bin/env node
 // test-nonjob-filter-20261119.mjs
-// Tests for the verifier NO-GO fix: NJ entries must only appear in the
-// Daily Report picker; all other form pickers (SR, EI, TT, index weather
-// tile) must be excluded.  Defense-in-depth: site-readiness.js also guards
-// projectId server-side before any email or PDF step fires.
+// Tests for NJ (non-job) entry filtering and Derek's rename (11/19).
 //
 // F1: /api/field-projects filters NJ entries unless ?includeNonJob=1
-// F2: Only daily-report.html passes ?includeNonJob=1; all others do not
+// F2: DR/TT/EI pass ?includeNonJob=1; SR and index do not
 // F3: Non-vacuous proofs — the filter actually changes the returned list
+// N:  NJ entry names match Derek's rename request (NJ-1/NJ-2 IDs stable)
 // S1: site-readiness.js guard rejects non-real project IDs with 400
 // S2: Guard position — BEFORE email send AND before PDF render
 // S3: Non-vacuous proofs — NJ-1/NJ-2 fail REAL_PROJ_RE; real jobs pass
+// T:  TT/EI SP upload path is fixed (not project-routed); NJ IDs safe
 //
 // Run: node field/tests/test-nonjob-filter-20261119.mjs
 
@@ -37,8 +36,12 @@ function assertNotIncludes(desc, str, sub) {
 
 import { FO_PROJECTS } from '../functions/lib/fo-projects-data.js';
 
-const fpApiSrc = readFileSync(resolve(root, 'functions/api/field-projects.js'), 'utf8');
-const srApiSrc = readFileSync(resolve(root, 'functions/api/site-readiness.js'), 'utf8');
+const fpApiSrc = readFileSync(resolve(root, 'functions/api/field-projects.js'),     'utf8');
+const srApiSrc = readFileSync(resolve(root, 'functions/api/site-readiness.js'),     'utf8');
+const ttApiSrc = readFileSync(resolve(root, 'functions/api/toolbox-talk.js'),       'utf8');
+const eiApiSrc = readFileSync(resolve(root, 'functions/api/equipment-inspection.js'),'utf8');
+const ttDocSrc = readFileSync(resolve(root, 'functions/lib/toolbox-talk-doc.js'),   'utf8');
+const eiDocSrc = readFileSync(resolve(root, 'functions/lib/equip-inspection-doc.js'),'utf8');
 const drHtmlSrc  = readFileSync(resolve(root, 'daily-report.html'),          'utf8');
 const srHtmlSrc  = readFileSync(resolve(root, 'site-readiness.html'),        'utf8');
 const eiHtmlSrc  = readFileSync(resolve(root, 'equipment-inspection.html'),  'utf8');
@@ -74,7 +77,10 @@ test('F1d: field-projects.js response uses visibleProjects not raw FO_PROJECTS',
 });
 
 // ============================================================
-// F2: HTML consumers — only DR passes the flag
+// F2: HTML consumers — DR/TT/EI pass the flag; SR and index do not.
+// SR is a job-site checklist that emails BEFORE upload; NJ entries
+// would hit the SP project-folder path and generate duplicate emails.
+// TT and EI upload to fixed SP folders (not project-routed), so NJ is safe.
 // ============================================================
 console.log('\nF2: HTML picker callers');
 
@@ -86,15 +92,19 @@ test('F2b: site-readiness.html does NOT pass includeNonJob', () => {
   assertNotIncludes('F2b', srHtmlSrc, 'includeNonJob');
 });
 
-test('F2c: equipment-inspection.html does NOT pass includeNonJob', () => {
-  assertNotIncludes('F2c', eiHtmlSrc, 'includeNonJob');
+test('F2c: equipment-inspection.html DOES pass includeNonJob=1 (fixed SP path, safe)', () => {
+  assertIncludes('F2c', eiHtmlSrc, 'field-projects?includeNonJob=1');
+  // Non-vacuous: asserting a wrong flag value would fail.
+  assertNotIncludes('F2c non-vacuous', eiHtmlSrc, 'includeNonJob=0');
 });
 
-test('F2d: toolbox-talk.html does NOT pass includeNonJob', () => {
-  assertNotIncludes('F2d', ttHtmlSrc, 'includeNonJob');
+test('F2d: toolbox-talk.html DOES pass includeNonJob=1 (fixed SP path, safe)', () => {
+  assertIncludes('F2d', ttHtmlSrc, 'field-projects?includeNonJob=1');
+  // Non-vacuous: asserting a wrong flag value would fail.
+  assertNotIncludes('F2d non-vacuous', ttHtmlSrc, 'includeNonJob=0');
 });
 
-test('F2e: index.html does NOT pass includeNonJob', () => {
+test('F2e: index.html does NOT pass includeNonJob (weather tile stays job-only)', () => {
   assertNotIncludes('F2e', idxHtmlSrc, 'includeNonJob');
 });
 
@@ -224,6 +234,115 @@ test('S3e: NJ-* pattern is distinct from real job pattern (non-vacuous: values d
   // Show the complementary case: a real project DOES pass.
   assert.ok(REAL_PROJ_RE.test('26-023'),
     'S3e complementary: 26-023 must pass, proving REAL_PROJ_RE is not trivially always-false');
+});
+
+// ============================================================
+// N: NJ entry names (Derek's rename, 11/19)
+// IDs NJ-1/NJ-2 must stay stable — existing drafts reference them.
+// ============================================================
+console.log('\nN: NJ entry names and ID stability');
+
+test('N1a: NJ-1 name is "FARM - Internal Operations"', () => {
+  const nj1 = FO_PROJECTS.find(p => p.number === 'NJ-1');
+  assert.ok(nj1, 'NJ-1 must exist in FO_PROJECTS');
+  assert.equal(nj1.name, 'FARM - Internal Operations',
+    `NJ-1 name should be "FARM - Internal Operations", got "${nj1.name}"`);
+});
+
+test('N1b: NJ-2 name is "Off Site - No Project"', () => {
+  const nj2 = FO_PROJECTS.find(p => p.number === 'NJ-2');
+  assert.ok(nj2, 'NJ-2 must exist in FO_PROJECTS');
+  assert.equal(nj2.name, 'Off Site - No Project',
+    `NJ-2 name should be "Off Site - No Project", got "${nj2.name}"`);
+});
+
+test('N1c: IDs NJ-1 and NJ-2 are stable (old drafts still load)', () => {
+  // Both NJ IDs must be present so existing saved drafts that reference
+  // "NJ-1" or "NJ-2" in D1 continue to populate the picker correctly.
+  assert.ok(FO_PROJECTS.some(p => p.number === 'NJ-1'), 'NJ-1 must exist');
+  assert.ok(FO_PROJECTS.some(p => p.number === 'NJ-2'), 'NJ-2 must exist');
+});
+
+test('N1d: old names are gone — non-vacuous (rename actually happened)', () => {
+  // If the old names were still present, N1a/N1b could trivially pass by
+  // adding new entries. This test proves the OLD names are gone.
+  assert.ok(!FO_PROJECTS.some(p => p.name === 'Non-Job: Farm'),
+    '"Non-Job: Farm" must be removed; still present means rename did not apply');
+  assert.ok(!FO_PROJECTS.some(p => p.name === 'Non-Job: Shop'),
+    '"Non-Job: Shop" must be removed; still present means rename did not apply');
+});
+
+test('N1e: NJ entries have no SP folder and no address (unchanged by rename)', () => {
+  for (const p of FO_PROJECTS.filter(p => /^NJ-/.test(p.number))) {
+    assert.equal(p.city_state, null, `${p.number} city_state must be null`);
+    assert.equal(p.address,    null, `${p.number} address must be null`);
+  }
+});
+
+// ============================================================
+// T: TT and EI submit with NJ IDs — no crash, correct SP path
+// SP paths for TT and EI are fixed (not project-routed). The project
+// number is stored as text and shown on the PDF; it never drives folder
+// selection, regex gating, or SP path construction.
+// ============================================================
+console.log('\nT: TT/EI safe submission with NJ project IDs');
+
+test('T1a: toolbox-talk.js has no PROJ_NUM_RE guard (NJ IDs pass through)', () => {
+  assertNotIncludes('T1a no PROJ_NUM_RE', ttApiSrc, 'PROJ_NUM_RE');
+  assertNotIncludes('T1a no REAL_PROJ_RE', ttApiSrc, 'REAL_PROJ_RE');
+  // Non-vacuous: site-readiness.js DOES have REAL_PROJ_RE; proves the absence in TT is meaningful.
+  assertIncludes('T1a SR has guard', srApiSrc, 'REAL_PROJ_RE');
+});
+
+test('T1b: toolbox-talk-doc.js SP path is a fixed base path (no projectId in path)', () => {
+  // The SP upload folder is '05 - Field Operations/Toolbox Talks/{YYYY}'.
+  // projectId is used only as a display string in the PDF and email subject.
+  assertIncludes('T1b fixed base', ttDocSrc, "TT_SP_BASE_PATH = '05 - Field Operations/Toolbox Talks'");
+  // The upload URL is built from TT_SP_BASE_PATH + year, NOT from projectId.
+  assertNotIncludes('T1b no proj routing', ttDocSrc, 'encodeURIComponent(rec.projectId)');
+});
+
+test('T1c: TT email subject uses projectName (falls back to projectId, then literal "Project")', () => {
+  // With NJ-1/NJ-2, projectName will be "FARM - Internal Operations" / "Off Site - No Project".
+  // Subject: "Safety Analysis - FARM - Internal Operations - 2026-11-19" — no crash.
+  assertIncludes('T1c subject', ttApiSrc, 'body.projectName || body.projectId');
+  // Non-vacuous: if projectName were NOT used, subject would show raw NJ-1 ID instead.
+  assertNotIncludes('T1c no bare id', ttApiSrc, "subject = `Safety Analysis - ${body.projectId}");
+});
+
+test('T2a: equipment-inspection.js has no PROJ_NUM_RE guard (NJ IDs pass through)', () => {
+  assertNotIncludes('T2a no PROJ_NUM_RE', eiApiSrc, 'PROJ_NUM_RE');
+  assertNotIncludes('T2a no REAL_PROJ_RE', eiApiSrc, 'REAL_PROJ_RE');
+  // Non-vacuous: site-readiness.js DOES have it; absence in EI is meaningful.
+  assertIncludes('T2a SR has guard', srApiSrc, 'REAL_PROJ_RE');
+});
+
+test('T2b: EI SP path uses machine type + serial, not projectId', () => {
+  // uploadEquipInspectionPdf builds path from rec.machineType and rec.serialNumber.
+  assertIncludes('T2b checklist folder', eiDocSrc, 'Equipment Checklist');
+  assertNotIncludes('T2b no proj routing', eiDocSrc, 'encodeURIComponent(rec.projectId)');
+  // Non-vacuous: the path DOES encode serialNumber and machineType.
+  assertIncludes('T2b serial encoded', eiDocSrc, 'encodeURIComponent(serial');
+});
+
+test('T3a: TT SP upload occurs BEFORE email send (no duplicate-email risk)', () => {
+  // If email fired first and SP upload threw, every retry would send another email.
+  // Confirm upload call precedes email call in source.
+  const uploadPos = ttApiSrc.indexOf('await uploadTalkPdf(');
+  const emailPos  = ttApiSrc.indexOf('await sendTalkEmail(');
+  assert.ok(uploadPos !== -1, 'uploadTalkPdf call not found in toolbox-talk.js');
+  assert.ok(emailPos  !== -1, 'sendTalkEmail call not found in toolbox-talk.js');
+  assert.ok(uploadPos < emailPos,
+    `TT upload must precede email: upload at ${uploadPos}, email at ${emailPos}`);
+});
+
+test('T3b: EI SP upload occurs BEFORE email send', () => {
+  const uploadPos = eiApiSrc.indexOf('await uploadEquipInspectionPdf(');
+  const emailPos  = eiApiSrc.indexOf('await sendEquipInspectionEmail(');
+  assert.ok(uploadPos !== -1, 'uploadEquipInspectionPdf call not found');
+  assert.ok(emailPos  !== -1, 'sendEquipInspectionEmail call not found');
+  assert.ok(uploadPos < emailPos,
+    `EI upload must precede email: upload at ${uploadPos}, email at ${emailPos}`);
 });
 
 // ============================================================

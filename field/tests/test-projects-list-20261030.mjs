@@ -57,9 +57,9 @@ const EXPECTED = [
   { number: '26-026', name: 'POET - N Manchester' },
   { number: '26-027', name: 'Westfield Ice Arena' },
   { number: '26-028', name: 'The Hangar' },
-  // Non-job entries added 2026-11-19 (Seth/Brad request)
-  { number: 'NJ-1',   name: 'Non-Job: Farm' },
-  { number: 'NJ-2',   name: 'Non-Job: Shop' },
+  // Non-job entries renamed 2026-11-19 (Derek's request); IDs unchanged.
+  { number: 'NJ-1',   name: 'FARM - Internal Operations' },
+  { number: 'NJ-2',   name: 'Off Site - No Project' },
 ];
 // Real job entries only (no NJ-* non-job entries). Used for SP folder checks.
 const REAL_JOB_PROJECTS = FO_PROJECTS.filter(p => /^\d{2}-\d{2,4}$/.test(p.number));

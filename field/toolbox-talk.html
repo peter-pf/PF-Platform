@@ -615,8 +615,8 @@ function ttInitForm(){
       paths.indexOf(window.location.pathname.replace(/\.html$/,'')) >= 0);
   });
 
-  // Load projects
-  fetch('/api/field-projects', {credentials:'same-origin'})
+  // Load projects (includeNonJob=1: TT SP path is fixed, not project-routed)
+  fetch('/api/field-projects?includeNonJob=1', {credentials:'same-origin'})
     .then(function(r){ return r.json(); })
     .then(function(d){ ttInitProjectPicker(d && d.projects ? d.projects : []); })
     .catch(function(){ ttInitProjectPicker([]); });

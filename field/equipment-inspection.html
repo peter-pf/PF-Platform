@@ -1226,8 +1226,8 @@ function eiShowMsg(msg, isErr) {
       document.getElementById('eiDate').value = eiTodayStr();
       // Inspected By is now a select; do not auto-set from session name.
 
-      // Load projects
-      return fetch('/api/field-projects', {credentials:'same-origin'})
+      // Load projects (includeNonJob=1: EI SP path is fixed, not project-routed)
+      return fetch('/api/field-projects?includeNonJob=1', {credentials:'same-origin'})
         .then(function(r){ return r.json(); })
         .then(function(d){
           eiState.projects = (d && Array.isArray(d.projects)) ? d.projects : [];

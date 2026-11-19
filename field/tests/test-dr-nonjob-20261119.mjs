@@ -53,16 +53,16 @@ test('N1a: at least 2 non-job entries exist', () => {
   assert.ok(NJ_ENTRIES.length >= 2, `expected >= 2 NJ entries, got ${NJ_ENTRIES.length}`);
 });
 
-test('N1b: NJ-1 entry exists with name "Non-Job: Farm"', () => {
+test('N1b: NJ-1 entry exists with name "FARM - Internal Operations"', () => {
   const e = FO_PROJECTS.find(p => p.number === 'NJ-1');
   assert.ok(e, 'NJ-1 entry missing');
-  assert.equal(e.name, 'Non-Job: Farm');
+  assert.equal(e.name, 'FARM - Internal Operations');
 });
 
-test('N1c: NJ-2 entry exists with name "Non-Job: Shop"', () => {
+test('N1c: NJ-2 entry exists with name "Off Site - No Project"', () => {
   const e = FO_PROJECTS.find(p => p.number === 'NJ-2');
   assert.ok(e, 'NJ-2 entry missing');
-  assert.equal(e.name, 'Non-Job: Shop');
+  assert.equal(e.name, 'Off Site - No Project');
 });
 
 test('N1d: NJ entries have null address and city_state (no geocode attempt)', () => {
@@ -128,29 +128,28 @@ test('N3d: DR auto-fill only proceeds when status === ok (NJ → silent no-op)',
 // ============================================================
 console.log('\nN4: PDF filename with NJ project');
 
-test('N4a: pdfFilename for NJ-1 Farm entry generates a valid filename', () => {
-  const rec = { date: '2026-11-19', projectId: 'NJ-1', projectName: 'Non-Job: Farm' };
+test('N4a: pdfFilename for NJ-1 "FARM - Internal Operations" generates a valid filename', () => {
+  const rec = { date: '2026-11-19', projectId: 'NJ-1', projectName: 'FARM - Internal Operations' };
   const name = pdfFilename(rec);
-  // Expected: 26-1119-Non-Job Farm-Daily Report.pdf (colon stripped by safeProjectName)
   assert.ok(name.startsWith('26-1119-'), `filename should start with date part: ${name}`);
-  assert.ok(name.includes('Non-Job'), `filename should contain "Non-Job": ${name}`);
-  assert.ok(name.includes('Farm'),    `filename should contain "Farm": ${name}`);
+  assert.ok(name.includes('FARM'), `filename should contain "FARM": ${name}`);
   assert.ok(name.endsWith('-Daily Report.pdf'), `filename should end with -Daily Report.pdf: ${name}`);
-  assert.ok(!name.includes(':'), `colon should be stripped from filename: ${name}`);
+  assert.ok(!name.includes(':'), `colon should be absent from filename: ${name}`);
 });
 
-test('N4b: pdfFilename for NJ-2 Shop entry generates a valid filename', () => {
-  const rec = { date: '2026-11-19', projectId: 'NJ-2', projectName: 'Non-Job: Shop' };
+test('N4b: pdfFilename for NJ-2 "Off Site - No Project" generates a valid filename', () => {
+  const rec = { date: '2026-11-19', projectId: 'NJ-2', projectName: 'Off Site - No Project' };
   const name = pdfFilename(rec);
   assert.ok(name.startsWith('26-1119-'), `filename should start with date part: ${name}`);
-  assert.ok(name.includes('Shop'), `filename should contain "Shop": ${name}`);
-  assert.ok(!name.includes(':'), `colon should be stripped: ${name}`);
+  assert.ok(name.includes('Off Site'), `filename should contain "Off Site": ${name}`);
+  assert.ok(!name.includes(':'), `colon should be absent: ${name}`);
 });
 
-test('N4c: safeProjectName strips colon from "Non-Job: Farm"', () => {
-  const safe = safeProjectName('Non-Job: Farm');
-  assert.ok(!safe.includes(':'), `colon not stripped: ${safe}`);
-  assert.ok(safe.includes('Non-Job'), `Non-Job not present: ${safe}`);
+test('N4c: safeProjectName handles "FARM - Internal Operations" without mangling', () => {
+  const safe = safeProjectName('FARM - Internal Operations');
+  assert.ok(!safe.includes(':'), `unexpected colon: ${safe}`);
+  assert.ok(safe.includes('FARM'), `FARM not present: ${safe}`);
+  assert.ok(safe.includes('Internal Operations'), `"Internal Operations" not present: ${safe}`);
 });
 
 // ============================================================
@@ -165,7 +164,7 @@ test('N5a: DR client checks projectName (not just projectId) so NJ entries pass'
 
 test('N5b: DR API accepts projectName alone (NJ entries always have a name)', () => {
   // The API: if (!body.projectId && !body.projectName) → 400
-  // NJ entries have projectId='NJ-1' AND projectName='Non-Job: Farm' → both present
+  // NJ entries have projectId='NJ-1' AND projectName='FARM - Internal Operations' → both present
   // This test just confirms the API code path exists
   const apiSrc = readFileSync(resolve(root, 'functions/api/daily-report.js'), 'utf8');
   assertIncludes('N5b', apiSrc, "!body.projectId && !body.projectName");

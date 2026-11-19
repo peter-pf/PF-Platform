@@ -32,8 +32,8 @@
 //   26-026 → '26-026 - POET N Manchester - POET'
 //   26-027 → '26-027 - Westfield Ice Arena - Nicholas'
 //   26-028 → '26-028 - The Hangar - Elford'
-//   NJ-1  → no SP folder (no project folder; file uploads are disabled for NJ entries)
-//   NJ-2  → no SP folder
+//   NJ-1 (FARM - Internal Operations) → no SP folder (uploads disabled for NJ entries)
+//   NJ-2 (Off Site - No Project)      → no SP folder
 // Back-compat: records with project numbers no longer in this list (e.g. 26-022, 25-015,
 // 26-001, 26-012) still load correctly. DR and SR inject a synthetic picker entry from
 // the stored projectId/projectName. EI and TT restore the search field directly from
@@ -61,8 +61,9 @@ export const FO_PROJECTS = [
   { number: '26-026',  name: 'POET - N Manchester',       city_state: null,                     address: null },
   { number: '26-027',  name: 'Westfield Ice Arena',       city_state: null,                     address: null },
   { number: '26-028',  name: 'The Hangar',                city_state: null,                     address: null },
-  // Non-job entries: crew time logged on farm, shop, or other non-project work.
+  // Non-job entries: crew time logged on internal or off-site non-project work.
   // NJ-* numbers do not match NN-NN[N] format → file uploads disabled (correct).
-  { number: 'NJ-1',   name: 'Non-Job: Farm',              city_state: null,                     address: null },
-  { number: 'NJ-2',   name: 'Non-Job: Shop',              city_state: null,                     address: null },
+  // IDs NJ-1/NJ-2 are STABLE — existing saved drafts reference them and must continue to load.
+  { number: 'NJ-1',   name: 'FARM - Internal Operations', city_state: null,                     address: null },
+  { number: 'NJ-2',   name: 'Off Site - No Project',      city_state: null,                     address: null },
 ];
