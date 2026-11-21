@@ -675,6 +675,39 @@ console.log('\n--- S. Static analysis ---');
     assert('S15-reveal[' + pg + ']: vendorsAllowed reveal present in ' + pg,
       pgSrc.includes('vendorsAllowed'), 'vendorsAllowed not in ' + pg);
   }
+
+  // S16: index.html home-page Vendors tile (vnTileItem)
+  {
+    const idxSrc = readFileSync(path.join(root, 'index.html'), 'utf8');
+    assert('S16a: index.html has vnTileItem element',
+      idxSrc.includes('id="vnTileItem"'));
+
+    // The tile must start hidden via inline style
+    assert('S16b: vnTileItem in index.html starts with display:none',
+      (() => {
+        const idx = idxSrc.indexOf('id="vnTileItem"');
+        if (idx < 0) return false;
+        const tagStart = idxSrc.lastIndexOf('<a ', idx);
+        const tagEnd   = idxSrc.indexOf('>', tagStart);
+        const tag      = idxSrc.slice(tagStart, tagEnd + 1);
+        return tag.includes('display:none');
+      })());
+
+    // The tile must link to /vendors.html (same target as the nav item)
+    assert('S16c: vnTileItem href is /vendors.html',
+      (() => {
+        const idx = idxSrc.indexOf('id="vnTileItem"');
+        if (idx < 0) return false;
+        const tagStart = idxSrc.lastIndexOf('<a ', idx);
+        const tagEnd   = idxSrc.indexOf('>', tagStart);
+        const tag      = idxSrc.slice(tagStart, tagEnd + 1);
+        return tag.includes('href="/vendors.html"');
+      })());
+
+    // The reveal JS must reference vnTileItem (belt check that the reveal was added)
+    assert('S16d: index.html JS reveals vnTileItem on vendorsAllowed',
+      idxSrc.includes('vnTileItem') && idxSrc.includes('vendorsAllowed'));
+  }
 }
 
 // ============================================================================
@@ -767,6 +800,19 @@ console.log('\n--- P-AUTH. Page auth init (hwNavItem + vnNavItem visibility + no
             vnNavEl.style.display !== 'none',
             'display="' + vnNavEl.style.display + '"');
         }
+
+        // Extra: vnTileItem on index.html (home page tile, Derek 2026-11-20)
+        if (pageFile === 'index.html') {
+          const vnTileEl = doc.getElementById('vnTileItem');
+          assert(tag + '[vn=true]: vnTileItem present in DOM',
+            vnTileEl != null, 'vnTileItem not found in index.html');
+          if (vnTileEl) {
+            assert(tag + '[vn=true]: vnTileItem visible after vendorsAllowed',
+              vnTileEl.style.display !== 'none',
+              'display="' + vnTileEl.style.display + '"');
+          }
+        }
+
         dom.window.close();
       }
     }
@@ -786,6 +832,15 @@ console.log('\n--- P-AUTH. Page auth init (hwNavItem + vnNavItem visibility + no
         assert(tag + '[vn=false]: vnNavItem stays hidden',
           vnNavEl != null && vnNavEl.style.display === 'none',
           'display="' + (vnNavEl ? vnNavEl.style.display : 'NOT FOUND') + '"');
+
+        // Extra: vnTileItem on index.html must stay hidden when vendorsAllowed=false
+        if (pageFile === 'index.html') {
+          const vnTileEl = doc.getElementById('vnTileItem');
+          assert(tag + '[vn=false]: vnTileItem stays hidden',
+            vnTileEl != null && vnTileEl.style.display === 'none',
+            'display="' + (vnTileEl ? vnTileEl.style.display : 'NOT FOUND') + '"');
+        }
+
         dom.window.close();
       }
     }
