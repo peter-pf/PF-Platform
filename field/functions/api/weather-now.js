@@ -187,13 +187,18 @@ export async function onRequest(context) {
     return json({ status: 'error', message: 'Missing job parameter.' }, 400);
   }
 
+  const PROJ_NUM_RE = /^[0-9]{2}-[0-9]{2,4}$/;
+  if (!PROJ_NUM_RE.test(jobNumber)) {
+    return json({ status: 'error', message: 'Invalid job number format.' }, 400);
+  }
+
   // Only serve current conditions for TODAY in Indianapolis local time.
   const today = todayIndy();
   if (dateParam && dateParam !== today) {
     return json({ status: 'not_today' });
   }
 
-  // Validate job number
+  // Validate job number against known projects
   const project = FO_PROJECTS.find(p => p.number === jobNumber);
   if (!project) {
     // New SP-driven project not yet geocoded — return no_location gracefully.

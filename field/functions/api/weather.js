@@ -124,8 +124,12 @@ export async function onRequest(context) {
     return json({ status: 'error', message: 'Method not allowed.' }, 405);
   }
 
-  // Validate job number against known projects
+  // Validate job number format and against known projects
   jobNumber = String(jobNumber || '').trim();
+  const PROJ_NUM_RE = /^[0-9]{2}-[0-9]{2,4}$/;
+  if (jobNumber && !PROJ_NUM_RE.test(jobNumber)) {
+    return json({ status: 'error', message: 'Invalid job number format.' }, 400);
+  }
   if (!jobNumber) {
     jobNumber = FO_PROJECTS[0]?.number || '';
   }

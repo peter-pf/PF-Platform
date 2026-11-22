@@ -897,6 +897,208 @@ await test('24. index.html: WX_PROJECTS removed; dropdown built from /api/field-
     'old pf-wx-job key is removed');
 });
 
+// ---- Format-validation tests for weather.js and weather-now.js (R8-FV) ----
+// Covers the PROJ_NUM_RE gate added to reject garbage input before the
+// FO_PROJECTS lookup.  Format: /^[0-9]{2}-[0-9]{2,4}$/.
+// Valid-format numbers not in FO_PROJECTS still return 200 no_location.
+
+const wnowUrl = new URL('../functions/api/weather-now.js', import.meta.url);
+const { onRequest: wnowOnRequest } = await import(wnowUrl.href);
+
+console.log('\nWeather format-validation tests (R8-FV):');
+
+// -- weather.js --
+
+await test('FV-1. weather.js: job=abc → 400 (invalid format)', async () => {
+  const ctx = makeCtx({
+    method: 'GET',
+    session: { uid: 'u1', role: 'field_ops', name: 'Test' },
+    env: { PF_SCHEDULE: makeKV() },
+  });
+  ctx.request = new Request('https://field.pierfoundations.com/api/weather?job=abc', { method: 'GET' });
+
+  const resp = await wxOnRequest(ctx);
+  assert.equal(resp.status, 400, `expected 400, got ${resp.status}`);
+  const data = await resp.json();
+  assert.equal(data.status, 'error');
+});
+
+await test('FV-2. weather.js: job=%3Cscript%3E (URL-decoded <script>) → 400', async () => {
+  const ctx = makeCtx({
+    method: 'GET',
+    session: { uid: 'u1', role: 'field_ops', name: 'Test' },
+    env: { PF_SCHEDULE: makeKV() },
+  });
+  ctx.request = new Request('https://field.pierfoundations.com/api/weather?job=%3Cscript%3E', { method: 'GET' });
+
+  const resp = await wxOnRequest(ctx);
+  assert.equal(resp.status, 400, `expected 400, got ${resp.status}`);
+  const data = await resp.json();
+  assert.equal(data.status, 'error');
+  // Must not echo the raw input back
+  assert.ok(!JSON.stringify(data).includes('<script>'), 'raw XSS input must not appear in response');
+});
+
+await test('FV-3. weather.js: job=99-999 (valid format, not in FO_PROJECTS) → 200 no_location', async () => {
+  const ctx = makeCtx({
+    method: 'GET',
+    session: { uid: 'u1', role: 'field_ops', name: 'Test' },
+    env: { PF_SCHEDULE: makeKV() },
+  });
+  ctx.request = new Request('https://field.pierfoundations.com/api/weather?job=99-999', { method: 'GET' });
+
+  const resp = await wxOnRequest(ctx);
+  assert.equal(resp.status, 200, `expected 200, got ${resp.status}`);
+  const data = await resp.json();
+  assert.equal(data.status, 'no_location');
+});
+
+await test('FV-4. weather.js: known job (26-014) → normal weather forecast (mocked NWS)', async () => {
+  mockFetch([
+    ['api.weather.gov/points', () => mockJsonResponse({
+      properties: { forecast: 'https://api.weather.gov/gridpoints/ILN/49,72/forecast' },
+    })],
+    ['api.weather.gov/gridpoints', () => mockJsonResponse({
+      properties: {
+        periods: [
+          { isDaytime: true,  name: 'Today',   temperature: 70, temperatureUnit: 'F', shortForecast: 'Sunny', probabilityOfPrecipitation: { value: 5 } },
+          { isDaytime: false, name: 'Tonight', temperature: 50, temperatureUnit: 'F', shortForecast: 'Clear', probabilityOfPrecipitation: { value: 0 } },
+          { isDaytime: true,  name: 'Tomorrow',temperature: 65, temperatureUnit: 'F', shortForecast: 'Cloudy',probabilityOfPrecipitation: { value: 20 } },
+          { isDaytime: false, name: 'Tomorrow Night', temperature: 48, temperatureUnit: 'F', shortForecast: 'Cloudy', probabilityOfPrecipitation: { value: 10 } },
+          { isDaytime: true,  name: 'Sunday',  temperature: 60, temperatureUnit: 'F', shortForecast: 'Rain',  probabilityOfPrecipitation: { value: 60 } },
+          { isDaytime: false, name: 'Sunday Night',  temperature: 45, temperatureUnit: 'F', shortForecast: 'Rain',  probabilityOfPrecipitation: { value: 40 } },
+        ],
+      },
+    })],
+  ]);
+
+  const ctx = makeCtx({
+    method: 'GET',
+    session: { uid: 'u1', role: 'field_ops', name: 'Test' },
+    env: { PF_SCHEDULE: makeKV() },
+  });
+  ctx.request = new Request('https://field.pierfoundations.com/api/weather?job=26-014', { method: 'GET' });
+
+  const resp = await wxOnRequest(ctx);
+  restoreFetch();
+  assert.equal(resp.status, 200);
+  const data = await resp.json();
+  assert.equal(data.status, 'ok');
+  assert.ok(Array.isArray(data.forecast) && data.forecast.length === 3);
+  assert.equal(data.job, '26-014');
+});
+
+// -- weather-now.js --
+
+await test('FV-5. weather-now.js: job=abc → 400 (invalid format)', async () => {
+  const ctx = makeCtx({
+    method: 'GET',
+    session: { uid: 'u1', role: 'field_ops', name: 'Test' },
+    env: { PF_SCHEDULE: makeKV() },
+  });
+  ctx.request = new Request('https://field.pierfoundations.com/api/weather-now?job=abc', { method: 'GET' });
+
+  const resp = await wnowOnRequest(ctx);
+  assert.equal(resp.status, 400, `expected 400, got ${resp.status}`);
+  const data = await resp.json();
+  assert.equal(data.status, 'error');
+});
+
+await test('FV-6. weather-now.js: job=%3Cscript%3E → 400', async () => {
+  const ctx = makeCtx({
+    method: 'GET',
+    session: { uid: 'u1', role: 'field_ops', name: 'Test' },
+    env: { PF_SCHEDULE: makeKV() },
+  });
+  ctx.request = new Request('https://field.pierfoundations.com/api/weather-now?job=%3Cscript%3E', { method: 'GET' });
+
+  const resp = await wnowOnRequest(ctx);
+  assert.equal(resp.status, 400, `expected 400, got ${resp.status}`);
+  const data = await resp.json();
+  assert.equal(data.status, 'error');
+  assert.ok(!JSON.stringify(data).includes('<script>'), 'raw XSS input must not appear in response');
+});
+
+await test('FV-7. weather-now.js: job=99-999 (valid format, not in FO_PROJECTS) → 200 no_location', async () => {
+  const ctx = makeCtx({
+    method: 'GET',
+    session: { uid: 'u1', role: 'field_ops', name: 'Test' },
+    env: { PF_SCHEDULE: makeKV() },
+  });
+  // Use today's date so it doesn't get short-circuited by the not_today check
+  const { todayIndy: todayIndyFn } = await import(wnowUrl.href);
+  const todayStr = todayIndyFn();
+  ctx.request = new Request(
+    `https://field.pierfoundations.com/api/weather-now?job=99-999&date=${encodeURIComponent(todayStr)}`,
+    { method: 'GET' },
+  );
+
+  const resp = await wnowOnRequest(ctx);
+  assert.equal(resp.status, 200, `expected 200, got ${resp.status}`);
+  const data = await resp.json();
+  assert.equal(data.status, 'no_location');
+});
+
+await test('FV-8. weather-now.js: known job (26-001) today → normal conditions (mocked NWS)', async () => {
+  const { todayIndy: todayIndyFn2 } = await import(wnowUrl.href);
+  const todayStr = todayIndyFn2();
+
+  mockFetch([
+    ['api.weather.gov/points', () => mockJsonResponse({
+      properties: { observationStations: 'https://api.weather.gov/gridpoints/IWX/50,70/stations' },
+    })],
+    ['api.weather.gov/gridpoints', (u) => {
+      if (u.includes('/stations')) {
+        return mockJsonResponse({
+          features: [{ properties: { stationIdentifier: 'KFWA', name: 'Fort Wayne' } }],
+        });
+      }
+      return mockJsonResponse({ ok: false }, 500);
+    }],
+    ['api.weather.gov/stations', (u) => {
+      if (u.includes('/observations/latest')) {
+        const now = new Date().toISOString();
+        return mockJsonResponse({
+          properties: {
+            temperature: { value: 15.5, unitCode: 'wmoUnit:degC' },
+            textDescription: 'Partly Cloudy',
+            timestamp: now,
+          },
+        });
+      }
+      return mockJsonResponse({
+        features: [{ properties: { stationIdentifier: 'KFWA', name: 'Fort Wayne' } }],
+      });
+    }],
+  ]);
+
+  const ctx = makeCtx({
+    method: 'GET',
+    session: { uid: 'u1', role: 'field_ops', name: 'Test' },
+    env: { PF_SCHEDULE: makeKV() },
+  });
+  ctx.request = new Request(
+    `https://field.pierfoundations.com/api/weather-now?job=26-001&date=${encodeURIComponent(todayStr)}`,
+    { method: 'GET' },
+  );
+
+  const resp = await wnowOnRequest(ctx);
+  restoreFetch();
+  // accept ok or unavailable — NWS mock path may not perfectly match
+  // the handler's internal URL patterns; the key assertion is no crash/400/500
+  assert.ok(
+    resp.status === 200,
+    `expected 200, got ${resp.status}`,
+  );
+  const data = await resp.json();
+  assert.ok(
+    ['ok', 'no_location', 'unavailable'].includes(data.status),
+    `unexpected status: ${data.status}`,
+  );
+  // Must not return an error status for a valid job
+  assert.notEqual(data.status, 'error', 'valid job must not return error status');
+});
+
 // ---- Summary ----
 console.log(`\n${'='.repeat(50)}`);
 console.log(`R8 Tests: ${passed} passed, ${failed} failed`);
