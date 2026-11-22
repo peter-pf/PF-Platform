@@ -5,9 +5,8 @@
 //   The main platform portal loads fo-projects-field.js as a static data file
 //   (server-gated at DATA_FILE_AREAS). The field portal is a separate Pages
 //   project (pf-field) with its own deployment; it has no access to the main
-//   portal's static files. This endpoint bundles the same field-safe project
-//   list (from field/functions/lib/fo-projects-data.js) into the Functions
-//   bundle and serves it behind the auth gate.
+//   portal's static files. This endpoint serves the live SP-driven project list
+//   behind the auth gate.
 //
 // SECURITY:
 //   - requireArea(session, 'field_ops') — field crew, partners, admin all
@@ -18,115 +17,55 @@
 //   - This matches the SEC-09 field-safe contract already in place for
 //     fo-projects-field.js on the main portal.
 //
-// spFolder RESOLUTION:
-//   Each project's real SharePoint folder name (e.g. "26-012 - Warrick Place")
-//   is resolved via Graph in batch and cached in KV (PF_SCHEDULE) under
-//   "spfolder:<number>" with a 6-hour TTL. On a cold cache ALL numbers are
-//   resolved in one active-listing Graph call (resolveAllProjectFolderNames).
-//   On failure or missing folder, spFolder is null and the client shows a clear
-//   fallback ("Project <num> folder (created on first upload) / ...").
+// PROJECT LIST SOURCE (as of 2026-11-22):
+//   Real projects are sourced LIVE from SP "05 - Field Operations/01 - Projects"
+//   with a 15-minute KV cache (key "sp_fo_projects").  A new folder Derek creates
+//   appears in the dropdown within 15 minutes — no deployment required.
+//   On Graph failure: falls back to "sp_fo_projects_last_good" (30-day KV key),
+//   then to the static FO_PROJECTS list.  Never returns an empty dropdown.
+//   See field/functions/lib/sp-fo-projects.js for the full fallback chain.
+//
+// NON-JOB ENTRIES (NJ-*):
+//   NJ entries come from the STATIC FO_PROJECTS (fo-projects-data.js) and are
+//   appended ONLY when the caller passes ?includeNonJob=1.
+//   - daily-report.html, equipment-inspection.html, toolbox-talk.html: pass the flag.
+//   - site-readiness.html, index.html: do NOT pass the flag.
+//   site-readiness.html emails BEFORE uploading; an NJ project would cause the SP
+//   upload to fail and generate duplicate emails on retry.  EI and TT upload BEFORE
+//   emailing (safe), and their SP paths are fixed (not project-routed).
 
 import { requireArea } from '../lib/auth.js';
-import { graphConfigured, getGraphToken } from '../lib/graph.js';
 import { FO_PROJECTS } from '../lib/fo-projects-data.js';
-import { resolveAllProjectFolderNames } from '../lib/sp-project-folders.js';
+import { getSpFoProjects } from '../lib/sp-fo-projects.js';
 
 const JSON_HEADERS = {
   'Content-Type': 'application/json',
   'Cache-Control': 'private, no-store',
 };
 
-// KV sentinel for a confirmed "not found" result (avoids cache miss on null).
-const NULL_SENTINEL = '__null__';
-// 6-hour TTL for resolved folder names.
-const SPFOLDER_TTL = 6 * 3600;
-
-// Read all project numbers from KV. Returns { hits: {num:name}, misses: [num] }.
-async function kvRead(kv, numbers) {
-  const hits = {};
-  const misses = [];
-  for (const num of numbers) {
-    let val;
-    try { val = await kv.get(`spfolder:${num}`); } catch (_) { val = null; }
-    if (val !== null) {
-      hits[num] = val === NULL_SENTINEL ? null : val;
-    } else {
-      misses.push(num);
-    }
-  }
-  return { hits, misses };
-}
-
-// Write resolved folder names back to KV.
-async function kvWrite(kv, resolved) {
-  for (const [num, name] of Object.entries(resolved)) {
-    try {
-      await kv.put(`spfolder:${num}`, name === null ? NULL_SENTINEL : name, {
-        expirationTtl: SPFOLDER_TTL,
-      });
-    } catch (_) { /* non-fatal — next request will resolve again */ }
-  }
-}
-
 export async function onRequestGet(context) {
   const { env, request } = context;
   const denied = requireArea(context.data && context.data.session, 'field_ops');
   if (denied) return denied;
 
-  // Non-job entries (NJ-*) are only returned when the caller passes ?includeNonJob=1.
-  // ONLY daily-report.html should pass this flag.  Every other picker
-  // (site-readiness, equipment-inspection, toolbox-talk, index weather tile)
-  // must NOT include NJ entries: those forms route PDFs via PROJ_NUM_RE-gated
-  // SharePoint folders, so an NJ project would cause the submit to email first
-  // and then throw on upload — producing duplicate emails on each retry.
+  // NJ entries only returned when caller passes ?includeNonJob=1.
+  // daily-report.html, equipment-inspection.html and toolbox-talk.html pass this flag.
+  // site-readiness.html and index.html must NOT get NJ entries.
   const url = new URL(request.url);
   const includeNonJob = url.searchParams.get('includeNonJob') === '1';
   const NJ_RE = /^NJ-/;
 
-  const visibleProjects = includeNonJob
-    ? FO_PROJECTS
-    : FO_PROJECTS.filter((p) => !NJ_RE.test(p.number));
+  // Real projects: sourced live from SharePoint "05 - Field Operations/01 - Projects"
+  // via getSpFoProjects(), with 15-min KV cache and multi-level fallback.
+  const realProjects = await getSpFoProjects(env);
 
-  // SP folder resolution only applies to real (NN-NNN) projects.
-  // NJ entries have no SharePoint folder and always return spFolder:null.
-  const realProjects = visibleProjects.filter((p) => !NJ_RE.test(p.number));
-  const numbers = realProjects.map((p) => p.number);
-  const spFolders = {};
+  // NJ (non-job) entries come from the static FO_PROJECTS.
+  // They are only appended when ?includeNonJob=1.
+  const njProjects = FO_PROJECTS.filter(p => NJ_RE.test(p.number))
+    .map(p => ({ number: p.number, name: p.name, spFolder: null }));
 
-  // ---- KV cache read --------------------------------------------------------
-  const kv = env.PF_SCHEDULE || null;
-  let misses = numbers;
-
-  if (kv) {
-    const { hits, misses: m } = await kvRead(kv, numbers);
-    Object.assign(spFolders, hits);
-    misses = m;
-  }
-
-  // ---- Batch SP resolution for cache misses ---------------------------------
-  if (misses.length > 0 && graphConfigured(env)) {
-    let token;
-    try { token = await getGraphToken(env); } catch (_) { token = null; }
-    if (token) {
-      let resolved = {};
-      try {
-        resolved = await resolveAllProjectFolderNames(env, token, misses);
-      } catch (_) {
-        for (const num of misses) resolved[num] = null;
-      }
-      Object.assign(spFolders, resolved);
-      if (kv) await kvWrite(kv, resolved);
-    }
-  }
-
-  // ---- Build response -------------------------------------------------------
-  // spFolder: real SP folder name or null (client shows safe fallback when null).
-  // NJ entries always get spFolder:null — they have no SharePoint routing.
-  const projects = visibleProjects.map((p) => ({
-    number:   p.number,
-    name:     p.name,
-    spFolder: NJ_RE.test(p.number) ? null : (spFolders[p.number] !== undefined ? spFolders[p.number] : null),
-  }));
+  // Build response — only {number, name, spFolder}. ZERO financials, ZERO GC data.
+  const projects = includeNonJob ? [...realProjects, ...njProjects] : realProjects;
 
   return new Response(JSON.stringify({ ok: true, projects }), {
     status: 200,

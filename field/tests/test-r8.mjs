@@ -357,7 +357,10 @@ await test('4. NWS forecast endpoint fails → status:unavailable', async () => 
   assert.equal(data.status, 'unavailable');
 });
 
-await test('5. unknown job → 400', async () => {
+await test('5. valid-format job not in FO_PROJECTS → no_location (graceful fallback for new SP projects)', async () => {
+  // New SP-driven projects appear in the dropdown before they are geocoded.
+  // weather.js returns no_location (not 400) so the tile shows a helpful
+  // message rather than "Weather unavailable right now."
   const ctx = makeCtx({
     method: 'GET',
     session: { uid: 'u1', role: 'field_ops', name: 'Test' },
@@ -366,7 +369,9 @@ await test('5. unknown job → 400', async () => {
   ctx.request = new Request('https://field.pierfoundations.com/api/weather?job=99-999', { method: 'GET' });
 
   const resp = await wxOnRequest(ctx);
-  assert.equal(resp.status, 400);
+  assert.equal(resp.status, 200);
+  const data = await resp.json();
+  assert.equal(data.status, 'no_location');
 });
 
 await test('6. no session → 403 (requireArea)', async () => {

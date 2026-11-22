@@ -196,7 +196,8 @@ export async function onRequest(context) {
   // Validate job number
   const project = FO_PROJECTS.find(p => p.number === jobNumber);
   if (!project) {
-    return json({ status: 'error', message: 'Unknown job number.' }, 400);
+    // New SP-driven project not yet geocoded — return no_location gracefully.
+    return json({ status: 'no_location', job: jobNumber, name: jobNumber });
   }
 
   // Look up precomputed coordinates

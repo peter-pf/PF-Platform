@@ -65,15 +65,19 @@ test('F1b: field-projects.js defines NJ_RE pattern', () => {
   assertIncludes('F1b', fpApiSrc, '/^NJ-/');
 });
 
-test('F1c: field-projects.js filters FO_PROJECTS when flag absent', () => {
+test('F1c: field-projects.js uses FO_PROJECTS.filter to source NJ entries only', () => {
+  // NJ entries come from FO_PROJECTS.filter().  Real projects come from
+  // getSpFoProjects() (live SP listing).  The filter separates them.
   assertIncludes('F1c filter', fpApiSrc, 'FO_PROJECTS.filter');
   assertIncludes('F1c NJ_RE', fpApiSrc, 'NJ_RE.test(p.number)');
 });
 
-test('F1d: field-projects.js response uses visibleProjects not raw FO_PROJECTS', () => {
-  // If the response still mapped FO_PROJECTS directly, NJ entries would leak.
-  assertIncludes('F1d', fpApiSrc, 'visibleProjects.map');
-  assertNotIncludes('F1d raw', fpApiSrc, 'FO_PROJECTS.map');
+test('F1d: field-projects.js uses getSpFoProjects for real projects (NJ entries not from SP)', () => {
+  // Real projects come from getSpFoProjects() — SP-driven, never includes NJ-*.
+  // NJ entries are explicitly gated to ?includeNonJob=1 from FO_PROJECTS.filter().
+  // FO_PROJECTS.map is never called directly — that would include NJ in every response.
+  assertIncludes('F1d getSpFoProjects', fpApiSrc, 'getSpFoProjects');
+  assertNotIncludes('F1d raw FO_PROJECTS.map', fpApiSrc, 'FO_PROJECTS.map');
 });
 
 // ============================================================

@@ -324,9 +324,15 @@ test('P5b: weather.js returns status:no_location when JOB_COORDS entry is missin
   assertIncludes('P5b status', weatherSrc, "status: 'no_location'");
 });
 
-test('P5c: weather.js validates jobNumber against FO_PROJECTS (prevents unknown project 400)', () => {
+test('P5c: weather.js looks up jobNumber in FO_PROJECTS; unknown jobs return no_location (not 400)', () => {
+  // The FO_PROJECTS.find() call is still used for name/coords lookup.
+  // Since the dropdown is now live-sourced from SP, new projects appear in the
+  // picker before they are geocoded.  Returning no_location (not 400) ensures
+  // the index.html weather tile shows "No site location" rather than "unavailable".
   const weatherSrc = readFileSync(resolve(root, 'functions/api/weather.js'), 'utf8');
-  assertIncludes('P5c', weatherSrc, "FO_PROJECTS.find(p => p.number === jobNumber)");
+  assertIncludes('P5c find', weatherSrc, "FO_PROJECTS.find(p => p.number === jobNumber)");
+  // The old 400 error message must be gone.
+  assertNotIncludes('P5c no 400 msg', weatherSrc, "'Unknown job number.'");
 });
 
 test('P5d: index.html weather tile falls back to first project if stored job not in current list', () => {

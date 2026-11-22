@@ -131,7 +131,15 @@ export async function onRequest(context) {
   }
   const project = FO_PROJECTS.find(p => p.number === jobNumber);
   if (!project) {
-    return json({ status: 'error', message: 'Unknown job number.' }, 400);
+    // Job has valid format but is not in FO_PROJECTS (e.g. a new project from the
+    // live SP-driven list that has not been geocoded yet).  Return no_location so
+    // the index.html weather tile shows a helpful message rather than an error card.
+    return json({
+      status: 'no_location',
+      message: 'No site location on file for this job.',
+      job: jobNumber,
+      name: jobNumber,
+    });
   }
 
   // Look up precomputed coordinates
