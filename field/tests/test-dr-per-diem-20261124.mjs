@@ -33,6 +33,10 @@
 //     D6  add crew button adds row with perDiem:false default
 //     D7  submit flow fires fetch exactly once (regression — ensure PD change didn't break)
 //
+//   E. Per diem note (11/24 follow-up — Brad request 22:50Z)
+//     E1  .dr-pd-note renders once inside #sb-crew with exact note text
+//     E2  crew rows still render with per-diem checkboxes after note is added
+//
 //   M. Mutation checks
 //     M1  if gatherBody omits perDiem, assertion for D3 would fail
 //
@@ -583,6 +587,42 @@ await testAsync('D7 save-draft fires fetch exactly once (per-diem change did not
     const drPosts = fetchLog.filter(e => e.url.includes('/api/daily-report') && e.body);
     assert.strictEqual(drPosts.length, 1,
       `expected exactly 1 POST to /api/daily-report, got ${drPosts.length}; log: ${JSON.stringify(drPosts.map(e=>e.body && e.body.action))}`);
+  } finally { dom.window.close(); }
+});
+
+// ---------------------------------------------------------------------------
+// E. Per diem note (11/24 follow-up — Brad request 22:50Z)
+// ---------------------------------------------------------------------------
+console.log('\n--- E. Per diem note ---');
+
+await testAsync('E1 dr-pd-note renders once in Crew & Hours section with exact text', async () => {
+  const { dom, doc } = await buildDom();
+  try {
+    const note = doc.querySelector('#sb-crew .dr-pd-note');
+    assert.ok(note, '.dr-pd-note element should exist inside #sb-crew');
+    const text = note.textContent.trim();
+    const expected = 'Only check if this employee is staying overnight in a hotel for PF work more than 50 miles from home.';
+    assert.strictEqual(text, expected, `note text mismatch; got: "${text}"`);
+    // Must appear exactly once (not per crew row)
+    const allNotes = doc.querySelectorAll('.dr-pd-note');
+    assert.strictEqual(allNotes.length, 1, `expected 1 .dr-pd-note, found ${allNotes.length}`);
+    // Must NOT be inside #drCrew (not repeated per row)
+    const noteInCrew = doc.querySelector('#drCrew .dr-pd-note');
+    assert.ok(!noteInCrew, '.dr-pd-note must not appear inside #drCrew (per-row rendering)');
+  } finally { dom.window.close(); }
+});
+
+await testAsync('E2 crew rows still render with per-diem checkboxes after note is added', async () => {
+  const { dom, doc } = await buildDom();
+  try {
+    // The note must not break crew row rendering
+    const checkboxes = doc.querySelectorAll('#drCrew input[type=checkbox][data-pd]');
+    assert.ok(checkboxes.length >= 1, `expected at least 1 per-diem checkbox in #drCrew, got ${checkboxes.length}`);
+    // Note is a sibling of #drCrew, not inside it
+    const crewDiv = doc.getElementById('drCrew');
+    assert.ok(crewDiv, '#drCrew element must exist');
+    const crewNote = crewDiv.querySelector('.dr-pd-note');
+    assert.ok(!crewNote, '.dr-pd-note must be a sibling of #drCrew, not a child');
   } finally { dom.window.close(); }
 });
 
