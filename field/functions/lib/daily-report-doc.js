@@ -53,13 +53,15 @@ export function renderDailyReportPdf(rec) {
     { label: 'Linear feet installed', value: (rec.lfInstalled != null) ? String(rec.lfInstalled) : '-' },
   ], { valueW: 130 });
 
-  // ---- crew (name + cost code ONLY - hours/time-in/out removed from PDF per Derek 10/28) ----
+  // ---- crew (name + cost code ONLY - hours/time-in/out removed from PDF per Derek 10/28;
+  //      perDiem (Beta) PD marker added 11/24) ----
   doc.heading('Crew');
   const crew = Array.isArray(rec.crew) ? rec.crew.filter((c) => c && c.name) : [];
   if (crew.length) {
     doc.table(crew.map((c) => ({
       label: c.name,  // cost code kept in data/timesheet; not shown in PDF per Derek 10/29
-      value: '',
+      // perDiem flag: show "PD" in value column when true (Beta, 11/24). No dollar amounts.
+      value: c.perDiem ? 'PD' : '',
     })));
   } else {
     doc.text('No crew recorded.', { size: 10 });
@@ -297,8 +299,10 @@ export function buildEmailBody(rec) {
   if (rec.columnsInstalled != null) prod.push(`${rec.columnsInstalled} columns`);
   if (rec.lfInstalled != null) prod.push(`${rec.lfInstalled} LF`);
   lines.push(`Production: ${prod.length ? prod.join(', ') : '-'}`);
-  const crewN = Array.isArray(rec.crew) ? rec.crew.filter((c) => c && c.name).length : 0;
-  lines.push(`Crew on site: ${crewN}`);
+  const crewAll = Array.isArray(rec.crew) ? rec.crew.filter((c) => c && c.name) : [];
+  const crewN = crewAll.length;
+  const pdCrew = crewAll.filter((c) => c.perDiem);
+  lines.push(`Crew on site: ${crewN}${pdCrew.length ? ` (${pdCrew.length} per diem: ${pdCrew.map((c) => c.name).join(', ')})` : ''}`);
   // R7: delayEntries replaces the plain delays string; fall back to legacy field.
   const emailDelays = Array.isArray(rec.delayEntries) && rec.delayEntries.length
     ? rec.delayEntries

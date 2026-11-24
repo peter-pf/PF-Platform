@@ -172,6 +172,9 @@ function rid() {
 }
 
 // Rebuild a clean crew array (HOURS ONLY - no pay rate / $ accepted).
+// perDiem: boolean yes/no flag per crew member. No dollar amounts -- just records
+// whether the person received per diem for this day. Backward compatible: old
+// records without this field load fine (treated as false).
 function cleanCrew(input) {
   if (!Array.isArray(input)) return [];
   const out = [];
@@ -179,7 +182,7 @@ function cleanCrew(input) {
     if (!m || typeof m !== 'object') continue;
     const name = s(m.name, MAX_SHORT);
     if (!name) continue;
-    out.push({ name, start: s(m.start, MAX_SHORT), end: s(m.end, MAX_SHORT), hours: hours(m.hours), costCode: s(m.costCode, MAX_SHORT) });
+    out.push({ name, start: s(m.start, MAX_SHORT), end: s(m.end, MAX_SHORT), hours: hours(m.hours), costCode: s(m.costCode, MAX_SHORT), perDiem: !!m.perDiem });
   }
   return out;
 }

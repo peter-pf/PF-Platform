@@ -85,6 +85,8 @@
   #mod-daily-reports .dr-up-msg{font-size:12px;margin-top:6px;}
   #mod-daily-reports input[type=file]:disabled{opacity:.55;cursor:not-allowed;}
   #mod-daily-reports .dr-msg{font-size:13px;margin-top:8px;}
+  #mod-daily-reports .dr-row .dr-pd{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--text-2);cursor:pointer;white-space:nowrap;}
+  #mod-daily-reports .dr-row .dr-pd input[type=checkbox]{width:auto;margin:0;padding:0;flex:0 0 auto;border:none;box-shadow:none;}
   @media(max-width:480px){#mod-daily-reports .dr-grid{grid-template-columns:1fr;}#mod-daily-reports .dr-row input.tm{flex:0 0 100px;}#mod-daily-reports .dr-row input.hr{flex:0 0 90px;}}
   /* ---- searchable project picker ---- */
   .pf-picker{position:relative;}
@@ -671,7 +673,7 @@ try {
     draftSavedAt: null,    // ISO timestamp of last successful draft save
     lists: { ownedEquipment:[], personnel:[], foremen:[], rentalCategories:[], maintenanceCategories:[], maintenanceSubcategories:{} },
     projects: [],
-    crew: [{name:'',start:'',end:'',hours:'',costCode:'',auto:true},{name:'',start:'',end:'',hours:'',costCode:'',auto:false},{name:'',start:'',end:'',hours:'',costCode:'',auto:false}],
+    crew: [{name:'',start:'',end:'',hours:'',costCode:'',perDiem:false,auto:true},{name:'',start:'',end:'',hours:'',costCode:'',perDiem:false,auto:false},{name:'',start:'',end:'',hours:'',costCode:'',perDiem:false,auto:false}],
     owned: [{machine:'',hours:''},{machine:'',hours:''}],
     rental: [{category:'',hours:''},{category:'',hours:''}],
     maintenance: [],
@@ -826,8 +828,8 @@ try {
     }
     renderDelays();
     if(Array.isArray(b.crew)&&b.crew.length){
-      var crew=b.crew.map(function(m){return{name:m.name||'',start:m.start||'',end:m.end||'',hours:(m.hours!=null?m.hours:''),costCode:m.costCode||'',auto:false};});
-      while(crew.length<1)crew.push({name:'',start:'',end:'',hours:'',costCode:'',auto:false});
+      var crew=b.crew.map(function(m){return{name:m.name||'',start:m.start||'',end:m.end||'',hours:(m.hours!=null?m.hours:''),costCode:m.costCode||'',perDiem:!!m.perDiem,auto:false};});
+      while(crew.length<1)crew.push({name:'',start:'',end:'',hours:'',costCode:'',perDiem:false,auto:false});
       state.crew=crew;
     }
     if(Array.isArray(b.equipmentOwned)&&b.equipmentOwned.length){
@@ -919,8 +921,8 @@ try {
     var prev=findPrevSentReport(pid);
     if(!prev){msg('No previous sent reports found for this project.',false);return;}
     // Copy crew names (clear hours) from previous report; pad to at least 1 row.
-    var crew=(Array.isArray(prev.crew)?prev.crew:[]).map(function(m){return{name:m.name||'',start:'',end:'',hours:'',costCode:m.costCode||'',auto:false};});
-    while(crew.length<1)crew.push({name:'',start:'',end:'',hours:'',costCode:'',auto:false});
+    var crew=(Array.isArray(prev.crew)?prev.crew:[]).map(function(m){return{name:m.name||'',start:'',end:'',hours:'',costCode:m.costCode||'',perDiem:false,auto:false};});
+    while(crew.length<1)crew.push({name:'',start:'',end:'',hours:'',costCode:'',perDiem:false,auto:false});
     state.crew=crew;
     var fm=document.getElementById('drForeman');if(fm&&prev.foreman)fm.value=prev.foreman;
     applyForemanToCrew(prev.foreman||'');
@@ -1087,6 +1089,8 @@ try {
         +'Reg <strong class="dr-reg">'+drNum(sp.reg)+'</strong> / OT <strong class="dr-ot">'+drNum(sp.ot)+'</strong>'
         +'</span>'
         +'<input class="cc" data-i="'+i+'" data-f="costCode" placeholder="Cost Code" value="'+E(m.costCode)+'">'
+        +'<label class="dr-pd" title="Check if this crew member received per diem for this day">'
+        +'<input type="checkbox" data-pd="'+i+'"'+(m.perDiem?' checked':'')+' aria-label="Per Diem for crew member '+i+'"> Per Diem <span class="dr-flag">(Beta)</span></label>'
         +(canRemove?'<button type="button" class="dr-rm" data-crm="'+i+'" aria-label="Remove crew member">Remove</button>':'')
         +'</div>';
     }).join('');
@@ -1097,6 +1101,12 @@ try {
         if(f==='name') state.crew[i].auto=false;
         if(f==='start'||f==='end') recalcCrewHours(i);
         if(f==='hours'||f==='start'||f==='end') updateRegOt(i);
+      });
+    });
+    host.querySelectorAll('input[data-pd]').forEach(function(cb){
+      cb.addEventListener('change',function(){
+        var i=+this.getAttribute('data-pd');
+        if(state.crew[i])state.crew[i].perDiem=this.checked;
       });
     });
     host.querySelectorAll('button[data-crm]').forEach(function(b){
@@ -1309,7 +1319,7 @@ try {
     var fm=document.getElementById('drForeman');
     if(fm&&!fm.dataset.wired){fm.dataset.wired='1';fm.addEventListener('change',function(){applyForemanToCrew(this.value);scheduleOfflineSave();});}
     var ac=document.getElementById('drAddCrew');
-    if(ac&&!ac.dataset.wired){ac.dataset.wired='1';ac.addEventListener('click',function(){state.crew.push({name:'',start:'',end:'',hours:'',costCode:'',auto:false});renderCrew();});}
+    if(ac&&!ac.dataset.wired){ac.dataset.wired='1';ac.addEventListener('click',function(){state.crew.push({name:'',start:'',end:'',hours:'',costCode:'',perDiem:false,auto:false});renderCrew();});}
     var ao=document.getElementById('drAddOwned');
     if(ao&&!ao.dataset.wired){ao.dataset.wired='1';ao.addEventListener('click',function(){state.owned.push({machine:'',hours:''});renderOwned();});}
     var ar=document.getElementById('drAddRental');
@@ -1546,7 +1556,7 @@ try {
       temp:document.getElementById('drTemp').value,
       columnsInstalled:document.getElementById('drCols').value,
       lfInstalled:document.getElementById('drLf').value,
-      crew:state.crew.filter(function(m){return(m.name||'').trim();}).map(function(m){return{name:m.name,start:m.start,end:m.end,hours:m.hours,costCode:m.costCode};}),
+      crew:state.crew.filter(function(m){return(m.name||'').trim();}).map(function(m){return{name:m.name,start:m.start,end:m.end,hours:m.hours,costCode:m.costCode,perDiem:!!m.perDiem};}),
       workCompleted:document.getElementById('drWork').value,
       equipmentOwned:state.owned.filter(function(r){return(r.machine||'').trim()||(r.hours||'').toString().trim();}),
       equipmentRental:state.rental.filter(function(r){return(r.category||'').trim()||(r.hours||'').toString().trim();}),
@@ -1618,8 +1628,8 @@ try {
     var hid=document.getElementById('drProjectId');if(hid)hid.value=pid;
     // Preserve whatever number of crew rows the record has (>3 possible in R9).
     // Minimum 1 row so the form never shows a blank crew section.
-    var crew=(Array.isArray(r.crew)?r.crew:[]).map(function(m){return{name:m.name||'',start:m.start||'',end:m.end||'',hours:(m.hours!=null?m.hours:''),costCode:m.costCode||'',auto:false};});
-    while(crew.length<1) crew.push({name:'',start:'',end:'',hours:'',costCode:'',auto:false});
+    var crew=(Array.isArray(r.crew)?r.crew:[]).map(function(m){return{name:m.name||'',start:m.start||'',end:m.end||'',hours:(m.hours!=null?m.hours:''),costCode:m.costCode||'',perDiem:!!m.perDiem,auto:false};});
+    while(crew.length<1) crew.push({name:'',start:'',end:'',hours:'',costCode:'',perDiem:false,auto:false});
     state.crew=crew;
     var owned=(Array.isArray(r.equipmentOwned)?r.equipmentOwned:[]).map(function(e){return{machine:e.machine||'',hours:(e.hours!=null?e.hours:'')};});
     while(owned.length<1)owned.push({machine:'',hours:''});state.owned=owned;
@@ -1701,7 +1711,7 @@ try {
     var srch=document.getElementById('drProjectSearch');if(srch)srch.value='';
     // Auto-fill today's date
     var dd=document.getElementById('drDate');if(dd)dd.value=todayIso();
-    state.crew=[{name:'',start:'',end:'',hours:'',costCode:'',auto:true},{name:'',start:'',end:'',hours:'',costCode:'',auto:false},{name:'',start:'',end:'',hours:'',costCode:'',auto:false}];
+    state.crew=[{name:'',start:'',end:'',hours:'',costCode:'',perDiem:false,auto:true},{name:'',start:'',end:'',hours:'',costCode:'',perDiem:false,auto:false},{name:'',start:'',end:'',hours:'',costCode:'',perDiem:false,auto:false}];
     state.owned=[{machine:'',hours:''},{machine:'',hours:''}];
     state.rental=[{category:'',hours:''},{category:'',hours:''}];
     state.future=[{equipment:'',description:''}];
@@ -1727,7 +1737,7 @@ try {
     var rs=state.reports.slice().sort(function(a,b){return String(b.createdAt||'').localeCompare(String(a.createdAt||''));});
     if(!rs.length){host.innerHTML='<div class="dr-muted">No daily reports yet.</div>';return;}
     host.innerHTML=rs.map(function(r){
-      var crewH=(r.crew||[]).map(function(c){return E(c.name)+(c.hours!=null?' ('+E(c.hours)+'h)':'');}).join(', ');
+      var crewH=(r.crew||[]).map(function(c){return E(c.name)+(c.hours!=null?' ('+E(c.hours)+'h)':'')+(c.perDiem?' PD':'');}).join(', ');
       var prod=[];
       if(r.columnsInstalled!=null)prod.push(E(r.columnsInstalled)+' cols');
       if(r.lfInstalled!=null)prod.push(E(r.lfInstalled)+' LF');
