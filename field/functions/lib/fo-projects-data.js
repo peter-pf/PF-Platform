@@ -32,8 +32,8 @@
 //   26-026 → '26-026 - POET N Manchester - POET'
 //   26-027 → '26-027 - Westfield Ice Arena - Nicholas'
 //   26-028 → '26-028 - The Hangar - Elford'
-//   NJ-1 (FARM - Internal Operations) → no SP folder (uploads disabled for NJ entries)
-//   NJ-2 (Off Site - No Project)      → no SP folder
+//   NJ-1 (FARM - Internal Operations) → 05 - Field Operations/Internal Operations/Daily Report Photos/<date>/<bucket>/
+//   NJ-2 (Off Site - No Project)      → 05 - Field Operations/Off Site/Daily Report Photos/<date>/<bucket>/
 // Back-compat: records with project numbers no longer in this list (e.g. 26-022, 25-015,
 // 26-001, 26-012) still load correctly. DR and SR inject a synthetic picker entry from
 // the stored projectId/projectName. EI and TT restore the search field directly from
@@ -41,9 +41,9 @@
 //
 // NON-JOB ENTRIES (NJ-*):
 //   - Number format does not match the NN-NN[N] pattern used for real job numbers.
-//   - File uploads (Hand Logs, GUHM Data, Site Photos) require a NN-NN[N] project number
-//     both client-side (updateUploadEnabled) and server-side (field-upload.js PROJ_NUM_RE).
-//     NJ entries therefore have uploads disabled automatically — there is no SP project folder.
+//   - File uploads (photos, obs_photos, handlogs, guhma, predrill) ARE supported for NJ
+//     entries. Files land in a dated folder under 05 - Field Operations (see NJ_FOLDER_PATHS
+//     in field-upload.js). No SP project folder is needed.
 //   - The daily report PDF still generates and emails normally; it goes to the same
 //     "Daily Reports Output" SP folder as all other reports (not project-routed).
 //   - Weather auto-fill is a no-op (no coords → no_location → client silently skips).
@@ -62,7 +62,8 @@ export const FO_PROJECTS = [
   { number: '26-027',  name: 'Westfield Ice Arena',       city_state: null,                     address: null },
   { number: '26-028',  name: 'The Hangar',                city_state: null,                     address: null },
   // Non-job entries: crew time logged on internal or off-site non-project work.
-  // NJ-* numbers do not match NN-NN[N] format → file uploads disabled (correct).
+  // NJ-* numbers do not match NN-NN[N] format but ARE accepted by field-upload.js
+  // via NJ_NUM_RE → files routed to 05 - Field Operations fixed folders.
   // IDs NJ-1/NJ-2 are STABLE — existing saved drafts reference them and must continue to load.
   { number: 'NJ-1',   name: 'FARM - Internal Operations', city_state: null,                     address: null },
   { number: 'NJ-2',   name: 'Off Site - No Project',      city_state: null,                     address: null },

@@ -1420,8 +1420,10 @@ try {
 
   function selectedProjectNumber(){
     var v=String((document.getElementById('drProject')||{}).value||'').trim();
-    return /^[0-9]{2}-[0-9]{2,4}$/.test(v)?v:'';
+    // Accept real job numbers (NN-NN[N]) and non-job entries (NJ-N).
+    return (/^[0-9]{2}-[0-9]{2,4}$/.test(v)||/^NJ-[0-9]+$/.test(v))?v:'';
   }
+  function isNonJobProject(num){return /^NJ-[0-9]+$/.test(String(num||''));}
   function selectedProjectName(){
     var v=(document.getElementById('drProject')||{}).value||'';
     if(!v)return '';
@@ -1436,6 +1438,7 @@ try {
 
   function updateUploadEnabled(){
     var num=selectedProjectNumber();
+    var isNJ=isNonJobProject(num);
     Object.keys(UP_BUCKETS).forEach(function(bk){
       var inp=document.getElementById(UP_BUCKETS[bk].input);
       var wrap=document.getElementById(UP_BUCKETS[bk].wrap);
@@ -1443,7 +1446,12 @@ try {
       if(wrap){
         var hint=wrap.querySelector('[data-up-hint]');
         if(hint){
-          if(num){
+          if(num&&isNJ){
+            // Non-job (FARM / Off Site): files land in a dated folder under
+            // 05 - Field Operations/Internal Operations (or Off Site)/Daily Report Photos.
+            if(bk==='photos'||bk==='obs_photos') hint.textContent='Photos upload to 05 - Field Operations / Daily Report Photos for this date. Allowed: .jpg .jpeg .png .heic, up to 50MB each.';
+            else hint.textContent='Files upload to 05 - Field Operations / Daily Report Photos for this date. Allowed: .guh .jpg .jpeg .png .heic .pdf .zip .xlsx, up to 50MB each.';
+          } else if(num){
             if(bk==='photos') hint.textContent='Photos upload to this project\'s 05 Field / 02 Project Photos folder. Allowed: .jpg .jpeg .png .heic, up to 50MB each.';
             else if(bk==='obs_photos') hint.textContent='Observation photos upload to the project\'s 05 Field / Observations folder. Allowed: .jpg .jpeg .png .heic, up to 50MB each.';
             else hint.textContent='Files upload to this project QA/QC folder for the report date. Allowed: .guh .jpg .jpeg .png .heic .pdf .zip .xlsx, up to 50MB each.';

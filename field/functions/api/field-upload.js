@@ -56,6 +56,10 @@ const MAX_REQUEST_BYTES = 120 * 1024 * 1024;
 
 // Project number format "NN-NNN" (e.g. 26-015). Bounded; used ONLY for search.
 const PROJ_NUM_RE = /^[0-9]{2}-[0-9]{2,4}$/;
+// Non-job entries (NJ-1 "FARM - Internal Operations", NJ-2 "Off Site - No Project").
+// These are accepted by the upload endpoint and routed to fixed SP folders in
+// 05 - Field Operations. They do NOT resolve a project folder.
+const NJ_NUM_RE = /^NJ-[0-9]+$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Allowed file extensions (lower-case, with dot). Reject anything else.
@@ -71,6 +75,7 @@ const BUCKET_EXT = new Map([
   ['sr_signature', new Set(['.png'])],
   ['staking_photo', IMAGE_ONLY_EXT],
   ['photos',        IMAGE_ONLY_EXT],
+  ['obs_photos',    IMAGE_ONLY_EXT],
   ['safety_cert',   new Set(['.pdf', '.jpg', '.jpeg', '.png', '.heic'])],
   ['predrill',      new Set(['.pdf', '.jpg', '.jpeg', '.png', '.heic'])],
   // R11 section 1 + 4 site-readiness photo buckets — images only
@@ -110,12 +115,16 @@ function isCrossSite(request) {
 // by the Site Readiness Form and go under <projectFolder>/Site Readiness/<YYYY-MM-DD>/.
 // safety_cert goes under <projectFolder>/06 - Safety/<YYYY-MM-DD>/.
 // photos: site photos -> <projectFolder>/05 - Field/02 - Project Photos/<date>/.
+// obs_photos: observation photos -> <projectFolder>/05 - Field/Observations/<date>/.
+//   For NJ entries: -> <nj-base>/05 - Field Operations/Internal Operations (or Off Site)/
+//                      Daily Report Photos/<date>/Observation Photos/.
 const BUCKETS = {
   handlogs:      'Hand Logs',
   guhma:         'GUHMA Data',
   grade_photo:   'Grade Photo',
   proof_roll:    'Proof Roll Letter',
   photos:        'Site Photos',
+  obs_photos:    'Observation Photos',
   predrill:      'Predrill Markup',
   staking_photo: 'Staking Photos',
   safety_cert:   'Safety Certs',
@@ -146,8 +155,21 @@ const SAFETY_BUCKETS = new Set(['safety_cert']);
 // use "05 - Field / 02 - Project Photos" for site photos.
 const PHOTO_BUCKETS = new Set(['photos']);
 
+// Observation photos: 05 - Field/Observations/<date>/ within the project folder.
+// (For NJ entries these are routed via NJ_FOLDER_PATHS instead — see below.)
+const OBS_PHOTO_BUCKETS = new Set(['obs_photos']);
+
 // Predrill Markup: 05 - Field/Predrill Markup/<date>/
 const PREDRILL_BUCKETS = new Set(['predrill']);
+
+// Non-job entries — fixed SP base folders under 05 - Field Operations.
+// Files land at: <nj-base-path>/<reportDate>/<BUCKETS[bucketKey]>/
+// Field users only have access to 05 - Field Operations; this keeps NJ uploads
+// within that area and out of the project management tree.
+const NJ_FOLDER_PATHS = {
+  'NJ-1': '05 - Field Operations/Internal Operations/Daily Report Photos',
+  'NJ-2': '05 - Field Operations/Off Site/Daily Report Photos',
+};
 
 const JSON_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' };
 function json(body, status = 200) {
@@ -247,6 +269,11 @@ async function ensureChildFolder(env, token, parentId, name) {
 //   <projectFolder>/05 - Field/02 - Project Photos/<reportDate>/
 //   Verified 2026-10-21: both active projects use this exact subfolder structure.
 //   Files go directly into the dated subfolder — no extra sub-bucket level.
+//
+// Observation Photos path (obs_photos):
+//   <projectFolder>/05 - Field/Observations/<reportDate>/
+//   Files go directly into the dated subfolder — no extra sub-bucket level.
+//   (Matches the client hint: "05 Field / Observations folder".)
 async function ensureDestination(env, token, projectFolderId, reportDate, bucketKey, bucketFolder) {
   if (SR_BUCKETS.has(bucketKey)) {
     const sr = await ensureChildFolder(env, token, projectFolderId, SR_SUBFOLDER);
@@ -270,6 +297,13 @@ async function ensureDestination(env, token, projectFolderId, reportDate, bucket
     const dated = await ensureChildFolder(env, token, photos, reportDate);
     return dated; // files land directly in the dated folder (no sub-bucket level)
   }
+  if (OBS_PHOTO_BUCKETS.has(bucketKey)) {
+    // Observation photos go into 05 - Field/Observations/<date>/ within the project folder.
+    const field05 = await ensureChildFolder(env, token, projectFolderId, '05 - Field');
+    const obs = await ensureChildFolder(env, token, field05, 'Observations');
+    const dated = await ensureChildFolder(env, token, obs, reportDate);
+    return dated; // files land directly in the dated folder (no sub-bucket level)
+  }
   if (PREDRILL_BUCKETS.has(bucketKey)) {
     // Predrill Markup goes under 05 - Field/Predrill Markup/<date>/ (not QAQC).
     const field05 = await ensureChildFolder(env, token, projectFolderId, '05 - Field');
@@ -281,6 +315,43 @@ async function ensureDestination(env, token, projectFolderId, reportDate, bucket
   const eng = await ensureChildFolder(env, token, projectFolderId, '03 - Engineering & Design');
   const qaqc = await ensureChildFolder(env, token, eng, 'QAQC');
   const dated = await ensureChildFolder(env, token, qaqc, reportDate);
+  const bucket = await ensureChildFolder(env, token, dated, bucketFolder);
+  return bucket;
+}
+
+// Get the SharePoint drive root item id. Used as the starting point for path-based
+// NJ folder navigation (non-job reports have no project folder to anchor from).
+async function getDriveRootId(env, token) {
+  const driveId = encodeURIComponent(env.SP_DRIVE_ID);
+  const url = `${GRAPH}/drives/${driveId}/root?$select=id`;
+  const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!resp.ok) throw new Error('could not get drive root ' + resp.status);
+  const data = await resp.json();
+  return data.id;
+}
+
+// Walk a drive-root-relative path (e.g. "05 - Field Operations/Internal Operations/...")
+// creating each missing folder component along the way. Returns the final folder's item id.
+// Each component uses ensureChildFolder (find-or-create with 409-race handling).
+async function ensureFolderAtPath(env, token, driveRootPath) {
+  const parts = String(driveRootPath || '').split('/').filter(Boolean);
+  if (!parts.length) throw new Error('ensureFolderAtPath: empty path');
+  let parentId = await getDriveRootId(env, token);
+  for (const part of parts) {
+    parentId = await ensureChildFolder(env, token, parentId, part);
+  }
+  return parentId;
+}
+
+// Ensure the destination folder for a non-job (NJ-*) upload and return its item id.
+// Path: <NJ_FOLDER_PATHS[njNumber]>/<reportDate>/<bucketFolder>/
+// All five DR buckets (photos, obs_photos, handlogs, guhma, predrill) land here with
+// a sub-folder named after the bucket so they stay organized within the dated folder.
+async function ensureNjDestination(env, token, njNumber, reportDate, bucketFolder) {
+  const basePath = NJ_FOLDER_PATHS[njNumber];
+  if (!basePath) throw new Error(`No folder path configured for non-job entry: ${njNumber}`);
+  const baseId = await ensureFolderAtPath(env, token, basePath);
+  const dated = await ensureChildFolder(env, token, baseId, reportDate);
   const bucket = await ensureChildFolder(env, token, dated, bucketFolder);
   return bucket;
 }
@@ -373,8 +444,15 @@ export async function onRequestPost(context) {
     const bucketKey = String(form.get('bucket') || '').trim().toLowerCase();
     const reportDate = String(form.get('reportDate') || '').trim();
 
-    if (!PROJ_NUM_RE.test(projectNumber)) {
+    // Accept real job numbers (NN-NNN) and non-job entries (NJ-N).
+    // NJ entries are routed to fixed folders in 05 - Field Operations (see NJ_FOLDER_PATHS).
+    const isNjProject = NJ_NUM_RE.test(projectNumber);
+    if (!PROJ_NUM_RE.test(projectNumber) && !isNjProject) {
       return json({ status: 'error', message: 'A valid project number is required.' }, 400);
+    }
+    // NJ-* entries must be in NJ_FOLDER_PATHS (guards against arbitrary NJ-999 injection).
+    if (isNjProject && !Object.prototype.hasOwnProperty.call(NJ_FOLDER_PATHS, projectNumber)) {
+      return json({ status: 'error', message: 'Unknown non-job entry.' }, 400);
     }
     if (!Object.prototype.hasOwnProperty.call(BUCKETS, bucketKey)) {
       return json({ status: 'error', message: 'Unknown upload bucket.' }, 400);
@@ -399,13 +477,19 @@ export async function onRequestPost(context) {
 
     const token = await getGraphToken(env);
 
-    // Resolve the project folder ONCE, then ensure the dated bucket path.
-    const proj = await resolveProjectFolder(env, token, projectNumber);
-    if (!proj) {
-      return json({ status: 'error', message: 'Could not find that project folder in SharePoint.' }, 404);
-    }
+    // Resolve the destination folder. For real jobs: project folder lookup + ensureDestination.
+    // For NJ entries: fixed path under 05 - Field Operations via ensureNjDestination.
     const bucketFolderName = BUCKETS[bucketKey];
-    const destFolderId = await ensureDestination(env, token, proj.id, reportDate, bucketKey, bucketFolderName);
+    let destFolderId;
+    if (isNjProject) {
+      destFolderId = await ensureNjDestination(env, token, projectNumber, reportDate, bucketFolderName);
+    } else {
+      const proj = await resolveProjectFolder(env, token, projectNumber);
+      if (!proj) {
+        return json({ status: 'error', message: 'Could not find that project folder in SharePoint.' }, 404);
+      }
+      destFolderId = await ensureDestination(env, token, proj.id, reportDate, bucketKey, bucketFolderName);
+    }
 
     const refs = [];
     const errors = [];
@@ -443,7 +527,7 @@ export async function onRequestPost(context) {
     if (!refs.length) {
       return json({ status: 'error', message: 'No files were uploaded.', errors }, 502);
     }
-    return json({ ok: true, refs, errors, project: { number: projectNumber, name: projectName, folder: proj.name } });
+    return json({ ok: true, refs, errors, project: { number: projectNumber, name: projectName } });
   } catch (err) {
     console.error('api/field-upload error:', err && err.message);
     return json({ status: 'error', message: 'An internal error occurred.' }, 500);
